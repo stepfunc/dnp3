@@ -36,7 +36,7 @@ pub struct Header {
 }
 
 impl Header {
-    pub fn from(ctrl: Ctrl, dest: u16, src: u16) -> Header {
+    pub fn new(ctrl: Ctrl, dest: u16, src: u16) -> Header {
         Header { ctrl, dest, src }
     }
 }

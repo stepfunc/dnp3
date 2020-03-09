@@ -23,17 +23,40 @@ const CRC_TABLE: [u16; 256] = [
     0x48D7, 0x7E89, 0x246B, 0x1235,
 ];
 
+const CRC_OF_0564: u16 = 0x3F0D;
+
 pub fn calc_crc(slice: &[u8]) -> u16 {
-    let mut acc: u16 = 0;
+    !crc_increment(0, slice)
+}
+
+pub fn calc_crc_with_0564(slice: &[u8]) -> u16 {
+    !crc_increment(CRC_OF_0564, slice)
+}
+
+pub fn calc_crc_no_negate(slice: &[u8]) -> u16 {
+    crc_increment(0, slice)
+}
+
+pub fn crc_increment(mut acc: u16, slice: &[u8]) -> u16 {
     for byte in slice {
         let index = (((acc as u8) ^ *byte) & 0xFF) as usize;
         acc = CRC_TABLE[index] ^ (acc >> 8)
     }
-    !acc
+    acc
 }
 
-#[test]
-fn crc_works() {
-    let bytes: [u8; 8] = [0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04];
-    assert_eq!(0x21E9, calc_crc(&bytes));
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn has_correct_constant_crc() {
+        assert_eq!(calc_crc_no_negate(&[0x05, 0x64]), CRC_OF_0564);
+    }
+
+    #[test]
+    fn crc_works() {
+        let bytes: [u8; 8] = [0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04];
+        assert_eq!(calc_crc(&bytes), 0x21E9);
+    }
 }
