@@ -1,12 +1,18 @@
-use crate::link::header::{Header, Ctrl};
+use crate::link::header::{Ctrl, Header};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum ParseError {
     BadLength(u8),
     BadHeaderCRC,
-    BadBodyCRC
+    BadBodyCRC,
 }
 
+enum ParseState {
+    FindSync1,
+    FindSync2,
+    ReadHeader,
+    ReadBody(Header),
+}
 
 /*
 #[test]
