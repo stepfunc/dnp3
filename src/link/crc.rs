@@ -36,16 +36,16 @@ const CRC_TABLE: [u16; 256] =
 
 pub fn calc_crc(slice: &[u8]) -> u16
 {
-    let accumulate = |acc, &byte| {
-        let index = (((acc as u8) ^ byte) & 0xFF) as usize;
-        CRC_TABLE[index] ^ (acc >> 8)
-    };
-    !slice.iter().fold(0, accumulate)
+    let mut acc : u16 = 0;
+    for byte in slice {
+        let index = (((acc as u8) ^ *byte) & 0xFF) as usize;
+        acc = CRC_TABLE[index] ^ (acc >> 8)
+    }
+    !acc
 }
 
 #[test]
 fn crc_works() {
-    // CRC is the 0x21E9 at the end (little endian)
     let bytes: [u8; 8] = [0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04];
     assert_eq!(0x21E9, calc_crc(&bytes));
 }
