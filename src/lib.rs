@@ -1,3 +1,3 @@
 pub mod error;
-mod link;
+pub mod link;
 pub(crate) mod util;

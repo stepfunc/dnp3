@@ -58,7 +58,10 @@ impl Parser {
         self.state = ParseState::FindSync1;
     }
 
-    fn parse<'a>(&'a mut self, cursor: &mut ReadCursor) -> Result<Option<Frame<'a>>, ParseError> {
+    pub fn parse<'a>(
+        &'a mut self,
+        cursor: &mut ReadCursor,
+    ) -> Result<Option<Frame<'a>>, ParseError> {
         loop {
             let start = cursor.len();
 

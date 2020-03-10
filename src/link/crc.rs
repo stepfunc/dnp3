@@ -33,10 +33,6 @@ pub fn calc_crc_with_0564(slice: &[u8]) -> u16 {
     !crc_increment(CRC_OF_0564, slice)
 }
 
-pub fn calc_crc_no_negate(slice: &[u8]) -> u16 {
-    crc_increment(0, slice)
-}
-
 pub fn crc_increment(mut acc: u16, slice: &[u8]) -> u16 {
     for byte in slice {
         let index = (((acc as u8) ^ *byte) & 0xFF) as usize;
@@ -51,7 +47,7 @@ mod test {
 
     #[test]
     fn has_correct_constant_crc() {
-        assert_eq!(calc_crc_no_negate(&[0x05, 0x64]), CRC_OF_0564);
+        assert_eq!(crc_increment(0, &[0x05, 0x64]), CRC_OF_0564);
     }
 
     #[test]
