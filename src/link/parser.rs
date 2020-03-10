@@ -54,38 +54,11 @@ impl Parser {
         }
     }
 
-    fn calc_trailer_length(data_length: u8) -> usize {
-        let div16: u8 = data_length / 16;
-        let mod16: u8 = data_length % 16;
-
-        if mod16 == 0 {
-            div16 as usize * 18
-        } else {
-            (div16 as usize * 18) + mod16 as usize + 2
-        }
+    pub fn reset(&mut self) {
+        self.state = ParseState::FindSync1;
     }
 
-    pub fn parse<'a>(
-        &'a mut self,
-        cursor: &mut ReadCursor,
-    ) -> Result<Option<Frame<'a>>, ParseError> {
-        match self.parse_impl(cursor) {
-            Err(err) => {
-                self.state = ParseState::FindSync1;
-                Err(err)
-            }
-            Ok(None) => Ok(None),
-            Ok(Some((header, length))) => {
-                // TODO - use a non-panicking variant
-                Ok(Some(Frame::new(header, &self.buffer[0..length])))
-            }
-        }
-    }
-
-    fn parse_impl(
-        &mut self,
-        cursor: &mut ReadCursor,
-    ) -> Result<Option<(Header, usize)>, ParseError> {
+    fn parse<'a>(&'a mut self, cursor: &mut ReadCursor) -> Result<Option<Frame<'a>>, ParseError> {
         loop {
             let start = cursor.len();
 
@@ -95,7 +68,7 @@ impl Parser {
                 ParseState::ReadHeader => self.parse_header(cursor)?,
                 ParseState::ReadBody(header, length) => {
                     if let Some(length) = self.parse_body(length, cursor)? {
-                        return Ok(Some((header, length)));
+                        return Ok(Some(Frame::new(header, &self.buffer[0..length])));
                     }
                 }
             }
@@ -106,6 +79,17 @@ impl Parser {
                 // no progress
                 return Ok(None);
             }
+        }
+    }
+
+    fn calc_trailer_length(data_length: u8) -> usize {
+        let div16: u8 = data_length / 16;
+        let mod16: u8 = data_length % 16;
+
+        if mod16 == 0 {
+            div16 as usize * 18
+        } else {
+            (div16 as usize * 18) + mod16 as usize + 2
         }
     }
 
@@ -208,6 +192,7 @@ impl Parser {
             pos += data_len;
         }
 
+        self.state = ParseState::FindSync1;
         Ok(Some(pos))
     }
 }
@@ -217,13 +202,94 @@ mod test {
     use super::*;
     use crate::link::function::Function;
 
-    #[test]
-    fn header_parse_catches_bad_length() {
-        // CRC is the 0x21E9 at the end (little endian)
-        let frame: [u8; 10] = [0x05, 0x64, 0x04, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21];
+    const RESET_LINK_BYTES: [u8; 10] = [0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21];
+    const RESET_LINK_FRAME: Frame = Frame {
+        header: Header {
+            ctrl: Ctrl {
+                func: Function::PriResetLinkStates,
+                master: true,
+                fcb: false,
+                fcv: false,
+            },
+            dest: 1,
+            src: 1024,
+        },
+        payload: &[],
+    };
 
+    const ACK_BYTES: [u8; 10] = [0x05, 0x64, 0x05, 0x00, 0x00, 0x04, 0x01, 0x00, 0x19, 0xA6];
+    const ACK_FRAME: Frame = Frame {
+        header: Header {
+            ctrl: Ctrl {
+                func: Function::SecAck,
+                master: false,
+                fcb: false,
+                fcv: false,
+            },
+            dest: 1024,
+            src: 1,
+        },
+        payload: &[],
+    };
+
+    const CONFIRM_USER_DATA_BYTES: [u8; 27] = [
+        // header
+        0x05, 0x64, 0x14, 0xF3, 0x01, 0x00, 0x00, 0x04, 0x0A, 0x3B,
+        // body
+        0xC0, 0xC3, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06, 0x9A, 0x12,
+    ];
+    const CONFIRM_USER_DATA_FRAME: Frame = Frame {
+        header: Header {
+            ctrl: Ctrl {
+                func: Function::PriConfirmedUserData,
+                master: true,
+                fcb: true,
+                fcv: true,
+            },
+            dest: 1,
+            src: 1024,
+        },
+        payload: &[0xC0, 0xC3, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06],
+    };
+
+    fn test_frame_parsing(parser: &mut Parser, bytes: &[u8], frame: &Frame) {
+        let mut cursor = ReadCursor::new(bytes);
+        let result : Frame = parser.parse(&mut cursor).unwrap().unwrap();
+        assert_eq!(&result, frame);
+        assert_eq!(cursor.len(), 0);
+    }
+
+    #[test]
+    fn catches_bad_start1() {
         let mut parser = Parser::new();
-        let mut cursor = ReadCursor::new(&frame);
+        let mut cursor = ReadCursor::new(&[0x06]);
+
+        assert_eq!(
+            parser.parse(&mut cursor),
+            Err(ParseError::BadFrame(FrameError::UnexpectedStart1(0x06)))
+        );
+
+        assert!(cursor.is_empty());
+    }
+
+    #[test]
+    fn catches_bad_start2() {
+        let mut parser = Parser::new();
+        let mut cursor = ReadCursor::new(&[0x05, 0x65]);
+
+        assert_eq!(
+            parser.parse(&mut cursor),
+            Err(ParseError::BadFrame(FrameError::UnexpectedStart2(0x65)))
+        );
+
+        assert!(cursor.is_empty());
+    }
+
+    #[test]
+    fn catches_bad_length() {
+        let mut parser = Parser::new();
+        let mut cursor =
+            ReadCursor::new(&[0x05, 0x64, 0x04, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21]);
 
         assert_eq!(
             parser.parse(&mut cursor),
@@ -234,7 +300,6 @@ mod test {
 
     #[test]
     fn header_parse_catches_bad_crc() {
-        // CRC is the 0x21E9 at the end (little endian)
         let frame: [u8; 10] = [0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x20];
 
         let mut parser = Parser::new();
@@ -248,29 +313,10 @@ mod test {
     }
 
     #[test]
-    fn returns_frame_for_length_of_five() {
-        // CRC is the 0x21E9 at the end (little endian)
-        let frame: [u8; 10] = [0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21];
-
+    fn can_parse_multiple_frames() {
         let mut parser = Parser::new();
-        let mut cursor = ReadCursor::new(&frame);
-
-        assert_eq!(
-            parser.parse(&mut cursor),
-            Ok(Some(Frame {
-                header: Header {
-                    ctrl: Ctrl {
-                        func: Function::PriResetLinkStates,
-                        master: true,
-                        fcb: false,
-                        fcv: false
-                    },
-                    dest: 1,
-                    src: 1024
-                },
-                payload: &[]
-            }))
-        );
-        assert_eq!(cursor.len(), 0);
+        test_frame_parsing(&mut parser, &RESET_LINK_BYTES, &RESET_LINK_FRAME);
+        test_frame_parsing(&mut parser, &ACK_BYTES, &ACK_FRAME);
+        test_frame_parsing(&mut parser, &CONFIRM_USER_DATA_BYTES, &CONFIRM_USER_DATA_FRAME);
     }
 }
