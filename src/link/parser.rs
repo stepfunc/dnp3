@@ -234,9 +234,9 @@ mod test {
 
     const CONFIRM_USER_DATA_BYTES: [u8; 27] = [
         // header
-        0x05, 0x64, 0x14, 0xF3, 0x01, 0x00, 0x00, 0x04, 0x0A, 0x3B,
-        // body
-        0xC0, 0xC3, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06, 0x9A, 0x12,
+        0x05, 0x64, 0x14, 0xF3, 0x01, 0x00, 0x00, 0x04, 0x0A, 0x3B, // body
+        0xC0, 0xC3, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
+        0x9A, 0x12,
     ];
     const CONFIRM_USER_DATA_FRAME: Frame = Frame {
         header: Header {
@@ -249,12 +249,15 @@ mod test {
             dest: 1,
             src: 1024,
         },
-        payload: &[0xC0, 0xC3, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06],
+        payload: &[
+            0xC0, 0xC3, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01,
+            0x06,
+        ],
     };
 
     fn test_frame_parsing(parser: &mut Parser, bytes: &[u8], frame: &Frame) {
         let mut cursor = ReadCursor::new(bytes);
-        let result : Frame = parser.parse(&mut cursor).unwrap().unwrap();
+        let result: Frame = parser.parse(&mut cursor).unwrap().unwrap();
         assert_eq!(&result, frame);
         assert_eq!(cursor.len(), 0);
     }
@@ -287,9 +290,11 @@ mod test {
 
     #[test]
     fn catches_bad_length() {
+        let mut frame = RESET_LINK_BYTES.clone();
+        *frame.get_mut(2).unwrap() = 0x04;
+
         let mut parser = Parser::new();
-        let mut cursor =
-            ReadCursor::new(&[0x05, 0x64, 0x04, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21]);
+        let mut cursor = ReadCursor::new(&frame);
 
         assert_eq!(
             parser.parse(&mut cursor),
@@ -300,7 +305,8 @@ mod test {
 
     #[test]
     fn header_parse_catches_bad_crc() {
-        let frame: [u8; 10] = [0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x20];
+        let mut frame = RESET_LINK_BYTES.clone();
+        *frame.last_mut().unwrap() = 0xFF;
 
         let mut parser = Parser::new();
         let mut cursor = ReadCursor::new(&frame);
@@ -313,10 +319,29 @@ mod test {
     }
 
     #[test]
+    fn catches_bad_crc_in_body() {
+        let mut frame = CONFIRM_USER_DATA_BYTES.clone();
+        *frame.last_mut().unwrap() = 0xFF;
+
+        let mut parser = Parser::new();
+        let mut cursor = ReadCursor::new(&frame);
+
+        assert_eq!(
+            parser.parse(&mut cursor),
+            Err(ParseError::BadFrame(FrameError::BadBodyCRC)),
+        );
+        assert_eq!(cursor.len(), 0);
+    }
+
+    #[test]
     fn can_parse_multiple_frames() {
         let mut parser = Parser::new();
         test_frame_parsing(&mut parser, &RESET_LINK_BYTES, &RESET_LINK_FRAME);
         test_frame_parsing(&mut parser, &ACK_BYTES, &ACK_FRAME);
-        test_frame_parsing(&mut parser, &CONFIRM_USER_DATA_BYTES, &CONFIRM_USER_DATA_FRAME);
+        test_frame_parsing(
+            &mut parser,
+            &CONFIRM_USER_DATA_BYTES,
+            &CONFIRM_USER_DATA_FRAME,
+        );
     }
 }
