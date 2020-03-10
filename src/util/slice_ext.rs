@@ -1,25 +1,27 @@
 use crate::error::LogicError;
 use std::ops::Range;
 
-pub trait SliceExt<T> {
-    fn split_at_no_panic(&self, pos: usize) -> Result<(&[T], &[T]), LogicError>;
-
-    fn get_no_panic(&mut self, range: Range<usize>) -> Result<&[T], LogicError>;
+pub trait SliceExtNoPanic<T> {
+    fn np_split_at(&self, pos: usize) -> Result<(&[T], &[T]), LogicError>;
+    fn np_get(&self, range: Range<usize>) -> Result<&[T], LogicError>;
+    fn np_take(&self, count: usize) -> Result<&[T], LogicError> {
+        self.np_get(0..count)
+    }
 }
 
-pub trait MutSliceExt<T> {
-    fn get_mut_no_panic(&mut self, range: std::ops::Range<usize>) -> Result<&mut [T], LogicError>;
+pub trait MutSliceExtNoPanic<T> {
+    fn np_get_mut(&mut self, range: std::ops::Range<usize>) -> Result<&mut [T], LogicError>;
 }
 
-impl<T> SliceExt<T> for &[T] {
-    fn split_at_no_panic(&self, pos: usize) -> Result<(&[T], &[T]), LogicError> {
+impl<T> SliceExtNoPanic<T> for &[T] {
+    fn np_split_at(&self, pos: usize) -> Result<(&[T], &[T]), LogicError> {
         match (self.get(0..pos), self.get(pos..)) {
             (Some(left), Some(right)) => Ok((left, right)),
             _ => Err(LogicError::BadSize),
         }
     }
 
-    fn get_no_panic(&mut self, range: Range<usize>) -> Result<&[T], LogicError> {
+    fn np_get(&self, range: Range<usize>) -> Result<&[T], LogicError> {
         match self.get(range) {
             Some(x) => Ok(x),
             None => Err(LogicError::BadSize),
@@ -27,8 +29,8 @@ impl<T> SliceExt<T> for &[T] {
     }
 }
 
-impl<T> MutSliceExt<T> for &mut [T] {
-    fn get_mut_no_panic(&mut self, range: Range<usize>) -> Result<&mut [T], LogicError> {
+impl<T> MutSliceExtNoPanic<T> for &mut [T] {
+    fn np_get_mut(&mut self, range: Range<usize>) -> Result<&mut [T], LogicError> {
         match self.get_mut(range) {
             Some(x) => Ok(x),
             None => Err(LogicError::BadSize),

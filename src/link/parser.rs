@@ -1,7 +1,7 @@
 use crate::error::*;
 use crate::link::header::{Ctrl, Header};
 use crate::util::cursor::{ReadCursor, ReadError};
-use crate::util::slice_ext::{MutSliceExt, SliceExt};
+use crate::util::slice_ext::*;
 
 #[derive(Copy, Clone)]
 enum ParseState {
@@ -178,7 +178,7 @@ impl Parser {
 
             let data_len = block.len() - 2;
 
-            let (data, crc) = block.split_at_no_panic(data_len)?;
+            let (data, crc) = block.np_split_at(data_len)?;
             let crc_value = ReadCursor::new(crc).read_u16_le()?;
             let calc_crc = super::crc::calc_crc(data);
 
@@ -189,7 +189,7 @@ impl Parser {
             // copy the data and advance the position
             self.buffer
                 .as_mut()
-                .get_mut_no_panic(pos..(pos + data_len))?
+                .np_get_mut(pos..(pos + data_len))?
                 .clone_from_slice(data);
 
             pos += data_len;
