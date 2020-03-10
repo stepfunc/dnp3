@@ -3,6 +3,8 @@ use std::ops::Range;
 
 pub trait SliceExt<T> {
     fn split_at_no_panic(&self, pos: usize) -> Result<(&[T], &[T]), LogicError>;
+
+    fn get_no_panic(&mut self, range: Range<usize>) -> Result<&[T], LogicError>;
 }
 
 pub trait MutSliceExt<T> {
@@ -14,6 +16,13 @@ impl<T> SliceExt<T> for &[T] {
         match (self.get(0..pos), self.get(pos..)) {
             (Some(left), Some(right)) => Ok((left, right)),
             _ => Err(LogicError::BadSize),
+        }
+    }
+
+    fn get_no_panic(&mut self, range: Range<usize>) -> Result<&[T], LogicError> {
+        match self.get(range) {
+            Some(x) => Ok(x),
+            None => Err(LogicError::BadSize),
         }
     }
 }

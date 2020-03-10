@@ -3,6 +3,7 @@ use crate::link::header::{Ctrl, Header};
 use crate::util::cursor::{ReadCursor, ReadError};
 use crate::util::slice_ext::{MutSliceExt, SliceExt};
 
+#[derive(Copy, Clone)]
 enum ParseState {
     FindSync1,
     FindSync2,
@@ -64,91 +65,83 @@ impl Parser {
         }
     }
 
-    fn extract_payload_and_verify_crc(&mut self, trailer: &[u8]) -> Result<&[u8], ParseError> {
-        // position with the destination buffer
-        let mut pos = 0;
-
-        for block in trailer.chunks(18) {
-            if block.len() < 3 {
-                // can't be a valid block
-                return Err(LogicError::BadSize.into());
-            }
-
-            let data_len = block.len() - 2;
-
-            let (data, crc) = block.split_at_no_panic(data_len)?;
-            let crc_value = ReadCursor::new(crc).read_u16_le()?;
-            let calc_crc = super::crc::calc_crc(data);
-
-            if crc_value != calc_crc {
-                return Err(FrameError::BadBodyCRC.into());
-            }
-
-            // copy the data and advance the position
-            self.buffer
-                .as_mut()
-                .get_mut_no_panic(pos..(pos + data_len))?
-                .clone_from_slice(data);
-            pos += data_len;
-        }
-
-        match self.buffer.get(0..pos) {
-            Some(x) => Ok(x),
-            None => Err(LogicError::BadSize.into()),
-        }
-    }
-
-    pub fn parse_one<'a>(
+    pub fn parse<'a>(
         &'a mut self,
         cursor: &mut ReadCursor,
     ) -> Result<Option<Frame<'a>>, ParseError> {
-        match self.state {
-            ParseState::FindSync1 => self.parse_sync1(cursor),
-            ParseState::FindSync2 => self.parse_sync2(cursor),
-            ParseState::ReadHeader => self.parse_header(cursor),
-            ParseState::ReadBody(header, trailer_len) => {
-                self.parse_body(header, trailer_len, cursor)
+        match self.parse_impl(cursor) {
+            Err(err) => {
+                self.state = ParseState::FindSync1;
+                Err(err)
+            }
+            Ok(None) => Ok(None),
+            Ok(Some((header, length))) => {
+                // TODO - use a non-panicking variant
+                Ok(Some(Frame::new(header, &self.buffer[0..length])))
             }
         }
     }
 
-    fn parse_sync1<'a>(
-        &'a mut self,
+    fn parse_impl(
+        &mut self,
         cursor: &mut ReadCursor,
-    ) -> Result<Option<Frame<'a>>, ParseError> {
+    ) -> Result<Option<(Header, usize)>, ParseError> {
+        loop {
+            let start = cursor.len();
+
+            match self.state {
+                ParseState::FindSync1 => self.parse_sync1(cursor)?,
+                ParseState::FindSync2 => self.parse_sync2(cursor)?,
+                ParseState::ReadHeader => self.parse_header(cursor)?,
+                ParseState::ReadBody(header, length) => {
+                    if let Some(length) = self.parse_body(length, cursor)? {
+                        return Ok(Some((header, length)));
+                    }
+                }
+            }
+
+            let end = cursor.len();
+
+            if start == end {
+                // no progress
+                return Ok(None);
+            }
+        }
+    }
+
+    fn parse_sync1(&mut self, cursor: &mut ReadCursor) -> Result<(), ParseError> {
         if cursor.is_empty() {
-            return Ok(None);
+            return Ok(());
         }
-        if cursor.read_u8()? != 0x05 {
-            return Ok(None);
+
+        let x = cursor.read_u8()?;
+
+        if x != 0x05 {
+            return Err(FrameError::UnexpectedStart1(x).into());
         }
+
         self.state = ParseState::FindSync2;
-        Ok(None)
+        Ok(())
     }
 
-    fn parse_sync2<'a>(
-        &'a mut self,
-        cursor: &mut ReadCursor,
-    ) -> Result<Option<Frame<'a>>, ParseError> {
+    fn parse_sync2(&mut self, cursor: &mut ReadCursor) -> Result<(), ParseError> {
         if cursor.is_empty() {
-            return Ok(None);
+            return Ok(());
         }
 
-        if cursor.read_u8()? != 0x64 {
-            self.state = ParseState::FindSync1;
-            return Ok(None);
+        let x = cursor.read_u8()?;
+
+        if x != 0x64 {
+            return Err(FrameError::UnexpectedStart2(x).into());
         }
 
         self.state = ParseState::ReadHeader;
-        Ok(None)
+        Ok(())
     }
 
-    fn parse_header<'a>(
-        &'a mut self,
-        cursor: &mut ReadCursor,
-    ) -> Result<Option<Frame<'a>>, ParseError> {
+    fn parse_header(&mut self, cursor: &mut ReadCursor) -> Result<(), ParseError> {
         if cursor.len() < 8 {
-            return Ok(None);
+            return Ok(());
         }
 
         let crc_bytes = cursor.read_bytes(6)?;
@@ -171,30 +164,51 @@ impl Parser {
             return Err(FrameError::BadHeaderCRC.into());
         }
 
-        self.state = ParseState::ReadBody(
-            header,
-            Self::calc_trailer_length(len - 5), // ok b/c len >= 5 above
-        );
+        let trailer_length = Self::calc_trailer_length(len - 5); // ok b/c len >= 5 above
 
-        Ok(None)
+        self.state = ParseState::ReadBody(header, trailer_length);
+        Ok(())
     }
 
-    fn parse_body<'a>(
-        &'a mut self,
-        header: Header,
+    fn parse_body(
+        &mut self,
         trailer_length: usize,
         cursor: &mut ReadCursor,
-    ) -> Result<Option<Frame<'a>>, ParseError> {
+    ) -> Result<Option<usize>, ParseError> {
         if cursor.len() < trailer_length {
             return Ok(None);
         }
 
-        let frame_trailer = cursor.read_bytes(trailer_length)?;
+        let body = cursor.read_bytes(trailer_length)?;
 
-        Ok(Some(Frame::new(
-            header,
-            self.extract_payload_and_verify_crc(frame_trailer)?,
-        )))
+        let mut pos = 0;
+
+        for block in body.chunks(18) {
+            if block.len() < 3 {
+                // can't be a valid block
+                return Err(LogicError::BadSize.into());
+            }
+
+            let data_len = block.len() - 2;
+
+            let (data, crc) = block.split_at_no_panic(data_len)?;
+            let crc_value = ReadCursor::new(crc).read_u16_le()?;
+            let calc_crc = super::crc::calc_crc(data);
+
+            if crc_value != calc_crc {
+                return Err(FrameError::BadBodyCRC.into());
+            }
+
+            // copy the data and advance the position
+            self.buffer
+                .as_mut()
+                .get_mut_no_panic(pos..(pos + data_len))?
+                .clone_from_slice(data);
+
+            pos += data_len;
+        }
+
+        Ok(Some(pos))
     }
 }
 
@@ -211,14 +225,8 @@ mod test {
         let mut parser = Parser::new();
         let mut cursor = ReadCursor::new(&frame);
 
-        assert_eq!(parser.parse_one(&mut cursor), Ok(None));
-        assert_eq!(cursor.len(), 9);
-
-        assert_eq!(parser.parse_one(&mut cursor), Ok(None));
-        assert_eq!(cursor.len(), 8);
-
         assert_eq!(
-            parser.parse_one(&mut cursor),
+            parser.parse(&mut cursor),
             Err(ParseError::BadFrame(FrameError::BadLength(4)))
         );
         assert_eq!(cursor.len(), 0);
@@ -232,14 +240,8 @@ mod test {
         let mut parser = Parser::new();
         let mut cursor = ReadCursor::new(&frame);
 
-        assert_eq!(parser.parse_one(&mut cursor), Ok(None));
-        assert_eq!(cursor.len(), 9);
-
-        assert_eq!(parser.parse_one(&mut cursor), Ok(None));
-        assert_eq!(cursor.len(), 8);
-
         assert_eq!(
-            parser.parse_one(&mut cursor),
+            parser.parse(&mut cursor),
             Err(ParseError::BadFrame(FrameError::BadHeaderCRC))
         );
         assert_eq!(cursor.len(), 0);
@@ -253,17 +255,8 @@ mod test {
         let mut parser = Parser::new();
         let mut cursor = ReadCursor::new(&frame);
 
-        assert_eq!(parser.parse_one(&mut cursor), Ok(None));
-        assert_eq!(cursor.len(), 9);
-
-        assert_eq!(parser.parse_one(&mut cursor), Ok(None));
-        assert_eq!(cursor.len(), 8);
-
-        assert_eq!(parser.parse_one(&mut cursor), Ok(None));
-        assert_eq!(cursor.len(), 0);
-
         assert_eq!(
-            parser.parse_one(&mut cursor),
+            parser.parse(&mut cursor),
             Ok(Some(Frame {
                 header: Header {
                     ctrl: Ctrl {

@@ -8,6 +8,8 @@ pub enum LogicError {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum FrameError {
+    UnexpectedStart1(u8),
+    UnexpectedStart2(u8),
     BadLength(u8),
     BadHeaderCRC,
     BadBodyCRC,
