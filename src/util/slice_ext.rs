@@ -3,6 +3,7 @@ use std::ops::Range;
 
 pub trait SliceExtNoPanic<T> {
     fn np_split_at(&self, pos: usize) -> Result<(&[T], &[T]), LogicError>;
+    fn np_split_at_no_error(&self, pos: usize) -> (&[T], &[T]);
     fn np_get(&self, range: Range<usize>) -> Result<&[T], LogicError>;
     fn np_take(&self, count: usize) -> Result<&[T], LogicError> {
         self.np_get(0..count)
@@ -18,6 +19,13 @@ impl<T> SliceExtNoPanic<T> for &[T] {
         match (self.get(0..pos), self.get(pos..)) {
             (Some(left), Some(right)) => Ok((left, right)),
             _ => Err(LogicError::BadSize),
+        }
+    }
+
+    fn np_split_at_no_error(&self, pos: usize) -> (&[T], &[T]) {
+        match (self.get(0..pos), self.get(pos..)) {
+            (Some(left), Some(right)) => (left, right),
+            _ => (self.as_ref(), &[])
         }
     }
 

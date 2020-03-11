@@ -1,6 +1,7 @@
 use crate::error::*;
+use crate::link::constant;
 use crate::link::header::{Address, ControlField, Header};
-use crate::util::cursor::{ReadCursor, ReadError};
+use crate::util::cursor::{ReadCursor, ReadError, WriteError};
 use crate::util::slice_ext::*;
 
 #[derive(Copy, Clone)]
@@ -13,8 +14,8 @@ enum ParseState {
 
 #[derive(Debug, PartialEq)]
 pub struct Frame<'a> {
-    header: Header,
-    payload: &'a [u8],
+    pub header: Header,
+    pub payload: &'a [u8],
 }
 
 impl<'a> Frame<'a> {
@@ -50,7 +51,7 @@ impl Parser {
     pub fn new() -> Parser {
         Parser {
             state: ParseState::FindSync1,
-            buffer: [0; 250],
+            buffer: [0; constant::MAX_FRAME_PAYLOAD_LENGTH],
         }
     }
 
@@ -86,13 +87,13 @@ impl Parser {
     }
 
     fn calc_trailer_length(data_length: u8) -> usize {
-        let div16: u8 = data_length / 16;
-        let mod16: u8 = data_length % 16;
+        let div16: usize = data_length as usize / constant::MAX_BLOCK_SIZE;
+        let mod16: usize = data_length as usize % constant::MAX_BLOCK_SIZE;
 
         if mod16 == 0 {
-            div16 as usize * 18
+            div16 * constant::MAX_BLOCK_SIZE_WITH_CRC
         } else {
-            (div16 as usize * 18) + mod16 as usize + 2
+            (div16 * constant::MAX_BLOCK_SIZE_WITH_CRC) + mod16 + constant::CRC_LENGTH
         }
     }
 
@@ -209,67 +210,7 @@ impl Default for Parser {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::link::function::Function;
-    use crate::link::header::Address;
-
-    const RESET_LINK_BYTES: [u8; 10] = [0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21];
-    const RESET_LINK_FRAME: Frame = Frame {
-        header: Header {
-            control: ControlField {
-                func: Function::PriResetLinkStates,
-                master: true,
-                fcb: false,
-                fcv: false,
-            },
-            address: Address {
-                destination: 1,
-                source: 1024,
-            },
-        },
-        payload: &[],
-    };
-
-    const ACK_BYTES: [u8; 10] = [0x05, 0x64, 0x05, 0x00, 0x00, 0x04, 0x01, 0x00, 0x19, 0xA6];
-    const ACK_FRAME: Frame = Frame {
-        header: Header {
-            control: ControlField {
-                func: Function::SecAck,
-                master: false,
-                fcb: false,
-                fcv: false,
-            },
-            address: Address {
-                destination: 1024,
-                source: 1,
-            },
-        },
-        payload: &[],
-    };
-
-    const CONFIRM_USER_DATA_BYTES: [u8; 27] = [
-        // header
-        0x05, 0x64, 0x14, 0xF3, 0x01, 0x00, 0x00, 0x04, 0x0A, 0x3B, // body
-        0xC0, 0xC3, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
-        0x9A, 0x12,
-    ];
-    const CONFIRM_USER_DATA_FRAME: Frame = Frame {
-        header: Header {
-            control: ControlField {
-                func: Function::PriConfirmedUserData,
-                master: true,
-                fcb: true,
-                fcv: true,
-            },
-            address: Address {
-                destination: 1,
-                source: 1024,
-            },
-        },
-        payload: &[
-            0xC0, 0xC3, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01,
-            0x06,
-        ],
-    };
+    use super::super::test_data::*;
 
     fn test_frame_parsing(parser: &mut Parser, bytes: &[u8], frame: &Frame) {
         let mut cursor = ReadCursor::new(bytes);

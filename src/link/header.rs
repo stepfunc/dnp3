@@ -1,4 +1,5 @@
 use super::function::Function;
+use crate::link::header::constants::{MASK_DIR, MASK_FCB, MASK_FCV};
 
 pub mod constants {
     pub const MASK_DIR: u8 = 0x80;
@@ -18,6 +19,16 @@ pub struct ControlField {
 }
 
 impl ControlField {
+
+    pub fn new(master: bool, function: Function) -> Self {
+        Self {
+            func: function,
+            master,
+            fcb : false,
+            fcv : false
+        }
+    }
+
     pub fn from(byte: u8) -> ControlField {
         ControlField {
             func: Function::from(byte & constants::MASK_FUNC_OR_PRM),
@@ -25,6 +36,16 @@ impl ControlField {
             fcb: (byte & constants::MASK_FCB) != 0,
             fcv: (byte & constants::MASK_FCV) != 0,
         }
+    }
+
+    pub fn to_u8(&self) -> u8 {
+        let mut ret = 0;
+        ret |= if self.master { MASK_DIR } else { 0 };
+        // the PRM bit is part of the function code
+        ret |= if self.fcb { MASK_FCB } else { 0 };
+        ret |= if self.fcv { MASK_FCV } else { 0 };
+        ret |= self.func.to_u8();
+        ret
     }
 }
 

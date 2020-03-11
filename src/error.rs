@@ -3,6 +3,7 @@
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum LogicError {
     BadRead,
+    BadWrite,
     BadSize,
 }
 
