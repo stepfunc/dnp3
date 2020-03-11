@@ -25,7 +25,7 @@ impl<T> SliceExtNoPanic<T> for &[T] {
     fn np_split_at_no_error(&self, pos: usize) -> (&[T], &[T]) {
         match (self.get(0..pos), self.get(pos..)) {
             (Some(left), Some(right)) => (left, right),
-            _ => (self.as_ref(), &[])
+            _ => (self.as_ref(), &[]),
         }
     }
 

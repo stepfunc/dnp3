@@ -209,8 +209,8 @@ impl Default for Parser {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use super::super::test_data::*;
+    use super::*;
 
     fn test_frame_parsing(parser: &mut Parser, bytes: &[u8], frame: &Frame) {
         let mut cursor = ReadCursor::new(bytes);

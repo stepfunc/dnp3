@@ -19,13 +19,12 @@ pub struct ControlField {
 }
 
 impl ControlField {
-
     pub fn new(master: bool, function: Function) -> Self {
         Self {
             func: function,
             master,
-            fcb : false,
-            fcv : false
+            fcb: false,
+            fcv: false,
         }
     }
 

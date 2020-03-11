@@ -5,28 +5,28 @@ mod header;
 pub mod parser;
 
 pub mod constant {
-    pub const START1 : u8 = 0x05;
+    pub const START1: u8 = 0x05;
     pub const START2: u8 = 0x64;
 
-    pub const MAX_FRAME_PAYLOAD_LENGTH : usize = 250;
+    pub const MAX_FRAME_PAYLOAD_LENGTH: usize = 250;
     pub const MAX_LINK_FRAME_LENGTH: usize = 292;
-    pub const MAX_APP_BYTES_PER_FRAME : usize = MAX_FRAME_PAYLOAD_LENGTH - 1;
-    pub const LINK_HEADER_SIZE : usize = 10;
-    pub const MIN_HEADER_LENGTH_VALUE : u8 = 5;
+    pub const MAX_APP_BYTES_PER_FRAME: usize = MAX_FRAME_PAYLOAD_LENGTH - 1;
+    pub const LINK_HEADER_SIZE: usize = 10;
+    pub const MIN_HEADER_LENGTH_VALUE: u8 = 5;
     pub const MAX_BLOCK_SIZE: usize = 16;
-    pub const CRC_LENGTH : usize = 2;
+    pub const CRC_LENGTH: usize = 2;
     pub const MAX_BLOCK_SIZE_WITH_CRC: usize = MAX_BLOCK_SIZE + CRC_LENGTH;
-
 }
 
 #[cfg(test)]
 pub mod test_data {
 
     use crate::link::function::Function;
-    use crate::link::header::{Address, Header, ControlField};
+    use crate::link::header::{Address, ControlField, Header};
     use crate::link::parser::Frame;
 
-    pub const RESET_LINK_BYTES: [u8; 10] = [0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21];
+    pub const RESET_LINK_BYTES: [u8; 10] =
+        [0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21];
     pub const RESET_LINK_FRAME: Frame = Frame {
         header: Header {
             control: ControlField {
@@ -87,12 +87,12 @@ pub mod test_data {
     };
 
     pub const UNCONFIRMED_USER_DATA_BYTES: [u8; 25] = [
-        0x05, 0x64, 0x12, 0xC4, 0x01, 0x00, 0x00, 0x04, 0x0E, 0x0B,
-        0xC0, 0xC5, 0x02, 0x32, 0x01, 0x07, 0x01, 0xF8, 0xB8, 0x6C, 0xAA, 0xF0, 0x00, 0x98, 0x98
+        0x05, 0x64, 0x12, 0xC4, 0x01, 0x00, 0x00, 0x04, 0x0E, 0x0B, 0xC0, 0xC5, 0x02, 0x32, 0x01,
+        0x07, 0x01, 0xF8, 0xB8, 0x6C, 0xAA, 0xF0, 0x00, 0x98, 0x98,
     ];
 
     pub const UNCONFIRMED_USER_DATA_APP_BYTES: [u8; 12] = [
-        0xC5, 0x02, 0x32, 0x01, 0x07, 0x01, 0xF8, 0xB8, 0x6C, 0xAA, 0xF0, 0x00
+        0xC5, 0x02, 0x32, 0x01, 0x07, 0x01, 0xF8, 0xB8, 0x6C, 0xAA, 0xF0, 0x00,
     ];
 
     pub const UNCONFIRMED_USER_DATA_FRAME: Frame = Frame {
@@ -109,7 +109,7 @@ pub mod test_data {
             },
         },
         payload: &[
-            0xC0, 0xC5, 0x02, 0x32, 0x01, 0x07, 0x01, 0xF8, 0xB8, 0x6C, 0xAA, 0xF0, 0x00
+            0xC0, 0xC5, 0x02, 0x32, 0x01, 0x07, 0x01, 0xF8, 0xB8, 0x6C, 0xAA, 0xF0, 0x00,
         ],
     };
 }

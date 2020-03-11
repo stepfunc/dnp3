@@ -1,5 +1,5 @@
-use crate::util::slice_ext::MutSliceExtNoPanic;
 use crate::error::LogicError;
+use crate::util::slice_ext::MutSliceExtNoPanic;
 use std::io::Cursor;
 
 /// custom read-only cursor
@@ -59,7 +59,6 @@ pub struct WriteCursor<'a> {
 pub struct WriteError;
 
 impl<'a> WriteCursor<'a> {
-
     pub fn new(dest: &'a mut [u8]) -> WriteCursor<'a> {
         WriteCursor { dest, pos: 0 }
     }
@@ -81,7 +80,7 @@ impl<'a> WriteCursor<'a> {
 
     pub fn write(&mut self, bytes: &[u8]) -> Result<(), WriteError> {
         if self.remaining() < bytes.len() {
-            return Err(WriteError)
+            return Err(WriteError);
         }
 
         let new_pos = self.pos + bytes.len();

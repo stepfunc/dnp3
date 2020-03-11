@@ -1,11 +1,10 @@
-use crate::link::header::{ControlField, Address};
-use crate::util::cursor::{WriteCursor, WriteError};
-use crate::link::constant;
 use crate::error::LogicError;
-use crate::link::crc::{calc_crc_with_0564, calc_crc};
-use crate::util::slice_ext::SliceExtNoPanic;
+use crate::link::constant;
+use crate::link::crc::{calc_crc, calc_crc_with_0564};
 use crate::link::function::Function;
-
+use crate::link::header::{Address, ControlField};
+use crate::util::cursor::{WriteCursor, WriteError};
+use crate::util::slice_ext::SliceExtNoPanic;
 
 impl std::convert::From<WriteError> for LogicError {
     fn from(_: WriteError) -> Self {
@@ -21,16 +20,18 @@ pub struct Payload<'a> {
 
 impl<'a> Payload<'a> {
     pub fn new(transport: u8, app_data: &'a [u8]) -> Self {
-        Self { transport, app_data }
+        Self {
+            transport,
+            app_data,
+        }
     }
 }
 
 struct LinkFormatter {
-    master: bool
+    master: bool,
 }
 
 impl LinkFormatter {
-
     pub fn new(master: bool) -> Self {
         Self { master }
     }
@@ -40,24 +41,35 @@ impl LinkFormatter {
             ControlField::new(self.master, Function::SecAck),
             address,
             None,
-            cursor
+            cursor,
         )
     }
 
-    pub fn format_unconfirmed_user_data(&self, address: Address, payload: Payload, cursor: &mut WriteCursor) -> Result<(), LogicError> {
+    pub fn format_unconfirmed_user_data(
+        &self,
+        address: Address,
+        payload: Payload,
+        cursor: &mut WriteCursor,
+    ) -> Result<(), LogicError> {
         Self::format(
             ControlField::new(self.master, Function::PriUnconfirmedUserData),
             address,
             Some(payload),
-            cursor
+            cursor,
         )
     }
 
-    fn format(control: ControlField, address: Address, payload: Option<Payload>, cursor: &mut WriteCursor) -> Result<(), LogicError> {
-
+    fn format(
+        control: ControlField,
+        address: Address,
+        payload: Option<Payload>,
+        cursor: &mut WriteCursor,
+    ) -> Result<(), LogicError> {
         fn format_payload(payload: Payload, cursor: &mut WriteCursor) -> Result<(), LogicError> {
             // the first block contains the transport header
-            let (first, remainder) = payload.app_data.np_split_at_no_error(constant::MAX_BLOCK_SIZE - 1);
+            let (first, remainder) = payload
+                .app_data
+                .np_split_at_no_error(constant::MAX_BLOCK_SIZE - 1);
 
             // write the first block
             let begin_first_block = cursor.position();
@@ -81,8 +93,8 @@ impl LinkFormatter {
                     return Err(LogicError::BadSize);
                 }
                 payload.app_data.len() as u8 + constant::MIN_HEADER_LENGTH_VALUE + 1
-            },
-            None => constant::MIN_HEADER_LENGTH_VALUE
+            }
+            None => constant::MIN_HEADER_LENGTH_VALUE,
         };
 
         cursor.write_u8(constant::START1)?;
@@ -103,34 +115,42 @@ impl LinkFormatter {
     }
 }
 
-
-
 #[cfg(test)]
 mod test {
 
-    use super::*;
     use super::super::test_data::*;
+    use super::*;
 
     type Buffer = [u8; constant::MAX_LINK_FRAME_LENGTH];
 
     #[test]
-    fn can_format_ack() {
-        let mut buffer : Buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
+    fn formats_ack() {
+        let mut buffer: Buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
         let mut cursor = WriteCursor::new(&mut buffer);
         let start = cursor.position();
         let formatter = LinkFormatter::new(false);
-        formatter.format_ack(ACK_FRAME.header.address, &mut cursor).unwrap();
+        formatter
+            .format_ack(ACK_FRAME.header.address, &mut cursor)
+            .unwrap();
         assert_eq!(cursor.written_since(start).unwrap(), ACK_BYTES);
     }
 
     #[test]
-    fn can_format_unconfirmed_user_data() {
-        let mut buffer : Buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
+    fn formats_unconfirmed_user_data() {
+        let mut buffer: Buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
         let mut cursor = WriteCursor::new(&mut buffer);
         let start = cursor.position();
         let formatter = LinkFormatter::new(true);
-        formatter.format_unconfirmed_user_data(UNCONFIRMED_USER_DATA_FRAME.header.address, Payload::new(0xC0, &UNCONFIRMED_USER_DATA_APP_BYTES), &mut cursor).unwrap();
-        assert_eq!(cursor.written_since(start).unwrap(), UNCONFIRMED_USER_DATA_BYTES);
+        formatter
+            .format_unconfirmed_user_data(
+                UNCONFIRMED_USER_DATA_FRAME.header.address,
+                Payload::new(0xC0, &UNCONFIRMED_USER_DATA_APP_BYTES),
+                &mut cursor,
+            )
+            .unwrap();
+        assert_eq!(
+            cursor.written_since(start).unwrap(),
+            UNCONFIRMED_USER_DATA_BYTES
+        );
     }
 }
-
