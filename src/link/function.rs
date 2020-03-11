@@ -40,7 +40,7 @@ impl Function {
         }
     }
 
-    pub fn to_u8(&self) -> u8 {
+    pub fn to_u8(self) -> u8 {
         match self {
             Function::PriResetLinkStates => constants::PRI_RESET_LINK_STATES,
             Function::PriTestLinkStates => constants::PRI_TEST_LINK_STATES,
@@ -51,7 +51,7 @@ impl Function {
             Function::SecNack => constants::SEC_NACK,
             Function::SecLinkStatus => constants::SEC_LINK_STATUS,
             Function::SecNotSupported => constants::SEC_NOT_SUPPORTED,
-            Function::Unknown(x) => *x,
+            Function::Unknown(x) => x,
         }
     }
 }

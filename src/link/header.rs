@@ -37,7 +37,7 @@ impl ControlField {
         }
     }
 
-    pub fn to_u8(&self) -> u8 {
+    pub fn to_u8(self) -> u8 {
         let mut ret = 0;
         ret |= if self.master { MASK_DIR } else { 0 };
         // the PRM bit is part of the function code
