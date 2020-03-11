@@ -12,10 +12,6 @@ impl Sequence {
         Sequence::new(0, 63)
     }
 
-    pub fn application() -> Self {
-        Sequence::new(0, 15)
-    }
-
     pub fn next(&mut self) -> u8 {
         let ret = self.value;
 
@@ -35,9 +31,9 @@ mod test {
 
     #[test]
     fn increments_and_wraps_as_expected() {
-        let mut seq = Sequence::application();
-        for i in 0..16 {
-            // which is really [0,15]
+        let mut seq = Sequence::transport();
+        for i in 0..64 {
+            // which is really [0,63]
             assert_eq!(seq.next(), i);
         }
 

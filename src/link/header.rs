@@ -10,16 +10,16 @@ pub mod constants {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Ctrl {
+pub struct ControlField {
     pub func: Function,
     pub master: bool,
     pub fcb: bool,
     pub fcv: bool,
 }
 
-impl Ctrl {
-    pub fn from(byte: u8) -> Ctrl {
-        Ctrl {
+impl ControlField {
+    pub fn from(byte: u8) -> ControlField {
+        ControlField {
             func: Function::from(byte & constants::MASK_FUNC_OR_PRM),
             master: (byte & constants::MASK_DIR) != 0,
             fcb: (byte & constants::MASK_FCB) != 0,
@@ -29,14 +29,28 @@ impl Ctrl {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
+pub struct Address {
+    pub destination: u16,
+    pub source: u16,
+}
+
+impl Address {
+    pub fn new(destination: u16, source: u16) -> Self {
+        Self {
+            destination,
+            source,
+        }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Header {
-    pub ctrl: Ctrl,
-    pub dest: u16,
-    pub src: u16,
+    pub control: ControlField,
+    pub address: Address,
 }
 
 impl Header {
-    pub fn new(ctrl: Ctrl, dest: u16, src: u16) -> Header {
-        Header { ctrl, dest, src }
+    pub fn new(control: ControlField, address: Address) -> Header {
+        Header { control, address }
     }
 }

@@ -1,5 +1,5 @@
 use crate::error::*;
-use crate::link::header::{Ctrl, Header};
+use crate::link::header::{Address, ControlField, Header};
 use crate::util::cursor::{ReadCursor, ReadError};
 use crate::util::slice_ext::*;
 
@@ -136,10 +136,10 @@ impl Parser {
 
         let mut cursor = ReadCursor::new(crc_bytes);
         let len = cursor.read_u8()?;
+
         let header = Header::new(
-            Ctrl::from(cursor.read_u8()?),
-            cursor.read_u16_le()?,
-            cursor.read_u16_le()?,
+            ControlField::from(cursor.read_u8()?),
+            Address::new(cursor.read_u16_le()?, cursor.read_u16_le()?),
         );
 
         if len < 5 {
@@ -210,18 +210,21 @@ impl Default for Parser {
 mod test {
     use super::*;
     use crate::link::function::Function;
+    use crate::link::header::Address;
 
     const RESET_LINK_BYTES: [u8; 10] = [0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21];
     const RESET_LINK_FRAME: Frame = Frame {
         header: Header {
-            ctrl: Ctrl {
+            control: ControlField {
                 func: Function::PriResetLinkStates,
                 master: true,
                 fcb: false,
                 fcv: false,
             },
-            dest: 1,
-            src: 1024,
+            address: Address {
+                destination: 1,
+                source: 1024,
+            },
         },
         payload: &[],
     };
@@ -229,14 +232,16 @@ mod test {
     const ACK_BYTES: [u8; 10] = [0x05, 0x64, 0x05, 0x00, 0x00, 0x04, 0x01, 0x00, 0x19, 0xA6];
     const ACK_FRAME: Frame = Frame {
         header: Header {
-            ctrl: Ctrl {
+            control: ControlField {
                 func: Function::SecAck,
                 master: false,
                 fcb: false,
                 fcv: false,
             },
-            dest: 1024,
-            src: 1,
+            address: Address {
+                destination: 1024,
+                source: 1,
+            },
         },
         payload: &[],
     };
@@ -249,14 +254,16 @@ mod test {
     ];
     const CONFIRM_USER_DATA_FRAME: Frame = Frame {
         header: Header {
-            ctrl: Ctrl {
+            control: ControlField {
                 func: Function::PriConfirmedUserData,
                 master: true,
                 fcb: true,
                 fcv: true,
             },
-            dest: 1,
-            src: 1024,
+            address: Address {
+                destination: 1,
+                source: 1024,
+            },
         },
         payload: &[
             0xC0, 0xC3, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01,
