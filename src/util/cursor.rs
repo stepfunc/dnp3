@@ -1,7 +1,3 @@
-use crate::error::LogicError;
-use crate::util::slice_ext::MutSliceExtNoPanic;
-use std::io::Cursor;
-
 /// custom read-only cursor
 pub struct ReadCursor<'a> {
     src: &'a [u8],

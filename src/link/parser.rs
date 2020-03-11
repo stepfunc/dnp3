@@ -1,7 +1,7 @@
 use crate::error::*;
 use crate::link::constant;
 use crate::link::header::{Address, ControlField, Header};
-use crate::util::cursor::{ReadCursor, ReadError, WriteError};
+use crate::util::cursor::{ReadCursor, ReadError};
 use crate::util::slice_ext::*;
 
 #[derive(Copy, Clone)]

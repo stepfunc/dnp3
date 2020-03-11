@@ -27,19 +27,21 @@ impl<'a> Payload<'a> {
     }
 }
 
-struct LinkFormatter {
+pub struct LinkFormatter {
     master: bool,
+    source: u16,
 }
 
 impl LinkFormatter {
-    pub fn new(master: bool) -> Self {
-        Self { master }
+    pub fn new(master: bool, source: u16) -> Self {
+        Self { master, source }
     }
 
-    pub fn format_ack(&self, address: Address, cursor: &mut WriteCursor) -> Result<(), LogicError> {
+    #[cfg(test)]
+    pub fn format_ack(&self, dest: u16, cursor: &mut WriteCursor) -> Result<(), LogicError> {
         Self::format(
             ControlField::new(self.master, Function::SecAck),
-            address,
+            Address::new(dest, self.source),
             None,
             cursor,
         )
@@ -47,13 +49,13 @@ impl LinkFormatter {
 
     pub fn format_unconfirmed_user_data(
         &self,
-        address: Address,
+        dest: u16,
         payload: Payload,
         cursor: &mut WriteCursor,
     ) -> Result<(), LogicError> {
         Self::format(
             ControlField::new(self.master, Function::PriUnconfirmedUserData),
-            address,
+            Address::new(dest, self.source),
             Some(payload),
             cursor,
         )
@@ -128,9 +130,9 @@ mod test {
         let mut buffer: Buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
         let mut cursor = WriteCursor::new(&mut buffer);
         let start = cursor.position();
-        let formatter = LinkFormatter::new(false);
+        let formatter = LinkFormatter::new(false, ACK_FRAME.header.address.source);
         formatter
-            .format_ack(ACK_FRAME.header.address, &mut cursor)
+            .format_ack(ACK_FRAME.header.address.destination, &mut cursor)
             .unwrap();
         assert_eq!(cursor.written_since(start).unwrap(), ACK_BYTES);
     }
@@ -140,10 +142,10 @@ mod test {
         let mut buffer: Buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
         let mut cursor = WriteCursor::new(&mut buffer);
         let start = cursor.position();
-        let formatter = LinkFormatter::new(true);
+        let formatter = LinkFormatter::new(true, UNCONFIRMED_USER_DATA_FRAME.header.address.source);
         formatter
             .format_unconfirmed_user_data(
-                UNCONFIRMED_USER_DATA_FRAME.header.address,
+                UNCONFIRMED_USER_DATA_FRAME.header.address.destination,
                 Payload::new(0xC0, &UNCONFIRMED_USER_DATA_APP_BYTES),
                 &mut cursor,
             )
