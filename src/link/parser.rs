@@ -343,7 +343,7 @@ mod test {
     }
 
     #[test]
-    fn can_parse_multiple_frames() {
+    fn can_parse_multiple_different_frames_sequentially() {
         let mut parser = Parser::new();
         test_frame_parsing(&mut parser, &RESET_LINK_BYTES, &RESET_LINK_FRAME);
         test_frame_parsing(&mut parser, &ACK_BYTES, &ACK_FRAME);
