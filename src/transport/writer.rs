@@ -4,36 +4,36 @@ use crate::util::cursor::WriteCursor;
 use crate::util::sequence::Sequence;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
-pub mod transport {
+pub mod constants {
     pub const FIN_MASK: u8 = 0b1000_0000;
     pub const FIR_MASK: u8 = 0b0100_0000;
     pub const SEQ_MASK: u8 = 0b0011_1111;
-
-    pub fn get_header(fin: bool, fir: bool, seq: u8) -> u8 {
-        let mut acc: u8 = 0;
-
-        if fin {
-            acc |= FIN_MASK;
-        }
-        if fir {
-            acc |= FIR_MASK;
-        }
-
-        acc | (seq & SEQ_MASK)
-    }
 }
 
 pub struct Writer {
     formatter: LinkFormatter,
-    buffer: [u8; super::constant::MAX_LINK_FRAME_LENGTH],
+    buffer: [u8; crate::link::constant::MAX_LINK_FRAME_LENGTH],
 }
 
 impl Writer {
     pub fn new(source: u16, master: bool) -> Self {
         Self {
             formatter: LinkFormatter::new(master, source),
-            buffer: [0; super::constant::MAX_LINK_FRAME_LENGTH],
+            buffer: [0; crate::link::constant::MAX_LINK_FRAME_LENGTH],
         }
+    }
+
+    fn get_header(fin: bool, fir: bool, seq: u8) -> u8 {
+        let mut acc: u8 = 0;
+
+        if fin {
+            acc |= constants::FIN_MASK;
+        }
+        if fir {
+            acc |= constants::FIR_MASK;
+        }
+
+        acc | (seq & constants::SEQ_MASK)
     }
 
     pub async fn write<W>(
@@ -46,7 +46,7 @@ impl Writer {
     where
         W: AsyncWrite + Unpin,
     {
-        let chunks = fragment.chunks(super::constant::MAX_APP_BYTES_PER_FRAME);
+        let chunks = fragment.chunks(crate::link::constant::MAX_APP_BYTES_PER_FRAME);
 
         let last = if chunks.len() == 0 {
             0
@@ -58,7 +58,7 @@ impl Writer {
 
         for chunk in chunks {
             let mut cursor = WriteCursor::new(&mut self.buffer);
-            let transport_byte = transport::get_header(count == last, count == 0, seq.next());
+            let transport_byte = Self::get_header(count == last, count == 0, seq.next());
             let mark = cursor.position();
             self.formatter.format_unconfirmed_user_data(
                 destination,

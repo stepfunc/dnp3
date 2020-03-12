@@ -1,9 +1,8 @@
 mod crc;
-mod formatter;
+pub mod formatter;
 mod function;
 mod header;
 pub mod parser;
-pub mod writer;
 
 pub mod constant {
     pub const START1: u8 = 0x05;
