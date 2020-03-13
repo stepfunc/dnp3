@@ -130,11 +130,11 @@ mod test {
         let mut buffer: Buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
         let mut cursor = WriteCursor::new(&mut buffer);
         let start = cursor.position();
-        let formatter = LinkFormatter::new(false, ACK_FRAME.header.address.source);
+        let formatter = LinkFormatter::new(false, ACK.header.address.source);
         formatter
-            .format_ack(ACK_FRAME.header.address.destination, &mut cursor)
+            .format_ack(ACK.header.address.destination, &mut cursor)
             .unwrap();
-        assert_eq!(cursor.written_since(start).unwrap(), ACK_BYTES);
+        assert_eq!(cursor.written_since(start).unwrap(), ACK.bytes);
     }
 
     #[test]
@@ -142,17 +142,17 @@ mod test {
         let mut buffer: Buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
         let mut cursor = WriteCursor::new(&mut buffer);
         let start = cursor.position();
-        let formatter = LinkFormatter::new(true, UNCONFIRMED_USER_DATA_FRAME.header.address.source);
+        let formatter = LinkFormatter::new(true, UNCONFIRMED_USER_DATA.header.address.source);
         formatter
             .format_unconfirmed_user_data(
-                UNCONFIRMED_USER_DATA_FRAME.header.address.destination,
-                Payload::new(0xC0, &UNCONFIRMED_USER_DATA_APP_BYTES),
+                UNCONFIRMED_USER_DATA.header.address.destination,
+                Payload::new(0xC0, &UNCONFIRMED_USER_DATA.payload[1..]),
                 &mut cursor,
             )
             .unwrap();
         assert_eq!(
             cursor.written_since(start).unwrap(),
-            UNCONFIRMED_USER_DATA_BYTES
+            UNCONFIRMED_USER_DATA.bytes
         );
     }
 }
