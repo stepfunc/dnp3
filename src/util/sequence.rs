@@ -12,6 +12,10 @@ impl Sequence {
         Sequence::new(0, 63)
     }
 
+    pub fn reset(&mut self) {
+        self.value = 0;
+    }
+
     pub fn next(&mut self) -> u8 {
         let ret = self.value;
 

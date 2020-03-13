@@ -220,6 +220,16 @@ mod test {
     }
 
     #[test]
+    fn can_parse_in_a_loop() {
+        let mut parser = Parser::new();
+        let mut cursor = ReadCursor::new(&[]);
+
+        loop {
+            let result = parser.parse(&mut cursor);
+        }
+    }
+
+    #[test]
     fn catches_bad_start1() {
         let mut parser = Parser::new();
         let mut cursor = ReadCursor::new(&[0x06]);

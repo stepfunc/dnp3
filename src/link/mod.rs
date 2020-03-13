@@ -3,6 +3,7 @@ pub mod formatter;
 mod function;
 mod header;
 pub mod parser;
+pub mod reader;
 
 pub mod constant {
     pub const START1: u8 = 0x05;

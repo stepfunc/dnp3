@@ -12,6 +12,7 @@ pub trait SliceExtNoPanic<T> {
 
 pub trait MutSliceExtNoPanic<T> {
     fn np_get_mut(&mut self, range: std::ops::Range<usize>) -> Result<&mut [T], LogicError>;
+    fn np_skip_mut(&mut self, count: usize) -> Result<&mut [T], LogicError>;
 }
 
 impl<T> SliceExtNoPanic<T> for &[T] {
@@ -41,6 +42,13 @@ impl<T> MutSliceExtNoPanic<T> for &mut [T] {
     fn np_get_mut(&mut self, range: Range<usize>) -> Result<&mut [T], LogicError> {
         match self.get_mut(range) {
             Some(x) => Ok(x),
+            None => Err(LogicError::BadSize),
+        }
+    }
+
+    fn np_skip_mut(&mut self, count: usize) -> Result<&mut [T], LogicError> {
+        match self.get_mut(count..) {
+            Some(remainder) => Ok(remainder),
             None => Err(LogicError::BadSize),
         }
     }
