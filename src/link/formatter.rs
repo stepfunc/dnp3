@@ -29,19 +29,31 @@ impl<'a> Payload<'a> {
 
 pub struct LinkFormatter {
     master: bool,
-    source: u16,
+    address: u16,
 }
 
 impl LinkFormatter {
-    pub fn new(master: bool, source: u16) -> Self {
-        Self { master, source }
+    pub fn new(master: bool, address: u16) -> Self {
+        Self { master, address }
     }
 
-    #[cfg(test)]
-    pub fn format_ack(&self, dest: u16, cursor: &mut WriteCursor) -> Result<(), LogicError> {
+    pub fn is_master(&self) -> bool {
+        self.master
+    }
+
+    pub fn get_address(&self) -> u16 {
+        self.address
+    }
+
+    pub fn format_header_only(
+        &self,
+        destination: u16,
+        control: ControlField,
+        cursor: &mut WriteCursor,
+    ) -> Result<(), LogicError> {
         Self::format(
-            ControlField::new(self.master, Function::SecAck),
-            Address::new(dest, self.source),
+            control,
+            Address::new(destination, self.address),
             None,
             cursor,
         )
@@ -55,7 +67,7 @@ impl LinkFormatter {
     ) -> Result<(), LogicError> {
         Self::format(
             ControlField::new(self.master, Function::PriUnconfirmedUserData),
-            Address::new(dest, self.source),
+            Address::new(dest, self.address),
             Some(payload),
             cursor,
         )
@@ -132,7 +144,11 @@ mod test {
         let start = cursor.position();
         let formatter = LinkFormatter::new(false, ACK.header.address.source);
         formatter
-            .format_ack(ACK.header.address.destination, &mut cursor)
+            .format_header_only(
+                ACK.header.address.destination,
+                ACK.header.control,
+                &mut cursor,
+            )
             .unwrap();
         assert_eq!(cursor.written_since(start).unwrap(), ACK.bytes);
     }

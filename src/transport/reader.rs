@@ -12,7 +12,7 @@ enum State {
     Running(Address, Header, usize),
 }
 pub struct Reader {
-    link: crate::link::reader::Reader,
+    link: crate::link::layer::Layer,
     state: State,
     buffer: [u8; 2048], // make this configurable and/or constant
 }
@@ -23,9 +23,9 @@ pub struct Fragment<'a> {
 }
 
 impl Reader {
-    pub fn new() -> Self {
+    pub fn new(is_master: bool, address: u16) -> Self {
         Self {
-            link: crate::link::reader::Reader::default(),
+            link: crate::link::layer::Layer::new(is_master, address),
             state: State::Empty,
             buffer: [0; 2048],
         }
@@ -43,7 +43,7 @@ impl Reader {
         let mut payload = FramePayload::new();
 
         loop {
-            let address = self.link.read(io, &mut payload).await?.address;
+            let address = self.link.read(io, &mut payload).await?;
             match payload.get() {
                 [transport, data @ ..] => {
                     let header = Header::new(*transport);
@@ -54,7 +54,7 @@ impl Reader {
                         });
                     }
                 }
-                // TODO - real error code - data message with no payload
+                // TODO - log error
                 [] => {}
             }
         }
@@ -117,11 +117,5 @@ impl Reader {
         } else {
             Ok(None)
         }
-    }
-}
-
-impl Default for Reader {
-    fn default() -> Self {
-        Self::new()
     }
 }

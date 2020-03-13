@@ -2,6 +2,7 @@ mod crc;
 pub mod formatter;
 mod function;
 pub mod header;
+pub mod layer;
 pub mod parser;
 pub mod reader;
 
