@@ -4,12 +4,26 @@ pub struct Sequence {
 }
 
 impl Sequence {
+    const MAX_TRANSPORT_SEQ: u8 = 63;
+
+    fn calc_next(value: u8, max: u8) -> u8 {
+        if value >= max {
+            0
+        } else {
+            value + 1
+        }
+    }
+
+    pub fn calc_next_transport(value: u8) -> u8 {
+        Self::calc_next(value, Self::MAX_TRANSPORT_SEQ)
+    }
+
     pub fn new(value: u8, max: u8) -> Self {
         Self { value, max }
     }
 
     pub fn transport() -> Self {
-        Sequence::new(0, 63)
+        Sequence::new(0, Self::MAX_TRANSPORT_SEQ)
     }
 
     pub fn reset(&mut self) {
@@ -18,13 +32,7 @@ impl Sequence {
 
     pub fn next(&mut self) -> u8 {
         let ret = self.value;
-
-        self.value = if self.value == self.max {
-            0
-        } else {
-            self.value + 1
-        };
-
+        self.value = Self::calc_next(ret, self.max);
         ret
     }
 }

@@ -21,6 +21,12 @@ impl Reader {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.begin = 0;
+        self.end = 0;
+        self.parser.reset();
+    }
+
     /**
     Returns a future that keeps reading until a frame is received or an error is returned
     This future can be dropped without losing any state.
