@@ -3,6 +3,7 @@ use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
 use crate::util::cursor::ReadCursor;
 use tokio::io::{AsyncRead, AsyncReadExt};
+use std::io::ErrorKind;
 
 pub struct Reader {
     parser: Parser,
@@ -46,7 +47,10 @@ impl Reader {
             let mut cursor = ReadCursor::new(&self.buffer[self.begin..self.end]);
             let start = cursor.len();
             let result = self.parser.parse(&mut cursor, payload)?;
-            self.begin += start - cursor.len();
+            {
+                let num_consumed = start - cursor.len();
+                self.begin += num_consumed;
+            }
             match result {
                 // complete frame
                 Some(header) => return Ok(header),
@@ -60,7 +64,12 @@ impl Reader {
                     }
 
                     // now we can read more data
-                    self.end += io.read(&mut self.buffer[..]).await?;
+                    let count = io.read(&mut self.buffer[self.end..]).await?;
+                    if count == 0 {
+                        return Err(Error::IO(ErrorKind::UnexpectedEof));
+                    }
+
+                    self.end += count;
                 }
             }
         }
