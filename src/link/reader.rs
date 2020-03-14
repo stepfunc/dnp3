@@ -45,16 +45,13 @@ impl Reader {
             // the readable portion of the buffer
             let mut cursor = ReadCursor::new(&self.buffer[self.begin..self.end]);
             let start = cursor.len();
-
-            match self.parser.parse(&mut cursor, payload)? {
+            let result = self.parser.parse(&mut cursor, payload)?;
+            self.begin += start - cursor.len();
+            match result {
                 // complete frame
                 Some(header) => return Ok(header),
                 // parser can't make progress without more bytes
                 None => {
-                    // how much was processed?
-                    let count = start - cursor.len();
-                    self.begin += count;
-
                     // if the buffer is full, we need to shift its contents
                     if self.end == super::constant::MAX_LINK_FRAME_LENGTH {
                         self.buffer.copy_within(self.begin..self.end, 0);

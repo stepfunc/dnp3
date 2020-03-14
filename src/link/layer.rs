@@ -15,7 +15,7 @@ pub struct Layer {
     secondary_state: SecondaryState,
     formatter: LinkFormatter,
     reader: super::reader::Reader,
-    reply_buffer: [u8; super::constant::MAX_LINK_FRAME_LENGTH],
+    tx_buffer: [u8; super::constant::MAX_LINK_FRAME_LENGTH],
 }
 
 impl Layer {
@@ -24,13 +24,28 @@ impl Layer {
             secondary_state: SecondaryState::NotReset,
             formatter: LinkFormatter::new(is_master, address),
             reader: super::reader::Reader::default(),
-            reply_buffer: [0; super::constant::MAX_LINK_FRAME_LENGTH],
+            tx_buffer: [0; super::constant::MAX_LINK_FRAME_LENGTH],
         }
     }
 
     pub fn reset(&mut self) {
         self.secondary_state = SecondaryState::NotReset;
         self.reader.reset();
+    }
+
+    pub async fn read<T>(
+        &mut self,
+        io: &mut T,
+        payload: &mut FramePayload,
+    ) -> Result<Address, Error>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        loop {
+            if let Some(address) = self.read_one(io, payload).await? {
+                return Ok(address);
+            }
+        }
     }
 
     async fn reply<T>(
@@ -42,7 +57,7 @@ impl Layer {
     where
         T: AsyncWrite + Unpin,
     {
-        let mut cursor = WriteCursor::new(self.reply_buffer.as_mut());
+        let mut cursor = WriteCursor::new(self.tx_buffer.as_mut());
         let start = cursor.position();
         self.formatter
             .format_header_only(destination, control, &mut cursor)?;
@@ -60,21 +75,6 @@ impl Layer {
             io,
         )
         .await
-    }
-
-    pub async fn read<T>(
-        &mut self,
-        io: &mut T,
-        payload: &mut FramePayload,
-    ) -> Result<Address, Error>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
-        loop {
-            if let Some(address) = self.read_one(io, payload).await? {
-                return Ok(address);
-            }
-        }
     }
 
     async fn read_one<T>(
@@ -99,7 +99,7 @@ impl Layer {
         }
 
         // TODO - handle broadcast
-        if header.address.destination == self.formatter.get_address() {
+        if header.address.destination != self.formatter.get_address() {
             log::info!(
                 "ignoring frame for destination address: {}",
                 header.address.destination
@@ -129,6 +129,15 @@ impl Layer {
                     }
                 }
             },
+            Function::PriRequestLinkStatus => {
+                self.reply(
+                    header.address.source,
+                    ControlField::new(self.formatter.is_master(), Function::SecLinkStatus),
+                    io,
+                )
+                .await?;
+                Ok(None)
+            }
             function => {
                 log::info!("ignoring frame with function code: {:?}", function);
                 Ok(None)

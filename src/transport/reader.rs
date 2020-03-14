@@ -17,6 +17,7 @@ pub struct Reader {
     buffer: [u8; 2048], // make this configurable and/or constant
 }
 
+#[derive(Debug)]
 pub struct Fragment<'a> {
     pub address: Address,
     pub data: &'a [u8],
