@@ -54,8 +54,7 @@ impl Reader {
                         });
                     }
                 }
-                // TODO - log error
-                [] => {}
+                [] => log::warn!("received link data frame with no payload"),
             }
         }
     }
@@ -69,7 +68,12 @@ impl Reader {
     ) -> Result<usize, WriteError> {
         let remaining = self.buffer.len() - length;
         if data.len() > remaining {
-            // TODO - transport buffer overflow
+            log::warn!(
+                "transport buffer overflow, {} bytes remaining, {} byte to write",
+                remaining,
+                data.len()
+            );
+            self.state = State::Empty;
             return Err(WriteError);
         }
         let new_length = length + data.len();
@@ -92,11 +96,12 @@ impl Reader {
         let length: usize = match self.state {
             State::Running(previous_address, previous_header, length) => {
                 if header.seq != Sequence::calc_next_transport(previous_header.seq) {
-                    // ignore it - TODO - drop existing?
+                    self.state = State::Empty;
                     return Ok(None);
                 }
                 if address != previous_address {
-                    // ignore it - TODO - drop existing?
+                    log::info!("transport: conflicting addresses, previous segment with {:?}, but received {:?}", previous_address, address);
+                    self.state = State::Empty;
                     return Ok(None);
                 }
                 self.append(header, address, length, payload)?

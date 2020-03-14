@@ -77,7 +77,7 @@ impl Layer {
         }
     }
 
-    pub async fn read_one<T>(
+    async fn read_one<T>(
         &mut self,
         io: &mut T,
         payload: &mut FramePayload,
@@ -88,16 +88,22 @@ impl Layer {
         let header = self.reader.read(io, payload).await?;
 
         if header.control.master == self.formatter.is_master() {
-            // don't process frames if this bit is the same
-            // masters can't talk to masters, etc
-            // TODO - logging
+            // TODO - more useful on TCP than multi-drop serial where
+            // you have to ignore frames
+            if header.control.master {
+                log::info!("ignoring link frame from master");
+            } else {
+                log::info!("ignoring link frame from outstation");
+            }
             return Ok(None);
         }
 
         // TODO - handle broadcast
         if header.address.destination == self.formatter.get_address() {
-            // don't process frames for the wrong address
-            // TODO - logging
+            log::info!(
+                "ignoring frame for destination address: {}",
+                header.address.destination
+            );
             return Ok(None);
         }
 
@@ -108,24 +114,25 @@ impl Layer {
                 self.acknowledge(header.address.source, io).await?;
                 Ok(None)
             }
-            Function::PriConfirmedUserData => {
-                match self.secondary_state {
-                    SecondaryState::NotReset => {
-                        // TODO log and ignore
+            Function::PriConfirmedUserData => match self.secondary_state {
+                SecondaryState::NotReset => {
+                    log::info!("ignoring confirmed user data while secondary state is not reset");
+                    Ok(None)
+                }
+                SecondaryState::Reset(expected) => {
+                    if header.control.fcb == expected {
+                        self.secondary_state = SecondaryState::Reset(!expected);
+                        Ok(Some(header.address))
+                    } else {
+                        log::info!("ignoring confirmed user data with non-matching fcb");
                         Ok(None)
                     }
-                    SecondaryState::Reset(expected) => {
-                        if header.control.fcb == expected {
-                            self.secondary_state = SecondaryState::Reset(!expected);
-                            Ok(Some(header.address))
-                        } else {
-                            // TODO log and ignore
-                            Ok(None)
-                        }
-                    }
                 }
+            },
+            function => {
+                log::info!("ignoring frame with function code: {:?}", function);
+                Ok(None)
             }
-            _ => Ok(None),
         }
     }
 }
