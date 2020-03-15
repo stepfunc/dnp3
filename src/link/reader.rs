@@ -47,10 +47,7 @@ impl Reader {
             let mut cursor = ReadCursor::new(&self.buffer[self.begin..self.end]);
             let start = cursor.len();
             let result = self.parser.parse(&mut cursor, payload)?;
-            {
-                let num_consumed = start - cursor.len();
-                self.begin += num_consumed;
-            }
+            self.begin += start - cursor.len();
             match result {
                 // complete frame
                 Some(header) => return Ok(header),
