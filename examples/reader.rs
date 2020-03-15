@@ -14,7 +14,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut reader = Reader::new(false, 1024);
 
     loop {
-
         let asdu = reader.read(&mut socket).await.unwrap();
 
         log::info!(
@@ -22,6 +21,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             asdu.data.len(),
             asdu.address.source
         )
-
     }
 }

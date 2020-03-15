@@ -2,8 +2,8 @@ use crate::error::Error;
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
 use crate::util::cursor::ReadCursor;
-use tokio::io::{AsyncRead, AsyncReadExt};
 use std::io::ErrorKind;
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 pub struct Reader {
     parser: Parser,
