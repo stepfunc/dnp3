@@ -4,6 +4,7 @@
 extern crate tokio_test;
 */
 
+pub mod app;
 pub mod error;
 pub mod link;
 pub mod transport;
