@@ -22,11 +22,11 @@ pub struct Group2Var2 {
 }
 
 impl FixedSizeVariation for Group2Var2 {
-    const SIZE: u8 = 3; // TODO
+    const SIZE: u8 = 7;
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(Group2Var2 {
             flags: cursor.read_u8()?,
-            time: cursor.read_u16_le()? as u64, // TODO - need u48
+            time: cursor.read_u48_le()?,
         })
     }
 }
@@ -38,8 +38,7 @@ pub struct Group2Var3 {
 }
 
 impl FixedSizeVariation for Group2Var3 {
-    const SIZE: u8 = 3; // TODO
-
+    const SIZE: u8 = 3;
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(Group2Var3 {
             flags: cursor.read_u8()?,

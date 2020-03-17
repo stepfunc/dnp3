@@ -11,6 +11,7 @@ where
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError>;
 }
 
+#[derive(Debug, PartialEq)]
 pub enum RangedVariation<'a> {
     Group2Var0,
     Group2Var1(RangedSequence<'a, Group2Var1>),
@@ -18,6 +19,7 @@ pub enum RangedVariation<'a> {
     Group2Var3(RangedSequence<'a, Group2Var3>),
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Header<'a> {
     OneByteStartStop(u8, u8, RangedVariation<'a>),
     TwoByteStartStop(u16, u16, RangedVariation<'a>),

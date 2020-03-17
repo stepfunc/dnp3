@@ -20,19 +20,48 @@ impl<'a> ReadCursor<'a> {
     }
 
     pub fn read_u8(&mut self) -> Result<u8, ReadError> {
-        match self.src.split_first() {
-            Some((first, rest)) => {
+        match self.src {
+            [a, rest @ ..] => {
                 self.src = rest;
-                Ok(*first)
+                Ok(*a)
             }
-            None => Err(ReadError),
+            _ => Err(ReadError),
         }
     }
 
     pub fn read_u16_le(&mut self) -> Result<u16, ReadError> {
-        let low = self.read_u8()?;
-        let high = self.read_u8()?;
-        Ok((high as u16) << 8 | (low as u16))
+        match self.src {
+            [a, b, rest @ ..] => {
+                self.src = rest;
+                Ok((*a as u16) << 8 | (*b as u16))
+            }
+            _ => Err(ReadError),
+        }
+    }
+
+    pub fn read_u32_le(&mut self) -> Result<u32, ReadError> {
+        match self.src {
+            [a, b, c, d, rest @ ..] => {
+                self.src = rest;
+                Ok((*d as u32) << 24 | (*c as u32) << 16 | (*b as u32) << 8 | *a as u32)
+            }
+            _ => Err(ReadError),
+        }
+    }
+
+    pub fn read_u48_le(&mut self) -> Result<u64, ReadError> {
+        match self.src {
+            [a, b, c, d, e, f, rest @ ..] => {
+                self.src = rest;
+                Ok((*f as u64) << 40
+                    | (*e as u64) << 32
+                    | (*d as u64) << 24
+                    | (*c as u64) << 16
+                    | (*b as u64) << 8
+                    | *a as u64)
+            }
+            _ => Err(ReadError),
+        }
     }
 
     pub fn read_bytes(&mut self, count: usize) -> Result<&'a [u8], ReadError> {

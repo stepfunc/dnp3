@@ -21,6 +21,7 @@ impl Range {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct RangedSequence<'a, T>
 where
     T: FixedSizeVariation,

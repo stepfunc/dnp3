@@ -2,7 +2,7 @@ use crate::app::header::{Header, RangedVariation};
 use crate::app::range::{InvalidRange, Range, RangedSequence};
 use crate::util::cursor::{ReadCursor, ReadError};
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     errored: bool,
     cursor: ReadCursor<'a>,
 }
@@ -33,7 +33,8 @@ impl GroupVar {
     }
 }
 
-enum ParseError {
+#[derive(Debug, PartialEq)]
+pub enum ParseError {
     UnknownGroupVariation(u8, u8),
     UnknownQualifier(u8),
     InsufficientBytes,
@@ -72,8 +73,15 @@ impl Qualifier {
 }
 
 impl<'a> Parser<'a> {
+    pub fn new(data: &'a [u8]) -> Self {
+        Parser {
+            cursor: ReadCursor::new(data),
+            errored: false,
+        }
+    }
+
     fn parse_one(&mut self) -> Option<Result<Header<'a>, ParseError>> {
-        if self.errored {
+        if self.errored || self.cursor.is_empty() {
             return None;
         }
 
@@ -143,5 +151,37 @@ impl<'a> Iterator for Parser<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.parse_one()
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+    use crate::app::header::*;
+    use crate::app::variations::Group2Var1;
+
+    #[test]
+    fn parses_range_of_g2v1() {
+        let input = [0x02, 0x01, 0x00, 0x02, 0x03, 0xAA, 0xBB];
+
+        let mut parser = Parser::new(&input);
+
+        let items: Vec<(Group2Var1, u16)> = match parser.next().unwrap().unwrap() {
+            Header::OneByteStartStop(02, 03, RangedVariation::Group2Var1(seq)) => {
+                seq.iter().collect()
+            }
+            x => panic!("got: {:?}", x),
+        };
+
+        assert_eq!(
+            items,
+            vec![
+                (Group2Var1 { flags: 0xAA }, 2),
+                (Group2Var1 { flags: 0xBB }, 3)
+            ]
+        );
+
+        assert_eq!(parser.next(), None);
     }
 }
