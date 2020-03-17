@@ -1,22 +1,57 @@
 use crate::app::header::FixedSizeVariation;
-use crate::util::cursor::ReadCursor;
+use crate::util::cursor::{ReadCursor, ReadError};
 
-pub struct RangeMarker<'a> {
+pub struct InvalidRange;
+
+pub struct Range {
     start: u16,
-    data: &'a [u8],
+    count: usize,
 }
 
-impl<'a> RangeMarker<'a> {
-    pub fn new(start: u16, data: &'a [u8]) -> Self {
-        Self { start, data }
+impl Range {
+    pub fn from(start: u16, stop: u16) -> Result<Self, InvalidRange> {
+        if stop < start {
+            return Err(InvalidRange);
+        }
+
+        Ok(Self {
+            start,
+            count: stop as usize - start as usize + 1,
+        })
     }
 }
 
-impl<'a> RangeMarker<'a> {
-    pub fn iter<T>(&self) -> RangeIterator<'a, T>
-    where
-        T: FixedSizeVariation,
-    {
+pub struct RangedSequence<'a, T>
+where
+    T: FixedSizeVariation,
+{
+    start: u16,
+    data: &'a [u8],
+    phantom: std::marker::PhantomData<T>,
+}
+
+impl<'a, T> RangedSequence<'a, T>
+where
+    T: FixedSizeVariation,
+{
+    pub fn parse(
+        range: Range,
+        cursor: &mut ReadCursor<'a>,
+    ) -> Result<RangedSequence<'a, T>, ReadError> {
+        // this cannot overflow b/c SIZE is [0, 255] and count is [0, 65536]
+        let num_bytes = T::SIZE as usize * range.count;
+        Ok(Self::new(range.start, cursor.read_bytes(num_bytes)?))
+    }
+
+    pub fn new(start: u16, data: &'a [u8]) -> Self {
+        Self {
+            start,
+            data,
+            phantom: std::marker::PhantomData {},
+        }
+    }
+
+    pub fn iter(&self) -> RangeIterator<'a, T> {
         RangeIterator {
             index: self.start,
             cursor: ReadCursor::new(self.data),
