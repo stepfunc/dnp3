@@ -31,9 +31,9 @@ impl<'a> ReadCursor<'a> {
 
     pub fn read_u16_le(&mut self) -> Result<u16, ReadError> {
         match self.src {
-            [a, b, rest @ ..] => {
+            [b1, b2, rest @ ..] => {
                 self.src = rest;
-                Ok((*a as u16) << 8 | (*b as u16))
+                Ok((*b2 as u16) << 8 | (*b1 as u16))
             }
             _ => Err(ReadError),
         }
@@ -41,9 +41,9 @@ impl<'a> ReadCursor<'a> {
 
     pub fn read_u32_le(&mut self) -> Result<u32, ReadError> {
         match self.src {
-            [a, b, c, d, rest @ ..] => {
+            [b1, b2, b3, b4, rest @ ..] => {
                 self.src = rest;
-                Ok((*d as u32) << 24 | (*c as u32) << 16 | (*b as u32) << 8 | *a as u32)
+                Ok((*b4 as u32) << 24 | (*b3 as u32) << 16 | (*b2 as u32) << 8 | *b1 as u32)
             }
             _ => Err(ReadError),
         }
@@ -51,14 +51,14 @@ impl<'a> ReadCursor<'a> {
 
     pub fn read_u48_le(&mut self) -> Result<u64, ReadError> {
         match self.src {
-            [a, b, c, d, e, f, rest @ ..] => {
+            [b1, b2, b3, b4, b5, b6, rest @ ..] => {
                 self.src = rest;
-                Ok((*f as u64) << 40
-                    | (*e as u64) << 32
-                    | (*d as u64) << 24
-                    | (*c as u64) << 16
-                    | (*b as u64) << 8
-                    | *a as u64)
+                Ok((*b6 as u64) << 40
+                    | (*b5 as u64) << 32
+                    | (*b4 as u64) << 24
+                    | (*b3 as u64) << 16
+                    | (*b2 as u64) << 8
+                    | *b1 as u64)
             }
             _ => Err(ReadError),
         }
