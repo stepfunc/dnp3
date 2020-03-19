@@ -39,6 +39,7 @@ object RangedVariationModule extends Module {
     }
 
     bracket("impl<'a> RangedVariation<'a>") {
+      "#[rustfmt::skip]".eol ++
       bracket("pub fn parse(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ParseError>") {
         bracket("match v") {
           variations.map { v =>

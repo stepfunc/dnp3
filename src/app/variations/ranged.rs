@@ -10,11 +10,11 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::range::{RangedSequence, Range};
+use crate::app::parser::ParseError;
+use crate::app::range::{Range, RangedSequence};
 use crate::app::variations::fixed::*;
 use crate::app::variations::gv::Variation;
 use crate::util::cursor::ReadCursor;
-use crate::app::parser::ParseError;
 
 #[derive(Debug, PartialEq)]
 pub enum RangedVariation<'a> {
@@ -46,6 +46,7 @@ pub enum RangedVariation<'a> {
 }
 
 impl<'a> RangedVariation<'a> {
+    #[rustfmt::skip]
     pub fn parse(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),

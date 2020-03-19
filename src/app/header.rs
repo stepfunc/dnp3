@@ -1,5 +1,5 @@
-use crate::util::cursor::{ReadCursor, ReadError};
 use crate::app::variations::ranged::RangedVariation;
+use crate::util::cursor::{ReadCursor, ReadError};
 
 pub trait FixedSizeVariation
 where
