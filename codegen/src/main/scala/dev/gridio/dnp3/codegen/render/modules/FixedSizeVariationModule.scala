@@ -15,6 +15,8 @@ object FixedSizeVariationModule {
       }
     }
 
+    Header() ++
+    space ++
     "use crate::app::header::FixedSizeVariation;".eol ++
     "use crate::util::cursor::{ReadCursor, ReadError};".eol ++
     space ++

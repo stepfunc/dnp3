@@ -36,6 +36,8 @@ object GroupVarEnumModule {
 
   def file : Iterator[String] = {
     implicit val ident : Indentation = SpacedIndent
+    Header() ++
+    space ++
     enumDefinition ++ space ++ enumImpl
   }
 }
