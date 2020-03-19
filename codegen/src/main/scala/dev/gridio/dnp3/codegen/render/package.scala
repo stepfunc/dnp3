@@ -12,11 +12,15 @@ package object render {
 
   def space: Iterator[String] = Iterator("")
 
-  def spaced(i: Iterator[Iterator[String]]): Iterator[String] = {
+  def spaced(groups: Iterator[Iterator[String]]): Iterator[String] = {
 
-    def map(iter: Iterator[String]): Iterator[String] = if(iter.hasNext) iter ++ space else iter
+    var sum : Iterator[String] = Iterator.empty[String]
+    var count = 1
 
-    i.foldLeft(Iterator.apply[String]())((sum, i) => sum ++ map(i))
+    groups.foreach { x : Iterator[String] =>
+      sum = sum ++ (if(groups.hasNext) x ++ space else x)
+    }
+    sum
   }
 
   def bracket(s: String)(inner: => Iterator[String])(implicit indent: Indentation): Iterator[String] = {
