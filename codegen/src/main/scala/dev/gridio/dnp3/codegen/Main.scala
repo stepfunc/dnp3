@@ -2,7 +2,7 @@ package dev.gridio.dnp3.codegen
 
 import java.nio.file.{FileSystems, Path}
 
-import dev.gridio.dnp3.codegen.render.modules.{FixedSizeVariation, GroupVarEnum}
+import dev.gridio.dnp3.codegen.render.modules.{FixedSizeVariationModule, GroupVarEnumModule}
 
 object Main {
 
@@ -13,8 +13,8 @@ object Main {
   def main(args: Array[String]): Unit = {
 
 
-    writeTo(fixedSizePath)(FixedSizeVariation.file)
-    writeTo(gvPath)(GroupVarEnum.file)
+    writeTo(fixedSizePath)(FixedSizeVariationModule.file)
+    writeTo(gvPath)(GroupVarEnumModule.file)
 
 
 

@@ -118,7 +118,7 @@ impl<'a> Parser<'a> {
         range: Range,
     ) -> Result<RangedVariation<'a>, ParseError> {
         let variation = match gv {
-            GroupVar::Group2Var0 => RangedVariation::Group2Var0,
+            GroupVar::Group1Var1 => RangedVariation::Group1Var1(),
             GroupVar::Group2Var1 => {
                 RangedVariation::Group2Var1(RangedSequence::parse(range, &mut self.cursor)?)
             }

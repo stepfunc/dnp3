@@ -13,8 +13,8 @@ where
 
 #[derive(Debug, PartialEq)]
 pub enum RangedVariation<'a> {
-    Group2Var0,
-    Group1Var2(RangedSequence<'a, Group2Var1>),
+    Group1Var1(), // TODO
+    Group1Var2(RangedSequence<'a, Group1Var2>),
     Group2Var1(RangedSequence<'a, Group2Var1>),
     Group2Var2(RangedSequence<'a, Group2Var2>),
     Group2Var3(RangedSequence<'a, Group2Var3>),

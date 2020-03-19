@@ -3,7 +3,7 @@ package dev.gridio.dnp3.codegen.render.modules
 import dev.gridio.dnp3.codegen.model.{AnyVariation, FixedSize, GroupVariation, ObjectGroup}
 import dev.gridio.dnp3.codegen.render._
 
-object GroupVarEnum {
+object GroupVarEnumModule {
 
   private def enumImpl(implicit indent: Indentation) : Iterator[String] = {
 

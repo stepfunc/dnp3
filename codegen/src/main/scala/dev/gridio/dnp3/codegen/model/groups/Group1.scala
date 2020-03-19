@@ -15,7 +15,6 @@ object Group1 extends ObjectGroup {
 
 object Group1Var0 extends AnyVariation(Group1, 0)
 
-object Group1Var1 extends SingleBitfield(Group1, 1, packedFormat) with StaticVariation.Binary
-
-object Group1Var2 extends FixedSize(Group1, 2, withFlags)(FixedSizeField.flags) with StaticVariation.Binary
+object Group1Var1 extends SingleBitField(Group1, 1, packedFormat)
+object Group1Var2 extends FixedSize(Group1, 2, withFlags)(FixedSizeField.flags)
 

@@ -18,9 +18,9 @@ trait GroupVariation {
 
   final def id: Id = Id(group, variation)
 
-  final def name: String = "%sVar%s".format(parent.name, variation)
+  final def name: String = s"${parent.name}Var${variation}"
 
-  final def fullDesc: String = "%s - %s".format(parent.desc, desc)
+  final def fullDesc: String = s"${parent.desc} - ${desc}"
 
   final def shortValue: Int = group * 256 + variation
 
@@ -41,9 +41,9 @@ class SizedByVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g, v
 
 abstract class DefaultVariableSize(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g, v, description)
 
-class SingleBitfield(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g, v, description)
+class SingleBitField(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g, v, description)
 
-class DoubleBitfield(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g, v, description)
+class DoubleBitField(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g, v, description)
 
 sealed abstract class BasicGroupVariation(g: ObjectGroup, v: Byte, description: String) extends GroupVariation {
   def variation: Byte = v
