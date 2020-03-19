@@ -121,49 +121,49 @@ impl GroupVar {
                 1 => Some(GroupVar::Group1Var1),
                 2 => Some(GroupVar::Group1Var2),
                 _ => None,
-            }
+            },
             2 => match var {
                 0 => Some(GroupVar::Group2Var0),
                 1 => Some(GroupVar::Group2Var1),
                 2 => Some(GroupVar::Group2Var2),
                 3 => Some(GroupVar::Group2Var3),
                 _ => None,
-            }
+            },
             3 => match var {
                 0 => Some(GroupVar::Group3Var0),
                 1 => Some(GroupVar::Group3Var1),
                 2 => Some(GroupVar::Group3Var2),
                 _ => None,
-            }
+            },
             4 => match var {
                 0 => Some(GroupVar::Group4Var0),
                 1 => Some(GroupVar::Group4Var1),
                 2 => Some(GroupVar::Group4Var2),
                 3 => Some(GroupVar::Group4Var3),
                 _ => None,
-            }
+            },
             10 => match var {
                 0 => Some(GroupVar::Group10Var0),
                 1 => Some(GroupVar::Group10Var1),
                 2 => Some(GroupVar::Group10Var2),
                 _ => None,
-            }
+            },
             11 => match var {
                 0 => Some(GroupVar::Group11Var0),
                 1 => Some(GroupVar::Group11Var1),
                 2 => Some(GroupVar::Group11Var2),
                 _ => None,
-            }
+            },
             12 => match var {
                 0 => Some(GroupVar::Group12Var0),
                 1 => Some(GroupVar::Group12Var1),
                 _ => None,
-            }
+            },
             13 => match var {
                 1 => Some(GroupVar::Group13Var1),
                 2 => Some(GroupVar::Group13Var2),
                 _ => None,
-            }
+            },
             20 => match var {
                 0 => Some(GroupVar::Group20Var0),
                 1 => Some(GroupVar::Group20Var1),
@@ -171,7 +171,7 @@ impl GroupVar {
                 5 => Some(GroupVar::Group20Var5),
                 6 => Some(GroupVar::Group20Var6),
                 _ => None,
-            }
+            },
             21 => match var {
                 0 => Some(GroupVar::Group21Var0),
                 1 => Some(GroupVar::Group21Var1),
@@ -181,7 +181,7 @@ impl GroupVar {
                 9 => Some(GroupVar::Group21Var9),
                 10 => Some(GroupVar::Group21Var10),
                 _ => None,
-            }
+            },
             22 => match var {
                 0 => Some(GroupVar::Group22Var0),
                 1 => Some(GroupVar::Group22Var1),
@@ -189,7 +189,7 @@ impl GroupVar {
                 5 => Some(GroupVar::Group22Var5),
                 6 => Some(GroupVar::Group22Var6),
                 _ => None,
-            }
+            },
             23 => match var {
                 0 => Some(GroupVar::Group23Var0),
                 1 => Some(GroupVar::Group23Var1),
@@ -197,7 +197,7 @@ impl GroupVar {
                 5 => Some(GroupVar::Group23Var5),
                 6 => Some(GroupVar::Group23Var6),
                 _ => None,
-            }
+            },
             30 => match var {
                 0 => Some(GroupVar::Group30Var0),
                 1 => Some(GroupVar::Group30Var1),
@@ -207,7 +207,7 @@ impl GroupVar {
                 5 => Some(GroupVar::Group30Var5),
                 6 => Some(GroupVar::Group30Var6),
                 _ => None,
-            }
+            },
             32 => match var {
                 0 => Some(GroupVar::Group32Var0),
                 1 => Some(GroupVar::Group32Var1),
@@ -219,7 +219,7 @@ impl GroupVar {
                 7 => Some(GroupVar::Group32Var7),
                 8 => Some(GroupVar::Group32Var8),
                 _ => None,
-            }
+            },
             40 => match var {
                 0 => Some(GroupVar::Group40Var0),
                 1 => Some(GroupVar::Group40Var1),
@@ -227,7 +227,7 @@ impl GroupVar {
                 3 => Some(GroupVar::Group40Var3),
                 4 => Some(GroupVar::Group40Var4),
                 _ => None,
-            }
+            },
             41 => match var {
                 0 => Some(GroupVar::Group41Var0),
                 1 => Some(GroupVar::Group41Var1),
@@ -235,7 +235,7 @@ impl GroupVar {
                 3 => Some(GroupVar::Group41Var3),
                 4 => Some(GroupVar::Group41Var4),
                 _ => None,
-            }
+            },
             42 => match var {
                 0 => Some(GroupVar::Group42Var0),
                 1 => Some(GroupVar::Group42Var1),
@@ -247,7 +247,7 @@ impl GroupVar {
                 7 => Some(GroupVar::Group42Var7),
                 8 => Some(GroupVar::Group42Var8),
                 _ => None,
-            }
+            },
             43 => match var {
                 1 => Some(GroupVar::Group43Var1),
                 2 => Some(GroupVar::Group43Var2),
@@ -258,30 +258,30 @@ impl GroupVar {
                 7 => Some(GroupVar::Group43Var7),
                 8 => Some(GroupVar::Group43Var8),
                 _ => None,
-            }
+            },
             50 => match var {
                 1 => Some(GroupVar::Group50Var1),
                 3 => Some(GroupVar::Group50Var3),
                 4 => Some(GroupVar::Group50Var4),
                 _ => None,
-            }
+            },
             51 => match var {
                 1 => Some(GroupVar::Group51Var1),
                 2 => Some(GroupVar::Group51Var2),
                 _ => None,
-            }
+            },
             52 => match var {
                 1 => Some(GroupVar::Group52Var1),
                 2 => Some(GroupVar::Group52Var2),
                 _ => None,
-            }
+            },
             60 => match var {
                 1 => Some(GroupVar::Group60Var1),
                 2 => Some(GroupVar::Group60Var2),
                 3 => Some(GroupVar::Group60Var3),
                 4 => Some(GroupVar::Group60Var4),
                 _ => None,
-            }
+            },
             _ => None,
         }
     }

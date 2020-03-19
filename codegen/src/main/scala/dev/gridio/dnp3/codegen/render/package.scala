@@ -25,6 +25,12 @@ package object render {
     } ++ "}".eol
   }
 
+  def bracketComma(s: String)(inner: => Iterator[String])(implicit indent: Indentation): Iterator[String] = {
+    (s + " {").eol ++ indent {
+      inner
+    } ++ "},".eol
+  }
+
   def paren(s: String)(inner: => Iterator[String])(implicit indent: Indentation): Iterator[String] = {
     (s + "(").eol ++ indent {
       inner

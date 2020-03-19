@@ -11,7 +11,7 @@ object GroupVarEnumModule {
       bracket("pub fn lookup(group: u8, var: u8) -> Option<GroupVar>") {
         bracket("match group") {
           ObjectGroup.all.iterator.flatMap { g =>
-            bracket(s"${g.group} => match var") {
+            bracketComma(s"${g.group} => match var") {
               g.variations.iterator.flatMap { v =>
                 s"${v.variation} => Some(GroupVar::${v.name}),".eol
               } ++ "_ => None,".eol
