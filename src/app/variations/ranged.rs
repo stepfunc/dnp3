@@ -13,7 +13,8 @@
 use crate::app::range::RangedSequence;
 use crate::app::variations::fixed::*;
 
-pub enum RangedVariation<'a> {
+#[derive(Debug, PartialEq)]
+pub enum RangedVarData<'a> {
     Group1Var0,
     Group1Var2(RangedSequence<'a, Group1Var2>),
     Group3Var0,

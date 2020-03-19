@@ -1,6 +1,7 @@
-use crate::app::header::{Header, RangedVariation};
+use crate::app::header::Header;
 use crate::app::range::{InvalidRange, Range, RangedSequence};
 use crate::app::variations::gv::GroupVar;
+use crate::app::variations::ranged::RangedVarData;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 pub struct Parser<'a> {
@@ -116,17 +117,11 @@ impl<'a> Parser<'a> {
         &mut self,
         gv: GroupVar,
         range: Range,
-    ) -> Result<RangedVariation<'a>, ParseError> {
+    ) -> Result<RangedVarData<'a>, ParseError> {
         let variation = match gv {
-            GroupVar::Group1Var1 => RangedVariation::Group1Var1(),
-            GroupVar::Group2Var1 => {
-                RangedVariation::Group2Var1(RangedSequence::parse(range, &mut self.cursor)?)
-            }
-            GroupVar::Group2Var2 => {
-                RangedVariation::Group2Var2(RangedSequence::parse(range, &mut self.cursor)?)
-            }
-            GroupVar::Group2Var3 => {
-                RangedVariation::Group2Var3(RangedSequence::parse(range, &mut self.cursor)?)
+            GroupVar::Group1Var0 => RangedVarData::Group1Var0,
+            GroupVar::Group1Var2 => {
+                RangedVarData::Group1Var2(RangedSequence::parse(range, &mut self.cursor)?)
             }
             _ => return Err(ParseError::InvalidQualifierAndObject),
         };
@@ -150,13 +145,13 @@ mod test {
     use crate::app::variations::fixed::*;
 
     #[test]
-    fn parses_range_of_g2v1() {
-        let input = [0x02, 0x01, 0x00, 0x02, 0x03, 0xAA, 0xBB];
+    fn parses_range_of_g1v2() {
+        let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 
         let mut parser = Parser::new(&input);
 
-        let items: Vec<(Group2Var1, u16)> = match parser.next().unwrap().unwrap() {
-            Header::OneByteStartStop(02, 03, RangedVariation::Group2Var1(seq)) => {
+        let items: Vec<(Group1Var2, u16)> = match parser.next().unwrap().unwrap() {
+            Header::OneByteStartStop(02, 03, RangedVarData::Group1Var2(seq)) => {
                 seq.iter().collect()
             }
             x => panic!("got: {:?}", x),
@@ -165,8 +160,8 @@ mod test {
         assert_eq!(
             items,
             vec![
-                (Group2Var1 { flags: 0xAA }, 2),
-                (Group2Var1 { flags: 0xBB }, 3)
+                (Group1Var2 { flags: 0xAA }, 2),
+                (Group1Var2 { flags: 0xBB }, 3)
             ]
         );
 

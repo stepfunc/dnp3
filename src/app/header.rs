@@ -1,5 +1,4 @@
-use super::variations::fixed::*;
-use crate::app::range::RangedSequence;
+use crate::app::variations::ranged::RangedVarData;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 pub trait FixedSizeVariation
@@ -12,23 +11,15 @@ where
 }
 
 #[derive(Debug, PartialEq)]
-pub enum RangedVariation<'a> {
-    Group1Var1(), // TODO
-    Group1Var2(RangedSequence<'a, Group1Var2>),
-    Group2Var1(RangedSequence<'a, Group2Var1>),
-    Group2Var2(RangedSequence<'a, Group2Var2>),
-    Group2Var3(RangedSequence<'a, Group2Var3>),
-}
-
-#[derive(Debug, PartialEq)]
 pub enum Header<'a> {
-    OneByteStartStop(u8, u8, RangedVariation<'a>),
-    TwoByteStartStop(u16, u16, RangedVariation<'a>),
+    OneByteStartStop(u8, u8, RangedVarData<'a>),
+    TwoByteStartStop(u16, u16, RangedVarData<'a>),
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use crate::app::range::RangedSequence;
+    use crate::app::variations::fixed::Group2Var1;
 
     #[test]
     fn iterates_over_g2v1() {

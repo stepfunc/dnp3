@@ -22,7 +22,8 @@ object RangedVariationModule extends Module {
       s"${v.name},"
     }
 
-    bracket("pub enum RangedVariation<'a>") {
+    "#[derive(Debug, PartialEq)]".eol ++
+    bracket("pub enum RangedVarData<'a>") {
       ObjectGroup.allVariations.iterator.collect {
         case v : AnyVariation if v.parent.isStaticGroup => getAnyVarDefinition(v)
         case v : FixedSize if v.parent.isStaticGroup => getFixedVarDefinition(v)
