@@ -1,18 +1,18 @@
 package dev.gridio.dnp3.codegen.model.groups
 
+import dev.gridio.dnp3.codegen.model._
 import dev.gridio.dnp3.codegen.model.FixedSizeField._
 import dev.gridio.dnp3.codegen.model.VariationNames._
-import dev.gridio.dnp3.codegen.model.{AnyVariation, FixedSize, GroupVariation, ObjectGroup}
 
 // analog input event
 object Group32 extends ObjectGroup {
-  def variations: List[GroupVariation] = List(Group32Var0, Group32Var1, Group32Var2, Group32Var3, Group32Var4, Group32Var5, Group32Var6, Group32Var7, Group32Var8)
+  def variations: List[Variation] = List(Group32Var0, Group32Var1, Group32Var2, Group32Var3, Group32Var4, Group32Var5, Group32Var6, Group32Var7, Group32Var8)
 
   def group: Byte = 32
 
   def desc: String = "Analog Input Event"
 
-  def isEventGroup: Boolean = true
+  override def groupType: GroupType = EventGroupType
 }
 
 object Group32Var0 extends AnyVariation(Group32, 0)

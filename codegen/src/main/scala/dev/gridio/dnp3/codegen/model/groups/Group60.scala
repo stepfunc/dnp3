@@ -1,15 +1,15 @@
 package dev.gridio.dnp3.codegen.model.groups
 
-import dev.gridio.dnp3.codegen.model.{ClassData, GroupVariation, ObjectGroup}
+import dev.gridio.dnp3.codegen.model._
 
 object Group60 extends ObjectGroup {
-  def variations: List[GroupVariation] = List(Group60Var1, Group60Var2, Group60Var3, Group60Var4)
+  def variations: List[Variation] = List(Group60Var1, Group60Var2, Group60Var3, Group60Var4)
 
   def group: Byte = 60
 
   def desc: String = "Class Data"
 
-  def isEventGroup: Boolean = false
+  override def groupType: GroupType = OtherGroupType
 }
 
 object Group60Var1 extends ClassData(Group60, 1, "Class 0")

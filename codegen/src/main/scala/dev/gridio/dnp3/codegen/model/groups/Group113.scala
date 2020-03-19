@@ -1,15 +1,15 @@
 package dev.gridio.dnp3.codegen.model.groups
 
-import dev.gridio.dnp3.codegen.model.{GroupVariation, ObjectGroup, SizedByVariation}
+import dev.gridio.dnp3.codegen.model._
 
 object Group113 extends ObjectGroup {
-  def variations: List[GroupVariation] = List(Group113AnyVar)
+  def variations: List[Variation] = List(Group113AnyVar)
 
   def group: Byte = 113
 
   def desc: String = "Virtual Terminal Event Data"
 
-  def isEventGroup: Boolean = true
+  override def groupType: GroupType = EventGroupType
 }
 
 object Group113AnyVar extends SizedByVariation(Group113, 0)

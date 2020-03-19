@@ -7,7 +7,7 @@ import dev.gridio.dnp3.codegen.model._
 // frozen counters
 object Group21 extends ObjectGroup {
 
-  def variations: List[GroupVariation] = List(
+  def variations: List[Variation] = List(
     Group21Var0,
     Group21Var1,
     Group21Var2,
@@ -21,7 +21,7 @@ object Group21 extends ObjectGroup {
 
   def desc: String = "Frozen Counter"
 
-  def isEventGroup: Boolean = false
+  override def groupType: GroupType = StaticGroupType
 
 }
 

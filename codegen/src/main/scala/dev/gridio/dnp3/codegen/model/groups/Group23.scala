@@ -1,18 +1,18 @@
 package dev.gridio.dnp3.codegen.model.groups
 
+import dev.gridio.dnp3.codegen.model._
 import dev.gridio.dnp3.codegen.model.FixedSizeField._
 import dev.gridio.dnp3.codegen.model.VariationNames._
-import dev.gridio.dnp3.codegen.model.{AnyVariation, FixedSize, GroupVariation, ObjectGroup}
 
 // frozen counter events
 object Group23 extends ObjectGroup {
-  def variations: List[GroupVariation] = List(Group23Var0, Group23Var1, Group23Var2, Group23Var5, Group23Var6)
+  def variations: List[Variation] = List(Group23Var0, Group23Var1, Group23Var2, Group23Var5, Group23Var6)
 
   def group: Byte = 23
 
   def desc: String = "Frozen Counter Event"
 
-  def isEventGroup: Boolean = true
+  override def groupType: GroupType = EventGroupType
 }
 
 object Group23Var0 extends AnyVariation(Group23, 0)

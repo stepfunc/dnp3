@@ -4,13 +4,13 @@ import dev.gridio.dnp3.codegen.model.FixedSizeField._
 import dev.gridio.dnp3.codegen.model._
 
 object Group122 extends ObjectGroup {
-  def variations: List[GroupVariation] = List(Group122Var0, Group122Var1, Group122Var2)
+  def variations: List[Variation] = List(Group122Var0, Group122Var1, Group122Var2)
 
   def group: Byte = 122
 
   def desc: String = "Security Statistic event"
 
-  def isEventGroup: Boolean = true
+  override def groupType: GroupType = OtherGroupType
 }
 
 object Group122Var0 extends AnyVariation(Group122, 0)

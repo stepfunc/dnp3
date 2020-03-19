@@ -1,18 +1,20 @@
 package dev.gridio.dnp3.codegen.model
 
-object GroupVariation {
-
+object Variation {
   case class Id(group: Byte, variation: Byte)
-
 }
+
+
+
+
 
 
 /**
  * Base trait for DNP3 objects
  */
-trait GroupVariation {
+trait Variation {
 
-  import GroupVariation.Id
+  import Variation.Id
 
   final def group: Byte = parent.group
 
@@ -22,15 +24,13 @@ trait GroupVariation {
 
   final def fullDesc: String = s"${parent.desc} - ${desc}"
 
-  final def shortValue: Int = group * 256 + variation
-
   def variation: Byte
 
   def parent: ObjectGroup
 
   def desc: String
 
-  def attributes: Set[FieldAttribute.Value]
+  def fieldAttributes: Set[FieldAttribute.Value]
 }
 
 class AnyVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g, v, "Any Variation")
@@ -45,14 +45,14 @@ class SingleBitField(g: ObjectGroup, v: Byte, description: String) extends Basic
 
 class DoubleBitField(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g, v, description)
 
-sealed abstract class BasicGroupVariation(g: ObjectGroup, v: Byte, description: String) extends GroupVariation {
+sealed abstract class BasicGroupVariation(g: ObjectGroup, v: Byte, description: String) extends Variation {
   def variation: Byte = v
 
   def parent: ObjectGroup = g
 
   def desc: String = description
 
-  def attributes: Set[FieldAttribute.Value] = Set.empty
+  def fieldAttributes: Set[FieldAttribute.Value] = Set.empty
 }
 
 class AuthVariableSize(g: ObjectGroup,
@@ -84,5 +84,5 @@ class FixedSize(g: ObjectGroup, v: Byte, description: String)(fs: FixedSizeField
 
   def size: Int = fs.map(x => x.typ.numBytes).sum
 
-  override def attributes: Set[FieldAttribute.Value] = fs.flatMap(_.attributes).toSet
+  override def fieldAttributes: Set[FieldAttribute.Value] = fs.flatMap(_.attributes).toSet
 }

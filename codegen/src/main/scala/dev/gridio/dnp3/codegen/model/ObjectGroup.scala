@@ -4,7 +4,7 @@ import dev.gridio.dnp3.codegen.model.groups._
 
 object ObjectGroup {
 
-  def allVariations : List[GroupVariation] = all.flatMap(g => g.variations)
+  def allVariations : List[Variation] = all.flatMap(g => g.variations)
 
   val all: List[ObjectGroup] = List(
     Group1,
@@ -44,9 +44,14 @@ object ObjectGroup {
 
 }
 
+sealed trait GroupType
+object StaticGroupType extends GroupType
+object EventGroupType extends GroupType
+object OtherGroupType extends GroupType
+
 trait ObjectGroup {
 
-  def variations: List[GroupVariation]
+  def variations: List[Variation]
 
   def group: Byte
 
@@ -54,7 +59,11 @@ trait ObjectGroup {
 
   def desc: String
 
-  def isEventGroup: Boolean
+  final def isEventGroup: Boolean = {
+    groupType == EventGroupType
+  }
 
   def hasSizedObjects: Boolean = variations.exists(x => x.isInstanceOf[FixedSizeField])
+
+  def groupType : GroupType
 }

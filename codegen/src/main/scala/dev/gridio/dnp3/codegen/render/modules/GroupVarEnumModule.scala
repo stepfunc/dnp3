@@ -1,6 +1,6 @@
 package dev.gridio.dnp3.codegen.render.modules
 
-import dev.gridio.dnp3.codegen.model.{AnyVariation, FixedSize, GroupVariation, ObjectGroup}
+import dev.gridio.dnp3.codegen.model.{AnyVariation, FixedSize, Variation, ObjectGroup}
 import dev.gridio.dnp3.codegen.render._
 
 object GroupVarEnumModule {
@@ -25,7 +25,7 @@ object GroupVarEnumModule {
 
   private def enumDefinition(implicit indent: Indentation) : Iterator[String] = {
 
-    def getVariationDefinition(v: GroupVariation) : String = v match {
+    def getVariationDefinition(v: Variation) : String = v match {
       case _ =>  s"${v.name}"
     }
 

@@ -6,7 +6,7 @@ import dev.gridio.dnp3.codegen.model._
 
 object Group120 extends ObjectGroup {
 
-  def variations: List[GroupVariation] = List(
+  def variations: List[Variation] = List(
     Group120Var1,
     Group120Var2,
     Group120Var3,
@@ -28,7 +28,7 @@ object Group120 extends ObjectGroup {
 
   def desc: String = "Authentication"
 
-  def isEventGroup: Boolean = false
+  override def groupType: GroupType = OtherGroupType
 }
 
 object Group120Var1 extends AuthVariableSize(Group120, 1, "Challenge",

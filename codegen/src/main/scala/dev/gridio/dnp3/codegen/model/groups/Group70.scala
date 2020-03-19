@@ -1,10 +1,10 @@
 package dev.gridio.dnp3.codegen.model.groups
 
-import dev.gridio.dnp3.codegen.model.{DefaultVariableSize, GroupVariation, ObjectGroup}
+import dev.gridio.dnp3.codegen.model._
 
 object Group70 extends ObjectGroup {
 
-  def variations: List[GroupVariation] = List(
+  def variations: List[Variation] = List(
     Group70Var1,
     Group70Var2,
     Group70Var3,
@@ -19,8 +19,7 @@ object Group70 extends ObjectGroup {
 
   def desc: String = "File-control"
 
-  def isEventGroup: Boolean = false
-
+  override def groupType: GroupType = OtherGroupType
 }
 
 object Group70Var1 extends DefaultVariableSize(Group70, 1, "File identifier")

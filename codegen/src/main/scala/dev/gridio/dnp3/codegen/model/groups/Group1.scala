@@ -4,13 +4,14 @@ import dev.gridio.dnp3.codegen.model.VariationNames._
 import dev.gridio.dnp3.codegen.model._
 
 object Group1 extends ObjectGroup {
-  def variations: List[GroupVariation] = List(Group1Var0, Group1Var1, Group1Var2)
+
+  def variations: List[Variation] = List(Group1Var0, Group1Var1, Group1Var2)
 
   def desc: String = "Binary Input"
 
   def group: Byte = 1
 
-  def isEventGroup: Boolean = false
+  override def groupType: GroupType = StaticGroupType
 }
 
 object Group1Var0 extends AnyVariation(Group1, 0)

@@ -1,17 +1,17 @@
 package dev.gridio.dnp3.codegen.model.groups
 
+import dev.gridio.dnp3.codegen.model._
 import dev.gridio.dnp3.codegen.model.FixedSizeField._
 import dev.gridio.dnp3.codegen.model.VariationNames._
-import dev.gridio.dnp3.codegen.model._
 
 object Group3 extends ObjectGroup {
-  def variations: List[GroupVariation] = List(Group3Var0, Group3Var1, Group3Var2)
+  def variations: List[Variation] = List(Group3Var0, Group3Var1, Group3Var2)
 
   def group: Byte = 3
 
   def desc: String = "Double-bit Binary Input"
 
-  def isEventGroup: Boolean = false
+  override def groupType: GroupType = StaticGroupType
 }
 
 object Group3Var0 extends AnyVariation(Group3, 0)

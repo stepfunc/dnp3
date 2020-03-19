@@ -20,7 +20,7 @@ class GroupVariationTestSuite extends AnyFunSuite with Matchers {
       gv <- group.variations
     } yield gv.id
 
-    ids.foldLeft(Set.empty[GroupVariation.Id]) { (set, id) =>
+    ids.foldLeft(Set.empty[Variation.Id]) { (set, id) =>
       if (set(id)) fail("collision at " + id)
       set + id
     }

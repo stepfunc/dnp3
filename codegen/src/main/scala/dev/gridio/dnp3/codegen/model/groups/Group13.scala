@@ -1,18 +1,17 @@
 package dev.gridio.dnp3.codegen.model.groups
 
+import dev.gridio.dnp3.codegen.model._
 import dev.gridio.dnp3.codegen.model.FixedSizeField._
 import dev.gridio.dnp3.codegen.model.VariationNames._
-import dev.gridio.dnp3.codegen.model.{FixedSize, GroupVariation, ObjectGroup}
-
 
 object Group13 extends ObjectGroup {
-  def variations: List[GroupVariation] = List(Group13Var1, Group13Var2)
+  def variations: List[Variation] = List(Group13Var1, Group13Var2)
 
   def group: Byte = 13
 
   def desc: String = "Binary Command Event"
 
-  def isEventGroup: Boolean = true
+  override def groupType: GroupType = EventGroupType
 }
 
 object Group13Var1 extends FixedSize(Group13, 1, withoutTime)(flags)
