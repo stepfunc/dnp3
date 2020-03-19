@@ -14,7 +14,7 @@ object Main {
   def main(args: Array[String]): Unit = {
 
     writeTo(fixedSizePath)(FixedSizeVariationModule)
-    writeTo(gvPath)(GroupVarEnumModule)
+    writeTo(gvPath)(VariationEnumModule)
     writeTo(rangedPath)(RangedVariationModule)
 
   }

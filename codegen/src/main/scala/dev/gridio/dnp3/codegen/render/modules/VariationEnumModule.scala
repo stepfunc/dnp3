@@ -3,7 +3,7 @@ package dev.gridio.dnp3.codegen.render.modules
 import dev.gridio.dnp3.codegen.model.{AnyVariation, FixedSize, Variation, ObjectGroup}
 import dev.gridio.dnp3.codegen.render._
 
-object GroupVarEnumModule extends Module {
+object VariationEnumModule extends Module {
 
   override def lines(implicit indent: Indentation) : Iterator[String] = {
     enumDefinition ++ space ++ enumImpl
@@ -11,13 +11,13 @@ object GroupVarEnumModule extends Module {
 
   private def enumImpl(implicit indent: Indentation) : Iterator[String] = {
 
-    bracket("impl GroupVar") {
-      bracket("pub fn lookup(group: u8, var: u8) -> Option<GroupVar>") {
+    bracket("impl Variation") {
+      bracket("pub fn lookup(group: u8, var: u8) -> Option<Variation>") {
         bracket("match group") {
           ObjectGroup.all.iterator.flatMap { g =>
             bracketComma(s"${g.group} => match var") {
               g.variations.iterator.flatMap { v =>
-                s"${v.variation} => Some(GroupVar::${v.name}),".eol
+                s"${v.variation} => Some(Variation::${v.name}),".eol
               } ++ "_ => None,".eol
             }
           } ++ "_ => None,".eol
@@ -33,7 +33,7 @@ object GroupVarEnumModule extends Module {
       case _ =>  s"${v.name}"
     }
 
-    bracket("pub enum GroupVar") {
+    bracket("pub enum Variation") {
       ObjectGroup.allVariations.iterator.flatMap(v => s"${getVariationDefinition(v)},".eol)
     }
   }

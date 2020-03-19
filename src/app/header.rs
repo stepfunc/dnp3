@@ -1,5 +1,5 @@
-use crate::app::variations::ranged::RangedVarData;
 use crate::util::cursor::{ReadCursor, ReadError};
+use crate::app::variations::ranged::RangedVariation;
 
 pub trait FixedSizeVariation
 where
@@ -12,8 +12,8 @@ where
 
 #[derive(Debug, PartialEq)]
 pub enum Header<'a> {
-    OneByteStartStop(u8, u8, RangedVarData<'a>),
-    TwoByteStartStop(u16, u16, RangedVarData<'a>),
+    OneByteStartStop(u8, u8, RangedVariation<'a>),
+    TwoByteStartStop(u16, u16, RangedVariation<'a>),
 }
 
 #[cfg(test)]
