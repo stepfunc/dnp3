@@ -63,6 +63,10 @@ trait ObjectGroup {
     groupType == EventGroupType
   }
 
+  final def isStaticGroup: Boolean = {
+    groupType == StaticGroupType
+  }
+
   def hasSizedObjects: Boolean = variations.exists(x => x.isInstanceOf[FixedSizeField])
 
   def groupType : GroupType
