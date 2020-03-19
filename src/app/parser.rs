@@ -1,7 +1,7 @@
 use crate::app::header::{Header, RangedVariation};
 use crate::app::range::{InvalidRange, Range, RangedSequence};
-use crate::util::cursor::{ReadCursor, ReadError};
 use crate::app::variations::gv::GroupVar;
+use crate::util::cursor::{ReadCursor, ReadError};
 
 pub struct Parser<'a> {
     errored: bool,
@@ -14,7 +14,7 @@ impl GroupVar {
         let var = cursor.read_u8()?;
         match Self::lookup(group, var) {
             Some(gv) => Ok(gv),
-            None => Err(ParseError::UnknownGroupVariation(group, var))
+            None => Err(ParseError::UnknownGroupVariation(group, var)),
         }
     }
 }
@@ -25,7 +25,7 @@ pub enum ParseError {
     UnknownQualifier(u8),
     InsufficientBytes,
     InvalidRange,
-    InvalidQualifierAndObject
+    InvalidQualifierAndObject,
 }
 
 impl std::convert::From<ReadError> for ParseError {
@@ -128,7 +128,7 @@ impl<'a> Parser<'a> {
             GroupVar::Group2Var3 => {
                 RangedVariation::Group2Var3(RangedSequence::parse(range, &mut self.cursor)?)
             }
-            _ => return Err(ParseError::InvalidQualifierAndObject)
+            _ => return Err(ParseError::InvalidQualifierAndObject),
         };
         Ok(variation)
     }

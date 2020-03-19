@@ -61,6 +61,7 @@ object FixedSizeVariationModule {
 
   private def implFixedSizedVariation(gv : FixedSize)(implicit indent: Indentation): Iterator[String] = {
     def implParse : Iterator[String] = {
+      "#[rustfmt::skip]".eol ++
       bracket(s"fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError>") {
         paren("Ok") {
           bracket(s"${gv.name}") {

@@ -14,9 +14,9 @@ object GroupVarEnumModule {
             bracket(s"${g.group} => match var") {
               g.variations.iterator.flatMap { v =>
                 s"${v.variation} => Some(GroupVar::${v.name}),".eol
-              } ++ "_ => None".eol
+              } ++ "_ => None,".eol
             }
-          } ++ "_ => None".eol
+          } ++ "_ => None,".eol
         }
       }
     }

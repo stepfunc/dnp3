@@ -480,6 +480,7 @@ pub struct Group52Var2 {
 
 impl FixedSizeVariation for Group1Var2 {
     const SIZE: u8 = 1;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group1Var2 {
@@ -491,6 +492,7 @@ impl FixedSizeVariation for Group1Var2 {
 
 impl FixedSizeVariation for Group2Var1 {
     const SIZE: u8 = 1;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group2Var1 {
@@ -502,6 +504,7 @@ impl FixedSizeVariation for Group2Var1 {
 
 impl FixedSizeVariation for Group2Var2 {
     const SIZE: u8 = 7;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group2Var2 {
@@ -514,6 +517,7 @@ impl FixedSizeVariation for Group2Var2 {
 
 impl FixedSizeVariation for Group2Var3 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group2Var3 {
@@ -526,6 +530,7 @@ impl FixedSizeVariation for Group2Var3 {
 
 impl FixedSizeVariation for Group3Var2 {
     const SIZE: u8 = 1;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group3Var2 {
@@ -537,6 +542,7 @@ impl FixedSizeVariation for Group3Var2 {
 
 impl FixedSizeVariation for Group4Var1 {
     const SIZE: u8 = 1;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group4Var1 {
@@ -548,6 +554,7 @@ impl FixedSizeVariation for Group4Var1 {
 
 impl FixedSizeVariation for Group4Var2 {
     const SIZE: u8 = 7;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group4Var2 {
@@ -560,6 +567,7 @@ impl FixedSizeVariation for Group4Var2 {
 
 impl FixedSizeVariation for Group4Var3 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group4Var3 {
@@ -572,6 +580,7 @@ impl FixedSizeVariation for Group4Var3 {
 
 impl FixedSizeVariation for Group10Var2 {
     const SIZE: u8 = 1;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group10Var2 {
@@ -583,6 +592,7 @@ impl FixedSizeVariation for Group10Var2 {
 
 impl FixedSizeVariation for Group11Var1 {
     const SIZE: u8 = 1;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group11Var1 {
@@ -594,6 +604,7 @@ impl FixedSizeVariation for Group11Var1 {
 
 impl FixedSizeVariation for Group11Var2 {
     const SIZE: u8 = 7;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group11Var2 {
@@ -606,6 +617,7 @@ impl FixedSizeVariation for Group11Var2 {
 
 impl FixedSizeVariation for Group12Var1 {
     const SIZE: u8 = 11;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group12Var1 {
@@ -621,6 +633,7 @@ impl FixedSizeVariation for Group12Var1 {
 
 impl FixedSizeVariation for Group13Var1 {
     const SIZE: u8 = 1;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group13Var1 {
@@ -632,6 +645,7 @@ impl FixedSizeVariation for Group13Var1 {
 
 impl FixedSizeVariation for Group13Var2 {
     const SIZE: u8 = 7;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group13Var2 {
@@ -644,6 +658,7 @@ impl FixedSizeVariation for Group13Var2 {
 
 impl FixedSizeVariation for Group20Var1 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group20Var1 {
@@ -656,6 +671,7 @@ impl FixedSizeVariation for Group20Var1 {
 
 impl FixedSizeVariation for Group20Var2 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group20Var2 {
@@ -668,6 +684,7 @@ impl FixedSizeVariation for Group20Var2 {
 
 impl FixedSizeVariation for Group20Var5 {
     const SIZE: u8 = 4;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group20Var5 {
@@ -679,6 +696,7 @@ impl FixedSizeVariation for Group20Var5 {
 
 impl FixedSizeVariation for Group20Var6 {
     const SIZE: u8 = 2;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group20Var6 {
@@ -690,6 +708,7 @@ impl FixedSizeVariation for Group20Var6 {
 
 impl FixedSizeVariation for Group21Var1 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var1 {
@@ -702,6 +721,7 @@ impl FixedSizeVariation for Group21Var1 {
 
 impl FixedSizeVariation for Group21Var2 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var2 {
@@ -714,6 +734,7 @@ impl FixedSizeVariation for Group21Var2 {
 
 impl FixedSizeVariation for Group21Var5 {
     const SIZE: u8 = 11;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var5 {
@@ -727,6 +748,7 @@ impl FixedSizeVariation for Group21Var5 {
 
 impl FixedSizeVariation for Group21Var6 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var6 {
@@ -740,6 +762,7 @@ impl FixedSizeVariation for Group21Var6 {
 
 impl FixedSizeVariation for Group21Var9 {
     const SIZE: u8 = 4;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var9 {
@@ -751,6 +774,7 @@ impl FixedSizeVariation for Group21Var9 {
 
 impl FixedSizeVariation for Group21Var10 {
     const SIZE: u8 = 2;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var10 {
@@ -762,6 +786,7 @@ impl FixedSizeVariation for Group21Var10 {
 
 impl FixedSizeVariation for Group22Var1 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group22Var1 {
@@ -774,6 +799,7 @@ impl FixedSizeVariation for Group22Var1 {
 
 impl FixedSizeVariation for Group22Var2 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group22Var2 {
@@ -786,6 +812,7 @@ impl FixedSizeVariation for Group22Var2 {
 
 impl FixedSizeVariation for Group22Var5 {
     const SIZE: u8 = 11;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group22Var5 {
@@ -799,6 +826,7 @@ impl FixedSizeVariation for Group22Var5 {
 
 impl FixedSizeVariation for Group22Var6 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group22Var6 {
@@ -812,6 +840,7 @@ impl FixedSizeVariation for Group22Var6 {
 
 impl FixedSizeVariation for Group23Var1 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group23Var1 {
@@ -824,6 +853,7 @@ impl FixedSizeVariation for Group23Var1 {
 
 impl FixedSizeVariation for Group23Var2 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group23Var2 {
@@ -836,6 +866,7 @@ impl FixedSizeVariation for Group23Var2 {
 
 impl FixedSizeVariation for Group23Var5 {
     const SIZE: u8 = 11;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group23Var5 {
@@ -849,6 +880,7 @@ impl FixedSizeVariation for Group23Var5 {
 
 impl FixedSizeVariation for Group23Var6 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group23Var6 {
@@ -862,6 +894,7 @@ impl FixedSizeVariation for Group23Var6 {
 
 impl FixedSizeVariation for Group30Var1 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var1 {
@@ -874,6 +907,7 @@ impl FixedSizeVariation for Group30Var1 {
 
 impl FixedSizeVariation for Group30Var2 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var2 {
@@ -886,6 +920,7 @@ impl FixedSizeVariation for Group30Var2 {
 
 impl FixedSizeVariation for Group30Var3 {
     const SIZE: u8 = 4;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var3 {
@@ -897,6 +932,7 @@ impl FixedSizeVariation for Group30Var3 {
 
 impl FixedSizeVariation for Group30Var4 {
     const SIZE: u8 = 2;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var4 {
@@ -908,6 +944,7 @@ impl FixedSizeVariation for Group30Var4 {
 
 impl FixedSizeVariation for Group30Var5 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var5 {
@@ -920,6 +957,7 @@ impl FixedSizeVariation for Group30Var5 {
 
 impl FixedSizeVariation for Group30Var6 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var6 {
@@ -932,6 +970,7 @@ impl FixedSizeVariation for Group30Var6 {
 
 impl FixedSizeVariation for Group32Var1 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var1 {
@@ -944,6 +983,7 @@ impl FixedSizeVariation for Group32Var1 {
 
 impl FixedSizeVariation for Group32Var2 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var2 {
@@ -956,6 +996,7 @@ impl FixedSizeVariation for Group32Var2 {
 
 impl FixedSizeVariation for Group32Var3 {
     const SIZE: u8 = 11;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var3 {
@@ -969,6 +1010,7 @@ impl FixedSizeVariation for Group32Var3 {
 
 impl FixedSizeVariation for Group32Var4 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var4 {
@@ -982,6 +1024,7 @@ impl FixedSizeVariation for Group32Var4 {
 
 impl FixedSizeVariation for Group32Var5 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var5 {
@@ -994,6 +1037,7 @@ impl FixedSizeVariation for Group32Var5 {
 
 impl FixedSizeVariation for Group32Var6 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var6 {
@@ -1006,6 +1050,7 @@ impl FixedSizeVariation for Group32Var6 {
 
 impl FixedSizeVariation for Group32Var7 {
     const SIZE: u8 = 11;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var7 {
@@ -1019,6 +1064,7 @@ impl FixedSizeVariation for Group32Var7 {
 
 impl FixedSizeVariation for Group32Var8 {
     const SIZE: u8 = 15;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var8 {
@@ -1032,6 +1078,7 @@ impl FixedSizeVariation for Group32Var8 {
 
 impl FixedSizeVariation for Group40Var1 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group40Var1 {
@@ -1044,6 +1091,7 @@ impl FixedSizeVariation for Group40Var1 {
 
 impl FixedSizeVariation for Group40Var2 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group40Var2 {
@@ -1056,6 +1104,7 @@ impl FixedSizeVariation for Group40Var2 {
 
 impl FixedSizeVariation for Group40Var3 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group40Var3 {
@@ -1068,6 +1117,7 @@ impl FixedSizeVariation for Group40Var3 {
 
 impl FixedSizeVariation for Group40Var4 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group40Var4 {
@@ -1080,6 +1130,7 @@ impl FixedSizeVariation for Group40Var4 {
 
 impl FixedSizeVariation for Group41Var1 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group41Var1 {
@@ -1092,6 +1143,7 @@ impl FixedSizeVariation for Group41Var1 {
 
 impl FixedSizeVariation for Group41Var2 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group41Var2 {
@@ -1104,6 +1156,7 @@ impl FixedSizeVariation for Group41Var2 {
 
 impl FixedSizeVariation for Group41Var3 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group41Var3 {
@@ -1116,6 +1169,7 @@ impl FixedSizeVariation for Group41Var3 {
 
 impl FixedSizeVariation for Group41Var4 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group41Var4 {
@@ -1128,6 +1182,7 @@ impl FixedSizeVariation for Group41Var4 {
 
 impl FixedSizeVariation for Group42Var1 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var1 {
@@ -1140,6 +1195,7 @@ impl FixedSizeVariation for Group42Var1 {
 
 impl FixedSizeVariation for Group42Var2 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var2 {
@@ -1152,6 +1208,7 @@ impl FixedSizeVariation for Group42Var2 {
 
 impl FixedSizeVariation for Group42Var3 {
     const SIZE: u8 = 11;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var3 {
@@ -1165,6 +1222,7 @@ impl FixedSizeVariation for Group42Var3 {
 
 impl FixedSizeVariation for Group42Var4 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var4 {
@@ -1178,6 +1236,7 @@ impl FixedSizeVariation for Group42Var4 {
 
 impl FixedSizeVariation for Group42Var5 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var5 {
@@ -1190,6 +1249,7 @@ impl FixedSizeVariation for Group42Var5 {
 
 impl FixedSizeVariation for Group42Var6 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var6 {
@@ -1202,6 +1262,7 @@ impl FixedSizeVariation for Group42Var6 {
 
 impl FixedSizeVariation for Group42Var7 {
     const SIZE: u8 = 11;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var7 {
@@ -1215,6 +1276,7 @@ impl FixedSizeVariation for Group42Var7 {
 
 impl FixedSizeVariation for Group42Var8 {
     const SIZE: u8 = 15;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var8 {
@@ -1228,6 +1290,7 @@ impl FixedSizeVariation for Group42Var8 {
 
 impl FixedSizeVariation for Group43Var1 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var1 {
@@ -1240,6 +1303,7 @@ impl FixedSizeVariation for Group43Var1 {
 
 impl FixedSizeVariation for Group43Var2 {
     const SIZE: u8 = 3;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var2 {
@@ -1252,6 +1316,7 @@ impl FixedSizeVariation for Group43Var2 {
 
 impl FixedSizeVariation for Group43Var3 {
     const SIZE: u8 = 11;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var3 {
@@ -1265,6 +1330,7 @@ impl FixedSizeVariation for Group43Var3 {
 
 impl FixedSizeVariation for Group43Var4 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var4 {
@@ -1278,6 +1344,7 @@ impl FixedSizeVariation for Group43Var4 {
 
 impl FixedSizeVariation for Group43Var5 {
     const SIZE: u8 = 5;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var5 {
@@ -1290,6 +1357,7 @@ impl FixedSizeVariation for Group43Var5 {
 
 impl FixedSizeVariation for Group43Var6 {
     const SIZE: u8 = 9;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var6 {
@@ -1302,6 +1370,7 @@ impl FixedSizeVariation for Group43Var6 {
 
 impl FixedSizeVariation for Group43Var7 {
     const SIZE: u8 = 11;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var7 {
@@ -1315,6 +1384,7 @@ impl FixedSizeVariation for Group43Var7 {
 
 impl FixedSizeVariation for Group43Var8 {
     const SIZE: u8 = 15;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var8 {
@@ -1328,6 +1398,7 @@ impl FixedSizeVariation for Group43Var8 {
 
 impl FixedSizeVariation for Group50Var1 {
     const SIZE: u8 = 6;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group50Var1 {
@@ -1339,6 +1410,7 @@ impl FixedSizeVariation for Group50Var1 {
 
 impl FixedSizeVariation for Group50Var3 {
     const SIZE: u8 = 6;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group50Var3 {
@@ -1350,6 +1422,7 @@ impl FixedSizeVariation for Group50Var3 {
 
 impl FixedSizeVariation for Group50Var4 {
     const SIZE: u8 = 11;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group50Var4 {
@@ -1363,6 +1436,7 @@ impl FixedSizeVariation for Group50Var4 {
 
 impl FixedSizeVariation for Group51Var1 {
     const SIZE: u8 = 6;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group51Var1 {
@@ -1374,6 +1448,7 @@ impl FixedSizeVariation for Group51Var1 {
 
 impl FixedSizeVariation for Group51Var2 {
     const SIZE: u8 = 6;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group51Var2 {
@@ -1385,6 +1460,7 @@ impl FixedSizeVariation for Group51Var2 {
 
 impl FixedSizeVariation for Group52Var1 {
     const SIZE: u8 = 2;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group52Var1 {
@@ -1396,6 +1472,7 @@ impl FixedSizeVariation for Group52Var1 {
 
 impl FixedSizeVariation for Group52Var2 {
     const SIZE: u8 = 2;
+    #[rustfmt::skip]
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group52Var2 {
