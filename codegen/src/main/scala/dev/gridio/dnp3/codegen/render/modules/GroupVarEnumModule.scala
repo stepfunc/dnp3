@@ -3,7 +3,11 @@ package dev.gridio.dnp3.codegen.render.modules
 import dev.gridio.dnp3.codegen.model.{AnyVariation, FixedSize, Variation, ObjectGroup}
 import dev.gridio.dnp3.codegen.render._
 
-object GroupVarEnumModule {
+object GroupVarEnumModule extends Module {
+
+  override def lines(implicit indent: Indentation) : Iterator[String] = {
+    enumDefinition ++ space ++ enumImpl
+  }
 
   private def enumImpl(implicit indent: Indentation) : Iterator[String] = {
 
@@ -34,10 +38,5 @@ object GroupVarEnumModule {
     }
   }
 
-  def file : Iterator[String] = {
-    implicit val ident : Indentation = SpacedIndent
-    Header() ++
-    space ++
-    enumDefinition ++ space ++ enumImpl
-  }
+
 }

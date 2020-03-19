@@ -13,9 +13,9 @@ object Main {
 
   def main(args: Array[String]): Unit = {
 
-    writeTo(fixedSizePath)(FixedSizeVariationModule.file)
-    writeTo(gvPath)(GroupVarEnumModule.file)
-    writeTo(rangedPath)(RangedVariationModule.file)
+    writeTo(fixedSizePath)(FixedSizeVariationModule)
+    writeTo(gvPath)(GroupVarEnumModule)
+    writeTo(rangedPath)(RangedVariationModule)
 
   }
 

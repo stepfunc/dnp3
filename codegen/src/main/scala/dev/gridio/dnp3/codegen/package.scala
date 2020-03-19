@@ -3,13 +3,20 @@ package dev.gridio.dnp3
 import java.nio.charset.Charset
 import java.nio.file.{Files, Path, StandardOpenOption}
 
+import dev.gridio.dnp3.codegen.render._
+
 package object codegen {
 
-  def writeTo(path: Path)(lines: Iterator[String]): Unit = {
+  def writeTo(path: Path)(module: Module): Unit = {
 
-    if(lines.isEmpty) {
+    val content = module.lines(SpacedIndent)
+
+    if(content.isEmpty) {
       throw new Exception(s"Empty file: ${path.toString}")
     }
+
+    val lines = Header() ++ space ++ content
+
 
     if(!Files.exists(path.getParent)) Files.createDirectory(path.getParent)
     if(!Files.exists(path)) Files.createFile(path)

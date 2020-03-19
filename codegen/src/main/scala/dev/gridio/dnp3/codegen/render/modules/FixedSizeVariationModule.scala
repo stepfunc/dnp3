@@ -3,11 +3,9 @@ package dev.gridio.dnp3.codegen.render.modules
 import dev.gridio.dnp3.codegen.model._
 import dev.gridio.dnp3.codegen.render._
 
-object FixedSizeVariationModule {
+object FixedSizeVariationModule extends Module {
 
-  def file : Iterator[String] = {
-
-    implicit val indent : Indentation = SpacedIndent
+  def lines(implicit indent : Indentation) : Iterator[String] = {
 
     def variations : List [FixedSize] = ObjectGroup.all.flatMap {
       g => g.variations.collect {
@@ -15,8 +13,6 @@ object FixedSizeVariationModule {
       }
     }
 
-    Header() ++
-    space ++
     "use crate::app::header::FixedSizeVariation;".eol ++
     "use crate::util::cursor::{ReadCursor, ReadError};".eol ++
     space ++
