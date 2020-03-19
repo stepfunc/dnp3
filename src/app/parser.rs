@@ -15,21 +15,26 @@ enum GroupVar {
 }
 
 impl GroupVar {
-    pub fn lookup(group: u8, var: u8) -> Result<GroupVar, ParseError> {
+    pub fn lookup(group: u8, var: u8) -> Option<GroupVar> {
         match group {
             2 => match var {
-                0 => Ok(GroupVar::Group2Var0),
-                1 => Ok(GroupVar::Group2Var1),
-                2 => Ok(GroupVar::Group2Var2),
-                3 => Ok(GroupVar::Group2Var3),
-                _ => Err(ParseError::UnknownGroupVariation(group, var)),
+                0 => Some(GroupVar::Group2Var0),
+                1 => Some(GroupVar::Group2Var1),
+                2 => Some(GroupVar::Group2Var2),
+                3 => Some(GroupVar::Group2Var3),
+                _ => None,
             },
-            _ => Err(ParseError::UnknownGroupVariation(group, var)),
+            _ => None,
         }
     }
 
     pub fn parse(cursor: &mut ReadCursor) -> Result<GroupVar, ParseError> {
-        Self::lookup(cursor.read_u8()?, cursor.read_u8()?)
+        let group = cursor.read_u8()?;
+        let var = cursor.read_u8()?;
+        match Self::lookup(group, var) {
+            Some(gv) => Ok(gv),
+            None => Err(ParseError::UnknownGroupVariation(group, var))
+        }
     }
 }
 
