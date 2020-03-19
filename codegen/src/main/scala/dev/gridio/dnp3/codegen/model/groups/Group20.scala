@@ -6,7 +6,7 @@ import dev.gridio.dnp3.codegen.model._
 
 // counters
 object Group20 extends ObjectGroup {
-  def objects: List[GroupVariation] = List(Group20Var0, Group20Var1, Group20Var2, Group20Var5, Group20Var6)
+  def variations: List[GroupVariation] = List(Group20Var0, Group20Var1, Group20Var2, Group20Var5, Group20Var6)
 
   def group: Byte = 20
 

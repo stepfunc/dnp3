@@ -27,6 +27,7 @@ object ObjectGroup {
     Group51,
     Group52,
     Group60,
+    /*
     Group70,
     Group80,
     Group110,
@@ -36,13 +37,14 @@ object ObjectGroup {
     Group120,
     Group121,
     Group122
+    */
   )
 
 }
 
 trait ObjectGroup {
 
-  def objects: List[GroupVariation]
+  def variations: List[GroupVariation]
 
   def group: Byte
 
@@ -52,5 +54,5 @@ trait ObjectGroup {
 
   def isEventGroup: Boolean
 
-  def hasSizedObjects: Boolean = objects.find(x => x.isInstanceOf[FixedSizeField]).isDefined
+  def hasSizedObjects: Boolean = variations.exists(x => x.isInstanceOf[FixedSizeField])
 }

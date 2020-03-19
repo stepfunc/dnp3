@@ -6,7 +6,7 @@ object GroupVariationEnum {
 
   private val defaultValue = EnumValue("UNKNOWN", 0xFFFF)
 
-  private def values: List[EnumValue] = ObjectGroup.all.flatMap(_.objects).map { gv =>
+  private def values: List[EnumValue] = ObjectGroup.all.flatMap(_.variations).map { gv =>
     EnumValue(gv.name, gv.shortValue, None, Some(gv.fullDesc))
   }
 

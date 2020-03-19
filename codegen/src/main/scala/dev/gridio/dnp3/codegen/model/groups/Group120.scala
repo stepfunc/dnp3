@@ -6,7 +6,7 @@ import dev.gridio.dnp3.codegen.model._
 
 object Group120 extends ObjectGroup {
 
-  def objects: List[GroupVariation] = List(
+  def variations: List[GroupVariation] = List(
     Group120Var1,
     Group120Var2,
     Group120Var3,

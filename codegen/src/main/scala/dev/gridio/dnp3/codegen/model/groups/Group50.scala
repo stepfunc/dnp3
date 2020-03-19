@@ -5,7 +5,7 @@ import dev.gridio.dnp3.codegen.model._
 
 // absolute time
 object Group50 extends ObjectGroup {
-  def objects: List[GroupVariation] = List(Group50Var1, Group50Var3, Group50Var4)
+  def variations: List[GroupVariation] = List(Group50Var1, Group50Var3, Group50Var4)
 
   def group: Byte = 50
 

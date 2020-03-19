@@ -3,7 +3,7 @@ package dev.gridio.dnp3.codegen.model.groups
 import dev.gridio.dnp3.codegen.model.{GroupVariation, ObjectGroup, SizedByVariation}
 
 object Group112 extends ObjectGroup {
-  def objects: List[GroupVariation] = List(Group112AnyVar)
+  def variations: List[GroupVariation] = List(Group112AnyVar)
 
   def group: Byte = 112
 

@@ -4,7 +4,7 @@ import dev.gridio.dnp3.codegen.model.{DefaultVariableSize, GroupVariation, Objec
 
 object Group70 extends ObjectGroup {
 
-  def objects: List[GroupVariation] = List(
+  def variations: List[GroupVariation] = List(
     Group70Var1,
     Group70Var2,
     Group70Var3,

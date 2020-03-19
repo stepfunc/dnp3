@@ -6,7 +6,7 @@ import dev.gridio.dnp3.codegen.model.{AnyVariation, FixedSize, GroupVariation, O
 
 // counter event
 object Group22 extends ObjectGroup {
-  def objects: List[GroupVariation] = List(Group22Var0, Group22Var1, Group22Var2, Group22Var5, Group22Var6)
+  def variations: List[GroupVariation] = List(Group22Var0, Group22Var1, Group22Var2, Group22Var5, Group22Var6)
 
   def group: Byte = 22
 

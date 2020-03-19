@@ -4,7 +4,7 @@ import dev.gridio.dnp3.codegen.model.FixedSizeField._
 import dev.gridio.dnp3.codegen.model.{FixedSize, GroupVariation, ObjectGroup}
 
 object Group52 extends ObjectGroup {
-  def objects: List[GroupVariation] = List(Group52Var1, Group52Var2)
+  def variations: List[GroupVariation] = List(Group52Var1, Group52Var2)
 
   def group: Byte = 52
 

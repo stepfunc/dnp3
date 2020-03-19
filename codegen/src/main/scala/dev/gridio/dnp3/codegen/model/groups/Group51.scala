@@ -5,7 +5,7 @@ import dev.gridio.dnp3.codegen.model.{FixedSize, GroupVariation, ObjectGroup}
 
 // common time of occurrence
 object Group51 extends ObjectGroup {
-  def objects: List[GroupVariation] = List(Group51Var1, Group51Var2)
+  def variations: List[GroupVariation] = List(Group51Var1, Group51Var2)
 
   def group: Byte = 51
 

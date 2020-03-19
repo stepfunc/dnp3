@@ -17,7 +17,7 @@ class GroupVariationTestSuite extends AnyFunSuite with Matchers {
 
     val ids = for {
       group <- ObjectGroup.all
-      gv <- group.objects
+      gv <- group.variations
     } yield gv.id
 
     ids.foldLeft(Set.empty[GroupVariation.Id]) { (set, id) =>
