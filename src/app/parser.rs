@@ -159,7 +159,7 @@ mod test {
 
     use super::*;
     use crate::app::header::*;
-    use crate::app::variations::Group2Var1;
+    use crate::app::variations::fixed::*;
 
     #[test]
     fn parses_range_of_g2v1() {

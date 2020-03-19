@@ -1,19 +1,18 @@
 package dev.gridio.dnp3.codegen
 
-import dev.gridio.dnp3.codegen.model.{FixedSize, ObjectGroup}
-import dev.gridio.dnp3.codegen.render.{FixedSizeVariation, Indentation, SpacedIndent}
+import java.nio.file.{FileSystems, Path}
+
+import dev.gridio.dnp3.codegen.render.FixedSizeVariation
 
 object Main {
 
-  def main(args: Array[String]): Unit = {
-    implicit val indent : Indentation = SpacedIndent
+  val appGenPath: Path = FileSystems.getDefault.getPath("../src/app/variations")
+  val fixedSizePath : Path = appGenPath.resolve("fixed.rs")
 
-    ObjectGroup.all.foreach { g=>
-      g.variations.foreach {
-        case x: FixedSize => FixedSizeVariation.lines(x).foreach(println)
-        case _ =>
-      }
-    }
+  def main(args: Array[String]): Unit = {
+
+
+    writeTo(fixedSizePath)(FixedSizeVariation.file)
 
 
 

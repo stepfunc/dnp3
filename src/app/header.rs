@@ -1,4 +1,4 @@
-use super::variations::*;
+use super::variations::fixed::*;
 use crate::app::range::RangedSequence;
 use crate::util::cursor::{ReadCursor, ReadError};
 
@@ -14,6 +14,7 @@ where
 #[derive(Debug, PartialEq)]
 pub enum RangedVariation<'a> {
     Group2Var0,
+    Group1Var2(RangedSequence<'a, Group2Var1>),
     Group2Var1(RangedSequence<'a, Group2Var1>),
     Group2Var2(RangedSequence<'a, Group2Var2>),
     Group2Var3(RangedSequence<'a, Group2Var3>),
@@ -31,9 +32,6 @@ mod test {
 
     #[test]
     fn iterates_over_g2v1() {
-        println!("header: {}", std::mem::size_of::<Header>());
-        println!("header[64]: {}", std::mem::size_of::<[Header; 128]>());
-
         let seq = RangedSequence::<Group2Var1>::new(1, &[0xAA, 0xBB]);
 
         let items: Vec<(Group2Var1, u16)> = seq.iter().collect();

@@ -39,6 +39,10 @@ impl<'a> ReadCursor<'a> {
         }
     }
 
+    pub fn read_i16_le(&mut self) -> Result<i16, ReadError> {
+        self.read_u16_le().map(|x| x as i16)
+    }
+
     pub fn read_u32_le(&mut self) -> Result<u32, ReadError> {
         match self.src {
             [b1, b2, b3, b4, rest @ ..] => {
@@ -47,6 +51,10 @@ impl<'a> ReadCursor<'a> {
             }
             _ => Err(ReadError),
         }
+    }
+
+    pub fn read_i32_le(&mut self) -> Result<i32, ReadError> {
+        self.read_u32_le().map(|x| x as i32)
     }
 
     pub fn read_u48_le(&mut self) -> Result<u64, ReadError> {
@@ -62,6 +70,18 @@ impl<'a> ReadCursor<'a> {
             }
             _ => Err(ReadError),
         }
+    }
+
+    pub fn read_f32_le(&mut self) -> Result<f32, ReadError> {
+        let mut bytes: [u8; 4] = [0; 4];
+        bytes.copy_from_slice(self.read_bytes(4)?);
+        Ok(f32::from_le_bytes(bytes))
+    }
+
+    pub fn read_f64_le(&mut self) -> Result<f64, ReadError> {
+        let mut bytes: [u8; 8] = [0; 8];
+        bytes.copy_from_slice(self.read_bytes(8)?);
+        Ok(f64::from_le_bytes(bytes))
     }
 
     pub fn read_bytes(&mut self, count: usize) -> Result<&'a [u8], ReadError> {
