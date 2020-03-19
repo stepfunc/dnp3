@@ -1,6 +1,7 @@
-package dev.gridio.dnp3.codegen.render
+package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
+import dev.gridio.dnp3.codegen.render._
 
 object FixedSizeVariation {
 

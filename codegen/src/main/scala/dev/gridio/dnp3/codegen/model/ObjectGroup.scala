@@ -4,7 +4,9 @@ import dev.gridio.dnp3.codegen.model.groups._
 
 object ObjectGroup {
 
-  val all = List(
+  def allVariations : List[GroupVariation] = all.flatMap(g => g.variations)
+
+  val all: List[ObjectGroup] = List(
     Group1,
     Group2,
     Group3,
