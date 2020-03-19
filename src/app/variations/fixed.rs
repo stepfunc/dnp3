@@ -6,9 +6,9 @@
 // |_| \_|\___/  |______\__,_|_|\__|_|_| |_|\__, (_|_|_)
 //                                           __/ |
 //                                          |___/
-// 
+//
 // This file is auto-generated. Do not edit manually
-// 
+//
 
 use crate::app::header::FixedSizeVariation;
 use crate::util::cursor::{ReadCursor, ReadError};

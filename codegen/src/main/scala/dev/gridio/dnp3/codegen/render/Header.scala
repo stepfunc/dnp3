@@ -2,7 +2,9 @@ package dev.gridio.dnp3.codegen.render
 
 object Header {
 
-  def apply(): Iterator[String] = list.iterator.map(s => s"// $s")
+  def apply(): Iterator[String] = {
+    list.iterator.map(s => if(s.isEmpty) "//" else s"// $s")
+  }
 
   private val list = List(
     """ _   _         ______    _ _ _   _             _ _ _""",
