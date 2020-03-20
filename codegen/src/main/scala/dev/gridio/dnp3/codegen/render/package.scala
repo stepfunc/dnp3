@@ -18,7 +18,6 @@ package object render {
   def spaced(groups: Iterator[Iterator[String]]): Iterator[String] = {
 
     var sum : Iterator[String] = Iterator.empty[String]
-    var count = 1
 
     groups.foreach { x : Iterator[String] =>
       sum = sum ++ (if(groups.hasNext) x ++ space else x)

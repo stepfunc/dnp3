@@ -9,7 +9,8 @@ object ProtocolEnums extends Module {
   private def enums : List[EnumModel] = List(
     FunctionCode,
     QualifierCode,
-    CommandStatus
+    CommandStatus,
+    OpType,
   )
 
   private def lines(model : EnumModel)(implicit indentation: Indentation) : Iterator[String] = {

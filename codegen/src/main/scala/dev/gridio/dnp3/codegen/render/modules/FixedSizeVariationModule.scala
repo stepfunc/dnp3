@@ -17,8 +17,9 @@ object FixedSizeVariationModule extends Module {
     "use crate::util::cursor::{ReadCursor, ReadError};".eol ++
     "use crate::app::gen::enums::CommandStatus;".eol ++
     space ++
-    spaced(variations.iterator.map(v => structDefinition(v))) ++
-    spaced(variations.iterator.map(v => implFixedSizedVariation(v)))
+    spaced(variations.map(v => structDefinition(v)).iterator) ++
+    space ++
+    spaced(variations.map(v => implFixedSizedVariation(v)).iterator)
   }
 
   private def getFieldType(f: FixedSizeFieldType) : String = {
@@ -52,6 +53,7 @@ object FixedSizeVariationModule extends Module {
   }
 
   private def structDefinition(gv : FixedSize)(implicit indent: Indentation): Iterator[String] = {
+    commented(gv.fullDesc).eol ++
     "#[derive(Debug, PartialEq)]".eol ++
     bracket(s"pub struct ${gv.name}") {
       gv.fields.map(f => s"pub ${f.name}: ${getFieldType(f.typ)},").iterator
@@ -88,10 +90,6 @@ object FixedSizeVariationModule extends Module {
 
   private def lines(gv : FixedSize)(implicit indent: Indentation): Iterator[String] = {
     structDefinition(gv) ++ space ++ implFixedSizedVariation(gv)
-  }
-
-  private def lines(gv: Seq[FixedSize])(implicit indent: Indentation): Iterator[String] = {
-    spaced(gv.map(x => lines(x)).iterator)
   }
 
 }

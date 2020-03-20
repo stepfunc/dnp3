@@ -224,3 +224,27 @@ impl CommandStatus {
         }
     }
 }
+/// Used in conjunction with the TCC field to specify a control operation
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum OpType {
+    Nul,
+    PulseOn,
+    PulseOff,
+    LatchOn,
+    LatchOff,
+    /// captures any value not defined in the enumeration
+    Unknown(u8),
+}
+
+impl OpType {
+    pub fn from(x: u8) -> Self {
+        match x {
+            0 => OpType::Nul,
+            1 => OpType::PulseOn,
+            2 => OpType::PulseOff,
+            3 => OpType::LatchOn,
+            4 => OpType::LatchOff,
+            _ => OpType::Unknown(x),
+        }
+    }
+}

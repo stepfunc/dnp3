@@ -10,11 +10,11 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::app::range::{RangedSequence, Range};
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
-use crate::app::parser::ParseError;
-use crate::app::range::{Range, RangedSequence};
 use crate::util::cursor::ReadCursor;
+use crate::app::parser::ParseError;
 
 #[derive(Debug, PartialEq)]
 pub enum RangedVariation<'a> {
@@ -77,7 +77,7 @@ impl<'a> RangedVariation<'a> {
             _ => Err(ParseError::InvalidQualifierAndObject),
         }
     }
-
+    
     pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
