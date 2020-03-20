@@ -1,7 +1,7 @@
+use crate::app::gen::variations::gv::Variation;
+use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::header::Header;
 use crate::app::range::{InvalidRange, Range};
-use crate::app::variations::gv::Variation;
-use crate::app::variations::ranged::RangedVariation;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Copy, Clone)]
@@ -82,7 +82,10 @@ impl Qualifier {
 }
 
 impl<'a> Parser<'a> {
-    pub fn one_pass(parse_type: ParseType, data: &'a [u8]) -> impl Iterator<Item = Result<Header<'a>, ParseError>> {
+    pub fn one_pass(
+        parse_type: ParseType,
+        data: &'a [u8],
+    ) -> impl Iterator<Item = Result<Header<'a>, ParseError>> {
         Parser {
             cursor: ReadCursor::new(data),
             parse_type,
@@ -90,11 +93,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn two_pass(parse_type: ParseType, data: &'a [u8]) -> Result<impl Iterator<Item = Header<'a>>, ParseError> {
-
+    pub fn two_pass(
+        parse_type: ParseType,
+        data: &'a [u8],
+    ) -> Result<impl Iterator<Item = Header<'a>>, ParseError> {
         for x in Parser::one_pass(parse_type, data) {
             if let Err(e) = x {
-                return Err(e)
+                return Err(e);
             }
         }
 
@@ -154,8 +159,8 @@ impl<'a> Iterator for Parser<'a> {
 mod test {
 
     use super::*;
+    use crate::app::gen::variations::fixed::*;
     use crate::app::header::*;
-    use crate::app::variations::fixed::*;
 
     #[test]
     fn parses_range_of_g1v2_as_non_read() {

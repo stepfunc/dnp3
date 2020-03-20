@@ -1,4 +1,4 @@
-use crate::app::variations::ranged::RangedVariation;
+use crate::app::gen::variations::ranged::RangedVariation;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 pub trait FixedSizeVariation
@@ -18,8 +18,8 @@ pub enum Header<'a> {
 
 #[cfg(test)]
 mod test {
+    use crate::app::gen::variations::fixed::Group2Var1;
     use crate::app::range::RangedSequence;
-    use crate::app::variations::fixed::Group2Var1;
 
     #[test]
     fn iterates_over_g2v1() {
