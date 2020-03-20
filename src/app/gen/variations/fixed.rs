@@ -10,6 +10,7 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::app::gen::enums::CommandStatus;
 use crate::app::header::FixedSizeVariation;
 use crate::util::cursor::{ReadCursor, ReadError};
 
@@ -68,7 +69,7 @@ pub struct Group12Var1 {
     pub count: u8,
     pub on_time: u32,
     pub off_time: u32,
-    pub status: u8,
+    pub status: CommandStatus,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group13Var1 {
@@ -266,22 +267,22 @@ pub struct Group40Var4 {
 #[derive(Debug, PartialEq)]
 pub struct Group41Var1 {
     pub value: i32,
-    pub status: u8,
+    pub status: CommandStatus,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group41Var2 {
     pub value: i16,
-    pub status: u8,
+    pub status: CommandStatus,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group41Var3 {
     pub value: f32,
-    pub status: u8,
+    pub status: CommandStatus,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group41Var4 {
     pub value: f64,
-    pub status: u8,
+    pub status: CommandStatus,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group42Var1 {
@@ -329,45 +330,45 @@ pub struct Group42Var8 {
 }
 #[derive(Debug, PartialEq)]
 pub struct Group43Var1 {
-    pub status: u8,
+    pub status: CommandStatus,
     pub value: i32,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group43Var2 {
-    pub status: u8,
+    pub status: CommandStatus,
     pub value: i16,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group43Var3 {
-    pub status: u8,
+    pub status: CommandStatus,
     pub value: i32,
     pub time: u64,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group43Var4 {
-    pub status: u8,
+    pub status: CommandStatus,
     pub value: i16,
     pub time: u64,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group43Var5 {
-    pub status: u8,
+    pub status: CommandStatus,
     pub value: f32,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group43Var6 {
-    pub status: u8,
+    pub status: CommandStatus,
     pub value: f64,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group43Var7 {
-    pub status: u8,
+    pub status: CommandStatus,
     pub value: f32,
     pub time: u64,
 }
 #[derive(Debug, PartialEq)]
 pub struct Group43Var8 {
-    pub status: u8,
+    pub status: CommandStatus,
     pub value: f64,
     pub time: u64,
 }
@@ -537,7 +538,7 @@ impl FixedSizeVariation for Group12Var1 {
                 count: cursor.read_u8()?,
                 on_time: cursor.read_u32_le()?,
                 off_time: cursor.read_u32_le()?,
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
             }
         )
     }
@@ -1008,7 +1009,7 @@ impl FixedSizeVariation for Group41Var1 {
         Ok(
             Group41Var1 {
                 value: cursor.read_i32_le()?,
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
             }
         )
     }
@@ -1020,7 +1021,7 @@ impl FixedSizeVariation for Group41Var2 {
         Ok(
             Group41Var2 {
                 value: cursor.read_i16_le()?,
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
             }
         )
     }
@@ -1032,7 +1033,7 @@ impl FixedSizeVariation for Group41Var3 {
         Ok(
             Group41Var3 {
                 value: cursor.read_f32_le()?,
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
             }
         )
     }
@@ -1044,7 +1045,7 @@ impl FixedSizeVariation for Group41Var4 {
         Ok(
             Group41Var4 {
                 value: cursor.read_f64_le()?,
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
             }
         )
     }
@@ -1155,7 +1156,7 @@ impl FixedSizeVariation for Group43Var1 {
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var1 {
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_i32_le()?,
             }
         )
@@ -1167,7 +1168,7 @@ impl FixedSizeVariation for Group43Var2 {
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var2 {
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_i16_le()?,
             }
         )
@@ -1179,7 +1180,7 @@ impl FixedSizeVariation for Group43Var3 {
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var3 {
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_i32_le()?,
                 time: cursor.read_u48_le()?,
             }
@@ -1192,7 +1193,7 @@ impl FixedSizeVariation for Group43Var4 {
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var4 {
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_i16_le()?,
                 time: cursor.read_u48_le()?,
             }
@@ -1205,7 +1206,7 @@ impl FixedSizeVariation for Group43Var5 {
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var5 {
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_f32_le()?,
             }
         )
@@ -1217,7 +1218,7 @@ impl FixedSizeVariation for Group43Var6 {
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var6 {
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_f64_le()?,
             }
         )
@@ -1229,7 +1230,7 @@ impl FixedSizeVariation for Group43Var7 {
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var7 {
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_f32_le()?,
                 time: cursor.read_u48_le()?,
             }
@@ -1242,7 +1243,7 @@ impl FixedSizeVariation for Group43Var8 {
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var8 {
-                status: cursor.read_u8()?,
+                status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_f64_le()?,
                 time: cursor.read_u48_le()?,
             }

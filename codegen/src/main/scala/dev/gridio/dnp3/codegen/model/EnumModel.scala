@@ -50,3 +50,5 @@ trait EnumModel {
   def render : IntRender
   def captureUnknownValues: Boolean
 }
+
+

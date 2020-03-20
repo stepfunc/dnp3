@@ -1,35 +1,20 @@
 package dev.gridio.dnp3.codegen.model
 
 import dev.gridio.dnp3.codegen.model.enums._
+import dev.gridio.dnp3.codegen.model.enums.protocol.CommandStatus
 
-sealed abstract class FixedSizeFieldType(val numBytes: Int) {
-  def defaultValue: String = "0"
-}
+sealed abstract class FixedSizeFieldType(val numBytes: Int)
 
 case object UInt8Field extends FixedSizeFieldType(1)
-
 case object UInt16Field extends FixedSizeFieldType(2)
-
 case object UInt32Field extends FixedSizeFieldType(4)
-
 case object UInt48Field extends FixedSizeFieldType(6)
-
 case object SInt16Field extends FixedSizeFieldType(2)
-
 case object SInt32Field extends FixedSizeFieldType(4)
-
 case object Float32Field extends FixedSizeFieldType(4)
-
 case object Float64Field extends FixedSizeFieldType(8)
+case class EnumFieldType(model: EnumModel) extends FixedSizeFieldType(1)
 
-/*
-case class EnumFieldType(model: EnumModel) extends FixedSizeFieldType(1) {
-  override def defaultValue: String = model.default match {
-    case Some(value) => "%s::%s".format(model.name, value.displayName)
-    case None => throw new Exception(s"No default value for ${model.name}!")
-  }
-}
-*/
 
 object FieldAttribute extends Enumeration {
   type WeekDay = Value
@@ -56,7 +41,7 @@ object FixedSizeField {
   val float64 = FixedSizeField("value", Float64Field)
 
   //enums
-  val commandStatus = FixedSizeField("status", UInt8Field)
+  val commandStatus = FixedSizeField("status", EnumFieldType(CommandStatus))
 
 
 }
