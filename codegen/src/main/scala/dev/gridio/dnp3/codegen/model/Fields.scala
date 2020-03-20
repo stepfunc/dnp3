@@ -14,6 +14,7 @@ case object SInt32Field extends FixedSizeFieldType(4)
 case object Float32Field extends FixedSizeFieldType(4)
 case object Float64Field extends FixedSizeFieldType(8)
 case class EnumFieldType(model: EnumModel) extends FixedSizeFieldType(1)
+case class CustomFieldTypeU8(structName : String) extends FixedSizeFieldType(1)
 
 
 object FieldAttribute extends Enumeration {

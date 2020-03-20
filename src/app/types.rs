@@ -1,5 +1,6 @@
 use crate::app::gen::enums::{OpType, TripCloseCode};
 
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ControlCode {
     pub tcc: TripCloseCode,
     pub clear: bool,

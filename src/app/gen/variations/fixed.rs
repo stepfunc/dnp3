@@ -12,6 +12,7 @@
 
 use crate::app::gen::enums::CommandStatus;
 use crate::app::header::FixedSizeVariation;
+use crate::app::types::ControlCode;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 /// Time Delay - Fine
@@ -475,10 +476,10 @@ pub struct Group13Var1 {
     pub flags: u8,
 }
 
-/// Binary Command - CROB
+/// Binary Command - Control Relay Output Block
 #[derive(Debug, PartialEq)]
 pub struct Group12Var1 {
-    pub code: u8,
+    pub code: ControlCode,
     pub count: u8,
     pub on_time: u32,
     pub off_time: u32,
@@ -1413,7 +1414,7 @@ impl FixedSizeVariation for Group12Var1 {
     fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group12Var1 {
-                code: cursor.read_u8()?,
+                code: ControlCode::from(cursor.read_u8()?),
                 count: cursor.read_u8()?,
                 on_time: cursor.read_u32_le()?,
                 off_time: cursor.read_u32_le()?,

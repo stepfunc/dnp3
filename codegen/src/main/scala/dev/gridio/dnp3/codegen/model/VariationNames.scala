@@ -14,7 +14,7 @@ object VariationNames {
   val outputStatusWithFlags = "Output Status With Flags"
   val outputStatusWithTime = "Output Status With Time"
   val outputStatusWithoutTime = "Output Status Without Time"
-  val crob = "CROB"
+  val crob = "Control Relay Output Block"
   val bit32 = "32-bit"
   val bit16 = "16-bit"
   val bit32WithTime = "32-bit With Time"

@@ -17,7 +17,7 @@ object Group12 extends ObjectGroup {
 object Group12Var0 extends AnyVariation(Group12, 0)
 
 object Group12Var1 extends FixedSize(Group12, 1, crob)(
-  FixedSizeField("code", UInt8Field),
+  FixedSizeField("code", CustomFieldTypeU8("ControlCode")),
   FixedSizeField("count", UInt8Field),
   FixedSizeField("on_time", UInt32Field),
   FixedSizeField("off_time", UInt32Field),

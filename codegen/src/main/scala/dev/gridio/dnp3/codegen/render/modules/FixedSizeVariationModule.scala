@@ -16,6 +16,7 @@ object FixedSizeVariationModule extends Module {
     "use crate::app::header::FixedSizeVariation;".eol ++
     "use crate::util::cursor::{ReadCursor, ReadError};".eol ++
     "use crate::app::gen::enums::CommandStatus;".eol ++
+    "use crate::app::types::ControlCode;".eol ++
     space ++
     spaced(variations.map(v => structDefinition(v)).iterator) ++
     space ++
@@ -33,6 +34,7 @@ object FixedSizeVariationModule extends Module {
       case Float32Field => "f32"
       case Float64Field => "f64"
       case x : EnumFieldType => x.model.name
+      case x : CustomFieldTypeU8 => x.structName
       case _ => throw new Exception(s"Unhandled field type: ${f.toString}")
     }
   }
@@ -48,6 +50,7 @@ object FixedSizeVariationModule extends Module {
       case Float32Field => "f32_le"
       case Float64Field => "f64_le"
       case EnumFieldType(_) => "u8"
+      case CustomFieldTypeU8(_) => "u8"
       case _ => throw new Exception(s"Unhandled field type: ${f.toString}")
     }
   }
@@ -65,6 +68,7 @@ object FixedSizeVariationModule extends Module {
       val inner = s"cursor.read_${getReadSuffix(f.typ)}()?"
       f.typ match {
         case x : EnumFieldType => s"${x.model.name}::from(${inner})"
+        case CustomFieldTypeU8(name) => s"${name}::from(${inner})"
         case _ => inner
       }
     }
