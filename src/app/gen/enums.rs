@@ -17,16 +17,18 @@ pub enum TripCloseCode {
     Close,
     Trip,
     Reserved,
+    /// captures any value not defined in the enumeration
+    Unknown(u8),
 }
 
 impl TripCloseCode {
-    pub fn from(x: u8) -> Option<Self> {
+    pub fn from(x: u8) -> Self {
         match x {
-            0 => Some(TripCloseCode::Nul),
-            1 => Some(TripCloseCode::Close),
-            2 => Some(TripCloseCode::Trip),
-            3 => Some(TripCloseCode::Reserved),
-            _ => None,
+            0 => TripCloseCode::Nul,
+            1 => TripCloseCode::Close,
+            2 => TripCloseCode::Trip,
+            3 => TripCloseCode::Reserved,
+            _ => TripCloseCode::Unknown(x),
         }
     }
 }
@@ -272,4 +274,3 @@ impl FunctionCode {
         }
     }
 }
-

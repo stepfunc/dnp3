@@ -16,5 +16,5 @@ object TripCloseCode extends EnumModel {
 
   override def render: IntRender = IntRender.Base10
 
-  override def captureUnknownValues: Boolean = false
+  override def captureUnknownValues: Boolean = true
 }
