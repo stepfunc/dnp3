@@ -4,8 +4,15 @@ use crate::app::variations::gv::Variation;
 use crate::app::variations::ranged::RangedVariation;
 use crate::util::cursor::{ReadCursor, ReadError};
 
+#[derive(Copy, Clone)]
+pub enum ParseType {
+    Read,
+    NonRead,
+}
+
 pub struct Parser<'a> {
     errored: bool,
+    parse_type: ParseType,
     cursor: ReadCursor<'a>,
 }
 
@@ -16,6 +23,20 @@ impl Variation {
         match Self::lookup(group, var) {
             Some(gv) => Ok(gv),
             None => Err(ParseError::UnknownGroupVariation(group, var)),
+        }
+    }
+}
+
+impl<'a> RangedVariation<'a> {
+    pub fn parse(
+        parse_type: ParseType,
+        v: Variation,
+        range: Range,
+        cursor: &mut ReadCursor<'a>,
+    ) -> Result<RangedVariation<'a>, ParseError> {
+        match parse_type {
+            ParseType::Read => Self::parse_read(v),
+            ParseType::NonRead => Self::parse_non_read(v, range, cursor),
         }
     }
 }
@@ -61,9 +82,10 @@ impl Qualifier {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(data: &'a [u8]) -> Self {
+    pub fn new(parse_type: ParseType, data: &'a [u8]) -> Self {
         Parser {
             cursor: ReadCursor::new(data),
+            parse_type,
             errored: false,
         }
     }
@@ -95,22 +117,16 @@ impl<'a> Parser<'a> {
         let start = self.cursor.read_u8()?;
         let stop = self.cursor.read_u8()?;
         let range = Range::from(start as u16, stop as u16)?;
-        Ok(Header::OneByteStartStop(
-            start,
-            stop,
-            RangedVariation::parse(gv, range, &mut self.cursor)?,
-        ))
+        let data = RangedVariation::parse(self.parse_type, gv, range, &mut self.cursor)?;
+        Ok(Header::OneByteStartStop(start, stop, data))
     }
 
     fn parse_start_stop_u16(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
         let start = self.cursor.read_u16_le()?;
         let stop = self.cursor.read_u16_le()?;
         let range = Range::from(start, stop)?;
-        Ok(Header::TwoByteStartStop(
-            start,
-            stop,
-            RangedVariation::parse(gv, range, &mut self.cursor)?,
-        ))
+        let data = RangedVariation::parse(self.parse_type, gv, range, &mut self.cursor)?;
+        Ok(Header::TwoByteStartStop(start, stop, data))
     }
 }
 
@@ -133,7 +149,7 @@ mod test {
     fn parses_range_of_g1v2() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 
-        let mut parser = Parser::new(&input);
+        let mut parser = Parser::new(ParseType::NonRead, &input);
 
         let items: Vec<(Group1Var2, u16)> = match parser.next().unwrap().unwrap() {
             Header::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
@@ -149,6 +165,29 @@ mod test {
                 (Group1Var2 { flags: 0xBB }, 3)
             ]
         );
+
+        assert_eq!(parser.next(), None);
+    }
+
+    #[test]
+    fn parses_2_ranges_of_g1v2_as_read() {
+        let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0x01, 0x02, 0x00, 0x07, 0x09];
+
+        let mut parser = Parser::new(ParseType::Read, &input);
+
+        match parser.next().unwrap().unwrap() {
+            Header::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
+                assert!(seq.is_empty())
+            }
+            x => panic!("got: {:?}", x),
+        };
+
+        match parser.next().unwrap().unwrap() {
+            Header::OneByteStartStop(07, 09, RangedVariation::Group1Var2(seq)) => {
+                assert!(seq.is_empty())
+            }
+            x => panic!("got: {:?}", x),
+        };
 
         assert_eq!(parser.next(), None);
     }

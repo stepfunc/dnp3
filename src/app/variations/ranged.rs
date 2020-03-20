@@ -47,7 +47,7 @@ pub enum RangedVariation<'a> {
 
 impl<'a> RangedVariation<'a> {
     #[rustfmt::skip]
-    pub fn parse(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ParseError> {
+    pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::parse(range, cursor)?)),
@@ -74,6 +74,37 @@ impl<'a> RangedVariation<'a> {
             Variation::Group30Var4 => Ok(RangedVariation::Group30Var4(RangedSequence::parse(range, cursor)?)),
             Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::parse(range, cursor)?)),
             Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::parse(range, cursor)?)),
+            _ => Err(ParseError::InvalidQualifierAndObject),
+        }
+    }
+
+    pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ParseError> {
+        match v {
+            Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
+            Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::empty())),
+            Variation::Group3Var0 => Ok(RangedVariation::Group3Var0),
+            Variation::Group3Var2 => Ok(RangedVariation::Group3Var2(RangedSequence::empty())),
+            Variation::Group10Var0 => Ok(RangedVariation::Group10Var0),
+            Variation::Group10Var2 => Ok(RangedVariation::Group10Var2(RangedSequence::empty())),
+            Variation::Group20Var0 => Ok(RangedVariation::Group20Var0),
+            Variation::Group20Var1 => Ok(RangedVariation::Group20Var1(RangedSequence::empty())),
+            Variation::Group20Var2 => Ok(RangedVariation::Group20Var2(RangedSequence::empty())),
+            Variation::Group20Var5 => Ok(RangedVariation::Group20Var5(RangedSequence::empty())),
+            Variation::Group20Var6 => Ok(RangedVariation::Group20Var6(RangedSequence::empty())),
+            Variation::Group21Var0 => Ok(RangedVariation::Group21Var0),
+            Variation::Group21Var1 => Ok(RangedVariation::Group21Var1(RangedSequence::empty())),
+            Variation::Group21Var2 => Ok(RangedVariation::Group21Var2(RangedSequence::empty())),
+            Variation::Group21Var5 => Ok(RangedVariation::Group21Var5(RangedSequence::empty())),
+            Variation::Group21Var6 => Ok(RangedVariation::Group21Var6(RangedSequence::empty())),
+            Variation::Group21Var9 => Ok(RangedVariation::Group21Var9(RangedSequence::empty())),
+            Variation::Group21Var10 => Ok(RangedVariation::Group21Var10(RangedSequence::empty())),
+            Variation::Group30Var0 => Ok(RangedVariation::Group30Var0),
+            Variation::Group30Var1 => Ok(RangedVariation::Group30Var1(RangedSequence::empty())),
+            Variation::Group30Var2 => Ok(RangedVariation::Group30Var2(RangedSequence::empty())),
+            Variation::Group30Var3 => Ok(RangedVariation::Group30Var3(RangedSequence::empty())),
+            Variation::Group30Var4 => Ok(RangedVariation::Group30Var4(RangedSequence::empty())),
+            Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::empty())),
+            Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::empty())),
             _ => Err(ParseError::InvalidQualifierAndObject),
         }
     }

@@ -44,6 +44,14 @@ where
         Ok(Self::new(range.start, cursor.read_bytes(num_bytes)?))
     }
 
+    pub fn empty() -> Self {
+        Self::new(0, &[])
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
     pub fn new(start: u16, data: &'a [u8]) -> Self {
         Self {
             start,
