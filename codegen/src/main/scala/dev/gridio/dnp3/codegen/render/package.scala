@@ -5,8 +5,6 @@ package object render {
     def eol : Iterator[String] = Iterator(value)
   }
 
-
-
   implicit def stringToRenderString(s : String) : RenderString = {
     new RenderString(s)
   }
@@ -16,13 +14,7 @@ package object render {
   def commented(s: String): String = s"/// ${s}"
 
   def spaced(groups: Iterator[Iterator[String]]): Iterator[String] = {
-
-    var sum : Iterator[String] = Iterator.empty[String]
-
-    groups.foreach { x : Iterator[String] =>
-      sum = sum ++ (if(groups.hasNext) x ++ space else x)
-    }
-    sum
+    groups.foldLeft(Iterator.empty[String])((x, sum) => sum ++ space ++ x)
   }
 
   def bracket(s: String)(inner: => Iterator[String])(implicit indent: Indentation): Iterator[String] = {
