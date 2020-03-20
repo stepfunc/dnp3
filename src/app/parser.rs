@@ -82,12 +82,24 @@ impl Qualifier {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(parse_type: ParseType, data: &'a [u8]) -> Self {
+    pub fn one_pass(parse_type: ParseType, data: &'a [u8]) -> impl Iterator<Item = Result<Header<'a>, ParseError>> {
         Parser {
             cursor: ReadCursor::new(data),
             parse_type,
             errored: false,
         }
+    }
+
+    pub fn two_pass(parse_type: ParseType, data: &'a [u8]) -> Result<impl Iterator<Item = Header<'a>>, ParseError> {
+
+        for x in Parser::one_pass(parse_type, data) {
+            if let Err(e) = x {
+                return Err(e)
+            }
+        }
+
+        // we can unwrap on the 2nd pass b/c it can't possibly panic
+        Ok(Parser::one_pass(parse_type, data).map(|h| h.unwrap()))
     }
 
     fn parse_one(&mut self) -> Option<Result<Header<'a>, ParseError>> {
@@ -146,10 +158,10 @@ mod test {
     use crate::app::variations::fixed::*;
 
     #[test]
-    fn parses_range_of_g1v2() {
+    fn parses_range_of_g1v2_as_non_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 
-        let mut parser = Parser::new(ParseType::NonRead, &input);
+        let mut parser = Parser::one_pass(ParseType::NonRead, &input);
 
         let items: Vec<(Group1Var2, u16)> = match parser.next().unwrap().unwrap() {
             Header::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
@@ -170,19 +182,19 @@ mod test {
     }
 
     #[test]
-    fn parses_2_ranges_of_g1v2_as_read() {
+    fn parses_range_of_g1v2_as_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0x01, 0x02, 0x00, 0x07, 0x09];
 
-        let mut parser = Parser::new(ParseType::Read, &input);
+        let mut parser = Parser::two_pass(ParseType::Read, &input).unwrap();
 
-        match parser.next().unwrap().unwrap() {
+        match parser.next().unwrap() {
             Header::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
                 assert!(seq.is_empty())
             }
             x => panic!("got: {:?}", x),
         };
 
-        match parser.next().unwrap().unwrap() {
+        match parser.next().unwrap() {
             Header::OneByteStartStop(07, 09, RangedVariation::Group1Var2(seq)) => {
                 assert!(seq.is_empty())
             }
