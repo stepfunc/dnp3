@@ -9,9 +9,9 @@ object EnumValues {
   def from(list: List[String], iterator: Iterator[Int]): List[EnumValue] = list.map(s => EnumValue(s, iterator.next(), None))
 
 
-  def fromPairs(list: List[Tuple2[String, String]], iterator: Iterator[Int]): List[EnumValue] = list.map(x => EnumValue(x._1, iterator.next(), Some(x._2)))
+  def fromPairs(list: List[(String, String)], iterator: Iterator[Int]): List[EnumValue] = list.map(x => EnumValue(x._1, iterator.next(), Some(x._2)))
 
-  def fromPairs(list: List[Tuple2[String, String]], i: Int = 0): List[EnumValue] = fromPairs(list, Iterator.from(i, 1))
+  def fromPairs(list: List[(String, String)], i: Int = 0): List[EnumValue] = fromPairs(list, Iterator.from(i, 1))
 }
 
 object EnumValue {
@@ -42,7 +42,7 @@ object EnumModel {
     def sizeInBytes = 4
   }
 
-  def BitfieldValues(names: List[String]): List[EnumValue] = names.zipWithIndex.map { pair =>
+  def BitFieldValues(names: List[String]): List[EnumValue] = names.zipWithIndex.map { pair =>
     EnumValue(pair._1, 1 << pair._2)
   }
 }

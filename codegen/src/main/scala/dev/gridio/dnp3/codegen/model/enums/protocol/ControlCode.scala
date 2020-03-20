@@ -1,7 +1,6 @@
-package dev.gridio.dnp3.codegen.model.enums
+package dev.gridio.dnp3.codegen.model.enums.protocol
 
 import dev.gridio.dnp3.codegen.model.{EnumModel, EnumValue, Hex}
-
 
 object ControlCode {
 
@@ -39,6 +38,3 @@ object ControlCode {
   )
 
 }
-
-
-

@@ -1,7 +1,6 @@
-package dev.gridio.dnp3.codegen.model.enums
+package dev.gridio.dnp3.codegen.model.enums.protocol
 
 import dev.gridio.dnp3.codegen.model.{EnumModel, EnumValue, Hex}
-
 
 object FunctionCode {
 
@@ -9,7 +8,7 @@ object FunctionCode {
 
   def apply(): EnumModel = EnumModel("FunctionCode", comments, EnumModel.UInt8, codes, Some(defaultValue), Hex)
 
-  private val defaultValue = EnumValue("UNKNOWN", 255, "Unknown function code. Used internally in opendnp3 to indicate the code didn't match anything known")
+  private val defaultValue = EnumValue("UNKNOWN", 255, "Unknown function code. Used internally in to indicate the code didn't match anything known")
 
   private val codes = List(
     EnumValue("CONFIRM", 0, "Master sends this to an outstation to confirm the receipt of an Application Layer fragment"),
@@ -51,6 +50,3 @@ object FunctionCode {
   )
 
 }
-
-
-

@@ -2,6 +2,7 @@ package dev.gridio.dnp3.codegen
 
 import java.nio.file.{FileSystems, Path}
 
+import dev.gridio.dnp3.codegen.render.SpacedIndent
 import dev.gridio.dnp3.codegen.render.modules._
 
 object Main {
@@ -16,12 +17,13 @@ object Main {
 
   def main(args: Array[String]): Unit = {
 
-    println(variationsPath)
-
+    /*
     writeTo(fixedSizePath)(FixedSizeVariationModule)
     writeTo(gvPath)(VariationEnumModule)
     writeTo(rangedPath)(RangedVariationModule)
+    */
 
+    ProtocolEnums.lines(SpacedIndent).foreach(println)
   }
 
 }
