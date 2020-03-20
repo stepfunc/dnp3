@@ -1,19 +1,21 @@
 package dev.gridio.dnp3.codegen.model.enums.protocol
 
-import dev.gridio.dnp3.codegen.model.{EnumModel, EnumValue, Hex}
+import dev.gridio.dnp3.codegen.model._
 
-object ControlCode {
+object ControlCode extends EnumModel {
 
-  private val comments = List(
+  override def render: IntRender = IntRender.Hex
+
+  override def captureUnknownValues: Boolean = true
+
+  override def comments: List[String] = List(
     "Defines the interoperable values of the Control Code",
     "Refer to pages 506-510 of 1815 for a full description"
   )
 
-  def apply(): EnumModel = EnumModel("ControlCode", comments, EnumModel.UInt8, codes, Some(defaultValue), Hex)
+  override def name: String = "ControlCode"
 
-  private val defaultValue = EnumValue("UNDEFINED", 0xFF, " undefined command (used by DNP standard)")
-
-  private val codes = List(
+  override def values: List[EnumValue] = List(
 
     EnumValue("NUL", 0x00, "Does not initiate an action or change an in-progress or pending command."),
     EnumValue("NUL_CANCEL", 0x20, "Cancel in-progress and pending commands. Take no additional action."),

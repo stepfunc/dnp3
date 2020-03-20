@@ -22,12 +22,14 @@ case object Float32Field extends FixedSizeFieldType(4)
 
 case object Float64Field extends FixedSizeFieldType(8)
 
+/*
 case class EnumFieldType(model: EnumModel) extends FixedSizeFieldType(1) {
   override def defaultValue: String = model.default match {
     case Some(value) => "%s::%s".format(model.name, value.displayName)
     case None => throw new Exception(s"No default value for ${model.name}!")
   }
 }
+*/
 
 object FieldAttribute extends Enumeration {
   type WeekDay = Value
@@ -55,7 +57,7 @@ object FixedSizeField {
 
   //enums
   val commandStatus = FixedSizeField("status", UInt8Field)
-  val intervalUnit = FixedSizeField("intervalUnit", EnumFieldType(IntervalUnit()))
+
 
 }
 
@@ -74,10 +76,6 @@ object VariableFields {
 
 sealed trait Field {
   def name: String
-
-  def cppType: String
-
-  def cppArgument: String = cppType
 }
 
 sealed case class FixedSizeField(name: String, typ: FixedSizeFieldType, attributes: Set[FieldAttribute.Value] = Set.empty) extends Field {
@@ -86,38 +84,8 @@ sealed case class FixedSizeField(name: String, typ: FixedSizeFieldType, attribut
 
   def isFlags: Boolean = attributes.contains(FieldAttribute.IsFlags)
 
-  def cppType: String = typ match {
-    case UInt8Field => "uint8_t"
-    case UInt16Field => "uint16_t"
-    case UInt32Field => "uint32_t"
-    case UInt48Field => "DNPTime"
-    case SInt16Field => "int16_t"
-    case SInt32Field => "int32_t"
-    case Float32Field => "float"
-    case Float64Field => "double"
-    case EnumFieldType(model: EnumModel) => model.name
-    case _ => throw new Exception("Unknown field type")
-  }
-
-  def defaultValue: String = typ match {
-    case UInt8Field => "0"
-    case UInt16Field => "0"
-    case UInt32Field => "0"
-    case UInt48Field => "0"
-    case SInt16Field => "0"
-    case SInt32Field => "0"
-    case Float32Field => "0.0"
-    case Float64Field => "0.0"
-    case EnumFieldType(model: EnumModel) => model.defaultValue.get.toString
-    case _ => throw new Exception("Unknown field type")
-  }
-
 }
 
-sealed case class VariableField(name: String) extends Field {
-  def cppType: String = "ser4cpp::rseq_t"
-
-  override def cppArgument = "const ser4cpp::rseq_t&"
-}
+sealed case class VariableField(name: String) extends Field
 
 

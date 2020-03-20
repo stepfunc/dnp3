@@ -6,11 +6,14 @@ package object render {
   }
 
 
+
   implicit def stringToRenderString(s : String) : RenderString = {
     new RenderString(s)
   }
 
   def space: Iterator[String] = Iterator("")
+
+  def commented(s: String): String = s"/// ${s}"
 
   def spaced(groups: Iterator[Iterator[String]]): Iterator[String] = {
 

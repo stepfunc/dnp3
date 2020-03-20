@@ -1,3 +1,4 @@
+use crate::app::gen::enums::QualifierCode;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::header::Header;
@@ -48,6 +49,7 @@ pub enum ParseError {
     InsufficientBytes,
     InvalidRange,
     InvalidQualifierAndObject,
+    UnsupportedQualifierCode(QualifierCode),
 }
 
 impl std::convert::From<ReadError> for ParseError {
@@ -62,22 +64,13 @@ impl std::convert::From<InvalidRange> for ParseError {
     }
 }
 
-enum Qualifier {
-    OneByteStartStop,
-    TwoByteStartStop,
-}
-
-impl Qualifier {
-    pub fn from(value: u8) -> Result<Qualifier, ParseError> {
-        match value {
-            0 => Ok(Qualifier::OneByteStartStop),
-            1 => Ok(Qualifier::TwoByteStartStop),
-            _ => Err(ParseError::UnknownQualifier(value)),
+impl QualifierCode {
+    pub fn parse(cursor: &mut ReadCursor) -> Result<QualifierCode, ParseError> {
+        let x = cursor.read_u8()?;
+        match Self::from(x) {
+            Some(qc) => Ok(qc),
+            None => Err(ParseError::UnknownQualifier(x)),
         }
-    }
-
-    pub fn parse(cursor: &mut ReadCursor) -> Result<Qualifier, ParseError> {
-        Self::from(cursor.read_u8()?)
     }
 }
 
@@ -123,10 +116,11 @@ impl<'a> Parser<'a> {
 
     fn parse_one_inner(&mut self) -> Result<Header<'a>, ParseError> {
         let gv = Variation::parse(&mut self.cursor)?;
-        let qualifier = Qualifier::parse(&mut self.cursor)?;
+        let qualifier = QualifierCode::parse(&mut self.cursor)?;
         match qualifier {
-            Qualifier::OneByteStartStop => self.parse_start_stop_u8(gv),
-            Qualifier::TwoByteStartStop => self.parse_start_stop_u16(gv),
+            QualifierCode::Range8 => self.parse_start_stop_u8(gv),
+            QualifierCode::Range16 => self.parse_start_stop_u16(gv),
+            _ => Err(ParseError::UnsupportedQualifierCode(qualifier)),
         }
     }
 
