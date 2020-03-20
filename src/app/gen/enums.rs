@@ -10,6 +10,27 @@
 // This file is auto-generated. Do not edit manually
 //
 
+/// This field is used in conjunction with the Op Type field to specify a control operation
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum TripCloseCode {
+    Nul,
+    Close,
+    Trip,
+    Reserved,
+}
+
+impl TripCloseCode {
+    pub fn from(x: u8) -> Option<Self> {
+        match x {
+            0 => Some(TripCloseCode::Nul),
+            1 => Some(TripCloseCode::Close),
+            2 => Some(TripCloseCode::Trip),
+            3 => Some(TripCloseCode::Reserved),
+            _ => None,
+        }
+    }
+}
+
 /// Used in conjunction with the TCC field to specify a control operation
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum OpType {
@@ -251,3 +272,4 @@ impl FunctionCode {
         }
     }
 }
+

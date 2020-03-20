@@ -11,6 +11,7 @@ object ProtocolEnums extends Module {
     QualifierCode,
     CommandStatus,
     OpType,
+    TripCloseCode
   )
 
   private def lines(model : EnumModel)(implicit indentation: Indentation) : Iterator[String] = {

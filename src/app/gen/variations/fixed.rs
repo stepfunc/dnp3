@@ -10,9 +10,9 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::enums::CommandStatus;
 use crate::app::header::FixedSizeVariation;
 use crate::util::cursor::{ReadCursor, ReadError};
+use crate::app::gen::enums::CommandStatus;
 
 /// Time Delay - Fine
 #[derive(Debug, PartialEq)]
@@ -555,6 +555,7 @@ pub struct Group2Var1 {
 pub struct Group1Var2 {
     pub flags: u8,
 }
+
 
 impl FixedSizeVariation for Group52Var2 {
     const SIZE: u8 = 2;
@@ -1559,3 +1560,4 @@ impl FixedSizeVariation for Group1Var2 {
         )
     }
 }
+
