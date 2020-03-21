@@ -9,7 +9,7 @@ object Group60 extends ObjectGroup {
 
   def desc: String = "Class Data"
 
-  override def groupType: GroupType = OtherGroupType
+  override def groupType: GroupType = ClassDataGroupType
 }
 
 object Group60Var1 extends ClassData(Group60, 1, "Class 0")

@@ -47,7 +47,12 @@ object ObjectGroup {
 sealed trait GroupType
 object StaticGroupType extends GroupType
 object EventGroupType extends GroupType
-object OtherGroupType extends GroupType
+object CommandGroupType extends GroupType
+object TimeGroupType extends GroupType
+object ClassDataGroupType extends GroupType
+object FileControlGroupType extends GroupType
+object InternalIndicationsGroupType extends GroupType
+object VirtualTerminalOutputGroupType extends GroupType
 
 trait ObjectGroup {
 

@@ -1,7 +1,7 @@
 package dev.gridio.dnp3.codegen.model.groups
 
 import dev.gridio.dnp3.codegen.model.FixedSizeField._
-import dev.gridio.dnp3.codegen.model.{FixedSize, GroupType, ObjectGroup, OtherGroupType, Variation}
+import dev.gridio.dnp3.codegen.model.{FixedSize, GroupType, ObjectGroup, OtherGroupType, TimeGroupType, Variation}
 
 // common time of occurrence
 object Group51 extends ObjectGroup {
@@ -11,7 +11,7 @@ object Group51 extends ObjectGroup {
 
   def desc: String = "Time and Date CTO"
 
-  override def groupType: GroupType = OtherGroupType
+  override def groupType: GroupType = TimeGroupType
 }
 
 object Group51Var1 extends FixedSize(Group51, 1, "Absolute time, synchronized")(time48)

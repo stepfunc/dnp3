@@ -1,7 +1,7 @@
 package dev.gridio.dnp3.codegen.model.groups
 
 import dev.gridio.dnp3.codegen.model.FixedSizeField._
-import dev.gridio.dnp3.codegen.model.{FixedSize, GroupType, ObjectGroup, OtherGroupType, Variation}
+import dev.gridio.dnp3.codegen.model.{FixedSize, GroupType, ObjectGroup, OtherGroupType, TimeGroupType, Variation}
 
 object Group52 extends ObjectGroup {
   def variations: List[Variation] = List(Group52Var1, Group52Var2)
@@ -10,7 +10,7 @@ object Group52 extends ObjectGroup {
 
   def desc: String = "Time Delay"
 
-  override def groupType: GroupType = OtherGroupType
+  override def groupType: GroupType = TimeGroupType
 }
 
 object Group52Var1 extends FixedSize(Group52, 1, "Coarse")(time16)

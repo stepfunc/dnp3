@@ -11,7 +11,7 @@ object Group41 extends ObjectGroup {
 
   def desc: String = "Analog Output"
 
-  override def groupType: GroupType = OtherGroupType
+  override def groupType: GroupType = CommandGroupType
 }
 
 object Group41Var0 extends AnyVariation(Group41, 0)

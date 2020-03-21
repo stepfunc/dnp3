@@ -9,7 +9,7 @@ object Group112 extends ObjectGroup {
 
   def desc: String = "Virtual Terminal Output Block"
 
-  override def groupType: GroupType = OtherGroupType
+  override def groupType: GroupType = VirtualTerminalOutputGroupType
 }
 
 object Group112AnyVar extends SizedByVariation(Group112, 0)

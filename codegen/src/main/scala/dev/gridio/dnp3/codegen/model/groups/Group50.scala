@@ -11,7 +11,7 @@ object Group50 extends ObjectGroup {
 
   def desc: String = "Time and Date"
 
-  override def groupType: GroupType = OtherGroupType
+  override def groupType: GroupType = TimeGroupType
 }
 
 object Group50Var1 extends FixedSize(Group50, 1, "Absolute Time")(time48)

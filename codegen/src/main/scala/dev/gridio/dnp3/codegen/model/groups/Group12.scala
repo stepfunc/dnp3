@@ -11,7 +11,7 @@ object Group12 extends ObjectGroup {
 
   def desc: String = "Binary Command"
 
-  override def groupType: GroupType = OtherGroupType
+  override def groupType: GroupType = CommandGroupType
 }
 
 object Group12Var0 extends AnyVariation(Group12, 0)
