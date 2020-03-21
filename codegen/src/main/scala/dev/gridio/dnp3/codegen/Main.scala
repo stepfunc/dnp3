@@ -2,7 +2,7 @@ package dev.gridio.dnp3.codegen
 
 import java.nio.file.{FileSystems, Path}
 
-
+import dev.gridio.dnp3.codegen.render.Module
 import dev.gridio.dnp3.codegen.render.modules._
 
 object Main {
@@ -10,20 +10,20 @@ object Main {
   val appGenPath: Path = FileSystems.getDefault.getPath("../src/app/gen")
   val variationsPath: Path = appGenPath.resolve("variations")
 
-  val enumsPath : Path = appGenPath.resolve("enums.rs")
-  val fixedSizePath : Path = variationsPath.resolve("fixed.rs")
-  val rangedPath : Path = variationsPath.resolve("ranged.rs")
-  val allObjectsPath : Path = variationsPath.resolve("allobjs.rs")
-  val gvPath : Path = variationsPath.resolve("gv.rs")
+
+  def modules : List[(Module, Path)] = List(
+    (ProtocolEnums,  appGenPath.resolve("enums.rs")),
+    (FixedSizeVariationModule,  variationsPath.resolve("fixed.rs")),
+    (RangedVariationModule,  variationsPath.resolve("ranged.rs")),
+    (AllObjectsVariationModule,  variationsPath.resolve("all.rs")),
+    (VariationEnumModule, variationsPath.resolve("gv.rs")),
+    (CountVariationModule, variationsPath.resolve("count.rs")),
+  )
 
 
 
   def main(args: Array[String]): Unit = {
-    writeTo(enumsPath)(ProtocolEnums)
-    writeTo(fixedSizePath)(FixedSizeVariationModule)
-    writeTo(gvPath)(VariationEnumModule)
-    writeTo(rangedPath)(RangedVariationModule)
-    writeTo(allObjectsPath)(AllObjectsVariationModule)
+    modules.foreach { case (m,p) => writeTo(p)(m) }
   }
 
 }

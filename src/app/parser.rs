@@ -1,5 +1,5 @@
 use crate::app::gen::enums::QualifierCode;
-use crate::app::gen::variations::allobjs::AllObjectsVariation;
+use crate::app::gen::variations::all::AllObjectsVariation;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::header::Header;

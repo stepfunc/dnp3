@@ -1,4 +1,4 @@
-use crate::app::gen::variations::allobjs::AllObjectsVariation;
+use crate::app::gen::variations::all::AllObjectsVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::util::cursor::{ReadCursor, ReadError};
 
