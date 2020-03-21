@@ -203,6 +203,26 @@ mod test {
     }
 
     #[test]
+    fn parses_count_of_time() {
+        let header = &[0x32, 0x01, 0x07, 0x01, 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA];
+        let mut parser = Parser::two_pass(ParseType::NonRead, header).unwrap();
+
+        let items: Vec<Group50Var1> = match parser.next().unwrap() {
+            Header::OneByteCount(01, CountVariation::Group50Var1(seq)) => seq.iter().collect(),
+            x => panic!("got: {:?}", x),
+        };
+
+        assert_eq!(
+            items,
+            vec![Group50Var1 {
+                time: 0x00_00_FA_FB_FC_FD_FE_FF
+            }]
+        );
+
+        assert_eq!(parser.next(), None);
+    }
+
+    #[test]
     fn parses_range_of_g1v2_as_non_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 
