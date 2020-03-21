@@ -13,7 +13,7 @@ object FixedSizeVariationModule extends Module {
       }
     }
 
-    "use crate::app::header::FixedSizeVariation;".eol ++
+    "use crate::app::header::FixedSize;".eol ++
     "use crate::util::cursor::{ReadCursor, ReadError};".eol ++
     "use crate::app::gen::enums::CommandStatus;".eol ++
     "use crate::app::types::ControlCode;".eol ++
@@ -86,7 +86,7 @@ object FixedSizeVariationModule extends Module {
       }
     }
 
-    bracket(s"impl FixedSizeVariation for ${gv.name}") {
+    bracket(s"impl FixedSize for ${gv.name}") {
       s"const SIZE: u8 = ${gv.size};".eol ++
       implParse
     }

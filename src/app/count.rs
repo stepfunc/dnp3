@@ -1,10 +1,10 @@
-use crate::app::header::FixedSizeVariation;
+use crate::app::header::FixedSize;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Debug, PartialEq)]
 pub struct CountSequence<'a, T>
 where
-    T: FixedSizeVariation,
+    T: FixedSize,
 {
     data: &'a [u8],
     phantom: std::marker::PhantomData<T>,
@@ -12,7 +12,7 @@ where
 
 impl<'a, T> CountSequence<'a, T>
 where
-    T: FixedSizeVariation,
+    T: FixedSize,
 {
     pub fn parse(
         count: u16,
@@ -53,7 +53,7 @@ pub struct CountIterator<'a, T> {
 
 impl<'a, T> Iterator for CountIterator<'a, T>
 where
-    T: FixedSizeVariation,
+    T: FixedSize,
 {
     type Item = T;
 

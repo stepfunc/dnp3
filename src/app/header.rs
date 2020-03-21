@@ -3,7 +3,7 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::util::cursor::{ReadCursor, ReadError};
 
-pub trait FixedSizeVariation
+pub trait FixedSize
 where
     Self: Sized,
 {

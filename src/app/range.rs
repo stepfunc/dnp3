@@ -1,4 +1,4 @@
-use crate::app::header::FixedSizeVariation;
+use crate::app::header::FixedSize;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 pub struct InvalidRange;
@@ -25,7 +25,7 @@ impl Range {
 #[derive(Debug, PartialEq)]
 pub struct RangedSequence<'a, T>
 where
-    T: FixedSizeVariation,
+    T: FixedSize,
 {
     start: u16,
     data: &'a [u8],
@@ -34,7 +34,7 @@ where
 
 impl<'a, T> RangedSequence<'a, T>
 where
-    T: FixedSizeVariation,
+    T: FixedSize,
 {
     pub fn parse(
         range: Range,
@@ -78,7 +78,7 @@ pub struct RangeIterator<'a, T> {
 
 impl<'a, T> Iterator for RangeIterator<'a, T>
 where
-    T: FixedSizeVariation,
+    T: FixedSize,
 {
     type Item = (T, u16);
 
