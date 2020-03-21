@@ -1,6 +1,7 @@
 use crate::app::header::FixedSize;
 use crate::util::cursor::{ReadCursor, ReadError};
 
+#[derive(Debug, PartialEq)]
 pub struct Prefix<I, V>
 where
     I: FixedSize,

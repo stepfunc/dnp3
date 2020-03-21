@@ -18,6 +18,7 @@ object Main {
     (AllObjectsVariationModule,  variationsPath.resolve("all.rs")),
     (VariationEnumModule, variationsPath.resolve("gv.rs")),
     (CountVariationModule, variationsPath.resolve("count.rs")),
+    (PrefixedVariationModule, variationsPath.resolve("prefixed.rs")),
   )
 
 

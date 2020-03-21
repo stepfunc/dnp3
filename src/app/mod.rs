@@ -11,6 +11,7 @@ pub mod gen {
         pub mod count;
         pub mod fixed;
         pub mod gv;
+        pub mod prefixed;
         pub mod ranged;
     }
 }
