@@ -33,6 +33,7 @@ object VariationEnumModule extends Module {
       case _ =>  s"${v.name}"
     }
 
+    "#[derive(Copy, Clone, Debug, PartialEq)]".eol ++
     bracket("pub enum Variation") {
       ObjectGroup.allVariations.iterator.flatMap(v => s"${getVariationDefinition(v)},".eol)
     }

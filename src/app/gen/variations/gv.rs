@@ -10,6 +10,7 @@
 // This file is auto-generated. Do not edit manually
 //
 
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Variation {
     Group1Var0,
     Group1Var1,

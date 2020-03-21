@@ -49,14 +49,14 @@ object RangedVariationModule extends Module {
         bracket("match v") {
           variations.map { v =>
             s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getNonReadVarDefinition(v)}),"
-          } ++ "_ => Err(ParseError::InvalidQualifierAndObject),".eol
+          } ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
         }
       } ++ space ++
         bracket("pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ParseError>") {
           bracket("match v") {
             variations.map { v =>
               s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getReadVarDefinition(v)}),"
-            } ++ "_ => Err(ParseError::InvalidQualifierAndObject),".eol
+            } ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
           }
         }
     }

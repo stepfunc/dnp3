@@ -74,7 +74,7 @@ impl<'a> RangedVariation<'a> {
             Variation::Group30Var4 => Ok(RangedVariation::Group30Var4(RangedSequence::parse(range, cursor)?)),
             Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::parse(range, cursor)?)),
             Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::parse(range, cursor)?)),
-            _ => Err(ParseError::InvalidQualifierAndObject),
+            _ => Err(ParseError::InvalidQualifierForVariation(v)),
         }
     }
 
@@ -105,7 +105,7 @@ impl<'a> RangedVariation<'a> {
             Variation::Group30Var4 => Ok(RangedVariation::Group30Var4(RangedSequence::empty())),
             Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::empty())),
             Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::empty())),
-            _ => Err(ParseError::InvalidQualifierAndObject),
+            _ => Err(ParseError::InvalidQualifierForVariation(v)),
         }
     }
 }

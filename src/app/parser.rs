@@ -1,4 +1,5 @@
 use crate::app::gen::enums::QualifierCode;
+use crate::app::gen::variations::allobjs::AllObjectsVariation;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::header::Header;
@@ -48,7 +49,7 @@ pub enum ParseError {
     UnknownQualifier(u8),
     InsufficientBytes,
     InvalidRange,
-    InvalidQualifierAndObject,
+    InvalidQualifierForVariation(Variation),
     UnsupportedQualifierCode(QualifierCode),
 }
 
@@ -118,9 +119,17 @@ impl<'a> Parser<'a> {
         let gv = Variation::parse(&mut self.cursor)?;
         let qualifier = QualifierCode::parse(&mut self.cursor)?;
         match qualifier {
+            QualifierCode::AllObjects => self.parse_all_objects(gv),
             QualifierCode::Range8 => self.parse_start_stop_u8(gv),
             QualifierCode::Range16 => self.parse_start_stop_u16(gv),
             _ => Err(ParseError::UnsupportedQualifierCode(qualifier)),
+        }
+    }
+
+    fn parse_all_objects(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+        match AllObjectsVariation::get(gv) {
+            Some(v) => Ok(Header::AllObjects(v)),
+            None => Err(ParseError::InvalidQualifierForVariation(gv)),
         }
     }
 

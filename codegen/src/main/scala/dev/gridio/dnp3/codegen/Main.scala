@@ -13,6 +13,7 @@ object Main {
   val enumsPath : Path = appGenPath.resolve("enums.rs")
   val fixedSizePath : Path = variationsPath.resolve("fixed.rs")
   val rangedPath : Path = variationsPath.resolve("ranged.rs")
+  val allObjectsPath : Path = variationsPath.resolve("allobjs.rs")
   val gvPath : Path = variationsPath.resolve("gv.rs")
 
 
@@ -22,6 +23,7 @@ object Main {
     writeTo(fixedSizePath)(FixedSizeVariationModule)
     writeTo(gvPath)(VariationEnumModule)
     writeTo(rangedPath)(RangedVariationModule)
+    writeTo(allObjectsPath)(AllObjectsVariationModule)
   }
 
 }

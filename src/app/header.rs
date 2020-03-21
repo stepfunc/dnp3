@@ -1,3 +1,4 @@
+use crate::app::gen::variations::allobjs::AllObjectsVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::util::cursor::{ReadCursor, ReadError};
 
@@ -12,6 +13,7 @@ where
 
 #[derive(Debug, PartialEq)]
 pub enum Header<'a> {
+    AllObjects(AllObjectsVariation),
     OneByteStartStop(u8, u8, RangedVariation<'a>),
     TwoByteStartStop(u16, u16, RangedVariation<'a>),
 }
