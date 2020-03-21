@@ -1,3 +1,4 @@
+pub mod count;
 pub mod header;
 pub mod parser;
 pub mod range;

@@ -9,6 +9,7 @@ pub struct Range {
 }
 
 impl Range {
+    /// construct a range in a way that ensures only a valid range can be obtained
     pub fn from(start: u16, stop: u16) -> Result<Self, InvalidRange> {
         if stop < start {
             return Err(InvalidRange);
