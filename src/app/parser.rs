@@ -166,6 +166,28 @@ mod test {
     use crate::app::header::*;
 
     #[test]
+    fn parses_integrity_scan() {
+        let vec: Vec<Header> = Parser::two_pass(
+            ParseType::NonRead,
+            &[
+                0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
+            ],
+        )
+        .unwrap()
+        .collect();
+
+        assert_eq!(
+            vec,
+            vec![
+                Header::AllObjects(AllObjectsVariation::Group60Var2),
+                Header::AllObjects(AllObjectsVariation::Group60Var3),
+                Header::AllObjects(AllObjectsVariation::Group60Var4),
+                Header::AllObjects(AllObjectsVariation::Group60Var1),
+            ]
+        )
+    }
+
+    #[test]
     fn parses_range_of_g1v2_as_non_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 

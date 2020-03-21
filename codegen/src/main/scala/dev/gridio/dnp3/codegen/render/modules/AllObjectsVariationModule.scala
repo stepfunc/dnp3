@@ -39,6 +39,7 @@ object AllObjectsVariationModule extends Module {
 
   def variations : Iterator[Variation] = {
     ObjectGroup.allVariations.iterator.collect {
+      case v : ClassData => v
       case v : AnyVariation => v
       case v : FixedSize if v.parent.isStaticGroup || v.parent.isEventGroup => v
     }
