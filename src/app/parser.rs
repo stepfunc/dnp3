@@ -1,5 +1,6 @@
 use crate::app::gen::enums::QualifierCode;
 use crate::app::gen::variations::all::AllObjectsVariation;
+use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::header::Header;
@@ -122,6 +123,8 @@ impl<'a> Parser<'a> {
             QualifierCode::AllObjects => self.parse_all_objects(gv),
             QualifierCode::Range8 => self.parse_start_stop_u8(gv),
             QualifierCode::Range16 => self.parse_start_stop_u16(gv),
+            QualifierCode::Count8 => self.parse_count_u8(gv),
+            QualifierCode::Count16 => self.parse_count_u16(gv),
             _ => Err(ParseError::UnsupportedQualifierCode(qualifier)),
         }
     }
@@ -131,6 +134,18 @@ impl<'a> Parser<'a> {
             Some(v) => Ok(Header::AllObjects(v)),
             None => Err(ParseError::InvalidQualifierForVariation(gv)),
         }
+    }
+
+    fn parse_count_u8(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+        let count = self.cursor.read_u8()?;
+        let data = CountVariation::parse(gv, count as u16, &mut self.cursor)?;
+        Ok(Header::OneByteCount(count, data))
+    }
+
+    fn parse_count_u16(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+        let count = self.cursor.read_u16_le()?;
+        let data = CountVariation::parse(gv, count, &mut self.cursor)?;
+        Ok(Header::TwoByteCount(count, data))
     }
 
     fn parse_start_stop_u8(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {

@@ -10,31 +10,35 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::app::count::CountSequence;
+use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
+use crate::app::parser::ParseError;
+use crate::util::cursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]
-pub enum CountVariation {
-    Group50Var1,
-    Group50Var3,
-    Group50Var4,
-    Group51Var1,
-    Group51Var2,
-    Group52Var1,
-    Group52Var2,
+pub enum CountVariation<'a> {
+    Group50Var1(CountSequence<'a, Group50Var1>),
+    Group50Var3(CountSequence<'a, Group50Var3>),
+    Group50Var4(CountSequence<'a, Group50Var4>),
+    Group51Var1(CountSequence<'a, Group51Var1>),
+    Group51Var2(CountSequence<'a, Group51Var2>),
+    Group52Var1(CountSequence<'a, Group52Var1>),
+    Group52Var2(CountSequence<'a, Group52Var2>),
 }
 
-impl CountVariation {
+impl<'a> CountVariation<'a> {
     #[rustfmt::skip]
-    pub fn get(v: Variation) -> Option<CountVariation> {
+    pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ParseError> {
         match v {
-            Variation::Group50Var1 => Some(CountVariation::Group50Var1),
-            Variation::Group50Var3 => Some(CountVariation::Group50Var3),
-            Variation::Group50Var4 => Some(CountVariation::Group50Var4),
-            Variation::Group51Var1 => Some(CountVariation::Group51Var1),
-            Variation::Group51Var2 => Some(CountVariation::Group51Var2),
-            Variation::Group52Var1 => Some(CountVariation::Group52Var1),
-            Variation::Group52Var2 => Some(CountVariation::Group52Var2),
-            _ => None,
+            Variation::Group50Var1 => Ok(CountVariation::Group50Var1(CountSequence::parse(count, cursor)?)),
+            Variation::Group50Var3 => Ok(CountVariation::Group50Var3(CountSequence::parse(count, cursor)?)),
+            Variation::Group50Var4 => Ok(CountVariation::Group50Var4(CountSequence::parse(count, cursor)?)),
+            Variation::Group51Var1 => Ok(CountVariation::Group51Var1(CountSequence::parse(count, cursor)?)),
+            Variation::Group51Var2 => Ok(CountVariation::Group51Var2(CountSequence::parse(count, cursor)?)),
+            Variation::Group52Var1 => Ok(CountVariation::Group52Var1(CountSequence::parse(count, cursor)?)),
+            Variation::Group52Var2 => Ok(CountVariation::Group52Var2(CountSequence::parse(count, cursor)?)),
+            _ => Err(ParseError::InvalidQualifierForVariation(v)),
         }
     }
 }

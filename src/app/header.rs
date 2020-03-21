@@ -1,4 +1,5 @@
 use crate::app::gen::variations::all::AllObjectsVariation;
+use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::util::cursor::{ReadCursor, ReadError};
 
@@ -16,6 +17,8 @@ pub enum Header<'a> {
     AllObjects(AllObjectsVariation),
     OneByteStartStop(u8, u8, RangedVariation<'a>),
     TwoByteStartStop(u16, u16, RangedVariation<'a>),
+    OneByteCount(u8, CountVariation<'a>),
+    TwoByteCount(u16, CountVariation<'a>),
 }
 
 #[cfg(test)]
