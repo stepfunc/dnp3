@@ -2,6 +2,7 @@ use crate::app::gen::enums::QualifierCode;
 use crate::app::gen::variations::all::AllObjectsVariation;
 use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::gv::Variation;
+use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::header::Header;
 use crate::app::range::{InvalidRange, Range};
@@ -78,6 +79,8 @@ impl<'a> Parser<'a> {
             QualifierCode::Range16 => self.parse_start_stop_u16(gv),
             QualifierCode::Count8 => self.parse_count_u8(gv),
             QualifierCode::Count16 => self.parse_count_u16(gv),
+            QualifierCode::CountAndPrefix8 => self.parse_count_and_prefix_u8(gv),
+            QualifierCode::CountAndPrefix16 => self.parse_count_and_prefix_u16(gv),
             _ => Err(ParseError::UnsupportedQualifierCode(qualifier)),
         }
     }
@@ -115,6 +118,18 @@ impl<'a> Parser<'a> {
         let range = Range::from(start, stop)?;
         let data = RangedVariation::parse(self.parse_type, gv, range, &mut self.cursor)?;
         Ok(Header::TwoByteStartStop(start, stop, data))
+    }
+
+    fn parse_count_and_prefix_u8(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+        let count = self.cursor.read_u8()?;
+        let data = PrefixedVariation::<u8>::parse(gv, count as u16, &mut self.cursor)?;
+        Ok(Header::OneByteCountAndPrefix(count, data))
+    }
+
+    fn parse_count_and_prefix_u16(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+        let count = self.cursor.read_u16_le()?;
+        let data = PrefixedVariation::<u16>::parse(gv, count, &mut self.cursor)?;
+        Ok(Header::TwoByteCountAndPrefix(count, data))
     }
 }
 
