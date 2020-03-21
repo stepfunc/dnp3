@@ -45,7 +45,7 @@ object PrefixedVariationModule extends Module {
 
   def variations : Iterator[Variation] = {
     ObjectGroup.allVariations.iterator.collect {
-      case v : FixedSize if v.parent.groupType == GroupType.Event => v
+      case v : FixedSize if v.parent.groupType == GroupType.Event || v.parent.groupType == GroupType.Command => v
     }
   }
 
