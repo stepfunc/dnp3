@@ -1,7 +1,7 @@
 package dev.gridio.dnp3.codegen.model.groups
 
-import dev.gridio.dnp3.codegen.model.FixedSizeField._
 import dev.gridio.dnp3.codegen.model._
+import dev.gridio.dnp3.codegen.model.FixedSizeField._
 
 // absolute time
 object Group50 extends ObjectGroup {
@@ -11,7 +11,7 @@ object Group50 extends ObjectGroup {
 
   def desc: String = "Time and Date"
 
-  override def groupType: GroupType = TimeGroupType
+  override def groupType: GroupType = GroupType.Time
 }
 
 object Group50Var1 extends FixedSize(Group50, 1, "Absolute Time")(time48)

@@ -12,7 +12,7 @@ object Group32 extends ObjectGroup {
 
   def desc: String = "Analog Input Event"
 
-  override def groupType: GroupType = EventGroupType
+  override def groupType: GroupType = GroupType.Event
 }
 
 object Group32Var0 extends AnyVariation(Group32, 0)

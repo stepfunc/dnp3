@@ -1,9 +1,8 @@
 package dev.gridio.dnp3.codegen.model.groups
 
+import dev.gridio.dnp3.codegen.model._
 import dev.gridio.dnp3.codegen.model.FixedSizeField._
 import dev.gridio.dnp3.codegen.model.VariationNames._
-import dev.gridio.dnp3.codegen.model.{AnyVariation, EventGroupType, FixedSize, GroupType, ObjectGroup, Variation}
-
 
 //analog output events
 object Group42 extends ObjectGroup {
@@ -13,7 +12,7 @@ object Group42 extends ObjectGroup {
 
   def desc: String = "Analog Output Event"
 
-  override def groupType: GroupType = EventGroupType
+  override def groupType: GroupType = GroupType.Event
 }
 
 object Group42Var0 extends AnyVariation(Group42, 0)

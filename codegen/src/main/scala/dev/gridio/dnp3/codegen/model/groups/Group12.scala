@@ -1,8 +1,8 @@
 package dev.gridio.dnp3.codegen.model.groups
 
+import dev.gridio.dnp3.codegen.model._
 import dev.gridio.dnp3.codegen.model.FixedSizeField._
 import dev.gridio.dnp3.codegen.model.VariationNames._
-import dev.gridio.dnp3.codegen.model._
 
 object Group12 extends ObjectGroup {
   def variations: List[Variation] = List(Group12Var0, Group12Var1)
@@ -11,7 +11,7 @@ object Group12 extends ObjectGroup {
 
   def desc: String = "Binary Command"
 
-  override def groupType: GroupType = CommandGroupType
+  override def groupType: GroupType = GroupType.Command
 }
 
 object Group12Var0 extends AnyVariation(Group12, 0)

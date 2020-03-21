@@ -10,7 +10,7 @@ object Group80 extends ObjectGroup {
 
   def desc: String = "Internal Indications"
 
-  override def groupType: GroupType = InternalIndicationsGroupType
+  override def groupType: GroupType = GroupType.InternalIndications
 }
 
 object Group80Var1 extends SingleBitField(Group80, 1, packedFormat)

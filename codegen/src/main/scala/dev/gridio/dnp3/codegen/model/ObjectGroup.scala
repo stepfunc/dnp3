@@ -45,14 +45,19 @@ object ObjectGroup {
 }
 
 sealed trait GroupType
-object StaticGroupType extends GroupType
-object EventGroupType extends GroupType
-object CommandGroupType extends GroupType
-object TimeGroupType extends GroupType
-object ClassDataGroupType extends GroupType
-object FileControlGroupType extends GroupType
-object InternalIndicationsGroupType extends GroupType
-object VirtualTerminalOutputGroupType extends GroupType
+
+object GroupType {
+  object Static extends GroupType
+  object Event extends GroupType
+  object Command extends GroupType
+  object Time extends GroupType
+  object ClassData extends GroupType
+  object FileControl extends GroupType
+  object InternalIndications extends GroupType
+  object VirtualTerminalOutput extends GroupType
+}
+
+
 
 trait ObjectGroup {
 
@@ -65,11 +70,11 @@ trait ObjectGroup {
   def desc: String
 
   final def isEventGroup: Boolean = {
-    groupType == EventGroupType
+    groupType == GroupType.Event
   }
 
   final def isStaticGroup: Boolean = {
-    groupType == StaticGroupType
+    groupType == GroupType.Static
   }
 
   def hasSizedObjects: Boolean = variations.exists(x => x.isInstanceOf[FixedSizeField])

@@ -11,7 +11,7 @@ object Group1 extends ObjectGroup {
 
   def group: Byte = 1
 
-  override def groupType: GroupType = StaticGroupType
+  override def groupType: GroupType = GroupType.Static
 }
 
 object Group1Var0 extends AnyVariation(Group1, 0)

@@ -21,7 +21,7 @@ object Group21 extends ObjectGroup {
 
   def desc: String = "Frozen Counter"
 
-  override def groupType: GroupType = StaticGroupType
+  override def groupType: GroupType = GroupType.Static
 
 }
 

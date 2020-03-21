@@ -1,6 +1,6 @@
 package dev.gridio.dnp3.codegen.model.groups
 
-import dev.gridio.dnp3.codegen.model.{EventGroupType, GroupType, ObjectGroup, SizedByVariation, Variation}
+import dev.gridio.dnp3.codegen.model._
 
 object Group111 extends ObjectGroup {
   def variations: List[Variation] = List(Group111AnyVar)
@@ -9,7 +9,7 @@ object Group111 extends ObjectGroup {
 
   def desc: String = "Octet String Event"
 
-  override def groupType: GroupType = EventGroupType
+  override def groupType: GroupType = GroupType.Event
 }
 
 object Group111AnyVar extends SizedByVariation(Group111, 0)

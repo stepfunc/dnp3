@@ -19,7 +19,7 @@ object Group70 extends ObjectGroup {
 
   def desc: String = "File-control"
 
-  override def groupType: GroupType = FileControlGroupType
+  override def groupType: GroupType = GroupType.FileControl
 }
 
 object Group70Var1 extends DefaultVariableSize(Group70, 1, "File identifier")
