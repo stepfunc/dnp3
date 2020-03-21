@@ -192,8 +192,10 @@ impl QualifierCode {
 mod test {
 
     use super::*;
+    use crate::app::gen::enums::CommandStatus;
     use crate::app::gen::variations::fixed::*;
     use crate::app::header::*;
+    use crate::app::prefix::Prefix;
 
     #[test]
     fn parses_integrity_scan() {
@@ -215,6 +217,31 @@ mod test {
                 Header::AllObjects(AllObjectsVariation::Group60Var1),
             ]
         )
+    }
+
+    #[test]
+    fn parses_analog_output() {
+        let header = &[0x29, 0x01, 0x17, 0x01, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x00];
+        let mut parser = Parser::two_pass(ParseType::NonRead, header).unwrap();
+
+        let items: Vec<Prefix<u8, Group41Var1>> = match parser.next().unwrap() {
+            Header::OneByteCountAndPrefix(01, PrefixedVariation::<u8>::Group41Var1(seq)) => {
+                seq.iter().collect()
+            }
+            x => panic!("got: {:?}", x),
+        };
+
+        let expected = Prefix::<u8, Group41Var1> {
+            index: 0xFF,
+            value: Group41Var1 {
+                value: 0x04030201,
+                status: CommandStatus::Success,
+            },
+        };
+
+        assert_eq!(items, vec![expected]);
+
+        assert_eq!(parser.next(), None);
     }
 
     #[test]
