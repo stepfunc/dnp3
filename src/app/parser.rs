@@ -13,37 +13,6 @@ pub enum ParseType {
     NonRead,
 }
 
-pub struct Parser<'a> {
-    errored: bool,
-    parse_type: ParseType,
-    cursor: ReadCursor<'a>,
-}
-
-impl Variation {
-    pub fn parse(cursor: &mut ReadCursor) -> Result<Variation, ParseError> {
-        let group = cursor.read_u8()?;
-        let var = cursor.read_u8()?;
-        match Self::lookup(group, var) {
-            Some(gv) => Ok(gv),
-            None => Err(ParseError::UnknownGroupVariation(group, var)),
-        }
-    }
-}
-
-impl<'a> RangedVariation<'a> {
-    pub fn parse(
-        parse_type: ParseType,
-        v: Variation,
-        range: Range,
-        cursor: &mut ReadCursor<'a>,
-    ) -> Result<RangedVariation<'a>, ParseError> {
-        match parse_type {
-            ParseType::Read => Self::parse_read(v),
-            ParseType::NonRead => Self::parse_non_read(v, range, cursor),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     UnknownGroupVariation(u8, u8),
@@ -54,26 +23,10 @@ pub enum ParseError {
     UnsupportedQualifierCode(QualifierCode),
 }
 
-impl std::convert::From<ReadError> for ParseError {
-    fn from(_: ReadError) -> Self {
-        ParseError::InsufficientBytes
-    }
-}
-
-impl std::convert::From<InvalidRange> for ParseError {
-    fn from(_: InvalidRange) -> Self {
-        ParseError::InvalidRange
-    }
-}
-
-impl QualifierCode {
-    pub fn parse(cursor: &mut ReadCursor) -> Result<QualifierCode, ParseError> {
-        let x = cursor.read_u8()?;
-        match Self::from(x) {
-            Some(qc) => Ok(qc),
-            None => Err(ParseError::UnknownQualifier(x)),
-        }
-    }
+pub struct Parser<'a> {
+    errored: bool,
+    parse_type: ParseType,
+    cursor: ReadCursor<'a>,
 }
 
 impl<'a> Parser<'a> {
@@ -170,6 +123,53 @@ impl<'a> Iterator for Parser<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.parse_one()
+    }
+}
+
+impl Variation {
+    pub fn parse(cursor: &mut ReadCursor) -> Result<Variation, ParseError> {
+        let group = cursor.read_u8()?;
+        let var = cursor.read_u8()?;
+        match Self::lookup(group, var) {
+            Some(gv) => Ok(gv),
+            None => Err(ParseError::UnknownGroupVariation(group, var)),
+        }
+    }
+}
+
+impl<'a> RangedVariation<'a> {
+    pub fn parse(
+        parse_type: ParseType,
+        v: Variation,
+        range: Range,
+        cursor: &mut ReadCursor<'a>,
+    ) -> Result<RangedVariation<'a>, ParseError> {
+        match parse_type {
+            ParseType::Read => Self::parse_read(v),
+            ParseType::NonRead => Self::parse_non_read(v, range, cursor),
+        }
+    }
+}
+
+impl std::convert::From<ReadError> for ParseError {
+    fn from(_: ReadError) -> Self {
+        ParseError::InsufficientBytes
+    }
+}
+
+impl std::convert::From<InvalidRange> for ParseError {
+    fn from(_: InvalidRange) -> Self {
+        ParseError::InvalidRange
+    }
+}
+
+impl QualifierCode {
+    pub fn parse(cursor: &mut ReadCursor) -> Result<QualifierCode, ParseError> {
+        let x = cursor.read_u8()?;
+        match Self::from(x) {
+            Some(qc) => Ok(qc),
+            None => Err(ParseError::UnknownQualifier(x)),
+        }
     }
 }
 
