@@ -339,7 +339,7 @@ mod test {
 
         let bytes: Vec<(Bytes, u16)> = match parser.next().unwrap() {
             Header::OneByteStartStop(01, 02, RangedVariation::Group110VarX(0x01, seq)) => {
-                seq.collect()
+                seq.iter().collect()
             }
             x => panic!("got: {:?}", x),
         };

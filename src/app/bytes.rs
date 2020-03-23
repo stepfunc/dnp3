@@ -8,6 +8,13 @@ pub struct Bytes<'a> {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct RangedBytesSequence<'a> {
+    bytes: &'a [u8],
+    index: u16,
+    size: usize,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct RangedBytesIterator<'a> {
     cursor: ReadCursor<'a>,
     index: u16,
@@ -29,18 +36,10 @@ impl<'a> Bytes<'a> {
     }
 }
 
-impl<'a> RangedBytesIterator<'a> {
-    pub fn empty() -> Self {
-        RangedBytesIterator {
-            cursor: ReadCursor::empty(),
-            index: 0,
-            size: 1,
-        }
-    }
-
+impl<'a> RangedBytesSequence<'a> {
     pub fn parse(
         variation: u8,
-        start: u16,
+        index: u16,
         count: usize,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<Self, ParseError> {
@@ -48,11 +47,19 @@ impl<'a> RangedBytesIterator<'a> {
             return Err(ParseError::ZeroLengthOctetData);
         }
 
-        Ok(RangedBytesIterator {
-            cursor: ReadCursor::new(cursor.read_bytes(variation as usize * count)?),
-            index: start,
+        Ok(RangedBytesSequence {
+            bytes: cursor.read_bytes(variation as usize * count)?,
+            index,
             size: variation as usize,
         })
+    }
+
+    pub fn iter(&self) -> RangedBytesIterator<'a> {
+        RangedBytesIterator {
+            cursor: ReadCursor::new(self.bytes),
+            index: self.index,
+            size: self.size,
+        }
     }
 }
 
