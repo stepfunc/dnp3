@@ -13,6 +13,7 @@ object RangedVariationModule extends Module {
       "use crate::util::cursor::ReadCursor;".eol ++
       "use crate::app::parser::ParseError;".eol ++
       "use crate::app::bytes::RangedBytesSequence;".eol ++
+      "use crate::app::bit::IndexedBitSequence;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++
@@ -78,24 +79,27 @@ object RangedVariationModule extends Module {
       "#[rustfmt::skip]".eol ++
       bracket("pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ParseError>") {
         bracket("match v") {
-          variations.flatMap(getNonReadMatcher) ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
+          variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
         }
       } ++ space ++
         bracket("pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ParseError>") {
           bracket("match v") {
-            variations.flatMap(getReadMatcher) ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
+            variations.flatMap(getReadMatcher).iterator ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
           }
         }
     }
 
   }
 
-  def variations : Iterator[Variation] = {
-    ObjectGroup.allVariations.iterator.collect {
-      case v : SingleBitField if v.parent == Group1 => v
-      case v : AnyVariation if v.parent.isStaticGroup => v
-      case v : FixedSize if v.parent.isStaticGroup => v
-      case v : SizedByVariation if v.parent.isStaticGroup => v
+  def variations : List[Variation] = {
+    ObjectGroup.allVariations.flatMap { v =>
+      v match {
+        case Group1Var1 => Some(v)
+        case v : AnyVariation if v.parent.isStaticGroup => Some(v)
+        case v : FixedSize if v.parent.isStaticGroup => Some(v)
+        case v : SizedByVariation if v.parent.isStaticGroup => Some(v)
+        case _ => None
+      }
     }
   }
 
