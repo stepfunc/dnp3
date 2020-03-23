@@ -21,6 +21,7 @@ pub struct RangedBytesIterator<'a> {
     size: usize,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct PrefixedBytesSequence<'a, T>
 where
     T: FixedSize,
@@ -78,14 +79,14 @@ where
 {
     pub fn parse(
         variation: u8,
-        count: usize,
+        count: u16,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<Self, ParseError> {
         if variation == 0 {
             return Err(ParseError::ZeroLengthOctetData);
         }
 
-        let size = (variation as usize + T::SIZE as usize) * count;
+        let size = (variation as usize + T::SIZE as usize) * count as usize;
 
         Ok(PrefixedBytesSequence {
             bytes: cursor.read_bytes(size)?,

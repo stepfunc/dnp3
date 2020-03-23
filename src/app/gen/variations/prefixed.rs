@@ -10,6 +10,7 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::app::bytes::PrefixedBytesSequence;
 use crate::app::count::CountSequence;
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
@@ -74,6 +75,7 @@ where
     Group43Var6(CountSequence<'a, Prefix<I, Group43Var6>>),
     Group43Var7(CountSequence<'a, Prefix<I, Group43Var7>>),
     Group43Var8(CountSequence<'a, Prefix<I, Group43Var8>>),
+    Group111VarX(u8, PrefixedBytesSequence<'a, I>),
 }
 
 impl<'a, I> PrefixedVariation<'a, I>
@@ -134,6 +136,8 @@ where
             Variation::Group43Var6 => Ok(PrefixedVariation::Group43Var6(CountSequence::parse(count, cursor)?)),
             Variation::Group43Var7 => Ok(PrefixedVariation::Group43Var7(CountSequence::parse(count, cursor)?)),
             Variation::Group43Var8 => Ok(PrefixedVariation::Group43Var8(CountSequence::parse(count, cursor)?)),
+            Variation::Group111(0) => Err(ParseError::ZeroLengthOctetData),
+            Variation::Group111(x) => Ok(PrefixedVariation::Group111VarX(x, PrefixedBytesSequence::parse(x, count, cursor)?)),
             _ => Err(ParseError::InvalidQualifierForVariation(v)),
         }
     }
