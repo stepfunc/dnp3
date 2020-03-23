@@ -11,7 +11,7 @@ object RangedVariationModule extends Module {
       "use crate::app::gen::variations::gv::Variation;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
       "use crate::app::parser::ParseError;".eol ++
-      "use crate::app::bytes::RangedBytesIterator;".eol ++
+      "use crate::app::bytes::RangedBytesSequence;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++
@@ -25,7 +25,7 @@ object RangedVariationModule extends Module {
       case v : FixedSize => s"${v.name}(RangedSequence<'a, ${v.name}>),".eol
       case v : SizedByVariation if v.parent.isStaticGroup =>  {
         s"${v.parent.name}Var0,".eol ++
-        s"${v.parent.name}VarX(u8, RangedBytesIterator<'a>),".eol
+        s"${v.parent.name}VarX(u8, RangedBytesSequence<'a>),".eol
       }
     }
 
@@ -52,7 +52,7 @@ object RangedVariationModule extends Module {
       case v : SizedByVariation => {
         s"Variation::${v.parent.name}(0) => Err(ParseError::ZeroLengthOctetData),".eol ++
         bracketComma(s"Variation::${v.parent.name}(x) =>") {
-          s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesIterator::parse(x, range.get_start(), range.get_count(), cursor)?))".eol
+          s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesSequence::parse(x, range.get_start(), range.get_count(), cursor)?))".eol
         }
       }
       case _ => s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getNonReadVarDefinition(v)}),".eol
