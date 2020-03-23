@@ -20,10 +20,13 @@ pub struct IndexedBitSequence<'a> {
 }
 
 impl<'a> BitSequence<'a> {
-    pub fn parse(cursor: &mut ReadCursor<'a>, count: usize) -> Result<Self, ReadError> {
-        let bytes = cursor.read_bytes(num_bytes_for_bits(count))?;
+    pub fn parse(count: u16, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
+        let bytes = cursor.read_bytes(num_bytes_for_bits(count as usize))?;
 
-        Ok(Self { bytes, count })
+        Ok(Self {
+            bytes,
+            count: count as usize,
+        })
     }
 
     pub fn iter(&self) -> BitIterator<'a> {
@@ -43,7 +46,7 @@ impl<'a> IndexedBitSequence<'a> {
         }
     }
 
-    pub fn parse(cursor: &mut ReadCursor<'a>, range: Range) -> Result<Self, ReadError> {
+    pub fn parse(range: Range, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
         let bytes = cursor.read_bytes(num_bytes_for_bits(range.get_count()))?;
 
         Ok(Self { bytes, range })
@@ -132,7 +135,7 @@ mod tests {
     fn can_parse_bit_sequence() {
         let data = [0b1111_0000, 0b0000_0001];
         let mut cursor = ReadCursor::new(&data);
-        let seq = BitSequence::parse(&mut cursor, 10).unwrap();
+        let seq = BitSequence::parse(10, &mut cursor).unwrap();
         assert!(cursor.is_empty());
         let vec: Vec<bool> = seq.iter().collect();
         assert_eq!(
@@ -146,7 +149,7 @@ mod tests {
         let range = Range::from(65534, 65535).unwrap();
         let data = [0b0000_0001];
         let mut cursor = ReadCursor::new(&data);
-        let seq = IndexedBitSequence::parse(&mut cursor, range).unwrap();
+        let seq = IndexedBitSequence::parse(range, &mut cursor).unwrap();
         assert!(cursor.is_empty());
         let vec: Vec<(bool, u16)> = seq.iter().collect();
         assert_eq!(vec, vec![(true, 65534), (false, 65535)]);

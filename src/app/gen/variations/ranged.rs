@@ -55,7 +55,7 @@ impl<'a> RangedVariation<'a> {
     pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
-            Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::parse(cursor, range)?)),
+            Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::parse(range, cursor)?)),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::parse(range, cursor)?)),
             Variation::Group3Var0 => Ok(RangedVariation::Group3Var0),
             Variation::Group3Var2 => Ok(RangedVariation::Group3Var2(RangedSequence::parse(range, cursor)?)),

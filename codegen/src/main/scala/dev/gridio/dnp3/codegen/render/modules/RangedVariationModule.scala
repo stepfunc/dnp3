@@ -53,7 +53,7 @@ object RangedVariationModule extends Module {
 
     def getNonReadMatcher(v: Variation): Iterator[String] = v match {
       case Group1Var1 =>  {
-        s"Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::parse(cursor, range)?)),".eol
+        s"Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::parse(range, cursor)?)),".eol
       }
 
       case v : SizedByVariation => {
