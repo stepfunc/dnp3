@@ -315,6 +315,23 @@ mod test {
     }
 
     #[test]
+    fn parses_range_of_g80v1() {
+        // this is what is typically sent to clear the restart IIN
+        let input = [0x50, 0x01, 0x00, 0x07, 0x07, 0x00];
+        let mut parser = Parser::two_pass(ParseType::NonRead, &input).unwrap();
+
+        let vec: Vec<(bool, u16)> = match parser.next().unwrap() {
+            Header::OneByteStartStop(07, 07, RangedVariation::Group80Var1(seq)) => {
+                seq.iter().collect()
+            }
+            x => panic!("got: {:?}", x),
+        };
+
+        assert_eq!(vec, vec![(false, 7)]);
+        assert_eq!(parser.next(), None);
+    }
+
+    #[test]
     fn parses_group110var0_as_read() {
         let input = [0x6E, 0x00, 0x00, 0x02, 0x03];
         let mut parser = Parser::two_pass(ParseType::Read, &input).unwrap();
