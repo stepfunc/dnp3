@@ -21,6 +21,15 @@ pub struct RangedBytesIterator<'a> {
     size: usize,
 }
 
+pub struct PrefixedBytesSequence<'a, T>
+where
+    T: FixedSize,
+{
+    bytes: &'a [u8],
+    size: usize,
+    phantom: std::marker::PhantomData<T>,
+}
+
 pub struct PrefixedBytesIterator<'a, T>
 where
     T: FixedSize,
@@ -63,7 +72,7 @@ impl<'a> RangedBytesSequence<'a> {
     }
 }
 
-impl<'a, T> PrefixedBytesIterator<'a, T>
+impl<'a, T> PrefixedBytesSequence<'a, T>
 where
     T: FixedSize,
 {
@@ -78,11 +87,19 @@ where
 
         let size = (variation as usize + T::SIZE as usize) * count;
 
-        Ok(PrefixedBytesIterator {
-            cursor: ReadCursor::new(cursor.read_bytes(size)?),
+        Ok(PrefixedBytesSequence {
+            bytes: cursor.read_bytes(size)?,
             size: variation as usize,
             phantom: std::marker::PhantomData {},
         })
+    }
+
+    pub fn iter(&self) -> PrefixedBytesIterator<'a, T> {
+        PrefixedBytesIterator {
+            cursor: ReadCursor::new(self.bytes),
+            size: self.size,
+            phantom: std::marker::PhantomData {},
+        }
     }
 }
 
