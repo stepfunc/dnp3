@@ -10,6 +10,7 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::app::bytes::RangedBytesIterator;
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::parser::ParseError;
@@ -43,6 +44,8 @@ pub enum RangedVariation<'a> {
     Group30Var4(RangedSequence<'a, Group30Var4>),
     Group30Var5(RangedSequence<'a, Group30Var5>),
     Group30Var6(RangedSequence<'a, Group30Var6>),
+    Group110Var0,
+    Group110VarX(u8, RangedBytesIterator<'a>),
 }
 
 impl<'a> RangedVariation<'a> {
@@ -74,6 +77,9 @@ impl<'a> RangedVariation<'a> {
             Variation::Group30Var4 => Ok(RangedVariation::Group30Var4(RangedSequence::parse(range, cursor)?)),
             Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::parse(range, cursor)?)),
             Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::parse(range, cursor)?)),
+            Variation::Group110(x) if x > 0 => {
+                Ok(RangedVariation::Group110VarX(x, RangedBytesIterator::parse(x, range.get_start(), range.get_count(), cursor)?))
+            },
             _ => Err(ParseError::InvalidQualifierForVariation(v)),
         }
     }
@@ -105,6 +111,11 @@ impl<'a> RangedVariation<'a> {
             Variation::Group30Var4 => Ok(RangedVariation::Group30Var4(RangedSequence::empty())),
             Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::empty())),
             Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::empty())),
+            Variation::Group110(0) => Ok(RangedVariation::Group110Var0),
+            Variation::Group110(x) => Ok(RangedVariation::Group110VarX(
+                x,
+                RangedBytesIterator::empty(),
+            )),
             _ => Err(ParseError::InvalidQualifierForVariation(v)),
         }
     }

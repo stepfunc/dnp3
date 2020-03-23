@@ -1,4 +1,5 @@
 /// custom read-only cursor
+#[derive(Debug, PartialEq)]
 pub struct ReadCursor<'a> {
     src: &'a [u8],
 }
@@ -7,6 +8,10 @@ pub struct ReadCursor<'a> {
 pub struct ReadError;
 
 impl<'a> ReadCursor<'a> {
+    pub fn empty() -> Self {
+        Self { src: &[] }
+    }
+
     pub fn new(src: &'a [u8]) -> ReadCursor {
         ReadCursor { src }
     }

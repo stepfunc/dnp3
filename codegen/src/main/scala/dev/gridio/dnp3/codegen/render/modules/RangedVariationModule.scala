@@ -11,6 +11,7 @@ object RangedVariationModule extends Module {
       "use crate::app::gen::variations::gv::Variation;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
       "use crate::app::parser::ParseError;".eol ++
+      "use crate::app::bytes::RangedBytesIterator;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++
@@ -19,14 +20,18 @@ object RangedVariationModule extends Module {
 
   private def rangedVariationEnumDefinition(implicit indent: Indentation) : Iterator[String] = {
 
-    def getVarDefinition(v: Variation) : String = v match {
-      case v : AnyVariation => s"${v.name},"
-      case v : FixedSize => s"${v.name}(RangedSequence<'a, ${v.name}>),"
+    def getVarDefinition(v: Variation) : Iterator[String] = v match {
+      case v : AnyVariation => s"${v.name},".eol
+      case v : FixedSize => s"${v.name}(RangedSequence<'a, ${v.name}>),".eol
+      case v : SizedByVariation if v.parent.isStaticGroup =>  {
+        s"${v.parent.name}Var0,".eol ++
+        s"${v.parent.name}VarX(u8, RangedBytesIterator<'a>),".eol
+      }
     }
 
     "#[derive(Debug, PartialEq)]".eol ++
       bracket("pub enum RangedVariation<'a>") {
-        variations.iterator.map(getVarDefinition)
+        variations.iterator.flatMap(getVarDefinition)
       }
 
   }
@@ -34,29 +39,42 @@ object RangedVariationModule extends Module {
   private def rangedVariationEnumImpl(implicit indent: Indentation) : Iterator[String] = {
 
     def getNonReadVarDefinition(v: Variation) : String = v match {
-      case v : AnyVariation => ""
-      case v : FixedSize => "(RangedSequence::parse(range, cursor)?)"
+      case _ : AnyVariation => ""
+      case _ : FixedSize => "(RangedSequence::parse(range, cursor)?)"
     }
 
     def getReadVarDefinition(v: Variation) : String = v match {
-      case v : AnyVariation => ""
-      case v : FixedSize => "(RangedSequence::empty())"
+      case _ : AnyVariation => ""
+      case _ : FixedSize => "(RangedSequence::empty())"
+    }
+
+    def getNonReadMatcher(v: Variation): Iterator[String] = v match {
+      case v : SizedByVariation => {
+        bracketComma(s"Variation::${v.parent.name}(x) if x > 0 =>") {
+          s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesIterator::parse(x, range.get_start(), range.get_count(), cursor)?))".eol
+        }
+      }
+      case _ => s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getNonReadVarDefinition(v)}),".eol
+    }
+
+    def getReadMatcher(v: Variation): Iterator[String] = v match {
+      case v : SizedByVariation => {
+        s"Variation::${v.parent.name}(0) => Ok(RangedVariation::${v.parent.name}Var0),".eol ++
+        s"Variation::${v.parent.name}(x) => Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesIterator::empty())),".eol
+      }
+      case _ => s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getReadVarDefinition(v)}),".eol
     }
 
     bracket("impl<'a> RangedVariation<'a>") {
       "#[rustfmt::skip]".eol ++
       bracket("pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ParseError>") {
         bracket("match v") {
-          variations.map { v =>
-            s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getNonReadVarDefinition(v)}),"
-          } ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
+          variations.flatMap(getNonReadMatcher) ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
         }
       } ++ space ++
         bracket("pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ParseError>") {
           bracket("match v") {
-            variations.map { v =>
-              s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getReadVarDefinition(v)}),"
-            } ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
+            variations.flatMap(getReadMatcher) ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
           }
         }
     }
@@ -67,6 +85,7 @@ object RangedVariationModule extends Module {
     ObjectGroup.allVariations.iterator.collect {
       case v : AnyVariation if v.parent.isStaticGroup => v
       case v : FixedSize if v.parent.isStaticGroup => v
+      case v : SizedByVariation if v.parent.isStaticGroup => v
     }
   }
 

@@ -20,6 +20,14 @@ impl Range {
             count: stop as usize - start as usize + 1,
         })
     }
+
+    pub fn get_start(&self) -> u16 {
+        self.start
+    }
+
+    pub fn get_count(&self) -> usize {
+        self.count
+    }
 }
 
 #[derive(Debug, PartialEq)]
