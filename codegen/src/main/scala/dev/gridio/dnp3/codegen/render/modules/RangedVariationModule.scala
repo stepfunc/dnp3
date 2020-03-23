@@ -50,7 +50,8 @@ object RangedVariationModule extends Module {
 
     def getNonReadMatcher(v: Variation): Iterator[String] = v match {
       case v : SizedByVariation => {
-        bracketComma(s"Variation::${v.parent.name}(x) if x > 0 =>") {
+        s"Variation::${v.parent.name}(0) => Err(ParseError::ZeroLengthOctetData),".eol ++
+        bracketComma(s"Variation::${v.parent.name}(x) =>") {
           s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesIterator::parse(x, range.get_start(), range.get_count(), cursor)?))".eol
         }
       }
@@ -59,8 +60,7 @@ object RangedVariationModule extends Module {
 
     def getReadMatcher(v: Variation): Iterator[String] = v match {
       case v : SizedByVariation => {
-        s"Variation::${v.parent.name}(0) => Ok(RangedVariation::${v.parent.name}Var0),".eol ++
-        s"Variation::${v.parent.name}(x) => Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesIterator::empty())),".eol
+        s"Variation::${v.parent.name}(0) => Ok(RangedVariation::${v.parent.name}Var0),".eol
       }
       case _ => s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getReadVarDefinition(v)}),".eol
     }

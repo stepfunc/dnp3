@@ -77,7 +77,8 @@ impl<'a> RangedVariation<'a> {
             Variation::Group30Var4 => Ok(RangedVariation::Group30Var4(RangedSequence::parse(range, cursor)?)),
             Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::parse(range, cursor)?)),
             Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::parse(range, cursor)?)),
-            Variation::Group110(x) if x > 0 => {
+            Variation::Group110(0) => Err(ParseError::ZeroLengthOctetData),
+            Variation::Group110(x) => {
                 Ok(RangedVariation::Group110VarX(x, RangedBytesIterator::parse(x, range.get_start(), range.get_count(), cursor)?))
             },
             _ => Err(ParseError::InvalidQualifierForVariation(v)),
@@ -112,10 +113,6 @@ impl<'a> RangedVariation<'a> {
             Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::empty())),
             Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::empty())),
             Variation::Group110(0) => Ok(RangedVariation::Group110Var0),
-            Variation::Group110(x) => Ok(RangedVariation::Group110VarX(
-                x,
-                RangedBytesIterator::empty(),
-            )),
             _ => Err(ParseError::InvalidQualifierForVariation(v)),
         }
     }

@@ -193,8 +193,10 @@ impl QualifierCode {
 mod test {
 
     use super::*;
+    use crate::app::bytes::Bytes;
     use crate::app::gen::enums::CommandStatus;
     use crate::app::gen::variations::fixed::*;
+    use crate::app::gen::variations::gv::Variation::Group110;
     use crate::app::header::*;
     use crate::app::prefix::Prefix;
 
@@ -310,5 +312,49 @@ mod test {
         };
 
         assert_eq!(parser.next(), None);
+    }
+
+    #[test]
+    fn parses_group110var0_as_read() {
+        let input = [0x6E, 0x00, 0x00, 0x02, 0x03];
+        let mut parser = Parser::two_pass(ParseType::Read, &input).unwrap();
+        assert_eq!(
+            parser.next().unwrap(),
+            Header::OneByteStartStop(02, 03, RangedVariation::Group110Var0)
+        );
+        assert_eq!(parser.next(), None);
+    }
+
+    #[test]
+    fn g110_variations_other_than_0_cannot_be_used_in_read() {
+        let input = [0x6E, 0x01, 0x00, 0x01, 0x02];
+        let err = Parser::two_pass(ParseType::Read, &input).err().unwrap();
+        assert_eq!(err, ParseError::InvalidQualifierForVariation(Group110(1)));
+    }
+
+    #[test]
+    fn parses_group110var1_as_non_read() {
+        let input = [0x6E, 0x01, 0x00, 0x01, 0x02, 0xAA, 0xBB];
+        let mut parser = Parser::two_pass(ParseType::NonRead, &input).unwrap();
+
+        let bytes: Vec<(Bytes, u16)> = match parser.next().unwrap() {
+            Header::OneByteStartStop(01, 02, RangedVariation::Group110VarX(0x01, seq)) => {
+                seq.collect()
+            }
+            x => panic!("got: {:?}", x),
+        };
+
+        assert_eq!(
+            bytes,
+            vec![(Bytes { value: &[0xAA] }, 1), (Bytes { value: &[0xBB] }, 2)]
+        );
+        assert_eq!(parser.next(), None);
+    }
+
+    #[test]
+    fn g110v0_cannot_be_used_in_non_read() {
+        let input = [0x6E, 0x00, 0x00, 0x01, 0x02];
+        let err = Parser::two_pass(ParseType::NonRead, &input).err().unwrap();
+        assert_eq!(err, ParseError::ZeroLengthOctetData);
     }
 }

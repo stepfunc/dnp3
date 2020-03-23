@@ -2,6 +2,7 @@ use crate::app::header::FixedSize;
 use crate::app::parser::ParseError;
 use crate::util::cursor::ReadCursor;
 
+#[derive(Debug, PartialEq)]
 pub struct Bytes<'a> {
     pub value: &'a [u8],
 }
