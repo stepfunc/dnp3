@@ -112,6 +112,7 @@ pub enum Variation {
     Group60Var2,
     Group60Var3,
     Group60Var4,
+    Group80Var1,
     Group110(u8),
     Group111(u8),
     Group112(u8),
@@ -285,6 +286,10 @@ impl Variation {
                 2 => Some(Variation::Group60Var2),
                 3 => Some(Variation::Group60Var3),
                 4 => Some(Variation::Group60Var4),
+                _ => None,
+            },
+            80 => match var {
+                1 => Some(Variation::Group80Var1),
                 _ => None,
             },
             110 => Some(Variation::Group110(var)),
