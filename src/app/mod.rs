@@ -1,3 +1,4 @@
+pub mod bit;
 pub mod bytes;
 pub mod count;
 pub mod header;
