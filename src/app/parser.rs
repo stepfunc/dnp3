@@ -22,6 +22,7 @@ pub enum ParseError {
     InvalidRange,
     InvalidQualifierForVariation(Variation),
     UnsupportedQualifierCode(QualifierCode),
+    ZeroLengthOctetData,
 }
 
 pub struct Parser<'a> {
