@@ -99,6 +99,8 @@ pub enum AllObjectsVariation {
     Group60Var2,
     Group60Var3,
     Group60Var4,
+    Group110Var0,
+    Group111Var0,
 }
 
 impl AllObjectsVariation {
@@ -190,6 +192,8 @@ impl AllObjectsVariation {
             Variation::Group60Var2 => Some(AllObjectsVariation::Group60Var2),
             Variation::Group60Var3 => Some(AllObjectsVariation::Group60Var3),
             Variation::Group60Var4 => Some(AllObjectsVariation::Group60Var4),
+            Variation::Group110(0) => Some(AllObjectsVariation::Group110Var0),
+            Variation::Group111(0) => Some(AllObjectsVariation::Group111Var0),
             _ => None,
         }
     }
