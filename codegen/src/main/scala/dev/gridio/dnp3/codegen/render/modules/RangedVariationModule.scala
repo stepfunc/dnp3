@@ -23,7 +23,7 @@ object RangedVariationModule extends Module {
   private def rangedVariationEnumDefinition(implicit indent: Indentation) : Iterator[String] = {
 
     def getVarDefinition(v: Variation) : Iterator[String] = v match {
-      case v : SingleBitField if v.parent == Group1 => s"${v.name}(IndexedBitSequence<'a>),".eol
+      case v : SingleBitField => s"${v.name}(IndexedBitSequence<'a>),".eol
       case v : AnyVariation => s"${v.name},".eol
       case v : FixedSize => s"${v.name}(RangedSequence<'a, ${v.name}>),".eol
       case v : SizedByVariation if v.parent.isStaticGroup =>  {
@@ -52,8 +52,8 @@ object RangedVariationModule extends Module {
     }
 
     def getNonReadMatcher(v: Variation): Iterator[String] = v match {
-      case Group1Var1 =>  {
-        s"Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::parse(range, cursor)?)),".eol
+      case _ : SingleBitField =>  {
+        s"Variation::${v.name} => Ok(RangedVariation::${v.name}(IndexedBitSequence::parse(range, cursor)?)),".eol
       }
 
       case v : SizedByVariation => {
@@ -66,8 +66,8 @@ object RangedVariationModule extends Module {
     }
 
     def getReadMatcher(v: Variation): Iterator[String] = v match {
-      case Group1Var1 =>  {
-        s"Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::empty())),".eol
+      case _ : SingleBitField =>  {
+        s"Variation::${v.name} => Ok(RangedVariation::${v.name}(IndexedBitSequence::empty())),".eol
       }
       case v : SizedByVariation => {
         s"Variation::${v.parent.name}(0) => Ok(RangedVariation::${v.parent.name}Var0),".eol
@@ -94,7 +94,7 @@ object RangedVariationModule extends Module {
   def variations : List[Variation] = {
     ObjectGroup.allVariations.flatMap { v =>
       v match {
-        case Group1Var1 => Some(v)
+        case _ : SingleBitField => Some(v)
         case v : AnyVariation if v.parent.isStaticGroup => Some(v)
         case v : FixedSize if v.parent.isStaticGroup => Some(v)
         case v : SizedByVariation if v.parent.isStaticGroup => Some(v)

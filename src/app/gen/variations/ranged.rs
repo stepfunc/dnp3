@@ -26,6 +26,7 @@ pub enum RangedVariation<'a> {
     Group3Var0,
     Group3Var2(RangedSequence<'a, Group3Var2>),
     Group10Var0,
+    Group10Var1(IndexedBitSequence<'a>),
     Group10Var2(RangedSequence<'a, Group10Var2>),
     Group20Var0,
     Group20Var1(RangedSequence<'a, Group20Var1>),
@@ -46,6 +47,7 @@ pub enum RangedVariation<'a> {
     Group30Var4(RangedSequence<'a, Group30Var4>),
     Group30Var5(RangedSequence<'a, Group30Var5>),
     Group30Var6(RangedSequence<'a, Group30Var6>),
+    Group80Var1(IndexedBitSequence<'a>),
     Group110Var0,
     Group110VarX(u8, RangedBytesSequence<'a>),
 }
@@ -60,6 +62,7 @@ impl<'a> RangedVariation<'a> {
             Variation::Group3Var0 => Ok(RangedVariation::Group3Var0),
             Variation::Group3Var2 => Ok(RangedVariation::Group3Var2(RangedSequence::parse(range, cursor)?)),
             Variation::Group10Var0 => Ok(RangedVariation::Group10Var0),
+            Variation::Group10Var1 => Ok(RangedVariation::Group10Var1(IndexedBitSequence::parse(range, cursor)?)),
             Variation::Group10Var2 => Ok(RangedVariation::Group10Var2(RangedSequence::parse(range, cursor)?)),
             Variation::Group20Var0 => Ok(RangedVariation::Group20Var0),
             Variation::Group20Var1 => Ok(RangedVariation::Group20Var1(RangedSequence::parse(range, cursor)?)),
@@ -80,6 +83,7 @@ impl<'a> RangedVariation<'a> {
             Variation::Group30Var4 => Ok(RangedVariation::Group30Var4(RangedSequence::parse(range, cursor)?)),
             Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::parse(range, cursor)?)),
             Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::parse(range, cursor)?)),
+            Variation::Group80Var1 => Ok(RangedVariation::Group80Var1(IndexedBitSequence::parse(range, cursor)?)),
             Variation::Group110(0) => Err(ParseError::ZeroLengthOctetData),
             Variation::Group110(x) => {
                 Ok(RangedVariation::Group110VarX(x, RangedBytesSequence::parse(x, range.get_start(), range.get_count(), cursor)?))
@@ -96,6 +100,7 @@ impl<'a> RangedVariation<'a> {
             Variation::Group3Var0 => Ok(RangedVariation::Group3Var0),
             Variation::Group3Var2 => Ok(RangedVariation::Group3Var2(RangedSequence::empty())),
             Variation::Group10Var0 => Ok(RangedVariation::Group10Var0),
+            Variation::Group10Var1 => Ok(RangedVariation::Group10Var1(IndexedBitSequence::empty())),
             Variation::Group10Var2 => Ok(RangedVariation::Group10Var2(RangedSequence::empty())),
             Variation::Group20Var0 => Ok(RangedVariation::Group20Var0),
             Variation::Group20Var1 => Ok(RangedVariation::Group20Var1(RangedSequence::empty())),
@@ -116,6 +121,7 @@ impl<'a> RangedVariation<'a> {
             Variation::Group30Var4 => Ok(RangedVariation::Group30Var4(RangedSequence::empty())),
             Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::empty())),
             Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::empty())),
+            Variation::Group80Var1 => Ok(RangedVariation::Group80Var1(IndexedBitSequence::empty())),
             Variation::Group110(0) => Ok(RangedVariation::Group110Var0),
             _ => Err(ParseError::InvalidQualifierForVariation(v)),
         }
