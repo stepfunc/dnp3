@@ -23,6 +23,10 @@ impl Range {
         })
     }
 
+    pub fn empty() -> Self {
+        Self { start: 0, count: 0 }
+    }
+
     pub fn get_start(&self) -> u16 {
         self.start
     }

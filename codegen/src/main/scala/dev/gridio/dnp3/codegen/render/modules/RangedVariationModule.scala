@@ -1,6 +1,7 @@
 package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
+import dev.gridio.dnp3.codegen.model.groups.{Group1, Group1Var1}
 import dev.gridio.dnp3.codegen.render._
 
 object RangedVariationModule extends Module {
@@ -21,6 +22,7 @@ object RangedVariationModule extends Module {
   private def rangedVariationEnumDefinition(implicit indent: Indentation) : Iterator[String] = {
 
     def getVarDefinition(v: Variation) : Iterator[String] = v match {
+      case v : SingleBitField if v.parent == Group1 => s"${v.name}(IndexedBitSequence<'a>),".eol
       case v : AnyVariation => s"${v.name},".eol
       case v : FixedSize => s"${v.name}(RangedSequence<'a, ${v.name}>),".eol
       case v : SizedByVariation if v.parent.isStaticGroup =>  {
@@ -49,6 +51,10 @@ object RangedVariationModule extends Module {
     }
 
     def getNonReadMatcher(v: Variation): Iterator[String] = v match {
+      case Group1Var1 =>  {
+        s"Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::parse(cursor, range)?)),".eol
+      }
+
       case v : SizedByVariation => {
         s"Variation::${v.parent.name}(0) => Err(ParseError::ZeroLengthOctetData),".eol ++
         bracketComma(s"Variation::${v.parent.name}(x) =>") {
@@ -59,6 +65,9 @@ object RangedVariationModule extends Module {
     }
 
     def getReadMatcher(v: Variation): Iterator[String] = v match {
+      case Group1Var1 =>  {
+        s"Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::empty())),".eol
+      }
       case v : SizedByVariation => {
         s"Variation::${v.parent.name}(0) => Ok(RangedVariation::${v.parent.name}Var0),".eol
       }
@@ -83,6 +92,7 @@ object RangedVariationModule extends Module {
 
   def variations : Iterator[Variation] = {
     ObjectGroup.allVariations.iterator.collect {
+      case v : SingleBitField if v.parent == Group1 => v
       case v : AnyVariation if v.parent.isStaticGroup => v
       case v : FixedSize if v.parent.isStaticGroup => v
       case v : SizedByVariation if v.parent.isStaticGroup => v

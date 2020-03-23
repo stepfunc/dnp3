@@ -36,6 +36,13 @@ impl<'a> BitSequence<'a> {
 }
 
 impl<'a> IndexedBitSequence<'a> {
+    pub fn empty() -> Self {
+        Self {
+            bytes: &[],
+            range: Range::empty(),
+        }
+    }
+
     pub fn parse(cursor: &mut ReadCursor<'a>, range: Range) -> Result<Self, ReadError> {
         let bytes = cursor.read_bytes(num_bytes_for_bits(range.get_count()))?;
 

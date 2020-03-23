@@ -10,6 +10,7 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::app::bit::IndexedBitSequence;
 use crate::app::bytes::RangedBytesSequence;
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
@@ -20,6 +21,7 @@ use crate::util::cursor::ReadCursor;
 #[derive(Debug, PartialEq)]
 pub enum RangedVariation<'a> {
     Group1Var0,
+    Group1Var1(IndexedBitSequence<'a>),
     Group1Var2(RangedSequence<'a, Group1Var2>),
     Group3Var0,
     Group3Var2(RangedSequence<'a, Group3Var2>),
@@ -53,6 +55,7 @@ impl<'a> RangedVariation<'a> {
     pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
+            Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::parse(cursor, range)?)),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::parse(range, cursor)?)),
             Variation::Group3Var0 => Ok(RangedVariation::Group3Var0),
             Variation::Group3Var2 => Ok(RangedVariation::Group3Var2(RangedSequence::parse(range, cursor)?)),
@@ -88,6 +91,7 @@ impl<'a> RangedVariation<'a> {
     pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
+            Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::empty())),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::empty())),
             Variation::Group3Var0 => Ok(RangedVariation::Group3Var0),
             Variation::Group3Var2 => Ok(RangedVariation::Group3Var2(RangedSequence::empty())),
