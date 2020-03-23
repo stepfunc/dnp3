@@ -1,3 +1,4 @@
+use crate::app::range::Range;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 fn num_bytes_for_bits(count: usize) -> usize {
@@ -6,20 +7,19 @@ fn num_bytes_for_bits(count: usize) -> usize {
 
 /// zero-copy type used to iterate over a collection of bits without allocating
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub struct BitCollection<'a> {
+pub struct BitSequence<'a> {
     bytes: &'a [u8],
     count: usize,
 }
 
 /// zero-copy type used to iterate over a collection of bits without allocating
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub struct IndexedBitCollection<'a> {
+pub struct IndexedBitSequence<'a> {
     bytes: &'a [u8],
-    count: usize,
-    start: u16,
+    range: Range,
 }
 
-impl<'a> BitCollection<'a> {
+impl<'a> BitSequence<'a> {
     pub fn parse(cursor: &mut ReadCursor<'a>, count: usize) -> Result<Self, ReadError> {
         let bytes = cursor.read_bytes(num_bytes_for_bits(count))?;
 
@@ -35,23 +35,19 @@ impl<'a> BitCollection<'a> {
     }
 }
 
-impl<'a> IndexedBitCollection<'a> {
-    pub fn parse(cursor: &mut ReadCursor<'a>, count: usize, start: u16) -> Result<Self, ReadError> {
-        let bytes = cursor.read_bytes(num_bytes_for_bits(count))?;
+impl<'a> IndexedBitSequence<'a> {
+    pub fn parse(cursor: &mut ReadCursor<'a>, range: Range) -> Result<Self, ReadError> {
+        let bytes = cursor.read_bytes(num_bytes_for_bits(range.get_count()))?;
 
-        Ok(Self {
-            bytes,
-            count,
-            start,
-        })
+        Ok(Self { bytes, range })
     }
 
     pub fn iter(&self) -> IndexedBitIterator<'a> {
         IndexedBitIterator::<'a> {
-            index: self.start,
+            index: self.range.get_start(),
             inner: BitIterator::<'a> {
                 bytes: self.bytes,
-                count: self.count,
+                count: self.range.get_count(),
                 pos: 0,
             },
         }
@@ -97,10 +93,55 @@ impl<'a> Iterator for IndexedBitIterator<'a> {
         match self.inner.next() {
             Some(x) => {
                 let index = self.index;
-                self.index += 1;
+                // this guard is required, b/c if the last
+                // element has an index of 65535, this would
+                // cause overflow
+                if index < std::u16::MAX {
+                    self.index += 1;
+                }
                 Some((x, index))
             }
             None => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn correctly_calculates_bytes_for_bits() {
+        assert_eq!(num_bytes_for_bits(0), 0);
+        assert_eq!(num_bytes_for_bits(1), 1);
+        assert_eq!(num_bytes_for_bits(8), 1);
+        assert_eq!(num_bytes_for_bits(7), 1);
+        assert_eq!(num_bytes_for_bits(9), 2);
+        assert_eq!(num_bytes_for_bits(15), 2);
+        assert_eq!(num_bytes_for_bits(16), 2);
+    }
+
+    #[test]
+    fn can_parse_bit_sequence() {
+        let data = [0b1111_0000, 0b0000_0001];
+        let mut cursor = ReadCursor::new(&data);
+        let seq = BitSequence::parse(&mut cursor, 10).unwrap();
+        assert!(cursor.is_empty());
+        let vec: Vec<bool> = seq.iter().collect();
+        assert_eq!(
+            vec,
+            vec![false, false, false, false, true, true, true, true, true, false]
+        );
+    }
+
+    #[test]
+    fn can_parse_bit_sequence_with_index() {
+        let range = Range::from(65534, 65535).unwrap();
+        let data = [0b0000_0001];
+        let mut cursor = ReadCursor::new(&data);
+        let seq = IndexedBitSequence::parse(&mut cursor, range).unwrap();
+        assert!(cursor.is_empty());
+        let vec: Vec<(bool, u16)> = seq.iter().collect();
+        assert_eq!(vec, vec![(true, 65534), (false, 65535)]);
     }
 }

@@ -1,8 +1,10 @@
 use crate::app::header::FixedSize;
 use crate::util::cursor::{ReadCursor, ReadError};
 
+#[derive(Debug, PartialEq)]
 pub struct InvalidRange;
 
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Range {
     start: u16,
     count: usize,
