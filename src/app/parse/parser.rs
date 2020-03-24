@@ -35,18 +35,18 @@ pub enum ParseError {
     ZeroLengthOctetData,
 }
 
-pub struct Parser<'a> {
+pub struct HeaderParser<'a> {
     errored: bool,
     parse_type: ParseType,
     cursor: ReadCursor<'a>,
 }
 
-impl<'a> Parser<'a> {
+impl<'a> HeaderParser<'a> {
     pub fn one_pass(
         parse_type: ParseType,
         data: &'a [u8],
     ) -> impl Iterator<Item = Result<Header<'a>, ParseError>> {
-        Parser {
+        HeaderParser {
             cursor: ReadCursor::new(data),
             parse_type,
             errored: false,
@@ -57,14 +57,14 @@ impl<'a> Parser<'a> {
         parse_type: ParseType,
         data: &'a [u8],
     ) -> Result<impl Iterator<Item = Header<'a>>, ParseError> {
-        for x in Parser::one_pass(parse_type, data) {
+        for x in HeaderParser::one_pass(parse_type, data) {
             if let Err(e) = x {
                 return Err(e);
             }
         }
 
         // we can unwrap on the 2nd pass b/c it can't possibly panic
-        Ok(Parser::one_pass(parse_type, data).map(|h| h.unwrap()))
+        Ok(HeaderParser::one_pass(parse_type, data).map(|h| h.unwrap()))
     }
 
     fn parse_one(&mut self) -> Option<Result<Header<'a>, ParseError>> {
@@ -144,7 +144,7 @@ impl<'a> Parser<'a> {
     }
 }
 
-impl<'a> Iterator for Parser<'a> {
+impl<'a> Iterator for HeaderParser<'a> {
     type Item = Result<Header<'a>, ParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -211,7 +211,7 @@ mod test {
 
     #[test]
     fn parses_integrity_scan() {
-        let vec: Vec<Header> = Parser::two_pass(
+        let vec: Vec<Header> = HeaderParser::two_pass(
             ParseType::NonRead,
             &[
                 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
@@ -234,7 +234,7 @@ mod test {
     #[test]
     fn parses_analog_output() {
         let header = &[0x29, 0x01, 0x17, 0x01, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x00];
-        let mut parser = Parser::two_pass(ParseType::NonRead, header).unwrap();
+        let mut parser = HeaderParser::two_pass(ParseType::NonRead, header).unwrap();
 
         let items: Vec<Prefix<u8, Group41Var1>> = match parser.next().unwrap() {
             Header::OneByteCountAndPrefix(01, PrefixedVariation::<u8>::Group41Var1(seq)) => {
@@ -259,7 +259,7 @@ mod test {
     #[test]
     fn parses_count_of_time() {
         let header = &[0x32, 0x01, 0x07, 0x01, 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA];
-        let mut parser = Parser::two_pass(ParseType::NonRead, header).unwrap();
+        let mut parser = HeaderParser::two_pass(ParseType::NonRead, header).unwrap();
 
         let items: Vec<Group50Var1> = match parser.next().unwrap() {
             Header::OneByteCount(01, CountVariation::Group50Var1(seq)) => seq.iter().collect(),
@@ -280,7 +280,7 @@ mod test {
     fn parses_range_of_g1v2_as_non_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 
-        let mut parser = Parser::one_pass(ParseType::NonRead, &input);
+        let mut parser = HeaderParser::one_pass(ParseType::NonRead, &input);
 
         let items: Vec<(Group1Var2, u16)> = match parser.next().unwrap().unwrap() {
             Header::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
@@ -304,7 +304,7 @@ mod test {
     fn parses_range_of_g1v2_as_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0x01, 0x02, 0x00, 0x07, 0x09];
 
-        let mut parser = Parser::two_pass(ParseType::Read, &input).unwrap();
+        let mut parser = HeaderParser::two_pass(ParseType::Read, &input).unwrap();
 
         match parser.next().unwrap() {
             Header::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
@@ -327,7 +327,7 @@ mod test {
     fn parses_range_of_g80v1() {
         // this is what is typically sent to clear the restart IIN
         let input = [0x50, 0x01, 0x00, 0x07, 0x07, 0x00];
-        let mut parser = Parser::two_pass(ParseType::NonRead, &input).unwrap();
+        let mut parser = HeaderParser::two_pass(ParseType::NonRead, &input).unwrap();
 
         let vec: Vec<(bool, u16)> = match parser.next().unwrap() {
             Header::OneByteStartStop(07, 07, RangedVariation::Group80Var1(seq)) => {
@@ -343,7 +343,7 @@ mod test {
     #[test]
     fn parses_group110var0_as_read() {
         let input = [0x6E, 0x00, 0x00, 0x02, 0x03];
-        let mut parser = Parser::two_pass(ParseType::Read, &input).unwrap();
+        let mut parser = HeaderParser::two_pass(ParseType::Read, &input).unwrap();
         assert_eq!(
             parser.next().unwrap(),
             Header::OneByteStartStop(02, 03, RangedVariation::Group110Var0)
@@ -354,14 +354,16 @@ mod test {
     #[test]
     fn g110_variations_other_than_0_cannot_be_used_in_read() {
         let input = [0x6E, 0x01, 0x00, 0x01, 0x02];
-        let err = Parser::two_pass(ParseType::Read, &input).err().unwrap();
+        let err = HeaderParser::two_pass(ParseType::Read, &input)
+            .err()
+            .unwrap();
         assert_eq!(err, ParseError::InvalidQualifierForVariation(Group110(1)));
     }
 
     #[test]
     fn parses_group110var1_as_non_read() {
         let input = [0x6E, 0x01, 0x00, 0x01, 0x02, 0xAA, 0xBB];
-        let mut parser = Parser::two_pass(ParseType::NonRead, &input).unwrap();
+        let mut parser = HeaderParser::two_pass(ParseType::NonRead, &input).unwrap();
 
         let bytes: Vec<(Bytes, u16)> = match parser.next().unwrap() {
             Header::OneByteStartStop(01, 02, RangedVariation::Group110VarX(0x01, seq)) => {
@@ -380,7 +382,9 @@ mod test {
     #[test]
     fn g110v0_cannot_be_used_in_non_read() {
         let input = [0x6E, 0x00, 0x00, 0x01, 0x02];
-        let err = Parser::two_pass(ParseType::NonRead, &input).err().unwrap();
+        let err = HeaderParser::two_pass(ParseType::NonRead, &input)
+            .err()
+            .unwrap();
         assert_eq!(err, ParseError::ZeroLengthOctetData);
     }
 }
