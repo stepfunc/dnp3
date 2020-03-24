@@ -10,13 +10,13 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::bytes::PrefixedBytesSequence;
-use crate::app::count::CountSequence;
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
-use crate::app::header::FixedSize;
-use crate::app::parser::ParseError;
-use crate::app::prefix::Prefix;
+use crate::app::parse::bytes::PrefixedBytesSequence;
+use crate::app::parse::count::CountSequence;
+use crate::app::parse::header::FixedSize;
+use crate::app::parse::parser::ParseError;
+use crate::app::parse::prefix::Prefix;
 use crate::util::cursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]

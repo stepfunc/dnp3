@@ -1,4 +1,4 @@
-use crate::app::range::Range;
+use crate::app::parse::range::Range;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 fn num_bytes_for_bits(count: usize) -> usize {

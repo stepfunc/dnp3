@@ -37,19 +37,3 @@ pub enum Header<'a> {
     OneByteCountAndPrefix(u8, PrefixedVariation<'a, u8>),
     TwoByteCountAndPrefix(u16, PrefixedVariation<'a, u16>),
 }
-
-#[cfg(test)]
-mod test {
-    use crate::app::gen::variations::fixed::Group2Var1;
-    use crate::app::range::RangedSequence;
-
-    #[test]
-    fn iterates_over_g2v1() {
-        let seq = RangedSequence::<Group2Var1>::new(1, &[0xAA, 0xBB]);
-
-        let items: Vec<(Group2Var1, u16)> = seq.iter().collect();
-        assert_eq!(items.len(), 2);
-        assert_eq!(items[0], (Group2Var1 { flags: 0xAA }, 1));
-        assert_eq!(items[1], (Group2Var1 { flags: 0xBB }, 2));
-    }
-}

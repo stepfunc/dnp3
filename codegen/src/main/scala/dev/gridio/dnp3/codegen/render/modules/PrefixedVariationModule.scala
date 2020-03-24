@@ -8,13 +8,13 @@ object PrefixedVariationModule extends Module {
 
   override def lines(implicit indent: Indentation) : Iterator[String] = {
       "use crate::app::gen::variations::gv::Variation;".eol ++
-      "use crate::app::count::CountSequence;".eol ++
+      "use crate::app::parse::count::CountSequence;".eol ++
       "use crate::app::gen::variations::fixed::*;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
-      "use crate::app::parser::ParseError;".eol ++
-      "use crate::app::header::FixedSize;".eol ++
-      "use crate::app::prefix::Prefix;".eol ++
-      "use crate::app::bytes::PrefixedBytesSequence;".eol ++
+      "use crate::app::parse::parser::ParseError;".eol ++
+      "use crate::app::parse::header::FixedSize;".eol ++
+      "use crate::app::parse::prefix::Prefix;".eol ++
+      "use crate::app::parse::bytes::PrefixedBytesSequence;".eol ++
       space ++
       enumDefinition ++
       space ++

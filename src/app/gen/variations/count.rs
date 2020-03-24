@@ -10,10 +10,10 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::count::CountSequence;
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
-use crate::app::parser::ParseError;
+use crate::app::parse::count::CountSequence;
+use crate::app::parse::parser::ParseError;
 use crate::util::cursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]

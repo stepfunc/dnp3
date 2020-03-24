@@ -1,5 +1,5 @@
-use crate::app::header::FixedSize;
-use crate::app::parser::ParseError;
+use crate::app::parse::header::FixedSize;
+use crate::app::parse::parser::ParseError;
 use crate::util::cursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]

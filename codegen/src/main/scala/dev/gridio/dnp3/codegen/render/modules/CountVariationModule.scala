@@ -1,17 +1,16 @@
 package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
-import dev.gridio.dnp3.codegen.model.groups.Group80Var1
 import dev.gridio.dnp3.codegen.render._
 
 object CountVariationModule extends Module {
 
   override def lines(implicit indent: Indentation) : Iterator[String] = {
       "use crate::app::gen::variations::gv::Variation;".eol ++
-      "use crate::app::count::CountSequence;".eol ++
       "use crate::app::gen::variations::fixed::*;".eol ++
+      "use crate::app::parse::count::CountSequence;".eol ++
+      "use crate::app::parse::parser::ParseError;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
-      "use crate::app::parser::ParseError;".eol ++
       space ++
       enumDefinition ++
       space ++

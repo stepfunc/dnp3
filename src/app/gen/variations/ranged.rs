@@ -10,12 +10,12 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::bit::IndexedBitSequence;
-use crate::app::bytes::RangedBytesSequence;
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
-use crate::app::parser::ParseError;
-use crate::app::range::{Range, RangedSequence};
+use crate::app::parse::bit::IndexedBitSequence;
+use crate::app::parse::bytes::RangedBytesSequence;
+use crate::app::parse::parser::ParseError;
+use crate::app::parse::range::{Range, RangedSequence};
 use crate::util::cursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]

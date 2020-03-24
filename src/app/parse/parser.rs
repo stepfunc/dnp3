@@ -4,8 +4,8 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
-use crate::app::header::Header;
-use crate::app::range::{InvalidRange, Range};
+use crate::app::parse::header::Header;
+use crate::app::parse::range::{InvalidRange, Range};
 use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Copy, Clone)]
@@ -193,12 +193,12 @@ impl QualifierCode {
 mod test {
 
     use super::*;
-    use crate::app::bytes::Bytes;
     use crate::app::gen::enums::CommandStatus;
     use crate::app::gen::variations::fixed::*;
     use crate::app::gen::variations::gv::Variation::Group110;
-    use crate::app::header::*;
-    use crate::app::prefix::Prefix;
+    use crate::app::parse::bytes::Bytes;
+    use crate::app::parse::header::*;
+    use crate::app::parse::prefix::Prefix;
 
     #[test]
     fn parses_integrity_scan() {

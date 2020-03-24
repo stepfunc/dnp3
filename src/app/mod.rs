@@ -1,10 +1,4 @@
-pub mod bit;
-pub mod bytes;
-pub mod count;
-pub mod header;
-pub mod parser;
-pub mod prefix;
-pub mod range;
+pub mod parse;
 pub mod types;
 pub mod gen {
     pub mod enums;
