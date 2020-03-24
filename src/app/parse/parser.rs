@@ -4,9 +4,19 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
-use crate::app::parse::header::Header;
 use crate::app::parse::range::{InvalidRange, Range};
 use crate::util::cursor::{ReadCursor, ReadError};
+
+#[derive(Debug, PartialEq)]
+pub enum Header<'a> {
+    AllObjects(AllObjectsVariation),
+    OneByteStartStop(u8, u8, RangedVariation<'a>),
+    TwoByteStartStop(u16, u16, RangedVariation<'a>),
+    OneByteCount(u8, CountVariation<'a>),
+    TwoByteCount(u16, CountVariation<'a>),
+    OneByteCountAndPrefix(u8, PrefixedVariation<'a, u8>),
+    TwoByteCountAndPrefix(u16, PrefixedVariation<'a, u16>),
+}
 
 #[derive(Copy, Clone)]
 pub enum ParseType {
@@ -197,7 +207,6 @@ mod test {
     use crate::app::gen::variations::fixed::*;
     use crate::app::gen::variations::gv::Variation::Group110;
     use crate::app::parse::bytes::Bytes;
-    use crate::app::parse::header::*;
     use crate::app::parse::prefix::Prefix;
 
     #[test]

@@ -14,9 +14,9 @@ use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::parse::bytes::PrefixedBytesSequence;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::header::FixedSize;
 use crate::app::parse::parser::ParseError;
 use crate::app::parse::prefix::Prefix;
+use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]

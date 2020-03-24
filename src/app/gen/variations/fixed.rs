@@ -11,7 +11,7 @@
 //
 
 use crate::app::gen::enums::CommandStatus;
-use crate::app::parse::header::FixedSize;
+use crate::app::parse::traits::FixedSize;
 use crate::app::types::ControlCode;
 use crate::util::cursor::{ReadCursor, ReadError};
 
