@@ -1,4 +1,5 @@
 use crate::app::gen::enums::{OpType, TripCloseCode};
+use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ControlCode {
@@ -21,5 +22,24 @@ impl ControlCode {
             queue: x & Self::QU_MASK != 0,
             op_type: OpType::from(x & Self::OP_MASK),
         }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct IIN {
+    iin1: u8,
+    iin2: u8,
+}
+
+impl IIN {
+    pub fn new(iin1: u8, iin2: u8) -> Self {
+        Self { iin1, iin2 }
+    }
+
+    pub fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(Self {
+            iin1: cursor.read_u8()?,
+            iin2: cursor.read_u8()?,
+        })
     }
 }
