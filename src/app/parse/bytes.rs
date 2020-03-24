@@ -1,4 +1,4 @@
-use crate::app::parse::parser::ParseError;
+use crate::app::parse::parser::HeaderParseError;
 use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::ReadCursor;
 
@@ -52,9 +52,9 @@ impl<'a> RangedBytesSequence<'a> {
         index: u16,
         count: usize,
         cursor: &mut ReadCursor<'a>,
-    ) -> Result<Self, ParseError> {
+    ) -> Result<Self, HeaderParseError> {
         if variation == 0 {
-            return Err(ParseError::ZeroLengthOctetData);
+            return Err(HeaderParseError::ZeroLengthOctetData);
         }
 
         Ok(RangedBytesSequence {
@@ -81,9 +81,9 @@ where
         variation: u8,
         count: u16,
         cursor: &mut ReadCursor<'a>,
-    ) -> Result<Self, ParseError> {
+    ) -> Result<Self, HeaderParseError> {
         if variation == 0 {
-            return Err(ParseError::ZeroLengthOctetData);
+            return Err(HeaderParseError::ZeroLengthOctetData);
         }
 
         let size = (variation as usize + T::SIZE as usize) * count as usize;

@@ -14,7 +14,7 @@ use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::parse::bit::IndexedBitSequence;
 use crate::app::parse::bytes::RangedBytesSequence;
-use crate::app::parse::parser::ParseError;
+use crate::app::parse::parser::HeaderParseError;
 use crate::app::parse::range::{Range, RangedSequence};
 use crate::util::cursor::ReadCursor;
 
@@ -54,7 +54,7 @@ pub enum RangedVariation<'a> {
 
 impl<'a> RangedVariation<'a> {
     #[rustfmt::skip]
-    pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ParseError> {
+    pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, HeaderParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::parse(range, cursor)?)),
@@ -84,15 +84,15 @@ impl<'a> RangedVariation<'a> {
             Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::parse(range, cursor)?)),
             Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::parse(range, cursor)?)),
             Variation::Group80Var1 => Ok(RangedVariation::Group80Var1(IndexedBitSequence::parse(range, cursor)?)),
-            Variation::Group110(0) => Err(ParseError::ZeroLengthOctetData),
+            Variation::Group110(0) => Err(HeaderParseError::ZeroLengthOctetData),
             Variation::Group110(x) => {
                 Ok(RangedVariation::Group110VarX(x, RangedBytesSequence::parse(x, range.get_start(), range.get_count(), cursor)?))
             },
-            _ => Err(ParseError::InvalidQualifierForVariation(v)),
+            _ => Err(HeaderParseError::InvalidQualifierForVariation(v)),
         }
     }
 
-    pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ParseError> {
+    pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, HeaderParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(IndexedBitSequence::empty())),
@@ -123,7 +123,7 @@ impl<'a> RangedVariation<'a> {
             Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::empty())),
             Variation::Group80Var1 => Ok(RangedVariation::Group80Var1(IndexedBitSequence::empty())),
             Variation::Group110(0) => Ok(RangedVariation::Group110Var0),
-            _ => Err(ParseError::InvalidQualifierForVariation(v)),
+            _ => Err(HeaderParseError::InvalidQualifierForVariation(v)),
         }
     }
 }

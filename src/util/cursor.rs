@@ -24,6 +24,12 @@ impl<'a> ReadCursor<'a> {
         self.src.is_empty()
     }
 
+    pub fn read_all(&mut self) -> &'a [u8] {
+        let ret = self.src;
+        self.src = &[];
+        ret
+    }
+
     pub fn read_u8(&mut self) -> Result<u8, ReadError> {
         match self.src {
             [a, rest @ ..] => {

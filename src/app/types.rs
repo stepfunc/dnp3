@@ -2,6 +2,56 @@ use crate::app::gen::enums::{OpType, TripCloseCode};
 use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Control {
+    pub fir: bool,
+    pub fin: bool,
+    pub con: bool,
+    pub uns: bool,
+    pub seq: u8,
+}
+
+impl Control {
+    const FIR_MASK: u8 = 0b1000_0000;
+    const FIN_MASK: u8 = 0b0100_0000;
+    const CON_MASK: u8 = 0b0010_0000;
+    const UNS_MASK: u8 = 0b0001_0000;
+    const SEQ_MASK: u8 = 0b0000_1111;
+
+    pub fn from(x: u8) -> Self {
+        Self {
+            fir: x & Self::FIR_MASK != 0,
+            fin: x & Self::FIN_MASK != 0,
+            con: x & Self::CON_MASK != 0,
+            uns: x & Self::UNS_MASK != 0,
+            seq: x & Self::SEQ_MASK,
+        }
+    }
+
+    pub fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(Self::from(cursor.read_u8()?))
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct IIN {
+    iin1: u8,
+    iin2: u8,
+}
+
+impl IIN {
+    pub fn new(iin1: u8, iin2: u8) -> Self {
+        Self { iin1, iin2 }
+    }
+
+    pub fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(Self {
+            iin1: cursor.read_u8()?,
+            iin2: cursor.read_u8()?,
+        })
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ControlCode {
     pub tcc: TripCloseCode,
     pub clear: bool,
@@ -22,24 +72,5 @@ impl ControlCode {
             queue: x & Self::QU_MASK != 0,
             op_type: OpType::from(x & Self::OP_MASK),
         }
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct IIN {
-    iin1: u8,
-    iin2: u8,
-}
-
-impl IIN {
-    pub fn new(iin1: u8, iin2: u8) -> Self {
-        Self { iin1, iin2 }
-    }
-
-    pub fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
-        Ok(Self {
-            iin1: cursor.read_u8()?,
-            iin2: cursor.read_u8()?,
-        })
     }
 }

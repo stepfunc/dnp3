@@ -1,10 +1,12 @@
-use crate::app::gen::enums::QualifierCode;
+use crate::app::gen::enums::{FunctionCode, QualifierCode};
 use crate::app::gen::variations::all::AllObjectsVariation;
 use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
+use crate::app::parse::parser::RequestParseError::BadRequestFunction;
 use crate::app::parse::range::{InvalidRange, Range};
+use crate::app::types::Control;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Debug, PartialEq)]
@@ -25,7 +27,7 @@ pub enum ParseType {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ParseError {
+pub enum HeaderParseError {
     UnknownGroupVariation(u8, u8),
     UnknownQualifier(u8),
     InsufficientBytes,
@@ -33,6 +35,41 @@ pub enum ParseError {
     InvalidQualifierForVariation(Variation),
     UnsupportedQualifierCode(QualifierCode),
     ZeroLengthOctetData,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum RequestParseError {
+    UnknownFunction(u8),
+    InsufficientBytes,
+    BadRequestFunction(FunctionCode),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Request<'a> {
+    pub control: Control,
+    pub function: FunctionCode,
+    pub objects: &'a [u8],
+}
+
+pub fn parse_request(bytes: &[u8]) -> Result<Request, RequestParseError> {
+    let mut cursor = ReadCursor::new(bytes);
+    let control = Control::parse(&mut cursor)?;
+    let function: FunctionCode = {
+        let raw_func = cursor.read_u8()?;
+        match FunctionCode::from(raw_func) {
+            None => return Err(RequestParseError::UnknownFunction(raw_func)),
+            Some(func) => func,
+        }
+    };
+    match function {
+        FunctionCode::Response => return Err(BadRequestFunction(function)),
+        FunctionCode::UnsolicitedResponse => return Err(BadRequestFunction(function)),
+        _ => Ok(Request {
+            control,
+            function,
+            objects: cursor.read_all(),
+        }),
+    }
 }
 
 pub struct HeaderParser<'a> {
@@ -45,7 +82,7 @@ impl<'a> HeaderParser<'a> {
     pub fn one_pass(
         parse_type: ParseType,
         data: &'a [u8],
-    ) -> impl Iterator<Item = Result<Header<'a>, ParseError>> {
+    ) -> impl Iterator<Item = Result<Header<'a>, HeaderParseError>> {
         HeaderParser {
             cursor: ReadCursor::new(data),
             parse_type,
@@ -56,7 +93,7 @@ impl<'a> HeaderParser<'a> {
     pub fn two_pass(
         parse_type: ParseType,
         data: &'a [u8],
-    ) -> Result<impl Iterator<Item = Header<'a>>, ParseError> {
+    ) -> Result<impl Iterator<Item = Header<'a>>, HeaderParseError> {
         for x in HeaderParser::one_pass(parse_type, data) {
             if let Err(e) = x {
                 return Err(e);
@@ -67,7 +104,7 @@ impl<'a> HeaderParser<'a> {
         Ok(HeaderParser::one_pass(parse_type, data).map(|h| h.unwrap()))
     }
 
-    fn parse_one(&mut self) -> Option<Result<Header<'a>, ParseError>> {
+    fn parse_one(&mut self) -> Option<Result<Header<'a>, HeaderParseError>> {
         if self.errored || self.cursor.is_empty() {
             return None;
         }
@@ -81,7 +118,7 @@ impl<'a> HeaderParser<'a> {
         Some(result)
     }
 
-    fn parse_one_inner(&mut self) -> Result<Header<'a>, ParseError> {
+    fn parse_one_inner(&mut self) -> Result<Header<'a>, HeaderParseError> {
         let gv = Variation::parse(&mut self.cursor)?;
         let qualifier = QualifierCode::parse(&mut self.cursor)?;
         match qualifier {
@@ -92,30 +129,30 @@ impl<'a> HeaderParser<'a> {
             QualifierCode::Count16 => self.parse_count_u16(gv),
             QualifierCode::CountAndPrefix8 => self.parse_count_and_prefix_u8(gv),
             QualifierCode::CountAndPrefix16 => self.parse_count_and_prefix_u16(gv),
-            _ => Err(ParseError::UnsupportedQualifierCode(qualifier)),
+            _ => Err(HeaderParseError::UnsupportedQualifierCode(qualifier)),
         }
     }
 
-    fn parse_all_objects(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+    fn parse_all_objects(&mut self, gv: Variation) -> Result<Header<'a>, HeaderParseError> {
         match AllObjectsVariation::get(gv) {
             Some(v) => Ok(Header::AllObjects(v)),
-            None => Err(ParseError::InvalidQualifierForVariation(gv)),
+            None => Err(HeaderParseError::InvalidQualifierForVariation(gv)),
         }
     }
 
-    fn parse_count_u8(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+    fn parse_count_u8(&mut self, gv: Variation) -> Result<Header<'a>, HeaderParseError> {
         let count = self.cursor.read_u8()?;
         let data = CountVariation::parse(gv, count as u16, &mut self.cursor)?;
         Ok(Header::OneByteCount(count, data))
     }
 
-    fn parse_count_u16(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+    fn parse_count_u16(&mut self, gv: Variation) -> Result<Header<'a>, HeaderParseError> {
         let count = self.cursor.read_u16_le()?;
         let data = CountVariation::parse(gv, count, &mut self.cursor)?;
         Ok(Header::TwoByteCount(count, data))
     }
 
-    fn parse_start_stop_u8(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+    fn parse_start_stop_u8(&mut self, gv: Variation) -> Result<Header<'a>, HeaderParseError> {
         let start = self.cursor.read_u8()?;
         let stop = self.cursor.read_u8()?;
         let range = Range::from(start as u16, stop as u16)?;
@@ -123,7 +160,7 @@ impl<'a> HeaderParser<'a> {
         Ok(Header::OneByteStartStop(start, stop, data))
     }
 
-    fn parse_start_stop_u16(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+    fn parse_start_stop_u16(&mut self, gv: Variation) -> Result<Header<'a>, HeaderParseError> {
         let start = self.cursor.read_u16_le()?;
         let stop = self.cursor.read_u16_le()?;
         let range = Range::from(start, stop)?;
@@ -131,13 +168,16 @@ impl<'a> HeaderParser<'a> {
         Ok(Header::TwoByteStartStop(start, stop, data))
     }
 
-    fn parse_count_and_prefix_u8(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+    fn parse_count_and_prefix_u8(&mut self, gv: Variation) -> Result<Header<'a>, HeaderParseError> {
         let count = self.cursor.read_u8()?;
         let data = PrefixedVariation::<u8>::parse(gv, count as u16, &mut self.cursor)?;
         Ok(Header::OneByteCountAndPrefix(count, data))
     }
 
-    fn parse_count_and_prefix_u16(&mut self, gv: Variation) -> Result<Header<'a>, ParseError> {
+    fn parse_count_and_prefix_u16(
+        &mut self,
+        gv: Variation,
+    ) -> Result<Header<'a>, HeaderParseError> {
         let count = self.cursor.read_u16_le()?;
         let data = PrefixedVariation::<u16>::parse(gv, count, &mut self.cursor)?;
         Ok(Header::TwoByteCountAndPrefix(count, data))
@@ -145,7 +185,7 @@ impl<'a> HeaderParser<'a> {
 }
 
 impl<'a> Iterator for HeaderParser<'a> {
-    type Item = Result<Header<'a>, ParseError>;
+    type Item = Result<Header<'a>, HeaderParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.parse_one()
@@ -153,12 +193,12 @@ impl<'a> Iterator for HeaderParser<'a> {
 }
 
 impl Variation {
-    pub fn parse(cursor: &mut ReadCursor) -> Result<Variation, ParseError> {
+    pub fn parse(cursor: &mut ReadCursor) -> Result<Variation, HeaderParseError> {
         let group = cursor.read_u8()?;
         let var = cursor.read_u8()?;
         match Self::lookup(group, var) {
             Some(gv) => Ok(gv),
-            None => Err(ParseError::UnknownGroupVariation(group, var)),
+            None => Err(HeaderParseError::UnknownGroupVariation(group, var)),
         }
     }
 }
@@ -169,7 +209,7 @@ impl<'a> RangedVariation<'a> {
         v: Variation,
         range: Range,
         cursor: &mut ReadCursor<'a>,
-    ) -> Result<RangedVariation<'a>, ParseError> {
+    ) -> Result<RangedVariation<'a>, HeaderParseError> {
         match parse_type {
             ParseType::Read => Self::parse_read(v),
             ParseType::NonRead => Self::parse_non_read(v, range, cursor),
@@ -177,24 +217,30 @@ impl<'a> RangedVariation<'a> {
     }
 }
 
-impl std::convert::From<ReadError> for ParseError {
+impl std::convert::From<ReadError> for HeaderParseError {
     fn from(_: ReadError) -> Self {
-        ParseError::InsufficientBytes
+        HeaderParseError::InsufficientBytes
     }
 }
 
-impl std::convert::From<InvalidRange> for ParseError {
+impl std::convert::From<ReadError> for RequestParseError {
+    fn from(_: ReadError) -> Self {
+        RequestParseError::InsufficientBytes
+    }
+}
+
+impl std::convert::From<InvalidRange> for HeaderParseError {
     fn from(_: InvalidRange) -> Self {
-        ParseError::InvalidRange
+        HeaderParseError::InvalidRange
     }
 }
 
 impl QualifierCode {
-    pub fn parse(cursor: &mut ReadCursor) -> Result<QualifierCode, ParseError> {
+    pub fn parse(cursor: &mut ReadCursor) -> Result<QualifierCode, HeaderParseError> {
         let x = cursor.read_u8()?;
         match Self::from(x) {
             Some(qc) => Ok(qc),
-            None => Err(ParseError::UnknownQualifier(x)),
+            None => Err(HeaderParseError::UnknownQualifier(x)),
         }
     }
 }
@@ -208,6 +254,25 @@ mod test {
     use crate::app::gen::variations::gv::Variation::Group110;
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::prefix::Prefix;
+
+    #[test]
+    fn parses_app_request() {
+        let fragment = &[0xC2, 0x02, 0xDE, 0xAD];
+        let request = parse_request(fragment).unwrap();
+        let expected = Request {
+            control: Control {
+                fir: true,
+                fin: true,
+                con: false,
+                uns: false,
+                seq: 0x02,
+            },
+            function: FunctionCode::Write,
+            objects: &[0xDE, 0xAD],
+        };
+
+        assert_eq!(request, expected);
+    }
 
     #[test]
     fn parses_integrity_scan() {
@@ -357,7 +422,10 @@ mod test {
         let err = HeaderParser::two_pass(ParseType::Read, &input)
             .err()
             .unwrap();
-        assert_eq!(err, ParseError::InvalidQualifierForVariation(Group110(1)));
+        assert_eq!(
+            err,
+            HeaderParseError::InvalidQualifierForVariation(Group110(1))
+        );
     }
 
     #[test]
@@ -385,6 +453,6 @@ mod test {
         let err = HeaderParser::two_pass(ParseType::NonRead, &input)
             .err()
             .unwrap();
-        assert_eq!(err, ParseError::ZeroLengthOctetData);
+        assert_eq!(err, HeaderParseError::ZeroLengthOctetData);
     }
 }
