@@ -87,7 +87,7 @@ impl ControlCode {
 
     pub fn from(x: u8) -> Self {
         Self {
-            tcc: TripCloseCode::from(x & Self::TCC_MASK >> 6),
+            tcc: TripCloseCode::from((x & Self::TCC_MASK) >> 6),
             clear: x & Self::CR_MASK != 0,
             queue: x & Self::QU_MASK != 0,
             op_type: OpType::from(x & Self::OP_MASK),
@@ -104,5 +104,58 @@ impl ControlCode {
         }
         x |= self.op_type.as_u8();
         x
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn test_control_code_round_trip(byte: u8, cc: ControlCode) {
+        assert_eq!(cc.as_u8(), byte);
+        assert_eq!(ControlCode::from(byte), cc)
+    }
+
+    #[test]
+    fn correctly_converts_control_code_to_and_from_u8() {
+        test_control_code_round_trip(
+            0b10_1_1_0100,
+            ControlCode {
+                tcc: TripCloseCode::Trip,
+                clear: true,
+                queue: true,
+                op_type: OpType::LatchOff,
+            },
+        );
+
+        test_control_code_round_trip(
+            0b10_0_1_0100,
+            ControlCode {
+                tcc: TripCloseCode::Trip,
+                clear: false,
+                queue: true,
+                op_type: OpType::LatchOff,
+            },
+        );
+
+        test_control_code_round_trip(
+            0b10_1_0_0100,
+            ControlCode {
+                tcc: TripCloseCode::Trip,
+                clear: true,
+                queue: false,
+                op_type: OpType::LatchOff,
+            },
+        );
+
+        test_control_code_round_trip(
+            0b11_0_0_0000,
+            ControlCode {
+                tcc: TripCloseCode::Reserved,
+                clear: false,
+                queue: false,
+                op_type: OpType::Nul,
+            },
+        );
     }
 }
