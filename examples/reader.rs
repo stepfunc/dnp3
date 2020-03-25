@@ -19,7 +19,7 @@ fn parse_asdu(data: &[u8]) {
         _ => ParseType::NonRead,
     };
 
-    if let Err(e) = HeaderParser::two_pass(mode, request.objects) {
+    if let Err(e) = HeaderParser::parse(mode, request.objects) {
         log::warn!("bad header: {:?}", e);
     }
 }
