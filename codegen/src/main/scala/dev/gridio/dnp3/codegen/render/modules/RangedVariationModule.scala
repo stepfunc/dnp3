@@ -12,7 +12,7 @@ object RangedVariationModule extends Module {
       "use crate::util::cursor::ReadCursor;".eol ++
       "use crate::app::parse::parser::HeaderParseError;".eol ++
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
-      "use crate::app::parse::bit::BitSequence;".eol ++
+      "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++
@@ -22,10 +22,11 @@ object RangedVariationModule extends Module {
   private def rangedVariationEnumDefinition(implicit indent: Indentation) : Iterator[String] = {
 
     def getVarDefinition(v: Variation) : Iterator[String] = v match {
-      case v : SingleBitField => s"${v.name}(BitSequence<'a>),".eol
-      case v : AnyVariation => s"${v.name},".eol
-      case v : FixedSize => s"${v.name}(RangedSequence<'a, ${v.name}>),".eol
-      case v : SizedByVariation if v.parent.isStaticGroup =>  {
+      case _ : SingleBitField => s"${v.name}(BitSequence<'a>),".eol
+      case _ : DoubleBitField => s"${v.name}(DoubleBitSequence<'a>),".eol
+      case _ : AnyVariation => s"${v.name},".eol
+      case _ : FixedSize => s"${v.name}(RangedSequence<'a, ${v.name}>),".eol
+      case _ : SizedByVariation if v.parent.isStaticGroup =>  {
         s"${v.parent.name}Var0,".eol ++
         s"${v.parent.name}VarX(u8, RangedBytesSequence<'a>),".eol
       }
@@ -55,6 +56,10 @@ object RangedVariationModule extends Module {
         s"Variation::${v.name} => Ok(RangedVariation::${v.name}(BitSequence::parse(range, cursor)?)),".eol
       }
 
+      case _ : DoubleBitField =>  {
+        s"Variation::${v.name} => Ok(RangedVariation::${v.name}(DoubleBitSequence::parse(range, cursor)?)),".eol
+      }
+
       case v : SizedByVariation => {
         s"Variation::${v.parent.name}(0) => Err(HeaderParseError::ZeroLengthOctetData),".eol ++
         bracketComma(s"Variation::${v.parent.name}(x) =>") {
@@ -68,7 +73,11 @@ object RangedVariationModule extends Module {
       case _ : SingleBitField =>  {
         s"Variation::${v.name} => Ok(RangedVariation::${v.name}(BitSequence::empty())),".eol
       }
-      case v : SizedByVariation => {
+
+      case _ : DoubleBitField =>  {
+        s"Variation::${v.name} => Ok(RangedVariation::${v.name}(DoubleBitSequence::empty())),".eol
+      }
+      case _ : SizedByVariation => {
         s"Variation::${v.parent.name}(0) => Ok(RangedVariation::${v.parent.name}Var0),".eol
       }
       case _ => s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getReadVarDefinition(v)}),".eol
@@ -93,6 +102,7 @@ object RangedVariationModule extends Module {
   def variations : List[Variation] = {
     ObjectGroup.allVariations.flatMap { v =>
       v match {
+        case _ : DoubleBitField => Some(v)
         case _ : SingleBitField => Some(v)
         case v : AnyVariation if v.parent.isStaticGroup => Some(v)
         case v : FixedSize if v.parent.isStaticGroup => Some(v)

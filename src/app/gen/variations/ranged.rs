@@ -12,7 +12,7 @@
 
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
-use crate::app::parse::bit::BitSequence;
+use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
 use crate::app::parse::bytes::RangedBytesSequence;
 use crate::app::parse::parser::HeaderParseError;
 use crate::app::parse::range::{Range, RangedSequence};
@@ -24,6 +24,7 @@ pub enum RangedVariation<'a> {
     Group1Var1(BitSequence<'a>),
     Group1Var2(RangedSequence<'a, Group1Var2>),
     Group3Var0,
+    Group3Var1(DoubleBitSequence<'a>),
     Group3Var2(RangedSequence<'a, Group3Var2>),
     Group10Var0,
     Group10Var1(BitSequence<'a>),
@@ -60,6 +61,7 @@ impl<'a> RangedVariation<'a> {
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::parse(range, cursor)?)),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::parse(range, cursor)?)),
             Variation::Group3Var0 => Ok(RangedVariation::Group3Var0),
+            Variation::Group3Var1 => Ok(RangedVariation::Group3Var1(DoubleBitSequence::parse(range, cursor)?)),
             Variation::Group3Var2 => Ok(RangedVariation::Group3Var2(RangedSequence::parse(range, cursor)?)),
             Variation::Group10Var0 => Ok(RangedVariation::Group10Var0),
             Variation::Group10Var1 => Ok(RangedVariation::Group10Var1(BitSequence::parse(range, cursor)?)),
@@ -98,6 +100,7 @@ impl<'a> RangedVariation<'a> {
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::empty())),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::empty())),
             Variation::Group3Var0 => Ok(RangedVariation::Group3Var0),
+            Variation::Group3Var1 => Ok(RangedVariation::Group3Var1(DoubleBitSequence::empty())),
             Variation::Group3Var2 => Ok(RangedVariation::Group3Var2(RangedSequence::empty())),
             Variation::Group10Var0 => Ok(RangedVariation::Group10Var0),
             Variation::Group10Var1 => Ok(RangedVariation::Group10Var1(BitSequence::empty())),
