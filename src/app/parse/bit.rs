@@ -12,19 +12,19 @@ fn num_bytes_for_double_bits(count: usize) -> usize {
 
 /// zero-copy type used to iterate over a collection of bits without allocating
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub struct IndexedBitSequence<'a> {
+pub struct BitSequence<'a> {
     bytes: &'a [u8],
     range: Range,
 }
 
 /// zero-copy type used to iterate over a collection of double bits without allocating
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub struct IndexedDoubleBitSequence<'a> {
+pub struct DoubleBitSequence<'a> {
     bytes: &'a [u8],
     range: Range,
 }
 
-impl<'a> IndexedBitSequence<'a> {
+impl<'a> BitSequence<'a> {
     pub fn empty() -> Self {
         Self {
             bytes: &[],
@@ -38,8 +38,8 @@ impl<'a> IndexedBitSequence<'a> {
         Ok(Self { bytes, range })
     }
 
-    pub fn iter(&self) -> IndexedBitIterator<'a> {
-        IndexedBitIterator::<'a> {
+    pub fn iter(&self) -> BitIterator<'a> {
+        BitIterator::<'a> {
             index: self.range.get_start(),
             bytes: self.bytes,
             count: self.range.get_count(),
@@ -48,7 +48,7 @@ impl<'a> IndexedBitSequence<'a> {
     }
 }
 
-impl<'a> IndexedDoubleBitSequence<'a> {
+impl<'a> DoubleBitSequence<'a> {
     pub fn empty() -> Self {
         Self {
             bytes: &[],
@@ -62,8 +62,8 @@ impl<'a> IndexedDoubleBitSequence<'a> {
         Ok(Self { bytes, range })
     }
 
-    pub fn iter(&self) -> IndexedDoubleBitIterator<'a> {
-        IndexedDoubleBitIterator::<'a> {
+    pub fn iter(&self) -> DoubleBitIterator<'a> {
+        DoubleBitIterator::<'a> {
             index: self.range.get_start(),
             bytes: self.bytes,
             count: self.range.get_count(),
@@ -72,21 +72,21 @@ impl<'a> IndexedDoubleBitSequence<'a> {
     }
 }
 
-pub struct IndexedBitIterator<'a> {
+pub struct BitIterator<'a> {
     index: u16,
     bytes: &'a [u8],
     count: usize,
     pos: usize,
 }
 
-pub struct IndexedDoubleBitIterator<'a> {
+pub struct DoubleBitIterator<'a> {
     index: u16,
     bytes: &'a [u8],
     count: usize,
     pos: usize,
 }
 
-impl<'a> Iterator for IndexedBitIterator<'a> {
+impl<'a> Iterator for BitIterator<'a> {
     type Item = (bool, u16);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -114,7 +114,7 @@ impl<'a> Iterator for IndexedBitIterator<'a> {
     }
 }
 
-impl<'a> Iterator for IndexedDoubleBitIterator<'a> {
+impl<'a> Iterator for DoubleBitIterator<'a> {
     type Item = (DoubleBit, u16);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -172,7 +172,7 @@ mod tests {
         let range = Range::from(65534, 65535).unwrap();
         let data = [0b0000_0001];
         let mut cursor = ReadCursor::new(&data);
-        let seq = IndexedBitSequence::parse(range, &mut cursor).unwrap();
+        let seq = BitSequence::parse(range, &mut cursor).unwrap();
         assert!(cursor.is_empty());
         let vec: Vec<(bool, u16)> = seq.iter().collect();
         assert_eq!(vec, vec![(true, 65534), (false, 65535)]);
@@ -183,7 +183,7 @@ mod tests {
         let range = Range::from(65531, 65535).unwrap(); // five values!
         let data = [0b1000_1101, 0b0000_0011];
         let mut cursor = ReadCursor::new(&data);
-        let seq = IndexedDoubleBitSequence::parse(range, &mut cursor).unwrap();
+        let seq = DoubleBitSequence::parse(range, &mut cursor).unwrap();
         assert!(cursor.is_empty());
         let vec: Vec<(DoubleBit, u16)> = seq.iter().collect();
         assert_eq!(

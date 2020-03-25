@@ -10,9 +10,9 @@ object RangedVariationModule extends Module {
       "use crate::app::gen::variations::fixed::*;".eol ++
       "use crate::app::gen::variations::gv::Variation;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
-      "use crate::app::parse::parser::ParseError;".eol ++
+      "use crate::app::parse::parser::HeaderParseError;".eol ++
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
-      "use crate::app::parse::bit::IndexedBitSequence;".eol ++
+      "use crate::app::parse::bit::BitSequence;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++
@@ -22,7 +22,7 @@ object RangedVariationModule extends Module {
   private def rangedVariationEnumDefinition(implicit indent: Indentation) : Iterator[String] = {
 
     def getVarDefinition(v: Variation) : Iterator[String] = v match {
-      case v : SingleBitField => s"${v.name}(IndexedBitSequence<'a>),".eol
+      case v : SingleBitField => s"${v.name}(BitSequence<'a>),".eol
       case v : AnyVariation => s"${v.name},".eol
       case v : FixedSize => s"${v.name}(RangedSequence<'a, ${v.name}>),".eol
       case v : SizedByVariation if v.parent.isStaticGroup =>  {
@@ -52,11 +52,11 @@ object RangedVariationModule extends Module {
 
     def getNonReadMatcher(v: Variation): Iterator[String] = v match {
       case _ : SingleBitField =>  {
-        s"Variation::${v.name} => Ok(RangedVariation::${v.name}(IndexedBitSequence::parse(range, cursor)?)),".eol
+        s"Variation::${v.name} => Ok(RangedVariation::${v.name}(BitSequence::parse(range, cursor)?)),".eol
       }
 
       case v : SizedByVariation => {
-        s"Variation::${v.parent.name}(0) => Err(ParseError::ZeroLengthOctetData),".eol ++
+        s"Variation::${v.parent.name}(0) => Err(HeaderParseError::ZeroLengthOctetData),".eol ++
         bracketComma(s"Variation::${v.parent.name}(x) =>") {
           s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesSequence::parse(x, range.get_start(), range.get_count(), cursor)?))".eol
         }
@@ -66,7 +66,7 @@ object RangedVariationModule extends Module {
 
     def getReadMatcher(v: Variation): Iterator[String] = v match {
       case _ : SingleBitField =>  {
-        s"Variation::${v.name} => Ok(RangedVariation::${v.name}(IndexedBitSequence::empty())),".eol
+        s"Variation::${v.name} => Ok(RangedVariation::${v.name}(BitSequence::empty())),".eol
       }
       case v : SizedByVariation => {
         s"Variation::${v.parent.name}(0) => Ok(RangedVariation::${v.parent.name}Var0),".eol
@@ -76,14 +76,14 @@ object RangedVariationModule extends Module {
 
     bracket("impl<'a> RangedVariation<'a>") {
       "#[rustfmt::skip]".eol ++
-      bracket("pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ParseError>") {
+      bracket("pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, HeaderParseError>") {
         bracket("match v") {
-          variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
+          variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(HeaderParseError::InvalidQualifierForVariation(v)),".eol
         }
       } ++ space ++
-        bracket("pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ParseError>") {
+        bracket("pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, HeaderParseError>") {
           bracket("match v") {
-            variations.flatMap(getReadMatcher).iterator ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
+            variations.flatMap(getReadMatcher).iterator ++ "_ => Err(HeaderParseError::InvalidQualifierForVariation(v)),".eol
           }
         }
     }

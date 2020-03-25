@@ -13,7 +13,7 @@ object FixedSizeVariationModule extends Module {
       }
     }
 
-    "use crate::app::parse::header::FixedSize;".eol ++
+    "use crate::app::parse::traits::FixedSize;".eol ++
     "use crate::util::cursor::{ReadCursor, ReadError};".eol ++
     "use crate::app::gen::enums::CommandStatus;".eol ++
     "use crate::app::types::ControlCode;".eol ++

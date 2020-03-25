@@ -9,7 +9,7 @@ object CountVariationModule extends Module {
       "use crate::app::gen::variations::gv::Variation;".eol ++
       "use crate::app::gen::variations::fixed::*;".eol ++
       "use crate::app::parse::count::CountSequence;".eol ++
-      "use crate::app::parse::parser::ParseError;".eol ++
+      "use crate::app::parse::parser::HeaderParseError;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
       space ++
       enumDefinition ++
@@ -42,9 +42,9 @@ object CountVariationModule extends Module {
 
     bracket("impl<'a> CountVariation<'a>") {
       "#[rustfmt::skip]".eol ++
-      bracket("pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ParseError>") {
+      bracket("pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, HeaderParseError>") {
         bracket("match v") {
-          variations.map(matcher) ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
+          variations.map(matcher) ++ "_ => Err(HeaderParseError::InvalidQualifierForVariation(v)),".eol
         }
       }
     }

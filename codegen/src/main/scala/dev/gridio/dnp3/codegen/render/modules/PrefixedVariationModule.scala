@@ -11,8 +11,8 @@ object PrefixedVariationModule extends Module {
       "use crate::app::parse::count::CountSequence;".eol ++
       "use crate::app::gen::variations::fixed::*;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
-      "use crate::app::parse::parser::ParseError;".eol ++
-      "use crate::app::parse::header::FixedSize;".eol ++
+      "use crate::app::parse::parser::HeaderParseError;".eol ++
+      "use crate::app::parse::traits::FixedSize;".eol ++
       "use crate::app::parse::prefix::Prefix;".eol ++
       "use crate::app::parse::bytes::PrefixedBytesSequence;".eol ++
       space ++
@@ -41,7 +41,7 @@ object PrefixedVariationModule extends Module {
 
     def matcher(v: Variation) : Iterator[String] = v match {
       case Group111AnyVar => {
-        "Variation::Group111(0) => Err(ParseError::ZeroLengthOctetData),".eol ++
+        "Variation::Group111(0) => Err(HeaderParseError::ZeroLengthOctetData),".eol ++
         "Variation::Group111(x) => Ok(PrefixedVariation::Group111VarX(x, PrefixedBytesSequence::parse(x, count, cursor)?)),".eol
       }
       case _ => {
@@ -51,9 +51,9 @@ object PrefixedVariationModule extends Module {
 
     bracket("impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize") {
       "#[rustfmt::skip]".eol ++
-      bracket("pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ParseError>") {
+      bracket("pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, HeaderParseError>") {
         bracket("match v") {
-          variations.flatMap(matcher) ++ "_ => Err(ParseError::InvalidQualifierForVariation(v)),".eol
+          variations.flatMap(matcher) ++ "_ => Err(HeaderParseError::InvalidQualifierForVariation(v)),".eol
         }
       }
     }
