@@ -112,33 +112,3 @@ pub mod test_data {
         ],
     };
 }
-/*
-
-    pub const UNCONFIRMED_USER_DATA_BYTES: [u8; 25] = [
-        0x05, 0x64, 0x12, 0xC4, 0x01, 0x00, 0x00, 0x04, 0x0E, 0x0B, 0xC0, 0xC5, 0x02, 0x32, 0x01,
-        0x07, 0x01, 0xF8, 0xB8, 0x6C, 0xAA, 0xF0, 0x00, 0x98, 0x98,
-    ];
-
-    pub const UNCONFIRMED_USER_DATA_APP_BYTES: [u8; 12] = [
-        0xC5, 0x02, 0x32, 0x01, 0x07, 0x01, 0xF8, 0xB8, 0x6C, 0xAA, 0xF0, 0x00,
-    ];
-
-    pub const UNCONFIRMED_USER_DATA_FRAME: Frame = Frame {
-        header: Header {
-            control: ControlField {
-                func: Function::PriUnconfirmedUserData,
-                master: true,
-                fcb: false,
-                fcv: false,
-            },
-            address: Address {
-                destination: 1,
-                source: 1024,
-            },
-        },
-        payload: &[
-            0xC0, 0xC5, 0x02, 0x32, 0x01, 0x07, 0x01, 0xF8, 0xB8, 0x6C, 0xAA, 0xF0, 0x00,
-        ],
-    };
-}
-*/

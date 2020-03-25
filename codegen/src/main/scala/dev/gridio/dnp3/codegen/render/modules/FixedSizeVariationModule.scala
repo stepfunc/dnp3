@@ -73,9 +73,9 @@ object FixedSizeVariationModule extends Module {
       }
     }
 
-    def implParse : Iterator[String] = {
+    def implRead : Iterator[String] = {
       "#[rustfmt::skip]".eol ++
-      bracket(s"fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError>") {
+      bracket(s"fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError>") {
         paren("Ok") {
           bracket(s"${gv.name}") {
             gv.fields.iterator.flatMap { f =>
@@ -88,7 +88,7 @@ object FixedSizeVariationModule extends Module {
 
     bracket(s"impl FixedSize for ${gv.name}") {
       s"const SIZE: u8 = ${gv.size};".eol ++
-      implParse
+      implRead
     }
   }
 

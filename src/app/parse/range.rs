@@ -97,7 +97,7 @@ where
     type Item = (T, u16);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match T::parse(&mut self.cursor) {
+        match T::read(&mut self.cursor) {
             Ok(x) => {
                 let idx = self.index;
                 self.index += 1;

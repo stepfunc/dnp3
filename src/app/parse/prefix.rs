@@ -18,10 +18,10 @@ where
 {
     const SIZE: u8 = I::SIZE + V::SIZE;
 
-    fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(Prefix {
-            index: I::parse(cursor)?,
-            value: V::parse(cursor)?,
+            index: I::read(cursor)?,
+            value: V::read(cursor)?,
         })
     }
 }

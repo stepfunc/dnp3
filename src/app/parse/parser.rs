@@ -263,8 +263,7 @@ mod test {
 
     #[test]
     fn catches_insufficient_data_for_header() {
-
-        let bad_frames : Vec<&[u8]>  = vec![
+        let bad_frames: Vec<&[u8]> = vec![
             &[0x01],
             &[0x01, 0x02],
             &[0x01, 0x02, 0x06, 0x01], // error on 2nd header
@@ -275,9 +274,12 @@ mod test {
         ];
 
         for frame in bad_frames {
-            test_parse_error(frame, ParseType::NonRead, HeaderParseError::InsufficientBytes);
+            test_parse_error(
+                frame,
+                ParseType::NonRead,
+                HeaderParseError::InsufficientBytes,
+            );
         }
-
     }
 
     #[test]

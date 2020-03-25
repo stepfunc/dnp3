@@ -58,7 +58,7 @@ where
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match T::parse(&mut self.cursor) {
+        match T::read(&mut self.cursor) {
             Ok(x) => Some(x),
             Err(_) => None,
         }

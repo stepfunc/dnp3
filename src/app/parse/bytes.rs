@@ -127,7 +127,7 @@ where
             Ok(x) => x,
             _ => return None,
         };
-        let index = match T::parse(&mut self.cursor) {
+        let index = match T::read(&mut self.cursor) {
             Ok(x) => x,
             _ => return None,
         };
