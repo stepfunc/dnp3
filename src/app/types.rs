@@ -15,7 +15,7 @@ impl DoubleBit {
         match x & 0b0000_0011 {
             0b00 => DoubleBit::Intermediate,
             0b01 => DoubleBit::DeterminedOff,
-            0b10 => DoubleBit::DeterminedOff,
+            0b10 => DoubleBit::DeterminedOn,
             _ => DoubleBit::Indeterminate,
         }
     }

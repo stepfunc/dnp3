@@ -58,7 +58,6 @@ impl<'a> DoubleBitSequence<'a> {
 
     pub fn parse(range: Range, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
         let bytes = cursor.read_bytes(num_bytes_for_double_bits(range.get_count()))?;
-        println!("bytes: {:?}", bytes);
         Ok(Self { bytes, range })
     }
 
@@ -126,8 +125,8 @@ impl<'a> Iterator for DoubleBitIterator<'a> {
         let shift = 2 * (self.pos % 4) as u8; // [0,2,4,6]
 
         match self.bytes.get(byte) {
-            Some(value) => {
-                let value = DoubleBit::from(*value >> shift);
+            Some(x) => {
+                let value = DoubleBit::from(*x >> shift);
                 let index = self.index;
                 self.pos += 1;
                 if self.pos < self.count {
@@ -179,6 +178,25 @@ mod tests {
     }
 
     #[test]
+    fn can_parse_single_byte_of_double_bit() {
+        let range = Range::from(1, 4).unwrap();
+        let data = [0b11_10_01_00];
+        let mut cursor = ReadCursor::new(&data);
+        let seq = DoubleBitSequence::parse(range, &mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        let vec: Vec<(DoubleBit, u16)> = seq.iter().collect();
+        assert_eq!(
+            vec,
+            vec![
+                (DoubleBit::Intermediate, 1),
+                (DoubleBit::DeterminedOff, 2),
+                (DoubleBit::DeterminedOn, 3),
+                (DoubleBit::Indeterminate, 4),
+            ]
+        );
+    }
+
+    #[test]
     fn can_parse_double_bit_sequence_at_max_index() {
         let range = Range::from(65531, 65535).unwrap(); // five values!
         let data = [0b1000_1101, 0b0000_0011];
@@ -192,7 +210,7 @@ mod tests {
                 (DoubleBit::DeterminedOff, 65531),
                 (DoubleBit::Indeterminate, 65532),
                 (DoubleBit::Intermediate, 65533),
-                (DoubleBit::DeterminedOff, 65534),
+                (DoubleBit::DeterminedOn, 65534),
                 (DoubleBit::Indeterminate, 65535),
             ]
         );

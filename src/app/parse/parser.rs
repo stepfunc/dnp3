@@ -254,6 +254,7 @@ mod test {
     use crate::app::gen::variations::gv::Variation::Group110;
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::prefix::Prefix;
+    use crate::app::types::DoubleBit;
 
     #[test]
     fn parses_app_request() {
@@ -318,6 +319,29 @@ mod test {
 
         assert_eq!(items, vec![expected]);
 
+        assert_eq!(parser.next(), None);
+    }
+
+    #[test]
+    fn parses_range_of_g3v1() {
+        let header = &[0x03, 0x01, 0x00, 0x01, 0x04, 0b11_10_01_00];
+        let mut parser = HeaderParser::two_pass(ParseType::NonRead, header).unwrap();
+
+        let items: Vec<(DoubleBit, u16)> = match parser.next().unwrap() {
+            Header::OneByteStartStop(01, 04, RangedVariation::Group3Var1(seq)) => {
+                seq.iter().collect()
+            }
+            x => panic!("got: {:?}", x),
+        };
+
+        let expected = vec![
+            (DoubleBit::Intermediate, 1),
+            (DoubleBit::DeterminedOff, 2),
+            (DoubleBit::DeterminedOn, 3),
+            (DoubleBit::Indeterminate, 4),
+        ];
+
+        assert_eq!(items, expected);
         assert_eq!(parser.next(), None);
     }
 
