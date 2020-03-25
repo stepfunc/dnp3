@@ -262,6 +262,25 @@ mod test {
     }
 
     #[test]
+    fn catches_insufficient_data_for_header() {
+
+        let bad_frames : Vec<&[u8]>  = vec![
+            &[0x01],
+            &[0x01, 0x02],
+            &[0x01, 0x02, 0x06, 0x01], // error on 2nd header
+            &[0x01, 0x02, 0x00, 0x07],
+            &[0x01, 0x02, 0x00, 0x07, 0x08],
+            &[0x01, 0x02, 0x00, 0x07, 0x08, 0xFF],
+            &[0x01, 0x02, 0x00, 0x07, 0x08, 0xFF],
+        ];
+
+        for frame in bad_frames {
+            test_parse_error(frame, ParseType::NonRead, HeaderParseError::InsufficientBytes);
+        }
+
+    }
+
+    #[test]
     fn parses_app_request() {
         let fragment = &[0xC2, 0x02, 0xDE, 0xAD];
         let request = parse_request(fragment).unwrap();
