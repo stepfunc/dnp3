@@ -302,23 +302,21 @@ mod test {
         let header = &[0x29, 0x01, 0x17, 0x01, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x00];
         let mut parser = HeaderParser::two_pass(ParseType::NonRead, header).unwrap();
 
-        let items: Vec<Prefix<u8, Group41Var1>> = match parser.next().unwrap() {
-            Header::OneByteCountAndPrefix(01, PrefixedVariation::<u8>::Group41Var1(seq)) => {
-                seq.iter().collect()
-            }
-            x => panic!("got: {:?}", x),
-        };
+        let items: Vec<Prefix<u8, Group41Var1>> = assert_matches!(
+            parser.next().unwrap(),
+            Header::OneByteCountAndPrefix(01, PrefixedVariation::<u8>::Group41Var1(seq)) => seq.iter().collect()
+        );
 
-        let expected = Prefix::<u8, Group41Var1> {
-            index: 0xFF,
-            value: Group41Var1 {
-                value: 0x04030201,
-                status: CommandStatus::Success,
-            },
-        };
-
-        assert_eq!(items, vec![expected]);
-
+        assert_eq!(
+            items,
+            vec![Prefix::<u8, Group41Var1> {
+                index: 0xFF,
+                value: Group41Var1 {
+                    value: 0x04030201,
+                    status: CommandStatus::Success,
+                },
+            }]
+        );
         assert_eq!(parser.next(), None);
     }
 
@@ -327,21 +325,20 @@ mod test {
         let header = &[0x03, 0x01, 0x00, 0x01, 0x04, 0b11_10_01_00];
         let mut parser = HeaderParser::two_pass(ParseType::NonRead, header).unwrap();
 
-        let items: Vec<(DoubleBit, u16)> = match parser.next().unwrap() {
-            Header::OneByteStartStop(01, 04, RangedVariation::Group3Var1(seq)) => {
-                seq.iter().collect()
-            }
-            x => panic!("got: {:?}", x),
-        };
+        let items: Vec<(DoubleBit, u16)> = assert_matches!(
+            parser.next().unwrap(),
+            Header::OneByteStartStop(01, 04, RangedVariation::Group3Var1(seq)) => seq.iter().collect()
+        );
 
-        let expected = vec![
-            (DoubleBit::Intermediate, 1),
-            (DoubleBit::DeterminedOff, 2),
-            (DoubleBit::DeterminedOn, 3),
-            (DoubleBit::Indeterminate, 4),
-        ];
-
-        assert_eq!(items, expected);
+        assert_eq!(
+            items,
+            vec![
+                (DoubleBit::Intermediate, 1),
+                (DoubleBit::DeterminedOff, 2),
+                (DoubleBit::DeterminedOn, 3),
+                (DoubleBit::Indeterminate, 4),
+            ]
+        );
         assert_eq!(parser.next(), None);
     }
 
@@ -350,10 +347,10 @@ mod test {
         let header = &[0x32, 0x01, 0x07, 0x01, 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA];
         let mut parser = HeaderParser::two_pass(ParseType::NonRead, header).unwrap();
 
-        let items: Vec<Group50Var1> = match parser.next().unwrap() {
-            Header::OneByteCount(01, CountVariation::Group50Var1(seq)) => seq.iter().collect(),
-            x => panic!("got: {:?}", x),
-        };
+        let items: Vec<Group50Var1> = assert_matches!(
+            parser.next().unwrap(),
+            Header::OneByteCount(01, CountVariation::Group50Var1(seq)) => seq.iter().collect()
+        );
 
         assert_eq!(
             items,
@@ -369,14 +366,12 @@ mod test {
     fn parses_range_of_g1v2_as_non_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 
-        let mut parser = HeaderParser::one_pass(ParseType::NonRead, &input);
+        let mut parser = HeaderParser::two_pass(ParseType::NonRead, &input).unwrap();
 
-        let items: Vec<(Group1Var2, u16)> = match parser.next().unwrap().unwrap() {
-            Header::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
-                seq.iter().collect()
-            }
-            x => panic!("got: {:?}", x),
-        };
+        let items: Vec<(Group1Var2, u16)> = assert_matches!(
+            parser.next().unwrap(),
+            Header::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => seq.iter().collect()
+        );
 
         assert_eq!(
             items,
@@ -385,7 +380,6 @@ mod test {
                 (Group1Var2 { flags: 0xBB }, 3)
             ]
         );
-
         assert_eq!(parser.next(), None);
     }
 
@@ -395,19 +389,19 @@ mod test {
 
         let mut parser = HeaderParser::two_pass(ParseType::Read, &input).unwrap();
 
-        match parser.next().unwrap() {
+        assert_matches!(
+            parser.next().unwrap(),
             Header::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
                 assert!(seq.is_empty())
             }
-            x => panic!("got: {:?}", x),
-        };
+        );
 
-        match parser.next().unwrap() {
+        assert_matches!(
+            parser.next().unwrap(),
             Header::OneByteStartStop(07, 09, RangedVariation::Group1Var2(seq)) => {
                 assert!(seq.is_empty())
             }
-            x => panic!("got: {:?}", x),
-        };
+        );
 
         assert_eq!(parser.next(), None);
     }
@@ -418,12 +412,12 @@ mod test {
         let input = [0x50, 0x01, 0x00, 0x07, 0x07, 0x00];
         let mut parser = HeaderParser::two_pass(ParseType::NonRead, &input).unwrap();
 
-        let vec: Vec<(bool, u16)> = match parser.next().unwrap() {
+        let vec: Vec<(bool, u16)> = assert_matches!(
+            parser.next().unwrap(),
             Header::OneByteStartStop(07, 07, RangedVariation::Group80Var1(seq)) => {
                 seq.iter().collect()
             }
-            x => panic!("got: {:?}", x),
-        };
+        );
 
         assert_eq!(vec, vec![(false, 7)]);
         assert_eq!(parser.next(), None);
@@ -443,11 +437,10 @@ mod test {
     #[test]
     fn g110_variations_other_than_0_cannot_be_used_in_read() {
         let input = [0x6E, 0x01, 0x00, 0x01, 0x02];
-        let err = HeaderParser::two_pass(ParseType::Read, &input)
-            .err()
-            .unwrap();
         assert_eq!(
-            err,
+            HeaderParser::two_pass(ParseType::Read, &input)
+                .err()
+                .unwrap(),
             HeaderParseError::InvalidQualifierForVariation(Group110(1))
         );
     }
@@ -457,12 +450,12 @@ mod test {
         let input = [0x6E, 0x01, 0x00, 0x01, 0x02, 0xAA, 0xBB];
         let mut parser = HeaderParser::two_pass(ParseType::NonRead, &input).unwrap();
 
-        let bytes: Vec<(Bytes, u16)> = match parser.next().unwrap() {
+        let bytes: Vec<(Bytes, u16)> = assert_matches!(
+            parser.next().unwrap(),
             Header::OneByteStartStop(01, 02, RangedVariation::Group110VarX(0x01, seq)) => {
                 seq.iter().collect()
             }
-            x => panic!("got: {:?}", x),
-        };
+        );
 
         assert_eq!(
             bytes,
@@ -474,9 +467,11 @@ mod test {
     #[test]
     fn g110v0_cannot_be_used_in_non_read() {
         let input = [0x6E, 0x00, 0x00, 0x01, 0x02];
-        let err = HeaderParser::two_pass(ParseType::NonRead, &input)
-            .err()
-            .unwrap();
-        assert_eq!(err, HeaderParseError::ZeroLengthOctetData);
+        assert_eq!(
+            HeaderParser::two_pass(ParseType::NonRead, &input)
+                .err()
+                .unwrap(),
+            HeaderParseError::ZeroLengthOctetData
+        );
     }
 }
