@@ -164,9 +164,50 @@ impl<'a> WriteCursor<'a> {
             // don't write any bytes if there's isn't space for the whole thing
             return Err(WriteError);
         }
-        let upper = ((value & 0xFF00) >> 8) as u8;
-        let lower = (value & 0x00FF) as u8;
-        self.write_u8(lower)?;
-        self.write_u8(upper)
+        for s in [0, 8].iter() {
+            let b = ((value >> *s) & 0xFF) as u8;
+            self.write_u8(b)?;
+        }
+        Ok(())
+    }
+
+    pub fn write_i16_le(&mut self, value: i16) -> Result<(), WriteError> {
+        self.write_u16_le(value as u16)
+    }
+
+    pub fn write_u32_le(&mut self, value: u32) -> Result<(), WriteError> {
+        if self.remaining() < 4 {
+            // don't write any bytes if there's isn't space for the whole thing
+            return Err(WriteError);
+        }
+        for s in [0, 8, 16, 24].iter() {
+            let b = ((value >> *s) & 0xFF) as u8;
+            self.write_u8(b)?;
+        }
+        Ok(())
+    }
+
+    pub fn write_i32_le(&mut self, value: i32) -> Result<(), WriteError> {
+        self.write_u32_le(value as u32)
+    }
+
+    pub fn write_u48_le(&mut self, value: u64) -> Result<(), WriteError> {
+        if self.remaining() < 6 {
+            // don't write any bytes if there's isn't space for the whole thing
+            return Err(WriteError);
+        }
+        for s in [0, 8, 16, 24, 32, 40].iter() {
+            let b = ((value >> *s) & 0xFF) as u8;
+            self.write_u8(b)?;
+        }
+        Ok(())
+    }
+
+    pub fn write_f32_le(&mut self, value: f32) -> Result<(), WriteError> {
+        self.write(&f32::to_le_bytes(value))
+    }
+
+    pub fn write_f64_le(&mut self, value: f64) -> Result<(), WriteError> {
+        self.write(&f64::to_le_bytes(value))
     }
 }

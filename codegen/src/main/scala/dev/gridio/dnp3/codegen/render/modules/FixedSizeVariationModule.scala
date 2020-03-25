@@ -14,7 +14,7 @@ object FixedSizeVariationModule extends Module {
     }
 
     "use crate::app::parse::traits::FixedSize;".eol ++
-    "use crate::util::cursor::{ReadCursor, ReadError};".eol ++
+    "use crate::util::cursor::*;".eol ++
     "use crate::app::gen::enums::CommandStatus;".eol ++
     "use crate::app::types::ControlCode;".eol ++
     space ++
@@ -39,7 +39,7 @@ object FixedSizeVariationModule extends Module {
     }
   }
 
-  private def getReadSuffix(f: FixedSizeFieldType) : String = {
+  private def getCursorSuffix(f: FixedSizeFieldType) : String = {
     f match {
       case UInt8Field => "u8"
       case UInt16Field => "u16_le"
@@ -64,8 +64,8 @@ object FixedSizeVariationModule extends Module {
   }
 
   private def implFixedSizedVariation(gv : FixedSize)(implicit indent: Indentation): Iterator[String] = {
-    def parseField(f : FixedSizeField) : String = {
-      val inner = s"cursor.read_${getReadSuffix(f.typ)}()?"
+    def readField(f : FixedSizeField) : String = {
+      val inner = s"cursor.read_${getCursorSuffix(f.typ)}()?"
       f.typ match {
         case x : EnumFieldType => s"${x.model.name}::from(${inner})"
         case CustomFieldTypeU8(name) => s"${name}::from(${inner})"
@@ -73,27 +73,42 @@ object FixedSizeVariationModule extends Module {
       }
     }
 
+    def writeField(f : FixedSizeField) : String = {
+      def write(suffix: String) = s"cursor.write_${getCursorSuffix(f.typ)}(self.${f.name}${suffix})?;"
+      f.typ match {
+        case _ : EnumFieldType => write(".as_u8()")
+        case CustomFieldTypeU8(name) => write(".as_u8()")
+        case _ => write("")
+      }
+    }
+
     def implRead : Iterator[String] = {
       "#[rustfmt::skip]".eol ++
-      bracket(s"fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError>") {
-        paren("Ok") {
-          bracket(s"${gv.name}") {
-            gv.fields.iterator.flatMap { f =>
-              s"${f.name}: ${parseField(f)},".eol
+        bracket(s"fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError>") {
+          paren("Ok") {
+            bracket(s"${gv.name}") {
+              gv.fields.iterator.flatMap { f =>
+                s"${f.name}: ${readField(f)},".eol
+              }
             }
           }
         }
-      }
+    }
+
+    def implWrite : Iterator[String] = {
+      "#[rustfmt::skip]".eol ++
+        bracket(s"fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError>") {
+            gv.fields.iterator.flatMap { f =>
+              writeField(f).eol
+            } ++ "Ok(())".eol
+        }
     }
 
     bracket(s"impl FixedSize for ${gv.name}") {
       s"const SIZE: u8 = ${gv.size};".eol ++
-      implRead
+      implRead ++
+      implWrite
     }
-  }
-
-  private def lines(gv : FixedSize)(implicit indent: Indentation): Iterator[String] = {
-    structDefinition(gv) ++ space ++ implFixedSizedVariation(gv)
   }
 
 }

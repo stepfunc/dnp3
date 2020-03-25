@@ -13,7 +13,7 @@
 use crate::app::gen::enums::CommandStatus;
 use crate::app::parse::traits::FixedSize;
 use crate::app::types::ControlCode;
-use crate::util::cursor::{ReadCursor, ReadError};
+use crate::util::cursor::*;
 
 /// Time Delay - Fine
 #[derive(Debug, PartialEq)]
@@ -567,6 +567,11 @@ impl FixedSize for Group52Var2 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u16_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group52Var1 {
@@ -578,6 +583,11 @@ impl FixedSize for Group52Var1 {
                 time: cursor.read_u16_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u16_le(self.time)?;
+        Ok(())
     }
 }
 
@@ -591,6 +601,11 @@ impl FixedSize for Group51Var2 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group51Var1 {
@@ -602,6 +617,11 @@ impl FixedSize for Group51Var1 {
                 time: cursor.read_u48_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u48_le(self.time)?;
+        Ok(())
     }
 }
 
@@ -617,6 +637,13 @@ impl FixedSize for Group50Var4 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u48_le(self.time)?;
+        cursor.write_u32_le(self.interval)?;
+        cursor.write_u8(self.units)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group50Var3 {
@@ -629,6 +656,11 @@ impl FixedSize for Group50Var3 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group50Var1 {
@@ -640,6 +672,11 @@ impl FixedSize for Group50Var1 {
                 time: cursor.read_u48_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u48_le(self.time)?;
+        Ok(())
     }
 }
 
@@ -655,6 +692,13 @@ impl FixedSize for Group43Var8 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.status.as_u8())?;
+        cursor.write_f64_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group43Var7 {
@@ -669,6 +713,13 @@ impl FixedSize for Group43Var7 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.status.as_u8())?;
+        cursor.write_f32_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group43Var6 {
@@ -682,6 +733,12 @@ impl FixedSize for Group43Var6 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.status.as_u8())?;
+        cursor.write_f64_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group43Var5 {
@@ -694,6 +751,12 @@ impl FixedSize for Group43Var5 {
                 value: cursor.read_f32_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.status.as_u8())?;
+        cursor.write_f32_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -709,6 +772,13 @@ impl FixedSize for Group43Var4 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.status.as_u8())?;
+        cursor.write_i16_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group43Var3 {
@@ -723,6 +793,13 @@ impl FixedSize for Group43Var3 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.status.as_u8())?;
+        cursor.write_i32_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group43Var2 {
@@ -736,6 +813,12 @@ impl FixedSize for Group43Var2 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.status.as_u8())?;
+        cursor.write_i16_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group43Var1 {
@@ -748,6 +831,12 @@ impl FixedSize for Group43Var1 {
                 value: cursor.read_i32_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.status.as_u8())?;
+        cursor.write_i32_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -763,6 +852,13 @@ impl FixedSize for Group42Var8 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f64_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group42Var7 {
@@ -777,6 +873,13 @@ impl FixedSize for Group42Var7 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f32_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group42Var6 {
@@ -790,6 +893,12 @@ impl FixedSize for Group42Var6 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f64_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group42Var5 {
@@ -802,6 +911,12 @@ impl FixedSize for Group42Var5 {
                 value: cursor.read_f32_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f32_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -817,6 +932,13 @@ impl FixedSize for Group42Var4 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i16_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group42Var3 {
@@ -831,6 +953,13 @@ impl FixedSize for Group42Var3 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i32_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group42Var2 {
@@ -843,6 +972,12 @@ impl FixedSize for Group42Var2 {
                 value: cursor.read_i16_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i16_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -857,6 +992,12 @@ impl FixedSize for Group42Var1 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i32_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group41Var4 {
@@ -869,6 +1010,12 @@ impl FixedSize for Group41Var4 {
                 status: CommandStatus::from(cursor.read_u8()?),
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_f64_le(self.value)?;
+        cursor.write_u8(self.status.as_u8())?;
+        Ok(())
     }
 }
 
@@ -883,6 +1030,12 @@ impl FixedSize for Group41Var3 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_f32_le(self.value)?;
+        cursor.write_u8(self.status.as_u8())?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group41Var2 {
@@ -895,6 +1048,12 @@ impl FixedSize for Group41Var2 {
                 status: CommandStatus::from(cursor.read_u8()?),
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_i16_le(self.value)?;
+        cursor.write_u8(self.status.as_u8())?;
+        Ok(())
     }
 }
 
@@ -909,6 +1068,12 @@ impl FixedSize for Group41Var1 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_i32_le(self.value)?;
+        cursor.write_u8(self.status.as_u8())?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group40Var4 {
@@ -921,6 +1086,12 @@ impl FixedSize for Group40Var4 {
                 value: cursor.read_f64_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f64_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -935,6 +1106,12 @@ impl FixedSize for Group40Var3 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f32_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group40Var2 {
@@ -948,6 +1125,12 @@ impl FixedSize for Group40Var2 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i16_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group40Var1 {
@@ -960,6 +1143,12 @@ impl FixedSize for Group40Var1 {
                 value: cursor.read_i32_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i32_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -975,6 +1164,13 @@ impl FixedSize for Group32Var8 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f64_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group32Var7 {
@@ -989,6 +1185,13 @@ impl FixedSize for Group32Var7 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f32_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group32Var6 {
@@ -1002,6 +1205,12 @@ impl FixedSize for Group32Var6 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f64_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group32Var5 {
@@ -1014,6 +1223,12 @@ impl FixedSize for Group32Var5 {
                 value: cursor.read_f32_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f32_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -1029,6 +1244,13 @@ impl FixedSize for Group32Var4 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i16_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group32Var3 {
@@ -1043,6 +1265,13 @@ impl FixedSize for Group32Var3 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i32_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group32Var2 {
@@ -1055,6 +1284,12 @@ impl FixedSize for Group32Var2 {
                 value: cursor.read_i16_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i16_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -1069,6 +1304,12 @@ impl FixedSize for Group32Var1 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i32_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group30Var6 {
@@ -1081,6 +1322,12 @@ impl FixedSize for Group30Var6 {
                 value: cursor.read_f64_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f64_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -1095,6 +1342,12 @@ impl FixedSize for Group30Var5 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f32_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group30Var4 {
@@ -1107,6 +1360,11 @@ impl FixedSize for Group30Var4 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_i16_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group30Var3 {
@@ -1118,6 +1376,11 @@ impl FixedSize for Group30Var3 {
                 value: cursor.read_i32_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_i32_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -1132,6 +1395,12 @@ impl FixedSize for Group30Var2 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i16_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group30Var1 {
@@ -1144,6 +1413,12 @@ impl FixedSize for Group30Var1 {
                 value: cursor.read_i32_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i32_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -1159,6 +1434,13 @@ impl FixedSize for Group23Var6 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u16_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group23Var5 {
@@ -1173,6 +1455,13 @@ impl FixedSize for Group23Var5 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u32_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group23Var2 {
@@ -1186,6 +1475,12 @@ impl FixedSize for Group23Var2 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u16_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group23Var1 {
@@ -1198,6 +1493,12 @@ impl FixedSize for Group23Var1 {
                 value: cursor.read_u32_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u32_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -1213,6 +1514,13 @@ impl FixedSize for Group22Var6 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u16_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group22Var5 {
@@ -1227,6 +1535,13 @@ impl FixedSize for Group22Var5 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u32_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group22Var2 {
@@ -1239,6 +1554,12 @@ impl FixedSize for Group22Var2 {
                 value: cursor.read_u16_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u16_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -1253,6 +1574,12 @@ impl FixedSize for Group22Var1 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u32_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group21Var10 {
@@ -1265,6 +1592,11 @@ impl FixedSize for Group21Var10 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u16_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group21Var9 {
@@ -1276,6 +1608,11 @@ impl FixedSize for Group21Var9 {
                 value: cursor.read_u32_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u32_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -1291,6 +1628,13 @@ impl FixedSize for Group21Var6 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u16_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group21Var5 {
@@ -1305,6 +1649,13 @@ impl FixedSize for Group21Var5 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u32_le(self.value)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group21Var2 {
@@ -1317,6 +1668,12 @@ impl FixedSize for Group21Var2 {
                 value: cursor.read_u16_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u16_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -1331,6 +1688,12 @@ impl FixedSize for Group21Var1 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u32_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group20Var6 {
@@ -1343,6 +1706,11 @@ impl FixedSize for Group20Var6 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u16_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group20Var5 {
@@ -1354,6 +1722,11 @@ impl FixedSize for Group20Var5 {
                 value: cursor.read_u32_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u32_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -1368,6 +1741,12 @@ impl FixedSize for Group20Var2 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u16_le(self.value)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group20Var1 {
@@ -1380,6 +1759,12 @@ impl FixedSize for Group20Var1 {
                 value: cursor.read_u32_le()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u32_le(self.value)?;
+        Ok(())
     }
 }
 
@@ -1394,6 +1779,12 @@ impl FixedSize for Group13Var2 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group13Var1 {
@@ -1405,6 +1796,11 @@ impl FixedSize for Group13Var1 {
                 flags: cursor.read_u8()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        Ok(())
     }
 }
 
@@ -1422,6 +1818,15 @@ impl FixedSize for Group12Var1 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.code.as_u8())?;
+        cursor.write_u8(self.count)?;
+        cursor.write_u32_le(self.on_time)?;
+        cursor.write_u32_le(self.off_time)?;
+        cursor.write_u8(self.status.as_u8())?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group11Var2 {
@@ -1435,6 +1840,12 @@ impl FixedSize for Group11Var2 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group11Var1 {
@@ -1447,6 +1858,11 @@ impl FixedSize for Group11Var1 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group10Var2 {
@@ -1458,6 +1874,11 @@ impl FixedSize for Group10Var2 {
                 flags: cursor.read_u8()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        Ok(())
     }
 }
 
@@ -1472,6 +1893,12 @@ impl FixedSize for Group4Var3 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u16_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group4Var2 {
@@ -1485,6 +1912,12 @@ impl FixedSize for Group4Var2 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group4Var1 {
@@ -1497,6 +1930,11 @@ impl FixedSize for Group4Var1 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group3Var2 {
@@ -1508,6 +1946,11 @@ impl FixedSize for Group3Var2 {
                 flags: cursor.read_u8()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        Ok(())
     }
 }
 
@@ -1522,6 +1965,12 @@ impl FixedSize for Group2Var3 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u16_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group2Var2 {
@@ -1535,6 +1984,12 @@ impl FixedSize for Group2Var2 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_u48_le(self.time)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group2Var1 {
@@ -1547,6 +2002,11 @@ impl FixedSize for Group2Var1 {
             }
         )
     }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        Ok(())
+    }
 }
 
 impl FixedSize for Group1Var2 {
@@ -1558,5 +2018,10 @@ impl FixedSize for Group1Var2 {
                 flags: cursor.read_u8()?,
             }
         )
+    }
+    #[rustfmt::skip]
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        Ok(())
     }
 }

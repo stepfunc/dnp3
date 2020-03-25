@@ -93,4 +93,16 @@ impl ControlCode {
             op_type: OpType::from(x & Self::OP_MASK),
         }
     }
+    pub fn as_u8(self) -> u8 {
+        let mut x = 0;
+        x |= self.tcc.as_u8() << 6;
+        if self.clear {
+            x |= Self::CR_MASK;
+        }
+        if self.queue {
+            x |= Self::QU_MASK;
+        }
+        x |= self.op_type.as_u8();
+        x
+    }
 }

@@ -1,5 +1,5 @@
 use crate::app::parse::traits::FixedSize;
-use crate::util::cursor::{ReadCursor, ReadError};
+use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 
 #[derive(Debug, PartialEq)]
 pub struct Prefix<I, V>
@@ -23,5 +23,10 @@ where
             index: I::read(cursor)?,
             value: V::read(cursor)?,
         })
+    }
+
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.index.write(cursor)?;
+        self.value.write(cursor)
     }
 }

@@ -35,6 +35,22 @@ object ProtocolEnums extends Module {
       }
     }
 
+    def asValue: Iterator[String] = {
+      def last : Iterator[String] = {
+        if(model.captureUnknownValues) {
+          s"${model.name}::Unknown(x) => x,".eol
+        } else {
+          Iterator.empty
+        }
+      }
+
+      bracket("pub fn as_u8(self) -> u8") {
+        bracket("match self") {
+          model.values.iterator.map(v => s"${model.name}::${v.name} => ${model.render(v.value)},") ++ last
+        }
+      }
+    }
+
     model.comments.map(commented).iterator ++
     "#[derive(Copy, Clone, Debug, PartialEq)]".eol ++
     bracket(s"pub enum ${model.name}") {
@@ -45,7 +61,9 @@ object ProtocolEnums extends Module {
       }
     } ++ space ++
     bracket(s"impl ${model.name}") {
-      if(model.captureUnknownValues) fromValue else fromValueToOption
+      (if(model.captureUnknownValues) fromValue else fromValueToOption) ++
+      space ++
+      asValue
     }
   }
 

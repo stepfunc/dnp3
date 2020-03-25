@@ -31,6 +31,16 @@ impl TripCloseCode {
             _ => TripCloseCode::Unknown(x),
         }
     }
+
+    pub fn as_u8(self) -> u8 {
+        match self {
+            TripCloseCode::Nul => 0,
+            TripCloseCode::Close => 1,
+            TripCloseCode::Trip => 2,
+            TripCloseCode::Reserved => 3,
+            TripCloseCode::Unknown(x) => x,
+        }
+    }
 }
 
 /// Used in conjunction with the TCC field to specify a control operation
@@ -54,6 +64,17 @@ impl OpType {
             3 => OpType::LatchOn,
             4 => OpType::LatchOff,
             _ => OpType::Unknown(x),
+        }
+    }
+
+    pub fn as_u8(self) -> u8 {
+        match self {
+            OpType::Nul => 0,
+            OpType::PulseOn => 1,
+            OpType::PulseOff => 2,
+            OpType::LatchOn => 3,
+            OpType::LatchOff => 4,
+            OpType::Unknown(x) => x,
         }
     }
 }
@@ -132,6 +153,32 @@ impl CommandStatus {
             _ => CommandStatus::Unknown(x),
         }
     }
+
+    pub fn as_u8(self) -> u8 {
+        match self {
+            CommandStatus::Success => 0,
+            CommandStatus::Timeout => 1,
+            CommandStatus::NoSelect => 2,
+            CommandStatus::FormatError => 3,
+            CommandStatus::NotSupported => 4,
+            CommandStatus::AlreadyActive => 5,
+            CommandStatus::HardwareError => 6,
+            CommandStatus::Local => 7,
+            CommandStatus::TooManyOps => 8,
+            CommandStatus::NotAuthorized => 9,
+            CommandStatus::AutomationInhibit => 10,
+            CommandStatus::ProcessingLimited => 11,
+            CommandStatus::OutOfRange => 12,
+            CommandStatus::DownstreamLocal => 13,
+            CommandStatus::AlreadyComplete => 14,
+            CommandStatus::Blocked => 15,
+            CommandStatus::Canceled => 16,
+            CommandStatus::BlockedOtherMaster => 17,
+            CommandStatus::DownstreamFail => 18,
+            CommandStatus::NonParticipating => 126,
+            CommandStatus::Unknown(x) => x,
+        }
+    }
 }
 
 /// application object header types
@@ -159,6 +206,19 @@ impl QualifierCode {
             0x28 => Some(QualifierCode::CountAndPrefix16),
             0x5B => Some(QualifierCode::FreeFormat16),
             _ => None,
+        }
+    }
+
+    pub fn as_u8(self) -> u8 {
+        match self {
+            QualifierCode::Range8 => 0x0,
+            QualifierCode::Range16 => 0x1,
+            QualifierCode::AllObjects => 0x6,
+            QualifierCode::Count8 => 0x7,
+            QualifierCode::Count16 => 0x8,
+            QualifierCode::CountAndPrefix8 => 0x17,
+            QualifierCode::CountAndPrefix16 => 0x28,
+            QualifierCode::FreeFormat16 => 0x5B,
         }
     }
 }
@@ -271,6 +331,44 @@ impl FunctionCode {
             129 => Some(FunctionCode::Response),
             130 => Some(FunctionCode::UnsolicitedResponse),
             _ => None,
+        }
+    }
+
+    pub fn as_u8(self) -> u8 {
+        match self {
+            FunctionCode::Confirm => 0,
+            FunctionCode::Read => 1,
+            FunctionCode::Write => 2,
+            FunctionCode::Select => 3,
+            FunctionCode::Operate => 4,
+            FunctionCode::DirectOperate => 5,
+            FunctionCode::DirectOperateNoResponse => 6,
+            FunctionCode::ImmediateFreeze => 7,
+            FunctionCode::ImmediateFreezeNoResponse => 8,
+            FunctionCode::FreezeClear => 9,
+            FunctionCode::FreezeClearNoResponse => 10,
+            FunctionCode::FreezeAtTime => 11,
+            FunctionCode::FreezeAtTimeNoResponse => 12,
+            FunctionCode::ColdRestart => 13,
+            FunctionCode::WarmRestart => 14,
+            FunctionCode::InitializeData => 15,
+            FunctionCode::InitializeApplication => 16,
+            FunctionCode::StartApplication => 17,
+            FunctionCode::StopApplication => 18,
+            FunctionCode::SaveConfiguration => 19,
+            FunctionCode::EnabledUnsolicited => 20,
+            FunctionCode::DisableUnsolicited => 21,
+            FunctionCode::AssignClass => 22,
+            FunctionCode::DelayMeasure => 23,
+            FunctionCode::RecordCurrentTime => 24,
+            FunctionCode::OpenFile => 25,
+            FunctionCode::CloseFile => 26,
+            FunctionCode::DeleteFile => 27,
+            FunctionCode::GetFileInfo => 28,
+            FunctionCode::AuthenticateFile => 29,
+            FunctionCode::AbortFile => 30,
+            FunctionCode::Response => 129,
+            FunctionCode::UnsolicitedResponse => 130,
         }
     }
 }
