@@ -256,6 +256,10 @@ mod test {
     use crate::app::parse::prefix::Prefix;
     use crate::app::types::DoubleBit;
 
+    fn test_parse_error(input: &[u8], pt: ParseType, err: HeaderParseError) {
+        assert_eq!(HeaderParser::two_pass(pt, input).err().unwrap(), err);
+    }
+
     #[test]
     fn parses_app_request() {
         let fragment = &[0xC2, 0x02, 0xDE, 0xAD];
@@ -436,12 +440,10 @@ mod test {
 
     #[test]
     fn g110_variations_other_than_0_cannot_be_used_in_read() {
-        let input = [0x6E, 0x01, 0x00, 0x01, 0x02];
-        assert_eq!(
-            HeaderParser::two_pass(ParseType::Read, &input)
-                .err()
-                .unwrap(),
-            HeaderParseError::InvalidQualifierForVariation(Group110(1))
+        test_parse_error(
+            &[0x6E, 0x01, 0x00, 0x01, 0x02],
+            ParseType::Read,
+            HeaderParseError::InvalidQualifierForVariation(Group110(1)),
         );
     }
 
@@ -466,12 +468,10 @@ mod test {
 
     #[test]
     fn g110v0_cannot_be_used_in_non_read() {
-        let input = [0x6E, 0x00, 0x00, 0x01, 0x02];
-        assert_eq!(
-            HeaderParser::two_pass(ParseType::NonRead, &input)
-                .err()
-                .unwrap(),
-            HeaderParseError::ZeroLengthOctetData
+        test_parse_error(
+            &[0x6E, 0x00, 0x00, 0x01, 0x02],
+            ParseType::NonRead,
+            HeaderParseError::ZeroLengthOctetData,
         );
     }
 }
