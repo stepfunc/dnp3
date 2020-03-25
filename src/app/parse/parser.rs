@@ -62,8 +62,8 @@ pub fn parse_request(bytes: &[u8]) -> Result<Request, RequestParseError> {
         }
     };
     match function {
-        FunctionCode::Response => return Err(BadRequestFunction(function)),
-        FunctionCode::UnsolicitedResponse => return Err(BadRequestFunction(function)),
+        FunctionCode::Response => Err(BadRequestFunction(function)),
+        FunctionCode::UnsolicitedResponse => Err(BadRequestFunction(function)),
         _ => Ok(Request {
             control,
             function,

@@ -2,6 +2,26 @@ use crate::app::gen::enums::{OpType, TripCloseCode};
 use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+pub enum DoubleBit {
+    Intermediate,
+    DeterminedOff,
+    DeterminedOn,
+    Indeterminate,
+}
+
+impl DoubleBit {
+    // the lowest two bits of this number
+    pub fn from(x: u8) -> Self {
+        match x & 0b0000_0011 {
+            0b00 => DoubleBit::Intermediate,
+            0b01 => DoubleBit::DeterminedOff,
+            0b10 => DoubleBit::DeterminedOff,
+            _ => DoubleBit::Indeterminate,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Control {
     pub fir: bool,
     pub fin: bool,

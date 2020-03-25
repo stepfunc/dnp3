@@ -10,7 +10,6 @@ object Main {
   val appGenPath: Path = FileSystems.getDefault.getPath("../src/app/gen")
   val variationsPath: Path = appGenPath.resolve("variations")
 
-
   def modules : List[(Module, Path)] = List(
     (ProtocolEnums,  appGenPath.resolve("enums.rs")),
     (FixedSizeVariationModule,  variationsPath.resolve("fixed.rs")),
