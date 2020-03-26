@@ -25,6 +25,15 @@ pub enum ParseType {
     NonRead,
 }
 
+impl ParseType {
+    pub fn from(func: FunctionCode) -> Self {
+        match func {
+            FunctionCode::Read => ParseType::Read,
+            _ => ParseType::NonRead,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum HeaderParseError {
     UnknownGroupVariation(u8, u8),
@@ -44,10 +53,9 @@ pub enum ParseError {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Request<'a> {
+pub struct RequestHeader {
     pub control: Control,
     pub function: FunctionCode,
-    pub objects: &'a [u8],
 }
 
 #[derive(Debug, PartialEq)]
@@ -57,15 +65,14 @@ pub enum ResponseFunction {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Response<'a> {
+pub struct ResponseHeader {
     pub control: Control,
     pub function: ResponseFunction,
     pub iin: IIN,
-    pub objects: &'a [u8],
 }
 
-impl<'a> Request<'a> {
-    pub fn parse(bytes: &[u8]) -> Result<Request, ParseError> {
+impl RequestHeader {
+    pub fn parse(bytes: &[u8]) -> Result<(Self, &[u8]), ParseError> {
         let mut cursor = ReadCursor::new(bytes);
         let control = Control::parse(&mut cursor)?;
         let function: FunctionCode = {
@@ -78,17 +85,13 @@ impl<'a> Request<'a> {
         match function {
             FunctionCode::Response => Err(ParseError::BadFunction(function)),
             FunctionCode::UnsolicitedResponse => Err(ParseError::BadFunction(function)),
-            _ => Ok(Request {
-                control,
-                function,
-                objects: cursor.read_all(),
-            }),
+            _ => Ok((RequestHeader { control, function }, cursor.read_all())),
         }
     }
 }
 
-impl<'a> Response<'a> {
-    pub fn parse(bytes: &[u8]) -> Result<Response, ParseError> {
+impl ResponseHeader {
+    pub fn parse(bytes: &[u8]) -> Result<(Self, &[u8]), ParseError> {
         let mut cursor = ReadCursor::new(bytes);
         let control = Control::parse(&mut cursor)?;
         let function: ResponseFunction = {
@@ -101,12 +104,14 @@ impl<'a> Response<'a> {
             }
         };
         let iin = IIN::parse(&mut cursor)?;
-        Ok(Response {
-            control,
-            function,
-            iin,
-            objects: cursor.read_all(),
-        })
+        Ok((
+            ResponseHeader {
+                control,
+                function,
+                iin,
+            },
+            cursor.read_all(),
+        ))
     }
 }
 
@@ -323,8 +328,8 @@ mod test {
     #[test]
     fn parses_app_request() {
         let fragment = &[0xC2, 0x02, 0xDE, 0xAD];
-        let request = Request::parse(fragment).unwrap();
-        let expected = Request {
+        let (header, trailer) = RequestHeader::parse(fragment).unwrap();
+        let expected = RequestHeader {
             control: Control {
                 fir: true,
                 fin: true,
@@ -333,17 +338,17 @@ mod test {
                 seq: 0x02,
             },
             function: FunctionCode::Write,
-            objects: &[0xDE, 0xAD],
         };
 
-        assert_eq!(request, expected);
+        assert_eq!(header, expected);
+        assert_eq!(trailer, [0xDE, 0xAD]);
     }
 
     #[test]
     fn parses_app_response() {
         let fragment = &[0xC2, 0x82, 0xFF, 0xAA, 0xDE, 0xAD];
-        let response = Response::parse(fragment).unwrap();
-        let expected = Response {
+        let (header, objects) = ResponseHeader::parse(fragment).unwrap();
+        let expected = ResponseHeader {
             control: Control {
                 fir: true,
                 fin: true,
@@ -356,10 +361,10 @@ mod test {
                 iin1: 0xFF,
                 iin2: 0xAA,
             },
-            objects: &[0xDE, 0xAD],
         };
 
-        assert_eq!(response, expected);
+        assert_eq!(header, expected);
+        assert_eq!(objects, &[0xDE, 0xAD]);
     }
 
     #[test]

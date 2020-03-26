@@ -1,25 +1,19 @@
-use dnp3rs::app::gen::enums::FunctionCode;
-use dnp3rs::app::parse::parser::{HeaderParser, ParseType, Request};
+use dnp3rs::app::parse::parser::{HeaderParser, ParseType, RequestHeader};
 use dnp3rs::transport::reader::Reader;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use tokio::net::TcpListener;
 
 fn parse_asdu(data: &[u8]) {
-    let request = match Request::parse(data) {
+    let (header, objects) = match RequestHeader::parse(data) {
         Err(e) => {
             log::warn!("bad request: {:?}", e);
             return;
         }
-        Ok(request) => request,
+        Ok(x) => x,
     };
 
-    let mode: ParseType = match request.function {
-        FunctionCode::Read => ParseType::Read,
-        _ => ParseType::NonRead,
-    };
-
-    if let Err(e) = HeaderParser::parse(mode, request.objects) {
+    if let Err(e) = HeaderParser::parse(ParseType::from(header.function), objects) {
         log::warn!("bad header: {:?}", e);
     }
 }
