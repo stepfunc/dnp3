@@ -130,7 +130,7 @@ impl ResponseHeader {
 
     pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.control.write(cursor)?;
-        cursor.write_u8(self.function.to_function().as_u8())?;
+        self.function.to_function().write(cursor)?;
         self.iin.write(cursor)?;
         Ok(())
     }
