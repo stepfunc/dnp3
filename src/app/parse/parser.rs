@@ -6,7 +6,7 @@ use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::parse::range::{InvalidRange, Range};
 use crate::app::types::{Control, IIN};
-use crate::util::cursor::{ReadCursor, ReadError};
+use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 
 #[derive(Debug, PartialEq)]
 pub enum ObjectHeader<'a> {
@@ -72,6 +72,15 @@ pub enum ResponseFunction {
     Unsolicited,
 }
 
+impl ResponseFunction {
+    pub fn to_function(&self) -> FunctionCode {
+        match self {
+            ResponseFunction::Solicited => FunctionCode::Response,
+            ResponseFunction::Unsolicited => FunctionCode::UnsolicitedResponse,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct ResponseHeader {
     pub control: Control,
@@ -95,6 +104,12 @@ impl RequestHeader {
         };
         Ok(Self { control, function })
     }
+
+    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.control.write(cursor)?;
+        cursor.write_u8(self.function.as_u8())?;
+        Ok(())
+    }
 }
 
 impl ResponseHeader {
@@ -111,6 +126,13 @@ impl ResponseHeader {
             function,
             iin,
         })
+    }
+
+    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.control.write(cursor)?;
+        cursor.write_u8(self.function.to_function().as_u8())?;
+        self.iin.write(cursor)?;
+        Ok(())
     }
 }
 

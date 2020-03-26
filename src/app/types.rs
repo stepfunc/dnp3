@@ -1,5 +1,5 @@
 use crate::app::gen::enums::{OpType, TripCloseCode};
-use crate::util::cursor::{ReadCursor, ReadError};
+use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DoubleBit {
@@ -47,8 +47,30 @@ impl Control {
         }
     }
 
+    pub fn to_u8(self) -> u8 {
+        let mut x: u8 = 0;
+        if self.fir {
+            x |= Self::FIR_MASK;
+        }
+        if self.fin {
+            x |= Self::FIN_MASK;
+        }
+        if self.con {
+            x |= Self::CON_MASK;
+        }
+        if self.uns {
+            x |= Self::UNS_MASK;
+        }
+        x |= self.seq & Self::SEQ_MASK;
+        x
+    }
+
     pub fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(Self::from(cursor.read_u8()?))
+    }
+
+    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        Ok(cursor.write_u8(self.to_u8())?)
     }
 }
 
@@ -68,6 +90,12 @@ impl IIN {
             iin1: cursor.read_u8()?,
             iin2: cursor.read_u8()?,
         })
+    }
+
+    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.iin1)?;
+        cursor.write_u8(self.iin2)?;
+        Ok(())
     }
 }
 

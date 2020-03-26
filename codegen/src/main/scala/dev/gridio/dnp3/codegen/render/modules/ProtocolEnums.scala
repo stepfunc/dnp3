@@ -51,23 +51,39 @@ object ProtocolEnums extends Module {
       }
     }
 
-    model.comments.map(commented).iterator ++
-    "#[derive(Copy, Clone, Debug, PartialEq)]".eol ++
-    bracket(s"pub enum ${model.name}") {
-      if(model.captureUnknownValues) {
-        values ++ Iterator(commented("captures any value not defined in the enumeration"), "Unknown(u8),")
-      } else {
-        values
-      }
-    } ++ space ++
-    bracket(s"impl ${model.name}") {
-      (if(model.captureUnknownValues) fromValue else fromValueToOption) ++
-      space ++
-      asValue
+    def enumDefinition : Iterator[String] = {
+      model.comments.map(commented).iterator ++
+        "#[derive(Copy, Clone, Debug, PartialEq)]".eol ++
+        bracket(s"pub enum ${model.name}") {
+          if(model.captureUnknownValues) {
+            values ++ Iterator(commented("captures any value not defined in the enumeration"), "Unknown(u8),")
+          } else {
+            values
+          }
+        }
     }
+
+    def write : Iterator[String] = {
+      bracket("pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError>") {
+        s"cursor.write_u8(self.as_u8())".eol
+      }
+    }
+
+    def enumImpl : Iterator[String] = {
+      bracket(s"impl ${model.name}") {
+        (if(model.captureUnknownValues) fromValue else fromValueToOption) ++
+          space ++
+          asValue ++
+          space ++
+          write
+      }
+    }
+
+    enumDefinition ++ space ++ enumImpl
   }
 
   override def lines(implicit indentation: Indentation): Iterator[String] = {
+    "use crate::util::cursor::{WriteCursor, WriteError};".eol ++ space ++
     spaced(enums.map(m => lines(m)).iterator)
   }
 }

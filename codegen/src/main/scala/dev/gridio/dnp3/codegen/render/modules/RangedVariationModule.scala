@@ -10,7 +10,7 @@ object RangedVariationModule extends Module {
       "use crate::app::gen::variations::fixed::*;".eol ++
       "use crate::app::gen::variations::gv::Variation;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
-      "use crate::app::parse::parser::HeaderParseError;".eol ++
+      "use crate::app::parse::parser::ObjectParseError;".eol ++
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
       space ++
@@ -61,7 +61,7 @@ object RangedVariationModule extends Module {
       }
 
       case v : SizedByVariation => {
-        s"Variation::${v.parent.name}(0) => Err(HeaderParseError::ZeroLengthOctetData),".eol ++
+        s"Variation::${v.parent.name}(0) => Err(ObjectParseError::ZeroLengthOctetData),".eol ++
         bracketComma(s"Variation::${v.parent.name}(x) =>") {
           s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesSequence::parse(x, range.get_start(), range.get_count(), cursor)?))".eol
         }
@@ -85,14 +85,14 @@ object RangedVariationModule extends Module {
 
     bracket("impl<'a> RangedVariation<'a>") {
       "#[rustfmt::skip]".eol ++
-      bracket("pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, HeaderParseError>") {
+      bracket("pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
         bracket("match v") {
-          variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(HeaderParseError::InvalidQualifierForVariation(v)),".eol
+          variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
         }
       } ++ space ++
-        bracket("pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, HeaderParseError>") {
+        bracket("pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ObjectParseError>") {
           bracket("match v") {
-            variations.flatMap(getReadMatcher).iterator ++ "_ => Err(HeaderParseError::InvalidQualifierForVariation(v)),".eol
+            variations.flatMap(getReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
           }
         }
     }

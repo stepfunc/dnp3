@@ -10,6 +10,8 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::util::cursor::{WriteCursor, WriteError};
+
 /// This field is used in conjunction with the Op Type field to specify a control operation
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TripCloseCode {
@@ -40,6 +42,10 @@ impl TripCloseCode {
             TripCloseCode::Reserved => 3,
             TripCloseCode::Unknown(x) => x,
         }
+    }
+
+    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.as_u8())
     }
 }
 
@@ -76,6 +82,10 @@ impl OpType {
             OpType::LatchOff => 4,
             OpType::Unknown(x) => x,
         }
+    }
+
+    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.as_u8())
     }
 }
 
@@ -179,6 +189,10 @@ impl CommandStatus {
             CommandStatus::Unknown(x) => x,
         }
     }
+
+    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.as_u8())
+    }
 }
 
 /// application object header types
@@ -220,6 +234,10 @@ impl QualifierCode {
             QualifierCode::CountAndPrefix16 => 0x28,
             QualifierCode::FreeFormat16 => 0x5B,
         }
+    }
+
+    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.as_u8())
     }
 }
 
@@ -370,5 +388,9 @@ impl FunctionCode {
             FunctionCode::Response => 129,
             FunctionCode::UnsolicitedResponse => 130,
         }
+    }
+
+    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.as_u8())
     }
 }
