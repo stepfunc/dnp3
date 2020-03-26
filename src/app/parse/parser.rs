@@ -371,7 +371,7 @@ mod test {
     }
 
     #[test]
-    fn parses_app_request() {
+    fn parses_valid_request() {
         let fragment = &[0xC2, 0x02, 0xAA];
         let request = Request::parse(fragment).unwrap();
         let expected = RequestHeader {
@@ -387,11 +387,15 @@ mod test {
 
         assert_eq!(request.header, expected);
         assert_eq!(request.objects, &[0xAA]);
+        assert_eq!(
+            request.parse_objects().err().unwrap(),
+            ObjectParseError::InsufficientBytes
+        )
     }
 
     #[test]
-    fn parses_app_response() {
-        let fragment = &[0xC2, 0x82, 0xFF, 0xAA, 0xDE, 0xAD];
+    fn parses_valid_response() {
+        let fragment = &[0xC2, 0x82, 0xFF, 0xAA, 0x01, 0x02];
         let response = Response::parse(fragment).unwrap();
         let expected = ResponseHeader {
             control: Control {
@@ -409,7 +413,11 @@ mod test {
         };
 
         assert_eq!(response.header, expected);
-        assert_eq!(response.objects, &[0xDE, 0xAD]);
+        assert_eq!(response.objects, &[0x01, 0x02]);
+        assert_eq!(
+            response.parse_objects().err().unwrap(),
+            ObjectParseError::InsufficientBytes
+        )
     }
 
     #[test]
