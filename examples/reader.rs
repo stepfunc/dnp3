@@ -1,22 +1,8 @@
-use dnp3rs::app::parse::parser::{HeaderParser, ParseType, RequestHeader};
+use dnp3rs::app::parse::parser::Request;
 use dnp3rs::transport::reader::Reader;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use tokio::net::TcpListener;
-
-fn parse_asdu(data: &[u8]) {
-    let (header, objects) = match RequestHeader::parse(data) {
-        Err(e) => {
-            log::warn!("bad request: {:?}", e);
-            return;
-        }
-        Ok(x) => x,
-    };
-
-    if let Err(e) = HeaderParser::parse(ParseType::from(header.function), objects) {
-        log::warn!("bad header: {:?}", e);
-    }
-}
 
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -31,6 +17,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         let asdu = reader.read(&mut socket).await.unwrap();
 
-        parse_asdu(asdu.data)
+        match Request::parse(asdu.data) {
+            Err(err) => {
+                log::warn!("bad request: {:?}", err);
+            }
+            Ok(request) => {
+                if let Err(err) = request.parse_objects() {
+                    log::warn!("bad request object: {:?}", err);
+                }
+            }
+        }
     }
 }

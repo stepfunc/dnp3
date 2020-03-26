@@ -13,7 +13,7 @@
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::HeaderParseError;
+use crate::app::parse::parser::ObjectParseError;
 use crate::util::cursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]
@@ -29,7 +29,7 @@ pub enum CountVariation<'a> {
 
 impl<'a> CountVariation<'a> {
     #[rustfmt::skip]
-    pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, HeaderParseError> {
+    pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group50Var1 => Ok(CountVariation::Group50Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group50Var3 => Ok(CountVariation::Group50Var3(CountSequence::parse(count, cursor)?)),
@@ -38,7 +38,7 @@ impl<'a> CountVariation<'a> {
             Variation::Group51Var2 => Ok(CountVariation::Group51Var2(CountSequence::parse(count, cursor)?)),
             Variation::Group52Var1 => Ok(CountVariation::Group52Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group52Var2 => Ok(CountVariation::Group52Var2(CountSequence::parse(count, cursor)?)),
-            _ => Err(HeaderParseError::InvalidQualifierForVariation(v)),
+            _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
         }
     }
 }

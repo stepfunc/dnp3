@@ -14,7 +14,7 @@ use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::parse::bytes::PrefixedBytesSequence;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::HeaderParseError;
+use crate::app::parse::parser::ObjectParseError;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::ReadCursor;
@@ -83,7 +83,7 @@ where
     I: FixedSize,
 {
     #[rustfmt::skip]
-    pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, HeaderParseError> {
+    pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
         match v {
             Variation::Group2Var1 => Ok(PrefixedVariation::Group2Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group2Var2 => Ok(PrefixedVariation::Group2Var2(CountSequence::parse(count, cursor)?)),
@@ -136,9 +136,9 @@ where
             Variation::Group43Var6 => Ok(PrefixedVariation::Group43Var6(CountSequence::parse(count, cursor)?)),
             Variation::Group43Var7 => Ok(PrefixedVariation::Group43Var7(CountSequence::parse(count, cursor)?)),
             Variation::Group43Var8 => Ok(PrefixedVariation::Group43Var8(CountSequence::parse(count, cursor)?)),
-            Variation::Group111(0) => Err(HeaderParseError::ZeroLengthOctetData),
+            Variation::Group111(0) => Err(ObjectParseError::ZeroLengthOctetData),
             Variation::Group111(x) => Ok(PrefixedVariation::Group111VarX(x, PrefixedBytesSequence::parse(x, count, cursor)?)),
-            _ => Err(HeaderParseError::InvalidQualifierForVariation(v)),
+            _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
         }
     }
 }
