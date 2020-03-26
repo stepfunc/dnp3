@@ -1,12 +1,12 @@
 use dnp3rs::app::gen::enums::FunctionCode;
-use dnp3rs::app::parse::parser::{parse_request, HeaderParser, ParseType};
+use dnp3rs::app::parse::parser::{HeaderParser, ParseType, Request};
 use dnp3rs::transport::reader::Reader;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use tokio::net::TcpListener;
 
 fn parse_asdu(data: &[u8]) {
-    let request = match parse_request(data) {
+    let request = match Request::parse(data) {
         Err(e) => {
             log::warn!("bad request: {:?}", e);
             return;

@@ -4,9 +4,8 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
-use crate::app::parse::parser::RequestParseError::BadRequestFunction;
 use crate::app::parse::range::{InvalidRange, Range};
-use crate::app::types::Control;
+use crate::app::types::{Control, IIN};
 use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Debug, PartialEq)]
@@ -38,10 +37,10 @@ pub enum HeaderParseError {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum RequestParseError {
+pub enum ParseError {
     UnknownFunction(u8),
     InsufficientBytes,
-    BadRequestFunction(FunctionCode),
+    BadFunction(FunctionCode),
 }
 
 #[derive(Debug, PartialEq)]
@@ -51,24 +50,63 @@ pub struct Request<'a> {
     pub objects: &'a [u8],
 }
 
-pub fn parse_request(bytes: &[u8]) -> Result<Request, RequestParseError> {
-    let mut cursor = ReadCursor::new(bytes);
-    let control = Control::parse(&mut cursor)?;
-    let function: FunctionCode = {
-        let raw_func = cursor.read_u8()?;
-        match FunctionCode::from(raw_func) {
-            None => return Err(RequestParseError::UnknownFunction(raw_func)),
-            Some(func) => func,
+#[derive(Debug, PartialEq)]
+pub enum ResponseFunction {
+    Solicited,
+    Unsolicited,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Response<'a> {
+    pub control: Control,
+    pub function: ResponseFunction,
+    pub iin: IIN,
+    pub objects: &'a [u8],
+}
+
+impl<'a> Request<'a> {
+    pub fn parse(bytes: &[u8]) -> Result<Request, ParseError> {
+        let mut cursor = ReadCursor::new(bytes);
+        let control = Control::parse(&mut cursor)?;
+        let function: FunctionCode = {
+            let raw_func = cursor.read_u8()?;
+            match FunctionCode::from(raw_func) {
+                None => return Err(ParseError::UnknownFunction(raw_func)),
+                Some(func) => func,
+            }
+        };
+        match function {
+            FunctionCode::Response => Err(ParseError::BadFunction(function)),
+            FunctionCode::UnsolicitedResponse => Err(ParseError::BadFunction(function)),
+            _ => Ok(Request {
+                control,
+                function,
+                objects: cursor.read_all(),
+            }),
         }
-    };
-    match function {
-        FunctionCode::Response => Err(BadRequestFunction(function)),
-        FunctionCode::UnsolicitedResponse => Err(BadRequestFunction(function)),
-        _ => Ok(Request {
+    }
+}
+
+impl<'a> Response<'a> {
+    pub fn parse(bytes: &[u8]) -> Result<Response, ParseError> {
+        let mut cursor = ReadCursor::new(bytes);
+        let control = Control::parse(&mut cursor)?;
+        let function: ResponseFunction = {
+            let raw_func = cursor.read_u8()?;
+            match FunctionCode::from(raw_func) {
+                None => return Err(ParseError::UnknownFunction(raw_func)),
+                Some(FunctionCode::Response) => ResponseFunction::Solicited,
+                Some(FunctionCode::UnsolicitedResponse) => ResponseFunction::Unsolicited,
+                Some(f) => return Err(ParseError::BadFunction(f)),
+            }
+        };
+        let iin = IIN::parse(&mut cursor)?;
+        Ok(Response {
             control,
             function,
+            iin,
             objects: cursor.read_all(),
-        }),
+        })
     }
 }
 
@@ -224,9 +262,9 @@ impl std::convert::From<ReadError> for HeaderParseError {
     }
 }
 
-impl std::convert::From<ReadError> for RequestParseError {
+impl std::convert::From<ReadError> for ParseError {
     fn from(_: ReadError) -> Self {
-        RequestParseError::InsufficientBytes
+        ParseError::InsufficientBytes
     }
 }
 
@@ -285,7 +323,7 @@ mod test {
     #[test]
     fn parses_app_request() {
         let fragment = &[0xC2, 0x02, 0xDE, 0xAD];
-        let request = parse_request(fragment).unwrap();
+        let request = Request::parse(fragment).unwrap();
         let expected = Request {
             control: Control {
                 fir: true,
@@ -299,6 +337,29 @@ mod test {
         };
 
         assert_eq!(request, expected);
+    }
+
+    #[test]
+    fn parses_app_response() {
+        let fragment = &[0xC2, 0x82, 0xFF, 0xAA, 0xDE, 0xAD];
+        let response = Response::parse(fragment).unwrap();
+        let expected = Response {
+            control: Control {
+                fir: true,
+                fin: true,
+                con: false,
+                uns: false,
+                seq: 0x02,
+            },
+            function: ResponseFunction::Unsolicited,
+            iin: IIN {
+                iin1: 0xFF,
+                iin2: 0xAA,
+            },
+            objects: &[0xDE, 0xAD],
+        };
+
+        assert_eq!(response, expected);
     }
 
     #[test]

@@ -54,8 +54,8 @@ impl Control {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct IIN {
-    iin1: u8,
-    iin2: u8,
+    pub iin1: u8,
+    pub iin2: u8,
 }
 
 impl IIN {
