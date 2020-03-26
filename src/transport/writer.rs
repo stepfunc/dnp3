@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::link::formatter::{LinkFormatter, Payload};
+use crate::transport::sequence::Sequence;
 use crate::util::cursor::WriteCursor;
-use crate::util::sequence::Sequence;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 pub struct Writer {
@@ -27,7 +27,7 @@ impl Writer {
     pub fn new(source: u16, master: bool) -> Self {
         Self {
             formatter: LinkFormatter::new(master, source),
-            seq: Sequence::transport(),
+            seq: Sequence::new(),
             buffer: [0; crate::link::constant::MAX_LINK_FRAME_LENGTH],
         }
     }

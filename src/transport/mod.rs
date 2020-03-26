@@ -1,5 +1,6 @@
 pub mod header;
 pub mod reader;
+pub mod sequence;
 pub mod writer;
 
 pub mod constants {
