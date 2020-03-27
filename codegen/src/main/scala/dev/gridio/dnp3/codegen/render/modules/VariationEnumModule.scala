@@ -31,27 +31,49 @@ object VariationEnumModule extends Module {
       }
     }
 
-    def matchVariation(g : ObjectGroup): Iterator[String] = {
-
-      if (isSizedByVariation(g)) {
-        s"${g.group} => Some(Variation::${g.name}(var)),".eol
-      } else {
-        bracketComma(s"${g.group} => match var") {
-          g.variations.iterator.flatMap { v =>
-            s"${v.variation} => Some(Variation::${v.name}),".eol
-          } ++ "_ => None,".eol
+    def lookupFn : Iterator[String] = {
+      def matchVariation(g : ObjectGroup): Iterator[String] = {
+        if (isSizedByVariation(g)) {
+          s"${g.group} => Some(Variation::${g.name}(var)),".eol
+        } else {
+          bracketComma(s"${g.group} => match var") {
+            g.variations.iterator.flatMap { v =>
+              s"${v.variation} => Some(Variation::${v.name}),".eol
+            } ++ "_ => None,".eol
+          }
         }
       }
 
-
-    }
-
-    bracket("impl Variation") {
       bracket("pub fn lookup(group: u8, var: u8) -> Option<Variation>") {
         bracket("match group") {
           ObjectGroup.all.iterator.flatMap(matchVariation) ++ "_ => None,".eol
         }
       }
+    }
+
+    def getGroupVarFn : Iterator[String] = {
+      def matchVariation(v : Variation): Iterator[String] = {
+        v match {
+          case _ : SizedByVariation => {
+            s"Variation::${v.parent.name}(x) => (${v.parent.group}, x),".eol
+          }
+          case _ => {
+            s"Variation::${v.name} => (${v.group}, ${v.variation}),".eol
+          }
+        }
+      }
+
+      bracket("pub fn to_group_and_var(self) -> (u8, u8)") {
+        bracket("match self") {
+          ObjectGroup.allVariations.iterator.flatMap(matchVariation)
+        }
+      }
+    }
+
+
+
+    bracket("impl Variation") {
+      lookupFn ++ space ++ getGroupVarFn
     }
 
   }

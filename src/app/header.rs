@@ -17,6 +17,16 @@ impl Control {
     const CON_MASK: u8 = 0b0010_0000;
     const UNS_MASK: u8 = 0b0001_0000;
 
+    pub fn request(seq: Sequence) -> Self {
+        Self {
+            fir: true,
+            fin: true,
+            con: false,
+            uns: false,
+            seq,
+        }
+    }
+
     pub fn from(x: u8) -> Self {
         Self {
             fir: x & Self::FIR_MASK != 0,
@@ -108,6 +118,10 @@ pub struct ResponseHeader {
 }
 
 impl RequestHeader {
+    pub fn new(control: Control, function: FunctionCode) -> Self {
+        Self { control, function }
+    }
+
     pub fn parse(cursor: &mut ReadCursor) -> Result<Self, HeaderParseError> {
         let control = Control::from(cursor.read_u8()?);
         let raw_func = cursor.read_u8()?;
