@@ -126,6 +126,14 @@ impl RequestHeader {
 }
 
 impl ResponseFunction {
+    pub fn from(function: FunctionCode) -> Option<Self> {
+        match function {
+            FunctionCode::Response => Some(ResponseFunction::Solicited),
+            FunctionCode::UnsolicitedResponse => Some(ResponseFunction::Unsolicited),
+            _ => None,
+        }
+    }
+
     pub fn to_function(self) -> FunctionCode {
         match self {
             ResponseFunction::Solicited => FunctionCode::Response,
@@ -138,10 +146,9 @@ impl ResponseHeader {
     pub fn parse(cursor: &mut ReadCursor) -> Result<Self, HeaderParseError> {
         let header = RequestHeader::parse(cursor)?;
         let iin = IIN::parse(cursor)?;
-        let function = match header.function {
-            FunctionCode::Response => ResponseFunction::Solicited,
-            FunctionCode::UnsolicitedResponse => ResponseFunction::Unsolicited,
-            _ => return Err(HeaderParseError::BadFunction(header.function)),
+        let function = match ResponseFunction::from(header.function) {
+            Some(x) => x,
+            None => return Err(HeaderParseError::BadFunction(header.function)),
         };
         Ok(Self {
             control: header.control,

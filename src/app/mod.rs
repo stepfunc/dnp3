@@ -1,3 +1,4 @@
+pub mod format;
 pub mod header;
 pub mod parse;
 pub mod sequence;
