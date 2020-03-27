@@ -4,9 +4,9 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
+use crate::app::header::{HeaderParseError, RequestHeader, ResponseHeader};
 use crate::app::parse::range::{InvalidRange, Range};
-use crate::app::types::{Control, IIN};
-use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
+use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Debug, PartialEq)]
 pub enum ObjectHeader<'a> {
@@ -30,21 +30,6 @@ pub enum ObjectParseError {
     ZeroLengthOctetData,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum HeaderParseError {
-    UnknownFunction(u8),
-    InsufficientBytes,
-    UnsolicitedBitNotAllowed(FunctionCode),
-    BadFirAndFin(Control),
-    BadFunction(FunctionCode),
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct RequestHeader {
-    pub control: Control,
-    pub function: FunctionCode,
-}
-
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Request<'a> {
     pub header: RequestHeader,
@@ -52,73 +37,9 @@ pub struct Request<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ResponseFunction {
-    Solicited,
-    Unsolicited,
-}
-
-impl ResponseFunction {
-    pub fn to_function(&self) -> FunctionCode {
-        match self {
-            ResponseFunction::Solicited => FunctionCode::Response,
-            ResponseFunction::Unsolicited => FunctionCode::UnsolicitedResponse,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct ResponseHeader {
-    pub control: Control,
-    pub function: ResponseFunction,
-    pub iin: IIN,
-}
-
-#[derive(Debug, PartialEq)]
 pub struct Response<'a> {
     pub header: ResponseHeader,
     pub objects: &'a [u8],
-}
-
-impl RequestHeader {
-    pub fn parse(cursor: &mut ReadCursor) -> Result<Self, HeaderParseError> {
-        let control = Control::from(cursor.read_u8()?);
-        let raw_func = cursor.read_u8()?;
-        let function = match FunctionCode::from(raw_func) {
-            None => return Err(HeaderParseError::UnknownFunction(raw_func)),
-            Some(x) => x,
-        };
-        Ok(Self { control, function })
-    }
-
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        self.control.write(cursor)?;
-        cursor.write_u8(self.function.as_u8())?;
-        Ok(())
-    }
-}
-
-impl ResponseHeader {
-    pub fn parse(cursor: &mut ReadCursor) -> Result<Self, HeaderParseError> {
-        let header = RequestHeader::parse(cursor)?;
-        let iin = IIN::parse(cursor)?;
-        let function = match header.function {
-            FunctionCode::Response => ResponseFunction::Solicited,
-            FunctionCode::UnsolicitedResponse => ResponseFunction::Unsolicited,
-            _ => return Err(HeaderParseError::BadFunction(header.function)),
-        };
-        Ok(Self {
-            control: header.control,
-            function,
-            iin,
-        })
-    }
-
-    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        self.control.write(cursor)?;
-        self.function.to_function().write(cursor)?;
-        self.iin.write(cursor)?;
-        Ok(())
-    }
 }
 
 impl<'a> Request<'a> {
@@ -358,6 +279,7 @@ mod test {
     use crate::app::gen::enums::CommandStatus;
     use crate::app::gen::variations::fixed::*;
     use crate::app::gen::variations::gv::Variation::Group110;
+    use crate::app::header::{Control, ResponseFunction, IIN};
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::prefix::Prefix;
     use crate::app::sequence::Sequence;
