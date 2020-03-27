@@ -15,7 +15,7 @@ impl Sequence {
         }
     }
 
-    pub fn value(&self) -> u8 {
+    pub fn value(self) -> u8 {
         self.value
     }
 
@@ -29,7 +29,7 @@ impl Sequence {
         self.value = 0;
     }
 
-    pub fn next_value(&self) -> u8 {
+    pub fn next_value(self) -> u8 {
         Self::calc_next(self.value)
     }
 

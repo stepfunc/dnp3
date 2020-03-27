@@ -19,21 +19,6 @@ pub enum ObjectHeader<'a> {
     TwoByteCountAndPrefix(u16, PrefixedVariation<'a, u16>),
 }
 
-#[derive(Copy, Clone)]
-pub enum ParseType {
-    Read,
-    NonRead,
-}
-
-impl ParseType {
-    pub fn from(func: FunctionCode) -> Self {
-        match func {
-            FunctionCode::Read => ParseType::Read,
-            _ => ParseType::NonRead,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub enum ObjectParseError {
     UnknownGroupVariation(u8, u8),
@@ -105,7 +90,7 @@ impl RequestHeader {
         Ok(Self { control, function })
     }
 
-    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.control.write(cursor)?;
         cursor.write_u8(self.function.as_u8())?;
         Ok(())
@@ -140,10 +125,7 @@ impl<'a> Request<'a> {
     pub fn parse_objects(
         &self,
     ) -> Result<impl Iterator<Item = ObjectHeader<'a>>, ObjectParseError> {
-        Ok(ObjectParser::parse(
-            ParseType::from(self.header.function),
-            self.objects,
-        )?)
+        Ok(ObjectParser::parse(self.header.function, self.objects)?)
     }
 
     pub fn parse(bytes: &'a [u8]) -> Result<Self, HeaderParseError> {
@@ -173,7 +155,10 @@ impl<'a> Response<'a> {
     pub fn parse_objects(
         &self,
     ) -> Result<impl Iterator<Item = ObjectHeader<'a>>, ObjectParseError> {
-        Ok(ObjectParser::parse(ParseType::NonRead, self.objects)?)
+        Ok(ObjectParser::parse(
+            self.header.function.to_function(),
+            self.objects,
+        )?)
     }
 
     pub fn parse(bytes: &'a [u8]) -> Result<Self, HeaderParseError> {
@@ -188,33 +173,33 @@ impl<'a> Response<'a> {
 
 pub struct ObjectParser<'a> {
     errored: bool,
-    parse_type: ParseType,
+    function: FunctionCode,
     cursor: ReadCursor<'a>,
 }
 
 impl<'a> ObjectParser<'a> {
     pub fn parse(
-        parse_type: ParseType,
+        function: FunctionCode,
         data: &'a [u8],
     ) -> Result<impl Iterator<Item = ObjectHeader<'a>>, ObjectParseError> {
         // we first do a single pass to ensure the ASDU is well-formed, returning an error if it occurs
-        for x in ObjectParser::one_pass(parse_type, data) {
+        for x in ObjectParser::one_pass(function, data) {
             if let Err(e) = x {
                 return Err(e);
             }
         }
 
         // on the 2nd pass, we can unwrap b/c it can't possibly panic
-        Ok(ObjectParser::one_pass(parse_type, data).map(|h| h.unwrap()))
+        Ok(ObjectParser::one_pass(function, data).map(|h| h.unwrap()))
     }
 
     fn one_pass(
-        parse_type: ParseType,
+        function: FunctionCode,
         data: &'a [u8],
     ) -> impl Iterator<Item = Result<ObjectHeader<'a>, ObjectParseError>> {
         ObjectParser {
             cursor: ReadCursor::new(data),
-            parse_type,
+            function,
             errored: false,
         }
     }
@@ -271,7 +256,7 @@ impl<'a> ObjectParser<'a> {
         let start = self.cursor.read_u8()?;
         let stop = self.cursor.read_u8()?;
         let range = Range::from(start as u16, stop as u16)?;
-        let data = RangedVariation::parse(self.parse_type, gv, range, &mut self.cursor)?;
+        let data = RangedVariation::parse(self.function, gv, range, &mut self.cursor)?;
         Ok(ObjectHeader::OneByteStartStop(start, stop, data))
     }
 
@@ -282,7 +267,7 @@ impl<'a> ObjectParser<'a> {
         let start = self.cursor.read_u16_le()?;
         let stop = self.cursor.read_u16_le()?;
         let range = Range::from(start, stop)?;
-        let data = RangedVariation::parse(self.parse_type, gv, range, &mut self.cursor)?;
+        let data = RangedVariation::parse(self.function, gv, range, &mut self.cursor)?;
         Ok(ObjectHeader::TwoByteStartStop(start, stop, data))
     }
 
@@ -326,14 +311,14 @@ impl Variation {
 
 impl<'a> RangedVariation<'a> {
     pub fn parse(
-        parse_type: ParseType,
+        function: FunctionCode,
         v: Variation,
         range: Range,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<RangedVariation<'a>, ObjectParseError> {
-        match parse_type {
-            ParseType::Read => Self::parse_read(v),
-            ParseType::NonRead => Self::parse_non_read(v, range, cursor),
+        match function {
+            FunctionCode::Read => Self::parse_read(v),
+            _ => Self::parse_non_read(v, range, cursor),
         }
     }
 }
@@ -378,8 +363,8 @@ mod test {
     use crate::app::sequence::Sequence;
     use crate::app::types::DoubleBit;
 
-    fn test_parse_error(input: &[u8], pt: ParseType, err: ObjectParseError) {
-        assert_eq!(ObjectParser::parse(pt, input).err().unwrap(), err);
+    fn test_parse_error(input: &[u8], func: FunctionCode, err: ObjectParseError) {
+        assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);
     }
 
     #[test]
@@ -397,7 +382,7 @@ mod test {
         for frame in bad_frames {
             test_parse_error(
                 frame,
-                ParseType::NonRead,
+                FunctionCode::Write,
                 ObjectParseError::InsufficientBytes,
             );
         }
@@ -456,7 +441,7 @@ mod test {
     #[test]
     fn parses_integrity_scan() {
         let vec: Vec<ObjectHeader> = ObjectParser::parse(
-            ParseType::NonRead,
+            FunctionCode::Read,
             &[
                 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
             ],
@@ -478,7 +463,7 @@ mod test {
     #[test]
     fn parses_analog_output() {
         let header = &[0x29, 0x01, 0x17, 0x01, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x00];
-        let mut parser = ObjectParser::parse(ParseType::NonRead, header).unwrap();
+        let mut parser = ObjectParser::parse(FunctionCode::Operate, header).unwrap();
 
         let items: Vec<Prefix<u8, Group41Var1>> = assert_matches!(
             parser.next().unwrap(),
@@ -501,7 +486,7 @@ mod test {
     #[test]
     fn parses_range_of_g3v1() {
         let header = &[0x03, 0x01, 0x00, 0x01, 0x04, 0b11_10_01_00];
-        let mut parser = ObjectParser::parse(ParseType::NonRead, header).unwrap();
+        let mut parser = ObjectParser::parse(FunctionCode::Response, header).unwrap();
 
         let items: Vec<(DoubleBit, u16)> = assert_matches!(
             parser.next().unwrap(),
@@ -523,7 +508,7 @@ mod test {
     #[test]
     fn parses_count_of_time() {
         let header = &[0x32, 0x01, 0x07, 0x01, 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA];
-        let mut parser = ObjectParser::parse(ParseType::NonRead, header).unwrap();
+        let mut parser = ObjectParser::parse(FunctionCode::Write, header).unwrap();
 
         let items: Vec<Group50Var1> = assert_matches!(
             parser.next().unwrap(),
@@ -544,7 +529,7 @@ mod test {
     fn parses_range_of_g1v2_as_non_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 
-        let mut parser = ObjectParser::parse(ParseType::NonRead, &input).unwrap();
+        let mut parser = ObjectParser::parse(FunctionCode::Response, &input).unwrap();
 
         let items: Vec<(Group1Var2, u16)> = assert_matches!(
             parser.next().unwrap(),
@@ -565,7 +550,7 @@ mod test {
     fn parses_range_of_g1v2_as_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0x01, 0x02, 0x00, 0x07, 0x09];
 
-        let mut parser = ObjectParser::parse(ParseType::Read, &input).unwrap();
+        let mut parser = ObjectParser::parse(FunctionCode::Read, &input).unwrap();
 
         assert_matches!(
             parser.next().unwrap(),
@@ -588,7 +573,7 @@ mod test {
     fn parses_range_of_g80v1() {
         // this is what is typically sent to clear the restart IIN
         let input = [0x50, 0x01, 0x00, 0x07, 0x07, 0x00];
-        let mut parser = ObjectParser::parse(ParseType::NonRead, &input).unwrap();
+        let mut parser = ObjectParser::parse(FunctionCode::Write, &input).unwrap();
 
         let vec: Vec<(bool, u16)> = assert_matches!(
             parser.next().unwrap(),
@@ -604,7 +589,7 @@ mod test {
     #[test]
     fn parses_group110var0_as_read() {
         let input = [0x6E, 0x00, 0x00, 0x02, 0x03];
-        let mut parser = ObjectParser::parse(ParseType::Read, &input).unwrap();
+        let mut parser = ObjectParser::parse(FunctionCode::Read, &input).unwrap();
         assert_eq!(
             parser.next().unwrap(),
             ObjectHeader::OneByteStartStop(02, 03, RangedVariation::Group110Var0)
@@ -616,7 +601,7 @@ mod test {
     fn g110_variations_other_than_0_cannot_be_used_in_read() {
         test_parse_error(
             &[0x6E, 0x01, 0x00, 0x01, 0x02],
-            ParseType::Read,
+            FunctionCode::Read,
             ObjectParseError::InvalidQualifierForVariation(Group110(1)),
         );
     }
@@ -624,7 +609,7 @@ mod test {
     #[test]
     fn parses_group110var1_as_non_read() {
         let input = [0x6E, 0x01, 0x00, 0x01, 0x02, 0xAA, 0xBB];
-        let mut parser = ObjectParser::parse(ParseType::NonRead, &input).unwrap();
+        let mut parser = ObjectParser::parse(FunctionCode::Response, &input).unwrap();
 
         let bytes: Vec<(Bytes, u16)> = assert_matches!(
             parser.next().unwrap(),
@@ -644,7 +629,7 @@ mod test {
     fn g110v0_cannot_be_used_in_non_read() {
         test_parse_error(
             &[0x6E, 0x00, 0x00, 0x01, 0x02],
-            ParseType::NonRead,
+            FunctionCode::Response,
             ObjectParseError::ZeroLengthOctetData,
         );
     }

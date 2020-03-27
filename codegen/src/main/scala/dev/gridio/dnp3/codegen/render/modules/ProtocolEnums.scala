@@ -64,7 +64,7 @@ object ProtocolEnums extends Module {
     }
 
     def write : Iterator[String] = {
-      bracket("pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError>") {
+      bracket("pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError>") {
         s"cursor.write_u8(self.as_u8())".eol
       }
     }

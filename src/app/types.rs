@@ -69,7 +69,7 @@ impl Control {
         Ok(Self::from(cursor.read_u8()?))
     }
 
-    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         Ok(cursor.write_u8(self.to_u8())?)
     }
 }
@@ -92,7 +92,7 @@ impl IIN {
         })
     }
 
-    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.iin1)?;
         cursor.write_u8(self.iin2)?;
         Ok(())

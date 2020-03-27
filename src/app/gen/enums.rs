@@ -44,7 +44,7 @@ impl TripCloseCode {
         }
     }
 
-    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }
@@ -84,7 +84,7 @@ impl OpType {
         }
     }
 
-    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }
@@ -190,7 +190,7 @@ impl CommandStatus {
         }
     }
 
-    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }
@@ -236,7 +236,7 @@ impl QualifierCode {
         }
     }
 
-    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }
@@ -390,7 +390,7 @@ impl FunctionCode {
         }
     }
 
-    pub fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }
