@@ -1,10 +1,11 @@
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Sequence {
     value: u8,
 }
 
 impl Sequence {
-    const MAX: u8 = 63;
+    pub const MAX: u8 = 15;
+    pub const MASK: u8 = 0b0000_1111;
 
     fn calc_next(value: u8) -> u8 {
         if value == Self::MAX {
@@ -14,9 +15,13 @@ impl Sequence {
         }
     }
 
+    pub fn value(&self) -> u8 {
+        self.value
+    }
+
     pub fn new(x: u8) -> Self {
         Self {
-            value: x & super::constants::SEQ_MASK,
+            value: x & Self::MASK,
         }
     }
 
@@ -24,11 +29,7 @@ impl Sequence {
         self.value = 0;
     }
 
-    pub fn value(&self) -> u8 {
-        self.value
-    }
-
-    pub fn next(&self) -> u8 {
+    pub fn next_value(&self) -> u8 {
         Self::calc_next(self.value)
     }
 
@@ -52,8 +53,8 @@ mod test {
     #[test]
     fn increments_and_wraps_as_expected() {
         let mut seq = Sequence::default();
-        for i in 0..64 {
-            // which is really [0,63]
+        for i in 0..16 {
+            // which is really [0,15]
             assert_eq!(seq.increment(), i);
         }
 

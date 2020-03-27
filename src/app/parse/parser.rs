@@ -375,6 +375,7 @@ mod test {
     use crate::app::gen::variations::gv::Variation::Group110;
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::prefix::Prefix;
+    use crate::app::sequence::Sequence;
     use crate::app::types::DoubleBit;
 
     fn test_parse_error(input: &[u8], pt: ParseType, err: ObjectParseError) {
@@ -412,7 +413,7 @@ mod test {
                 fin: true,
                 con: false,
                 uns: false,
-                seq: 0x02,
+                seq: Sequence::new(0x02),
             },
             function: FunctionCode::Write,
         };
@@ -435,7 +436,7 @@ mod test {
                 fin: true,
                 con: false,
                 uns: false,
-                seq: 0x02,
+                seq: Sequence::new(0x02),
             },
             function: ResponseFunction::Unsolicited,
             iin: IIN {

@@ -2,7 +2,6 @@ use crate::error::Error;
 use crate::link::header::Address;
 use crate::link::parser::FramePayload;
 use crate::transport::header::Header;
-use crate::transport::sequence::Sequence;
 use crate::util::cursor::WriteError;
 use tokio::prelude::{AsyncRead, AsyncWrite};
 
@@ -96,7 +95,7 @@ impl Reader {
 
         let length: usize = match self.state {
             State::Running(previous_address, previous_header, length) => {
-                if header.seq != Sequence::calc_next(previous_header.seq) {
+                if header.seq.value() != previous_header.seq.next() {
                     self.state = State::Empty;
                     return Ok(None);
                 }

@@ -27,7 +27,7 @@ impl Writer {
     pub fn new(source: u16, master: bool) -> Self {
         Self {
             formatter: LinkFormatter::new(master, source),
-            seq: Sequence::new(),
+            seq: Sequence::default(),
             buffer: [0; crate::link::constant::MAX_LINK_FRAME_LENGTH],
         }
     }
@@ -57,7 +57,7 @@ impl Writer {
 
         for chunk in chunks {
             let mut cursor = WriteCursor::new(&mut self.buffer);
-            let transport_byte = Self::get_header(count == last, count == 0, self.seq.next());
+            let transport_byte = Self::get_header(count == last, count == 0, self.seq.increment());
             let mark = cursor.position();
             self.formatter.format_unconfirmed_user_data(
                 destination,

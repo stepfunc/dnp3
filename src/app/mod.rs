@@ -1,4 +1,5 @@
 pub mod parse;
+pub mod sequence;
 pub mod types;
 pub mod gen {
     pub mod enums;

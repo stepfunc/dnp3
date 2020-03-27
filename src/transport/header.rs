@@ -1,8 +1,10 @@
+use crate::transport::sequence::Sequence;
+
 #[derive(Copy, Clone)]
 pub struct Header {
     pub fin: bool,
     pub fir: bool,
-    pub seq: u8,
+    pub seq: Sequence,
 }
 
 impl Header {
@@ -10,7 +12,7 @@ impl Header {
         Self {
             fin: value & super::constants::FIN_MASK != 0,
             fir: value & super::constants::FIR_MASK != 0,
-            seq: value & super::constants::SEQ_MASK,
+            seq: Sequence::new(value),
         }
     }
 }

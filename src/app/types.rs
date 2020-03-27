@@ -1,4 +1,5 @@
 use crate::app::gen::enums::{OpType, TripCloseCode};
+use crate::app::sequence::Sequence;
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -27,7 +28,7 @@ pub struct Control {
     pub fin: bool,
     pub con: bool,
     pub uns: bool,
-    pub seq: u8,
+    pub seq: Sequence,
 }
 
 impl Control {
@@ -35,7 +36,6 @@ impl Control {
     const FIN_MASK: u8 = 0b0100_0000;
     const CON_MASK: u8 = 0b0010_0000;
     const UNS_MASK: u8 = 0b0001_0000;
-    const SEQ_MASK: u8 = 0b0000_1111;
 
     pub fn from(x: u8) -> Self {
         Self {
@@ -43,7 +43,7 @@ impl Control {
             fin: x & Self::FIN_MASK != 0,
             con: x & Self::CON_MASK != 0,
             uns: x & Self::UNS_MASK != 0,
-            seq: x & Self::SEQ_MASK,
+            seq: Sequence::new(x),
         }
     }
 
@@ -61,7 +61,7 @@ impl Control {
         if self.uns {
             x |= Self::UNS_MASK;
         }
-        x |= self.seq & Self::SEQ_MASK;
+        x |= self.seq.value();
         x
     }
 
