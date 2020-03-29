@@ -24,9 +24,9 @@ impl Writer {
         acc | (seq & super::constants::SEQ_MASK)
     }
 
-    pub fn new(source: u16, master: bool) -> Self {
+    pub fn new(master: bool, address: u16) -> Self {
         Self {
-            formatter: LinkFormatter::new(master, source),
+            formatter: LinkFormatter::new(master, address),
             seq: Sequence::default(),
             buffer: [0; crate::link::constant::MAX_LINK_FRAME_LENGTH],
         }

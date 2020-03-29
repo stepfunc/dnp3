@@ -1,8 +1,6 @@
 use dnp3rs::app::header::ResponseFunction;
 use dnp3rs::app::parse::parser::Response;
 use dnp3rs::app::sequence::Sequence;
-use dnp3rs::transport::reader::Reader;
-use dnp3rs::transport::writer::Writer;
 use dnp3rs::util::cursor::WriteCursor;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -14,8 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut socket = TcpStream::connect(SocketAddr::from_str("127.0.0.1:20000")?).await?;
 
-    let mut reader = Reader::new(true, 1);
-    let mut writer = Writer::new(1, true);
+    let (mut reader, mut writer) = dnp3rs::transport::create_transport_layer(true, 1);
 
     let mut buffer: [u8; 100] = [0; 100];
     let mut seq = Sequence::default();

@@ -36,6 +36,7 @@ pub fn read_integrity(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), Wri
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::app::sequence::Sequence;
     use crate::util::cursor::WriteCursor;
 
@@ -43,7 +44,7 @@ mod test {
     fn formats_integrity_poll() {
         let mut buffer: [u8; 100] = [0; 100];
         let mut cursor = WriteCursor::new(&mut buffer);
-        super::super::write::read_integrity(Sequence::new(0x01), &mut cursor).unwrap();
+        read_integrity(Sequence::new(0x01), &mut cursor).unwrap();
 
         assert_eq!(
             cursor.written(),
