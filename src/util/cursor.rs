@@ -123,6 +123,10 @@ impl<'a> WriteCursor<'a> {
         self.pos
     }
 
+    pub fn written(&self) -> &[u8] {
+        &self.dest[0..self.pos]
+    }
+
     pub fn written_since(&'a self, pos: usize) -> Result<&'a [u8], WriteError> {
         match self.dest.get(pos..self.pos) {
             Some(x) => Ok(x),

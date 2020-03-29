@@ -12,4 +12,4 @@ pub mod app;
 pub mod error;
 pub mod link;
 pub mod transport;
-pub(crate) mod util;
+pub mod util;
