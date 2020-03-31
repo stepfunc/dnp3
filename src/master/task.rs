@@ -72,9 +72,10 @@ impl MasterTask for IntegrityPoll {
             log::info!("got a header");
         }
 
-        match response.header.control.fin {
-            true => Ok(ResponseResult::Complete),
-            false => Ok(ResponseResult::Continue),
+        if response.header.control.fin {
+            Ok(ResponseResult::Complete)
+        } else {
+            Ok(ResponseResult::Continue)
         }
     }
 }
@@ -126,6 +127,7 @@ pub enum TaskError {
     NeverReceivedFir,
     UnexpectedFir,
     BadSequence,
+    MultiFragmentResponse,
     ResponseTimeout,
     WriteError,
 }
@@ -155,6 +157,38 @@ impl std::convert::From<ResponseError> for TaskError {
 }
 
 impl TaskRunner {
+    async fn confirm_solicited<T>(
+        &mut self,
+        io: &mut T,
+        destination: u16,
+        seq: Sequence,
+        writer: &mut Writer,
+    ) -> Result<(), Error>
+    where
+        T: AsyncWrite + Unpin,
+    {
+        let mut cursor = WriteCursor::new(&mut self.buffer);
+        write::confirm_solicited(seq, &mut cursor)?;
+        writer.write(io, destination, cursor.written()).await?;
+        Ok(())
+    }
+
+    async fn confirm_unsolicited<T>(
+        &mut self,
+        io: &mut T,
+        destination: u16,
+        seq: Sequence,
+        writer: &mut Writer,
+    ) -> Result<(), Error>
+    where
+        T: AsyncWrite + Unpin,
+    {
+        let mut cursor = WriteCursor::new(&mut self.buffer);
+        write::confirm_unsolicited(seq, &mut cursor)?;
+        writer.write(io, destination, cursor.written()).await?;
+        Ok(())
+    }
+
     async fn handle_unsolicited<T>(
         &mut self,
         io: &mut T,
@@ -165,11 +199,10 @@ impl TaskRunner {
     where
         T: AsyncWrite + Unpin,
     {
-        // TODO - actually handle it and write to correct destination
+        // TODO - invoke handling callback
         if rsp.header.control.con {
-            let mut cursor = WriteCursor::new(&mut self.buffer);
-            write::confirm_unsolicited(rsp.header.control.seq, &mut cursor)?;
-            writer.write(io, address.source, cursor.written()).await?;
+            self.confirm_unsolicited(io, address.source, rsp.header.control.seq, writer)
+                .await?;
         }
 
         Ok(())
@@ -177,15 +210,31 @@ impl TaskRunner {
 
     async fn handle_non_read_response<T>(
         &mut self,
-        _io: &mut T,
-        _rsp: Response<'_>,
-        _task: &dyn MasterTask,
-        _writer: &mut Writer,
+        io: &mut T,
+        rsp: Response<'_>,
+        task: &dyn MasterTask,
+        writer: &mut Writer,
     ) -> Result<ResponseResult, TaskError>
     where
         T: AsyncWrite + Unpin,
     {
-        Ok(ResponseResult::Complete)
+        if rsp.header.control.seq.value() != self.seq.previous_value() {
+            return Err(TaskError::BadSequence);
+        }
+
+        if !(rsp.header.control.fir && rsp.header.control.fin) {
+            return Err(TaskError::MultiFragmentResponse);
+        }
+
+        // non-read responses REALLY shouldn't request confirmation
+        // but we'll confirm them if requested and log
+        if rsp.header.control.con {
+            log::warn!("received response requesting confirmation to non-read request");
+            self.confirm_solicited(io, task.get_destination(), rsp.header.control.seq, writer)
+                .await?;
+        }
+
+        Ok(task.handle(rsp)?)
     }
 
     async fn handle_read_response<T>(
@@ -221,7 +270,9 @@ impl TaskRunner {
         if rsp.header.control.con {
             let mut cursor = WriteCursor::new(&mut self.buffer);
             write::confirm_solicited(rsp.header.control.seq, &mut cursor)?;
-            writer.write(io, task.get_destination(), cursor.written()).await?;
+            writer
+                .write(io, task.get_destination(), cursor.written())
+                .await?;
         }
 
         let result = task.handle(rsp)?;
@@ -265,13 +316,14 @@ impl TaskRunner {
         let seq = self.seq.increment();
         let mut cursor = WriteCursor::new(&mut self.buffer);
         task.format(seq, &mut cursor)?;
-        writer.write(io, 1024, cursor.written()).await?;
+        writer
+            .write(io, task.get_destination(), cursor.written())
+            .await?;
 
         let mut deadline = Instant::now() + self.reply_timeout;
 
         // now enter a loop to read responses
         loop {
-
             let fragment: Fragment = tokio::time::timeout_at(deadline, reader.read(io)).await??;
             match Response::parse(fragment.data) {
                 Err(err) => log::warn!("error parsing response header: {:?}", err),
@@ -285,7 +337,7 @@ impl TaskRunner {
                             ResponseResult::Continue => {
                                 // continue to next iteration of the loop, read another reply
                                 deadline = Instant::now() + self.reply_timeout;
-                            },
+                            }
                         };
                     }
                 }

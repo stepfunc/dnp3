@@ -144,7 +144,7 @@ impl RequestHeader {
 }
 
 impl ResponseHeader {
-    pub fn function(&self) -> FunctionCode {
+    pub fn function(self) -> FunctionCode {
         if self.unsolicited {
             FunctionCode::UnsolicitedResponse
         } else {
