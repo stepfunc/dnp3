@@ -115,15 +115,9 @@ pub struct RequestHeader {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ResponseFunction {
-    Solicited,
-    Unsolicited,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ResponseHeader {
     pub control: Control,
-    pub function: ResponseFunction,
+    pub unsolicited: bool,
     pub iin: IIN,
 }
 
@@ -149,41 +143,33 @@ impl RequestHeader {
     }
 }
 
-impl ResponseFunction {
-    pub fn from(function: FunctionCode) -> Option<Self> {
-        match function {
-            FunctionCode::Response => Some(ResponseFunction::Solicited),
-            FunctionCode::UnsolicitedResponse => Some(ResponseFunction::Unsolicited),
-            _ => None,
-        }
-    }
-
-    pub fn to_function(self) -> FunctionCode {
-        match self {
-            ResponseFunction::Solicited => FunctionCode::Response,
-            ResponseFunction::Unsolicited => FunctionCode::UnsolicitedResponse,
-        }
-    }
-}
-
 impl ResponseHeader {
+    pub fn function(&self) -> FunctionCode {
+        if self.unsolicited {
+            FunctionCode::UnsolicitedResponse
+        } else {
+            FunctionCode::Response
+        }
+    }
+
     pub fn parse(cursor: &mut ReadCursor) -> Result<Self, HeaderParseError> {
         let header = RequestHeader::parse(cursor)?;
         let iin = IIN::parse(cursor)?;
-        let function = match ResponseFunction::from(header.function) {
-            Some(x) => x,
-            None => return Err(HeaderParseError::BadFunction(header.function)),
+        let unsolicited = match header.function {
+            FunctionCode::Response => false,
+            FunctionCode::UnsolicitedResponse => true,
+            _ => return Err(HeaderParseError::BadFunction(header.function)),
         };
         Ok(Self {
             control: header.control,
-            function,
+            unsolicited,
             iin,
         })
     }
 
     pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.control.write(cursor)?;
-        self.function.to_function().write(cursor)?;
+        self.function().write(cursor)?;
         self.iin.write(cursor)?;
         Ok(())
     }

@@ -1,8 +1,8 @@
 use crate::app::format::write;
-use crate::app::header::ResponseFunction;
 use crate::app::parse::parser::{ObjectParseError, Response};
 use crate::app::sequence::Sequence;
 use crate::error::Error;
+use crate::link::header::Address;
 use crate::transport::reader::{Fragment, Reader};
 use crate::transport::writer::Writer;
 use crate::util::cursor::{WriteCursor, WriteError};
@@ -29,20 +29,27 @@ pub enum ResponseResult {
 }
 
 pub trait MasterTask {
+    fn get_destination(&self) -> u16;
     fn is_read(&self) -> bool;
     fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError>;
     fn handle(&self, response: Response) -> Result<ResponseResult, ResponseError>;
 }
 
-pub struct IntegrityPoll;
+pub struct IntegrityPoll {
+    destination: u16,
+}
 
 impl IntegrityPoll {
-    pub fn create() -> Box<dyn MasterTask> {
-        Box::new(IntegrityPoll {})
+    pub fn new(destination: u16) -> Self {
+        Self { destination }
     }
 }
 
 impl MasterTask for IntegrityPoll {
+    fn get_destination(&self) -> u16 {
+        self.destination
+    }
+
     fn is_read(&self) -> bool {
         true
     }
@@ -146,6 +153,7 @@ impl TaskRunner {
     async fn handle_unsolicited<T>(
         &mut self,
         io: &mut T,
+        address: Address,
         rsp: Response<'_>,
         writer: &mut Writer,
     ) -> Result<(), Error>
@@ -156,7 +164,7 @@ impl TaskRunner {
         if rsp.header.control.con {
             let mut cursor = WriteCursor::new(&mut self.buffer);
             write::confirm_unsolicited(rsp.header.control.seq, &mut cursor)?;
-            writer.write(io, 1024, cursor.written()).await?;
+            writer.write(io, address.source, cursor.written()).await?;
         }
 
         Ok(())
@@ -260,12 +268,13 @@ impl TaskRunner {
             match Response::parse(fragment.data) {
                 Err(err) => log::warn!("error parsing response header: {:?}", err),
                 Ok(response) => {
-                    if response.header.function == ResponseFunction::Unsolicited {
-                        self.handle_unsolicited(io, response, writer).await?;
+                    if response.header.unsolicited {
+                        self.handle_unsolicited(io, fragment.address, response, writer)
+                            .await?;
                     } else {
-                        match self.handle_response(io, response, task, writer).await? {
-                            ResponseResult::Success => return Ok(()),
-                        }
+                        return match self.handle_response(io, response, task, writer).await? {
+                            ResponseResult::Success => Ok(()),
+                        };
                     }
                 }
             }

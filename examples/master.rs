@@ -15,9 +15,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut runner = TaskRunner::new(Duration::from_secs(1));
 
     loop {
-        let task = IntegrityPoll::create();
+        let task = IntegrityPoll::new(1024);
         runner
-            .run(&mut socket, &*task, &mut writer, &mut reader)
+            .run(&mut socket, &task, &mut writer, &mut reader)
             .await
             .unwrap();
         tokio::time::delay_for(Duration::from_secs(2)).await;

@@ -76,10 +76,7 @@ impl<'a> Response<'a> {
     pub fn parse_objects(
         &self,
     ) -> Result<impl Iterator<Item = ObjectHeader<'a>>, ObjectParseError> {
-        Ok(ObjectParser::parse(
-            self.header.function.to_function(),
-            self.objects,
-        )?)
+        Ok(ObjectParser::parse(self.header.function(), self.objects)?)
     }
 
     pub fn parse(bytes: &'a [u8]) -> Result<Self, HeaderParseError> {
@@ -279,7 +276,7 @@ mod test {
     use crate::app::gen::enums::CommandStatus;
     use crate::app::gen::variations::fixed::*;
     use crate::app::gen::variations::gv::Variation::Group110;
-    use crate::app::header::{Control, ResponseFunction, IIN};
+    use crate::app::header::{Control, IIN};
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::prefix::Prefix;
     use crate::app::sequence::Sequence;
@@ -345,7 +342,7 @@ mod test {
                 uns: false,
                 seq: Sequence::new(0x02),
             },
-            function: ResponseFunction::Unsolicited,
+            unsolicited: true,
             iin: IIN {
                 iin1: 0xFF,
                 iin2: 0xAA,
