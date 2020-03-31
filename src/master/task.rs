@@ -22,8 +22,10 @@ impl std::convert::From<ObjectParseError> for ResponseError {
 }
 
 pub enum ResponseResult {
-    /// the response was successfully processed
-    Success,
+    /// the response completed the task
+    Complete,
+    /// another response is needed
+    Continue,
     ///// run a new task - e.g. select then operate
     //Transition(Box<dyn MasterTask>),
 }
@@ -70,7 +72,10 @@ impl MasterTask for IntegrityPoll {
             log::info!("got a header");
         }
 
-        Ok(ResponseResult::Success)
+        match response.header.control.fin {
+            true => Ok(ResponseResult::Complete),
+            false => Ok(ResponseResult::Continue),
+        }
     }
 }
 
@@ -180,7 +185,7 @@ impl TaskRunner {
     where
         T: AsyncWrite + Unpin,
     {
-        Ok(ResponseResult::Success)
+        Ok(ResponseResult::Complete)
     }
 
     async fn handle_read_response<T>(
@@ -193,6 +198,7 @@ impl TaskRunner {
     where
         T: AsyncWrite + Unpin,
     {
+        // validate the sequence number
         if rsp.header.control.seq.value() != self.seq.previous_value() {
             return Err(TaskError::BadSequence);
         }
@@ -215,15 +221,16 @@ impl TaskRunner {
         if rsp.header.control.con {
             let mut cursor = WriteCursor::new(&mut self.buffer);
             write::confirm_solicited(rsp.header.control.seq, &mut cursor)?;
-            writer.write(io, 1024, cursor.written()).await?;
+            writer.write(io, task.get_destination(), cursor.written()).await?;
         }
 
-        match task.handle(rsp)? {
-            ResponseResult::Success => {
-                self.seq.increment();
-                Ok(ResponseResult::Success)
-            }
+        let result = task.handle(rsp)?;
+
+        if let ResponseResult::Continue = result {
+            self.seq.increment();
         }
+
+        Ok(result)
     }
 
     async fn handle_response<T>(
@@ -260,10 +267,11 @@ impl TaskRunner {
         task.format(seq, &mut cursor)?;
         writer.write(io, 1024, cursor.written()).await?;
 
-        let deadline = Instant::now() + self.reply_timeout;
+        let mut deadline = Instant::now() + self.reply_timeout;
 
         // now enter a loop to read responses
         loop {
+
             let fragment: Fragment = tokio::time::timeout_at(deadline, reader.read(io)).await??;
             match Response::parse(fragment.data) {
                 Err(err) => log::warn!("error parsing response header: {:?}", err),
@@ -272,8 +280,12 @@ impl TaskRunner {
                         self.handle_unsolicited(io, fragment.address, response, writer)
                             .await?;
                     } else {
-                        return match self.handle_response(io, response, task, writer).await? {
-                            ResponseResult::Success => Ok(()),
+                        match self.handle_response(io, response, task, writer).await? {
+                            ResponseResult::Complete => return Ok(()),
+                            ResponseResult::Continue => {
+                                // continue to next iteration of the loop, read another reply
+                                deadline = Instant::now() + self.reply_timeout;
+                            },
                         };
                     }
                 }
