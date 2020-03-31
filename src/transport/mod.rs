@@ -1,6 +1,18 @@
 use crate::transport::reader::Reader;
 use crate::transport::writer::Writer;
 
+#[cfg(not(test))]
+pub type ReaderType = crate::transport::reader::Reader;
+#[cfg(not(test))]
+pub type WriterType = crate::transport::writer::Writer;
+
+#[cfg(test)]
+pub mod mocks;
+#[cfg(test)]
+pub type ReaderType = crate::transport::mocks::MockReader;
+#[cfg(test)]
+pub type WriterType = crate::transport::mocks::MockWriter;
+
 pub mod header;
 pub mod reader;
 pub mod sequence;

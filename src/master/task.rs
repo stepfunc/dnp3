@@ -3,8 +3,8 @@ use crate::app::parse::parser::{ObjectParseError, Response};
 use crate::app::sequence::Sequence;
 use crate::error::Error;
 use crate::link::header::Address;
-use crate::transport::reader::{Fragment, Reader};
-use crate::transport::writer::Writer;
+use crate::transport::reader::Fragment;
+use crate::transport::{ReaderType, WriterType};
 use crate::util::cursor::{WriteCursor, WriteError};
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
@@ -162,7 +162,7 @@ impl TaskRunner {
         io: &mut T,
         destination: u16,
         seq: Sequence,
-        writer: &mut Writer,
+        writer: &mut WriterType,
     ) -> Result<(), Error>
     where
         T: AsyncWrite + Unpin,
@@ -178,7 +178,7 @@ impl TaskRunner {
         io: &mut T,
         destination: u16,
         seq: Sequence,
-        writer: &mut Writer,
+        writer: &mut WriterType,
     ) -> Result<(), Error>
     where
         T: AsyncWrite + Unpin,
@@ -194,7 +194,7 @@ impl TaskRunner {
         io: &mut T,
         address: Address,
         rsp: Response<'_>,
-        writer: &mut Writer,
+        writer: &mut WriterType,
     ) -> Result<(), Error>
     where
         T: AsyncWrite + Unpin,
@@ -213,7 +213,7 @@ impl TaskRunner {
         io: &mut T,
         rsp: Response<'_>,
         task: &dyn MasterTask,
-        writer: &mut Writer,
+        writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
     where
         T: AsyncWrite + Unpin,
@@ -242,7 +242,7 @@ impl TaskRunner {
         io: &mut T,
         rsp: Response<'_>,
         task: &dyn MasterTask,
-        writer: &mut Writer,
+        writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
     where
         T: AsyncWrite + Unpin,
@@ -289,7 +289,7 @@ impl TaskRunner {
         io: &mut T,
         rsp: Response<'_>,
         task: &dyn MasterTask,
-        writer: &mut Writer,
+        writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
     where
         T: AsyncWrite + Unpin,
@@ -305,8 +305,8 @@ impl TaskRunner {
         &mut self,
         io: &mut T,
         task: &dyn MasterTask,
-        writer: &mut Writer,
-        reader: &mut Reader,
+        writer: &mut WriterType,
+        reader: &mut ReaderType,
     ) -> Result<(), TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
