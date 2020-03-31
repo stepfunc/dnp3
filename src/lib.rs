@@ -11,5 +11,6 @@ extern crate assert_matches;
 pub mod app;
 pub mod error;
 pub mod link;
+pub mod master;
 pub mod transport;
 pub mod util;

@@ -19,7 +19,7 @@ pub enum ObjectHeader<'a> {
     TwoByteCountAndPrefix(u16, PrefixedVariation<'a, u16>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ObjectParseError {
     UnknownGroupVariation(u8, u8),
     UnknownQualifier(u8),
@@ -36,7 +36,7 @@ pub struct Request<'a> {
     pub objects: &'a [u8],
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Response<'a> {
     pub header: ResponseHeader,
     pub objects: &'a [u8],

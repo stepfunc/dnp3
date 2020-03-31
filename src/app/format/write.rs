@@ -8,6 +8,10 @@ pub fn confirm_solicited(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), 
     RequestHeader::new(Control::request(seq), FunctionCode::Confirm).write(cursor)
 }
 
+pub fn confirm_unsolicited(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    RequestHeader::new(Control::unsolicited(seq), FunctionCode::Confirm).write(cursor)
+}
+
 fn write_gv(variation: Variation, cursor: &mut WriteCursor) -> Result<(), WriteError> {
     let (g, v) = variation.to_group_and_var();
     cursor.write_u8(g)?;

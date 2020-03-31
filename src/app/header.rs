@@ -27,6 +27,16 @@ impl Control {
         }
     }
 
+    pub fn unsolicited(seq: Sequence) -> Self {
+        Self {
+            fir: true,
+            fin: true,
+            con: false,
+            uns: true,
+            seq,
+        }
+    }
+
     pub fn from(x: u8) -> Self {
         Self {
             fir: x & Self::FIR_MASK != 0,

@@ -15,6 +15,14 @@ impl Sequence {
         }
     }
 
+    fn calc_previous(value: u8) -> u8 {
+        if value == 0 {
+            Self::MAX
+        } else {
+            value - 1
+        }
+    }
+
     pub fn value(self) -> u8 {
         self.value
     }
@@ -33,10 +41,14 @@ impl Sequence {
         Self::calc_next(self.value)
     }
 
-    pub fn increment(&mut self) -> u8 {
+    pub fn previous_value(self) -> u8 {
+        Self::calc_previous(self.value)
+    }
+
+    pub fn increment(&mut self) -> Sequence {
         let ret = self.value;
         self.value = Self::calc_next(ret);
-        ret
+        Sequence { value: ret }
     }
 }
 
@@ -55,9 +67,9 @@ mod test {
         let mut seq = Sequence::default();
         for i in 0..16 {
             // which is really [0,15]
-            assert_eq!(seq.increment(), i);
+            assert_eq!(seq.increment(), Sequence::new(i));
         }
 
-        assert_eq!(seq.increment(), 0); // goes to zero
+        assert_eq!(seq.increment(), Sequence::new(0)); // goes to zero
     }
 }

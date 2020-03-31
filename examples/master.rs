@@ -1,9 +1,7 @@
-use dnp3rs::app::header::ResponseFunction;
-use dnp3rs::app::parse::parser::Response;
-use dnp3rs::app::sequence::Sequence;
-use dnp3rs::util::cursor::WriteCursor;
+use dnp3rs::master::task::{IntegrityPoll, TaskRunner};
 use std::net::SocketAddr;
 use std::str::FromStr;
+use std::time::Duration;
 use tokio::net::TcpStream;
 
 #[tokio::main(threaded_scheduler)]
@@ -14,52 +12,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut reader, mut writer) = dnp3rs::transport::create_transport_layer(true, 1);
 
-    let mut buffer: [u8; 100] = [0; 100];
-    let mut seq = Sequence::default();
+    let mut runner = TaskRunner::new(Duration::from_secs(1));
 
     loop {
-        let mut cursor = WriteCursor::new(&mut buffer);
-        dnp3rs::app::format::write::read_integrity(seq, &mut cursor).unwrap();
-        writer
-            .write(&mut socket, 1024, cursor.written())
+        let task = IntegrityPoll::create();
+        runner
+            .run(&mut socket, &*task, &mut writer, &mut reader)
             .await
             .unwrap();
-        seq.increment();
-
-        loop {
-            let response = reader.read(&mut socket).await.unwrap();
-
-            match Response::parse(response.data) {
-                Err(err) => {
-                    log::warn!("bad response: {:?}", err);
-                    break;
-                }
-                Ok(response) => {
-                    if response.header.function == ResponseFunction::Solicited {
-                        if response.header.control.con {
-                            let mut cursor = WriteCursor::new(&mut buffer);
-                            dnp3rs::app::format::write::confirm_solicited(
-                                response.header.control.seq,
-                                &mut cursor,
-                            )
-                            .unwrap();
-                            writer
-                                .write(&mut socket, 1024, cursor.written())
-                                .await
-                                .unwrap();
-                        }
-
-                        if response.header.control.fin {
-                            break;
-                        }
-                    }
-
-                    if let Err(err) = response.parse_objects() {
-                        log::warn!("bad response object: {:?}", err);
-                        break;
-                    }
-                }
-            }
-        }
+        tokio::time::delay_for(Duration::from_secs(2)).await;
     }
 }
