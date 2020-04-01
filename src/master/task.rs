@@ -68,7 +68,10 @@ impl TaskDetails {
                 for header in objects {
                     match header {
                         ObjectHeader::OneByteStartStop(_, _, v) => handler.handle_ranged(v),
-                        _ => log::info!("unknown response header"),
+                        ObjectHeader::TwoByteStartStop(_, _, v) => handler.handle_ranged(v),
+                        ObjectHeader::OneByteCountAndPrefix(_, v) => handler.handle_prefixed_u8(v),
+                        ObjectHeader::TwoByteCountAndPrefix(_, v) => handler.handle_prefixed_u16(v),
+                        _ => log::warn!("ignoring response header"),
                     }
                 }
 
