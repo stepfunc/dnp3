@@ -1,8 +1,12 @@
 use crate::app::format::write;
+use crate::app::gen::enums::FunctionCode;
+use crate::app::gen::variations::gv::Variation;
+use crate::app::header::{Control, RequestHeader};
 use crate::app::parse::parser::{ObjectParseError, Response};
 use crate::app::sequence::Sequence;
 use crate::error::Error;
 use crate::link::header::Address;
+use crate::master::types::ClassScan;
 use crate::transport::reader::Fragment;
 use crate::transport::{ReaderType, WriterType};
 use crate::util::cursor::{WriteCursor, WriteError};
@@ -30,52 +34,72 @@ pub enum ResponseResult {
     //Transition(Box<dyn MasterTask>),
 }
 
-pub trait MasterTask {
-    fn get_destination(&self) -> u16;
-    fn is_read(&self) -> bool;
-    fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError>;
-    fn handle(&self, response: Response) -> Result<ResponseResult, ResponseError>;
+pub enum TaskDetails {
+    ClassScan(ClassScan),
 }
 
-pub struct IntegrityPoll {
-    destination: u16,
-}
-
-impl IntegrityPoll {
-    pub fn new(destination: u16) -> Self {
-        Self { destination }
-    }
-}
-
-impl MasterTask for IntegrityPoll {
-    fn get_destination(&self) -> u16 {
-        self.destination
-    }
-
-    fn is_read(&self) -> bool {
-        true
-    }
-
-    fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        write::read_integrity(seq, cursor)
-    }
-
-    fn handle(&self, response: Response) -> Result<ResponseResult, ResponseError> {
-        log::info!(
-            "fir: {} fin: {} seq: {}",
-            response.header.control.fir,
-            response.header.control.fin,
-            response.header.control.seq.value()
-        );
-
-        for _ in response.parse_objects()? {
-            log::info!("got a header");
+impl TaskDetails {
+    pub fn function(&self) -> FunctionCode {
+        match self {
+            TaskDetails::ClassScan(_) => FunctionCode::Read,
         }
+    }
 
-        if response.header.control.fin {
-            Ok(ResponseResult::Complete)
-        } else {
-            Ok(ResponseResult::Continue)
+    pub fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        match self {
+            TaskDetails::ClassScan(params) => {
+                RequestHeader::new(Control::request(seq), self.function()).write(cursor)?;
+                if params.class1 {
+                    write::write_all_objects(Variation::Group60Var2, cursor)?;
+                }
+                if params.class2 {
+                    write::write_all_objects(Variation::Group60Var3, cursor)?;
+                }
+                if params.class3 {
+                    write::write_all_objects(Variation::Group60Var4, cursor)?;
+                }
+                if params.class0 {
+                    write::write_all_objects(Variation::Group60Var1, cursor)?;
+                }
+                Ok(())
+            }
+        }
+    }
+
+    pub fn handle(&self, response: Response) -> Result<ResponseResult, ResponseError> {
+        match self {
+            TaskDetails::ClassScan(_) => {
+                log::info!(
+                    "fir: {} fin: {} seq: {}",
+                    response.header.control.fir,
+                    response.header.control.fin,
+                    response.header.control.seq.value()
+                );
+
+                for _ in response.parse_objects()? {
+                    log::info!("got a header");
+                }
+
+                if response.header.control.fin {
+                    Ok(ResponseResult::Complete)
+                } else {
+                    Ok(ResponseResult::Continue)
+                }
+            }
+        }
+    }
+}
+
+pub struct MasterTask {
+    pub destination: u16,
+    pub details: TaskDetails,
+}
+
+impl MasterTask {
+    pub fn new(destination: u16, details: TaskDetails) -> Self {
+        Self {
+            destination,
+            details,
         }
     }
 }
@@ -212,7 +236,7 @@ impl TaskRunner {
         &mut self,
         io: &mut T,
         rsp: Response<'_>,
-        task: &dyn MasterTask,
+        task: &MasterTask,
         writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
     where
@@ -230,18 +254,18 @@ impl TaskRunner {
         // but we'll confirm them if requested and log
         if rsp.header.control.con {
             log::warn!("received response requesting confirmation to non-read request");
-            self.confirm_solicited(io, task.get_destination(), rsp.header.control.seq, writer)
+            self.confirm_solicited(io, task.destination, rsp.header.control.seq, writer)
                 .await?;
         }
 
-        Ok(task.handle(rsp)?)
+        Ok(task.details.handle(rsp)?)
     }
 
     async fn handle_read_response<T>(
         &mut self,
         io: &mut T,
         rsp: Response<'_>,
-        task: &dyn MasterTask,
+        task: &MasterTask,
         writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
     where
@@ -270,12 +294,10 @@ impl TaskRunner {
         if rsp.header.control.con {
             let mut cursor = WriteCursor::new(&mut self.buffer);
             write::confirm_solicited(rsp.header.control.seq, &mut cursor)?;
-            writer
-                .write(io, task.get_destination(), cursor.written())
-                .await?;
+            writer.write(io, task.destination, cursor.written()).await?;
         }
 
-        let result = task.handle(rsp)?;
+        let result = task.details.handle(rsp)?;
 
         if let ResponseResult::Continue = result {
             self.seq.increment();
@@ -288,13 +310,13 @@ impl TaskRunner {
         &mut self,
         io: &mut T,
         rsp: Response<'_>,
-        task: &dyn MasterTask,
+        task: &MasterTask,
         writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
     where
         T: AsyncWrite + Unpin,
     {
-        if task.is_read() {
+        if task.details.function() == FunctionCode::Read {
             self.handle_read_response(io, rsp, task, writer).await
         } else {
             self.handle_non_read_response(io, rsp, task, writer).await
@@ -304,7 +326,7 @@ impl TaskRunner {
     pub async fn run<T>(
         &mut self,
         io: &mut T,
-        task: &dyn MasterTask,
+        task: &MasterTask,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), TaskError>
@@ -315,10 +337,8 @@ impl TaskRunner {
         // format the request
         let seq = self.seq.increment();
         let mut cursor = WriteCursor::new(&mut self.buffer);
-        task.format(seq, &mut cursor)?;
-        writer
-            .write(io, task.get_destination(), cursor.written())
-            .await?;
+        task.details.format(seq, &mut cursor)?;
+        writer.write(io, task.destination, cursor.written()).await?;
 
         let mut deadline = Instant::now() + self.reply_timeout;
 

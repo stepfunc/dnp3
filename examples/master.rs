@@ -1,4 +1,5 @@
-use dnp3rs::master::task::{IntegrityPoll, TaskRunner};
+use dnp3rs::master::task::{MasterTask, TaskDetails, TaskRunner};
+use dnp3rs::master::types::ClassScan;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
@@ -15,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut runner = TaskRunner::new(Duration::from_secs(1));
 
     loop {
-        let task = IntegrityPoll::new(1024);
+        let task = MasterTask::new(1024, TaskDetails::ClassScan(ClassScan::integrity()));
         runner
             .run(&mut socket, &task, &mut writer, &mut reader)
             .await

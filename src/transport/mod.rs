@@ -1,6 +1,3 @@
-use crate::transport::reader::Reader;
-use crate::transport::writer::Writer;
-
 #[cfg(not(test))]
 pub type ReaderType = crate::transport::reader::Reader;
 #[cfg(not(test))]
