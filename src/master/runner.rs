@@ -207,7 +207,7 @@ impl TaskRunner {
 
         let result = task.details.handle(rsp)?;
 
-        if let ResponseResult::Continue = result {
+        if !rsp.header.control.fin {
             self.seq.increment();
         }
 
@@ -261,8 +261,10 @@ impl TaskRunner {
                             .await?;
                     } else {
                         match self.handle_response(io, response, task, writer).await? {
-                            ResponseResult::Complete => return Ok(()),
-                            ResponseResult::Continue => {
+                            ResponseResult::Success => {
+                                if response.header.control.fin {
+                                    return Ok(());
+                                }
                                 // continue to next iteration of the loop, read another reply
                                 deadline = Instant::now() + self.reply_timeout;
                             }

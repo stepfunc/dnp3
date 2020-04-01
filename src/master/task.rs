@@ -20,11 +20,9 @@ impl std::convert::From<ObjectParseError> for ResponseError {
 
 pub enum ResponseResult {
     /// the response completed the task
-    Complete,
-    /// another response is needed
-    Continue,
+    Success,
     ///// run a new task - e.g. select then operate
-    //Transition(Box<dyn MasterTask>),
+    //Transition(MasterTask),
 }
 
 pub enum TaskDetails {
@@ -73,11 +71,7 @@ impl TaskDetails {
                     log::info!("got a header");
                 }
 
-                if response.header.control.fin {
-                    Ok(ResponseResult::Complete)
-                } else {
-                    Ok(ResponseResult::Continue)
-                }
+                Ok(ResponseResult::Success)
             }
         }
     }
