@@ -6,12 +6,16 @@ pub struct ClassScan {
 }
 
 impl ClassScan {
-    pub fn integrity() -> Self {
+    pub fn new(class1: bool, class2: bool, class3: bool, class0: bool) -> Self {
         Self {
-            class1: true,
-            class2: true,
-            class3: true,
-            class0: true,
+            class1,
+            class2,
+            class3,
+            class0,
         }
+    }
+
+    pub fn integrity() -> Self {
+        Self::new(true, true, true, true)
     }
 }

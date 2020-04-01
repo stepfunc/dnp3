@@ -283,15 +283,16 @@ mod test {
     use tokio_test::io::Builder;
 
     #[test]
-    fn performs_multi_fragmented_integrity_scan() {
-        let task = MasterTask::new(1024, TaskDetails::ClassScan(ClassScan::integrity()));
+    fn performs_multi_fragmented_class_scan() {
+        let task = MasterTask::new(
+            1024,
+            TaskDetails::ClassScan(ClassScan::new(true, false, false, false)),
+        );
 
         let mut runner = TaskRunner::new(Duration::from_secs(1));
 
-        let mut io= Builder::new()
-            .write(&[
-                0xC0, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
-            ])
+        let mut io = Builder::new()
+            .write(&[0xC0, 0x01, 0x3C, 0x02, 0x06])
             // FIR=1, FIN=0, CON=1, SEQ = 0
             .read(&[0xA0, 0x81, 0x00, 0x00])
             // confirm

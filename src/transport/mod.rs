@@ -1,6 +1,10 @@
 #[cfg(not(test))]
+/// This type definition is used so that we can mock the transport reader during testing.
+/// If Rust eventually allows `async fn` in traits, this can be removed
 pub type ReaderType = crate::transport::reader::Reader;
 #[cfg(not(test))]
+/// This type definition is used so that we can mock the transport writer during testing.
+/// If Rust eventually allows `async fn` in traits, this can be removed
 pub type WriterType = crate::transport::writer::Writer;
 
 #[cfg(test)]
