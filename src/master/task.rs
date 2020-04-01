@@ -65,8 +65,8 @@ impl TaskDetails {
 
                 handler.begin(1024, response.header);
 
-                for (_, header) in objects {
-                    match header {
+                for header in objects {
+                    match header.details {
                         HeaderDetails::OneByteStartStop(_, _, v) => handler.handle_ranged(v),
                         HeaderDetails::TwoByteStartStop(_, _, v) => handler.handle_ranged(v),
                         HeaderDetails::OneByteCountAndPrefix(_, v) => handler.handle_prefixed_u8(v),
