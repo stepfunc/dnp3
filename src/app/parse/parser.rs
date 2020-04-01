@@ -9,7 +9,7 @@ use crate::app::parse::range::{InvalidRange, Range};
 use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Debug, PartialEq)]
-pub enum ObjectHeader<'a> {
+pub enum HeaderDetails<'a> {
     AllObjects(AllObjectsVariation),
     OneByteStartStop(u8, u8, RangedVariation<'a>),
     TwoByteStartStop(u16, u16, RangedVariation<'a>),
@@ -45,7 +45,7 @@ pub struct Response<'a> {
 impl<'a> Request<'a> {
     pub fn parse_objects(
         &self,
-    ) -> Result<impl Iterator<Item = ObjectHeader<'a>>, ObjectParseError> {
+    ) -> Result<impl Iterator<Item = (Variation, HeaderDetails<'a>)>, ObjectParseError> {
         Ok(ObjectParser::parse(self.header.function, self.objects)?)
     }
 
@@ -75,7 +75,7 @@ impl<'a> Request<'a> {
 impl<'a> Response<'a> {
     pub fn parse_objects(
         &self,
-    ) -> Result<impl Iterator<Item = ObjectHeader<'a>>, ObjectParseError> {
+    ) -> Result<impl Iterator<Item = (Variation, HeaderDetails<'a>)>, ObjectParseError> {
         Ok(ObjectParser::parse(self.header.function(), self.objects)?)
     }
 
@@ -99,7 +99,7 @@ impl<'a> ObjectParser<'a> {
     pub fn parse(
         function: FunctionCode,
         data: &'a [u8],
-    ) -> Result<impl Iterator<Item = ObjectHeader<'a>>, ObjectParseError> {
+    ) -> Result<impl Iterator<Item = (Variation, HeaderDetails<'a>)>, ObjectParseError> {
         // we first do a single pass to ensure the ASDU is well-formed, returning an error if it occurs
         for x in ObjectParser::one_pass(function, data) {
             if let Err(e) = x {
@@ -114,7 +114,7 @@ impl<'a> ObjectParser<'a> {
     fn one_pass(
         function: FunctionCode,
         data: &'a [u8],
-    ) -> impl Iterator<Item = Result<ObjectHeader<'a>, ObjectParseError>> {
+    ) -> impl Iterator<Item = Result<(Variation, HeaderDetails<'a>), ObjectParseError>> {
         ObjectParser {
             cursor: ReadCursor::new(data),
             function,
@@ -122,7 +122,7 @@ impl<'a> ObjectParser<'a> {
         }
     }
 
-    fn parse_one(&mut self) -> Option<Result<ObjectHeader<'a>, ObjectParseError>> {
+    fn parse_one(&mut self) -> Option<Result<(Variation, HeaderDetails<'a>), ObjectParseError>> {
         if self.errored || self.cursor.is_empty() {
             return None;
         }
@@ -136,7 +136,7 @@ impl<'a> ObjectParser<'a> {
         Some(result)
     }
 
-    fn parse_one_inner(&mut self) -> Result<ObjectHeader<'a>, ObjectParseError> {
+    fn parse_one_inner(&mut self) -> Result<(Variation, HeaderDetails<'a>), ObjectParseError> {
         let gv = Variation::parse(&mut self.cursor)?;
         let qualifier = QualifierCode::parse(&mut self.cursor)?;
         match qualifier {
@@ -151,65 +151,77 @@ impl<'a> ObjectParser<'a> {
         }
     }
 
-    fn parse_all_objects(&mut self, gv: Variation) -> Result<ObjectHeader<'a>, ObjectParseError> {
-        match AllObjectsVariation::get(gv) {
-            Some(v) => Ok(ObjectHeader::AllObjects(v)),
-            None => Err(ObjectParseError::InvalidQualifierForVariation(gv)),
+    fn parse_all_objects(
+        &mut self,
+        v: Variation,
+    ) -> Result<(Variation, HeaderDetails<'a>), ObjectParseError> {
+        match AllObjectsVariation::get(v) {
+            Some(av) => Ok((v, HeaderDetails::AllObjects(av))),
+            None => Err(ObjectParseError::InvalidQualifierForVariation(v)),
         }
     }
 
-    fn parse_count_u8(&mut self, gv: Variation) -> Result<ObjectHeader<'a>, ObjectParseError> {
+    fn parse_count_u8(
+        &mut self,
+        v: Variation,
+    ) -> Result<(Variation, HeaderDetails<'a>), ObjectParseError> {
         let count = self.cursor.read_u8()?;
-        let data = CountVariation::parse(gv, count as u16, &mut self.cursor)?;
-        Ok(ObjectHeader::OneByteCount(count, data))
+        let data = CountVariation::parse(v, count as u16, &mut self.cursor)?;
+        Ok((v, HeaderDetails::OneByteCount(count, data)))
     }
 
-    fn parse_count_u16(&mut self, gv: Variation) -> Result<ObjectHeader<'a>, ObjectParseError> {
+    fn parse_count_u16(
+        &mut self,
+        v: Variation,
+    ) -> Result<(Variation, HeaderDetails<'a>), ObjectParseError> {
         let count = self.cursor.read_u16_le()?;
-        let data = CountVariation::parse(gv, count, &mut self.cursor)?;
-        Ok(ObjectHeader::TwoByteCount(count, data))
+        let data = CountVariation::parse(v, count, &mut self.cursor)?;
+        Ok((v, HeaderDetails::TwoByteCount(count, data)))
     }
 
-    fn parse_start_stop_u8(&mut self, gv: Variation) -> Result<ObjectHeader<'a>, ObjectParseError> {
+    fn parse_start_stop_u8(
+        &mut self,
+        v: Variation,
+    ) -> Result<(Variation, HeaderDetails<'a>), ObjectParseError> {
         let start = self.cursor.read_u8()?;
         let stop = self.cursor.read_u8()?;
         let range = Range::from(start as u16, stop as u16)?;
-        let data = RangedVariation::parse(self.function, gv, range, &mut self.cursor)?;
-        Ok(ObjectHeader::OneByteStartStop(start, stop, data))
+        let data = RangedVariation::parse(self.function, v, range, &mut self.cursor)?;
+        Ok((v, HeaderDetails::OneByteStartStop(start, stop, data)))
     }
 
     fn parse_start_stop_u16(
         &mut self,
-        gv: Variation,
-    ) -> Result<ObjectHeader<'a>, ObjectParseError> {
+        v: Variation,
+    ) -> Result<(Variation, HeaderDetails<'a>), ObjectParseError> {
         let start = self.cursor.read_u16_le()?;
         let stop = self.cursor.read_u16_le()?;
         let range = Range::from(start, stop)?;
-        let data = RangedVariation::parse(self.function, gv, range, &mut self.cursor)?;
-        Ok(ObjectHeader::TwoByteStartStop(start, stop, data))
+        let data = RangedVariation::parse(self.function, v, range, &mut self.cursor)?;
+        Ok((v, HeaderDetails::TwoByteStartStop(start, stop, data)))
     }
 
     fn parse_count_and_prefix_u8(
         &mut self,
-        gv: Variation,
-    ) -> Result<ObjectHeader<'a>, ObjectParseError> {
+        v: Variation,
+    ) -> Result<(Variation, HeaderDetails<'a>), ObjectParseError> {
         let count = self.cursor.read_u8()?;
-        let data = PrefixedVariation::<u8>::parse(gv, count as u16, &mut self.cursor)?;
-        Ok(ObjectHeader::OneByteCountAndPrefix(count, data))
+        let data = PrefixedVariation::<u8>::parse(v, count as u16, &mut self.cursor)?;
+        Ok((v, HeaderDetails::OneByteCountAndPrefix(count, data)))
     }
 
     fn parse_count_and_prefix_u16(
         &mut self,
-        gv: Variation,
-    ) -> Result<ObjectHeader<'a>, ObjectParseError> {
+        v: Variation,
+    ) -> Result<(Variation, HeaderDetails<'a>), ObjectParseError> {
         let count = self.cursor.read_u16_le()?;
-        let data = PrefixedVariation::<u16>::parse(gv, count, &mut self.cursor)?;
-        Ok(ObjectHeader::TwoByteCountAndPrefix(count, data))
+        let data = PrefixedVariation::<u16>::parse(v, count, &mut self.cursor)?;
+        Ok((v, HeaderDetails::TwoByteCountAndPrefix(count, data)))
     }
 }
 
 impl<'a> Iterator for ObjectParser<'a> {
-    type Item = Result<ObjectHeader<'a>, ObjectParseError>;
+    type Item = Result<(Variation, HeaderDetails<'a>), ObjectParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.parse_one()
@@ -359,22 +371,23 @@ mod test {
 
     #[test]
     fn parses_integrity_scan() {
-        let vec: Vec<ObjectHeader> = ObjectParser::parse(
+        let vec: Vec<HeaderDetails> = ObjectParser::parse(
             FunctionCode::Read,
             &[
                 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
             ],
         )
         .unwrap()
+        .map(|x| x.1)
         .collect();
 
         assert_eq!(
             vec,
             vec![
-                ObjectHeader::AllObjects(AllObjectsVariation::Group60Var2),
-                ObjectHeader::AllObjects(AllObjectsVariation::Group60Var3),
-                ObjectHeader::AllObjects(AllObjectsVariation::Group60Var4),
-                ObjectHeader::AllObjects(AllObjectsVariation::Group60Var1),
+                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var2),
+                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var3),
+                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var4),
+                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var1),
             ]
         )
     }
@@ -385,8 +398,8 @@ mod test {
         let mut parser = ObjectParser::parse(FunctionCode::Operate, header).unwrap();
 
         let items: Vec<Prefix<u8, Group41Var1>> = assert_matches!(
-            parser.next().unwrap(),
-            ObjectHeader::OneByteCountAndPrefix(01, PrefixedVariation::<u8>::Group41Var1(seq)) => seq.iter().collect()
+            parser.next().unwrap().1,
+            HeaderDetails::OneByteCountAndPrefix(01, PrefixedVariation::<u8>::Group41Var1(seq)) => seq.iter().collect()
         );
 
         assert_eq!(
@@ -408,8 +421,8 @@ mod test {
         let mut parser = ObjectParser::parse(FunctionCode::Response, header).unwrap();
 
         let items: Vec<(DoubleBit, u16)> = assert_matches!(
-            parser.next().unwrap(),
-            ObjectHeader::OneByteStartStop(01, 04, RangedVariation::Group3Var1(seq)) => seq.iter().collect()
+            parser.next().unwrap().1,
+            HeaderDetails::OneByteStartStop(01, 04, RangedVariation::Group3Var1(seq)) => seq.iter().collect()
         );
 
         assert_eq!(
@@ -430,8 +443,8 @@ mod test {
         let mut parser = ObjectParser::parse(FunctionCode::Write, header).unwrap();
 
         let items: Vec<Group50Var1> = assert_matches!(
-            parser.next().unwrap(),
-            ObjectHeader::OneByteCount(01, CountVariation::Group50Var1(seq)) => seq.iter().collect()
+            parser.next().unwrap().1,
+            HeaderDetails::OneByteCount(01, CountVariation::Group50Var1(seq)) => seq.iter().collect()
         );
 
         assert_eq!(
@@ -451,8 +464,8 @@ mod test {
         let mut parser = ObjectParser::parse(FunctionCode::Response, &input).unwrap();
 
         let items: Vec<(Group1Var2, u16)> = assert_matches!(
-            parser.next().unwrap(),
-            ObjectHeader::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => seq.iter().collect()
+            parser.next().unwrap().1,
+            HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => seq.iter().collect()
         );
 
         assert_eq!(
@@ -472,15 +485,15 @@ mod test {
         let mut parser = ObjectParser::parse(FunctionCode::Read, &input).unwrap();
 
         assert_matches!(
-            parser.next().unwrap(),
-            ObjectHeader::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
+            parser.next().unwrap().1,
+            HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
                 assert!(seq.is_empty())
             }
         );
 
         assert_matches!(
-            parser.next().unwrap(),
-            ObjectHeader::OneByteStartStop(07, 09, RangedVariation::Group1Var2(seq)) => {
+            parser.next().unwrap().1,
+            HeaderDetails::OneByteStartStop(07, 09, RangedVariation::Group1Var2(seq)) => {
                 assert!(seq.is_empty())
             }
         );
@@ -495,8 +508,8 @@ mod test {
         let mut parser = ObjectParser::parse(FunctionCode::Write, &input).unwrap();
 
         let vec: Vec<(bool, u16)> = assert_matches!(
-            parser.next().unwrap(),
-            ObjectHeader::OneByteStartStop(07, 07, RangedVariation::Group80Var1(seq)) => {
+            parser.next().unwrap().1,
+            HeaderDetails::OneByteStartStop(07, 07, RangedVariation::Group80Var1(seq)) => {
                 seq.iter().collect()
             }
         );
@@ -510,8 +523,8 @@ mod test {
         let input = [0x6E, 0x00, 0x00, 0x02, 0x03];
         let mut parser = ObjectParser::parse(FunctionCode::Read, &input).unwrap();
         assert_eq!(
-            parser.next().unwrap(),
-            ObjectHeader::OneByteStartStop(02, 03, RangedVariation::Group110Var0)
+            parser.next().unwrap().1,
+            HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group110Var0)
         );
         assert_eq!(parser.next(), None);
     }
@@ -531,8 +544,8 @@ mod test {
         let mut parser = ObjectParser::parse(FunctionCode::Response, &input).unwrap();
 
         let bytes: Vec<(Bytes, u16)> = assert_matches!(
-            parser.next().unwrap(),
-            ObjectHeader::OneByteStartStop(01, 02, RangedVariation::Group110VarX(0x01, seq)) => {
+            parser.next().unwrap().1,
+            HeaderDetails::OneByteStartStop(01, 02, RangedVariation::Group110VarX(0x01, seq)) => {
                 seq.iter().collect()
             }
         );

@@ -2,7 +2,7 @@ use crate::app::format::write;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::header::{Control, RequestHeader};
-use crate::app::parse::parser::{ObjectHeader, ObjectParseError, Response};
+use crate::app::parse::parser::{HeaderDetails, ObjectParseError, Response};
 use crate::app::sequence::Sequence;
 use crate::master::handlers::ResponseHandler;
 use crate::master::types::ClassScan;
@@ -65,12 +65,14 @@ impl TaskDetails {
 
                 handler.begin(1024, response.header);
 
-                for header in objects {
+                for (_, header) in objects {
                     match header {
-                        ObjectHeader::OneByteStartStop(_, _, v) => handler.handle_ranged(v),
-                        ObjectHeader::TwoByteStartStop(_, _, v) => handler.handle_ranged(v),
-                        ObjectHeader::OneByteCountAndPrefix(_, v) => handler.handle_prefixed_u8(v),
-                        ObjectHeader::TwoByteCountAndPrefix(_, v) => handler.handle_prefixed_u16(v),
+                        HeaderDetails::OneByteStartStop(_, _, v) => handler.handle_ranged(v),
+                        HeaderDetails::TwoByteStartStop(_, _, v) => handler.handle_ranged(v),
+                        HeaderDetails::OneByteCountAndPrefix(_, v) => handler.handle_prefixed_u8(v),
+                        HeaderDetails::TwoByteCountAndPrefix(_, v) => {
+                            handler.handle_prefixed_u16(v)
+                        }
                         _ => log::warn!("ignoring response header"),
                     }
                 }
