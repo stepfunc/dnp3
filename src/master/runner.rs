@@ -144,7 +144,7 @@ impl TaskRunner {
         &mut self,
         io: &mut T,
         rsp: Response<'_>,
-        task: &MasterTask,
+        task: &mut MasterTask,
         writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
     where
@@ -173,7 +173,7 @@ impl TaskRunner {
         &mut self,
         io: &mut T,
         rsp: Response<'_>,
-        task: &MasterTask,
+        task: &mut MasterTask,
         writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
     where
@@ -218,7 +218,7 @@ impl TaskRunner {
         &mut self,
         io: &mut T,
         rsp: Response<'_>,
-        task: &MasterTask,
+        task: &mut MasterTask,
         writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
     where
@@ -234,7 +234,7 @@ impl TaskRunner {
     pub async fn run<T>(
         &mut self,
         io: &mut T,
-        task: &MasterTask,
+        task: &mut MasterTask,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), TaskError>
@@ -279,6 +279,7 @@ impl TaskRunner {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::master::handlers::LoggingResponseHandler;
     use crate::master::task::TaskDetails;
     use crate::master::types::ClassScan;
     use crate::transport::mocks::{MockReader, MockWriter};
@@ -286,9 +287,9 @@ mod test {
 
     #[test]
     fn performs_multi_fragmented_class_scan() {
-        let task = MasterTask::new(
+        let mut task = MasterTask::new(
             1024,
-            TaskDetails::ClassScan(ClassScan::new(true, false, false, false)),
+            TaskDetails::ClassScan(ClassScan::class1(), Box::new(LoggingResponseHandler {})),
         );
 
         let mut runner = TaskRunner::new(Duration::from_secs(1));
@@ -309,6 +310,6 @@ mod test {
 
         let mut writer = MockWriter::mock();
         let mut reader = MockReader::mock();
-        tokio_test::block_on(runner.run(&mut io, &task, &mut writer, &mut reader)).unwrap();
+        tokio_test::block_on(runner.run(&mut io, &mut task, &mut writer, &mut reader)).unwrap();
     }
 }

@@ -2,8 +2,9 @@ use crate::app::format::write;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::header::{Control, RequestHeader};
-use crate::app::parse::parser::{ObjectParseError, Response};
+use crate::app::parse::parser::{ObjectHeader, ObjectParseError, Response};
 use crate::app::sequence::Sequence;
+use crate::master::handlers::ResponseHandler;
 use crate::master::types::ClassScan;
 use crate::util::cursor::{WriteCursor, WriteError};
 
@@ -26,19 +27,19 @@ pub enum ResponseResult {
 }
 
 pub enum TaskDetails {
-    ClassScan(ClassScan),
+    ClassScan(ClassScan, Box<dyn ResponseHandler>),
 }
 
 impl TaskDetails {
     pub fn is_read_request(&self) -> bool {
         match self {
-            TaskDetails::ClassScan(_) => true,
+            TaskDetails::ClassScan(_, _) => true,
         }
     }
 
     pub fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         match self {
-            TaskDetails::ClassScan(params) => {
+            TaskDetails::ClassScan(params, _) => {
                 RequestHeader::new(Control::request(seq), FunctionCode::Read).write(cursor)?;
                 if params.class1 {
                     write::write_all_objects(Variation::Group60Var2, cursor)?;
@@ -57,19 +58,21 @@ impl TaskDetails {
         }
     }
 
-    pub fn handle(&self, response: Response) -> Result<ResponseResult, ResponseError> {
+    pub fn handle(&mut self, response: Response) -> Result<ResponseResult, ResponseError> {
         match self {
-            TaskDetails::ClassScan(_) => {
-                log::info!(
-                    "fir: {} fin: {} seq: {}",
-                    response.header.control.fir,
-                    response.header.control.fin,
-                    response.header.control.seq.value()
-                );
+            TaskDetails::ClassScan(_, handler) => {
+                let objects = response.parse_objects()?;
 
-                for _ in response.parse_objects()? {
-                    log::info!("got a header");
+                handler.begin(1024, response.header);
+
+                for header in objects {
+                    match header {
+                        ObjectHeader::OneByteStartStop(_, _, v) => handler.handle_ranged(v),
+                        _ => log::info!("unknown response header"),
+                    }
                 }
+
+                handler.end(1024, response.header);
 
                 Ok(ResponseResult::Success)
             }

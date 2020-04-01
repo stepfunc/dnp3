@@ -15,6 +15,10 @@ impl ClassScan {
         }
     }
 
+    pub fn class1() -> Self {
+        Self::new(true, false, false, false)
+    }
+
     pub fn integrity() -> Self {
         Self::new(true, true, true, true)
     }
