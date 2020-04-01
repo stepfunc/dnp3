@@ -1,5 +1,4 @@
 use crate::app::format::write;
-use crate::app::gen::enums::FunctionCode;
 use crate::app::parse::parser::Response;
 use crate::app::sequence::Sequence;
 use crate::error::Error;
@@ -225,7 +224,7 @@ impl TaskRunner {
     where
         T: AsyncWrite + Unpin,
     {
-        if task.details.function() == FunctionCode::Read {
+        if task.details.is_read_request() {
             self.handle_read_response(io, rsp, task, writer).await
         } else {
             self.handle_non_read_response(io, rsp, task, writer).await
@@ -272,5 +271,41 @@ impl TaskRunner {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::master::task::TaskDetails;
+    use crate::master::types::ClassScan;
+    use crate::transport::mocks::{MockReader, MockWriter};
+    use tokio_test::io::Builder;
+
+    #[test]
+    fn performs_multi_fragmented_integrity_scan() {
+        let task = MasterTask::new(1024, TaskDetails::ClassScan(ClassScan::integrity()));
+
+        let mut runner = TaskRunner::new(Duration::from_secs(1));
+
+        let mut io= Builder::new()
+            .write(&[
+                0xC0, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
+            ])
+            // FIR=1, FIN=0, CON=1, SEQ = 0
+            .read(&[0xA0, 0x81, 0x00, 0x00])
+            // confirm
+            .write(&[0xC0, 0x00])
+            // FIR=0, FIN=0, CON=1, SEQ = 1
+            .read(&[0x21, 0x81, 0x00, 0x00])
+            // confirm
+            .write(&[0xC1, 0x00])
+            // FIR=0, FIN=1, CON=0, SEQ = 2
+            .read(&[0x42, 0x81, 0x00, 0x00])
+            .build();
+
+        let mut writer = MockWriter::mock();
+        let mut reader = MockReader::mock();
+        tokio_test::block_on(runner.run(&mut io, &task, &mut writer, &mut reader)).unwrap();
     }
 }

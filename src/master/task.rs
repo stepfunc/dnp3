@@ -32,16 +32,16 @@ pub enum TaskDetails {
 }
 
 impl TaskDetails {
-    pub fn function(&self) -> FunctionCode {
+    pub fn is_read_request(&self) -> bool {
         match self {
-            TaskDetails::ClassScan(_) => FunctionCode::Read,
+            TaskDetails::ClassScan(_) => true,
         }
     }
 
     pub fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         match self {
             TaskDetails::ClassScan(params) => {
-                RequestHeader::new(Control::request(seq), self.function()).write(cursor)?;
+                RequestHeader::new(Control::request(seq), FunctionCode::Read).write(cursor)?;
                 if params.class1 {
                     write::write_all_objects(Variation::Group60Var2, cursor)?;
                 }

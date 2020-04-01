@@ -1,8 +1,5 @@
-/*
 #[cfg(test)]
-#[macro_use]
 extern crate tokio_test;
-*/
 
 #[cfg(test)]
 #[macro_use]

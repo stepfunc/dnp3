@@ -14,6 +14,10 @@ impl MockWriter {
         Self {}
     }
 
+    pub fn mock() -> Self {
+        Self {}
+    }
+
     // just write the fragment directly to the I/O
     pub async fn write<W>(
         &mut self,
@@ -31,6 +35,10 @@ impl MockWriter {
 
 impl MockReader {
     pub fn new(_master: bool, _address: u16) -> Self {
+        Self::mock()
+    }
+
+    pub fn mock() -> Self {
         Self { buffer: [0; 2048] }
     }
 
