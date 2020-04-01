@@ -24,9 +24,9 @@ pub mod constants {
     pub const SEQ_MASK: u8 = 0b0011_1111;
 }
 
-pub fn create_transport_layer(is_master: bool, address: u16) -> (Reader, Writer) {
+pub fn create_transport_layer(is_master: bool, address: u16) -> (ReaderType, WriterType) {
     (
-        Reader::new(is_master, address),
-        Writer::new(is_master, address),
+        ReaderType::new(is_master, address),
+        WriterType::new(is_master, address),
     )
 }
