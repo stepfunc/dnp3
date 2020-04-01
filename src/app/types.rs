@@ -1,4 +1,6 @@
 use crate::app::gen::enums::{OpType, TripCloseCode};
+use crate::app::gen::variations::gv::Variation;
+use std::fmt::Formatter;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DoubleBit {
@@ -53,6 +55,13 @@ impl ControlCode {
         }
         x |= self.op_type.as_u8();
         x
+    }
+}
+
+impl std::fmt::Display for Variation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let (g,v) = self.to_group_and_var();
+        write!(f, "g{}v{}", g, v)
     }
 }
 

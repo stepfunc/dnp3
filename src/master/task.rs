@@ -2,7 +2,7 @@ use crate::app::format::write;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::header::{Control, RequestHeader};
-use crate::app::parse::parser::{HeaderDetails, ObjectParseError, Response};
+use crate::app::parse::parser::{ObjectParseError, Response};
 use crate::app::sequence::Sequence;
 use crate::master::handlers::ResponseHandler;
 use crate::master::types::ClassScan;
@@ -61,24 +61,7 @@ impl TaskDetails {
     pub fn handle(&mut self, response: Response) -> Result<ResponseResult, ResponseError> {
         match self {
             TaskDetails::ClassScan(_, handler) => {
-                let objects = response.parse_objects()?;
-
-                handler.begin(1024, response.header);
-
-                for header in objects {
-                    match header.details {
-                        HeaderDetails::OneByteStartStop(_, _, v) => handler.handle_ranged(v),
-                        HeaderDetails::TwoByteStartStop(_, _, v) => handler.handle_ranged(v),
-                        HeaderDetails::OneByteCountAndPrefix(_, v) => handler.handle_prefixed_u8(v),
-                        HeaderDetails::TwoByteCountAndPrefix(_, v) => {
-                            handler.handle_prefixed_u16(v)
-                        }
-                        _ => log::warn!("ignoring response header"),
-                    }
-                }
-
-                handler.end(1024, response.header);
-
+                handler.handle(1024, response.header, response.parse_objects()?);
                 Ok(ResponseResult::Success)
             }
         }

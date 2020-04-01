@@ -20,6 +20,20 @@ impl<'a> ObjectHeader<'a> {
     }
 }
 
+impl<'a> std::fmt::Display for ObjectHeader<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.details {
+            HeaderDetails::AllObjects(_) => write!(f, "{}", self.variation),
+            HeaderDetails::OneByteStartStop(s1, s2, _) => write!(f, "{} start: {} stop: {}", self.variation, s1, s2),
+            HeaderDetails::TwoByteStartStop(s1, s2, _) => write!(f, "{} start: {} stop: {}", self.variation, s1, s2),
+            HeaderDetails::OneByteCount(c, _) => write!(f, "{} count: {}", self.variation, c),
+            HeaderDetails::TwoByteCount(c, _) => write!(f, "{} count: {}", self.variation, c),
+            HeaderDetails::OneByteCountAndPrefix(c, _) => write!(f, "{} count: {}", self.variation, c),
+            HeaderDetails::TwoByteCountAndPrefix(c, _) => write!(f, "{} count: {}", self.variation, c),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum HeaderDetails<'a> {
     AllObjects(AllObjectsVariation),
@@ -87,7 +101,7 @@ impl<'a> Request<'a> {
 impl<'a> Response<'a> {
     pub fn parse_objects(
         &self,
-    ) -> Result<impl Iterator<Item = ObjectHeader<'a>>, ObjectParseError> {
+    ) -> Result<HeaderIterator<'a>, ObjectParseError> {
         Ok(ObjectParser::parse(self.header.function(), self.objects)?)
     }
 
@@ -107,11 +121,23 @@ pub struct ObjectParser<'a> {
     cursor: ReadCursor<'a>,
 }
 
+pub struct HeaderIterator<'a> {
+    parser: ObjectParser<'a>
+}
+
+impl<'a> Iterator for HeaderIterator<'a> {
+    type Item = ObjectHeader<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.parser.next().map(|x| x.unwrap())
+    }
+}
+
 impl<'a> ObjectParser<'a> {
     pub fn parse(
         function: FunctionCode,
         data: &'a [u8],
-    ) -> Result<impl Iterator<Item = ObjectHeader<'a>>, ObjectParseError> {
+    ) -> Result<HeaderIterator<'a>, ObjectParseError> {
         // we first do a single pass to ensure the ASDU is well-formed, returning an error if it occurs
         for x in ObjectParser::one_pass(function, data) {
             if let Err(e) = x {
@@ -120,13 +146,17 @@ impl<'a> ObjectParser<'a> {
         }
 
         // on the 2nd pass, we can unwrap b/c it can't possibly panic
-        Ok(ObjectParser::one_pass(function, data).map(|h| h.unwrap()))
+        Ok(
+            HeaderIterator {
+                parser: ObjectParser::one_pass(function, data)
+            }
+        )
     }
 
     fn one_pass(
         function: FunctionCode,
         data: &'a [u8],
-    ) -> impl Iterator<Item = Result<ObjectHeader<'a>, ObjectParseError>> {
+    ) -> Self {
         ObjectParser {
             cursor: ReadCursor::new(data),
             function,
