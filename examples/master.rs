@@ -1,4 +1,5 @@
-use dnp3rs::master::task::{MasterTask, TaskDetails, TaskRunner};
+use dnp3rs::master::runner::TaskRunner;
+use dnp3rs::master::task::{MasterTask, TaskDetails};
 use dnp3rs::master::types::ClassScan;
 use std::net::SocketAddr;
 use std::str::FromStr;
