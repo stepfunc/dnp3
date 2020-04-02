@@ -80,4 +80,15 @@ impl MasterTask {
             details,
         }
     }
+
+    pub fn class_scan(
+        destination: u16,
+        class_scan: ClassScan,
+        handler: Box<dyn ResponseHandler>,
+    ) -> Self {
+        Self {
+            destination,
+            details: TaskDetails::ClassScan(class_scan, handler),
+        }
+    }
 }

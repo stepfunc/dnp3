@@ -12,7 +12,7 @@
 
 use crate::app::gen::enums::CommandStatus;
 use crate::app::parse::traits::FixedSize;
-use crate::app::types::ControlCode;
+use crate::app::types::{ControlCode, Timestamp};
 use crate::util::cursor::*;
 
 /// Time Delay - Fine
@@ -30,19 +30,19 @@ pub struct Group52Var1 {
 /// Time and Date CTO - Absolute time, unsynchronized
 #[derive(Debug, PartialEq)]
 pub struct Group51Var2 {
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Time and Date CTO - Absolute time, synchronized
 #[derive(Debug, PartialEq)]
 pub struct Group51Var1 {
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Time and Date - Indexed absolute time and long interval
 #[derive(Debug, PartialEq)]
 pub struct Group50Var4 {
-    pub time: u64,
+    pub time: Timestamp,
     pub interval: u32,
     pub units: u8,
 }
@@ -50,13 +50,13 @@ pub struct Group50Var4 {
 /// Time and Date - Absolute Time at last recorded time
 #[derive(Debug, PartialEq)]
 pub struct Group50Var3 {
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Time and Date - Absolute Time
 #[derive(Debug, PartialEq)]
 pub struct Group50Var1 {
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Command Event - Double-precision With Time
@@ -64,7 +64,7 @@ pub struct Group50Var1 {
 pub struct Group43Var8 {
     pub status: CommandStatus,
     pub value: f64,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Command Event - Single-precision With Time
@@ -72,7 +72,7 @@ pub struct Group43Var8 {
 pub struct Group43Var7 {
     pub status: CommandStatus,
     pub value: f32,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Command Event - Double-precision
@@ -94,7 +94,7 @@ pub struct Group43Var5 {
 pub struct Group43Var4 {
     pub status: CommandStatus,
     pub value: i16,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Command Event - 32-bit With Time
@@ -102,7 +102,7 @@ pub struct Group43Var4 {
 pub struct Group43Var3 {
     pub status: CommandStatus,
     pub value: i32,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Command Event - 16-bit
@@ -124,7 +124,7 @@ pub struct Group43Var1 {
 pub struct Group42Var8 {
     pub flags: u8,
     pub value: f64,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Output Event - Single-precision With Flag and Time
@@ -132,7 +132,7 @@ pub struct Group42Var8 {
 pub struct Group42Var7 {
     pub flags: u8,
     pub value: f32,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Output Event - Double-precision With Flag
@@ -154,7 +154,7 @@ pub struct Group42Var5 {
 pub struct Group42Var4 {
     pub flags: u8,
     pub value: i16,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Output Event - 32-bit With Flag and Time
@@ -162,7 +162,7 @@ pub struct Group42Var4 {
 pub struct Group42Var3 {
     pub flags: u8,
     pub value: i32,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Output Event - 16-bit With Flag
@@ -240,7 +240,7 @@ pub struct Group40Var1 {
 pub struct Group32Var8 {
     pub flags: u8,
     pub value: f64,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Input Event - Single-precision With Flag and Time
@@ -248,7 +248,7 @@ pub struct Group32Var8 {
 pub struct Group32Var7 {
     pub flags: u8,
     pub value: f32,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Input Event - Double-precision With Flag
@@ -270,7 +270,7 @@ pub struct Group32Var5 {
 pub struct Group32Var4 {
     pub flags: u8,
     pub value: i16,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Input Event - 32-bit With Flag and Time
@@ -278,7 +278,7 @@ pub struct Group32Var4 {
 pub struct Group32Var3 {
     pub flags: u8,
     pub value: i32,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Analog Input Event - 16-bit With Flag
@@ -340,7 +340,7 @@ pub struct Group30Var1 {
 pub struct Group23Var6 {
     pub flags: u8,
     pub value: u16,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Frozen Counter Event - 32-bit With Flag and Time
@@ -348,7 +348,7 @@ pub struct Group23Var6 {
 pub struct Group23Var5 {
     pub flags: u8,
     pub value: u32,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Frozen Counter Event - 16-bit With Flag
@@ -370,7 +370,7 @@ pub struct Group23Var1 {
 pub struct Group22Var6 {
     pub flags: u8,
     pub value: u16,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Counter Event - 32-bit With Flag and Time
@@ -378,7 +378,7 @@ pub struct Group22Var6 {
 pub struct Group22Var5 {
     pub flags: u8,
     pub value: u32,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Counter Event - 16-bit With Flag
@@ -412,7 +412,7 @@ pub struct Group21Var9 {
 pub struct Group21Var6 {
     pub flags: u8,
     pub value: u16,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Frozen Counter - 32-bit With Flag and Time
@@ -420,7 +420,7 @@ pub struct Group21Var6 {
 pub struct Group21Var5 {
     pub flags: u8,
     pub value: u32,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Frozen Counter - 16-bit With Flag
@@ -467,7 +467,7 @@ pub struct Group20Var1 {
 #[derive(Debug, PartialEq)]
 pub struct Group13Var2 {
     pub flags: u8,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Binary Command Event - Without Time
@@ -490,7 +490,7 @@ pub struct Group12Var1 {
 #[derive(Debug, PartialEq)]
 pub struct Group11Var2 {
     pub flags: u8,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Binary Output Event - Output Status Without Time
@@ -516,7 +516,7 @@ pub struct Group4Var3 {
 #[derive(Debug, PartialEq)]
 pub struct Group4Var2 {
     pub flags: u8,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Double-bit Binary Input Event - Without Time
@@ -542,7 +542,7 @@ pub struct Group2Var3 {
 #[derive(Debug, PartialEq)]
 pub struct Group2Var2 {
     pub flags: u8,
-    pub time: u64,
+    pub time: Timestamp,
 }
 
 /// Binary Input Event - Without Time
@@ -597,13 +597,13 @@ impl FixedSize for Group51Var2 {
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group51Var2 {
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
     #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -614,13 +614,13 @@ impl FixedSize for Group51Var1 {
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group51Var1 {
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
     #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -631,7 +631,7 @@ impl FixedSize for Group50Var4 {
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group50Var4 {
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
                 interval: cursor.read_u32_le()?,
                 units: cursor.read_u8()?,
             }
@@ -639,7 +639,7 @@ impl FixedSize for Group50Var4 {
     }
     #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         cursor.write_u32_le(self.interval)?;
         cursor.write_u8(self.units)?;
         Ok(())
@@ -652,13 +652,13 @@ impl FixedSize for Group50Var3 {
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group50Var3 {
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
     #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -669,13 +669,13 @@ impl FixedSize for Group50Var1 {
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group50Var1 {
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
     #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -688,7 +688,7 @@ impl FixedSize for Group43Var8 {
             Group43Var8 {
                 status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_f64_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -696,7 +696,7 @@ impl FixedSize for Group43Var8 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_f64_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -709,7 +709,7 @@ impl FixedSize for Group43Var7 {
             Group43Var7 {
                 status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_f32_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -717,7 +717,7 @@ impl FixedSize for Group43Var7 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_f32_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -768,7 +768,7 @@ impl FixedSize for Group43Var4 {
             Group43Var4 {
                 status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_i16_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -776,7 +776,7 @@ impl FixedSize for Group43Var4 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_i16_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -789,7 +789,7 @@ impl FixedSize for Group43Var3 {
             Group43Var3 {
                 status: CommandStatus::from(cursor.read_u8()?),
                 value: cursor.read_i32_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -797,7 +797,7 @@ impl FixedSize for Group43Var3 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_i32_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -848,7 +848,7 @@ impl FixedSize for Group42Var8 {
             Group42Var8 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_f64_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -856,7 +856,7 @@ impl FixedSize for Group42Var8 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f64_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -869,7 +869,7 @@ impl FixedSize for Group42Var7 {
             Group42Var7 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_f32_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -877,7 +877,7 @@ impl FixedSize for Group42Var7 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f32_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -928,7 +928,7 @@ impl FixedSize for Group42Var4 {
             Group42Var4 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_i16_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -936,7 +936,7 @@ impl FixedSize for Group42Var4 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i16_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -949,7 +949,7 @@ impl FixedSize for Group42Var3 {
             Group42Var3 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_i32_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -957,7 +957,7 @@ impl FixedSize for Group42Var3 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i32_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1160,7 +1160,7 @@ impl FixedSize for Group32Var8 {
             Group32Var8 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_f64_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -1168,7 +1168,7 @@ impl FixedSize for Group32Var8 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f64_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1181,7 +1181,7 @@ impl FixedSize for Group32Var7 {
             Group32Var7 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_f32_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -1189,7 +1189,7 @@ impl FixedSize for Group32Var7 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f32_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1240,7 +1240,7 @@ impl FixedSize for Group32Var4 {
             Group32Var4 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_i16_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -1248,7 +1248,7 @@ impl FixedSize for Group32Var4 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i16_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1261,7 +1261,7 @@ impl FixedSize for Group32Var3 {
             Group32Var3 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_i32_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -1269,7 +1269,7 @@ impl FixedSize for Group32Var3 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i32_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1430,7 +1430,7 @@ impl FixedSize for Group23Var6 {
             Group23Var6 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_u16_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -1438,7 +1438,7 @@ impl FixedSize for Group23Var6 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1451,7 +1451,7 @@ impl FixedSize for Group23Var5 {
             Group23Var5 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_u32_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -1459,7 +1459,7 @@ impl FixedSize for Group23Var5 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u32_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1510,7 +1510,7 @@ impl FixedSize for Group22Var6 {
             Group22Var6 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_u16_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -1518,7 +1518,7 @@ impl FixedSize for Group22Var6 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1531,7 +1531,7 @@ impl FixedSize for Group22Var5 {
             Group22Var5 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_u32_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -1539,7 +1539,7 @@ impl FixedSize for Group22Var5 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u32_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1624,7 +1624,7 @@ impl FixedSize for Group21Var6 {
             Group21Var6 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_u16_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -1632,7 +1632,7 @@ impl FixedSize for Group21Var6 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1645,7 +1645,7 @@ impl FixedSize for Group21Var5 {
             Group21Var5 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_u32_le()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
@@ -1653,7 +1653,7 @@ impl FixedSize for Group21Var5 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u32_le(self.value)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1775,14 +1775,14 @@ impl FixedSize for Group13Var2 {
         Ok(
             Group13Var2 {
                 flags: cursor.read_u8()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
     #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1836,14 +1836,14 @@ impl FixedSize for Group11Var2 {
         Ok(
             Group11Var2 {
                 flags: cursor.read_u8()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
     #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1908,14 +1908,14 @@ impl FixedSize for Group4Var2 {
         Ok(
             Group4Var2 {
                 flags: cursor.read_u8()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
     #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }
@@ -1980,14 +1980,14 @@ impl FixedSize for Group2Var2 {
         Ok(
             Group2Var2 {
                 flags: cursor.read_u8()?,
-                time: cursor.read_u48_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
             }
         )
     }
     #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
-        cursor.write_u48_le(self.time)?;
+        cursor.write_u48_le(self.time.value)?;
         Ok(())
     }
 }

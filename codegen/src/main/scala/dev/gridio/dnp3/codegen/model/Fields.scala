@@ -1,6 +1,5 @@
 package dev.gridio.dnp3.codegen.model
 
-import dev.gridio.dnp3.codegen.model.enums._
 import dev.gridio.dnp3.codegen.model.enums.protocol.CommandStatus
 
 sealed abstract class FixedSizeFieldType(val numBytes: Int)
@@ -15,6 +14,7 @@ case object Float32Field extends FixedSizeFieldType(4)
 case object Float64Field extends FixedSizeFieldType(8)
 case class EnumFieldType(model: EnumModel) extends FixedSizeFieldType(1)
 case class CustomFieldTypeU8(structName : String) extends FixedSizeFieldType(1)
+case object TimestampField extends FixedSizeFieldType(6)
 
 
 object FieldAttribute extends Enumeration {
@@ -29,7 +29,7 @@ object FixedSizeField {
 
   // timestamps
   val time16 = FixedSizeField("time", UInt16Field, Set(FieldAttribute.IsTimeRel))
-  val time48 = FixedSizeField("time", UInt48Field, Set(FieldAttribute.IsTimeUTC))
+  val time48 = FixedSizeField("time", TimestampField, Set(FieldAttribute.IsTimeUTC))
 
   // counter values
   val count16 = FixedSizeField("value", UInt16Field)

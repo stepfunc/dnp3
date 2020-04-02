@@ -1,6 +1,6 @@
 use dnp3rs::master::handlers::LoggingResponseHandler;
 use dnp3rs::master::runner::TaskRunner;
-use dnp3rs::master::task::{MasterTask, TaskDetails};
+use dnp3rs::master::task::MasterTask;
 use dnp3rs::master::types::ClassScan;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -18,9 +18,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut runner = TaskRunner::new(Duration::from_secs(1));
 
     loop {
-        let mut task = MasterTask::new(
+        let mut task = MasterTask::class_scan(
             1024,
-            TaskDetails::ClassScan(ClassScan::integrity(), Box::new(LoggingResponseHandler {})),
+            ClassScan::integrity(),
+            LoggingResponseHandler::create(),
         );
         runner
             .run(&mut socket, &mut task, &mut writer, &mut reader)

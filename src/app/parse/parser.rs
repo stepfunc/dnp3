@@ -24,12 +24,20 @@ impl<'a> std::fmt::Display for ObjectHeader<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.details {
             HeaderDetails::AllObjects(_) => write!(f, "{}", self.variation),
-            HeaderDetails::OneByteStartStop(s1, s2, _) => write!(f, "{} start: {} stop: {}", self.variation, s1, s2),
-            HeaderDetails::TwoByteStartStop(s1, s2, _) => write!(f, "{} start: {} stop: {}", self.variation, s1, s2),
+            HeaderDetails::OneByteStartStop(s1, s2, _) => {
+                write!(f, "{} start: {} stop: {}", self.variation, s1, s2)
+            }
+            HeaderDetails::TwoByteStartStop(s1, s2, _) => {
+                write!(f, "{} start: {} stop: {}", self.variation, s1, s2)
+            }
             HeaderDetails::OneByteCount(c, _) => write!(f, "{} count: {}", self.variation, c),
             HeaderDetails::TwoByteCount(c, _) => write!(f, "{} count: {}", self.variation, c),
-            HeaderDetails::OneByteCountAndPrefix(c, _) => write!(f, "{} count: {}", self.variation, c),
-            HeaderDetails::TwoByteCountAndPrefix(c, _) => write!(f, "{} count: {}", self.variation, c),
+            HeaderDetails::OneByteCountAndPrefix(c, _) => {
+                write!(f, "{} count: {}", self.variation, c)
+            }
+            HeaderDetails::TwoByteCountAndPrefix(c, _) => {
+                write!(f, "{} count: {}", self.variation, c)
+            }
         }
     }
 }
@@ -99,9 +107,7 @@ impl<'a> Request<'a> {
 }
 
 impl<'a> Response<'a> {
-    pub fn parse_objects(
-        &self,
-    ) -> Result<HeaderIterator<'a>, ObjectParseError> {
+    pub fn parse_objects(&self) -> Result<HeaderIterator<'a>, ObjectParseError> {
         Ok(ObjectParser::parse(self.header.function(), self.objects)?)
     }
 
@@ -122,7 +128,7 @@ pub struct ObjectParser<'a> {
 }
 
 pub struct HeaderIterator<'a> {
-    parser: ObjectParser<'a>
+    parser: ObjectParser<'a>,
 }
 
 impl<'a> Iterator for HeaderIterator<'a> {
@@ -146,17 +152,12 @@ impl<'a> ObjectParser<'a> {
         }
 
         // on the 2nd pass, we can unwrap b/c it can't possibly panic
-        Ok(
-            HeaderIterator {
-                parser: ObjectParser::one_pass(function, data)
-            }
-        )
+        Ok(HeaderIterator {
+            parser: ObjectParser::one_pass(function, data),
+        })
     }
 
-    fn one_pass(
-        function: FunctionCode,
-        data: &'a [u8],
-    ) -> Self {
+    fn one_pass(function: FunctionCode, data: &'a [u8]) -> Self {
         ObjectParser {
             cursor: ReadCursor::new(data),
             function,
@@ -337,7 +338,7 @@ mod test {
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::prefix::Prefix;
     use crate::app::sequence::Sequence;
-    use crate::app::types::DoubleBit;
+    use crate::app::types::{DoubleBit, Timestamp};
 
     fn test_parse_error(input: &[u8], func: FunctionCode, err: ObjectParseError) {
         assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);
@@ -495,7 +496,9 @@ mod test {
         assert_eq!(
             items,
             vec![Group50Var1 {
-                time: 0x00_00_FA_FB_FC_FD_FE_FF
+                time: Timestamp {
+                    value: 0x00_00_FA_FB_FC_FD_FE_FF
+                }
             }]
         );
 

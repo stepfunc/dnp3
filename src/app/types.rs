@@ -2,6 +2,23 @@ use crate::app::gen::enums::{OpType, TripCloseCode};
 use crate::app::gen::variations::gv::Variation;
 use std::fmt::Formatter;
 
+#[derive(Debug, PartialEq)]
+pub struct Timestamp {
+    pub value: u64,
+}
+
+impl Timestamp {
+    pub fn new(value: u64) -> Self {
+        Self { value }
+    }
+}
+
+pub struct Binary {
+    pub value: bool,
+    pub flags: u8,
+    pub time: Timestamp,
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DoubleBit {
     Intermediate,
@@ -60,7 +77,7 @@ impl ControlCode {
 
 impl std::fmt::Display for Variation {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let (g,v) = self.to_group_and_var();
+        let (g, v) = self.to_group_and_var();
         write!(f, "g{}v{}", g, v)
     }
 }

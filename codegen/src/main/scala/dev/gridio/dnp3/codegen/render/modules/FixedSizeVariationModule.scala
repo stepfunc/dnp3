@@ -16,7 +16,7 @@ object FixedSizeVariationModule extends Module {
     "use crate::app::parse::traits::FixedSize;".eol ++
     "use crate::util::cursor::*;".eol ++
     "use crate::app::gen::enums::CommandStatus;".eol ++
-    "use crate::app::types::ControlCode;".eol ++
+    "use crate::app::types::{ControlCode, Timestamp};".eol ++
     space ++
     spaced(variations.map(v => structDefinition(v)).iterator) ++
     space ++
@@ -35,6 +35,7 @@ object FixedSizeVariationModule extends Module {
       case Float64Field => "f64"
       case x : EnumFieldType => x.model.name
       case x : CustomFieldTypeU8 => x.structName
+      case TimestampField => "Timestamp"
       case _ => throw new Exception(s"Unhandled field type: ${f.toString}")
     }
   }
@@ -51,6 +52,7 @@ object FixedSizeVariationModule extends Module {
       case Float64Field => "f64_le"
       case EnumFieldType(_) => "u8"
       case CustomFieldTypeU8(_) => "u8"
+      case TimestampField => "u48_le"
       case _ => throw new Exception(s"Unhandled field type: ${f.toString}")
     }
   }
@@ -69,6 +71,7 @@ object FixedSizeVariationModule extends Module {
       f.typ match {
         case x : EnumFieldType => s"${x.model.name}::from(${inner})"
         case CustomFieldTypeU8(name) => s"${name}::from(${inner})"
+        case TimestampField => s"Timestamp::new(${inner})"
         case _ => inner
       }
     }
@@ -78,6 +81,7 @@ object FixedSizeVariationModule extends Module {
       f.typ match {
         case _ : EnumFieldType => write(".as_u8()")
         case CustomFieldTypeU8(name) => write(".as_u8()")
+        case TimestampField => write(".value")
         case _ => write("")
       }
     }
