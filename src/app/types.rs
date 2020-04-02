@@ -1,15 +1,42 @@
 use crate::app::gen::enums::{OpType, TripCloseCode};
 use crate::app::gen::variations::gv::Variation;
+use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use std::fmt::Formatter;
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Timestamp {
     pub value: u64,
 }
 
 impl Timestamp {
+    pub const MASK_U48: u64 = 0x00FF_FFFF_FFFF_FFFF;
+    pub const OUT_OF_RANGE: &'static str = "<out of range>";
+
     pub fn new(value: u64) -> Self {
-        Self { value }
+        Self {
+            value: value & Self::MASK_U48,
+        }
+    }
+
+    pub fn min() -> Self {
+        Self::new(std::u64::MIN)
+    }
+
+    pub fn max() -> Self {
+        Self::new(std::u64::MAX)
+    }
+
+    pub fn to_datetime_utc(self) -> Option<DateTime<Utc>> {
+        Utc.timestamp_millis_opt(self.value as i64).single()
+    }
+}
+
+impl std::fmt::Display for Timestamp {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.to_datetime_utc() {
+            Some(x) => write!(f, "{}", x.to_rfc3339_opts(SecondsFormat::Millis, true)),
+            None => f.write_str(Timestamp::OUT_OF_RANGE),
+        }
     }
 }
 
@@ -85,6 +112,19 @@ impl std::fmt::Display for Variation {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn conversion_from_timestamp_to_datetime_utc_cannot_overflow() {
+        let timestamp = Timestamp::new(std::u64::MAX);
+        assert_eq!(timestamp.to_datetime_utc(), None)
+    }
+
+    #[test]
+    fn timestamp_display_formatting_works_as_expected() {
+        assert_eq!(format!("{}", Timestamp::min()), "1970-01-01T00:00:00.000Z");
+
+        assert_eq!(format!("{}", Timestamp::max()), Timestamp::OUT_OF_RANGE);
+    }
 
     fn test_control_code_round_trip(byte: u8, cc: ControlCode) {
         assert_eq!(cc.as_u8(), byte);
