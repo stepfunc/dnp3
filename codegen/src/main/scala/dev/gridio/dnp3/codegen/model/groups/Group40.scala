@@ -12,7 +12,7 @@ object Group40 extends ObjectGroup {
 
   def desc: String = "Analog Output Status"
 
-  override def groupType: GroupType = GroupType.Event
+  override def groupType: GroupType = GroupType.Static
 }
 
 object Group40Var0 extends AnyVariation(Group40, 0)
