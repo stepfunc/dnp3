@@ -10,8 +10,8 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::fixed::*;
+use crate::app::gen::variations::gv::Variation;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::ObjectParseError;
 use crate::util::cursor::ReadCursor;

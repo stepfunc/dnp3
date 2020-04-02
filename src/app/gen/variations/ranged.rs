@@ -10,13 +10,13 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::parse::range::{RangedSequence, Range};
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
-use crate::util::cursor::ReadCursor;
-use crate::app::parse::parser::ObjectParseError;
-use crate::app::parse::bytes::RangedBytesSequence;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
+use crate::app::parse::bytes::RangedBytesSequence;
+use crate::app::parse::parser::ObjectParseError;
+use crate::app::parse::range::{Range, RangedSequence};
+use crate::util::cursor::ReadCursor;
 use crate::util::logging::log_items;
 
 #[derive(Debug, PartialEq)]
@@ -94,7 +94,7 @@ impl<'a> RangedVariation<'a> {
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
         }
     }
-    
+
     pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
@@ -130,8 +130,8 @@ impl<'a> RangedVariation<'a> {
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
         }
     }
-    
-    pub fn log(&self, level : log::Level) {
+
+    pub fn log(&self, level: log::Level) {
         match self {
             RangedVariation::Group1Var0 => {}
             RangedVariation::Group1Var1(seq) => log_items(level, seq.iter()),
@@ -163,7 +163,7 @@ impl<'a> RangedVariation<'a> {
             RangedVariation::Group30Var6(seq) => log_items(level, seq.iter()),
             RangedVariation::Group80Var1(seq) => log_items(level, seq.iter()),
             RangedVariation::Group110Var0 => {}
-            RangedVariation::Group110VarX(_,_) => {}
+            RangedVariation::Group110VarX(_, _) => {}
         }
     }
 }
