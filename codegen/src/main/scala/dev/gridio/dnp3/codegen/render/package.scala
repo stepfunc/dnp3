@@ -13,6 +13,8 @@ package object render {
 
   def commented(s: String): String = s"/// ${s}"
 
+  def quoted(s: String): String = s""""${s}""""
+
   def spaced(groups: Iterator[Iterator[String]]): Iterator[String] = {
     groups.foldLeft(Iterator.empty[String])((x, sum) => sum ++ space ++ x)
   }

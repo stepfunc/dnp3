@@ -2025,3 +2025,545 @@ impl FixedSize for Group1Var2 {
         Ok(())
     }
 }
+
+impl std::fmt::Display for Group52Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "time: {}", self.time)
+    }
+}
+
+impl std::fmt::Display for Group52Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "time: {}", self.time)
+    }
+}
+
+impl std::fmt::Display for Group51Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "time: {}", self.time)
+    }
+}
+
+impl std::fmt::Display for Group51Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "time: {}", self.time)
+    }
+}
+
+impl std::fmt::Display for Group50Var4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "time: {} interval: {} units: {}",
+            self.time, self.interval, self.units
+        )
+    }
+}
+
+impl std::fmt::Display for Group50Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "time: {}", self.time)
+    }
+}
+
+impl std::fmt::Display for Group50Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "time: {}", self.time)
+    }
+}
+
+impl std::fmt::Display for Group43Var8 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "status: {:?} value: {} time: {}",
+            self.status, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group43Var7 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "status: {:?} value: {} time: {}",
+            self.status, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group43Var6 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {}", self.status, self.value)
+    }
+}
+
+impl std::fmt::Display for Group43Var5 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {}", self.status, self.value)
+    }
+}
+
+impl std::fmt::Display for Group43Var4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "status: {:?} value: {} time: {}",
+            self.status, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group43Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "status: {:?} value: {} time: {}",
+            self.status, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group43Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {}", self.status, self.value)
+    }
+}
+
+impl std::fmt::Display for Group43Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {}", self.status, self.value)
+    }
+}
+
+impl std::fmt::Display for Group42Var8 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group42Var7 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group42Var6 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group42Var5 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group42Var4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group42Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group42Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group42Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group41Var4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {} status: {:?}", self.value, self.status)
+    }
+}
+
+impl std::fmt::Display for Group41Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {} status: {:?}", self.value, self.status)
+    }
+}
+
+impl std::fmt::Display for Group41Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {} status: {:?}", self.value, self.status)
+    }
+}
+
+impl std::fmt::Display for Group41Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {} status: {:?}", self.value, self.status)
+    }
+}
+
+impl std::fmt::Display for Group40Var4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group40Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group40Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group40Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group32Var8 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group32Var7 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group32Var6 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group32Var5 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group32Var4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group32Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group32Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group32Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group30Var6 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group30Var5 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group30Var4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {}", self.value)
+    }
+}
+
+impl std::fmt::Display for Group30Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {}", self.value)
+    }
+}
+
+impl std::fmt::Display for Group30Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group30Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group23Var6 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group23Var5 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group23Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group23Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group22Var6 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group22Var5 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group22Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group22Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group21Var10 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {}", self.value)
+    }
+}
+
+impl std::fmt::Display for Group21Var9 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {}", self.value)
+    }
+}
+
+impl std::fmt::Display for Group21Var6 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group21Var5 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "flags: {} value: {} time: {}",
+            self.flags, self.value, self.time
+        )
+    }
+}
+
+impl std::fmt::Display for Group21Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group21Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group20Var6 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {}", self.value)
+    }
+}
+
+impl std::fmt::Display for Group20Var5 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {}", self.value)
+    }
+}
+
+impl std::fmt::Display for Group20Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group20Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", self.flags, self.value)
+    }
+}
+
+impl std::fmt::Display for Group13Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} time: {}", self.flags, self.time)
+    }
+}
+
+impl std::fmt::Display for Group13Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {}", self.flags)
+    }
+}
+
+impl std::fmt::Display for Group12Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "code: {:?} count: {} on_time: {} off_time: {} status: {:?}",
+            self.code, self.count, self.on_time, self.off_time, self.status
+        )
+    }
+}
+
+impl std::fmt::Display for Group11Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} time: {}", self.flags, self.time)
+    }
+}
+
+impl std::fmt::Display for Group11Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {}", self.flags)
+    }
+}
+
+impl std::fmt::Display for Group10Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {}", self.flags)
+    }
+}
+
+impl std::fmt::Display for Group4Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} time: {}", self.flags, self.time)
+    }
+}
+
+impl std::fmt::Display for Group4Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} time: {}", self.flags, self.time)
+    }
+}
+
+impl std::fmt::Display for Group4Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {}", self.flags)
+    }
+}
+
+impl std::fmt::Display for Group3Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {}", self.flags)
+    }
+}
+
+impl std::fmt::Display for Group2Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} time: {}", self.flags, self.time)
+    }
+}
+
+impl std::fmt::Display for Group2Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} time: {}", self.flags, self.time)
+    }
+}
+
+impl std::fmt::Display for Group2Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {}", self.flags)
+    }
+}
+
+impl std::fmt::Display for Group1Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {}", self.flags)
+    }
+}

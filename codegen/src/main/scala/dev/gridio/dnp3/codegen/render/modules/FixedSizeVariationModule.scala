@@ -20,7 +20,9 @@ object FixedSizeVariationModule extends Module {
     space ++
     spaced(variations.map(v => structDefinition(v)).iterator) ++
     space ++
-    spaced(variations.map(v => implFixedSizedVariation(v)).iterator)
+    spaced(variations.map(v => implFixedSizedVariation(v)).iterator) ++
+    space ++
+    spaced(variations.map(v => implDisplay(v)).iterator)
   }
 
   private def getFieldType(f: FixedSizeFieldType) : String = {
@@ -60,6 +62,30 @@ object FixedSizeVariationModule extends Module {
     "#[derive(Debug, PartialEq)]".eol ++
     bracket(s"pub struct ${gv.name}") {
       gv.fields.map(f => s"pub ${f.name}: ${getFieldType(f.typ)},").iterator
+    }
+  }
+
+  private def implDisplay(gv : FixedSize)(implicit indent: Indentation): Iterator[String] = {
+    def fieldDisplayType(typ: FixedSizeFieldType): String = {
+      typ match {
+        case _ : EnumFieldType => "{:?}"
+        case _ : CustomFieldTypeU8 => "{:?}"
+        case _ => "{}"
+      }
+    }
+
+    def fieldNames : String = {
+      quoted(gv.fields.map( f=> s"${f.name}: ${fieldDisplayType(f.typ)}").mkString(" "))
+    }
+
+    def fieldArgs : String = {
+      gv.fields.map( f=> s"self.${f.name}").mkString(", ")
+    }
+
+    bracket(s"impl std::fmt::Display for ${gv.name}") {
+      bracket("fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
+        s"write!(f, ${fieldNames}, ${fieldArgs})".eol
+      }
     }
   }
 
