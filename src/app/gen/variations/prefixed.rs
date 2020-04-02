@@ -10,20 +10,17 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
-use crate::app::parse::bytes::PrefixedBytesSequence;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::ObjectParseError;
-use crate::app::parse::prefix::Prefix;
-use crate::app::parse::traits::FixedSize;
+use crate::app::gen::variations::fixed::*;
 use crate::util::cursor::ReadCursor;
+use crate::app::parse::parser::ObjectParseError;
+use crate::app::parse::traits::FixedSize;
+use crate::app::parse::prefix::Prefix;
+use crate::app::parse::bytes::PrefixedBytesSequence;
 
 #[derive(Debug, PartialEq)]
-pub enum PrefixedVariation<'a, I>
-where
-    I: FixedSize,
-{
+pub enum PrefixedVariation<'a, I> where I : FixedSize {
     Group2Var1(CountSequence<'a, Prefix<I, Group2Var1>>),
     Group2Var2(CountSequence<'a, Prefix<I, Group2Var2>>),
     Group2Var3(CountSequence<'a, Prefix<I, Group2Var3>>),
@@ -78,10 +75,7 @@ where
     Group111VarX(u8, PrefixedBytesSequence<'a, I>),
 }
 
-impl<'a, I> PrefixedVariation<'a, I>
-where
-    I: FixedSize,
-{
+impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize {
     #[rustfmt::skip]
     pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
         match v {

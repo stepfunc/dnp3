@@ -33,7 +33,7 @@ impl TripCloseCode {
             _ => TripCloseCode::Unknown(x),
         }
     }
-
+    
     pub fn as_u8(self) -> u8 {
         match self {
             TripCloseCode::Nul => 0,
@@ -43,7 +43,7 @@ impl TripCloseCode {
             TripCloseCode::Unknown(x) => x,
         }
     }
-
+    
     pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
@@ -72,7 +72,7 @@ impl OpType {
             _ => OpType::Unknown(x),
         }
     }
-
+    
     pub fn as_u8(self) -> u8 {
         match self {
             OpType::Nul => 0,
@@ -83,7 +83,7 @@ impl OpType {
             OpType::Unknown(x) => x,
         }
     }
-
+    
     pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
@@ -163,7 +163,7 @@ impl CommandStatus {
             _ => CommandStatus::Unknown(x),
         }
     }
-
+    
     pub fn as_u8(self) -> u8 {
         match self {
             CommandStatus::Success => 0,
@@ -189,7 +189,7 @@ impl CommandStatus {
             CommandStatus::Unknown(x) => x,
         }
     }
-
+    
     pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
@@ -222,7 +222,7 @@ impl QualifierCode {
             _ => None,
         }
     }
-
+    
     pub fn as_u8(self) -> u8 {
         match self {
             QualifierCode::Range8 => 0x0,
@@ -235,7 +235,7 @@ impl QualifierCode {
             QualifierCode::FreeFormat16 => 0x5B,
         }
     }
-
+    
     pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
@@ -351,7 +351,7 @@ impl FunctionCode {
             _ => None,
         }
     }
-
+    
     pub fn as_u8(self) -> u8 {
         match self {
             FunctionCode::Confirm => 0,
@@ -389,8 +389,9 @@ impl FunctionCode {
             FunctionCode::UnsolicitedResponse => 130,
         }
     }
-
+    
     pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }
+

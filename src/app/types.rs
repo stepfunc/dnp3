@@ -1,7 +1,6 @@
 use crate::app::gen::enums::{OpType, TripCloseCode};
 use crate::app::gen::variations::gv::Variation;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use std::fmt::Formatter;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Timestamp {
@@ -32,7 +31,7 @@ impl Timestamp {
 }
 
 impl std::fmt::Display for Timestamp {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.to_datetime_utc() {
             Some(x) => write!(f, "{}", x.to_rfc3339_opts(SecondsFormat::Millis, true)),
             None => f.write_str(Timestamp::OUT_OF_RANGE),
@@ -63,6 +62,12 @@ impl DoubleBit {
             0b10 => DoubleBit::DeterminedOn,
             _ => DoubleBit::Indeterminate,
         }
+    }
+}
+
+impl std::fmt::Display for DoubleBit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
@@ -103,7 +108,7 @@ impl ControlCode {
 }
 
 impl std::fmt::Display for Variation {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let (g, v) = self.to_group_and_var();
         write!(f, "g{}v{}", g, v)
     }

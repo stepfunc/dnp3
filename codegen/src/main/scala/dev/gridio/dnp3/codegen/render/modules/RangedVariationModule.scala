@@ -13,6 +13,7 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::parser::ObjectParseError;".eol ++
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
+      "use crate::util::logging::log_items;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++
@@ -83,6 +84,15 @@ object RangedVariationModule extends Module {
       case _ => s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getReadVarDefinition(v)}),".eol
     }
 
+    def getLogMatcher(v: Variation): Iterator[String] = v match {
+      case _ : AnyVariation => s"RangedVariation::${v.name} => {}".eol
+      case _ : SizedByVariation => {
+        s"RangedVariation::${v.parent.name}Var0 => {}".eol ++
+          s"RangedVariation::${v.parent.name}VarX(_,_) => {}".eol
+      }
+      case _ => s"RangedVariation::${v.name}(seq) => log_items(level, seq.iter()),".eol
+    }
+
     bracket("impl<'a> RangedVariation<'a>") {
       "#[rustfmt::skip]".eol ++
       bracket("pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
@@ -94,8 +104,14 @@ object RangedVariationModule extends Module {
           bracket("match v") {
             variations.flatMap(getReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
           }
+        } ++ space ++
+        bracket("pub fn log(&self, level : log::Level)") {
+          bracket("match self") {
+            variations.flatMap(getLogMatcher).iterator
+          }
         }
     }
+
 
   }
 

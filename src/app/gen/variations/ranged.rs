@@ -10,13 +10,14 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::app::parse::range::{RangedSequence, Range};
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
-use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
-use crate::app::parse::bytes::RangedBytesSequence;
-use crate::app::parse::parser::ObjectParseError;
-use crate::app::parse::range::{Range, RangedSequence};
 use crate::util::cursor::ReadCursor;
+use crate::app::parse::parser::ObjectParseError;
+use crate::app::parse::bytes::RangedBytesSequence;
+use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
+use crate::util::logging::log_items;
 
 #[derive(Debug, PartialEq)]
 pub enum RangedVariation<'a> {
@@ -93,7 +94,7 @@ impl<'a> RangedVariation<'a> {
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
         }
     }
-
+    
     pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
@@ -127,6 +128,42 @@ impl<'a> RangedVariation<'a> {
             Variation::Group80Var1 => Ok(RangedVariation::Group80Var1(BitSequence::empty())),
             Variation::Group110(0) => Ok(RangedVariation::Group110Var0),
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
+        }
+    }
+    
+    pub fn log(&self, level : log::Level) {
+        match self {
+            RangedVariation::Group1Var0 => {}
+            RangedVariation::Group1Var1(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group1Var2(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group3Var0 => {}
+            RangedVariation::Group3Var1(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group3Var2(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group10Var0 => {}
+            RangedVariation::Group10Var1(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group10Var2(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group20Var0 => {}
+            RangedVariation::Group20Var1(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group20Var2(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group20Var5(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group20Var6(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group21Var0 => {}
+            RangedVariation::Group21Var1(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group21Var2(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group21Var5(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group21Var6(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group21Var9(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group21Var10(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group30Var0 => {}
+            RangedVariation::Group30Var1(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group30Var2(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group30Var3(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group30Var4(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group30Var5(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group30Var6(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group80Var1(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group110Var0 => {}
+            RangedVariation::Group110VarX(_,_) => {}
         }
     }
 }

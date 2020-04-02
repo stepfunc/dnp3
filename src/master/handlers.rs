@@ -1,5 +1,5 @@
 use crate::app::header::ResponseHeader;
-use crate::app::parse::parser::HeaderCollection;
+use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
 
 pub trait ResponseHandler {
     fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
@@ -23,6 +23,15 @@ impl ResponseHandler for LoggingResponseHandler {
         );
         for x in headers.iter() {
             log::info!("header: {}", x);
+            match x.details {
+                HeaderDetails::AllObjects(_) => {}
+                HeaderDetails::OneByteStartStop(_, _, var) => var.log(log::Level::Info),
+                HeaderDetails::TwoByteStartStop(_, _, var) => var.log(log::Level::Info),
+                HeaderDetails::OneByteCount(_, _var) => {}
+                HeaderDetails::TwoByteCount(_, _var) => {}
+                HeaderDetails::OneByteCountAndPrefix(_, _var) => {}
+                HeaderDetails::TwoByteCountAndPrefix(_, _var) => {}
+            }
         }
     }
 }
