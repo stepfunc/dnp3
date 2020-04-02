@@ -78,7 +78,7 @@ pub struct Response<'a> {
 
 impl<'a> Request<'a> {
     pub fn parse_objects(&self) -> Result<HeaderCollection<'a>, ObjectParseError> {
-        Ok(ObjectParser::parse(self.header.function, self.objects)?)
+        Ok(HeaderCollection::parse(self.header.function, self.objects)?)
     }
 
     pub fn parse(bytes: &'a [u8]) -> Result<Self, HeaderParseError> {
@@ -106,7 +106,10 @@ impl<'a> Request<'a> {
 
 impl<'a> Response<'a> {
     pub fn parse_objects(&self) -> Result<HeaderCollection<'a>, ObjectParseError> {
-        Ok(ObjectParser::parse(self.header.function(), self.objects)?)
+        Ok(HeaderCollection::parse(
+            self.header.function(),
+            self.objects,
+        )?)
     }
 
     pub fn parse(bytes: &'a [u8]) -> Result<Self, HeaderParseError> {
@@ -119,18 +122,26 @@ impl<'a> Response<'a> {
     }
 }
 
-pub struct ObjectParser<'a> {
+struct ObjectParser<'a> {
     errored: bool,
     function: FunctionCode,
     cursor: ReadCursor<'a>,
 }
 
+/// An abstract collection of pre-validated object headers
+/// that can provide an iterator of the headers.
 pub struct HeaderCollection<'a> {
     function: FunctionCode,
     data: &'a [u8],
 }
 
 impl<'a> HeaderCollection<'a> {
+    /// parse the the raw header data in accordance with the provided function code
+    pub fn parse(function: FunctionCode, data: &'a [u8]) -> Result<Self, ObjectParseError> {
+        ObjectParser::parse(function, data)
+    }
+
+    /// return and iterator of the headers that lazily parses them
     pub fn iter(&self) -> HeaderIterator<'a> {
         HeaderIterator {
             parser: ObjectParser::one_pass(self.function, self.data),
@@ -501,7 +512,7 @@ mod test {
     #[test]
     fn parses_count_of_time() {
         let header = &[0x32, 0x01, 0x07, 0x01, 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA];
-        let mut headers = ObjectParser::parse(FunctionCode::Write, header)
+        let mut headers = HeaderCollection::parse(FunctionCode::Write, header)
             .unwrap()
             .iter();
 
@@ -526,7 +537,7 @@ mod test {
     fn parses_range_of_g1v2_as_non_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 
-        let mut headers = ObjectParser::parse(FunctionCode::Response, &input)
+        let mut headers = HeaderCollection::parse(FunctionCode::Response, &input)
             .unwrap()
             .iter();
 
@@ -549,7 +560,7 @@ mod test {
     fn parses_range_of_g1v2_as_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0x01, 0x02, 0x00, 0x07, 0x09];
 
-        let mut headers = ObjectParser::parse(FunctionCode::Read, &input)
+        let mut headers = HeaderCollection::parse(FunctionCode::Read, &input)
             .unwrap()
             .iter();
 
@@ -574,7 +585,7 @@ mod test {
     fn parses_range_of_g80v1() {
         // this is what is typically sent to clear the restart IIN
         let input = [0x50, 0x01, 0x00, 0x07, 0x07, 0x00];
-        let mut headers = ObjectParser::parse(FunctionCode::Write, &input)
+        let mut headers = HeaderCollection::parse(FunctionCode::Write, &input)
             .unwrap()
             .iter();
 
@@ -592,7 +603,7 @@ mod test {
     #[test]
     fn parses_group110var0_as_read() {
         let input = [0x6E, 0x00, 0x00, 0x02, 0x03];
-        let mut headers = ObjectParser::parse(FunctionCode::Read, &input)
+        let mut headers = HeaderCollection::parse(FunctionCode::Read, &input)
             .unwrap()
             .iter();
         assert_eq!(
