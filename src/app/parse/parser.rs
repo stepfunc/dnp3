@@ -77,9 +77,7 @@ pub struct Response<'a> {
 }
 
 impl<'a> Request<'a> {
-    pub fn parse_objects(
-        &self,
-    ) -> Result<impl Iterator<Item = ObjectHeader<'a>>, ObjectParseError> {
+    pub fn parse_objects(&self) -> Result<HeaderCollection<'a>, ObjectParseError> {
         Ok(ObjectParser::parse(self.header.function, self.objects)?)
     }
 
@@ -107,7 +105,7 @@ impl<'a> Request<'a> {
 }
 
 impl<'a> Response<'a> {
-    pub fn parse_objects(&self) -> Result<HeaderIterator<'a>, ObjectParseError> {
+    pub fn parse_objects(&self) -> Result<HeaderCollection<'a>, ObjectParseError> {
         Ok(ObjectParser::parse(self.header.function(), self.objects)?)
     }
 
@@ -127,6 +125,19 @@ pub struct ObjectParser<'a> {
     cursor: ReadCursor<'a>,
 }
 
+pub struct HeaderCollection<'a> {
+    function: FunctionCode,
+    data: &'a [u8],
+}
+
+impl<'a> HeaderCollection<'a> {
+    pub fn iter(&self) -> HeaderIterator<'a> {
+        HeaderIterator {
+            parser: ObjectParser::one_pass(self.function, self.data),
+        }
+    }
+}
+
 pub struct HeaderIterator<'a> {
     parser: ObjectParser<'a>,
 }
@@ -143,7 +154,7 @@ impl<'a> ObjectParser<'a> {
     pub fn parse(
         function: FunctionCode,
         data: &'a [u8],
-    ) -> Result<HeaderIterator<'a>, ObjectParseError> {
+    ) -> Result<HeaderCollection<'a>, ObjectParseError> {
         // we first do a single pass to ensure the ASDU is well-formed, returning an error if it occurs
         for x in ObjectParser::one_pass(function, data) {
             if let Err(e) = x {
@@ -151,10 +162,9 @@ impl<'a> ObjectParser<'a> {
             }
         }
 
-        // on the 2nd pass, we can unwrap b/c it can't possibly panic
-        Ok(HeaderIterator {
-            parser: ObjectParser::one_pass(function, data),
-        })
+        // now we know that the headers are well-formed and our 2nd pass
+        // on the same data can just unwrap() the results w/o fear of panic
+        Ok(HeaderCollection { function, data })
     }
 
     fn one_pass(function: FunctionCode, data: &'a [u8]) -> Self {
@@ -424,6 +434,7 @@ mod test {
             ],
         )
         .unwrap()
+        .iter()
         .map(|x| x.details)
         .collect();
 
@@ -441,10 +452,12 @@ mod test {
     #[test]
     fn parses_analog_output() {
         let header = &[0x29, 0x01, 0x17, 0x01, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x00];
-        let mut parser = ObjectParser::parse(FunctionCode::Operate, header).unwrap();
+        let mut headers = ObjectParser::parse(FunctionCode::Operate, header)
+            .unwrap()
+            .iter();
 
         let items: Vec<Prefix<u8, Group41Var1>> = assert_matches!(
-            parser.next().unwrap().details,
+            headers.next().unwrap().details,
             HeaderDetails::OneByteCountAndPrefix(01, PrefixedVariation::<u8>::Group41Var1(seq)) => seq.iter().collect()
         );
 
@@ -458,16 +471,18 @@ mod test {
                 },
             }]
         );
-        assert_eq!(parser.next(), None);
+        assert_eq!(headers.next(), None);
     }
 
     #[test]
     fn parses_range_of_g3v1() {
         let header = &[0x03, 0x01, 0x00, 0x01, 0x04, 0b11_10_01_00];
-        let mut parser = ObjectParser::parse(FunctionCode::Response, header).unwrap();
+        let mut headers = ObjectParser::parse(FunctionCode::Response, header)
+            .unwrap()
+            .iter();
 
         let items: Vec<(DoubleBit, u16)> = assert_matches!(
-            parser.next().unwrap().details,
+            headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(01, 04, RangedVariation::Group3Var1(seq)) => seq.iter().collect()
         );
 
@@ -480,16 +495,18 @@ mod test {
                 (DoubleBit::Indeterminate, 4),
             ]
         );
-        assert_eq!(parser.next(), None);
+        assert_eq!(headers.next(), None);
     }
 
     #[test]
     fn parses_count_of_time() {
         let header = &[0x32, 0x01, 0x07, 0x01, 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA];
-        let mut parser = ObjectParser::parse(FunctionCode::Write, header).unwrap();
+        let mut headers = ObjectParser::parse(FunctionCode::Write, header)
+            .unwrap()
+            .iter();
 
         let items: Vec<Group50Var1> = assert_matches!(
-            parser.next().unwrap().details,
+            headers.next().unwrap().details,
             HeaderDetails::OneByteCount(01, CountVariation::Group50Var1(seq)) => seq.iter().collect()
         );
 
@@ -502,17 +519,19 @@ mod test {
             }]
         );
 
-        assert_eq!(parser.next(), None);
+        assert_eq!(headers.next(), None);
     }
 
     #[test]
     fn parses_range_of_g1v2_as_non_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 
-        let mut parser = ObjectParser::parse(FunctionCode::Response, &input).unwrap();
+        let mut headers = ObjectParser::parse(FunctionCode::Response, &input)
+            .unwrap()
+            .iter();
 
         let items: Vec<(Group1Var2, u16)> = assert_matches!(
-            parser.next().unwrap().details,
+            headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => seq.iter().collect()
         );
 
@@ -523,58 +542,64 @@ mod test {
                 (Group1Var2 { flags: 0xBB }, 3)
             ]
         );
-        assert_eq!(parser.next(), None);
+        assert_eq!(headers.next(), None);
     }
 
     #[test]
     fn parses_range_of_g1v2_as_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0x01, 0x02, 0x00, 0x07, 0x09];
 
-        let mut parser = ObjectParser::parse(FunctionCode::Read, &input).unwrap();
+        let mut headers = ObjectParser::parse(FunctionCode::Read, &input)
+            .unwrap()
+            .iter();
 
         assert_matches!(
-            parser.next().unwrap().details,
+            headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
                 assert!(seq.is_empty())
             }
         );
 
         assert_matches!(
-            parser.next().unwrap().details,
+            headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(07, 09, RangedVariation::Group1Var2(seq)) => {
                 assert!(seq.is_empty())
             }
         );
 
-        assert_eq!(parser.next(), None);
+        assert_eq!(headers.next(), None);
     }
 
     #[test]
     fn parses_range_of_g80v1() {
         // this is what is typically sent to clear the restart IIN
         let input = [0x50, 0x01, 0x00, 0x07, 0x07, 0x00];
-        let mut parser = ObjectParser::parse(FunctionCode::Write, &input).unwrap();
+        let mut headers = ObjectParser::parse(FunctionCode::Write, &input)
+            .unwrap()
+            .iter();
 
         let vec: Vec<(bool, u16)> = assert_matches!(
-            parser.next().unwrap().details,
+            headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(07, 07, RangedVariation::Group80Var1(seq)) => {
                 seq.iter().collect()
             }
         );
 
         assert_eq!(vec, vec![(false, 7)]);
-        assert_eq!(parser.next(), None);
+        assert_eq!(headers.next(), None);
     }
 
     #[test]
     fn parses_group110var0_as_read() {
         let input = [0x6E, 0x00, 0x00, 0x02, 0x03];
-        let mut parser = ObjectParser::parse(FunctionCode::Read, &input).unwrap();
+        let mut headers = ObjectParser::parse(FunctionCode::Read, &input)
+            .unwrap()
+            .iter();
         assert_eq!(
-            parser.next().unwrap().details,
+            headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group110Var0)
         );
-        assert_eq!(parser.next(), None);
+        assert_eq!(headers.next(), None);
     }
 
     #[test]
@@ -589,10 +614,12 @@ mod test {
     #[test]
     fn parses_group110var1_as_non_read() {
         let input = [0x6E, 0x01, 0x00, 0x01, 0x02, 0xAA, 0xBB];
-        let mut parser = ObjectParser::parse(FunctionCode::Response, &input).unwrap();
+        let mut headers = ObjectParser::parse(FunctionCode::Response, &input)
+            .unwrap()
+            .iter();
 
         let bytes: Vec<(Bytes, u16)> = assert_matches!(
-            parser.next().unwrap().details,
+            headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(01, 02, RangedVariation::Group110VarX(0x01, seq)) => {
                 seq.iter().collect()
             }
@@ -602,7 +629,7 @@ mod test {
             bytes,
             vec![(Bytes { value: &[0xAA] }, 1), (Bytes { value: &[0xBB] }, 2)]
         );
-        assert_eq!(parser.next(), None);
+        assert_eq!(headers.next(), None);
     }
 
     #[test]
