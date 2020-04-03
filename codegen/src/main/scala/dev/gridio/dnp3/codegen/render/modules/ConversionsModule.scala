@@ -5,10 +5,6 @@ import dev.gridio.dnp3.codegen.render._
 
 object ConversionsModule extends Module {
 
-  def isBinary(fs: FixedSize) : Boolean = {
-    fs.parent.groupType == GroupType.StaticBinary || fs.parent.groupType == GroupType.BinaryEvent
-  }
-
   private def fixedSize(select: FixedSize => Boolean) : List[FixedSize] = {
     ObjectGroup.allVariations.flatMap { v=>
       v match {
@@ -28,14 +24,35 @@ object ConversionsModule extends Module {
       "Time::Invalid"
     }
   }
-  
-  private def binaryVariations : List[FixedSize] = {
-    def isNonCTOBinary(fs: FixedSize) : Boolean = {
-      val isBinary = fs.parent.groupType == GroupType.StaticBinary || fs.parent.groupType == GroupType.BinaryEvent
-      isBinary && !fs.hasRelativeTime
+
+  def flagsConversion(fs: FixedSize) : String = {
+    def hasFlags : Boolean = {
+      fs.fields.exists(f => f.attr.contains(FieldAttribute.Flags))
     }
-    fixedSize(isNonCTOBinary)
+    if(hasFlags) {
+      "Flags::new(v.flags)"
+    } else {
+      "Flags::new(masks::ONLINE)"
+    }
   }
+
+  private def binaryVariations : List[FixedSize] = {
+    def isNonCTO(fs: FixedSize) : Boolean = {
+      val isType = fs.parent.groupType == GroupType.StaticBinary || fs.parent.groupType == GroupType.BinaryEvent
+      isType && !fs.hasRelativeTime
+    }
+    fixedSize(isNonCTO)
+  }
+
+  private def counterVariations : List[FixedSize] = {
+    def isNonCTO(fs: FixedSize) : Boolean = {
+      val isType = fs.parent.groupType == GroupType.StaticCounter || fs.parent.groupType == GroupType.CounterEvent
+      isType && !fs.hasRelativeTime
+    }
+    fixedSize(isNonCTO)
+  }
+
+
 
   private def binaryConversion(fs: FixedSize)(implicit indentation: Indentation) : Iterator[String] = {
 
@@ -56,12 +73,39 @@ object ConversionsModule extends Module {
     }
   }
 
+  private def counterConversion(fs: FixedSize)(implicit indentation: Indentation) : Iterator[String] = {
+
+    def cast : String = {
+      val field = fs.fields.find(f => f.attr.contains(FieldAttribute.Value)).get
+      field.typ match {
+        case UInt32Field => ""
+        case _ => " as u32"
+      }
+    }
+
+    def conversion : Iterator[String] = {
+        bracket("Counter") {
+          s"value : v.value${cast},".eol ++
+          s"flags: ${flagsConversion(fs)},".eol ++
+          s"time : ${timeConversion(fs)},".eol
+        }
+    }
+
+    bracket(s"impl std::convert::From<${fs.name}> for Counter") {
+      bracket(s"fn from(v: ${fs.name}) -> Self") {
+        conversion
+      }
+    }
+  }
+
   override def lines(implicit indentation: Indentation): Iterator[String] = {
     "use crate::app::meas::*;".eol ++
+    "use crate::app::flags::*;".eol ++
     "use crate::app::gen::variations::fixed::*;".eol ++
-    "use crate::app::flags::Flags;".eol ++
     space ++
-    spaced(binaryVariations.map(binaryConversion).iterator)
+    spaced(binaryVariations.map(binaryConversion).iterator) ++
+    space ++
+    spaced(counterVariations.map(counterConversion).iterator)
   }
 
 

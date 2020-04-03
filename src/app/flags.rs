@@ -28,6 +28,12 @@ impl Flags {
         Self { value }
     }
 
+    pub fn new_online() -> Self {
+        Self {
+            value: masks::ONLINE,
+        }
+    }
+
     fn is_set(self, mask: u8) -> bool {
         self.value & mask != 0
     }
