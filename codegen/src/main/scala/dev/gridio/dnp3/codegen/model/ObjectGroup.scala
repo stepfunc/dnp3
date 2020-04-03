@@ -69,12 +69,10 @@ object GroupType {
   object BinaryEvent extends Event
   object BinaryOutputEvent extends Event
   object DoubleBinaryEvent extends Event
-  object BinaryOutputStatusEvent extends Event
   object CounterEvent extends Event
   object FrozenCounterEvent extends Event
   object AnalogEvent extends Event
   object AnalogOutputEvent extends Event
-  object AnalogOutputStatusEvent extends Event
   object OctetStringEvent extends Event
   object VirtualTerminalEvent extends Event
 
