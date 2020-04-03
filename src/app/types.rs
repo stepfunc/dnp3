@@ -39,12 +39,6 @@ impl std::fmt::Display for Timestamp {
     }
 }
 
-pub struct Binary {
-    pub value: bool,
-    pub flags: u8,
-    pub time: Timestamp,
-}
-
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DoubleBit {
     Intermediate,
