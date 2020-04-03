@@ -18,6 +18,7 @@ object Main {
     (VariationEnumModule, variationsPath.resolve("gv.rs")),
     (CountVariationModule, variationsPath.resolve("count.rs")),
     (PrefixedVariationModule, variationsPath.resolve("prefixed.rs")),
+    (ConversionsModule, appGenPath.resolve("conversion.rs"))
   )
 
 

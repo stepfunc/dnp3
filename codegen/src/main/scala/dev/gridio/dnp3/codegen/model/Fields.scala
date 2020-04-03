@@ -15,32 +15,32 @@ case class EnumFieldType(model: EnumModel) extends FixedSizeFieldType(1)
 case class CustomFieldTypeU8(structName : String) extends FixedSizeFieldType(1)
 case object TimestampField extends FixedSizeFieldType(6)
 
-sealed trait FieldType
-object FieldType {
-  object Flags extends FieldType;
-  object Timestamp48 extends FieldType;
-  object Timestamp16 extends FieldType;
-  object Value extends FieldType;
+sealed trait FieldAttribute
+object FieldAttribute {
+  object Flags extends FieldAttribute;
+  object Timestamp48 extends FieldAttribute;
+  object Timestamp16 extends FieldAttribute;
+  object Value extends FieldAttribute;
 }
 
 object FixedSizeField {
 
   //common flags field
-  val flags = FixedSizeField("flags", UInt8Field, Some(FieldType.Flags))
+  val flags = FixedSizeField("flags", UInt8Field, Some(FieldAttribute.Flags))
 
   // timestamps
-  val time16 = FixedSizeField("time", UInt16Field, Some(FieldType.Timestamp16))
-  val time48 = FixedSizeField("time", TimestampField, Some(FieldType.Timestamp48))
+  val time16 = FixedSizeField("time", UInt16Field, Some(FieldAttribute.Timestamp16))
+  val time48 = FixedSizeField("time", TimestampField, Some(FieldAttribute.Timestamp48))
 
   // counter values
-  val count16 = FixedSizeField("value", UInt16Field, Some(FieldType.Value))
-  val count32 = FixedSizeField("value", UInt32Field, Some(FieldType.Value))
+  val count16 = FixedSizeField("value", UInt16Field, Some(FieldAttribute.Value))
+  val count32 = FixedSizeField("value", UInt32Field, Some(FieldAttribute.Value))
 
   // analog values
-  val value16 = FixedSizeField("value", SInt16Field, Some(FieldType.Value))
-  val value32 = FixedSizeField("value", SInt32Field, Some(FieldType.Value))
-  val float32 = FixedSizeField("value", Float32Field, Some(FieldType.Value))
-  val float64 = FixedSizeField("value", Float64Field, Some(FieldType.Value))
+  val value16 = FixedSizeField("value", SInt16Field, Some(FieldAttribute.Value))
+  val value32 = FixedSizeField("value", SInt32Field, Some(FieldAttribute.Value))
+  val float32 = FixedSizeField("value", Float32Field, Some(FieldAttribute.Value))
+  val float64 = FixedSizeField("value", Float64Field, Some(FieldAttribute.Value))
 
   //enums
   val commandStatus = FixedSizeField("status", EnumFieldType(CommandStatus))
@@ -64,12 +64,13 @@ sealed trait Field {
   def name: String
 }
 
-sealed case class FixedSizeField(name: String, typ: FixedSizeFieldType, attributes: Option[FieldType] = None) extends Field {
-
-  //def isTimeUTC: Boolean = attributes.contains(FieldAttribute.IsTimeUTC)
-
-  //def isFlags: Boolean = attributes.contains(FieldAttribute.IsFlags)
-
+sealed case class FixedSizeField(name: String, typ: FixedSizeFieldType, attr: Option[FieldAttribute] = None) extends Field {
+  def isRelativeTime : Boolean = {
+    attr match {
+      case Some(FieldAttribute.Timestamp16) => true
+      case _ => false
+    }
+  }
 }
 
 sealed case class VariableField(name: String) extends Field

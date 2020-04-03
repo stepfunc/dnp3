@@ -78,6 +78,10 @@ class RemainderOnly(g: ObjectGroup, v: Byte, description: String, remainder: Var
 
 class FixedSize(g: ObjectGroup, v: Byte, description: String)(fs: FixedSizeField*) extends BasicGroupVariation(g, v, description) {
 
+  def hasRelativeTime : Boolean = {
+    fields.exists(f => f.isRelativeTime)
+  }
+
   def fields: List[FixedSizeField] = fs.toList
 
   def size: Int = fs.map(x => x.typ.numBytes).sum
