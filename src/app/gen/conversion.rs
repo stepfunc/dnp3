@@ -47,6 +47,39 @@ impl std::convert::From<Group1Var2> for Binary {
     }
 }
 
+impl std::convert::From<Group4Var2> for DoubleBitBinary {
+    fn from(v: Group4Var2) -> Self {
+        let flags = Flags::new(v.flags);
+        DoubleBitBinary {
+            value: flags.double_bit_state(),
+            flags,
+            time: Time::Synchronized(v.time),
+        }
+    }
+}
+
+impl std::convert::From<Group4Var1> for DoubleBitBinary {
+    fn from(v: Group4Var1) -> Self {
+        let flags = Flags::new(v.flags);
+        DoubleBitBinary {
+            value: flags.double_bit_state(),
+            flags,
+            time: Time::Invalid,
+        }
+    }
+}
+
+impl std::convert::From<Group3Var2> for DoubleBitBinary {
+    fn from(v: Group3Var2) -> Self {
+        let flags = Flags::new(v.flags);
+        DoubleBitBinary {
+            value: flags.double_bit_state(),
+            flags,
+            time: Time::Invalid,
+        }
+    }
+}
+
 impl std::convert::From<Group22Var6> for Counter {
     fn from(v: Group22Var6) -> Self {
         Counter {

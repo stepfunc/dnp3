@@ -44,10 +44,6 @@ object ConversionsModule extends Module {
     fixedSize(isNonCTO)
   }
 
-
-
-
-
   private def binaryConversions(implicit indentation: Indentation) : Iterator[String] = {
 
     def variations : List[FixedSize] = {
@@ -69,6 +65,36 @@ object ConversionsModule extends Module {
       }
 
       bracket(s"impl std::convert::From<${fs.name}> for Binary") {
+        bracket(s"fn from(v: ${fs.name}) -> Self") {
+          conversion
+        }
+      }
+    }
+
+    spaced(variations.map(single).iterator)
+  }
+
+  private def doubleBitBinaryConversions(implicit indentation: Indentation) : Iterator[String] = {
+
+    def variations : List[FixedSize] = {
+      def isNonCTO(fs: FixedSize) : Boolean = {
+        val isType = fs.parent.groupType == GroupType.StaticDoubleBinary || fs.parent.groupType == GroupType.DoubleBinaryEvent
+        isType && !fs.hasRelativeTime
+      }
+      fixedSize(isNonCTO)
+    }
+
+    def single(fs: FixedSize) : Iterator[String] = {
+      def conversion : Iterator[String] = {
+        "let flags = Flags::new(v.flags);".eol ++
+          bracket("DoubleBitBinary") {
+            "value : flags.double_bit_state(),".eol ++
+              "flags,".eol ++
+              s"time : ${timeConversion(fs)},".eol
+          }
+      }
+
+      bracket(s"impl std::convert::From<${fs.name}> for DoubleBitBinary") {
         bracket(s"fn from(v: ${fs.name}) -> Self") {
           conversion
         }
@@ -130,6 +156,8 @@ object ConversionsModule extends Module {
     "use crate::app::gen::variations::fixed::*;".eol ++
     space ++
     binaryConversions ++
+    space ++
+    doubleBitBinaryConversions ++
     space ++
     counterConversions
   }
