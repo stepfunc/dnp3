@@ -126,3 +126,103 @@ impl std::convert::From<Group20Var1> for Counter {
         }
     }
 }
+
+impl std::convert::From<Group23Var6> for FrozenCounter {
+    fn from(v: Group23Var6) -> Self {
+        FrozenCounter {
+            value: v.value as u32,
+            flags: Flags::new(v.flags),
+            time: Time::Synchronized(v.time),
+        }
+    }
+}
+
+impl std::convert::From<Group23Var5> for FrozenCounter {
+    fn from(v: Group23Var5) -> Self {
+        FrozenCounter {
+            value: v.value,
+            flags: Flags::new(v.flags),
+            time: Time::Synchronized(v.time),
+        }
+    }
+}
+
+impl std::convert::From<Group23Var2> for FrozenCounter {
+    fn from(v: Group23Var2) -> Self {
+        FrozenCounter {
+            value: v.value as u32,
+            flags: Flags::new(v.flags),
+            time: Time::Invalid,
+        }
+    }
+}
+
+impl std::convert::From<Group23Var1> for FrozenCounter {
+    fn from(v: Group23Var1) -> Self {
+        FrozenCounter {
+            value: v.value,
+            flags: Flags::new(v.flags),
+            time: Time::Invalid,
+        }
+    }
+}
+
+impl std::convert::From<Group21Var10> for FrozenCounter {
+    fn from(v: Group21Var10) -> Self {
+        FrozenCounter {
+            value: v.value as u32,
+            flags: Flags::new(masks::ONLINE),
+            time: Time::Invalid,
+        }
+    }
+}
+
+impl std::convert::From<Group21Var9> for FrozenCounter {
+    fn from(v: Group21Var9) -> Self {
+        FrozenCounter {
+            value: v.value,
+            flags: Flags::new(masks::ONLINE),
+            time: Time::Invalid,
+        }
+    }
+}
+
+impl std::convert::From<Group21Var6> for FrozenCounter {
+    fn from(v: Group21Var6) -> Self {
+        FrozenCounter {
+            value: v.value as u32,
+            flags: Flags::new(v.flags),
+            time: Time::Synchronized(v.time),
+        }
+    }
+}
+
+impl std::convert::From<Group21Var5> for FrozenCounter {
+    fn from(v: Group21Var5) -> Self {
+        FrozenCounter {
+            value: v.value,
+            flags: Flags::new(v.flags),
+            time: Time::Synchronized(v.time),
+        }
+    }
+}
+
+impl std::convert::From<Group21Var2> for FrozenCounter {
+    fn from(v: Group21Var2) -> Self {
+        FrozenCounter {
+            value: v.value as u32,
+            flags: Flags::new(v.flags),
+            time: Time::Invalid,
+        }
+    }
+}
+
+impl std::convert::From<Group21Var1> for FrozenCounter {
+    fn from(v: Group21Var1) -> Self {
+        FrozenCounter {
+            value: v.value,
+            flags: Flags::new(v.flags),
+            time: Time::Invalid,
+        }
+    }
+}

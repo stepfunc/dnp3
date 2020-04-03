@@ -52,6 +52,14 @@ object ConversionsModule extends Module {
     fixedSize(isNonCTO)
   }
 
+  private def frozenCounterVariations : List[FixedSize] = {
+    def isNonCTO(fs: FixedSize) : Boolean = {
+      val isType = fs.parent.groupType == GroupType.StaticFrozenCounter || fs.parent.groupType == GroupType.FrozenCounterEvent
+      isType && !fs.hasRelativeTime
+    }
+    fixedSize(isNonCTO)
+  }
+
 
 
   private def binaryConversion(fs: FixedSize)(implicit indentation: Indentation) : Iterator[String] = {
@@ -73,7 +81,7 @@ object ConversionsModule extends Module {
     }
   }
 
-  private def counterConversion(fs: FixedSize)(implicit indentation: Indentation) : Iterator[String] = {
+  private def counterConversion(name: String)(fs: FixedSize)(implicit indentation: Indentation) : Iterator[String] = {
 
     def cast : String = {
       val field = fs.fields.find(f => f.attr.contains(FieldAttribute.Value)).get
@@ -84,14 +92,14 @@ object ConversionsModule extends Module {
     }
 
     def conversion : Iterator[String] = {
-        bracket("Counter") {
+        bracket(name) {
           s"value : v.value${cast},".eol ++
           s"flags: ${flagsConversion(fs)},".eol ++
           s"time : ${timeConversion(fs)},".eol
         }
     }
 
-    bracket(s"impl std::convert::From<${fs.name}> for Counter") {
+    bracket(s"impl std::convert::From<${fs.name}> for ${name}") {
       bracket(s"fn from(v: ${fs.name}) -> Self") {
         conversion
       }
@@ -105,7 +113,9 @@ object ConversionsModule extends Module {
     space ++
     spaced(binaryVariations.map(binaryConversion).iterator) ++
     space ++
-    spaced(counterVariations.map(counterConversion).iterator)
+    spaced(counterVariations.map(counterConversion("Counter")).iterator) ++
+    space ++
+    spaced(frozenCounterVariations.map(counterConversion("FrozenCounter")).iterator)
   }
 
 
