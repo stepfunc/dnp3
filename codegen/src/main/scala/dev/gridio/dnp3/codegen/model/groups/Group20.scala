@@ -12,7 +12,7 @@ object Group20 extends ObjectGroup {
 
   def desc: String = "Counter"
 
-  override def groupType: GroupType = GroupType.Static
+  override def groupType: GroupType = GroupType.StaticCounter
 }
 
 object Group20Var0 extends AnyVariation(Group20, 0)

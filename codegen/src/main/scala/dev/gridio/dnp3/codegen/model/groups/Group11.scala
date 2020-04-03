@@ -12,7 +12,7 @@ object Group11 extends ObjectGroup {
 
   def desc: String = "Binary Output Event"
 
-  override def groupType: GroupType = GroupType.Event
+  override def groupType: GroupType = GroupType.BinaryOutputEvent
 }
 
 object Group11Var0 extends AnyVariation(Group11, 0)

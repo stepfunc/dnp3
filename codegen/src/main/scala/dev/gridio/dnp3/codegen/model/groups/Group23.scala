@@ -12,7 +12,7 @@ object Group23 extends ObjectGroup {
 
   def desc: String = "Frozen Counter Event"
 
-  override def groupType: GroupType = GroupType.Event
+  override def groupType: GroupType = GroupType.FrozenCounterEvent
 }
 
 object Group23Var0 extends AnyVariation(Group23, 0)

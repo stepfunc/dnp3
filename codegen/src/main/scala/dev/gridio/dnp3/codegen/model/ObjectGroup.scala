@@ -44,11 +44,40 @@ object ObjectGroup {
 
 }
 
-sealed trait GroupType
+sealed trait GroupType {
+  def isStatic : Boolean = false
+  def isEvent : Boolean = false
+}
 
 object GroupType {
-  object Static extends GroupType
-  object Event extends GroupType
+  trait Static extends GroupType {
+    override def isStatic: Boolean = true
+  }
+  trait Event extends GroupType {
+    override def isEvent: Boolean = true
+  }
+
+  object StaticBinary extends Static
+  object StaticDoubleBinary extends Static
+  object StaticBinaryOutputStatus extends Static
+  object StaticCounter extends Static
+  object StaticFrozenCounter extends Static
+  object StaticAnalog extends Static
+  object StaticAnalogOutputStatus extends Static
+  object StaticOctetString extends Static
+
+  object BinaryEvent extends Event
+  object BinaryOutputEvent extends Event
+  object DoubleBinaryEvent extends Event
+  object BinaryOutputStatusEvent extends Event
+  object CounterEvent extends Event
+  object FrozenCounterEvent extends Event
+  object AnalogEvent extends Event
+  object AnalogOutputEvent extends Event
+  object AnalogOutputStatusEvent extends Event
+  object OctetStringEvent extends Event
+  object VirtualTerminalEvent extends Event
+
   object Command extends GroupType
   object Time extends GroupType
   object ClassData extends GroupType
@@ -56,8 +85,6 @@ object GroupType {
   object InternalIndications extends GroupType
   object VirtualTerminalOutput extends GroupType
 }
-
-
 
 trait ObjectGroup {
 
@@ -68,14 +95,6 @@ trait ObjectGroup {
   def name: String = "Group%s".format(group)
 
   def desc: String
-
-  final def isEventGroup: Boolean = {
-    groupType == GroupType.Event
-  }
-
-  final def isStaticGroup: Boolean = {
-    groupType == GroupType.Static
-  }
 
   def hasSizedObjects: Boolean = variations.exists(x => x.isInstanceOf[FixedSizeField])
 

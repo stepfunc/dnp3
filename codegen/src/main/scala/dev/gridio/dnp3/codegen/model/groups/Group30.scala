@@ -11,7 +11,7 @@ object Group30 extends ObjectGroup {
 
   def desc: String = "Analog Input"
 
-  override def groupType: GroupType = GroupType.Static
+  override def groupType: GroupType = GroupType.StaticAnalog
 }
 
 object Group30Var0 extends AnyVariation(Group30, 0)

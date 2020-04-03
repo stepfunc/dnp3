@@ -11,7 +11,7 @@ object Group13 extends ObjectGroup {
 
   def desc: String = "Binary Command Event"
 
-  override def groupType: GroupType = GroupType.Event
+  override def groupType: GroupType = GroupType.BinaryOutputEvent
 }
 
 object Group13Var1 extends FixedSize(Group13, 1, withoutTime)(flags)

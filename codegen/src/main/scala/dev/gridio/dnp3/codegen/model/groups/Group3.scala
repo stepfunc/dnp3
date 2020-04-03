@@ -11,7 +11,7 @@ object Group3 extends ObjectGroup {
 
   def desc: String = "Double-bit Binary Input"
 
-  override def groupType: GroupType = GroupType.Static
+  override def groupType: GroupType = GroupType.StaticDoubleBinary
 }
 
 object Group3Var0 extends AnyVariation(Group3, 0)

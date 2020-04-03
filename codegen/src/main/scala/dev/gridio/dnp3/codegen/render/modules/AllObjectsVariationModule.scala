@@ -45,7 +45,7 @@ object AllObjectsVariationModule extends Module {
     ObjectGroup.allVariations.iterator.collect {
       case v : ClassData => v
       case v : AnyVariation => v
-      case v : FixedSize if v.parent.isStaticGroup || v.parent.isEventGroup => v
+      case v : FixedSize if v.parent.groupType.isStatic || v.parent.groupType.isEvent => v
       case v if v.parent == Group110 || v.parent == Group111 => v
     }
   }

@@ -30,7 +30,7 @@ trait Variation {
 
   def desc: String
 
-  def fieldAttributes: Set[FieldAttribute.Value]
+//  def fieldAttributes: Set[FieldAttribute.Value]
 }
 
 class AnyVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g, v, "Any Variation")
@@ -51,8 +51,6 @@ sealed abstract class BasicGroupVariation(g: ObjectGroup, v: Byte, description: 
   def parent: ObjectGroup = g
 
   def desc: String = description
-
-  def fieldAttributes: Set[FieldAttribute.Value] = Set.empty
 }
 
 class AuthVariableSize(g: ObjectGroup,
@@ -83,6 +81,4 @@ class FixedSize(g: ObjectGroup, v: Byte, description: String)(fs: FixedSizeField
   def fields: List[FixedSizeField] = fs.toList
 
   def size: Int = fs.map(x => x.typ.numBytes).sum
-
-  override def fieldAttributes: Set[FieldAttribute.Value] = fs.flatMap(_.attributes).toSet
 }

@@ -12,7 +12,7 @@ object Group43 extends ObjectGroup {
 
   def desc: String = "Analog Command Event"
 
-  override def groupType: GroupType = GroupType.Event
+  override def groupType: GroupType = GroupType.AnalogOutputEvent
 }
 
 object Group43Var1 extends FixedSize(Group43, 1, bit32)(commandStatus, value32)

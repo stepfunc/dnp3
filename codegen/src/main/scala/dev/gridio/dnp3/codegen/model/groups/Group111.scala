@@ -9,7 +9,7 @@ object Group111 extends ObjectGroup {
 
   def desc: String = "Octet String Event"
 
-  override def groupType: GroupType = GroupType.Event
+  override def groupType: GroupType = GroupType.OctetStringEvent
 }
 
 object Group111AnyVar extends SizedByVariation(Group111, 0)

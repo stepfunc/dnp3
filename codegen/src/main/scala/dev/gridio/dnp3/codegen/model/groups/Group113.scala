@@ -9,7 +9,7 @@ object Group113 extends ObjectGroup {
 
   def desc: String = "Virtual Terminal Event Data"
 
-  override def groupType: GroupType = GroupType.Event
+  override def groupType: GroupType = GroupType.VirtualTerminalEvent
 }
 
 object Group113AnyVar extends SizedByVariation(Group113, 0)

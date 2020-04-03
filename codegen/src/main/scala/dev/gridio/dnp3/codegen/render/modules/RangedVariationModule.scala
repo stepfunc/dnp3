@@ -27,7 +27,7 @@ object RangedVariationModule extends Module {
       case _ : DoubleBitField => s"${v.name}(DoubleBitSequence<'a>),".eol
       case _ : AnyVariation => s"${v.name},".eol
       case _ : FixedSize => s"${v.name}(RangedSequence<'a, ${v.name}>),".eol
-      case _ : SizedByVariation if v.parent.isStaticGroup =>  {
+      case _ : SizedByVariation if v.parent.groupType.isStatic =>  {
         s"${v.parent.name}Var0,".eol ++
         s"${v.parent.name}VarX(u8, RangedBytesSequence<'a>),".eol
       }
@@ -120,9 +120,9 @@ object RangedVariationModule extends Module {
       v match {
         case _ : DoubleBitField => Some(v)
         case _ : SingleBitField => Some(v)
-        case v : AnyVariation if v.parent.isStaticGroup => Some(v)
-        case v : FixedSize if v.parent.isStaticGroup => Some(v)
-        case v : SizedByVariation if v.parent.isStaticGroup => Some(v)
+        case v : AnyVariation if v.parent.groupType.isStatic => Some(v)
+        case v : FixedSize if v.parent.groupType.isStatic => Some(v)
+        case v : SizedByVariation if v.parent.groupType.isStatic => Some(v)
         case _ => None
       }
     }
