@@ -56,7 +56,7 @@ where
             }
             // everything else
             HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group1Var2(seq)) => {
-                handler.handle_binary(seq.iter().map(|(v, i)| (Binary::from(v), i)))
+                handler.handle_binary(seq.iter().map(|(v, i)| (v.into(), i)))
             }
             _ => {}
         };
