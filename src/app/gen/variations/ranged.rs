@@ -12,10 +12,12 @@
 
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
+use crate::app::meas::*;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
 use crate::app::parse::bytes::RangedBytesSequence;
 use crate::app::parse::parser::ObjectParseError;
 use crate::app::parse::range::{Range, RangedSequence};
+use crate::master::handlers::MeasurementHandler;
 use crate::util::cursor::ReadCursor;
 use crate::util::logging::log_items;
 
@@ -182,6 +184,104 @@ impl<'a> RangedVariation<'a> {
             RangedVariation::Group40Var3(seq) => log_items(level, seq.iter()),
             RangedVariation::Group40Var4(seq) => log_items(level, seq.iter()),
             RangedVariation::Group80Var1(seq) => log_items(level, seq.iter()),
+            RangedVariation::Group110Var0 => {}
+            RangedVariation::Group110VarX(_, _) => {}
+        }
+    }
+
+    pub fn extract_measurements_to<T>(&self, handler: &mut T)
+    where
+        T: MeasurementHandler,
+    {
+        match self {
+            RangedVariation::Group1Var0 => {}
+            RangedVariation::Group1Var1(seq) => {
+                handler.handle_binary(seq.iter().map(|(v, i)| (Binary::from_raw_state(v), i)))
+            }
+            RangedVariation::Group1Var2(seq) => {
+                handler.handle_binary(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group3Var0 => {}
+            RangedVariation::Group3Var1(seq) => handler.handle_double_bit_binary(
+                seq.iter()
+                    .map(|(v, i)| (DoubleBitBinary::from_raw_state(v), i)),
+            ),
+            RangedVariation::Group3Var2(seq) => {
+                handler.handle_double_bit_binary(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group10Var0 => {}
+            RangedVariation::Group10Var1(seq) => handler.handle_binary_output_status(
+                seq.iter()
+                    .map(|(v, i)| (BinaryOutputStatus::from_raw_state(v), i)),
+            ),
+            RangedVariation::Group10Var2(seq) => {
+                handler.handle_binary_output_status(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group20Var0 => {}
+            RangedVariation::Group20Var1(seq) => {
+                handler.handle_counter(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group20Var2(seq) => {
+                handler.handle_counter(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group20Var5(seq) => {
+                handler.handle_counter(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group20Var6(seq) => {
+                handler.handle_counter(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group21Var0 => {}
+            RangedVariation::Group21Var1(seq) => {
+                handler.handle_frozen_counter(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group21Var2(seq) => {
+                handler.handle_frozen_counter(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group21Var5(seq) => {
+                handler.handle_frozen_counter(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group21Var6(seq) => {
+                handler.handle_frozen_counter(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group21Var9(seq) => {
+                handler.handle_frozen_counter(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group21Var10(seq) => {
+                handler.handle_frozen_counter(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group30Var0 => {}
+            RangedVariation::Group30Var1(seq) => {
+                handler.handle_analog(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group30Var2(seq) => {
+                handler.handle_analog(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group30Var3(seq) => {
+                handler.handle_analog(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group30Var4(seq) => {
+                handler.handle_analog(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group30Var5(seq) => {
+                handler.handle_analog(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group30Var6(seq) => {
+                handler.handle_analog(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group40Var0 => {}
+            RangedVariation::Group40Var1(seq) => {
+                handler.handle_analog_output_status(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group40Var2(seq) => {
+                handler.handle_analog_output_status(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group40Var3(seq) => {
+                handler.handle_analog_output_status(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group40Var4(seq) => {
+                handler.handle_analog_output_status(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
+            RangedVariation::Group80Var1(_) => {}
             RangedVariation::Group110Var0 => {}
             RangedVariation::Group110VarX(_, _) => {}
         }

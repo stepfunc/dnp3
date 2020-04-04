@@ -1,6 +1,7 @@
 package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
+import dev.gridio.dnp3.codegen.model.groups.{Group10Var1, Group1Var1, Group80Var1}
 import dev.gridio.dnp3.codegen.render._
 
 object RangedVariationModule extends Module {
@@ -14,6 +15,8 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
       "use crate::util::logging::log_items;".eol ++
+      "use crate::master::handlers::MeasurementHandler;".eol ++
+      "use crate::app::meas::*;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++
@@ -93,6 +96,51 @@ object RangedVariationModule extends Module {
       case _ => s"RangedVariation::${v.name}(seq) => log_items(level, seq.iter()),".eol
     }
 
+    def getName(v: SingleBitField): (String, String) = {
+      v match {
+        case Group1Var1 => ("binary", "Binary")
+        case Group10Var1 => ("binary_output_status", "BinaryOutputStatus")
+      }
+    }
+
+    def getMeasName(v: Variation): String = {
+      v.parent.groupType match {
+        case GroupType.StaticBinary => "binary"
+        case GroupType.StaticDoubleBinary => "double_bit_binary"
+        case GroupType.StaticBinaryOutputStatus => "binary_output_status"
+        case GroupType.StaticAnalog => "analog"
+        case GroupType.StaticAnalogOutputStatus => "analog_output_status"
+        case GroupType.StaticCounter => "counter"
+        case GroupType.StaticFrozenCounter => "frozen_counter"
+      }
+    }
+
+    def getExtractMatcher(v: Variation): Iterator[String] = v match {
+      case Group80Var1 => s"RangedVariation::${v.name}(_) => {}".eol
+      case _ : AnyVariation => s"RangedVariation::${v.name} => {}".eol
+      case s : SingleBitField => {
+        val (lower, upper) = getName(s)
+        bracket(s"RangedVariation::${v.name}(seq) =>") {
+          s"handler.handle_${lower}(seq.iter().map(|(v,i)| (${upper}::from_raw_state(v), i)))".eol
+        }
+      }
+      case _ : DoubleBitField => {
+        bracket(s"RangedVariation::${v.name}(seq) =>") {
+          s"handler.handle_double_bit_binary(seq.iter().map(|(v,i)| (DoubleBitBinary::from_raw_state(v), i)))".eol
+        }
+      }
+      case _ : SizedByVariation => {
+        s"RangedVariation::${v.parent.name}Var0 => {}".eol ++
+        s"RangedVariation::${v.parent.name}VarX(_,_) => {}".eol
+      }
+      case _ => {
+        val name = getMeasName(v)
+        bracket(s"RangedVariation::${v.name}(seq) =>") {
+          s"handler.handle_${name}(seq.iter().map(|(v, i)| (v.into(), i)))".eol
+        }
+      }
+    }
+
     bracket("impl<'a> RangedVariation<'a>") {
       "#[rustfmt::skip]".eol ++
       bracket("pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
@@ -108,6 +156,11 @@ object RangedVariationModule extends Module {
         bracket("pub fn log(&self, level : log::Level)") {
           bracket("match self") {
             variations.flatMap(getLogMatcher).iterator
+          }
+        } ++ space ++
+        bracket("pub fn extract_measurements_to<T>(&self, handler: &mut T) where T: MeasurementHandler") {
+          bracket("match self") {
+            variations.flatMap(getExtractMatcher).iterator
           }
         }
     }
