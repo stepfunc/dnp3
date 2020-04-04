@@ -1,7 +1,7 @@
 package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
-import dev.gridio.dnp3.codegen.model.groups.{Group10Var1, Group1Var1, Group80Var1}
+import dev.gridio.dnp3.codegen.model.groups.{Group10Var1, Group110AnyVar, Group1Var1, Group80Var1}
 import dev.gridio.dnp3.codegen.render._
 
 object RangedVariationModule extends Module {
@@ -112,12 +112,12 @@ object RangedVariationModule extends Module {
         case GroupType.StaticAnalogOutputStatus => "analog_output_status"
         case GroupType.StaticCounter => "counter"
         case GroupType.StaticFrozenCounter => "frozen_counter"
+        case _ => throw new Exception("unhandled variation")
       }
     }
 
     def getExtractMatcher(v: Variation): Iterator[String] = v match {
       case Group80Var1 => s"RangedVariation::${v.name}(_) => {}".eol
-      case _ : AnyVariation => s"RangedVariation::${v.name} => {}".eol
       case s : SingleBitField => {
         val (lower, upper) = getName(s)
         bracket(s"RangedVariation::${v.name}(seq) =>") {
@@ -129,10 +129,13 @@ object RangedVariationModule extends Module {
           s"handler.handle_double_bit_binary(seq.iter().map(|(v,i)| (DoubleBitBinary::from_raw_state(v), i)))".eol
         }
       }
-      case _ : SizedByVariation => {
+      case Group110AnyVar => {
         s"RangedVariation::${v.parent.name}Var0 => {}".eol ++
-        s"RangedVariation::${v.parent.name}VarX(_,_) => {}".eol
+        bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
+          "handler.handle_octet_string(seq)".eol
+        }
       }
+      case _ : AnyVariation => s"RangedVariation::${v.name} => {}".eol
       case _ => {
         val name = getMeasName(v)
         bracket(s"RangedVariation::${v.name}(seq) =>") {

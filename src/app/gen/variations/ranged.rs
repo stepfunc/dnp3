@@ -283,7 +283,7 @@ impl<'a> RangedVariation<'a> {
             }
             RangedVariation::Group80Var1(_) => {}
             RangedVariation::Group110Var0 => {}
-            RangedVariation::Group110VarX(_, _) => {}
+            RangedVariation::Group110VarX(_, seq) => handler.handle_octet_string(seq),
         }
     }
 }
