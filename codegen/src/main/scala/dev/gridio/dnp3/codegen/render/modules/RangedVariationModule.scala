@@ -96,13 +96,6 @@ object RangedVariationModule extends Module {
       case _ => s"RangedVariation::${v.name}(seq) => log_items(level, seq.iter()),".eol
     }
 
-    def getName(v: SingleBitField): (String, String) = {
-      v match {
-        case Group1Var1 => ("binary", "Binary")
-        case Group10Var1 => ("binary_output_status", "BinaryOutputStatus")
-      }
-    }
-
     def getMeasName(v: Variation): String = {
       v.parent.groupType match {
         case GroupType.StaticBinary => "binary"
@@ -116,31 +109,38 @@ object RangedVariationModule extends Module {
       }
     }
 
-    def getExtractMatcher(v: Variation): Iterator[String] = v match {
-      case Group80Var1 => s"RangedVariation::${v.name}(_) => {}".eol
-      case s : SingleBitField => {
-        val (lower, upper) = getName(s)
+    def getExtractMatcher(v: Variation): Iterator[String] = {
+
+      def singleBitField(v: Variation): Iterator[String] = {
+        val (lower, upper) = v match {
+          case Group1Var1 => ("binary", "Binary")
+          case Group10Var1 => ("binary_output_status", "BinaryOutputStatus")
+        }
         bracket(s"RangedVariation::${v.name}(seq) =>") {
           s"handler.handle_${lower}(seq.iter().map(|(v,i)| (${upper}::from_raw_state(v), i)))".eol
         }
       }
-      case _ : DoubleBitField => {
-        bracket(s"RangedVariation::${v.name}(seq) =>") {
-          s"handler.handle_double_bit_binary(seq.iter().map(|(v,i)| (DoubleBitBinary::from_raw_state(v), i)))".eol
+
+      v match {
+        case Group1Var1 => singleBitField(v)
+        case Group10Var1 => singleBitField(v)
+        case _ : DoubleBitField => {
+          bracket(s"RangedVariation::${v.name}(seq) =>") {
+            s"handler.handle_double_bit_binary(seq.iter().map(|(v,i)| (DoubleBitBinary::from_raw_state(v), i)))".eol
+          }
         }
-      }
-      case Group110AnyVar => {
-        s"RangedVariation::${v.parent.name}Var0 => {}".eol ++
-        bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
-          "handler.handle_octet_string(seq)".eol
+        case Group110AnyVar => {
+          bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
+            "handler.handle_octet_string(seq)".eol
+          }
         }
-      }
-      case _ : AnyVariation => s"RangedVariation::${v.name} => {}".eol
-      case _ => {
-        val name = getMeasName(v)
-        bracket(s"RangedVariation::${v.name}(seq) =>") {
-          s"handler.handle_${name}(seq.iter().map(|(v, i)| (v.into(), i)))".eol
+        case _ : FixedSize => {
+          val name = getMeasName(v)
+          bracket(s"RangedVariation::${v.name}(seq) =>") {
+            s"handler.handle_${name}(seq.iter().map(|(v, i)| (v.into(), i)))".eol
+          }
         }
+        case _ => Iterator.empty
       }
     }
 
@@ -163,7 +163,8 @@ object RangedVariationModule extends Module {
         } ++ space ++
         bracket("pub fn extract_measurements_to<T>(&self, handler: &mut T) where T: MeasurementHandler") {
           bracket("match self") {
-            variations.flatMap(getExtractMatcher).iterator
+            variations.flatMap(getExtractMatcher).iterator ++
+            "_ => {}".eol // TODO - log something?
           }
         }
     }
