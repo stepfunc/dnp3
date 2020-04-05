@@ -123,7 +123,7 @@ object RangedVariationModule extends Module {
         case _ : FixedSize => simpleExtract(v)
         case Group110AnyVar => {
           bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
-            "handler.handle_octet_string(seq)".eol
+            "handler.handle_octet_string(seq.iter())".eol
           }
         }
         case _ => Iterator.empty

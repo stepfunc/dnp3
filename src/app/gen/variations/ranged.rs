@@ -271,7 +271,7 @@ impl<'a> RangedVariation<'a> {
             RangedVariation::Group40Var4(seq) => {
                 handler.handle_analog_output_status(seq.iter().map(|(v, i)| (v.into(), i)))
             }
-            RangedVariation::Group110VarX(_, seq) => handler.handle_octet_string(seq),
+            RangedVariation::Group110VarX(_, seq) => handler.handle_octet_string(seq.iter()),
             _ => {}
         }
     }

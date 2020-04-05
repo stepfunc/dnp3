@@ -11,6 +11,22 @@ pub enum Time {
     Invalid,
 }
 
+impl Time {
+    pub(crate) fn checked_add(self, x: u16) -> Self {
+        match self {
+            Time::Invalid => Time::Invalid,
+            Time::Synchronized(ts) => match ts.checked_add(x) {
+                Some(x) => Time::Synchronized(x),
+                None => Time::Invalid,
+            },
+            Time::NotSynchronized(ts) => match ts.checked_add(x) {
+                Some(x) => Time::NotSynchronized(x),
+                None => Time::Invalid,
+            },
+        }
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Binary {
     pub value: bool,

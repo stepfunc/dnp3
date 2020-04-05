@@ -1,6 +1,6 @@
 use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
-use crate::app::parse::bytes::RangedBytesSequence;
+use crate::app::parse::bytes::Bytes;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
 
 pub trait ResponseHandler {
@@ -15,7 +15,7 @@ pub trait MeasurementHandler {
     fn handle_frozen_counter(&mut self, x: impl Iterator<Item = (FrozenCounter, u16)>);
     fn handle_analog(&mut self, x: impl Iterator<Item = (Analog, u16)>);
     fn handle_analog_output_status(&mut self, x: impl Iterator<Item = (AnalogOutputStatus, u16)>);
-    fn handle_octet_string(&mut self, x: &RangedBytesSequence);
+    fn handle_octet_string<'a>(&mut self, x: impl Iterator<Item = (Bytes<'a>, u16)>);
 }
 
 pub struct LoggingResponseHandler;

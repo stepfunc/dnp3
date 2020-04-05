@@ -8,21 +8,32 @@ pub struct Timestamp {
 }
 
 impl Timestamp {
-    pub const MASK_U48: u64 = 0x00FF_FFFF_FFFF_FFFF;
+    pub const MAX_VALUE: u64 = 0x00FF_FFFF_FFFF_FFFF;
     pub const OUT_OF_RANGE: &'static str = "<out of range>";
 
     pub fn new(value: u64) -> Self {
         Self {
-            value: value & Self::MASK_U48,
+            value: value & Self::MAX_VALUE,
         }
     }
 
+    pub(crate) fn checked_add(self, x: u16) -> Option<Timestamp> {
+        if self.value > Self::MAX_VALUE {
+            return None;
+        }
+        let max_add = Self::MAX_VALUE - self.value;
+        if x as u64 > max_add {
+            return None;
+        }
+        Some(Timestamp::new(self.value + x as u64))
+    }
+
     pub fn min() -> Self {
-        Self::new(std::u64::MIN)
+        Self::new(0)
     }
 
     pub fn max() -> Self {
-        Self::new(std::u64::MAX)
+        Self::new(Self::MAX_VALUE)
     }
 
     pub fn to_datetime_utc(self) -> Option<DateTime<Utc>> {

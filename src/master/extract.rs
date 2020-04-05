@@ -44,8 +44,12 @@ where
             // everything else
             HeaderDetails::OneByteStartStop(_, _, var) => var.extract_measurements_to(handler),
             HeaderDetails::TwoByteStartStop(_, _, var) => var.extract_measurements_to(handler),
-            HeaderDetails::OneByteCountAndPrefix(_, _var) => {} // TODO
-            HeaderDetails::TwoByteCountAndPrefix(_, _var) => {} // TODO
+            HeaderDetails::OneByteCountAndPrefix(_, var) => {
+                var.extract_measurements_to(cto, handler)
+            }
+            HeaderDetails::TwoByteCountAndPrefix(_, var) => {
+                var.extract_measurements_to(cto, handler)
+            }
             _ => {}
         };
         // if we didn't return early b/c the header is a CTO, then we just return the previous value
