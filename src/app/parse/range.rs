@@ -41,7 +41,7 @@ pub struct RangedSequence<'a, T>
 where
     T: FixedSize,
 {
-    start: u16,
+    range: Range,
     data: &'a [u8],
     phantom: std::marker::PhantomData<T>,
 }
@@ -56,20 +56,20 @@ where
     ) -> Result<RangedSequence<'a, T>, ReadError> {
         // this cannot overflow b/c SIZE is [0, 255] and count is [0, 65536]
         let num_bytes = T::SIZE as usize * range.count;
-        Ok(Self::new(range.start, cursor.read_bytes(num_bytes)?))
+        Ok(Self::new(range, cursor.read_bytes(num_bytes)?))
     }
 
     pub fn empty() -> Self {
-        Self::new(0, &[])
+        Self::new(Range::empty(), &[])
     }
 
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
-    pub fn new(start: u16, data: &'a [u8]) -> Self {
+    pub fn new(range: Range, data: &'a [u8]) -> Self {
         Self {
-            start,
+            range,
             data,
             phantom: std::marker::PhantomData {},
         }
@@ -77,7 +77,8 @@ where
 
     pub fn iter(&self) -> RangeIterator<'a, T> {
         RangeIterator {
-            index: self.start,
+            index: self.range.start,
+            remaining: self.range.count,
             cursor: ReadCursor::new(self.data),
             phantom: std::marker::PhantomData {},
         }
@@ -86,6 +87,7 @@ where
 
 pub struct RangeIterator<'a, T> {
     index: u16,
+    remaining: usize,
     cursor: ReadCursor<'a>,
     phantom: std::marker::PhantomData<T>,
 }
@@ -101,9 +103,14 @@ where
             Ok(x) => {
                 let idx = self.index;
                 self.index += 1;
+                self.remaining -= 1;
                 Some((x, idx))
             }
             Err(_) => None,
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
     }
 }
