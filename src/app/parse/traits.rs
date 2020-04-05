@@ -11,7 +11,7 @@ where
 }
 
 pub trait Index {
-    fn index(self) -> u16;
+    fn widen_to_u16(self) -> u16;
 }
 
 impl FixedSize for u8 {
@@ -36,13 +36,13 @@ impl FixedSize for u16 {
 }
 
 impl Index for u8 {
-    fn index(self) -> u16 {
+    fn widen_to_u16(self) -> u16 {
         self as u16
     }
 }
 
 impl Index for u16 {
-    fn index(self) -> u16 {
+    fn widen_to_u16(self) -> u16 {
         self
     }
 }

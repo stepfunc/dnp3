@@ -65,29 +65,25 @@ object PrefixedVariationModule extends Module {
       }
 
       v match {
-        case _ if v.parent.groupType == GroupType.Command => {
-          bracket(s"PrefixedVariation::${v.name}(_) =>") {
-            "// TODO - log?".eol
-          }
-        }
+        case _ if v.parent.groupType == GroupType.Command => Iterator.empty
         case Group111AnyVar => {
           bracket(s"PrefixedVariation::Group111VarX(_, seq) =>") {
-            "handler.handle_octet_string(seq.iter().map(|x| (x.0, x.1.index())))".eol
+            "handler.handle_octet_string(seq.iter().map(|x| (x.0, x.1.widen_to_u16())))".eol
           }
         }
         case Group2Var3 => {
           bracket(s"PrefixedVariation::${v.name}(seq) =>") {
-            "handler.handle_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.index())))".eol
+            "handler.handle_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())))".eol
           }
         }
         case Group4Var3 => {
           bracket(s"PrefixedVariation::${v.name}(seq) =>") {
-            "handler.handle_double_bit_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.index())))".eol
+            "handler.handle_double_bit_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())))".eol
           }
         }
         case _ => {
           bracket(s"PrefixedVariation::${v.name}(seq) =>") {
-            s"handler.handle_${getName}(seq.iter().map(|x| (x.value.into(), x.index.index())))".eol
+            s"handler.handle_${getName}(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())))".eol
           }
         }
       }
@@ -102,7 +98,7 @@ object PrefixedVariationModule extends Module {
       } ++ space ++
       bracket("pub fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) where T: MeasurementHandler") {
         bracket("match self") {
-          variations.flatMap(extractMatcher).iterator
+          variations.flatMap(extractMatcher).iterator ++ "_ => {} // TODO - log?".eol
         }
       }
     }
