@@ -111,6 +111,11 @@ impl<'a> Iterator for BitIterator<'a> {
             None => None,
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let count = self.count - self.pos;
+        (count, Some(count))
+    }
 }
 
 impl<'a> Iterator for DoubleBitIterator<'a> {
@@ -137,6 +142,11 @@ impl<'a> Iterator for DoubleBitIterator<'a> {
             }
             None => None,
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let count = self.count - self.pos;
+        (count, Some(count))
     }
 }
 
@@ -173,6 +183,7 @@ mod tests {
         let mut cursor = ReadCursor::new(&data);
         let seq = BitSequence::parse(range, &mut cursor).unwrap();
         assert!(cursor.is_empty());
+        assert_eq!(seq.iter().size_hint(), (2, Some(2)));
         let vec: Vec<(bool, u16)> = seq.iter().collect();
         assert_eq!(vec, vec![(true, 65534), (false, 65535)]);
     }
@@ -184,6 +195,7 @@ mod tests {
         let mut cursor = ReadCursor::new(&data);
         let seq = DoubleBitSequence::parse(range, &mut cursor).unwrap();
         assert!(cursor.is_empty());
+        assert_eq!(seq.iter().size_hint(), (4, Some(4)));
         let vec: Vec<(DoubleBit, u16)> = seq.iter().collect();
         assert_eq!(
             vec,
@@ -203,6 +215,7 @@ mod tests {
         let mut cursor = ReadCursor::new(&data);
         let seq = DoubleBitSequence::parse(range, &mut cursor).unwrap();
         assert!(cursor.is_empty());
+        assert_eq!(seq.iter().size_hint(), (5, Some(5)));
         let vec: Vec<(DoubleBit, u16)> = seq.iter().collect();
         assert_eq!(
             vec,
