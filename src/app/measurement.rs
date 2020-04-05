@@ -18,16 +18,6 @@ pub struct Binary {
     pub time: Time,
 }
 
-impl Binary {
-    pub fn from_raw_state(value: bool) -> Self {
-        Self {
-            value,
-            flags: Flags::new_online(),
-            time: Time::Invalid,
-        }
-    }
-}
-
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct DoubleBitBinary {
     pub value: DoubleBit,
@@ -35,31 +25,11 @@ pub struct DoubleBitBinary {
     pub time: Time,
 }
 
-impl DoubleBitBinary {
-    pub fn from_raw_state(value: DoubleBit) -> Self {
-        Self {
-            value,
-            flags: Flags::new_online(),
-            time: Time::Invalid,
-        }
-    }
-}
-
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct BinaryOutputStatus {
     pub value: bool,
     pub flags: Flags,
     pub time: Time,
-}
-
-impl BinaryOutputStatus {
-    pub fn from_raw_state(value: bool) -> Self {
-        Self {
-            value,
-            flags: Flags::new_online(),
-            time: Time::Invalid,
-        }
-    }
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]

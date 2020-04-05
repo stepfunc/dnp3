@@ -16,7 +16,6 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
       "use crate::util::logging::log_items;".eol ++
       "use crate::master::handlers::MeasurementHandler;".eol ++
-      "use crate::app::meas::*;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++
@@ -111,33 +110,20 @@ object RangedVariationModule extends Module {
 
     def getExtractMatcher(v: Variation): Iterator[String] = {
 
-      def singleBitField(v: Variation): Iterator[String] = {
-        val (lower, upper) = v match {
-          case Group1Var1 => ("binary", "Binary")
-          case Group10Var1 => ("binary_output_status", "BinaryOutputStatus")
-        }
+      def simpleExtract(v: Variation): Iterator[String] = {
         bracket(s"RangedVariation::${v.name}(seq) =>") {
-          s"handler.handle_${lower}(seq.iter().map(|(v,i)| (${upper}::from_raw_state(v), i)))".eol
+          s"handler.handle_${getMeasName(v)}(seq.iter().map(|(v,i)| (v.into(), i)))".eol
         }
       }
 
       v match {
-        case Group1Var1 => singleBitField(v)
-        case Group10Var1 => singleBitField(v)
-        case _ : DoubleBitField => {
-          bracket(s"RangedVariation::${v.name}(seq) =>") {
-            s"handler.handle_double_bit_binary(seq.iter().map(|(v,i)| (DoubleBitBinary::from_raw_state(v), i)))".eol
-          }
-        }
+        case Group1Var1 => simpleExtract(v)
+        case Group10Var1 => simpleExtract(v)
+        case _ : DoubleBitField => simpleExtract(v)
+        case _ : FixedSize => simpleExtract(v)
         case Group110AnyVar => {
           bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
             "handler.handle_octet_string(seq)".eol
-          }
-        }
-        case _ : FixedSize => {
-          val name = getMeasName(v)
-          bracket(s"RangedVariation::${v.name}(seq) =>") {
-            s"handler.handle_${name}(seq.iter().map(|(v, i)| (v.into(), i)))".eol
           }
         }
         case _ => Iterator.empty

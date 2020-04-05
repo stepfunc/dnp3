@@ -1,5 +1,5 @@
 use crate::app::header::ResponseHeader;
-use crate::app::meas::*;
+use crate::app::measurement::*;
 use crate::app::parse::bytes::RangedBytesSequence;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
 

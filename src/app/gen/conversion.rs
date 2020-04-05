@@ -12,7 +12,7 @@
 
 use crate::app::flags::*;
 use crate::app::gen::variations::fixed::*;
-use crate::app::meas::*;
+use crate::app::measurement::*;
 
 impl std::convert::From<Group2Var2> for Binary {
     fn from(v: Group2Var2) -> Self {

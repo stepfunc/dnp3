@@ -1,6 +1,6 @@
 use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::fixed::*;
-use crate::app::meas::*;
+use crate::app::measurement::*;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
 use crate::master::handlers::MeasurementHandler;

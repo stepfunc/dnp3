@@ -12,7 +12,6 @@
 
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
-use crate::app::meas::*;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
 use crate::app::parse::bytes::RangedBytesSequence;
 use crate::app::parse::parser::ObjectParseError;
@@ -195,22 +194,20 @@ impl<'a> RangedVariation<'a> {
     {
         match self {
             RangedVariation::Group1Var1(seq) => {
-                handler.handle_binary(seq.iter().map(|(v, i)| (Binary::from_raw_state(v), i)))
+                handler.handle_binary(seq.iter().map(|(v, i)| (v.into(), i)))
             }
             RangedVariation::Group1Var2(seq) => {
                 handler.handle_binary(seq.iter().map(|(v, i)| (v.into(), i)))
             }
-            RangedVariation::Group3Var1(seq) => handler.handle_double_bit_binary(
-                seq.iter()
-                    .map(|(v, i)| (DoubleBitBinary::from_raw_state(v), i)),
-            ),
+            RangedVariation::Group3Var1(seq) => {
+                handler.handle_double_bit_binary(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
             RangedVariation::Group3Var2(seq) => {
                 handler.handle_double_bit_binary(seq.iter().map(|(v, i)| (v.into(), i)))
             }
-            RangedVariation::Group10Var1(seq) => handler.handle_binary_output_status(
-                seq.iter()
-                    .map(|(v, i)| (BinaryOutputStatus::from_raw_state(v), i)),
-            ),
+            RangedVariation::Group10Var1(seq) => {
+                handler.handle_binary_output_status(seq.iter().map(|(v, i)| (v.into(), i)))
+            }
             RangedVariation::Group10Var2(seq) => {
                 handler.handle_binary_output_status(seq.iter().map(|(v, i)| (v.into(), i)))
             }

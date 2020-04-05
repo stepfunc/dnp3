@@ -24,14 +24,10 @@ pub mod masks {
 }
 
 impl Flags {
-    pub fn new(value: u8) -> Self {
-        Self { value }
-    }
+    pub const ONLINE: Flags = Flags::new(masks::ONLINE);
 
-    pub fn new_online() -> Self {
-        Self {
-            value: masks::ONLINE,
-        }
+    pub const fn new(value: u8) -> Self {
+        Self { value }
     }
 
     fn is_set(self, mask: u8) -> bool {
