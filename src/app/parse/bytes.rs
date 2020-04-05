@@ -12,6 +12,7 @@ pub struct RangedBytesSequence<'a> {
     bytes: &'a [u8],
     index: u16,
     size: usize,
+    count: usize,
 }
 
 #[derive(Debug, PartialEq)]
@@ -19,6 +20,7 @@ pub struct RangedBytesIterator<'a> {
     cursor: ReadCursor<'a>,
     index: u16,
     size: usize,
+    remaining: usize,
 }
 
 #[derive(Debug, PartialEq)]
@@ -28,6 +30,7 @@ where
 {
     bytes: &'a [u8],
     size: usize,
+    count: usize,
     phantom: std::marker::PhantomData<T>,
 }
 
@@ -37,6 +40,7 @@ where
 {
     cursor: ReadCursor<'a>,
     size: usize,
+    remaining: usize,
     phantom: std::marker::PhantomData<T>,
 }
 
@@ -61,6 +65,7 @@ impl<'a> RangedBytesSequence<'a> {
             bytes: cursor.read_bytes(variation as usize * count)?,
             index,
             size: variation as usize,
+            count,
         })
     }
 
@@ -69,6 +74,7 @@ impl<'a> RangedBytesSequence<'a> {
             cursor: ReadCursor::new(self.bytes),
             index: self.index,
             size: self.size,
+            remaining: self.count,
         }
     }
 }
@@ -91,6 +97,7 @@ where
         Ok(PrefixedBytesSequence {
             bytes: cursor.read_bytes(size)?,
             size: variation as usize,
+            count: count as usize,
             phantom: std::marker::PhantomData {},
         })
     }
@@ -99,6 +106,7 @@ where
         PrefixedBytesIterator {
             cursor: ReadCursor::new(self.bytes),
             size: self.size,
+            remaining: self.count,
             phantom: std::marker::PhantomData {},
         }
     }
@@ -111,8 +119,13 @@ impl<'a> Iterator for RangedBytesIterator<'a> {
         self.cursor.read_bytes(self.size).ok().map(|b| {
             let index = self.index;
             self.index += 1;
+            self.remaining -= 1;
             (Bytes::new(b), index)
         })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
     }
 }
 
@@ -132,6 +145,12 @@ where
             _ => return None,
         };
 
+        self.remaining -= 1;
+
         Some((Bytes::new(bytes), index))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
     }
 }
