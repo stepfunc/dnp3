@@ -8,7 +8,7 @@ pub struct Timestamp {
 }
 
 impl Timestamp {
-    pub const MAX_VALUE: u64 = 0x00FF_FFFF_FFFF_FFFF;
+    pub const MAX_VALUE: u64 = 0x0000_FFFF_FFFF_FFFF;
     pub const OUT_OF_RANGE: &'static str = "<out of range>";
 
     pub fn new(value: u64) -> Self {
@@ -126,14 +126,16 @@ mod test {
     #[test]
     fn conversion_from_timestamp_to_datetime_utc_cannot_overflow() {
         let timestamp = Timestamp::new(std::u64::MAX);
-        assert_eq!(timestamp.to_datetime_utc(), None)
+        timestamp.to_datetime_utc();
     }
 
     #[test]
     fn timestamp_display_formatting_works_as_expected() {
         assert_eq!(format!("{}", Timestamp::min()), "1970-01-01T00:00:00.000Z");
-
-        assert_eq!(format!("{}", Timestamp::max()), Timestamp::OUT_OF_RANGE);
+        assert_eq!(
+            format!("{}", Timestamp::max()),
+            "+10889-08-02T05:31:50.655Z"
+        );
     }
 
     fn test_control_code_round_trip(byte: u8, cc: ControlCode) {
