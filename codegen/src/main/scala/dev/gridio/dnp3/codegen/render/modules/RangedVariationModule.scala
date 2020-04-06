@@ -90,7 +90,7 @@ object RangedVariationModule extends Module {
       case _ : AnyVariation => s"RangedVariation::${v.name} => {}".eol
       case _ : SizedByVariation => {
         s"RangedVariation::${v.parent.name}Var0 => {}".eol ++
-          s"RangedVariation::${v.parent.name}VarX(_,_) => {}".eol
+          s"RangedVariation::${v.parent.name}VarX(_,seq) =>  log_items(level, seq.iter()),".eol
       }
       case _ => s"RangedVariation::${v.name}(seq) => log_items(level, seq.iter()),".eol
     }

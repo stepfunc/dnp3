@@ -6,7 +6,7 @@ use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
 use crate::master::handlers::MeasurementHandler;
 
 /// Extract measurements from a HeaderCollection, sinking them into
-/// a something that implements `MeasurementHandler`
+/// something that implements `MeasurementHandler`
 pub fn extract_measurements<T>(headers: HeaderCollection, handler: &mut T)
 where
     T: MeasurementHandler,

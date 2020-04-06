@@ -1,10 +1,26 @@
 use crate::app::parse::parser::ObjectParseError;
 use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::ReadCursor;
+use std::fmt::Formatter;
 
 #[derive(Debug, PartialEq)]
 pub struct Bytes<'a> {
     pub value: &'a [u8],
+}
+
+impl<'a> std::fmt::Display for Bytes<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.value.len() <= 3 {
+            return write!(f, "{:02X?}", self.value);
+        }
+
+        write!(
+            f,
+            "length = {}, {:02X?} ...",
+            self.value.len(),
+            &self.value[0..3]
+        )
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -152,5 +168,19 @@ where
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.remaining, Some(self.remaining))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn bytes_formats_as_expected() {
+        let short = Bytes::new(&[0x01, 0x02, 0x03]);
+        let long = Bytes::new(&[0x01, 0x02, 0x03, 0x04]);
+
+        assert_eq!(format!("{}", short), "[01, 02, 03]");
+        assert_eq!(format!("{}", long), "length = 4, [01, 02, 03] ...");
     }
 }

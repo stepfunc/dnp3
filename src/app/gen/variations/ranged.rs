@@ -184,7 +184,7 @@ impl<'a> RangedVariation<'a> {
             RangedVariation::Group40Var4(seq) => log_items(level, seq.iter()),
             RangedVariation::Group80Var1(seq) => log_items(level, seq.iter()),
             RangedVariation::Group110Var0 => {}
-            RangedVariation::Group110VarX(_, _) => {}
+            RangedVariation::Group110VarX(_, seq) => log_items(level, seq.iter()),
         }
     }
 
