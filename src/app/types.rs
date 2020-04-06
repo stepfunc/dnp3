@@ -1,10 +1,11 @@
 use crate::app::gen::enums::{OpType, TripCloseCode};
 use crate::app::gen::variations::gv::Variation;
+use crate::util::cursor::{WriteCursor, WriteError};
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Timestamp {
-    pub value: u64,
+    value: u64,
 }
 
 impl Timestamp {
@@ -17,10 +18,12 @@ impl Timestamp {
         }
     }
 
+    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u48_le(self.value)
+    }
+
     pub(crate) fn checked_add(self, x: u16) -> Option<Timestamp> {
-        if self.value > Self::MAX_VALUE {
-            return None;
-        }
+        // safe from overflow since self.value cannot possibly be larger than MAX
         let max_add = Self::MAX_VALUE - self.value;
         if x as u64 > max_add {
             return None;

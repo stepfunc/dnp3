@@ -105,7 +105,7 @@ object FixedSizeVariationModule extends Module {
       f.typ match {
         case _ : EnumFieldType => write(".as_u8()")
         case CustomFieldTypeU8(name) => write(".as_u8()")
-        case TimestampField => write(".value")
+        case TimestampField => s"self.${f.name}.write(cursor)?;"
         case _ => write("")
       }
     }

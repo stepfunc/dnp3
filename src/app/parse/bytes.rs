@@ -14,12 +14,10 @@ impl<'a> std::fmt::Display for Bytes<'a> {
             return write!(f, "{:02X?}", self.value);
         }
 
-        write!(
-            f,
-            "length = {}, {:02X?} ...",
-            self.value.len(),
-            &self.value[0..3]
-        )
+        if let Some(s) = self.value.get(0..3) {
+            return write!(f, "length = {}, {:02X?} ...", self.value.len(), s);
+        }
+        Ok(())
     }
 }
 

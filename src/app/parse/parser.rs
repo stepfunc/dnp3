@@ -524,9 +524,7 @@ mod test {
         assert_eq!(
             items,
             vec![Group50Var1 {
-                time: Timestamp {
-                    value: 0x00_00_FA_FB_FC_FD_FE_FF
-                }
+                time: Timestamp::new(0x00_00_FA_FB_FC_FD_FE_FF)
             }]
         );
 
