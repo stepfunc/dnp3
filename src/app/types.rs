@@ -18,6 +18,18 @@ impl Timestamp {
         }
     }
 
+    pub fn min() -> Self {
+        Self::new(0)
+    }
+
+    pub fn max() -> Self {
+        Self::new(Self::MAX_VALUE)
+    }
+
+    pub fn to_datetime_utc(self) -> Option<DateTime<Utc>> {
+        Utc.timestamp_millis_opt(self.value as i64).single()
+    }
+
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u48_le(self.value)
     }
@@ -29,18 +41,6 @@ impl Timestamp {
             return None;
         }
         Some(Timestamp::new(self.value + x as u64))
-    }
-
-    pub fn min() -> Self {
-        Self::new(0)
-    }
-
-    pub fn max() -> Self {
-        Self::new(Self::MAX_VALUE)
-    }
-
-    pub fn to_datetime_utc(self) -> Option<DateTime<Utc>> {
-        Utc.timestamp_millis_opt(self.value as i64).single()
     }
 }
 

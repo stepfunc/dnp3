@@ -20,11 +20,12 @@ use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSize, Index};
 use crate::master::handlers::MeasurementHandler;
 use crate::util::cursor::ReadCursor;
+use crate::util::logging::*;
 
 #[derive(Debug, PartialEq)]
 pub enum PrefixedVariation<'a, I>
 where
-    I: FixedSize + Index,
+    I: FixedSize + Index + std::fmt::Display,
 {
     Group2Var1(CountSequence<'a, Prefix<I, Group2Var1>>),
     Group2Var2(CountSequence<'a, Prefix<I, Group2Var2>>),
@@ -78,7 +79,7 @@ where
 
 impl<'a, I> PrefixedVariation<'a, I>
 where
-    I: FixedSize + Index,
+    I: FixedSize + Index + std::fmt::Display,
 {
     #[rustfmt::skip]
     pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
@@ -133,6 +134,59 @@ where
             Variation::Group111(0) => Err(ObjectParseError::ZeroLengthOctetData),
             Variation::Group111(x) => Ok(PrefixedVariation::Group111VarX(x, PrefixedBytesSequence::parse(x, count, cursor)?)),
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
+        }
+    }
+
+    pub fn log(&self, level: log::Level) {
+        match self {
+            PrefixedVariation::Group2Var1(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group2Var2(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group2Var3(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group4Var1(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group4Var2(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group4Var3(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group11Var1(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group11Var2(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group12Var1(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group13Var1(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group13Var2(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group22Var1(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group22Var2(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group22Var5(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group22Var6(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group23Var1(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group23Var2(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group23Var5(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group23Var6(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group32Var1(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group32Var2(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group32Var3(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group32Var4(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group32Var5(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group32Var6(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group32Var7(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group32Var8(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group41Var1(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group41Var2(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group41Var3(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group41Var4(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group42Var1(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group42Var2(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group42Var3(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group42Var4(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group42Var5(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group42Var6(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group42Var7(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group42Var8(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group43Var1(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group43Var2(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group43Var3(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group43Var4(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group43Var5(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group43Var6(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group43Var7(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group43Var8(seq) => log_prefixed_items(level, seq.iter()),
+            PrefixedVariation::Group111VarX(_, seq) => log_indexed_items(level, seq.iter()),
         }
     }
 

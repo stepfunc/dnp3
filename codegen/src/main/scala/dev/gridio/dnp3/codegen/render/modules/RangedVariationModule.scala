@@ -14,7 +14,7 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::parser::ObjectParseError;".eol ++
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
-      "use crate::util::logging::log_items;".eol ++
+      "use crate::util::logging::log_indexed_items;".eol ++
       "use crate::master::handlers::MeasurementHandler;".eol ++
       space ++
       rangedVariationEnumDefinition ++
@@ -90,9 +90,9 @@ object RangedVariationModule extends Module {
       case _ : AnyVariation => s"RangedVariation::${v.name} => {}".eol
       case _ : SizedByVariation => {
         s"RangedVariation::${v.parent.name}Var0 => {}".eol ++
-          s"RangedVariation::${v.parent.name}VarX(_,seq) =>  log_items(level, seq.iter()),".eol
+          s"RangedVariation::${v.parent.name}VarX(_,seq) =>  log_indexed_items(level, seq.iter()),".eol
       }
-      case _ => s"RangedVariation::${v.name}(seq) => log_items(level, seq.iter()),".eol
+      case _ => s"RangedVariation::${v.name}(seq) => log_indexed_items(level, seq.iter()),".eol
     }
 
     def getMeasName(v: Variation): String = {

@@ -42,8 +42,8 @@ impl ResponseHandler for LoggingResponseHandler {
                 HeaderDetails::TwoByteStartStop(_, _, var) => var.log(log::Level::Info),
                 HeaderDetails::OneByteCount(_, _var) => {}
                 HeaderDetails::TwoByteCount(_, _var) => {}
-                HeaderDetails::OneByteCountAndPrefix(_, _var) => {}
-                HeaderDetails::TwoByteCountAndPrefix(_, _var) => {}
+                HeaderDetails::OneByteCountAndPrefix(_, var) => var.log(log::Level::Info),
+                HeaderDetails::TwoByteCountAndPrefix(_, var) => var.log(log::Level::Info),
             }
         }
     }

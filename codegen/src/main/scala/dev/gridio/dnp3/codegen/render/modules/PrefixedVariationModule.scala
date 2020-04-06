@@ -18,6 +18,7 @@ object PrefixedVariationModule extends Module {
       "use crate::app::parse::bytes::PrefixedBytesSequence;".eol ++
       "use crate::app::measurement::Time;".eol ++
       "use crate::master::handlers::MeasurementHandler;".eol ++
+      "use crate::util::logging::*;".eol ++
       space ++
       enumDefinition ++
       space ++
@@ -34,7 +35,7 @@ object PrefixedVariationModule extends Module {
     }
 
     "#[derive(Debug, PartialEq)]".eol ++
-      bracket("pub enum PrefixedVariation<'a, I> where I : FixedSize + Index") {
+      bracket("pub enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display") {
         variations.iterator.flatMap(definition)
       }
 
@@ -49,6 +50,15 @@ object PrefixedVariationModule extends Module {
       }
       case _ => {
         s"Variation::${v.name} => Ok(PrefixedVariation::${v.name}(CountSequence::parse(count, cursor)?)),".eol
+      }
+    }
+
+    def logMatcher(v: Variation): Iterator[String] = v match {
+      case _ : SizedByVariation => {
+          s"PrefixedVariation::${v.parent.name}VarX(_,seq) =>  log_indexed_items(level, seq.iter()),".eol
+      }
+      case _ : FixedSize => {
+        s"PrefixedVariation::${v.name}(seq) => log_prefixed_items(level, seq.iter()),".eol
       }
     }
 
@@ -89,11 +99,16 @@ object PrefixedVariationModule extends Module {
       }
     }
 
-    bracket("impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index") {
+    bracket("impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display") {
       "#[rustfmt::skip]".eol ++
       bracket("pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError>") {
         bracket("match v") {
           variations.flatMap(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
+        }
+      } ++ space ++
+      bracket("pub fn log(&self, level : log::Level)") {
+        bracket("match self") {
+          variations.flatMap(logMatcher).iterator
         }
       } ++ space ++
       bracket("pub fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) where T: MeasurementHandler") {

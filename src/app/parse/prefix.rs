@@ -4,7 +4,7 @@ use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 #[derive(Debug, PartialEq)]
 pub struct Prefix<I, V>
 where
-    I: FixedSize,
+    I: FixedSize + std::fmt::Display,
     V: FixedSize,
 {
     pub index: I,
@@ -13,7 +13,7 @@ where
 
 impl<I, V> FixedSize for Prefix<I, V>
 where
-    I: FixedSize,
+    I: FixedSize + std::fmt::Display,
     V: FixedSize,
 {
     const SIZE: u8 = I::SIZE + V::SIZE;
