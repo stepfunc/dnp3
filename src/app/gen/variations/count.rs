@@ -15,6 +15,7 @@ use crate::app::gen::variations::gv::Variation;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::ObjectParseError;
 use crate::util::cursor::ReadCursor;
+use crate::util::logging::*;
 
 #[derive(Debug, PartialEq)]
 pub enum CountVariation<'a> {
@@ -39,6 +40,18 @@ impl<'a> CountVariation<'a> {
             Variation::Group52Var1 => Ok(CountVariation::Group52Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group52Var2 => Ok(CountVariation::Group52Var2(CountSequence::parse(count, cursor)?)),
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
+        }
+    }
+
+    pub fn log(&self, level: log::Level) {
+        match self {
+            CountVariation::Group50Var1(seq) => log_count_of_items(level, seq.iter()),
+            CountVariation::Group50Var3(seq) => log_count_of_items(level, seq.iter()),
+            CountVariation::Group50Var4(seq) => log_count_of_items(level, seq.iter()),
+            CountVariation::Group51Var1(seq) => log_count_of_items(level, seq.iter()),
+            CountVariation::Group51Var2(seq) => log_count_of_items(level, seq.iter()),
+            CountVariation::Group52Var1(seq) => log_count_of_items(level, seq.iter()),
+            CountVariation::Group52Var2(seq) => log_count_of_items(level, seq.iter()),
         }
     }
 }

@@ -11,6 +11,7 @@ object CountVariationModule extends Module {
       "use crate::app::parse::count::CountSequence;".eol ++
       "use crate::app::parse::parser::ObjectParseError;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
+      "use crate::util::logging::*;".eol ++
       space ++
       enumDefinition ++
       space ++
@@ -34,9 +35,15 @@ object CountVariationModule extends Module {
 
   private def enumImpl(implicit indent: Indentation) : Iterator[String] = {
 
-    def matcher(v : Variation) : String = {
+    def parseMatcher(v : Variation) : String = {
       v match {
         case _ : FixedSize => s"Variation::${v.name} => Ok(CountVariation::${v.name}(CountSequence::parse(count, cursor)?)),"
+      }
+    }
+
+    def logMatcher(v : Variation) : String = {
+      v match {
+        case _ : FixedSize => s"CountVariation::${v.name}(seq) => log_count_of_items(level, seq.iter()),"
       }
     }
 
@@ -44,7 +51,12 @@ object CountVariationModule extends Module {
       "#[rustfmt::skip]".eol ++
       bracket("pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError>") {
         bracket("match v") {
-          variations.map(matcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
+          variations.map(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
+        }
+      } ++ space ++
+      bracket("pub fn log(&self, level : log::Level)") {
+        bracket("match self") {
+          variations.map(logMatcher).iterator
         }
       }
     }
