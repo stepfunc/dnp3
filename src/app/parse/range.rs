@@ -50,7 +50,7 @@ impl<'a, T> RangedSequence<'a, T>
 where
     T: FixedSize,
 {
-    pub fn parse(
+    pub(crate) fn parse(
         range: Range,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<RangedSequence<'a, T>, ReadError> {
@@ -59,7 +59,7 @@ where
         Ok(Self::new(range, cursor.read_bytes(num_bytes)?))
     }
 
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self::new(Range::empty(), &[])
     }
 
@@ -67,7 +67,7 @@ where
         self.data.is_empty()
     }
 
-    pub fn new(range: Range, data: &'a [u8]) -> Self {
+    pub(crate) fn new(range: Range, data: &'a [u8]) -> Self {
         Self {
             range,
             data,

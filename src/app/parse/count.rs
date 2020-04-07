@@ -15,7 +15,7 @@ impl<'a, T> CountSequence<'a, T>
 where
     T: FixedSize,
 {
-    pub fn parse(
+    pub(crate) fn parse(
         count: u16,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<CountSequence<'a, T>, ReadError> {
@@ -32,15 +32,11 @@ where
         self.iter().next()
     }
 
-    pub fn empty() -> Self {
-        Self::new(0, &[])
-    }
-
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
-    pub fn new(count: usize, data: &'a [u8]) -> Self {
+    pub(crate) fn new(count: usize, data: &'a [u8]) -> Self {
         Self {
             count,
             data,

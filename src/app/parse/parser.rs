@@ -15,7 +15,7 @@ pub struct ObjectHeader<'a> {
 }
 
 impl<'a> ObjectHeader<'a> {
-    pub fn new(variation: Variation, details: HeaderDetails<'a>) -> Self {
+    pub(crate) fn new(variation: Variation, details: HeaderDetails<'a>) -> Self {
         Self { variation, details }
     }
 }
