@@ -91,6 +91,7 @@ impl std::convert::From<ResponseError> for TaskError {
 impl TaskRunner {
     async fn confirm_solicited<T>(
         &mut self,
+        level: ParseLogLevel,
         io: &mut T,
         destination: u16,
         seq: Sequence,
@@ -101,12 +102,15 @@ impl TaskRunner {
     {
         let mut cursor = WriteCursor::new(&mut self.buffer);
         write::confirm_solicited(seq, &mut cursor)?;
-        writer.write(io, destination, cursor.written()).await?;
+        writer
+            .write(level, io, destination, cursor.written())
+            .await?;
         Ok(())
     }
 
     async fn confirm_unsolicited<T>(
         &mut self,
+        level: ParseLogLevel,
         io: &mut T,
         destination: u16,
         seq: Sequence,
@@ -117,12 +121,15 @@ impl TaskRunner {
     {
         let mut cursor = WriteCursor::new(&mut self.buffer);
         write::confirm_unsolicited(seq, &mut cursor)?;
-        writer.write(io, destination, cursor.written()).await?;
+        writer
+            .write(level, io, destination, cursor.written())
+            .await?;
         Ok(())
     }
 
     async fn handle_unsolicited<T>(
         &mut self,
+        level: ParseLogLevel,
         io: &mut T,
         address: Address,
         rsp: Response<'_>,
@@ -133,7 +140,7 @@ impl TaskRunner {
     {
         // TODO - invoke handling callback
         if rsp.header.control.con {
-            self.confirm_unsolicited(io, address.source, rsp.header.control.seq, writer)
+            self.confirm_unsolicited(level, io, address.source, rsp.header.control.seq, writer)
                 .await?;
         }
 
@@ -142,6 +149,7 @@ impl TaskRunner {
 
     async fn handle_non_read_response<T>(
         &mut self,
+        level: ParseLogLevel,
         io: &mut T,
         rsp: Response<'_>,
         task: &mut MasterTask,
@@ -162,7 +170,7 @@ impl TaskRunner {
         // but we'll confirm them if requested and log
         if rsp.header.control.con {
             log::warn!("received response requesting confirmation to non-read request");
-            self.confirm_solicited(io, task.destination, rsp.header.control.seq, writer)
+            self.confirm_solicited(level, io, task.destination, rsp.header.control.seq, writer)
                 .await?;
         }
 
@@ -171,6 +179,7 @@ impl TaskRunner {
 
     async fn handle_read_response<T>(
         &mut self,
+        level: ParseLogLevel,
         io: &mut T,
         rsp: Response<'_>,
         task: &mut MasterTask,
@@ -202,7 +211,9 @@ impl TaskRunner {
         if rsp.header.control.con {
             let mut cursor = WriteCursor::new(&mut self.buffer);
             write::confirm_solicited(rsp.header.control.seq, &mut cursor)?;
-            writer.write(io, task.destination, cursor.written()).await?;
+            writer
+                .write(level, io, task.destination, cursor.written())
+                .await?;
         }
 
         let result = task.details.handle(rsp)?;
@@ -216,6 +227,7 @@ impl TaskRunner {
 
     async fn handle_response<T>(
         &mut self,
+        level: ParseLogLevel,
         io: &mut T,
         rsp: Response<'_>,
         task: &mut MasterTask,
@@ -225,9 +237,11 @@ impl TaskRunner {
         T: AsyncWrite + Unpin,
     {
         if task.details.is_read_request() {
-            self.handle_read_response(io, rsp, task, writer).await
+            self.handle_read_response(level, io, rsp, task, writer)
+                .await
         } else {
-            self.handle_non_read_response(io, rsp, task, writer).await
+            self.handle_non_read_response(level, io, rsp, task, writer)
+                .await
         }
     }
 
@@ -247,7 +261,9 @@ impl TaskRunner {
         let seq = self.seq.increment();
         let mut cursor = WriteCursor::new(&mut self.buffer);
         task.details.format(seq, &mut cursor)?;
-        writer.write(io, task.destination, cursor.written()).await?;
+        writer
+            .write(level, io, task.destination, cursor.written())
+            .await?;
 
         let mut deadline = Instant::now() + self.reply_timeout;
 
@@ -258,10 +274,13 @@ impl TaskRunner {
                 Err(err) => log::warn!("error parsing response header: {:?}", err),
                 Ok(response) => {
                     if response.header.unsolicited {
-                        self.handle_unsolicited(io, fragment.address, response, writer)
+                        self.handle_unsolicited(level, io, fragment.address, response, writer)
                             .await?;
                     } else {
-                        match self.handle_response(io, response, task, writer).await? {
+                        match self
+                            .handle_response(level, io, response, task, writer)
+                            .await?
+                        {
                             ResponseResult::Success => {
                                 if response.header.control.fin {
                                     return Ok(());

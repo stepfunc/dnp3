@@ -97,7 +97,7 @@ pub struct IIN {
 
 impl std::fmt::Display for IIN {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[iin1: {:02X}, iin2: {:02X}]", self.iin1, self.iin2)
+        write!(f, "[iin1: 0x{:02X}, iin2: 0x{:02X}]", self.iin1, self.iin2)
     }
 }
 

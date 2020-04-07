@@ -134,6 +134,40 @@ pub struct Response<'a> {
     pub objects: &'a [u8],
 }
 
+pub(crate) fn log_tx_fragment(level: ParseLogLevel, is_master: bool, data: &[u8]) {
+    if !level.log_header() {
+        return;
+    }
+
+    if is_master {
+        match Request::parse(level, data) {
+            Ok(request) => {
+                if level.log_object_headers() {
+                    if let Err(err) = request.parse_objects() {
+                        log::error!("error parsing tx request objects: {:?}", err);
+                    }
+                }
+            }
+            Err(err) => {
+                log::error!("error parsing tx request header: {:?}", err);
+            }
+        }
+    } else {
+        match Response::parse(level, data) {
+            Ok(request) => {
+                if level.log_object_headers() {
+                    if let Err(err) = request.parse_objects() {
+                        log::error!("error parsing tx response objects: {:?}", err);
+                    }
+                }
+            }
+            Err(err) => {
+                log::error!("error parsing tx response header: {:?}", err);
+            }
+        }
+    }
+}
+
 impl<'a> Request<'a> {
     pub fn parse_objects(&self) -> Result<HeaderCollection<'a>, ObjectParseError> {
         Ok(HeaderCollection::parse(
@@ -150,9 +184,9 @@ impl<'a> Request<'a> {
 
         if level.log_header() {
             log::info!(
-                "control: {} function: {:?}",
+                "function: {:?} control: {}",
+                header.function,
                 header.control,
-                header.function
             );
         }
 
@@ -192,9 +226,9 @@ impl<'a> Response<'a> {
         let header = ResponseHeader::parse(&mut cursor)?;
         if level.log_header() {
             log::info!(
-                "control: {} function: {:?} iin: {}",
-                header.control,
+                "function: {:?} control: {} iin: {}",
                 header.function(),
+                header.control,
                 header.iin
             );
         }
