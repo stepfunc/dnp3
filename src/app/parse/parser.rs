@@ -159,44 +159,87 @@ pub(crate) struct ObjectHeaderDisplay<'a> {
 impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self.header.details {
-            HeaderDetails::AllObjects(_) => write!(f, "{}", self.header.variation),
+            HeaderDetails::AllObjects(_) => write!(
+                f,
+                "{} {}",
+                self.header.variation,
+                self.header.details.qualifier().description()
+            ),
             HeaderDetails::OneByteStartStop(s1, s2, seq) => {
-                write!(f, "{} start: {} stop: {}", self.header.variation, s1, s2)?;
+                write!(
+                    f,
+                    "{} {} [{}, {}]",
+                    self.header.variation,
+                    self.header.details.qualifier().description(),
+                    s1,
+                    s2
+                )?;
                 if self.objects {
                     seq.format_objects(f)?;
                 }
                 Ok(())
             }
             HeaderDetails::TwoByteStartStop(s1, s2, seq) => {
-                write!(f, "{} start: {} stop: {}", self.header.variation, s1, s2)?;
+                write!(
+                    f,
+                    "{} {} [{}, {}]",
+                    self.header.variation,
+                    self.header.details.qualifier().description(),
+                    s1,
+                    s2
+                )?;
                 if self.objects {
                     seq.format_objects(f)?;
                 }
                 Ok(())
             }
             HeaderDetails::OneByteCount(c, seq) => {
-                write!(f, "{} count: {}", self.header.variation, c)?;
+                write!(
+                    f,
+                    "{} {} [{}]",
+                    self.header.variation,
+                    self.header.details.qualifier().description(),
+                    c
+                )?;
                 if self.objects {
                     seq.format_objects(f)?;
                 }
                 Ok(())
             }
             HeaderDetails::TwoByteCount(c, seq) => {
-                write!(f, "{} count: {}", self.header.variation, c)?;
+                write!(
+                    f,
+                    "{} {} [{}]",
+                    self.header.variation,
+                    self.header.details.qualifier().description(),
+                    c
+                )?;
                 if self.objects {
                     seq.format_objects(f)?;
                 }
                 Ok(())
             }
             HeaderDetails::OneByteCountAndPrefix(c, seq) => {
-                write!(f, "{} count: {}", self.header.variation, c)?;
+                write!(
+                    f,
+                    "{} {} [{}]",
+                    self.header.variation,
+                    self.header.details.qualifier().description(),
+                    c
+                )?;
                 if self.objects {
                     seq.format_objects(f)?;
                 }
                 Ok(())
             }
             HeaderDetails::TwoByteCountAndPrefix(c, seq) => {
-                write!(f, "{} count: {}", self.header.variation, c)?;
+                write!(
+                    f,
+                    "{} {} [{}]",
+                    self.header.variation,
+                    self.header.details.qualifier().description(),
+                    c
+                )?;
                 if self.objects {
                     seq.format_objects(f)?;
                 }
@@ -218,6 +261,18 @@ pub enum HeaderDetails<'a> {
 }
 
 impl<'a> HeaderDetails<'a> {
+    pub fn qualifier(&self) -> QualifierCode {
+        match self {
+            HeaderDetails::AllObjects(_) => QualifierCode::AllObjects,
+            HeaderDetails::OneByteStartStop(_, _, _) => QualifierCode::Range8,
+            HeaderDetails::TwoByteStartStop(_, _, _) => QualifierCode::Range16,
+            HeaderDetails::OneByteCount(_, _) => QualifierCode::Count8,
+            HeaderDetails::TwoByteCount(_, _) => QualifierCode::Count16,
+            HeaderDetails::OneByteCountAndPrefix(_, _) => QualifierCode::CountAndPrefix8,
+            HeaderDetails::TwoByteCountAndPrefix(_, _) => QualifierCode::CountAndPrefix16,
+        }
+    }
+
     pub(crate) fn log_object_values(&self, level: log::Level) {
         match self {
             HeaderDetails::AllObjects(_) => {}
@@ -305,11 +360,7 @@ impl<'a> Request<'a> {
         let objects = cursor.read_all();
 
         if level.log_header() {
-            log::info!(
-                "function: {:?} control: {}",
-                header.function,
-                header.control,
-            );
+            log::info!("{:?} control: {}", header.function, header.control,);
         }
 
         if header.control.uns {
@@ -348,7 +399,7 @@ impl<'a> Response<'a> {
         let header = ResponseHeader::parse(&mut cursor)?;
         if level.log_header() {
             log::info!(
-                "function: {:?} control: {} iin: {}",
+                "{:?} control: {} iin: {}",
                 header.function(),
                 header.control,
                 header.iin

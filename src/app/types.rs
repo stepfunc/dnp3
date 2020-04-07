@@ -1,4 +1,4 @@
-use crate::app::gen::enums::{OpType, TripCloseCode};
+use crate::app::gen::enums::{OpType, QualifierCode, TripCloseCode};
 use crate::app::gen::variations::gv::Variation;
 use crate::util::cursor::{WriteCursor, WriteError};
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
@@ -119,6 +119,21 @@ impl std::fmt::Display for Variation {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let (g, v) = self.to_group_and_var();
         write!(f, "g{}v{}", g, v)
+    }
+}
+
+impl QualifierCode {
+    pub(crate) fn description(self) -> &'static str {
+        match self {
+            QualifierCode::AllObjects => "all objects",
+            QualifierCode::Range8 => "1-byte start/stop",
+            QualifierCode::Range16 => "2-byte start/stop",
+            QualifierCode::Count8 => "1-byte count of objects",
+            QualifierCode::Count16 => "2-byte count of objects",
+            QualifierCode::CountAndPrefix8 => "1-byte count of objects",
+            QualifierCode::CountAndPrefix16 => "2-byte count of objects",
+            QualifierCode::FreeFormat16 => "2-byte free format",
+        }
     }
 }
 
