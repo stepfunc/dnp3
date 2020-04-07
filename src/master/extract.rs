@@ -67,7 +67,7 @@ mod test {
     use crate::app::flags::Flags;
     use crate::app::gen::enums::FunctionCode;
     use crate::app::parse::bytes::Bytes;
-    use crate::app::parse::parser::HeaderCollection;
+    use crate::app::parse::parser::{HeaderCollection, ParseLogLevel};
     use crate::app::types::Timestamp;
     use crate::master::handlers::MeasurementHandler;
 
@@ -150,6 +150,7 @@ mod test {
     fn g2v3_without_cto_yields_invalid_time() {
         let mut handler = MockHandler::new();
         let headers = HeaderCollection::parse(
+            ParseLogLevel::Nothing,
             FunctionCode::Response,
             &[0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF],
         )
@@ -173,6 +174,7 @@ mod test {
     fn g2v3_with_synchronized_cto_yields_synchronized_time() {
         let mut handler = MockHandler::new();
         let headers = HeaderCollection::parse(
+            ParseLogLevel::Nothing,
             FunctionCode::Response,
             // g50v1       count: 1   -------- time: 1 ------------------
             &[
@@ -200,6 +202,7 @@ mod test {
     fn g2v3_with_unsynchronized_cto_yields_unsynchronized_time() {
         let mut handler = MockHandler::new();
         let headers = HeaderCollection::parse(
+            ParseLogLevel::Nothing,
             FunctionCode::Response,
             // g50v2   count: 1    --------- time: 2 -----------------
             &[
@@ -227,6 +230,7 @@ mod test {
     fn can_calculate_maximum_timestamp() {
         let mut handler = MockHandler::new();
         let headers = HeaderCollection::parse(
+            ParseLogLevel::Nothing,
             FunctionCode::Response,
             // g50v1      count: 1  --------- time: 0xFFFFFE ----------
             &[
@@ -254,6 +258,7 @@ mod test {
     fn cto_overflow_of_u48_yields_invalid_time() {
         let mut handler = MockHandler::new();
         let headers = HeaderCollection::parse(
+            ParseLogLevel::Nothing,
             FunctionCode::Response,
             // g50v1      count: 1  --------- time: 0xFFFFFE ----------
             &[

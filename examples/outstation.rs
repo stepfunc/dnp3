@@ -1,4 +1,4 @@
-use dnp3rs::app::parse::parser::Request;
+use dnp3rs::app::parse::parser::{ParseLogLevel, Request};
 use dnp3rs::transport::reader::Reader;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         let asdu = reader.read(&mut socket).await.unwrap();
 
-        match Request::parse(asdu.data) {
+        match Request::parse(ParseLogLevel::ObjectValues, asdu.data) {
             Err(err) => {
                 log::warn!("bad request: {:?}", err);
             }

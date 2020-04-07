@@ -1,6 +1,7 @@
 use crate::app::gen::enums::FunctionCode;
 use crate::app::sequence::Sequence;
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
+use std::fmt::Formatter;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Control {
@@ -9,6 +10,20 @@ pub struct Control {
     pub con: bool,
     pub uns: bool,
     pub seq: Sequence,
+}
+
+impl std::fmt::Display for Control {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "[fir: {} fin: {} con: {} uns: {} seq: {}]",
+            self.fir,
+            self.fin,
+            self.con,
+            self.uns,
+            self.seq.value()
+        )
+    }
 }
 
 impl Control {
@@ -78,6 +93,12 @@ impl Control {
 pub struct IIN {
     pub iin1: u8,
     pub iin2: u8,
+}
+
+impl std::fmt::Display for IIN {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[iin1: {:02X}, iin2: {:02X}]", self.iin1, self.iin2)
+    }
 }
 
 impl IIN {

@@ -1,5 +1,5 @@
 use crate::app::format::write;
-use crate::app::parse::parser::Response;
+use crate::app::parse::parser::{ParseLogLevel, Response};
 use crate::app::sequence::Sequence;
 use crate::error::Error;
 use crate::link::header::Address;
@@ -233,6 +233,7 @@ impl TaskRunner {
 
     pub async fn run<T>(
         &mut self,
+        level: ParseLogLevel,
         io: &mut T,
         task: &mut MasterTask,
         writer: &mut WriterType,
@@ -253,7 +254,7 @@ impl TaskRunner {
         // now enter a loop to read responses
         loop {
             let fragment: Fragment = tokio::time::timeout_at(deadline, reader.read(io)).await??;
-            match Response::parse(fragment.data) {
+            match Response::parse(level, fragment.data) {
                 Err(err) => log::warn!("error parsing response header: {:?}", err),
                 Ok(response) => {
                     if response.header.unsolicited {
@@ -310,6 +311,13 @@ mod test {
 
         let mut writer = MockWriter::mock();
         let mut reader = MockReader::mock();
-        tokio_test::block_on(runner.run(&mut io, &mut task, &mut writer, &mut reader)).unwrap();
+        tokio_test::block_on(runner.run(
+            ParseLogLevel::Nothing,
+            &mut io,
+            &mut task,
+            &mut writer,
+            &mut reader,
+        ))
+        .unwrap();
     }
 }

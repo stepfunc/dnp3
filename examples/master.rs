@@ -1,3 +1,4 @@
+use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::master::handlers::NullResponseHandler;
 use dnp3rs::master::runner::TaskRunner;
 use dnp3rs::master::task::MasterTask;
@@ -21,7 +22,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut task =
             MasterTask::class_scan(1024, ClassScan::integrity(), NullResponseHandler::create());
         runner
-            .run(&mut socket, &mut task, &mut writer, &mut reader)
+            .run(
+                ParseLogLevel::ObjectValues,
+                &mut socket,
+                &mut task,
+                &mut writer,
+                &mut reader,
+            )
             .await
             .unwrap();
         tokio::time::delay_for(Duration::from_secs(2)).await;

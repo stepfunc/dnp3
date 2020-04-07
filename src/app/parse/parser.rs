@@ -8,6 +8,48 @@ use crate::app::header::{HeaderParseError, RequestHeader, ResponseHeader};
 use crate::app::parse::range::{InvalidRange, Range};
 use crate::util::cursor::{ReadCursor, ReadError};
 
+/// Controls how parsed ASDUs are logged
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ParseLogLevel {
+    /// Log nothing
+    Nothing,
+    /// Log the header-only
+    Header,
+    /// Log the header and the object headers
+    ObjectHeaders,
+    /// Log the header, the object headers, and the object values
+    ObjectValues,
+}
+
+impl ParseLogLevel {
+    pub(crate) fn log_header(self) -> bool {
+        match self {
+            ParseLogLevel::Nothing => false,
+            ParseLogLevel::Header => true,
+            ParseLogLevel::ObjectHeaders => true,
+            ParseLogLevel::ObjectValues => true,
+        }
+    }
+
+    pub(crate) fn log_object_headers(self) -> bool {
+        match self {
+            ParseLogLevel::Nothing => false,
+            ParseLogLevel::Header => false,
+            ParseLogLevel::ObjectHeaders => true,
+            ParseLogLevel::ObjectValues => true,
+        }
+    }
+
+    pub(crate) fn log_object_values(self) -> bool {
+        match self {
+            ParseLogLevel::Nothing => false,
+            ParseLogLevel::Header => false,
+            ParseLogLevel::ObjectHeaders => false,
+            ParseLogLevel::ObjectValues => true,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct ObjectHeader<'a> {
     pub variation: Variation,
@@ -53,6 +95,20 @@ pub enum HeaderDetails<'a> {
     TwoByteCountAndPrefix(u16, PrefixedVariation<'a, u16>),
 }
 
+impl<'a> HeaderDetails<'a> {
+    pub(crate) fn log_object_values(&self, level: log::Level) {
+        match self {
+            HeaderDetails::AllObjects(_) => {}
+            HeaderDetails::OneByteStartStop(_, _, var) => var.log_objects(level),
+            HeaderDetails::TwoByteStartStop(_, _, var) => var.log_objects(level),
+            HeaderDetails::OneByteCount(_, var) => var.log_objects(level),
+            HeaderDetails::TwoByteCount(_, var) => var.log_objects(level),
+            HeaderDetails::OneByteCountAndPrefix(_, var) => var.log_objects(level),
+            HeaderDetails::TwoByteCountAndPrefix(_, var) => var.log_objects(level),
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ObjectParseError {
     UnknownGroupVariation(u8, u8),
@@ -66,25 +122,39 @@ pub enum ObjectParseError {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Request<'a> {
+    level: ParseLogLevel,
     pub header: RequestHeader,
     pub objects: &'a [u8],
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Response<'a> {
+    level: ParseLogLevel,
     pub header: ResponseHeader,
     pub objects: &'a [u8],
 }
 
 impl<'a> Request<'a> {
     pub fn parse_objects(&self) -> Result<HeaderCollection<'a>, ObjectParseError> {
-        Ok(HeaderCollection::parse(self.header.function, self.objects)?)
+        Ok(HeaderCollection::parse(
+            self.level,
+            self.header.function,
+            self.objects,
+        )?)
     }
 
-    pub fn parse(bytes: &'a [u8]) -> Result<Self, HeaderParseError> {
+    pub fn parse(level: ParseLogLevel, bytes: &'a [u8]) -> Result<Self, HeaderParseError> {
         let mut cursor = ReadCursor::new(bytes);
         let header = RequestHeader::parse(&mut cursor)?;
         let objects = cursor.read_all();
+
+        if level.log_header() {
+            log::info!(
+                "control: {} function: {:?}",
+                header.control,
+                header.function
+            );
+        }
 
         if header.control.uns {
             return Err(HeaderParseError::UnsolicitedBitNotAllowed(header.function));
@@ -99,7 +169,11 @@ impl<'a> Request<'a> {
             FunctionCode::UnsolicitedResponse => {
                 Err(HeaderParseError::BadFunction(header.function))
             }
-            _ => Ok(Self { header, objects }),
+            _ => Ok(Self {
+                level,
+                header,
+                objects,
+            }),
         }
     }
 }
@@ -107,15 +181,25 @@ impl<'a> Request<'a> {
 impl<'a> Response<'a> {
     pub fn parse_objects(&self) -> Result<HeaderCollection<'a>, ObjectParseError> {
         Ok(HeaderCollection::parse(
+            self.level,
             self.header.function(),
             self.objects,
         )?)
     }
 
-    pub fn parse(bytes: &'a [u8]) -> Result<Self, HeaderParseError> {
+    pub fn parse(level: ParseLogLevel, bytes: &'a [u8]) -> Result<Self, HeaderParseError> {
         let mut cursor = ReadCursor::new(bytes);
         let header = ResponseHeader::parse(&mut cursor)?;
+        if level.log_header() {
+            log::info!(
+                "control: {} function: {:?} iin: {}",
+                header.control,
+                header.function(),
+                header.iin
+            );
+        }
         Ok(Self {
+            level,
             header,
             objects: cursor.read_all(),
         })
@@ -137,8 +221,12 @@ pub struct HeaderCollection<'a> {
 
 impl<'a> HeaderCollection<'a> {
     /// parse the the raw header data in accordance with the provided function code
-    pub fn parse(function: FunctionCode, data: &'a [u8]) -> Result<Self, ObjectParseError> {
-        ObjectParser::parse(function, data)
+    pub fn parse(
+        level: ParseLogLevel,
+        function: FunctionCode,
+        data: &'a [u8],
+    ) -> Result<Self, ObjectParseError> {
+        ObjectParser::parse(level, function, data)
     }
 
     /// return and iterator of the headers that lazily parses them
@@ -163,13 +251,25 @@ impl<'a> Iterator for HeaderIterator<'a> {
 
 impl<'a> ObjectParser<'a> {
     pub fn parse(
+        level: ParseLogLevel,
         function: FunctionCode,
         data: &'a [u8],
     ) -> Result<HeaderCollection<'a>, ObjectParseError> {
         // we first do a single pass to ensure the ASDU is well-formed, returning an error if it occurs
-        for x in ObjectParser::one_pass(function, data) {
-            if let Err(e) = x {
-                return Err(e);
+        for result in ObjectParser::one_pass(function, data) {
+            match result {
+                Err(err) => {
+                    log::warn!("error parsing object header: {:?}", err); // TODO implement std::fmt::Display
+                    return Err(err);
+                }
+                Ok(header) => {
+                    if level.log_object_headers() {
+                        log::info!("{}", header);
+                    }
+                    if level.log_object_values() {
+                        header.details.log_object_values(log::Level::Info);
+                    }
+                }
             }
         }
 
@@ -362,7 +462,12 @@ mod test {
     use crate::app::types::{DoubleBit, Timestamp};
 
     fn test_parse_error(input: &[u8], func: FunctionCode, err: ObjectParseError) {
-        assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);
+        assert_eq!(
+            ObjectParser::parse(ParseLogLevel::Nothing, func, input)
+                .err()
+                .unwrap(),
+            err
+        );
     }
 
     #[test]
@@ -389,7 +494,7 @@ mod test {
     #[test]
     fn parses_valid_request() {
         let fragment = &[0xC2, 0x02, 0xAA];
-        let request = Request::parse(fragment).unwrap();
+        let request = Request::parse(ParseLogLevel::Nothing, fragment).unwrap();
         let expected = RequestHeader {
             control: Control {
                 fir: true,
@@ -412,7 +517,7 @@ mod test {
     #[test]
     fn parses_valid_response() {
         let fragment = &[0xC2, 0x82, 0xFF, 0xAA, 0x01, 0x02];
-        let response = Response::parse(fragment).unwrap();
+        let response = Response::parse(ParseLogLevel::Nothing, fragment).unwrap();
         let expected = ResponseHeader {
             control: Control {
                 fir: true,
@@ -439,6 +544,7 @@ mod test {
     #[test]
     fn parses_integrity_scan() {
         let vec: Vec<HeaderDetails> = ObjectParser::parse(
+            ParseLogLevel::Nothing,
             FunctionCode::Read,
             &[
                 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
@@ -463,9 +569,10 @@ mod test {
     #[test]
     fn parses_analog_output() {
         let header = &[0x29, 0x01, 0x17, 0x01, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x00];
-        let mut headers = ObjectParser::parse(FunctionCode::Operate, header)
-            .unwrap()
-            .iter();
+        let mut headers =
+            ObjectParser::parse(ParseLogLevel::Nothing, FunctionCode::Operate, header)
+                .unwrap()
+                .iter();
 
         let items: Vec<Prefix<u8, Group41Var1>> = assert_matches!(
             headers.next().unwrap().details,
@@ -488,9 +595,10 @@ mod test {
     #[test]
     fn parses_range_of_g3v1() {
         let header = &[0x03, 0x01, 0x00, 0x01, 0x04, 0b11_10_01_00];
-        let mut headers = ObjectParser::parse(FunctionCode::Response, header)
-            .unwrap()
-            .iter();
+        let mut headers =
+            ObjectParser::parse(ParseLogLevel::Nothing, FunctionCode::Response, header)
+                .unwrap()
+                .iter();
 
         let items: Vec<(DoubleBit, u16)> = assert_matches!(
             headers.next().unwrap().details,
@@ -512,9 +620,10 @@ mod test {
     #[test]
     fn parses_count_of_time() {
         let header = &[0x32, 0x01, 0x07, 0x01, 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA];
-        let mut headers = HeaderCollection::parse(FunctionCode::Write, header)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseLogLevel::Nothing, FunctionCode::Write, header)
+                .unwrap()
+                .iter();
 
         let items: Vec<Group50Var1> = assert_matches!(
             headers.next().unwrap().details,
@@ -535,9 +644,10 @@ mod test {
     fn parses_range_of_g1v2_as_non_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 
-        let mut headers = HeaderCollection::parse(FunctionCode::Response, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseLogLevel::Nothing, FunctionCode::Response, &input)
+                .unwrap()
+                .iter();
 
         let items: Vec<(Group1Var2, u16)> = assert_matches!(
             headers.next().unwrap().details,
@@ -558,9 +668,10 @@ mod test {
     fn parses_range_of_g1v2_as_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0x01, 0x02, 0x00, 0x07, 0x09];
 
-        let mut headers = HeaderCollection::parse(FunctionCode::Read, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseLogLevel::Nothing, FunctionCode::Read, &input)
+                .unwrap()
+                .iter();
 
         assert_matches!(
             headers.next().unwrap().details,
@@ -583,9 +694,10 @@ mod test {
     fn parses_range_of_g80v1() {
         // this is what is typically sent to clear the restart IIN
         let input = [0x50, 0x01, 0x00, 0x07, 0x07, 0x00];
-        let mut headers = HeaderCollection::parse(FunctionCode::Write, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseLogLevel::Nothing, FunctionCode::Write, &input)
+                .unwrap()
+                .iter();
 
         let vec: Vec<(bool, u16)> = assert_matches!(
             headers.next().unwrap().details,
@@ -601,9 +713,10 @@ mod test {
     #[test]
     fn parses_group110var0_as_read() {
         let input = [0x6E, 0x00, 0x00, 0x02, 0x03];
-        let mut headers = HeaderCollection::parse(FunctionCode::Read, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseLogLevel::Nothing, FunctionCode::Read, &input)
+                .unwrap()
+                .iter();
         assert_eq!(
             headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group110Var0)
@@ -623,9 +736,10 @@ mod test {
     #[test]
     fn parses_group110var1_as_non_read() {
         let input = [0x6E, 0x01, 0x00, 0x01, 0x02, 0xAA, 0xBB];
-        let mut headers = ObjectParser::parse(FunctionCode::Response, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            ObjectParser::parse(ParseLogLevel::Nothing, FunctionCode::Response, &input)
+                .unwrap()
+                .iter();
 
         let bytes: Vec<(Bytes, u16)> = assert_matches!(
             headers.next().unwrap().details,
