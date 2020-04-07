@@ -29,8 +29,6 @@ trait Variation {
   def parent: ObjectGroup
 
   def desc: String
-
-//  def fieldAttributes: Set[FieldAttribute.Value]
 }
 
 class AnyVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g, v, "Any Variation")

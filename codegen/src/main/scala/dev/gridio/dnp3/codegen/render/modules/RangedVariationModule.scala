@@ -37,7 +37,7 @@ object RangedVariationModule extends Module {
 
     "#[derive(Debug, PartialEq)]".eol ++
       bracket("pub enum RangedVariation<'a>") {
-        variations.iterator.flatMap(getVarDefinition)
+        variations.iterator.flatMap(v =>  commented(v.fullDesc).eol ++ getVarDefinition(v))
       }
 
   }
@@ -145,24 +145,24 @@ object RangedVariationModule extends Module {
       }
     }
 
+    "#[rustfmt::skip]".eol ++
     bracket("impl<'a> RangedVariation<'a>") {
-      "#[rustfmt::skip]".eol ++
-      bracket("pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
+      bracket("pub(crate) fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
         bracket("match v") {
           variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
         }
       } ++ space ++
-        bracket("pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ObjectParseError>") {
+        bracket("pub(crate) fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ObjectParseError>") {
           bracket("match v") {
             variations.flatMap(getReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
           }
         } ++ space ++
-        bracket("pub fn log(&self, level : log::Level)") {
+        bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
           bracket("match self") {
             variations.flatMap(getLogMatcher).iterator
           }
         } ++ space ++
-        bracket("pub fn extract_measurements_to<T>(&self, handler: &mut T) -> bool where T: MeasurementHandler") {
+        bracket("pub(crate) fn extract_measurements_to<T>(&self, handler: &mut T) -> bool where T: MeasurementHandler") {
           bracket("match self") {
             variations.flatMap(getExtractMatcher).iterator
           }

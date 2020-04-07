@@ -10,59 +10,94 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::parse::range::{RangedSequence, Range};
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
-use crate::util::cursor::ReadCursor;
-use crate::app::parse::parser::ObjectParseError;
-use crate::app::parse::bytes::RangedBytesSequence;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
-use crate::util::logging::log_indexed_items;
+use crate::app::parse::bytes::RangedBytesSequence;
+use crate::app::parse::parser::ObjectParseError;
+use crate::app::parse::range::{Range, RangedSequence};
 use crate::master::handlers::MeasurementHandler;
+use crate::util::cursor::ReadCursor;
+use crate::util::logging::log_indexed_items;
 
 #[derive(Debug, PartialEq)]
 pub enum RangedVariation<'a> {
+    /// Binary Input - Any Variation
     Group1Var0,
+    /// Binary Input - Packed Format
     Group1Var1(BitSequence<'a>),
+    /// Binary Input - With Flags
     Group1Var2(RangedSequence<'a, Group1Var2>),
+    /// Double-bit Binary Input - Any Variation
     Group3Var0,
+    /// Double-bit Binary Input - Packed Format
     Group3Var1(DoubleBitSequence<'a>),
+    /// Double-bit Binary Input - With Flags
     Group3Var2(RangedSequence<'a, Group3Var2>),
+    /// Binary Output - Any Variation
     Group10Var0,
+    /// Binary Output - Packed Format
     Group10Var1(BitSequence<'a>),
+    /// Binary Output - Output Status With Flags
     Group10Var2(RangedSequence<'a, Group10Var2>),
+    /// Counter - Any Variation
     Group20Var0,
+    /// Counter - 32-bit With Flag
     Group20Var1(RangedSequence<'a, Group20Var1>),
+    /// Counter - 16-bit With Flag
     Group20Var2(RangedSequence<'a, Group20Var2>),
+    /// Counter - 32-bit Without Flag
     Group20Var5(RangedSequence<'a, Group20Var5>),
+    /// Counter - 16-bit Without Flag
     Group20Var6(RangedSequence<'a, Group20Var6>),
+    /// Frozen Counter - Any Variation
     Group21Var0,
+    /// Frozen Counter - 32-bit With Flag
     Group21Var1(RangedSequence<'a, Group21Var1>),
+    /// Frozen Counter - 16-bit With Flag
     Group21Var2(RangedSequence<'a, Group21Var2>),
+    /// Frozen Counter - 32-bit With Flag and Time
     Group21Var5(RangedSequence<'a, Group21Var5>),
+    /// Frozen Counter - 16-bit With Flag and Time
     Group21Var6(RangedSequence<'a, Group21Var6>),
+    /// Frozen Counter - 32-bit Without Flag
     Group21Var9(RangedSequence<'a, Group21Var9>),
+    /// Frozen Counter - 16-bit Without Flag
     Group21Var10(RangedSequence<'a, Group21Var10>),
+    /// Analog Input - Any Variation
     Group30Var0,
+    /// Analog Input - 32-bit With Flag
     Group30Var1(RangedSequence<'a, Group30Var1>),
+    /// Analog Input - 16-bit With Flag
     Group30Var2(RangedSequence<'a, Group30Var2>),
+    /// Analog Input - 32-bit Without Flag
     Group30Var3(RangedSequence<'a, Group30Var3>),
+    /// Analog Input - 16-bit Without Flag
     Group30Var4(RangedSequence<'a, Group30Var4>),
+    /// Analog Input - Single-precision With Flag
     Group30Var5(RangedSequence<'a, Group30Var5>),
+    /// Analog Input - Double-precision With Flag
     Group30Var6(RangedSequence<'a, Group30Var6>),
+    /// Analog Output Status - Any Variation
     Group40Var0,
+    /// Analog Output Status - 32-bit With Flag
     Group40Var1(RangedSequence<'a, Group40Var1>),
+    /// Analog Output Status - 16-bit With Flag
     Group40Var2(RangedSequence<'a, Group40Var2>),
+    /// Analog Output Status - Single-precision With Flag
     Group40Var3(RangedSequence<'a, Group40Var3>),
+    /// Analog Output Status - Double-precision With Flag
     Group40Var4(RangedSequence<'a, Group40Var4>),
+    /// Internal Indications - Packed Format
     Group80Var1(BitSequence<'a>),
+    /// Octet String - Sized by variation
     Group110Var0,
     Group110VarX(u8, RangedBytesSequence<'a>),
 }
 
+#[rustfmt::skip]
 impl<'a> RangedVariation<'a> {
-    #[rustfmt::skip]
-    pub fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
+    pub(crate) fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::parse(range, cursor)?)),
@@ -106,7 +141,7 @@ impl<'a> RangedVariation<'a> {
         }
     }
     
-    pub fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ObjectParseError> {
+    pub(crate) fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::empty())),
@@ -147,7 +182,7 @@ impl<'a> RangedVariation<'a> {
         }
     }
     
-    pub fn log(&self, level : log::Level) {
+    pub(crate) fn log_objects(&self, level : log::Level) {
         match self {
             RangedVariation::Group1Var0 => {}
             RangedVariation::Group1Var1(seq) => log_indexed_items(level, seq.iter()),
@@ -188,7 +223,7 @@ impl<'a> RangedVariation<'a> {
         }
     }
     
-    pub fn extract_measurements_to<T>(&self, handler: &mut T) -> bool where T: MeasurementHandler {
+    pub(crate) fn extract_measurements_to<T>(&self, handler: &mut T) -> bool where T: MeasurementHandler {
         match self {
             RangedVariation::Group1Var0 => {
                 false // qualifier 0x06

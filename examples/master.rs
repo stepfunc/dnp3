@@ -1,4 +1,4 @@
-use dnp3rs::master::handlers::LoggingResponseHandler;
+use dnp3rs::master::handlers::NullResponseHandler;
 use dnp3rs::master::runner::TaskRunner;
 use dnp3rs::master::task::MasterTask;
 use dnp3rs::master::types::ClassScan;
@@ -18,11 +18,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut runner = TaskRunner::new(Duration::from_secs(1));
 
     loop {
-        let mut task = MasterTask::class_scan(
-            1024,
-            ClassScan::integrity(),
-            LoggingResponseHandler::create(),
-        );
+        let mut task =
+            MasterTask::class_scan(1024, ClassScan::integrity(), NullResponseHandler::create());
         runner
             .run(&mut socket, &mut task, &mut writer, &mut reader)
             .await

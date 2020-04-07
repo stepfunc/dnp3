@@ -10,73 +10,124 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::variations::gv::Variation;
-use crate::app::parse::count::CountSequence;
 use crate::app::gen::variations::fixed::*;
-use crate::util::cursor::ReadCursor;
-use crate::app::parse::parser::ObjectParseError;
-use crate::app::parse::traits::{FixedSize, Index};
-use crate::app::parse::prefix::Prefix;
-use crate::app::parse::bytes::PrefixedBytesSequence;
+use crate::app::gen::variations::gv::Variation;
 use crate::app::measurement::Time;
+use crate::app::parse::bytes::PrefixedBytesSequence;
+use crate::app::parse::count::CountSequence;
+use crate::app::parse::parser::ObjectParseError;
+use crate::app::parse::prefix::Prefix;
+use crate::app::parse::traits::{FixedSize, Index};
 use crate::master::handlers::MeasurementHandler;
+use crate::util::cursor::ReadCursor;
 use crate::util::logging::*;
 
 #[derive(Debug, PartialEq)]
-pub enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
+pub enum PrefixedVariation<'a, I>
+where
+    I: FixedSize + Index + std::fmt::Display,
+{
+    /// Binary Input Event - Without Time
     Group2Var1(CountSequence<'a, Prefix<I, Group2Var1>>),
+    /// Binary Input Event - With Absolute Time
     Group2Var2(CountSequence<'a, Prefix<I, Group2Var2>>),
+    /// Binary Input Event - With Relative Time
     Group2Var3(CountSequence<'a, Prefix<I, Group2Var3>>),
+    /// Double-bit Binary Input Event - Without Time
     Group4Var1(CountSequence<'a, Prefix<I, Group4Var1>>),
+    /// Double-bit Binary Input Event - With Absolute Time
     Group4Var2(CountSequence<'a, Prefix<I, Group4Var2>>),
+    /// Double-bit Binary Input Event - With Relative Time
     Group4Var3(CountSequence<'a, Prefix<I, Group4Var3>>),
+    /// Binary Output Event - Output Status Without Time
     Group11Var1(CountSequence<'a, Prefix<I, Group11Var1>>),
+    /// Binary Output Event - Output Status With Time
     Group11Var2(CountSequence<'a, Prefix<I, Group11Var2>>),
+    /// Binary Command - Control Relay Output Block
     Group12Var1(CountSequence<'a, Prefix<I, Group12Var1>>),
+    /// Binary Command Event - Without Time
     Group13Var1(CountSequence<'a, Prefix<I, Group13Var1>>),
+    /// Binary Command Event - With Time
     Group13Var2(CountSequence<'a, Prefix<I, Group13Var2>>),
+    /// Counter Event - 32-bit With Flag
     Group22Var1(CountSequence<'a, Prefix<I, Group22Var1>>),
+    /// Counter Event - 16-bit With Flag
     Group22Var2(CountSequence<'a, Prefix<I, Group22Var2>>),
+    /// Counter Event - 32-bit With Flag and Time
     Group22Var5(CountSequence<'a, Prefix<I, Group22Var5>>),
+    /// Counter Event - 16-bit With Flag and Time
     Group22Var6(CountSequence<'a, Prefix<I, Group22Var6>>),
+    /// Frozen Counter Event - 32-bit With Flag
     Group23Var1(CountSequence<'a, Prefix<I, Group23Var1>>),
+    /// Frozen Counter Event - 16-bit With Flag
     Group23Var2(CountSequence<'a, Prefix<I, Group23Var2>>),
+    /// Frozen Counter Event - 32-bit With Flag and Time
     Group23Var5(CountSequence<'a, Prefix<I, Group23Var5>>),
+    /// Frozen Counter Event - 16-bit With Flag and Time
     Group23Var6(CountSequence<'a, Prefix<I, Group23Var6>>),
+    /// Analog Input Event - 32-bit With Flag
     Group32Var1(CountSequence<'a, Prefix<I, Group32Var1>>),
+    /// Analog Input Event - 16-bit With Flag
     Group32Var2(CountSequence<'a, Prefix<I, Group32Var2>>),
+    /// Analog Input Event - 32-bit With Flag and Time
     Group32Var3(CountSequence<'a, Prefix<I, Group32Var3>>),
+    /// Analog Input Event - 16-bit With Flag and Time
     Group32Var4(CountSequence<'a, Prefix<I, Group32Var4>>),
+    /// Analog Input Event - Single-precision With Flag
     Group32Var5(CountSequence<'a, Prefix<I, Group32Var5>>),
+    /// Analog Input Event - Double-precision With Flag
     Group32Var6(CountSequence<'a, Prefix<I, Group32Var6>>),
+    /// Analog Input Event - Single-precision With Flag and Time
     Group32Var7(CountSequence<'a, Prefix<I, Group32Var7>>),
+    /// Analog Input Event - Double-precision With Flag and Time
     Group32Var8(CountSequence<'a, Prefix<I, Group32Var8>>),
+    /// Analog Output - 32-bit With Flag
     Group41Var1(CountSequence<'a, Prefix<I, Group41Var1>>),
+    /// Analog Output - 16-bit With Flag
     Group41Var2(CountSequence<'a, Prefix<I, Group41Var2>>),
+    /// Analog Output - Single-precision
     Group41Var3(CountSequence<'a, Prefix<I, Group41Var3>>),
+    /// Analog Output - Double-precision
     Group41Var4(CountSequence<'a, Prefix<I, Group41Var4>>),
+    /// Analog Output Event - 32-bit With Flag
     Group42Var1(CountSequence<'a, Prefix<I, Group42Var1>>),
+    /// Analog Output Event - 16-bit With Flag
     Group42Var2(CountSequence<'a, Prefix<I, Group42Var2>>),
+    /// Analog Output Event - 32-bit With Flag and Time
     Group42Var3(CountSequence<'a, Prefix<I, Group42Var3>>),
+    /// Analog Output Event - 16-bit With Flag and Time
     Group42Var4(CountSequence<'a, Prefix<I, Group42Var4>>),
+    /// Analog Output Event - Single-precision With Flag
     Group42Var5(CountSequence<'a, Prefix<I, Group42Var5>>),
+    /// Analog Output Event - Double-precision With Flag
     Group42Var6(CountSequence<'a, Prefix<I, Group42Var6>>),
+    /// Analog Output Event - Single-precision With Flag and Time
     Group42Var7(CountSequence<'a, Prefix<I, Group42Var7>>),
+    /// Analog Output Event - Double-precision With Flag and Time
     Group42Var8(CountSequence<'a, Prefix<I, Group42Var8>>),
+    /// Analog Command Event - 32-bit
     Group43Var1(CountSequence<'a, Prefix<I, Group43Var1>>),
+    /// Analog Command Event - 16-bit
     Group43Var2(CountSequence<'a, Prefix<I, Group43Var2>>),
+    /// Analog Command Event - 32-bit With Time
     Group43Var3(CountSequence<'a, Prefix<I, Group43Var3>>),
+    /// Analog Command Event - 16-bit With Time
     Group43Var4(CountSequence<'a, Prefix<I, Group43Var4>>),
+    /// Analog Command Event - Single-precision
     Group43Var5(CountSequence<'a, Prefix<I, Group43Var5>>),
+    /// Analog Command Event - Double-precision
     Group43Var6(CountSequence<'a, Prefix<I, Group43Var6>>),
+    /// Analog Command Event - Single-precision With Time
     Group43Var7(CountSequence<'a, Prefix<I, Group43Var7>>),
+    /// Analog Command Event - Double-precision With Time
     Group43Var8(CountSequence<'a, Prefix<I, Group43Var8>>),
+    /// Octet String Event - Sized by variation
     Group111VarX(u8, PrefixedBytesSequence<'a, I>),
 }
 
+#[rustfmt::skip]
 impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
-    #[rustfmt::skip]
-    pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
+    pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
         match v {
             Variation::Group2Var1 => Ok(PrefixedVariation::Group2Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group2Var2 => Ok(PrefixedVariation::Group2Var2(CountSequence::parse(count, cursor)?)),
@@ -131,7 +182,7 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
         }
     }
     
-    pub fn log(&self, level : log::Level) {
+    pub(crate) fn log_objects(&self, level : log::Level) {
         match self {
             PrefixedVariation::Group2Var1(seq) => log_prefixed_items(level, seq.iter()),
             PrefixedVariation::Group2Var2(seq) => log_prefixed_items(level, seq.iter()),
@@ -184,7 +235,7 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
         }
     }
     
-    pub fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) -> bool where T: MeasurementHandler {
+    pub(crate) fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) -> bool where T: MeasurementHandler {
         match self {
             PrefixedVariation::Group2Var1(seq) => {
                 handler.handle_binary(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));

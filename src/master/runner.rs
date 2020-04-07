@@ -279,7 +279,7 @@ impl TaskRunner {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::master::handlers::LoggingResponseHandler;
+    use crate::master::handlers::NullResponseHandler;
     use crate::master::task::TaskDetails;
     use crate::master::types::ClassScan;
     use crate::transport::mocks::{MockReader, MockWriter};
@@ -289,7 +289,7 @@ mod test {
     fn performs_multi_fragmented_class_scan() {
         let mut task = MasterTask::new(
             1024,
-            TaskDetails::ClassScan(ClassScan::class1(), Box::new(LoggingResponseHandler {})),
+            TaskDetails::ClassScan(ClassScan::class1(), Box::new(NullResponseHandler {})),
         );
 
         let mut runner = TaskRunner::new(Duration::from_secs(1));

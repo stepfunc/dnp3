@@ -1,9 +1,8 @@
 package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
-import dev.gridio.dnp3.codegen.model.groups.{Group111, Group111AnyVar, Group12Var1, Group2Var3, Group41Var1, Group41Var2, Group41Var3, Group41Var4, Group4Var3}
+import dev.gridio.dnp3.codegen.model.groups._
 import dev.gridio.dnp3.codegen.render._
-import dev.gridio.dnp3.codegen.render.modules.RangedVariationModule.variations
 
 object PrefixedVariationModule extends Module {
 
@@ -27,16 +26,18 @@ object PrefixedVariationModule extends Module {
 
   private def enumDefinition(implicit indent: Indentation) : Iterator[String] = {
 
-    def definition(v : Variation) : Iterator[String] = v match {
-      case _ : SizedByVariation =>{
-        "Group111VarX(u8, PrefixedBytesSequence<'a, I>),".eol
+    def definition(v : Variation) : Iterator[String] = {
+      v match {
+        case _ : SizedByVariation =>{
+          "Group111VarX(u8, PrefixedBytesSequence<'a, I>),".eol
+        }
+        case _ => s"${v.name}(CountSequence<'a, Prefix<I, ${v.name}>>),".eol
       }
-      case _ => s"${v.name}(CountSequence<'a, Prefix<I, ${v.name}>>),".eol
     }
 
     "#[derive(Debug, PartialEq)]".eol ++
       bracket("pub enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display") {
-        variations.iterator.flatMap(definition)
+        variations.iterator.flatMap(v =>  commented(v.fullDesc).eol ++ definition(v))
       }
 
   }
@@ -107,19 +108,19 @@ object PrefixedVariationModule extends Module {
       }
     }
 
+    "#[rustfmt::skip]".eol ++
     bracket("impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display") {
-      "#[rustfmt::skip]".eol ++
-      bracket("pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError>") {
+      bracket("pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError>") {
         bracket("match v") {
           variations.flatMap(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
         }
       } ++ space ++
-      bracket("pub fn log(&self, level : log::Level)") {
+      bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
         bracket("match self") {
           variations.flatMap(logMatcher).iterator
         }
       } ++ space ++
-      bracket("pub fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) -> bool where T: MeasurementHandler") {
+      bracket("pub(crate) fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) -> bool where T: MeasurementHandler") {
         bracket("match self") {
           variations.flatMap(extractMatcher).iterator
         }

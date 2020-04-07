@@ -20,15 +20,15 @@ object CountVariationModule extends Module {
 
   private def enumDefinition(implicit indent: Indentation) : Iterator[String] = {
 
-    def definition(v : Variation): String = {
+    def definition(v : Variation): Iterator[String] = {
       v match {
-        case _ : FixedSize => s"${v.name}(CountSequence<'a, ${v.name}>),"
+        case _ : FixedSize => s"${v.name}(CountSequence<'a, ${v.name}>),".eol
       }
     }
 
     "#[derive(Debug, PartialEq)]".eol ++
       bracket("pub enum CountVariation<'a>") {
-        variations.iterator.map(definition)
+        variations.iterator.flatMap(v =>  commented(v.fullDesc).eol ++ definition(v))
       }
 
   }
@@ -47,14 +47,14 @@ object CountVariationModule extends Module {
       }
     }
 
+    "#[rustfmt::skip]".eol ++
     bracket("impl<'a> CountVariation<'a>") {
-      "#[rustfmt::skip]".eol ++
-      bracket("pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError>") {
+      bracket("pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError>") {
         bracket("match v") {
           variations.map(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
         }
       } ++ space ++
-      bracket("pub fn log(&self, level : log::Level)") {
+      bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
         bracket("match self") {
           variations.map(logMatcher).iterator
         }
