@@ -10,7 +10,7 @@ use tokio::net::TcpStream;
 
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    simple_logger::init_with_level(log::Level::Info).unwrap();
+    colog::init();
 
     let mut socket = TcpStream::connect(SocketAddr::from_str("127.0.0.1:20000")?).await?;
 

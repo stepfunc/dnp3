@@ -102,7 +102,9 @@ where
         match T::read(&mut self.cursor) {
             Ok(x) => {
                 let idx = self.index;
-                self.index += 1;
+                if self.index != std::u16::MAX {
+                    self.index += 1;
+                }
                 self.remaining -= 1;
                 Some((x, idx))
             }

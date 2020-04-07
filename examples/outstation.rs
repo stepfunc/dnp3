@@ -6,7 +6,7 @@ use tokio::net::TcpListener;
 
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    simple_logger::init_with_level(log::Level::Info).unwrap();
+    colog::init();
 
     let mut listener = TcpListener::bind(SocketAddr::from_str("127.0.0.1:20000")?).await?;
 
@@ -22,9 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 log::warn!("bad request: {:?}", err);
             }
             Ok(request) => {
-                if let Err(err) = request.parse_objects() {
-                    log::warn!("bad request object: {:?}", err);
-                }
+                request.parse_objects().ok();
             }
         }
     }
