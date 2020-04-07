@@ -33,6 +33,17 @@ where
     }
 }
 
+pub(crate) fn format_count_of_items<T, V>(f: &mut std::fmt::Formatter, iter: T) -> std::fmt::Result
+where
+    T: Iterator<Item = V>,
+    V: std::fmt::Display,
+{
+    for x in iter {
+        write!(f, "\n{}", x)?;
+    }
+    Ok(())
+}
+
 pub(crate) fn log_indexed_items<T, V, I>(level: log::Level, iter: T)
 where
     T: Iterator<Item = (V, I)>,
@@ -44,6 +55,21 @@ where
     }
 }
 
+pub(crate) fn format_indexed_items<T, V, I>(
+    f: &mut std::fmt::Formatter,
+    iter: T,
+) -> std::fmt::Result
+where
+    T: Iterator<Item = (V, I)>,
+    V: std::fmt::Display,
+    I: std::fmt::Display,
+{
+    for (v, i) in iter {
+        write!(f, "\nindex: {} {}", i, v)?;
+    }
+    Ok(())
+}
+
 pub(crate) fn log_prefixed_items<T, V, I>(level: log::Level, iter: T)
 where
     T: Iterator<Item = Prefix<I, V>>,
@@ -53,6 +79,21 @@ where
     for x in iter {
         log::log!(level, "index: {} {}", x.index, x.value);
     }
+}
+
+pub(crate) fn format_prefixed_items<T, V, I>(
+    f: &mut std::fmt::Formatter,
+    iter: T,
+) -> std::fmt::Result
+where
+    T: Iterator<Item = Prefix<I, V>>,
+    V: FixedSize + std::fmt::Display,
+    I: FixedSize + std::fmt::Display,
+{
+    for x in iter {
+        write!(f, "\nindex: {} {}", x.index, x.value)?;
+    }
+    Ok(())
 }
 
 impl ParseLogLevel {
@@ -94,25 +135,72 @@ impl<'a> ObjectHeader<'a> {
     pub(crate) fn new(variation: Variation, details: HeaderDetails<'a>) -> Self {
         Self { variation, details }
     }
+
+    pub(crate) fn display_header_only(&'a self) -> ObjectHeaderDisplay<'a> {
+        ObjectHeaderDisplay {
+            objects: false,
+            header: self,
+        }
+    }
+
+    pub(crate) fn display_header_and_objects(&'a self) -> ObjectHeaderDisplay<'a> {
+        ObjectHeaderDisplay {
+            objects: true,
+            header: self,
+        }
+    }
 }
 
-impl<'a> std::fmt::Display for ObjectHeader<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.details {
-            HeaderDetails::AllObjects(_) => write!(f, "{}", self.variation),
-            HeaderDetails::OneByteStartStop(s1, s2, _) => {
-                write!(f, "{} start: {} stop: {}", self.variation, s1, s2)
+pub(crate) struct ObjectHeaderDisplay<'a> {
+    objects: bool,
+    header: &'a ObjectHeader<'a>,
+}
+
+impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match &self.header.details {
+            HeaderDetails::AllObjects(_) => write!(f, "{}", self.header.variation),
+            HeaderDetails::OneByteStartStop(s1, s2, seq) => {
+                write!(f, "{} start: {} stop: {}", self.header.variation, s1, s2)?;
+                if self.objects {
+                    seq.format_objects(f)?;
+                }
+                Ok(())
             }
-            HeaderDetails::TwoByteStartStop(s1, s2, _) => {
-                write!(f, "{} start: {} stop: {}", self.variation, s1, s2)
+            HeaderDetails::TwoByteStartStop(s1, s2, seq) => {
+                write!(f, "{} start: {} stop: {}", self.header.variation, s1, s2)?;
+                if self.objects {
+                    seq.format_objects(f)?;
+                }
+                Ok(())
             }
-            HeaderDetails::OneByteCount(c, _) => write!(f, "{} count: {}", self.variation, c),
-            HeaderDetails::TwoByteCount(c, _) => write!(f, "{} count: {}", self.variation, c),
-            HeaderDetails::OneByteCountAndPrefix(c, _) => {
-                write!(f, "{} count: {}", self.variation, c)
+            HeaderDetails::OneByteCount(c, seq) => {
+                write!(f, "{} count: {}", self.header.variation, c)?;
+                if self.objects {
+                    seq.format_objects(f)?;
+                }
+                Ok(())
             }
-            HeaderDetails::TwoByteCountAndPrefix(c, _) => {
-                write!(f, "{} count: {}", self.variation, c)
+            HeaderDetails::TwoByteCount(c, seq) => {
+                write!(f, "{} count: {}", self.header.variation, c)?;
+                if self.objects {
+                    seq.format_objects(f)?;
+                }
+                Ok(())
+            }
+            HeaderDetails::OneByteCountAndPrefix(c, seq) => {
+                write!(f, "{} count: {}", self.header.variation, c)?;
+                if self.objects {
+                    seq.format_objects(f)?;
+                }
+                Ok(())
+            }
+            HeaderDetails::TwoByteCountAndPrefix(c, seq) => {
+                write!(f, "{} count: {}", self.header.variation, c)?;
+                if self.objects {
+                    seq.format_objects(f)?;
+                }
+                Ok(())
             }
         }
     }
@@ -332,10 +420,11 @@ impl<'a> ObjectParser<'a> {
                 }
                 Ok(header) => {
                     if level.log_object_headers() {
-                        log::info!("{}", header);
-                    }
-                    if level.log_object_values() {
-                        header.details.log_object_values(log::Level::Info);
+                        if level.log_object_values() {
+                            log::info!("{}", header.display_header_and_objects());
+                        } else {
+                            log::info!("{}", header.display_header_only());
+                        }
                     }
                 }
             }

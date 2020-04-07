@@ -13,7 +13,7 @@
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::{log_count_of_items, ObjectParseError};
+use crate::app::parse::parser::*;
 use crate::util::cursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]
@@ -58,6 +58,18 @@ impl<'a> CountVariation<'a> {
             CountVariation::Group51Var2(seq) => log_count_of_items(level, seq.iter()),
             CountVariation::Group52Var1(seq) => log_count_of_items(level, seq.iter()),
             CountVariation::Group52Var2(seq) => log_count_of_items(level, seq.iter()),
+        }
+    }
+    
+    pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            CountVariation::Group50Var1(seq) => format_count_of_items(f, seq.iter()),
+            CountVariation::Group50Var3(seq) => format_count_of_items(f, seq.iter()),
+            CountVariation::Group50Var4(seq) => format_count_of_items(f, seq.iter()),
+            CountVariation::Group51Var1(seq) => format_count_of_items(f, seq.iter()),
+            CountVariation::Group51Var2(seq) => format_count_of_items(f, seq.iter()),
+            CountVariation::Group52Var1(seq) => format_count_of_items(f, seq.iter()),
+            CountVariation::Group52Var2(seq) => format_count_of_items(f, seq.iter()),
         }
     }
 }

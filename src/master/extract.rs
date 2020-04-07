@@ -49,7 +49,7 @@ where
         };
 
         if !handled {
-            log::warn!("ignored header: {}", header);
+            log::warn!("ignored header: {}", header.display_header_only());
         }
 
         // if we didn't return early b/c the header is a CTO, then we just return the previous value

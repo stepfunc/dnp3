@@ -9,7 +9,7 @@ object CountVariationModule extends Module {
       "use crate::app::gen::variations::gv::Variation;".eol ++
       "use crate::app::gen::variations::fixed::*;".eol ++
       "use crate::app::parse::count::CountSequence;".eol ++
-      "use crate::app::parse::parser::{ObjectParseError, log_count_of_items};".eol ++
+      "use crate::app::parse::parser::*;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
       space ++
       enumDefinition ++
@@ -45,6 +45,11 @@ object CountVariationModule extends Module {
         case _ : FixedSize => s"CountVariation::${v.name}(seq) => log_count_of_items(level, seq.iter()),"
       }
     }
+    def fmtMatcher(v : Variation) : String = {
+      v match {
+        case _ : FixedSize => s"CountVariation::${v.name}(seq) => format_count_of_items(f, seq.iter()),"
+      }
+    }
 
     "#[rustfmt::skip]".eol ++
     bracket("impl<'a> CountVariation<'a>") {
@@ -56,6 +61,11 @@ object CountVariationModule extends Module {
       bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
         bracket("match self") {
           variations.map(logMatcher).iterator
+        }
+      } ++ space ++
+      bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
+        bracket("match self") {
+          variations.map(fmtMatcher).iterator
         }
       }
     }

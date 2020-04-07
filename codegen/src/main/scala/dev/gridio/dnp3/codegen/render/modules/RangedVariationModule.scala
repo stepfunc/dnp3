@@ -11,7 +11,7 @@ object RangedVariationModule extends Module {
       "use crate::app::gen::variations::fixed::*;".eol ++
       "use crate::app::gen::variations::gv::Variation;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
-      "use crate::app::parse::parser::ObjectParseError;".eol ++
+      "use crate::app::parse::parser::*;".eol ++
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
       "use crate::master::handlers::MeasurementHandler;".eol ++
@@ -95,6 +95,15 @@ object RangedVariationModule extends Module {
       case _ => s"RangedVariation::${v.name}(seq) => log_indexed_items(level, seq.iter()),".eol
     }
 
+    def getFmtMatcher(v: Variation): Iterator[String] = v match {
+      case _ : AnyVariation => s"RangedVariation::${v.name} => Ok(()),".eol
+      case _ : SizedByVariation => {
+        s"RangedVariation::${v.parent.name}Var0 => Ok(()),".eol ++
+          s"RangedVariation::${v.parent.name}VarX(_,seq) =>  format_indexed_items(f, seq.iter()),".eol
+      }
+      case _ => s"RangedVariation::${v.name}(seq) => format_indexed_items(f, seq.iter()),".eol
+    }
+
     def getMeasName(v: Variation): String = {
       v.parent.groupType match {
         case GroupType.StaticBinary => "binary"
@@ -160,6 +169,11 @@ object RangedVariationModule extends Module {
         bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
           bracket("match self") {
             variations.flatMap(getLogMatcher).iterator
+          }
+        } ++ space ++
+        bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
+          bracket("match self") {
+            variations.flatMap(getFmtMatcher).iterator
           }
         } ++ space ++
         bracket("pub(crate) fn extract_measurements_to<T>(&self, handler: &mut T) -> bool where T: MeasurementHandler") {

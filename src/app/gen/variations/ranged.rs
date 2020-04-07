@@ -15,7 +15,7 @@ use crate::app::gen::variations::gv::Variation;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
 use crate::app::parse::bytes::RangedBytesSequence;
 use crate::app::parse::parser::log_indexed_items;
-use crate::app::parse::parser::ObjectParseError;
+use crate::app::parse::parser::*;
 use crate::app::parse::range::{Range, RangedSequence};
 use crate::master::handlers::MeasurementHandler;
 use crate::util::cursor::ReadCursor;
@@ -220,6 +220,47 @@ impl<'a> RangedVariation<'a> {
             RangedVariation::Group80Var1(seq) => log_indexed_items(level, seq.iter()),
             RangedVariation::Group110Var0 => {}
             RangedVariation::Group110VarX(_,seq) =>  log_indexed_items(level, seq.iter()),
+        }
+    }
+    
+    pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            RangedVariation::Group1Var0 => Ok(()),
+            RangedVariation::Group1Var1(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group1Var2(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group3Var0 => Ok(()),
+            RangedVariation::Group3Var1(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group3Var2(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group10Var0 => Ok(()),
+            RangedVariation::Group10Var1(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group10Var2(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group20Var0 => Ok(()),
+            RangedVariation::Group20Var1(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group20Var2(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group20Var5(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group20Var6(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group21Var0 => Ok(()),
+            RangedVariation::Group21Var1(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group21Var2(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group21Var5(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group21Var6(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group21Var9(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group21Var10(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group30Var0 => Ok(()),
+            RangedVariation::Group30Var1(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group30Var2(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group30Var3(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group30Var4(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group30Var5(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group30Var6(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group40Var0 => Ok(()),
+            RangedVariation::Group40Var1(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group40Var2(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group40Var3(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group40Var4(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group80Var1(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group110Var0 => Ok(()),
+            RangedVariation::Group110VarX(_,seq) =>  format_indexed_items(f, seq.iter()),
         }
     }
     

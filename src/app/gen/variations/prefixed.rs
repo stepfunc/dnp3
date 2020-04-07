@@ -15,7 +15,7 @@ use crate::app::gen::variations::gv::Variation;
 use crate::app::measurement::Time;
 use crate::app::parse::bytes::PrefixedBytesSequence;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::{log_indexed_items, log_prefixed_items, ObjectParseError};
+use crate::app::parse::parser::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSize, Index};
 use crate::master::handlers::MeasurementHandler;
@@ -231,6 +231,59 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
             PrefixedVariation::Group43Var7(seq) => log_prefixed_items(level, seq.iter()),
             PrefixedVariation::Group43Var8(seq) => log_prefixed_items(level, seq.iter()),
             PrefixedVariation::Group111VarX(_,seq) =>  log_indexed_items(level, seq.iter()),
+        }
+    }
+    
+    pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PrefixedVariation::Group2Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group2Var2(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group2Var3(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group4Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group4Var2(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group4Var3(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group11Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group11Var2(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group12Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group13Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group13Var2(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group22Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group22Var2(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group22Var5(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group22Var6(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group23Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group23Var2(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group23Var5(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group23Var6(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group32Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group32Var2(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group32Var3(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group32Var4(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group32Var5(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group32Var6(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group32Var7(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group32Var8(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group41Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group41Var2(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group41Var3(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group41Var4(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group42Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group42Var2(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group42Var3(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group42Var4(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group42Var5(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group42Var6(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group42Var7(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group42Var8(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group43Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group43Var2(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group43Var3(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group43Var4(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group43Var5(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group43Var6(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group43Var7(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group43Var8(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group111VarX(_,seq) =>  format_indexed_items(f, seq.iter()),
         }
     }
     

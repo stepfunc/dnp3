@@ -102,10 +102,8 @@ where
         match T::read(&mut self.cursor) {
             Ok(x) => {
                 let idx = self.index;
-                if self.index != std::u16::MAX {
-                    self.index += 1;
-                }
-                self.remaining -= 1;
+                self.index = self.index.saturating_add(1);
+                self.remaining = self.remaining.saturating_sub(1);
                 Some((x, idx))
             }
             Err(_) => None,

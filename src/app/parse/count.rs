@@ -68,7 +68,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         match T::read(&mut self.cursor) {
             Ok(x) => {
-                self.remaining -= 1;
+                self.remaining = self.remaining.saturating_sub(1);
                 Some(x)
             }
             Err(_) => None,

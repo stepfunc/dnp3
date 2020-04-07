@@ -11,7 +11,7 @@ object PrefixedVariationModule extends Module {
       "use crate::app::parse::count::CountSequence;".eol ++
       "use crate::app::gen::variations::fixed::*;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
-      "use crate::app::parse::parser::{ObjectParseError, log_prefixed_items, log_indexed_items};".eol ++
+      "use crate::app::parse::parser::*;".eol ++
       "use crate::app::parse::traits::{FixedSize, Index};".eol ++
       "use crate::app::parse::prefix::Prefix;".eol ++
       "use crate::app::parse::bytes::PrefixedBytesSequence;".eol ++
@@ -59,6 +59,15 @@ object PrefixedVariationModule extends Module {
       }
       case _ : FixedSize => {
         s"PrefixedVariation::${v.name}(seq) => log_prefixed_items(level, seq.iter()),".eol
+      }
+    }
+
+    def fmtMatcher(v: Variation): Iterator[String] = v match {
+      case _ : SizedByVariation => {
+        s"PrefixedVariation::${v.parent.name}VarX(_,seq) =>  format_indexed_items(f, seq.iter()),".eol
+      }
+      case _ : FixedSize => {
+        s"PrefixedVariation::${v.name}(seq) => format_prefixed_items(f, seq.iter()),".eol
       }
     }
 
@@ -119,6 +128,11 @@ object PrefixedVariationModule extends Module {
           variations.flatMap(logMatcher).iterator
         }
       } ++ space ++
+        bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
+          bracket("match self") {
+            variations.flatMap(fmtMatcher).iterator
+          }
+        } ++ space ++
       bracket("pub(crate) fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) -> bool where T: MeasurementHandler") {
         bracket("match self") {
           variations.flatMap(extractMatcher).iterator
