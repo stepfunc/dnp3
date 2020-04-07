@@ -42,13 +42,17 @@ where
                 return extract_cto_g51v2(cto, seq)
             }
             // everything else
-            HeaderDetails::OneByteStartStop(_, _, var) => var.extract_measurements_to(handler),
-            HeaderDetails::TwoByteStartStop(_, _, var) => var.extract_measurements_to(handler),
+            HeaderDetails::OneByteStartStop(_, _, var) => {
+                var.extract_measurements_to(handler);
+            }
+            HeaderDetails::TwoByteStartStop(_, _, var) => {
+                var.extract_measurements_to(handler);
+            }
             HeaderDetails::OneByteCountAndPrefix(_, var) => {
-                var.extract_measurements_to(cto, handler)
+                var.extract_measurements_to(cto, handler);
             }
             HeaderDetails::TwoByteCountAndPrefix(_, var) => {
-                var.extract_measurements_to(cto, handler)
+                var.extract_measurements_to(cto, handler);
             }
             _ => {}
         };

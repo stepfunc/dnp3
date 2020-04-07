@@ -112,7 +112,8 @@ object RangedVariationModule extends Module {
 
       def simpleExtract(v: Variation): Iterator[String] = {
         bracket(s"RangedVariation::${v.name}(seq) =>") {
-          s"handler.handle_${getMeasName(v)}(seq.iter().map(|(v,i)| (v.into(), i)))".eol
+          s"handler.handle_${getMeasName(v)}(seq.iter().map(|(v,i)| (v.into(), i)));".eol ++
+          "true".eol
         }
       }
 
@@ -123,7 +124,8 @@ object RangedVariationModule extends Module {
         case _ : FixedSize => simpleExtract(v)
         case Group110AnyVar => {
           bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
-            "handler.handle_octet_string(seq.iter())".eol
+            "handler.handle_octet_string(seq.iter());".eol ++
+            "true".eol
           }
         }
         case _ => Iterator.empty
@@ -147,10 +149,10 @@ object RangedVariationModule extends Module {
             variations.flatMap(getLogMatcher).iterator
           }
         } ++ space ++
-        bracket("pub fn extract_measurements_to<T>(&self, handler: &mut T) where T: MeasurementHandler") {
+        bracket("pub fn extract_measurements_to<T>(&self, handler: &mut T) -> bool where T: MeasurementHandler") {
           bracket("match self") {
             variations.flatMap(getExtractMatcher).iterator ++
-            "_ => {}".eol // TODO - log something?
+            "_ => false".eol // TODO - log something?
           }
         }
     }

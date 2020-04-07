@@ -78,22 +78,26 @@ object PrefixedVariationModule extends Module {
         case _ if v.parent.groupType == GroupType.Command => Iterator.empty
         case Group111AnyVar => {
           bracket(s"PrefixedVariation::Group111VarX(_, seq) =>") {
-            "handler.handle_octet_string(seq.iter().map(|x| (x.0, x.1.widen_to_u16())))".eol
+            "handler.handle_octet_string(seq.iter().map(|x| (x.0, x.1.widen_to_u16())));".eol ++
+            "true".eol
           }
         }
         case Group2Var3 => {
           bracket(s"PrefixedVariation::${v.name}(seq) =>") {
-            "handler.handle_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())))".eol
+            "handler.handle_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())));".eol ++
+            "true".eol
           }
         }
         case Group4Var3 => {
           bracket(s"PrefixedVariation::${v.name}(seq) =>") {
-            "handler.handle_double_bit_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())))".eol
+            "handler.handle_double_bit_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())));".eol ++
+            "true".eol
           }
         }
         case _ => {
           bracket(s"PrefixedVariation::${v.name}(seq) =>") {
-            s"handler.handle_${getName}(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())))".eol
+            s"handler.handle_${getName}(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));".eol ++
+            "true".eol
           }
         }
       }
@@ -111,9 +115,9 @@ object PrefixedVariationModule extends Module {
           variations.flatMap(logMatcher).iterator
         }
       } ++ space ++
-      bracket("pub fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) where T: MeasurementHandler") {
+      bracket("pub fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) -> bool where T: MeasurementHandler") {
         bracket("match self") {
-          variations.flatMap(extractMatcher).iterator ++ "_ => {} // TODO - log?".eol
+          variations.flatMap(extractMatcher).iterator ++ "_ => false".eol
         }
       }
     }
