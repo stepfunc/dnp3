@@ -24,6 +24,14 @@ where
         Ok(Self::new(count as usize, cursor.read_bytes(num_bytes)?))
     }
 
+    pub fn single(&self) -> Option<T> {
+        if self.count != 1 {
+            return None;
+        }
+
+        self.iter().next()
+    }
+
     pub fn empty() -> Self {
         Self::new(0, &[])
     }
