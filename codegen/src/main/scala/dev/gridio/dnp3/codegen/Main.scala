@@ -15,7 +15,7 @@ object Main {
     (FixedSizeVariationModule,  variationsPath.resolve("fixed.rs")),
     (RangedVariationModule,  variationsPath.resolve("ranged.rs")),
     (AllObjectsVariationModule,  variationsPath.resolve("all.rs")),
-    (VariationEnumModule, variationsPath.resolve("gv.rs")),
+    (VariationEnumModule, variationsPath.resolve("variation.rs")),
     (CountVariationModule, variationsPath.resolve("count.rs")),
     (PrefixedVariationModule, variationsPath.resolve("prefixed.rs")),
     (ConversionsModule, appGenPath.resolve("conversion.rs"))

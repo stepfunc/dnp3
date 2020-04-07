@@ -1,9 +1,9 @@
 use crate::app::gen::enums::{FunctionCode, QualifierCode};
 use crate::app::gen::variations::all::AllObjectsVariation;
 use crate::app::gen::variations::count::CountVariation;
-use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
+use crate::app::gen::variations::variation::Variation;
 use crate::app::header::{HeaderParseError, RequestHeader, ResponseHeader};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::{InvalidRange, Range};
@@ -662,7 +662,7 @@ mod test {
     use super::*;
     use crate::app::gen::enums::CommandStatus;
     use crate::app::gen::variations::fixed::*;
-    use crate::app::gen::variations::gv::Variation::Group110;
+    use crate::app::gen::variations::variation::Variation::Group110;
     use crate::app::header::{Control, IIN};
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::prefix::Prefix;

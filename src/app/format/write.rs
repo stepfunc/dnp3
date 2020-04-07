@@ -1,5 +1,5 @@
 use crate::app::gen::enums::{FunctionCode, QualifierCode};
-use crate::app::gen::variations::gv::Variation;
+use crate::app::gen::variations::variation::Variation;
 use crate::app::header::{Control, RequestHeader};
 use crate::app::sequence::Sequence;
 use crate::util::cursor::{WriteCursor, WriteError};

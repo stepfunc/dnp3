@@ -12,8 +12,8 @@ pub mod gen {
         pub mod all;
         pub mod count;
         pub mod fixed;
-        pub mod gv;
         pub mod prefixed;
         pub mod ranged;
+        pub mod variation;
     }
 }

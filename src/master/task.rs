@@ -1,6 +1,6 @@
 use crate::app::format::write;
 use crate::app::gen::enums::FunctionCode;
-use crate::app::gen::variations::gv::Variation;
+use crate::app::gen::variations::variation::Variation;
 use crate::app::header::{Control, RequestHeader};
 use crate::app::parse::parser::{ObjectParseError, Response};
 use crate::app::sequence::Sequence;

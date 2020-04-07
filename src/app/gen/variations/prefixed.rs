@@ -11,7 +11,7 @@
 //
 
 use crate::app::gen::variations::fixed::*;
-use crate::app::gen::variations::gv::Variation;
+use crate::app::gen::variations::variation::Variation;
 use crate::app::measurement::Time;
 use crate::app::parse::bytes::PrefixedBytesSequence;
 use crate::app::parse::count::CountSequence;

@@ -1,5 +1,5 @@
 use crate::app::gen::enums::{OpType, QualifierCode, TripCloseCode};
-use crate::app::gen::variations::gv::Variation;
+use crate::app::gen::variations::variation::Variation;
 use crate::util::cursor::{WriteCursor, WriteError};
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 

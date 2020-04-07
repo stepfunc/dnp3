@@ -10,7 +10,7 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::variations::gv::Variation;
+use crate::app::gen::variations::variation::Variation;
 
 #[derive(Debug, PartialEq)]
 pub enum AllObjectsVariation {

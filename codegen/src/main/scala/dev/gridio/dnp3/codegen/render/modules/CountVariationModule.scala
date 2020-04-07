@@ -6,7 +6,7 @@ import dev.gridio.dnp3.codegen.render._
 object CountVariationModule extends Module {
 
   override def lines(implicit indent: Indentation) : Iterator[String] = {
-      "use crate::app::gen::variations::gv::Variation;".eol ++
+      "use crate::app::gen::variations::variation::Variation;".eol ++
       "use crate::app::gen::variations::fixed::*;".eol ++
       "use crate::app::parse::count::CountSequence;".eol ++
       "use crate::app::parse::parser::*;".eol ++

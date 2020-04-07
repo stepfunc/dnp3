@@ -11,7 +11,7 @@
 //
 
 use crate::app::gen::variations::fixed::*;
-use crate::app::gen::variations::gv::Variation;
+use crate::app::gen::variations::variation::Variation;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
 use crate::app::parse::bytes::RangedBytesSequence;
 use crate::app::parse::parser::log_indexed_items;
