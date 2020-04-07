@@ -299,7 +299,7 @@ impl Variation {
             _ => None,
         }
     }
-
+    
     pub fn to_group_and_var(self) -> (u8, u8) {
         match self {
             Variation::Group1Var0 => (1, 0),

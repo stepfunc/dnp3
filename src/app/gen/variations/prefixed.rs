@@ -10,23 +10,20 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
-use crate::app::measurement::Time;
-use crate::app::parse::bytes::PrefixedBytesSequence;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::ObjectParseError;
-use crate::app::parse::prefix::Prefix;
-use crate::app::parse::traits::{FixedSize, Index};
-use crate::master::handlers::MeasurementHandler;
+use crate::app::gen::variations::fixed::*;
 use crate::util::cursor::ReadCursor;
+use crate::app::parse::parser::ObjectParseError;
+use crate::app::parse::traits::{FixedSize, Index};
+use crate::app::parse::prefix::Prefix;
+use crate::app::parse::bytes::PrefixedBytesSequence;
+use crate::app::measurement::Time;
+use crate::master::handlers::MeasurementHandler;
 use crate::util::logging::*;
 
 #[derive(Debug, PartialEq)]
-pub enum PrefixedVariation<'a, I>
-where
-    I: FixedSize + Index + std::fmt::Display,
-{
+pub enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
     Group2Var1(CountSequence<'a, Prefix<I, Group2Var1>>),
     Group2Var2(CountSequence<'a, Prefix<I, Group2Var2>>),
     Group2Var3(CountSequence<'a, Prefix<I, Group2Var3>>),
@@ -77,10 +74,7 @@ where
     Group111VarX(u8, PrefixedBytesSequence<'a, I>),
 }
 
-impl<'a, I> PrefixedVariation<'a, I>
-where
-    I: FixedSize + Index + std::fmt::Display,
-{
+impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
     #[rustfmt::skip]
     pub fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
         match v {
@@ -136,8 +130,8 @@ where
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
         }
     }
-
-    pub fn log(&self, level: log::Level) {
+    
+    pub fn log(&self, level : log::Level) {
         match self {
             PrefixedVariation::Group2Var1(seq) => log_prefixed_items(level, seq.iter()),
             PrefixedVariation::Group2Var2(seq) => log_prefixed_items(level, seq.iter()),
@@ -186,14 +180,11 @@ where
             PrefixedVariation::Group43Var6(seq) => log_prefixed_items(level, seq.iter()),
             PrefixedVariation::Group43Var7(seq) => log_prefixed_items(level, seq.iter()),
             PrefixedVariation::Group43Var8(seq) => log_prefixed_items(level, seq.iter()),
-            PrefixedVariation::Group111VarX(_, seq) => log_indexed_items(level, seq.iter()),
+            PrefixedVariation::Group111VarX(_,seq) =>  log_indexed_items(level, seq.iter()),
         }
     }
-
-    pub fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) -> bool
-    where
-        T: MeasurementHandler,
-    {
+    
+    pub fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) -> bool where T: MeasurementHandler {
         match self {
             PrefixedVariation::Group2Var1(seq) => {
                 handler.handle_binary(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
@@ -204,97 +195,70 @@ where
                 true
             }
             PrefixedVariation::Group2Var3(seq) => {
-                handler.handle_binary(
-                    seq.iter()
-                        .map(|x| (x.value.to_measurement(cto), x.index.widen_to_u16())),
-                );
+                handler.handle_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group4Var1(seq) => {
-                handler.handle_double_bit_binary(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_double_bit_binary(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group4Var2(seq) => {
-                handler.handle_double_bit_binary(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_double_bit_binary(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group4Var3(seq) => {
-                handler.handle_double_bit_binary(
-                    seq.iter()
-                        .map(|x| (x.value.to_measurement(cto), x.index.widen_to_u16())),
-                );
+                handler.handle_double_bit_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group11Var1(seq) => {
-                handler.handle_binary_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_binary_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group11Var2(seq) => {
-                handler.handle_binary_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_binary_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
+            PrefixedVariation::Group12Var1(_) => {
+                false // command
+            }
             PrefixedVariation::Group13Var1(seq) => {
-                handler.handle_binary_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_binary_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group13Var2(seq) => {
-                handler.handle_binary_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_binary_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group22Var1(seq) => {
-                handler
-                    .handle_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
+                handler.handle_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group22Var2(seq) => {
-                handler
-                    .handle_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
+                handler.handle_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group22Var5(seq) => {
-                handler
-                    .handle_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
+                handler.handle_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group22Var6(seq) => {
-                handler
-                    .handle_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
+                handler.handle_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group23Var1(seq) => {
-                handler.handle_frozen_counter(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_frozen_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group23Var2(seq) => {
-                handler.handle_frozen_counter(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_frozen_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group23Var5(seq) => {
-                handler.handle_frozen_counter(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_frozen_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group23Var6(seq) => {
-                handler.handle_frozen_counter(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_frozen_counter(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group32Var1(seq) => {
@@ -329,107 +293,86 @@ where
                 handler.handle_analog(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
+            PrefixedVariation::Group41Var1(_) => {
+                false // command
+            }
+            PrefixedVariation::Group41Var2(_) => {
+                false // command
+            }
+            PrefixedVariation::Group41Var3(_) => {
+                false // command
+            }
+            PrefixedVariation::Group41Var4(_) => {
+                false // command
+            }
             PrefixedVariation::Group42Var1(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group42Var2(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group42Var3(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group42Var4(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group42Var5(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group42Var6(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group42Var7(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group42Var8(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group43Var1(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group43Var2(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group43Var3(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group43Var4(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group43Var5(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group43Var6(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group43Var7(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group43Var8(seq) => {
-                handler.handle_analog_output_status(
-                    seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())),
-                );
+                handler.handle_analog_output_status(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));
                 true
             }
             PrefixedVariation::Group111VarX(_, seq) => {
                 handler.handle_octet_string(seq.iter().map(|x| (x.0, x.1.widen_to_u16())));
                 true
             }
-            _ => false,
         }
     }
 }

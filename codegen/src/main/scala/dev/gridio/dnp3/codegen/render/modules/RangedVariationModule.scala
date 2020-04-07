@@ -118,17 +118,30 @@ object RangedVariationModule extends Module {
       }
 
       v match {
+        case _ : AnyVariation => {
+          bracket(s"RangedVariation::${v.name} =>") {
+              "false // qualifier 0x06".eol
+          }
+        }
+        case Group80Var1 => {
+          bracket(s"RangedVariation::${v.name}(_) =>") {
+            "false // internal indications".eol
+          }
+        }
         case Group1Var1 => simpleExtract(v)
         case Group10Var1 => simpleExtract(v)
         case _ : DoubleBitField => simpleExtract(v)
         case _ : FixedSize => simpleExtract(v)
         case Group110AnyVar => {
+          bracket(s"RangedVariation::${v.parent.name}Var0 =>") {
+            "false".eol
+          } ++
           bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
             "handler.handle_octet_string(seq.iter());".eol ++
-            "true".eol
+              "true".eol
           }
         }
-        case _ => Iterator.empty
+        //case _ => Iterator.empty
       }
     }
 
@@ -151,8 +164,7 @@ object RangedVariationModule extends Module {
         } ++ space ++
         bracket("pub fn extract_measurements_to<T>(&self, handler: &mut T) -> bool where T: MeasurementHandler") {
           bracket("match self") {
-            variations.flatMap(getExtractMatcher).iterator ++
-            "_ => false".eol // TODO - log something?
+            variations.flatMap(getExtractMatcher).iterator
           }
         }
     }

@@ -75,7 +75,11 @@ object PrefixedVariationModule extends Module {
       }
 
       v match {
-        case _ if v.parent.groupType == GroupType.Command => Iterator.empty
+        case _ if v.parent.groupType == GroupType.Command => {
+          bracket(s"PrefixedVariation::${v.name}(_) =>") {
+            "false // command".eol
+          }
+        }
         case Group111AnyVar => {
           bracket(s"PrefixedVariation::Group111VarX(_, seq) =>") {
             "handler.handle_octet_string(seq.iter().map(|x| (x.0, x.1.widen_to_u16())));".eol ++
@@ -117,7 +121,7 @@ object PrefixedVariationModule extends Module {
       } ++ space ++
       bracket("pub fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) -> bool where T: MeasurementHandler") {
         bracket("match self") {
-          variations.flatMap(extractMatcher).iterator ++ "_ => false".eol
+          variations.flatMap(extractMatcher).iterator
         }
       }
     }

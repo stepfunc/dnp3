@@ -10,8 +10,8 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
+use crate::app::gen::variations::fixed::*;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::ObjectParseError;
 use crate::util::cursor::ReadCursor;
@@ -42,8 +42,8 @@ impl<'a> CountVariation<'a> {
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
         }
     }
-
-    pub fn log(&self, level: log::Level) {
+    
+    pub fn log(&self, level : log::Level) {
         match self {
             CountVariation::Group50Var1(seq) => log_count_of_items(level, seq.iter()),
             CountVariation::Group50Var3(seq) => log_count_of_items(level, seq.iter()),
