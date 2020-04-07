@@ -161,15 +161,17 @@ impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
         match &self.header.details {
             HeaderDetails::AllObjects(_) => write!(
                 f,
-                "{} {}",
+                "{} : {} - {}",
                 self.header.variation,
+                self.header.variation.description(),
                 self.header.details.qualifier().description()
             ),
             HeaderDetails::OneByteStartStop(s1, s2, seq) => {
                 write!(
                     f,
-                    "{} {} [{}, {}]",
+                    "{} : {} - {} - [{}, {}]",
                     self.header.variation,
+                    self.header.variation.description(),
                     self.header.details.qualifier().description(),
                     s1,
                     s2
@@ -182,8 +184,9 @@ impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
             HeaderDetails::TwoByteStartStop(s1, s2, seq) => {
                 write!(
                     f,
-                    "{} {} [{}, {}]",
+                    "{} : {} - {} - [{}, {}]",
                     self.header.variation,
+                    self.header.variation.description(),
                     self.header.details.qualifier().description(),
                     s1,
                     s2
@@ -196,8 +199,9 @@ impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
             HeaderDetails::OneByteCount(c, seq) => {
                 write!(
                     f,
-                    "{} {} [{}]",
+                    "{} : {} - {} - [{}]",
                     self.header.variation,
+                    self.header.variation.description(),
                     self.header.details.qualifier().description(),
                     c
                 )?;
@@ -209,8 +213,9 @@ impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
             HeaderDetails::TwoByteCount(c, seq) => {
                 write!(
                     f,
-                    "{} {} [{}]",
+                    "{} : {} - {} - [{}]",
                     self.header.variation,
+                    self.header.variation.description(),
                     self.header.details.qualifier().description(),
                     c
                 )?;
@@ -222,8 +227,9 @@ impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
             HeaderDetails::OneByteCountAndPrefix(c, seq) => {
                 write!(
                     f,
-                    "{} {} [{}]",
+                    "{} : {} - {} - [{}]",
                     self.header.variation,
+                    self.header.variation.description(),
                     self.header.details.qualifier().description(),
                     c
                 )?;
@@ -235,8 +241,9 @@ impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
             HeaderDetails::TwoByteCountAndPrefix(c, seq) => {
                 write!(
                     f,
-                    "{} {} [{}]",
+                    "{} : {} - {} - [{}]",
                     self.header.variation,
+                    self.header.variation.description(),
                     self.header.details.qualifier().description(),
                     c
                 )?;

@@ -52,7 +52,7 @@ object VariationEnumModule extends Module {
     }
 
     def getGroupVarFn : Iterator[String] = {
-      def matchVariation(v : Variation): Iterator[String] = {
+      def matcher(v : Variation): Iterator[String] = {
         v match {
           case _ : SizedByVariation => {
             s"Variation::${v.parent.name}(x) => (${v.parent.group}, x),".eol
@@ -65,7 +65,26 @@ object VariationEnumModule extends Module {
 
       bracket("pub fn to_group_and_var(self) -> (u8, u8)") {
         bracket("match self") {
-          ObjectGroup.allVariations.iterator.flatMap(matchVariation)
+          ObjectGroup.allVariations.iterator.flatMap(matcher)
+        }
+      }
+    }
+
+    def descriptionFn : Iterator[String] = {
+      def matcher(v : Variation): Iterator[String] = {
+        v match {
+          case _ : SizedByVariation => {
+            s"Variation::${v.parent.name}(_) => ${quoted(v.fullDesc)},".eol
+          }
+          case _ => {
+            s"Variation::${v.name} => ${quoted(v.fullDesc)},".eol
+          }
+        }
+      }
+
+      bracket("pub fn description(self) -> &'static str") {
+        bracket("match self") {
+          ObjectGroup.allVariations.iterator.flatMap(matcher)
         }
       }
     }
@@ -73,7 +92,7 @@ object VariationEnumModule extends Module {
 
 
     bracket("impl Variation") {
-      lookupFn ++ space ++ getGroupVarFn
+      lookupFn ++ space ++ getGroupVarFn ++ space ++ descriptionFn
     }
 
   }
