@@ -11,13 +11,12 @@ object PrefixedVariationModule extends Module {
       "use crate::app::parse::count::CountSequence;".eol ++
       "use crate::app::gen::variations::fixed::*;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
-      "use crate::app::parse::parser::ObjectParseError;".eol ++
+      "use crate::app::parse::parser::{ObjectParseError, log_prefixed_items, log_indexed_items};".eol ++
       "use crate::app::parse::traits::{FixedSize, Index};".eol ++
       "use crate::app::parse::prefix::Prefix;".eol ++
       "use crate::app::parse::bytes::PrefixedBytesSequence;".eol ++
       "use crate::app::measurement::Time;".eol ++
       "use crate::master::handlers::MeasurementHandler;".eol ++
-      "use crate::util::logging::*;".eol ++
       space ++
       enumDefinition ++
       space ++

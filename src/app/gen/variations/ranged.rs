@@ -14,11 +14,11 @@ use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
 use crate::app::parse::bytes::RangedBytesSequence;
+use crate::app::parse::parser::log_indexed_items;
 use crate::app::parse::parser::ObjectParseError;
 use crate::app::parse::range::{Range, RangedSequence};
 use crate::master::handlers::MeasurementHandler;
 use crate::util::cursor::ReadCursor;
-use crate::util::logging::log_indexed_items;
 
 #[derive(Debug, PartialEq)]
 pub enum RangedVariation<'a> {

@@ -14,8 +14,8 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::parser::ObjectParseError;".eol ++
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
-      "use crate::util::logging::log_indexed_items;".eol ++
       "use crate::master::handlers::MeasurementHandler;".eol ++
+      "use crate::app::parse::parser::log_indexed_items;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++

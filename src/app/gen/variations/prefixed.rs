@@ -15,12 +15,11 @@ use crate::app::gen::variations::gv::Variation;
 use crate::app::measurement::Time;
 use crate::app::parse::bytes::PrefixedBytesSequence;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::ObjectParseError;
+use crate::app::parse::parser::{log_indexed_items, log_prefixed_items, ObjectParseError};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSize, Index};
 use crate::master::handlers::MeasurementHandler;
 use crate::util::cursor::ReadCursor;
-use crate::util::logging::*;
 
 #[derive(Debug, PartialEq)]
 pub enum PrefixedVariation<'a, I>

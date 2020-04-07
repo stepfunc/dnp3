@@ -13,9 +13,8 @@
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::gv::Variation;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::ObjectParseError;
+use crate::app::parse::parser::{log_count_of_items, ObjectParseError};
 use crate::util::cursor::ReadCursor;
-use crate::util::logging::*;
 
 #[derive(Debug, PartialEq)]
 pub enum CountVariation<'a> {

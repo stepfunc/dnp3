@@ -5,7 +5,9 @@ use crate::app::gen::variations::gv::Variation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::header::{HeaderParseError, RequestHeader, ResponseHeader};
+use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::{InvalidRange, Range};
+use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 /// Controls how parsed ASDUs are logged
@@ -19,6 +21,38 @@ pub enum ParseLogLevel {
     ObjectHeaders,
     /// Log the header, the object headers, and the object values
     ObjectValues,
+}
+
+pub(crate) fn log_count_of_items<T, V>(level: log::Level, iter: T)
+where
+    T: Iterator<Item = V>,
+    V: std::fmt::Display,
+{
+    for x in iter {
+        log::log!(level, "{}", x);
+    }
+}
+
+pub(crate) fn log_indexed_items<T, V, I>(level: log::Level, iter: T)
+where
+    T: Iterator<Item = (V, I)>,
+    V: std::fmt::Display,
+    I: std::fmt::Display,
+{
+    for (v, i) in iter {
+        log::log!(level, "index: {} {}", i, v);
+    }
+}
+
+pub(crate) fn log_prefixed_items<T, V, I>(level: log::Level, iter: T)
+where
+    T: Iterator<Item = Prefix<I, V>>,
+    V: FixedSize + std::fmt::Display,
+    I: FixedSize + std::fmt::Display,
+{
+    for x in iter {
+        log::log!(level, "index: {} {}", x.index, x.value);
+    }
 }
 
 impl ParseLogLevel {
