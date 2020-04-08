@@ -1,4 +1,5 @@
 use crate::app::types::DoubleBit;
+use std::fmt::Formatter;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Flags {
@@ -74,11 +75,84 @@ impl Flags {
         self.is_set(masks::REFERENCE_ERR)
     }
 
+    pub fn bit6(self) -> bool {
+        self.is_set(masks::DISCONTINUITY)
+    }
+
     pub fn state(self) -> bool {
         self.is_set(masks::STATE)
     }
 
     pub fn double_bit_state(self) -> DoubleBit {
         DoubleBit::from(self.value >> 6)
+    }
+}
+
+struct FlagFormatter {
+    prev: bool,
+}
+
+impl FlagFormatter {
+    pub fn new() -> Self {
+        Self { prev: false }
+    }
+
+    pub fn push(
+        &mut self,
+        is_set: bool,
+        text: &'static str,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        if is_set {
+            if self.prev {
+                f.write_str(", ")?;
+            }
+            self.prev = true;
+            f.write_str(text)?;
+        }
+        Ok(())
+    }
+}
+
+pub(crate) struct BinaryFlagFormatter {
+    flags: Flags,
+}
+
+impl BinaryFlagFormatter {
+    pub fn new(value: u8) -> Self {
+        Self {
+            flags: Flags::new(value),
+        }
+    }
+}
+
+impl std::fmt::Display for BinaryFlagFormatter {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "0x{:02X} [", self.flags.value)?;
+        let mut formatter = FlagFormatter::new();
+        formatter.push(self.flags.online(), "ONLINE", f)?;
+        formatter.push(self.flags.restart(), "RESTART", f)?;
+        formatter.push(self.flags.comm_lost(), "COMM_LOST", f)?;
+        formatter.push(self.flags.remote_forced(), "REMOTE_FORCED", f)?;
+        formatter.push(self.flags.local_forced(), "LOCAL_FORCED", f)?;
+        formatter.push(self.flags.chatter_filter(), "CHATTER_FILTER", f)?;
+        formatter.push(self.flags.bit6(), "RESERVED_BIT_6", f)?;
+        formatter.push(self.flags.state(), "STATE", f)?;
+        f.write_str("]")?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::app::flags::BinaryFlagFormatter;
+
+    #[test]
+    fn formats_binary_flags() {
+        assert_eq!(format!("{}", BinaryFlagFormatter::new(0)), "0x00 []");
+        assert_eq!(
+            format!("{}", BinaryFlagFormatter::new(0b1100_0001)),
+            "0xC1 [ONLINE, RESERVED_BIT_6, STATE]"
+        );
     }
 }
