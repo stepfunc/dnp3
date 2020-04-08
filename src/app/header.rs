@@ -129,8 +129,12 @@ pub enum HeaderParseError {
     UnknownFunction(u8),
     InsufficientBytes,
     UnsolicitedBitNotAllowed(FunctionCode),
-    BadFirAndFin(Control),
-    BadFunction(FunctionCode),
+    ExpectedFirAndFin(Control),
+    UnexpectedResponseFunction(FunctionCode),
+    UnexpectedRequestFunction(FunctionCode),
+    UnsolicitedResponseWithoutUnsBit,
+    ResponseWithUnsBit,
+    BadRequestWithUnsBit(FunctionCode),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

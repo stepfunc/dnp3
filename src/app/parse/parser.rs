@@ -352,14 +352,16 @@ impl<'a> Request<'a> {
         let mut cursor = ReadCursor::new(data);
         let header = Header::parse(level.log_header(), &mut cursor)?;
 
-        // TODO validate the uns bit against the function code
-
-        if !(header.control.is_fir_and_fin()) {
-            return Err(HeaderParseError::BadFirAndFin(header.control));
+        if header.iin.is_some() {
+            return Err(HeaderParseError::UnexpectedRequestFunction(header.function));
         }
 
-        if header.iin.is_some() {
-            return Err(HeaderParseError::BadFunction(header.function));
+        if !(header.control.is_fir_and_fin()) {
+            return Err(HeaderParseError::ExpectedFirAndFin(header.control));
+        }
+
+        if header.control.uns && header.function != FunctionCode::Confirm {
+            return Err(HeaderParseError::BadRequestWithUnsBit(header.function));
         }
 
         Ok(Self {
@@ -383,15 +385,27 @@ impl<'a> Response<'a> {
         let mut cursor = ReadCursor::new(data);
         let header = Header::parse(level.log_header(), &mut cursor)?;
 
-        let (unsol, iin) = match (header.function, header.iin) {
+        let (unsolicited, iin) = match (header.function, header.iin) {
             (FunctionCode::Response, Some(x)) => (false, x),
             (FunctionCode::UnsolicitedResponse, Some(x)) => (true, x),
-            _ => return Err(HeaderParseError::BadFunction(header.function)),
+            _ => {
+                return Err(HeaderParseError::UnexpectedResponseFunction(
+                    header.function,
+                ))
+            }
         };
+
+        if !unsolicited && header.control.uns {
+            return Err(HeaderParseError::ResponseWithUnsBit);
+        }
+
+        if unsolicited && !header.control.uns {
+            return Err(HeaderParseError::UnsolicitedResponseWithoutUnsBit);
+        }
 
         Ok(Self {
             level,
-            header: ResponseHeader::new(header.control, unsol, iin),
+            header: ResponseHeader::new(header.control, unsolicited, iin),
             objects: header.trailer,
         })
     }
@@ -662,6 +676,22 @@ mod test {
         );
     }
 
+    fn test_response_parse_error(input: &[u8], err: HeaderParseError) {
+        assert_eq!(
+            Response::parse(ParseLogLevel::Nothing, input)
+                .err()
+                .unwrap(),
+            err
+        );
+    }
+
+    fn test_request_parse_error(input: &[u8], err: HeaderParseError) {
+        assert_eq!(
+            Request::parse(ParseLogLevel::Nothing, input).err().unwrap(),
+            err
+        );
+    }
+
     #[test]
     fn catches_insufficient_data_for_header() {
         let bad_frames: Vec<&[u8]> = vec![
@@ -707,15 +737,15 @@ mod test {
     }
 
     #[test]
-    fn parses_valid_response() {
-        let fragment = &[0xC2, 0x82, 0xFF, 0xAA, 0x01, 0x02];
+    fn parses_valid_unsolicited_response() {
+        let fragment = &[0b11010010, 0x82, 0xFF, 0xAA, 0x01, 0x02];
         let response = Response::parse(ParseLogLevel::Nothing, fragment).unwrap();
         let expected = ResponseHeader {
             control: Control {
                 fir: true,
                 fin: true,
                 con: false,
-                uns: false,
+                uns: true,
                 seq: Sequence::new(0x02),
             },
             unsolicited: true,
@@ -731,6 +761,44 @@ mod test {
             response.parse_objects().err().unwrap(),
             ObjectParseError::InsufficientBytes
         )
+    }
+
+    #[test]
+    fn fails_unsolicited_response_without_uns_bit() {
+        test_response_parse_error(
+            &[0b11000000, 0x82, 0x00, 0x00],
+            HeaderParseError::UnsolicitedResponseWithoutUnsBit,
+        );
+    }
+
+    #[test]
+    fn fails_solicited_response_with_uns_bit() {
+        test_response_parse_error(
+            &[0b11010000, 0x81, 0x00, 0x00],
+            HeaderParseError::ResponseWithUnsBit,
+        );
+    }
+
+    #[test]
+    fn fails_bad_request_function_with_uns_bit() {
+        test_request_parse_error(
+            &[0b11010000, 0x02], // write with UNS
+            HeaderParseError::BadRequestWithUnsBit(FunctionCode::Write),
+        );
+    }
+
+    #[test]
+    fn confirms_may_or_may_not_have_uns_set() {
+        {
+            let request = Request::parse(ParseLogLevel::Nothing, &[0b11010000, 0x00]).unwrap();
+            assert_eq!(request.header.function, FunctionCode::Confirm);
+            assert!(request.header.control.uns);
+        }
+        {
+            let request = Request::parse(ParseLogLevel::Nothing, &[0b11000000, 0x00]).unwrap();
+            assert_eq!(request.header.function, FunctionCode::Confirm);
+            assert!(!request.header.control.uns);
+        }
     }
 
     #[test]
