@@ -58,16 +58,19 @@ object CountVariationModule extends Module {
           variations.map(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
         }
       } ++ space ++
-      bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
-        bracket("match self") {
-          variations.map(logMatcher).iterator
-        }
-      } ++ space ++
       bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
         bracket("match self") {
           variations.map(fmtMatcher).iterator
         }
       }
+      /*
+      ++ space ++
+      bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
+        bracket("match self") {
+          variations.map(logMatcher).iterator
+        }
+      }
+       */
     }
 
   }

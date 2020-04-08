@@ -23,16 +23,6 @@ pub enum ParseLogLevel {
     ObjectValues,
 }
 
-pub(crate) fn log_count_of_items<T, V>(level: log::Level, iter: T)
-where
-    T: Iterator<Item = V>,
-    V: std::fmt::Display,
-{
-    for x in iter {
-        log::log!(level, "{}", x);
-    }
-}
-
 pub(crate) fn format_count_of_items<T, V>(f: &mut std::fmt::Formatter, iter: T) -> std::fmt::Result
 where
     T: Iterator<Item = V>,
@@ -42,17 +32,6 @@ where
         write!(f, "\n{}", x)?;
     }
     Ok(())
-}
-
-pub(crate) fn log_indexed_items<T, V, I>(level: log::Level, iter: T)
-where
-    T: Iterator<Item = (V, I)>,
-    V: std::fmt::Display,
-    I: std::fmt::Display,
-{
-    for (v, i) in iter {
-        log::log!(level, "index: {} {}", i, v);
-    }
 }
 
 pub(crate) fn format_indexed_items<T, V, I>(
@@ -70,6 +49,28 @@ where
     Ok(())
 }
 
+/*
+pub(crate) fn log_count_of_items<T, V>(level: log::Level, iter: T)
+    where
+        T: Iterator<Item = V>,
+        V: std::fmt::Display,
+{
+    for x in iter {
+        log::log!(level, "{}", x);
+    }
+}
+
+pub(crate) fn log_indexed_items<T, V, I>(level: log::Level, iter: T)
+    where
+        T: Iterator<Item = (V, I)>,
+        V: std::fmt::Display,
+        I: std::fmt::Display,
+{
+    for (v, i) in iter {
+        log::log!(level, "index: {} {}", i, v);
+    }
+}
+
 pub(crate) fn log_prefixed_items<T, V, I>(level: log::Level, iter: T)
 where
     T: Iterator<Item = Prefix<I, V>>,
@@ -80,6 +81,7 @@ where
         log::log!(level, "index: {} {}", x.index, x.value);
     }
 }
+*/
 
 pub(crate) fn format_prefixed_items<T, V, I>(
     f: &mut std::fmt::Formatter,
@@ -279,18 +281,19 @@ impl<'a> HeaderDetails<'a> {
             HeaderDetails::TwoByteCountAndPrefix(_, _) => QualifierCode::CountAndPrefix16,
         }
     }
-
-    pub(crate) fn log_object_values(&self, level: log::Level) {
-        match self {
-            HeaderDetails::AllObjects(_) => {}
-            HeaderDetails::OneByteStartStop(_, _, var) => var.log_objects(level),
-            HeaderDetails::TwoByteStartStop(_, _, var) => var.log_objects(level),
-            HeaderDetails::OneByteCount(_, var) => var.log_objects(level),
-            HeaderDetails::TwoByteCount(_, var) => var.log_objects(level),
-            HeaderDetails::OneByteCountAndPrefix(_, var) => var.log_objects(level),
-            HeaderDetails::TwoByteCountAndPrefix(_, var) => var.log_objects(level),
+    /*
+        pub(crate) fn log_object_values(&self, level: log::Level) {
+            match self {
+                HeaderDetails::AllObjects(_) => {}
+                HeaderDetails::OneByteStartStop(_, _, var) => var.log_objects(level),
+                HeaderDetails::TwoByteStartStop(_, _, var) => var.log_objects(level),
+                HeaderDetails::OneByteCount(_, var) => var.log_objects(level),
+                HeaderDetails::TwoByteCount(_, var) => var.log_objects(level),
+                HeaderDetails::OneByteCountAndPrefix(_, var) => var.log_objects(level),
+                HeaderDetails::TwoByteCountAndPrefix(_, var) => var.log_objects(level),
+            }
         }
-    }
+    */
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

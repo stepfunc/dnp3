@@ -15,7 +15,6 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
       "use crate::master::handlers::MeasurementHandler;".eol ++
-      "use crate::app::parse::parser::log_indexed_items;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++
@@ -166,11 +165,6 @@ object RangedVariationModule extends Module {
             variations.flatMap(getReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
           }
         } ++ space ++
-        bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
-          bracket("match self") {
-            variations.flatMap(getLogMatcher).iterator
-          }
-        } ++ space ++
         bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
           bracket("match self") {
             variations.flatMap(getFmtMatcher).iterator
@@ -181,6 +175,15 @@ object RangedVariationModule extends Module {
             variations.flatMap(getExtractMatcher).iterator
           }
         }
+
+      /*
+         ++ space ++
+        bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
+          bracket("match self") {
+            variations.flatMap(getLogMatcher).iterator
+          }
+        }
+       */
     }
 
 

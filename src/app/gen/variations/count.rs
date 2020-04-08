@@ -49,18 +49,6 @@ impl<'a> CountVariation<'a> {
         }
     }
     
-    pub(crate) fn log_objects(&self, level : log::Level) {
-        match self {
-            CountVariation::Group50Var1(seq) => log_count_of_items(level, seq.iter()),
-            CountVariation::Group50Var3(seq) => log_count_of_items(level, seq.iter()),
-            CountVariation::Group50Var4(seq) => log_count_of_items(level, seq.iter()),
-            CountVariation::Group51Var1(seq) => log_count_of_items(level, seq.iter()),
-            CountVariation::Group51Var2(seq) => log_count_of_items(level, seq.iter()),
-            CountVariation::Group52Var1(seq) => log_count_of_items(level, seq.iter()),
-            CountVariation::Group52Var2(seq) => log_count_of_items(level, seq.iter()),
-        }
-    }
-    
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             CountVariation::Group50Var1(seq) => format_count_of_items(f, seq.iter()),

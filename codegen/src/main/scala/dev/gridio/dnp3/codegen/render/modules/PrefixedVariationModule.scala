@@ -123,11 +123,6 @@ object PrefixedVariationModule extends Module {
           variations.flatMap(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
         }
       } ++ space ++
-      bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
-        bracket("match self") {
-          variations.flatMap(logMatcher).iterator
-        }
-      } ++ space ++
         bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
           bracket("match self") {
             variations.flatMap(fmtMatcher).iterator
@@ -139,7 +134,14 @@ object PrefixedVariationModule extends Module {
         }
       }
     }
-
+    /*
+     ++ space ++
+      bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
+        bracket("match self") {
+          variations.flatMap(logMatcher).iterator
+        }
+      }
+    */
   }
 
   def variations : Iterator[Variation] = {
