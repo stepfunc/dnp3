@@ -1,3 +1,13 @@
+use crate::util::sequence::SequenceParams;
+
+pub struct AppParams;
+impl SequenceParams for AppParams {
+    const NUM_BITS: u8 = 4;
+}
+
+pub type Sequence = crate::util::sequence::Sequence<AppParams>;
+
+/*
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Sequence {
     value: u8,
@@ -57,6 +67,7 @@ impl Default for Sequence {
         Self::new(0)
     }
 }
+*/
 
 #[cfg(test)]
 mod test {
@@ -67,9 +78,9 @@ mod test {
         let mut seq = Sequence::default();
         for i in 0..16 {
             // which is really [0,15]
-            assert_eq!(seq.increment(), Sequence::new(i));
+            assert_eq!(seq.increment().value(), i);
         }
 
-        assert_eq!(seq.increment(), Sequence::new(0)); // goes to zero
+        assert_eq!(seq.increment().value(), 0); // goes to zero
     }
 }

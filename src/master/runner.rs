@@ -158,7 +158,7 @@ impl TaskRunner {
     where
         T: AsyncWrite + Unpin,
     {
-        if rsp.header.control.seq.value() != self.seq.previous_value() {
+        if rsp.header.control.seq.value() != self.seq.previous() {
             return Err(TaskError::BadSequence);
         }
 
@@ -189,7 +189,7 @@ impl TaskRunner {
         T: AsyncWrite + Unpin,
     {
         // validate the sequence number
-        if rsp.header.control.seq.value() != self.seq.previous_value() {
+        if rsp.header.control.seq.value() != self.seq.previous() {
             return Err(TaskError::BadSequence);
         }
 

@@ -12,7 +12,7 @@ pub struct Writer {
 }
 
 impl Writer {
-    fn get_header(fin: bool, fir: bool, seq: u8) -> u8 {
+    fn get_header(fin: bool, fir: bool, seq: Sequence) -> u8 {
         let mut acc: u8 = 0;
 
         if fin {
@@ -22,7 +22,7 @@ impl Writer {
             acc |= super::constants::FIR_MASK;
         }
 
-        acc | (seq & super::constants::SEQ_MASK)
+        acc | seq.value()
     }
 
     pub fn new(master: bool, address: u16) -> Self {
