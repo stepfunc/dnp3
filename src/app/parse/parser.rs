@@ -302,7 +302,7 @@ pub enum ObjectParseError {
     UnknownQualifier(u8),
     InsufficientBytes,
     InvalidRange,
-    InvalidQualifierForVariation(Variation),
+    InvalidQualifierForVariation(Variation, QualifierCode),
     UnsupportedQualifierCode(QualifierCode),
     ZeroLengthOctetData,
 }
@@ -334,7 +334,7 @@ pub(crate) fn log_fragment(level: ParseLogLevel, data: &[u8]) {
             }
         }
         Err(err) => {
-            log::error!("error parsing header: {:?}", err);
+            log::error!("error parsing header: {}", err);
         }
     }
 }
@@ -357,11 +357,11 @@ impl<'a> Request<'a> {
         }
 
         if !(header.control.is_fir_and_fin()) {
-            return Err(HeaderParseError::ExpectedFirAndFin(header.control));
+            return Err(HeaderParseError::ExpectedFirAndFin(header.function));
         }
 
         if header.control.uns && header.function != FunctionCode::Confirm {
-            return Err(HeaderParseError::BadRequestWithUnsBit(header.function));
+            return Err(HeaderParseError::UnsolicitedBitNotAllowed(header.function));
         }
 
         Ok(Self {
@@ -524,13 +524,16 @@ impl<'a> ObjectParser<'a> {
     fn parse_all_objects(&mut self, v: Variation) -> Result<ObjectHeader<'a>, ObjectParseError> {
         match AllObjectsVariation::get(v) {
             Some(av) => Ok(ObjectHeader::new(v, HeaderDetails::AllObjects(av))),
-            None => Err(ObjectParseError::InvalidQualifierForVariation(v)),
+            None => Err(ObjectParseError::InvalidQualifierForVariation(
+                v,
+                QualifierCode::AllObjects,
+            )),
         }
     }
 
     fn parse_count_u8(&mut self, v: Variation) -> Result<ObjectHeader<'a>, ObjectParseError> {
         let count = self.cursor.read_u8()?;
-        let data = CountVariation::parse(v, count as u16, &mut self.cursor)?;
+        let data = CountVariation::parse(v, QualifierCode::Count8, count as u16, &mut self.cursor)?;
         Ok(ObjectHeader::new(
             v,
             HeaderDetails::OneByteCount(count, data),
@@ -539,7 +542,7 @@ impl<'a> ObjectParser<'a> {
 
     fn parse_count_u16(&mut self, v: Variation) -> Result<ObjectHeader<'a>, ObjectParseError> {
         let count = self.cursor.read_u16_le()?;
-        let data = CountVariation::parse(v, count, &mut self.cursor)?;
+        let data = CountVariation::parse(v, QualifierCode::Count16, count, &mut self.cursor)?;
         Ok(ObjectHeader::new(
             v,
             HeaderDetails::TwoByteCount(count, data),
@@ -550,7 +553,13 @@ impl<'a> ObjectParser<'a> {
         let start = self.cursor.read_u8()?;
         let stop = self.cursor.read_u8()?;
         let range = Range::from(start as u16, stop as u16)?;
-        let data = RangedVariation::parse(self.function, v, range, &mut self.cursor)?;
+        let data = RangedVariation::parse(
+            self.function,
+            QualifierCode::Range8,
+            v,
+            range,
+            &mut self.cursor,
+        )?;
         Ok(ObjectHeader::new(
             v,
             HeaderDetails::OneByteStartStop(start, stop, data),
@@ -561,7 +570,13 @@ impl<'a> ObjectParser<'a> {
         let start = self.cursor.read_u16_le()?;
         let stop = self.cursor.read_u16_le()?;
         let range = Range::from(start, stop)?;
-        let data = RangedVariation::parse(self.function, v, range, &mut self.cursor)?;
+        let data = RangedVariation::parse(
+            self.function,
+            QualifierCode::Range16,
+            v,
+            range,
+            &mut self.cursor,
+        )?;
         Ok(ObjectHeader::new(
             v,
             HeaderDetails::TwoByteStartStop(start, stop, data),
@@ -615,13 +630,14 @@ impl Variation {
 impl<'a> RangedVariation<'a> {
     pub fn parse(
         function: FunctionCode,
+        qualifier: QualifierCode,
         v: Variation,
         range: Range,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<RangedVariation<'a>, ObjectParseError> {
         match function {
-            FunctionCode::Read => Self::parse_read(v),
-            _ => Self::parse_non_read(v, range, cursor),
+            FunctionCode::Read => Self::parse_read(v, qualifier),
+            _ => Self::parse_non_read(v, qualifier, range, cursor),
         }
     }
 }
@@ -783,7 +799,7 @@ mod test {
     fn fails_bad_request_function_with_uns_bit() {
         test_request_parse_error(
             &[0b11010000, 0x02], // write with UNS
-            HeaderParseError::BadRequestWithUnsBit(FunctionCode::Write),
+            HeaderParseError::UnsolicitedBitNotAllowed(FunctionCode::Write),
         );
     }
 
@@ -989,7 +1005,7 @@ mod test {
         test_parse_error(
             &[0x6E, 0x01, 0x00, 0x01, 0x02],
             FunctionCode::Read,
-            ObjectParseError::InvalidQualifierForVariation(Group110(1)),
+            ObjectParseError::InvalidQualifierForVariation(Group110(1), QualifierCode::Range8),
         );
     }
 

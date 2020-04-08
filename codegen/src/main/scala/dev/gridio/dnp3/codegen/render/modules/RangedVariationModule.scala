@@ -15,6 +15,7 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
       "use crate::master::handlers::MeasurementHandler;".eol ++
+      "use crate::app::gen::enums::QualifierCode;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++
@@ -155,14 +156,14 @@ object RangedVariationModule extends Module {
 
     "#[rustfmt::skip]".eol ++
     bracket("impl<'a> RangedVariation<'a>") {
-      bracket("pub(crate) fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
+      bracket("pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
         bracket("match v") {
-          variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
+          variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
         }
       } ++ space ++
-        bracket("pub(crate) fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ObjectParseError>") {
+        bracket("pub(crate) fn parse_read(v: Variation, qualifier: QualifierCode) -> Result<RangedVariation<'a>, ObjectParseError>") {
           bracket("match v") {
-            variations.flatMap(getReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
+            variations.flatMap(getReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
           }
         } ++ space ++
         bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {

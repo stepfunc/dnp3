@@ -10,6 +10,7 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::app::gen::enums::QualifierCode;
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::variation::Variation;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
@@ -96,7 +97,7 @@ pub enum RangedVariation<'a> {
 
 #[rustfmt::skip]
 impl<'a> RangedVariation<'a> {
-    pub(crate) fn parse_non_read(v: Variation, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
+    pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::parse(range, cursor)?)),
@@ -136,11 +137,11 @@ impl<'a> RangedVariation<'a> {
             Variation::Group110(x) => {
                 Ok(RangedVariation::Group110VarX(x, RangedBytesSequence::parse(x, range.get_start(), range.get_count(), cursor)?))
             },
-            _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
+            _ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),
         }
     }
     
-    pub(crate) fn parse_read(v: Variation) -> Result<RangedVariation<'a>, ObjectParseError> {
+    pub(crate) fn parse_read(v: Variation, qualifier: QualifierCode) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::empty())),
@@ -177,7 +178,7 @@ impl<'a> RangedVariation<'a> {
             Variation::Group40Var4 => Ok(RangedVariation::Group40Var4(RangedSequence::empty())),
             Variation::Group80Var1 => Ok(RangedVariation::Group80Var1(BitSequence::empty())),
             Variation::Group110(0) => Ok(RangedVariation::Group110Var0),
-            _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
+            _ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),
         }
     }
     

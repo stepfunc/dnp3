@@ -271,7 +271,7 @@ impl TaskRunner {
         loop {
             let fragment: Fragment = tokio::time::timeout_at(deadline, reader.read(io)).await??;
             match Response::parse(level, fragment.data) {
-                Err(err) => log::warn!("error parsing response header: {:?}", err),
+                Err(err) => log::warn!("error parsing response header: {}", err),
                 Ok(response) => {
                     if response.header.unsolicited {
                         self.handle_unsolicited(level, io, fragment.address, response, writer)

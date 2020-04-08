@@ -129,12 +129,38 @@ pub enum HeaderParseError {
     UnknownFunction(u8),
     InsufficientBytes,
     UnsolicitedBitNotAllowed(FunctionCode),
-    ExpectedFirAndFin(Control),
+    ExpectedFirAndFin(FunctionCode),
     UnexpectedResponseFunction(FunctionCode),
     UnexpectedRequestFunction(FunctionCode),
     UnsolicitedResponseWithoutUnsBit,
     ResponseWithUnsBit,
-    BadRequestWithUnsBit(FunctionCode),
+}
+
+impl std::fmt::Display for HeaderParseError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            HeaderParseError::UnknownFunction(x) => write!(f, "unknown function: {:?}", x),
+            HeaderParseError::InsufficientBytes => write!(f, "insufficient bytes"),
+            HeaderParseError::UnsolicitedBitNotAllowed(x) => {
+                write!(f, "UNS bit not allowed for function: {:?}", x)
+            }
+            HeaderParseError::ExpectedFirAndFin(x) => {
+                write!(f, "function {:?} must have fir/fin both set to 1", x)
+            }
+            HeaderParseError::UnexpectedResponseFunction(x) => {
+                write!(f, "expected response, but received {:?}", x)
+            }
+            HeaderParseError::UnexpectedRequestFunction(x) => {
+                write!(f, "expected a request, but received {:?}", x)
+            }
+            HeaderParseError::UnsolicitedResponseWithoutUnsBit => {
+                write!(f, "unsolicited responses must have the UNS bit set")
+            }
+            HeaderParseError::ResponseWithUnsBit => {
+                write!(f, "solicited responses may not have the UNS bit set")
+            }
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

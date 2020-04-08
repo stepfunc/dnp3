@@ -11,6 +11,7 @@ object CountVariationModule extends Module {
       "use crate::app::parse::count::CountSequence;".eol ++
       "use crate::app::parse::parser::*;".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
+      "use crate::app::gen::enums::QualifierCode;".eol ++
       space ++
       enumDefinition ++
       space ++
@@ -53,9 +54,9 @@ object CountVariationModule extends Module {
 
     "#[rustfmt::skip]".eol ++
     bracket("impl<'a> CountVariation<'a>") {
-      bracket("pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError>") {
+      bracket("pub(crate) fn parse(v: Variation, qualifier: QualifierCode, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError>") {
         bracket("match v") {
-          variations.map(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v)),".eol
+          variations.map(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
         }
       } ++ space ++
       bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {

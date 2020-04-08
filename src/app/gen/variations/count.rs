@@ -10,6 +10,7 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::app::gen::enums::QualifierCode;
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::variation::Variation;
 use crate::app::parse::count::CountSequence;
@@ -36,7 +37,7 @@ pub enum CountVariation<'a> {
 
 #[rustfmt::skip]
 impl<'a> CountVariation<'a> {
-    pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError> {
+    pub(crate) fn parse(v: Variation, qualifier: QualifierCode, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group50Var1 => Ok(CountVariation::Group50Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group50Var3 => Ok(CountVariation::Group50Var3(CountSequence::parse(count, cursor)?)),
@@ -45,7 +46,7 @@ impl<'a> CountVariation<'a> {
             Variation::Group51Var2 => Ok(CountVariation::Group51Var2(CountSequence::parse(count, cursor)?)),
             Variation::Group52Var1 => Ok(CountVariation::Group52Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group52Var2 => Ok(CountVariation::Group52Var2(CountSequence::parse(count, cursor)?)),
-            _ => Err(ObjectParseError::InvalidQualifierForVariation(v)),
+            _ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),
         }
     }
     

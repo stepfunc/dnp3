@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         match Request::parse(ParseLogLevel::ObjectValues, asdu.data) {
             Err(err) => {
-                log::warn!("bad request: {:?}", err);
+                log::warn!("bad request: {}", err);
             }
             Ok(request) => {
                 request.parse_objects().ok();

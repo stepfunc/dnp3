@@ -1,3 +1,4 @@
+use crate::app::gen::enums::QualifierCode;
 use crate::util::cursor::*;
 
 pub trait FixedSize
@@ -12,6 +13,7 @@ where
 
 pub trait Index {
     fn widen_to_u16(self) -> u16;
+    fn count_and_prefix_qualifier() -> QualifierCode;
 }
 
 impl FixedSize for u8 {
@@ -39,10 +41,16 @@ impl Index for u8 {
     fn widen_to_u16(self) -> u16 {
         self as u16
     }
+    fn count_and_prefix_qualifier() -> QualifierCode {
+        QualifierCode::CountAndPrefix8
+    }
 }
 
 impl Index for u16 {
     fn widen_to_u16(self) -> u16 {
         self
+    }
+    fn count_and_prefix_qualifier() -> QualifierCode {
+        QualifierCode::CountAndPrefix16
     }
 }
