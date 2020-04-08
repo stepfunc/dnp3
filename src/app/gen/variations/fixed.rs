@@ -10,6 +10,7 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::app::flags::format::*;
 use crate::app::gen::enums::CommandStatus;
 use crate::app::parse::traits::FixedSize;
 use crate::app::types::{ControlCode, Timestamp};
@@ -2141,7 +2142,9 @@ impl std::fmt::Display for Group42Var8 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            AnalogFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
@@ -2151,20 +2154,32 @@ impl std::fmt::Display for Group42Var7 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            AnalogFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
 
 impl std::fmt::Display for Group42Var6 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group42Var5 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
@@ -2173,7 +2188,9 @@ impl std::fmt::Display for Group42Var4 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            AnalogFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
@@ -2183,20 +2200,32 @@ impl std::fmt::Display for Group42Var3 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            AnalogFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
 
 impl std::fmt::Display for Group42Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group42Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
@@ -2226,25 +2255,45 @@ impl std::fmt::Display for Group41Var1 {
 
 impl std::fmt::Display for Group40Var4 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group40Var3 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group40Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group40Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
@@ -2253,7 +2302,9 @@ impl std::fmt::Display for Group32Var8 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            AnalogFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
@@ -2263,20 +2314,32 @@ impl std::fmt::Display for Group32Var7 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            AnalogFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
 
 impl std::fmt::Display for Group32Var6 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group32Var5 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
@@ -2285,7 +2348,9 @@ impl std::fmt::Display for Group32Var4 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            AnalogFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
@@ -2295,32 +2360,54 @@ impl std::fmt::Display for Group32Var3 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            AnalogFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
 
 impl std::fmt::Display for Group32Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group32Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group30Var6 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group30Var5 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
@@ -2338,13 +2425,23 @@ impl std::fmt::Display for Group30Var3 {
 
 impl std::fmt::Display for Group30Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group30Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            AnalogFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
@@ -2353,7 +2450,9 @@ impl std::fmt::Display for Group23Var6 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            CounterFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
@@ -2363,20 +2462,32 @@ impl std::fmt::Display for Group23Var5 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            CounterFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
 
 impl std::fmt::Display for Group23Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            CounterFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group23Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            CounterFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
@@ -2385,7 +2496,9 @@ impl std::fmt::Display for Group22Var6 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            CounterFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
@@ -2395,20 +2508,32 @@ impl std::fmt::Display for Group22Var5 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            CounterFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
 
 impl std::fmt::Display for Group22Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            CounterFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group22Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            CounterFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
@@ -2429,7 +2554,9 @@ impl std::fmt::Display for Group21Var6 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            CounterFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
@@ -2439,20 +2566,32 @@ impl std::fmt::Display for Group21Var5 {
         write!(
             f,
             "flags: {} value: {} time: {}",
-            self.flags, self.value, self.time
+            CounterFlagFormatter::new(self.flags),
+            self.value,
+            self.time
         )
     }
 }
 
 impl std::fmt::Display for Group21Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            CounterFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group21Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            CounterFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
@@ -2470,25 +2609,44 @@ impl std::fmt::Display for Group20Var5 {
 
 impl std::fmt::Display for Group20Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            CounterFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group20Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} value: {}", self.flags, self.value)
+        write!(
+            f,
+            "flags: {} value: {}",
+            CounterFlagFormatter::new(self.flags),
+            self.value
+        )
     }
 }
 
 impl std::fmt::Display for Group13Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} time: {}", self.flags, self.time)
+        write!(
+            f,
+            "flags: {} time: {}",
+            BinaryOutputStatusFlagFormatter::new(self.flags),
+            self.time
+        )
     }
 }
 
 impl std::fmt::Display for Group13Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {}", self.flags)
+        write!(
+            f,
+            "flags: {}",
+            BinaryOutputStatusFlagFormatter::new(self.flags)
+        )
     }
 }
 
@@ -2504,66 +2662,107 @@ impl std::fmt::Display for Group12Var1 {
 
 impl std::fmt::Display for Group11Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} time: {}", self.flags, self.time)
+        write!(
+            f,
+            "flags: {} time: {}",
+            BinaryOutputStatusFlagFormatter::new(self.flags),
+            self.time
+        )
     }
 }
 
 impl std::fmt::Display for Group11Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {}", self.flags)
+        write!(
+            f,
+            "flags: {}",
+            BinaryOutputStatusFlagFormatter::new(self.flags)
+        )
     }
 }
 
 impl std::fmt::Display for Group10Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {}", self.flags)
+        write!(
+            f,
+            "flags: {}",
+            BinaryOutputStatusFlagFormatter::new(self.flags)
+        )
     }
 }
 
 impl std::fmt::Display for Group4Var3 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} time: {}", self.flags, self.time)
+        write!(
+            f,
+            "flags: {} time: {}",
+            DoubleBitBinaryFlagFormatter::new(self.flags),
+            self.time
+        )
     }
 }
 
 impl std::fmt::Display for Group4Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} time: {}", self.flags, self.time)
+        write!(
+            f,
+            "flags: {} time: {}",
+            DoubleBitBinaryFlagFormatter::new(self.flags),
+            self.time
+        )
     }
 }
 
 impl std::fmt::Display for Group4Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {}", self.flags)
+        write!(
+            f,
+            "flags: {}",
+            DoubleBitBinaryFlagFormatter::new(self.flags)
+        )
     }
 }
 
 impl std::fmt::Display for Group3Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {}", self.flags)
+        write!(
+            f,
+            "flags: {}",
+            DoubleBitBinaryFlagFormatter::new(self.flags)
+        )
     }
 }
 
 impl std::fmt::Display for Group2Var3 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} time: {}", self.flags, self.time)
+        write!(
+            f,
+            "flags: {} time: {}",
+            BinaryFlagFormatter::new(self.flags),
+            self.time
+        )
     }
 }
 
 impl std::fmt::Display for Group2Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {} time: {}", self.flags, self.time)
+        write!(
+            f,
+            "flags: {} time: {}",
+            BinaryFlagFormatter::new(self.flags),
+            self.time
+        )
     }
 }
 
 impl std::fmt::Display for Group2Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {}", self.flags)
+        write!(f, "flags: {}", BinaryFlagFormatter::new(self.flags))
     }
 }
 
 impl std::fmt::Display for Group1Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "flags: {}", self.flags)
+        write!(f, "flags: {}", BinaryFlagFormatter::new(self.flags))
     }
 }

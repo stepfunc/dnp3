@@ -71,6 +71,13 @@ sealed case class FixedSizeField(name: String, typ: FixedSizeFieldType, attr: Op
       case _ => false
     }
   }
+
+  def isFlags : Boolean = {
+    attr match {
+      case Some(FieldAttribute.Flags) => true
+      case _ => false
+    }
+  }
 }
 
 sealed case class VariableField(name: String) extends Field

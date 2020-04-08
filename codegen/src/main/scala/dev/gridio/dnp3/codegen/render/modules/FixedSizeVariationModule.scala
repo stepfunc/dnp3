@@ -17,6 +17,7 @@ object FixedSizeVariationModule extends Module {
     "use crate::util::cursor::*;".eol ++
     "use crate::app::gen::enums::CommandStatus;".eol ++
     "use crate::app::types::{ControlCode, Timestamp};".eol ++
+    "use crate::app::flags::format::*;".eol ++
     space ++
     spaced(variations.map(v => structDefinition(v)).iterator) ++
     space ++
@@ -78,8 +79,44 @@ object FixedSizeVariationModule extends Module {
       quoted(gv.fields.map( f=> s"${f.name}: ${fieldDisplayType(f.typ)}").mkString(" "))
     }
 
+    def fieldArgExpression(f: FixedSizeField) : String = {
+
+      def getFlagsType : String = {
+        def binary = "BinaryFlagFormatter"
+        def analog = "AnalogFlagFormatter"
+        def counter = "CounterFlagFormatter"
+        def binaryOutputStatus = "BinaryOutputStatusFlagFormatter"
+        def doubleBitBinary = "DoubleBitBinaryFlagFormatter"
+
+        gv.parent.groupType match {
+          case GroupType.StaticBinary => binary
+          case GroupType.BinaryEvent => binary
+          case GroupType.AnalogOutputEvent => analog
+          case GroupType.StaticAnalogOutputStatus => analog
+          case GroupType.AnalogEvent => analog
+          case GroupType.StaticAnalog => analog
+          case GroupType.StaticCounter => counter
+          case GroupType.CounterEvent => counter
+          case GroupType.StaticFrozenCounter => counter
+          case GroupType.FrozenCounterEvent => counter
+          case GroupType.BinaryOutputEvent => binaryOutputStatus
+          case GroupType.StaticBinaryOutputStatus => binaryOutputStatus
+          case GroupType.StaticDoubleBinary => doubleBitBinary
+          case GroupType.DoubleBinaryEvent => doubleBitBinary
+          case _ => throw new Exception("unhandled group type")
+        }
+      }
+
+
+      if(f.isFlags) {
+        s"${getFlagsType}::new(self.flags)"
+      } else {
+        s"self.${f.name}"
+      }
+    }
+
     def fieldArgs : String = {
-      gv.fields.map( f=> s"self.${f.name}").mkString(", ")
+      gv.fields.map(fieldArgExpression).mkString(", ")
     }
 
     bracket(s"impl std::fmt::Display for ${gv.name}") {
