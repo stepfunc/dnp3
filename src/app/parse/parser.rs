@@ -4,7 +4,7 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::gen::variations::variation::Variation;
-use crate::app::header::{HeaderParseError, RequestHeader, ResponseHeader};
+use crate::app::header::{Header, HeaderParseError, RequestHeader, ResponseHeader};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::{InvalidRange, Range};
 use crate::app::parse::traits::FixedSize;
@@ -321,36 +321,20 @@ pub struct Response<'a> {
     pub objects: &'a [u8],
 }
 
-pub(crate) fn log_tx_fragment(level: ParseLogLevel, is_master: bool, data: &[u8]) {
+pub(crate) fn log_fragment(level: ParseLogLevel, data: &[u8]) {
     if !level.log_header() {
         return;
     }
 
-    if is_master {
-        match Request::parse(level, data) {
-            Ok(request) => {
-                if level.log_object_headers() {
-                    if let Err(err) = request.parse_objects() {
-                        log::error!("error parsing tx request objects: {:?}", err);
-                    }
-                }
-            }
-            Err(err) => {
-                log::error!("error parsing tx request header: {:?}", err);
+    let mut cursor = ReadCursor::new(data);
+    match Header::parse(level.log_header(), &mut cursor) {
+        Ok(header) => {
+            if let Err(err) = HeaderCollection::parse(level, header.function, header.trailer) {
+                log::error!("error parsing objects: {:?}", err);
             }
         }
-    } else {
-        match Response::parse(level, data) {
-            Ok(request) => {
-                if level.log_object_headers() {
-                    if let Err(err) = request.parse_objects() {
-                        log::error!("error parsing tx response objects: {:?}", err);
-                    }
-                }
-            }
-            Err(err) => {
-                log::error!("error parsing tx response header: {:?}", err);
-            }
+        Err(err) => {
+            log::error!("error parsing header: {:?}", err);
         }
     }
 }
@@ -364,34 +348,25 @@ impl<'a> Request<'a> {
         )?)
     }
 
-    pub fn parse(level: ParseLogLevel, bytes: &'a [u8]) -> Result<Self, HeaderParseError> {
-        let mut cursor = ReadCursor::new(bytes);
-        let header = RequestHeader::parse(&mut cursor)?;
-        let objects = cursor.read_all();
+    pub fn parse(level: ParseLogLevel, data: &'a [u8]) -> Result<Self, HeaderParseError> {
+        let mut cursor = ReadCursor::new(data);
+        let header = Header::parse(level.log_header(), &mut cursor)?;
 
-        if level.log_header() {
-            log::info!("{:?} control: {}", header.function, header.control,);
-        }
+        // TODO validate the uns bit against the function code
 
-        if header.control.uns {
-            return Err(HeaderParseError::UnsolicitedBitNotAllowed(header.function));
-        }
-
-        if !(header.control.fir && header.control.fin) {
+        if !(header.control.is_fir_and_fin()) {
             return Err(HeaderParseError::BadFirAndFin(header.control));
         }
 
-        match header.function {
-            FunctionCode::Response => Err(HeaderParseError::BadFunction(header.function)),
-            FunctionCode::UnsolicitedResponse => {
-                Err(HeaderParseError::BadFunction(header.function))
-            }
-            _ => Ok(Self {
-                level,
-                header,
-                objects,
-            }),
+        if header.iin.is_some() {
+            return Err(HeaderParseError::BadFunction(header.function));
         }
+
+        Ok(Self {
+            level,
+            header: RequestHeader::new(header.control, header.function),
+            objects: header.trailer,
+        })
     }
 }
 
@@ -404,21 +379,20 @@ impl<'a> Response<'a> {
         )?)
     }
 
-    pub fn parse(level: ParseLogLevel, bytes: &'a [u8]) -> Result<Self, HeaderParseError> {
-        let mut cursor = ReadCursor::new(bytes);
-        let header = ResponseHeader::parse(&mut cursor)?;
-        if level.log_header() {
-            log::info!(
-                "{:?} control: {} iin: {}",
-                header.function(),
-                header.control,
-                header.iin
-            );
-        }
+    pub fn parse(level: ParseLogLevel, data: &'a [u8]) -> Result<Self, HeaderParseError> {
+        let mut cursor = ReadCursor::new(data);
+        let header = Header::parse(level.log_header(), &mut cursor)?;
+
+        let (unsol, iin) = match (header.function, header.iin) {
+            (FunctionCode::Response, Some(x)) => (false, x),
+            (FunctionCode::UnsolicitedResponse, Some(x)) => (true, x),
+            _ => return Err(HeaderParseError::BadFunction(header.function)),
+        };
+
         Ok(Self {
             level,
-            header,
-            objects: cursor.read_all(),
+            header: ResponseHeader::new(header.control, unsol, iin),
+            objects: header.trailer,
         })
     }
 }

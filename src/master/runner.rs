@@ -6,8 +6,8 @@ use crate::link::header::Address;
 use crate::master::task::{MasterTask, ResponseError, ResponseResult};
 use crate::transport::reader::Fragment;
 use crate::transport::{ReaderType, WriterType};
-use crate::util::cursor::{WriteCursor, WriteError};
 
+use crate::util::cursor::{WriteCursor, WriteError};
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
 use tokio::time::Instant;

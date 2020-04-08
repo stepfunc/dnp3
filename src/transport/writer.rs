@@ -1,4 +1,4 @@
-use crate::app::parse::parser::{log_tx_fragment, ParseLogLevel};
+use crate::app::parse::parser::{log_fragment, ParseLogLevel};
 use crate::error::Error;
 use crate::link::formatter::{LinkFormatter, Payload};
 use crate::transport::sequence::Sequence;
@@ -47,7 +47,7 @@ impl Writer {
     where
         W: AsyncWrite + Unpin,
     {
-        log_tx_fragment(level, self.formatter.is_master(), fragment);
+        log_fragment(level, fragment);
 
         let chunks = fragment.chunks(crate::link::constant::MAX_APP_BYTES_PER_FRAME);
 

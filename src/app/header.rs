@@ -62,6 +62,10 @@ impl Control {
         }
     }
 
+    pub(crate) fn is_fir_and_fin(self) -> bool {
+        self.fir && self.fin
+    }
+
     pub fn to_u8(self) -> u8 {
         let mut x: u8 = 0;
         if self.fir {
@@ -130,6 +134,14 @@ pub enum HeaderParseError {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Header<'a> {
+    pub control: Control,
+    pub function: FunctionCode,
+    pub iin: Option<IIN>,
+    pub trailer: &'a [u8],
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct RequestHeader {
     pub control: Control,
     pub function: FunctionCode,
@@ -142,50 +154,81 @@ pub struct ResponseHeader {
     pub iin: IIN,
 }
 
-impl RequestHeader {
-    pub fn new(control: Control, function: FunctionCode) -> Self {
-        Self { control, function }
-    }
-
-    pub fn parse(cursor: &mut ReadCursor) -> Result<Self, HeaderParseError> {
+impl<'a> Header<'a> {
+    pub fn parse(log: bool, cursor: &mut ReadCursor<'a>) -> Result<Self, HeaderParseError> {
         let control = Control::from(cursor.read_u8()?);
         let raw_func = cursor.read_u8()?;
         let function = match FunctionCode::from(raw_func) {
             None => return Err(HeaderParseError::UnknownFunction(raw_func)),
             Some(x) => x,
         };
-        Ok(Self { control, function })
+        let iin = match function {
+            FunctionCode::Response => Some(IIN::parse(cursor)?),
+            FunctionCode::UnsolicitedResponse => Some(IIN::parse(cursor)?),
+            _ => None,
+        };
+        let header = Self {
+            control,
+            function,
+            iin,
+            trailer: cursor.read_all(),
+        };
+        if log {
+            log::info!("{}", header);
+        }
+        Ok(header)
+    }
+}
+
+impl<'a> std::fmt::Display for Header<'a> {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self.iin {
+            Some(iin) => write!(
+                f,
+                "ctrl: {} func: {:?} iin: {} objects: (len = {})",
+                self.control,
+                self.function,
+                iin,
+                self.trailer.len()
+            ),
+            None => write!(
+                f,
+                "ctrl: {} func: {:?} objects: (len = {})",
+                self.control,
+                self.function,
+                self.trailer.len()
+            ),
+        }
+    }
+}
+
+impl RequestHeader {
+    pub fn new(control: Control, function: FunctionCode) -> Self {
+        Self { control, function }
     }
 
     pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.control.write(cursor)?;
-        cursor.write_u8(self.function.as_u8())?;
+        self.function.write(cursor)?;
         Ok(())
     }
 }
 
 impl ResponseHeader {
+    pub fn new(control: Control, unsolicited: bool, iin: IIN) -> Self {
+        Self {
+            control,
+            unsolicited,
+            iin,
+        }
+    }
+
     pub fn function(self) -> FunctionCode {
         if self.unsolicited {
             FunctionCode::UnsolicitedResponse
         } else {
             FunctionCode::Response
         }
-    }
-
-    pub fn parse(cursor: &mut ReadCursor) -> Result<Self, HeaderParseError> {
-        let header = RequestHeader::parse(cursor)?;
-        let iin = IIN::parse(cursor)?;
-        let unsolicited = match header.function {
-            FunctionCode::Response => false,
-            FunctionCode::UnsolicitedResponse => true,
-            _ => return Err(HeaderParseError::BadFunction(header.function)),
-        };
-        Ok(Self {
-            control: header.control,
-            unsolicited,
-            iin,
-        })
     }
 
     pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
