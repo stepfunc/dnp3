@@ -1,5 +1,5 @@
 use crate::app::format::write;
-use crate::app::parse::parser::{ParseLogLevel, Response};
+use crate::app::parse::parser::{HeaderCollection, ObjectParseError, ParseLogLevel, Response};
 use crate::app::sequence::Sequence;
 use crate::error::Error;
 use crate::link::header::Address;
@@ -7,6 +7,7 @@ use crate::master::task::{MasterTask, ResponseError, ResponseResult};
 use crate::transport::reader::Fragment;
 use crate::transport::{ReaderType, WriterType};
 
+use crate::app::header::ResponseHeader;
 use crate::util::cursor::{WriteCursor, WriteError};
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
@@ -55,6 +56,7 @@ impl TaskRunner {
 #[derive(Copy, Clone, Debug)]
 pub enum TaskError {
     Lower(Error),
+    MalformedResponse(ObjectParseError),
     BadResponse(ResponseError),
     NeverReceivedFir,
     UnexpectedFir,
@@ -79,6 +81,12 @@ impl std::convert::From<Error> for TaskError {
 impl std::convert::From<tokio::time::Elapsed> for TaskError {
     fn from(_: tokio::time::Elapsed) -> Self {
         TaskError::ResponseTimeout
+    }
+}
+
+impl std::convert::From<ObjectParseError> for TaskError {
+    fn from(err: ObjectParseError) -> Self {
+        TaskError::MalformedResponse(err)
     }
 }
 
@@ -151,37 +159,39 @@ impl TaskRunner {
         &mut self,
         level: ParseLogLevel,
         io: &mut T,
-        rsp: Response<'_>,
+        header: ResponseHeader,
+        objects: HeaderCollection<'_>,
         task: &mut MasterTask,
         writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
     where
         T: AsyncWrite + Unpin,
     {
-        if rsp.header.control.seq.value() != self.seq.previous() {
+        if header.control.seq.value() != self.seq.previous() {
             return Err(TaskError::BadSequence);
         }
 
-        if !(rsp.header.control.fir && rsp.header.control.fin) {
+        if !(header.control.is_fir_and_fin()) {
             return Err(TaskError::MultiFragmentResponse);
         }
 
         // non-read responses REALLY shouldn't request confirmation
         // but we'll confirm them if requested and log
-        if rsp.header.control.con {
+        if header.control.con {
             log::warn!("received response requesting confirmation to non-read request");
-            self.confirm_solicited(level, io, task.destination, rsp.header.control.seq, writer)
+            self.confirm_solicited(level, io, task.destination, header.control.seq, writer)
                 .await?;
         }
 
-        Ok(task.details.handle(rsp)?)
+        Ok(task.details.handle(header, objects)?)
     }
 
     async fn handle_read_response<T>(
         &mut self,
         level: ParseLogLevel,
         io: &mut T,
-        rsp: Response<'_>,
+        header: ResponseHeader,
+        objects: HeaderCollection<'_>,
         task: &mut MasterTask,
         writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
@@ -189,36 +199,36 @@ impl TaskRunner {
         T: AsyncWrite + Unpin,
     {
         // validate the sequence number
-        if rsp.header.control.seq.value() != self.seq.previous() {
+        if header.control.seq.value() != self.seq.previous() {
             return Err(TaskError::BadSequence);
         }
 
-        if rsp.header.control.fir && !self.count.is_none() {
+        if header.control.fir && !self.count.is_none() {
             return Err(TaskError::UnexpectedFir);
         }
 
-        if !rsp.header.control.fir && self.count.is_none() {
+        if !header.control.fir && self.count.is_none() {
             return Err(TaskError::NeverReceivedFir);
         }
 
-        if !rsp.header.control.fin && !rsp.header.control.con {
+        if !header.control.fin && !header.control.con {
             log::warn!("received non-FIN response NOT requesting confirmation")
         }
 
         self.count.increment();
 
         // write a confirmation if required
-        if rsp.header.control.con {
+        if header.control.con {
             let mut cursor = WriteCursor::new(&mut self.buffer);
-            write::confirm_solicited(rsp.header.control.seq, &mut cursor)?;
+            write::confirm_solicited(header.control.seq, &mut cursor)?;
             writer
                 .write(level, io, task.destination, cursor.written())
                 .await?;
         }
 
-        let result = task.details.handle(rsp)?;
+        let result = task.details.handle(header, objects)?;
 
-        if !rsp.header.control.fin {
+        if !header.control.fin {
             self.seq.increment();
         }
 
@@ -236,11 +246,13 @@ impl TaskRunner {
     where
         T: AsyncWrite + Unpin,
     {
+        let objects = rsp.parse_objects()?;
+
         if task.details.is_read_request() {
-            self.handle_read_response(level, io, rsp, task, writer)
+            self.handle_read_response(level, io, rsp.header, objects, task, writer)
                 .await
         } else {
-            self.handle_non_read_response(level, io, rsp, task, writer)
+            self.handle_non_read_response(level, io, rsp.header, objects, task, writer)
                 .await
         }
     }

@@ -132,8 +132,8 @@ impl<'a> Iterator for RangedBytesIterator<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.cursor.read_bytes(self.size).ok().map(|b| {
             let index = self.index;
-            self.index += 1;
-            self.remaining -= 1;
+            self.index = self.index.saturating_add(1);
+            self.remaining = self.remaining.saturating_sub(1);
             (Bytes::new(b), index)
         })
     }

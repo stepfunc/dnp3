@@ -9,6 +9,7 @@ use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::{InvalidRange, Range};
 use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::{ReadCursor, ReadError};
+use std::fmt::Formatter;
 
 /// Controls how parsed ASDUs are logged
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -301,10 +302,41 @@ pub enum ObjectParseError {
     UnknownGroupVariation(u8, u8),
     UnknownQualifier(u8),
     InsufficientBytes,
-    InvalidRange,
+    InvalidRange(u16, u16),
     InvalidQualifierForVariation(Variation, QualifierCode),
     UnsupportedQualifierCode(QualifierCode),
     ZeroLengthOctetData,
+}
+
+impl std::fmt::Display for ObjectParseError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            ObjectParseError::UnknownGroupVariation(g, v) => {
+                write!(f, "unknown group/variation: g{}v{}", g, v)
+            }
+            ObjectParseError::UnknownQualifier(q) => write!(f, "unknown qualifier: 0x{:02X}", q),
+            ObjectParseError::InsufficientBytes => f.write_str("insufficient bytes"),
+            ObjectParseError::InvalidRange(start, stop) => {
+                write!(f, "invalid range - start: {} stop: {}", start, stop)
+            }
+            ObjectParseError::InvalidQualifierForVariation(v, q) => write!(
+                f,
+                "{:?} may not be used with the qualifier: {} (0x{:02X})",
+                v,
+                q.description(),
+                q.as_u8()
+            ),
+            ObjectParseError::UnsupportedQualifierCode(q) => write!(
+                f,
+                "Unsupported qualifier code: {} (0x{:02X})",
+                q.description(),
+                q.as_u8()
+            ),
+            ObjectParseError::ZeroLengthOctetData => {
+                f.write_str("octet-data may not be zero length")
+            }
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -330,7 +362,7 @@ pub(crate) fn log_fragment(level: ParseLogLevel, data: &[u8]) {
     match Header::parse(level.log_header(), &mut cursor) {
         Ok(header) => {
             if let Err(err) = HeaderCollection::parse(level, header.function, header.trailer) {
-                log::error!("error parsing objects: {:?}", err);
+                log::error!("error parsing objects: {}", err);
             }
         }
         Err(err) => {
@@ -464,7 +496,7 @@ impl<'a> ObjectParser<'a> {
         for result in ObjectParser::one_pass(function, data) {
             match result {
                 Err(err) => {
-                    log::warn!("error parsing object header: {:?}", err); // TODO implement std::fmt::Display
+                    log::warn!("{}", err);
                     return Err(err);
                 }
                 Ok(header) => {
@@ -655,8 +687,8 @@ impl std::convert::From<ReadError> for HeaderParseError {
 }
 
 impl std::convert::From<InvalidRange> for ObjectParseError {
-    fn from(_: InvalidRange) -> Self {
-        ObjectParseError::InvalidRange
+    fn from(r: InvalidRange) -> Self {
+        ObjectParseError::InvalidRange(r.start, r.stop)
     }
 }
 

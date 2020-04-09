@@ -1,8 +1,8 @@
 use crate::app::format::write;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::gen::variations::variation::Variation;
-use crate::app::header::{Control, RequestHeader};
-use crate::app::parse::parser::{ObjectParseError, Response};
+use crate::app::header::{Control, RequestHeader, ResponseHeader};
+use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::handlers::ResponseHandler;
 use crate::master::types::ClassScan;
@@ -10,13 +10,7 @@ use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone, Debug)]
 pub enum ResponseError {
-    BadObjects(ObjectParseError),
-}
-
-impl std::convert::From<ObjectParseError> for ResponseError {
-    fn from(err: ObjectParseError) -> Self {
-        ResponseError::BadObjects(err)
-    }
+    Todo,
 }
 
 pub enum ResponseResult {
@@ -58,10 +52,14 @@ impl TaskDetails {
         }
     }
 
-    pub fn handle(&mut self, response: Response) -> Result<ResponseResult, ResponseError> {
+    pub fn handle(
+        &mut self,
+        response: ResponseHeader,
+        headers: HeaderCollection,
+    ) -> Result<ResponseResult, ResponseError> {
         match self {
             TaskDetails::ClassScan(_, handler) => {
-                handler.handle(1024, response.header, response.parse_objects()?);
+                handler.handle(1024, response, headers);
                 Ok(ResponseResult::Success)
             }
         }
