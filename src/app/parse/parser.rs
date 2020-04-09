@@ -128,10 +128,11 @@ impl<'a> ParsedFragment<'a> {
         match self.iin {
             Some(iin) => write!(
                 f,
-                "ctrl: {} func: {:?} iin: {} ... (len = {})",
+                "ctrl: {} func: {:?} {} {} ... (len = {})",
                 self.control,
                 self.function,
-                iin,
+                iin.iin1,
+                iin.iin2,
                 self.raw_objects.len()
             ),
             None => write!(

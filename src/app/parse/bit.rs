@@ -1,6 +1,6 @@
 use crate::app::parse::range::Range;
 use crate::app::types::DoubleBit;
-use crate::util::bit::BitTest;
+use crate::util::bit::Bitfield;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 fn num_bytes_for_bits(count: usize) -> usize {

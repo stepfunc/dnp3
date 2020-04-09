@@ -1,5 +1,5 @@
 use crate::app::types::DoubleBit;
-use crate::util::bit::BitTest;
+use crate::util::bit::Bitfield;
 use std::fmt::Formatter;
 
 #[derive(Copy, Clone, PartialEq, Debug)]

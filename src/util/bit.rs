@@ -1,4 +1,6 @@
-pub trait BitTest {
+use std::fmt::Formatter;
+
+pub trait Bitfield {
     const BIT_0: u8 = 0b0000_0001;
     const BIT_1: u8 = 0b0000_0010;
     const BIT_2: u8 = 0b0000_0100;
@@ -18,7 +20,7 @@ pub trait BitTest {
     fn bit_7(self) -> bool;
 }
 
-impl BitTest for u8 {
+impl Bitfield for u8 {
     fn bit_0(self) -> bool {
         self & Self::BIT_0 != 0
     }
@@ -50,4 +52,54 @@ impl BitTest for u8 {
     fn bit_7(self) -> bool {
         self & Self::BIT_7 != 0
     }
+}
+
+pub fn format_bitfield(
+    f: &mut Formatter,
+    value: u8,
+    name: &'static str,
+    names: [&'static str; 8],
+) -> std::fmt::Result {
+    fn push(f: &mut Formatter, prev: bool, s: &'static str) -> std::fmt::Result {
+        if prev {
+            f.write_str(", ")?;
+        }
+        f.write_str(s)
+    }
+
+    let mut prev = false;
+    write!(f, "{}: [", name)?;
+    if value.bit_0() {
+        push(f, prev, names[0])?;
+        prev = true;
+    }
+    if value.bit_1() {
+        push(f, prev, names[1])?;
+        prev = true;
+    }
+    if value.bit_2() {
+        push(f, prev, names[2])?;
+        prev = true;
+    }
+    if value.bit_3() {
+        push(f, prev, names[3])?;
+        prev = true;
+    }
+    if value.bit_4() {
+        push(f, prev, names[4])?;
+        prev = true;
+    }
+    if value.bit_5() {
+        push(f, prev, names[5])?;
+        prev = true;
+    }
+    if value.bit_6() {
+        push(f, prev, names[6])?;
+        prev = true;
+    }
+    if value.bit_7() {
+        push(f, prev, names[7])?;
+    }
+
+    f.write_str("]")
 }

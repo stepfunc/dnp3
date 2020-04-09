@@ -1,6 +1,6 @@
 use crate::app::gen::enums::FunctionCode;
 use crate::app::sequence::Sequence;
-use crate::util::bit::BitTest;
+use crate::util::bit::{format_bitfield, Bitfield};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::Formatter;
 
@@ -186,12 +186,42 @@ impl IIN2 {
     }
 }
 
-impl std::fmt::Display for IIN {
+impl std::fmt::Display for IIN1 {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(
+        format_bitfield(
             f,
-            "[iin1: 0x{:02X}, iin2: 0x{:02X}]",
-            self.iin1.value, self.iin2.value
+            self.value,
+            "iin1",
+            [
+                "BROADCAST",
+                "CLASS_1_EVENTS",
+                "CLASS_2_EVENTS",
+                "CLASS_3_EVENTS",
+                "NEED_TIME",
+                "LOCAL_CONTROL",
+                "DEVICE_TROUBLE",
+                "DEVICE_RESTART",
+            ],
+        )
+    }
+}
+
+impl std::fmt::Display for IIN2 {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        format_bitfield(
+            f,
+            self.value,
+            "iin2",
+            [
+                "NO_FUNC_CODE_SUPPORT",
+                "OBJECT_UNKNOWN",
+                "PARAMETER_ERROR",
+                "EVENT_BUFFER_OVERFLOW",
+                "ALREADY_EXECUTING",
+                "CONFIG_CORRUPT",
+                "RESERVED_2",
+                "RESERVED_1",
+            ],
         )
     }
 }
