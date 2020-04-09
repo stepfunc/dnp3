@@ -1,5 +1,6 @@
 use crate::app::parse::range::Range;
 use crate::app::types::DoubleBit;
+use crate::util::bit::BitTest;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 fn num_bytes_for_bits(count: usize) -> usize {
@@ -131,7 +132,8 @@ impl<'a> Iterator for DoubleBitIterator<'a> {
 
         match self.bytes.get(byte) {
             Some(x) => {
-                let value = DoubleBit::from(*x >> shift);
+                let bits = *x >> shift;
+                let value = DoubleBit::from(bits.bit_1(), bits.bit_0());
                 let index = self.index;
                 self.pos += 1;
                 if self.pos < self.count {

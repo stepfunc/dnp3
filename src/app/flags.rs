@@ -71,7 +71,7 @@ impl Flags {
     }
 
     pub fn double_bit_state(self) -> DoubleBit {
-        DoubleBit::from(self.value >> 6)
+        DoubleBit::from(self.value.bit_7(), self.value.bit_6())
     }
 }
 

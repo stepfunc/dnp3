@@ -63,18 +63,18 @@ pub enum DoubleBit {
 
 impl DoubleBit {
     // the lowest two bits of this number
-    pub fn from(x: u8) -> Self {
-        match x & 0b0000_0011 {
-            0b00 => DoubleBit::Intermediate,
-            0b01 => DoubleBit::DeterminedOff,
-            0b10 => DoubleBit::DeterminedOn,
-            _ => DoubleBit::Indeterminate,
+    pub fn from(high: bool, low: bool) -> Self {
+        match (high, low) {
+            (false, false) => DoubleBit::Intermediate,
+            (false, true) => DoubleBit::DeterminedOff,
+            (true, false) => DoubleBit::DeterminedOn,
+            (true, true) => DoubleBit::Indeterminate,
         }
     }
 }
 
 impl std::fmt::Display for DoubleBit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
