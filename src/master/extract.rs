@@ -49,7 +49,11 @@ where
         };
 
         if !handled {
-            log::warn!("ignored header: {}", header.display_header_only());
+            log::warn!(
+                "Ignored header variation: {} qualifier: {:?}",
+                &header.variation,
+                &header.details.qualifier()
+            );
         }
 
         // if we didn't return early b/c the header is a CTO, then we just return the previous value

@@ -283,7 +283,7 @@ impl TaskRunner {
         // now enter a loop to read responses
         loop {
             let fragment: Fragment = tokio::time::timeout_at(deadline, reader.read(io)).await??;
-            if let Ok(parsed) = ParsedFragment::parse(level, fragment.data) {
+            if let Ok(parsed) = ParsedFragment::parse(level.receive(), fragment.data) {
                 match parsed.to_response() {
                     Err(err) => log::warn!("{}", err),
                     Ok(response) => {

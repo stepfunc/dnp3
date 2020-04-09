@@ -10,7 +10,7 @@ use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::ReadCursor;
-use std::fmt::Formatter;
+use std::fmt::{Debug, Formatter};
 
 /// Controls how parsed ASDUs are logged
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -23,6 +23,28 @@ pub enum ParseLogLevel {
     ObjectHeaders,
     /// Log the header, the object headers, and the object values
     ObjectValues,
+}
+
+#[derive(Copy, Clone)]
+pub struct ParseSettings {
+    is_transmit: bool,
+    level: ParseLogLevel,
+}
+
+impl ParseLogLevel {
+    pub fn transmit(self) -> ParseSettings {
+        ParseSettings {
+            is_transmit: true,
+            level: self,
+        }
+    }
+
+    pub fn receive(self) -> ParseSettings {
+        ParseSettings {
+            is_transmit: false,
+            level: self,
+        }
+    }
 }
 
 pub(crate) fn format_count_of_items<T, V>(f: &mut std::fmt::Formatter, iter: T) -> std::fmt::Result
@@ -66,35 +88,6 @@ where
     Ok(())
 }
 
-impl ParseLogLevel {
-    pub(crate) fn log_header(self) -> bool {
-        match self {
-            ParseLogLevel::Nothing => false,
-            ParseLogLevel::Header => true,
-            ParseLogLevel::ObjectHeaders => true,
-            ParseLogLevel::ObjectValues => true,
-        }
-    }
-
-    pub(crate) fn log_object_headers(self) -> bool {
-        match self {
-            ParseLogLevel::Nothing => false,
-            ParseLogLevel::Header => false,
-            ParseLogLevel::ObjectHeaders => true,
-            ParseLogLevel::ObjectValues => true,
-        }
-    }
-
-    pub(crate) fn log_object_values(self) -> bool {
-        match self {
-            ParseLogLevel::Nothing => false,
-            ParseLogLevel::Header => false,
-            ParseLogLevel::ObjectHeaders => false,
-            ParseLogLevel::ObjectValues => true,
-        }
-    }
-}
-
 pub struct ParsedFragment<'a> {
     pub control: Control,
     pub function: FunctionCode,
@@ -104,6 +97,53 @@ pub struct ParsedFragment<'a> {
 }
 
 impl<'a> ParsedFragment<'a> {
+    pub(crate) fn display_view(
+        &'a self,
+        settings: ParseSettings,
+    ) -> Option<ParsedFragmentDisplay<'a>> {
+        match settings.level {
+            ParseLogLevel::Nothing => None,
+            ParseLogLevel::Header => Some(ParsedFragmentDisplay {
+                is_transmit: settings.is_transmit,
+                format_objects_headers: false,
+                format_object_values: false,
+                fragment: self,
+            }),
+            ParseLogLevel::ObjectHeaders => Some(ParsedFragmentDisplay {
+                is_transmit: settings.is_transmit,
+                format_objects_headers: true,
+                format_object_values: false,
+                fragment: self,
+            }),
+            ParseLogLevel::ObjectValues => Some(ParsedFragmentDisplay {
+                is_transmit: settings.is_transmit,
+                format_objects_headers: true,
+                format_object_values: true,
+                fragment: self,
+            }),
+        }
+    }
+
+    fn format_header(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self.iin {
+            Some(iin) => write!(
+                f,
+                "ctrl: {} func: {:?} iin: {} ... (len = {})",
+                self.control,
+                self.function,
+                iin,
+                self.raw_objects.len()
+            ),
+            None => write!(
+                f,
+                "ctrl: {} func: {:?} ... (len = {})",
+                self.control,
+                self.function,
+                self.raw_objects.len()
+            ),
+        }
+    }
+
     pub fn to_request(&self) -> Result<Request<'a>, RequestValidationError> {
         if self.iin.is_some() {
             return Err(RequestValidationError::UnexpectedFunction(self.function));
@@ -146,7 +186,7 @@ impl<'a> ParsedFragment<'a> {
         })
     }
 
-    pub fn parse(level: ParseLogLevel, fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
+    pub fn parse(settings: ParseSettings, fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
         let mut cursor = ReadCursor::new(fragment);
 
         let control = Control::from(cursor.read_u8()?);
@@ -169,32 +209,12 @@ impl<'a> ParsedFragment<'a> {
             raw_objects: objects,
             objects: HeaderCollection::parse(function, objects),
         };
-        if level.log_header() {
-            log::info!("{}", fragment);
-        }
-        Ok(fragment)
-    }
-}
 
-impl<'a> std::fmt::Display for ParsedFragment<'a> {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match self.iin {
-            Some(iin) => write!(
-                f,
-                "ctrl: {} func: {:?} iin: {} ... (len = {})",
-                self.control,
-                self.function,
-                iin,
-                self.raw_objects.len()
-            ),
-            None => write!(
-                f,
-                "ctrl: {} func: {:?} ... (len = {})",
-                self.control,
-                self.function,
-                self.raw_objects.len()
-            ),
+        if let Some(x) = fragment.display_view(settings) {
+            log::info!("{}", x);
         }
+
+        Ok(fragment)
     }
 }
 
@@ -209,47 +229,26 @@ impl<'a> ObjectHeader<'a> {
         Self { variation, details }
     }
 
-    pub(crate) fn display_header_only(&'a self) -> ObjectHeaderDisplay<'a> {
-        ObjectHeaderDisplay {
-            objects: false,
-            header: self,
-        }
-    }
-
-    pub(crate) fn display_header_and_objects(&'a self) -> ObjectHeaderDisplay<'a> {
-        ObjectHeaderDisplay {
-            objects: true,
-            header: self,
-        }
-    }
-}
-
-pub(crate) struct ObjectHeaderDisplay<'a> {
-    objects: bool,
-    header: &'a ObjectHeader<'a>,
-}
-
-impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match &self.header.details {
+    pub fn format(&self, format_values: bool, f: &mut Formatter) -> std::fmt::Result {
+        match &self.details {
             HeaderDetails::AllObjects(_) => write!(
                 f,
                 "{} : {} - {}",
-                self.header.variation,
-                self.header.variation.description(),
-                self.header.details.qualifier().description()
+                self.variation,
+                self.variation.description(),
+                self.details.qualifier().description()
             ),
             HeaderDetails::OneByteStartStop(s1, s2, seq) => {
                 write!(
                     f,
                     "{} : {} - {} - [{}, {}]",
-                    self.header.variation,
-                    self.header.variation.description(),
-                    self.header.details.qualifier().description(),
+                    self.variation,
+                    self.variation.description(),
+                    self.details.qualifier().description(),
                     s1,
                     s2
                 )?;
-                if self.objects {
+                if format_values {
                     seq.format_objects(f)?;
                 }
                 Ok(())
@@ -258,13 +257,13 @@ impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
                 write!(
                     f,
                     "{} : {} - {} - [{}, {}]",
-                    self.header.variation,
-                    self.header.variation.description(),
-                    self.header.details.qualifier().description(),
+                    self.variation,
+                    self.variation.description(),
+                    self.details.qualifier().description(),
                     s1,
                     s2
                 )?;
-                if self.objects {
+                if format_values {
                     seq.format_objects(f)?;
                 }
                 Ok(())
@@ -273,12 +272,12 @@ impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
                 write!(
                     f,
                     "{} : {} - {} - [{}]",
-                    self.header.variation,
-                    self.header.variation.description(),
-                    self.header.details.qualifier().description(),
+                    self.variation,
+                    self.variation.description(),
+                    self.details.qualifier().description(),
                     c
                 )?;
-                if self.objects {
+                if format_values {
                     seq.format_objects(f)?;
                 }
                 Ok(())
@@ -287,12 +286,12 @@ impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
                 write!(
                     f,
                     "{} : {} - {} - [{}]",
-                    self.header.variation,
-                    self.header.variation.description(),
-                    self.header.details.qualifier().description(),
+                    self.variation,
+                    self.variation.description(),
+                    self.details.qualifier().description(),
                     c
                 )?;
-                if self.objects {
+                if format_values {
                     seq.format_objects(f)?;
                 }
                 Ok(())
@@ -301,12 +300,12 @@ impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
                 write!(
                     f,
                     "{} : {} - {} - [{}]",
-                    self.header.variation,
-                    self.header.variation.description(),
-                    self.header.details.qualifier().description(),
+                    self.variation,
+                    self.variation.description(),
+                    self.details.qualifier().description(),
                     c
                 )?;
-                if self.objects {
+                if format_values {
                     seq.format_objects(f)?;
                 }
                 Ok(())
@@ -315,17 +314,52 @@ impl<'a> std::fmt::Display for ObjectHeaderDisplay<'a> {
                 write!(
                     f,
                     "{} : {} - {} - [{}]",
-                    self.header.variation,
-                    self.header.variation.description(),
-                    self.header.details.qualifier().description(),
+                    self.variation,
+                    self.variation.description(),
+                    self.details.qualifier().description(),
                     c
                 )?;
-                if self.objects {
+                if format_values {
                     seq.format_objects(f)?;
                 }
                 Ok(())
             }
         }
+    }
+}
+
+pub(crate) struct ParsedFragmentDisplay<'a> {
+    is_transmit: bool,
+    format_objects_headers: bool,
+    format_object_values: bool,
+    fragment: &'a ParsedFragment<'a>,
+}
+
+impl<'a> std::fmt::Display for ParsedFragmentDisplay<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        // always display the header
+        f.write_str(if self.is_transmit {
+            "APP TX - "
+        } else {
+            "APP RX - "
+        })?;
+        self.fragment.format_header(f)?;
+
+        if !self.format_objects_headers {
+            return Ok(());
+        }
+
+        match self.fragment.objects {
+            Ok(headers) => {
+                for header in headers.iter() {
+                    f.write_str("\n")?;
+                    header.format(self.format_object_values, f)?
+                }
+            }
+            Err(_) => {}
+        }
+
+        Ok(())
     }
 }
 
@@ -618,7 +652,7 @@ mod test {
 
     fn test_request_validation_error(input: &[u8], err: RequestValidationError) {
         assert_eq!(
-            ParsedFragment::parse(ParseLogLevel::Nothing, input)
+            ParsedFragment::parse(ParseLogLevel::Nothing.receive(), input)
                 .unwrap()
                 .to_request()
                 .err()
@@ -629,7 +663,7 @@ mod test {
 
     fn test_response_validation_error(input: &[u8], err: ResponseValidationError) {
         assert_eq!(
-            ParsedFragment::parse(ParseLogLevel::Nothing, input)
+            ParsedFragment::parse(ParseLogLevel::Nothing.receive(), input)
                 .unwrap()
                 .to_response()
                 .err()
@@ -662,7 +696,7 @@ mod test {
     #[test]
     fn parses_valid_request() {
         let fragment = &[0xC2, 0x02, 0xAA];
-        let request = ParsedFragment::parse(ParseLogLevel::Nothing, fragment)
+        let request = ParsedFragment::parse(ParseLogLevel::Nothing.receive(), fragment)
             .unwrap()
             .to_request()
             .unwrap();
@@ -688,7 +722,7 @@ mod test {
     #[test]
     fn parses_valid_unsolicited_response() {
         let fragment = &[0b11010010, 0x82, 0xFF, 0xAA, 0x01, 0x02];
-        let response = ParsedFragment::parse(ParseLogLevel::Nothing, fragment)
+        let response = ParsedFragment::parse(ParseLogLevel::Nothing.receive(), fragment)
             .unwrap()
             .to_response()
             .unwrap();
@@ -742,18 +776,20 @@ mod test {
     #[test]
     fn confirms_may_or_may_not_have_uns_set() {
         {
-            let request = ParsedFragment::parse(ParseLogLevel::Nothing, &[0b11010000, 0x00])
-                .unwrap()
-                .to_request()
-                .unwrap();
+            let request =
+                ParsedFragment::parse(ParseLogLevel::Nothing.receive(), &[0b11010000, 0x00])
+                    .unwrap()
+                    .to_request()
+                    .unwrap();
             assert_eq!(request.header.function, FunctionCode::Confirm);
             assert!(request.header.control.uns);
         }
         {
-            let request = ParsedFragment::parse(ParseLogLevel::Nothing, &[0b11000000, 0x00])
-                .unwrap()
-                .to_request()
-                .unwrap();
+            let request =
+                ParsedFragment::parse(ParseLogLevel::Nothing.receive(), &[0b11000000, 0x00])
+                    .unwrap()
+                    .to_request()
+                    .unwrap();
             assert_eq!(request.header.function, FunctionCode::Confirm);
             assert!(!request.header.control.uns);
         }

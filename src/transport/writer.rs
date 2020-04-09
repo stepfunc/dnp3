@@ -47,8 +47,8 @@ impl Writer {
     where
         W: AsyncWrite + Unpin,
     {
-        if level.log_header() {
-            ParsedFragment::parse(level, fragment).ok();
+        if level != ParseLogLevel::Nothing {
+            ParsedFragment::parse(level.transmit(), fragment).ok();
         }
 
         let chunks = fragment.chunks(crate::link::constant::MAX_APP_BYTES_PER_FRAME);

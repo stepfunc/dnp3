@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         let asdu = reader.read(&mut socket).await.unwrap();
 
-        if let Err(err) = ParsedFragment::parse(ParseLogLevel::ObjectValues, asdu.data) {
+        if let Err(err) = ParsedFragment::parse(ParseLogLevel::ObjectValues.receive(), asdu.data) {
             log::warn!("bad request: {}", err);
         }
     }
