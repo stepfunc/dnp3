@@ -140,7 +140,7 @@ impl TaskRunner {
         level: ParseLogLevel,
         io: &mut T,
         address: Address,
-        rsp: Response<'_>,
+        rsp: &Response<'_>,
         writer: &mut WriterType,
     ) -> Result<(), Error>
     where
@@ -239,20 +239,20 @@ impl TaskRunner {
         &mut self,
         level: ParseLogLevel,
         io: &mut T,
-        rsp: Response<'_>,
+        response: &Response<'_>,
         task: &mut MasterTask,
         writer: &mut WriterType,
     ) -> Result<ResponseResult, TaskError>
     where
         T: AsyncWrite + Unpin,
     {
-        let objects = rsp.parse_objects()?;
+        let objects = response.objects?;
 
         if task.details.is_read_request() {
-            self.handle_read_response(level, io, rsp.header, objects, task, writer)
+            self.handle_read_response(level, io, response.header, objects, task, writer)
                 .await
         } else {
-            self.handle_non_read_response(level, io, rsp.header, objects, task, writer)
+            self.handle_non_read_response(level, io, response.header, objects, task, writer)
                 .await
         }
     }
@@ -286,11 +286,11 @@ impl TaskRunner {
                 Err(err) => log::warn!("error parsing response header: {}", err),
                 Ok(response) => {
                     if response.header.unsolicited {
-                        self.handle_unsolicited(level, io, fragment.address, response, writer)
+                        self.handle_unsolicited(level, io, fragment.address, &response, writer)
                             .await?;
                     } else {
                         match self
-                            .handle_response(level, io, response, task, writer)
+                            .handle_response(level, io, &response, task, writer)
                             .await?
                         {
                             ResponseResult::Success => {

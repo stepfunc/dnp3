@@ -4,7 +4,7 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::gen::variations::variation::Variation;
-use crate::app::header::{Header, HeaderParseError, RequestHeader, ResponseHeader};
+use crate::app::header::{HeaderParseError, ParsedFragment, RequestHeader, ResponseHeader};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::{InvalidRange, Range};
 use crate::app::parse::traits::FixedSize;
@@ -49,40 +49,6 @@ where
     }
     Ok(())
 }
-
-/*
-pub(crate) fn log_count_of_items<T, V>(level: log::Level, iter: T)
-    where
-        T: Iterator<Item = V>,
-        V: std::fmt::Display,
-{
-    for x in iter {
-        log::log!(level, "{}", x);
-    }
-}
-
-pub(crate) fn log_indexed_items<T, V, I>(level: log::Level, iter: T)
-    where
-        T: Iterator<Item = (V, I)>,
-        V: std::fmt::Display,
-        I: std::fmt::Display,
-{
-    for (v, i) in iter {
-        log::log!(level, "index: {} {}", i, v);
-    }
-}
-
-pub(crate) fn log_prefixed_items<T, V, I>(level: log::Level, iter: T)
-where
-    T: Iterator<Item = Prefix<I, V>>,
-    V: FixedSize + std::fmt::Display,
-    I: FixedSize + std::fmt::Display,
-{
-    for x in iter {
-        log::log!(level, "index: {} {}", x.index, x.value);
-    }
-}
-*/
 
 pub(crate) fn format_prefixed_items<T, V, I>(
     f: &mut std::fmt::Formatter,
@@ -282,19 +248,6 @@ impl<'a> HeaderDetails<'a> {
             HeaderDetails::TwoByteCountAndPrefix(_, _) => QualifierCode::CountAndPrefix16,
         }
     }
-    /*
-        pub(crate) fn log_object_values(&self, level: log::Level) {
-            match self {
-                HeaderDetails::AllObjects(_) => {}
-                HeaderDetails::OneByteStartStop(_, _, var) => var.log_objects(level),
-                HeaderDetails::TwoByteStartStop(_, _, var) => var.log_objects(level),
-                HeaderDetails::OneByteCount(_, var) => var.log_objects(level),
-                HeaderDetails::TwoByteCount(_, var) => var.log_objects(level),
-                HeaderDetails::OneByteCountAndPrefix(_, var) => var.log_objects(level),
-                HeaderDetails::TwoByteCountAndPrefix(_, var) => var.log_objects(level),
-            }
-        }
-    */
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -341,106 +294,42 @@ impl std::fmt::Display for ObjectParseError {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Request<'a> {
-    level: ParseLogLevel,
     pub header: RequestHeader,
-    pub objects: &'a [u8],
+    pub raw_objects: &'a [u8],
+    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Response<'a> {
-    level: ParseLogLevel,
     pub header: ResponseHeader,
-    pub objects: &'a [u8],
+    pub raw_objects: &'a [u8],
+    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
-pub(crate) fn log_fragment(level: ParseLogLevel, data: &[u8]) {
-    if !level.log_header() {
-        return;
-    }
-
-    let mut cursor = ReadCursor::new(data);
-    match Header::parse(level.log_header(), &mut cursor) {
-        Ok(header) => {
-            if let Err(err) = HeaderCollection::parse(level, header.function, header.trailer) {
-                log::error!("error parsing objects: {}", err);
-            }
-        }
-        Err(err) => {
-            log::error!("error parsing header: {}", err);
-        }
+impl<'a> Response<'a> {
+    pub fn parse(
+        level: ParseLogLevel,
+        fragment: &'a [u8],
+    ) -> Result<Response<'a>, HeaderParseError> {
+        ParsedFragment::parse(level, fragment)?.to_response()
     }
 }
 
 impl<'a> Request<'a> {
-    pub fn parse_objects(&self) -> Result<HeaderCollection<'a>, ObjectParseError> {
-        Ok(HeaderCollection::parse(
-            self.level,
-            self.header.function,
-            self.objects,
-        )?)
-    }
-
-    pub fn parse(level: ParseLogLevel, data: &'a [u8]) -> Result<Self, HeaderParseError> {
-        let mut cursor = ReadCursor::new(data);
-        let header = Header::parse(level.log_header(), &mut cursor)?;
-
-        if header.iin.is_some() {
-            return Err(HeaderParseError::UnexpectedRequestFunction(header.function));
-        }
-
-        if !(header.control.is_fir_and_fin()) {
-            return Err(HeaderParseError::ExpectedFirAndFin(header.function));
-        }
-
-        if header.control.uns && header.function != FunctionCode::Confirm {
-            return Err(HeaderParseError::UnsolicitedBitNotAllowed(header.function));
-        }
-
-        Ok(Self {
-            level,
-            header: RequestHeader::new(header.control, header.function),
-            objects: header.trailer,
-        })
+    pub fn parse(
+        level: ParseLogLevel,
+        fragment: &'a [u8],
+    ) -> Result<Request<'a>, HeaderParseError> {
+        ParsedFragment::parse(level, fragment)?.to_request()
     }
 }
 
-impl<'a> Response<'a> {
-    pub fn parse_objects(&self) -> Result<HeaderCollection<'a>, ObjectParseError> {
-        Ok(HeaderCollection::parse(
-            self.level,
-            self.header.function(),
-            self.objects,
-        )?)
+pub(crate) fn log_fragment(level: ParseLogLevel, fragment: &[u8]) {
+    if !level.log_header() {
+        return;
     }
 
-    pub fn parse(level: ParseLogLevel, data: &'a [u8]) -> Result<Self, HeaderParseError> {
-        let mut cursor = ReadCursor::new(data);
-        let header = Header::parse(level.log_header(), &mut cursor)?;
-
-        let (unsolicited, iin) = match (header.function, header.iin) {
-            (FunctionCode::Response, Some(x)) => (false, x),
-            (FunctionCode::UnsolicitedResponse, Some(x)) => (true, x),
-            _ => {
-                return Err(HeaderParseError::UnexpectedResponseFunction(
-                    header.function,
-                ))
-            }
-        };
-
-        if !unsolicited && header.control.uns {
-            return Err(HeaderParseError::ResponseWithUnsBit);
-        }
-
-        if unsolicited && !header.control.uns {
-            return Err(HeaderParseError::UnsolicitedResponseWithoutUnsBit);
-        }
-
-        Ok(Self {
-            level,
-            header: ResponseHeader::new(header.control, unsolicited, iin),
-            objects: header.trailer,
-        })
-    }
+    ParsedFragment::parse(level, fragment).ok();
 }
 
 struct ObjectParser<'a> {
@@ -451,6 +340,7 @@ struct ObjectParser<'a> {
 
 /// An abstract collection of pre-validated object headers
 /// that can provide an iterator of the headers.
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct HeaderCollection<'a> {
     function: FunctionCode,
     data: &'a [u8],
@@ -764,7 +654,10 @@ mod test {
     #[test]
     fn parses_valid_request() {
         let fragment = &[0xC2, 0x02, 0xAA];
-        let request = Request::parse(ParseLogLevel::Nothing, fragment).unwrap();
+        let request = ParsedFragment::parse(ParseLogLevel::Nothing, fragment)
+            .unwrap()
+            .to_request()
+            .unwrap();
         let expected = RequestHeader {
             control: Control {
                 fir: true,
@@ -777,9 +670,9 @@ mod test {
         };
 
         assert_eq!(request.header, expected);
-        assert_eq!(request.objects, &[0xAA]);
+        assert_eq!(request.raw_objects, &[0xAA]);
         assert_eq!(
-            request.parse_objects().err().unwrap(),
+            request.objects.err().unwrap(),
             ObjectParseError::InsufficientBytes
         )
     }
@@ -804,9 +697,9 @@ mod test {
         };
 
         assert_eq!(response.header, expected);
-        assert_eq!(response.objects, &[0x01, 0x02]);
+        assert_eq!(response.raw_objects, &[0x01, 0x02]);
         assert_eq!(
-            response.parse_objects().err().unwrap(),
+            response.objects.err().unwrap(),
             ObjectParseError::InsufficientBytes
         )
     }

@@ -1,4 +1,7 @@
 use crate::app::gen::enums::FunctionCode;
+use crate::app::parse::parser::{
+    HeaderCollection, ObjectParseError, ParseLogLevel, Request, Response,
+};
 use crate::app::sequence::Sequence;
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::Formatter;
@@ -100,7 +103,7 @@ pub struct IIN {
 }
 
 impl std::fmt::Display for IIN {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "[iin1: 0x{:02X}, iin2: 0x{:02X}]", self.iin1, self.iin2)
     }
 }
@@ -163,12 +166,12 @@ impl std::fmt::Display for HeaderParseError {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Header<'a> {
+pub struct ParsedFragment<'a> {
     pub control: Control,
     pub function: FunctionCode,
     pub iin: Option<IIN>,
-    pub trailer: &'a [u8],
+    pub raw_objects: &'a [u8],
+    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -184,8 +187,52 @@ pub struct ResponseHeader {
     pub iin: IIN,
 }
 
-impl<'a> Header<'a> {
-    pub fn parse(log: bool, cursor: &mut ReadCursor<'a>) -> Result<Self, HeaderParseError> {
+impl<'a> ParsedFragment<'a> {
+    pub fn to_request(&self) -> Result<Request<'a>, HeaderParseError> {
+        if self.iin.is_some() {
+            return Err(HeaderParseError::UnexpectedRequestFunction(self.function));
+        }
+
+        if !(self.control.is_fir_and_fin()) {
+            return Err(HeaderParseError::ExpectedFirAndFin(self.function));
+        }
+
+        if self.control.uns && self.function != FunctionCode::Confirm {
+            return Err(HeaderParseError::UnsolicitedBitNotAllowed(self.function));
+        }
+
+        Ok(Request {
+            header: RequestHeader::new(self.control, self.function),
+            raw_objects: self.raw_objects,
+            objects: self.objects,
+        })
+    }
+
+    pub fn to_response(&self) -> Result<Response<'a>, HeaderParseError> {
+        let (unsolicited, iin) = match (self.function, self.iin) {
+            (FunctionCode::Response, Some(x)) => (false, x),
+            (FunctionCode::UnsolicitedResponse, Some(x)) => (true, x),
+            _ => return Err(HeaderParseError::UnexpectedResponseFunction(self.function)),
+        };
+
+        if !unsolicited && self.control.uns {
+            return Err(HeaderParseError::ResponseWithUnsBit);
+        }
+
+        if unsolicited && !self.control.uns {
+            return Err(HeaderParseError::UnsolicitedResponseWithoutUnsBit);
+        }
+
+        Ok(Response {
+            header: ResponseHeader::new(self.control, unsolicited, iin),
+            raw_objects: self.raw_objects,
+            objects: self.objects,
+        })
+    }
+
+    pub fn parse(level: ParseLogLevel, fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
+        let mut cursor = ReadCursor::new(fragment);
+
         let control = Control::from(cursor.read_u8()?);
         let raw_func = cursor.read_u8()?;
         let function = match FunctionCode::from(raw_func) {
@@ -193,40 +240,43 @@ impl<'a> Header<'a> {
             Some(x) => x,
         };
         let iin = match function {
-            FunctionCode::Response => Some(IIN::parse(cursor)?),
-            FunctionCode::UnsolicitedResponse => Some(IIN::parse(cursor)?),
+            FunctionCode::Response => Some(IIN::parse(&mut cursor)?),
+            FunctionCode::UnsolicitedResponse => Some(IIN::parse(&mut cursor)?),
             _ => None,
         };
-        let header = Self {
+
+        let objects = cursor.read_all();
+        let fragment = Self {
             control,
             function,
             iin,
-            trailer: cursor.read_all(),
+            raw_objects: objects,
+            objects: HeaderCollection::parse(level, function, objects),
         };
-        if log {
-            log::info!("{}", header);
+        if level.log_header() {
+            log::info!("{}", fragment);
         }
-        Ok(header)
+        Ok(fragment)
     }
 }
 
-impl<'a> std::fmt::Display for Header<'a> {
+impl<'a> std::fmt::Display for ParsedFragment<'a> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.iin {
             Some(iin) => write!(
                 f,
-                "ctrl: {} func: {:?} iin: {} objects: (len = {})",
+                "ctrl: {} func: {:?} iin: {} ... (len = {})",
                 self.control,
                 self.function,
                 iin,
-                self.trailer.len()
+                self.raw_objects.len()
             ),
             None => write!(
                 f,
-                "ctrl: {} func: {:?} objects: (len = {})",
+                "ctrl: {} func: {:?} ... (len = {})",
                 self.control,
                 self.function,
-                self.trailer.len()
+                self.raw_objects.len()
             ),
         }
     }
