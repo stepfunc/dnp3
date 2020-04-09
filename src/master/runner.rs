@@ -7,7 +7,7 @@ use crate::master::task::{MasterTask, ResponseError, ResponseResult};
 use crate::transport::reader::Fragment;
 use crate::transport::{ReaderType, WriterType};
 
-use crate::app::header::ResponseHeader;
+use crate::app::header::{ParsedFragment, ResponseHeader};
 use crate::app::parse::error::ObjectParseError;
 use crate::util::cursor::{WriteCursor, WriteError};
 use std::time::Duration;
@@ -283,28 +283,30 @@ impl TaskRunner {
         // now enter a loop to read responses
         loop {
             let fragment: Fragment = tokio::time::timeout_at(deadline, reader.read(io)).await??;
-            match Response::parse(level, fragment.data) {
-                Err(err) => log::warn!("error parsing response header: {}", err),
-                Ok(response) => {
-                    if response.header.unsolicited {
-                        self.handle_unsolicited(level, io, fragment.address, &response, writer)
-                            .await?;
-                    } else {
-                        match self
-                            .handle_response(level, io, &response, task, writer)
-                            .await?
-                        {
-                            ResponseResult::Success => {
-                                if response.header.control.fin {
-                                    return Ok(());
+            if let Ok(parsed) = ParsedFragment::parse(level, fragment.data) {
+                match parsed.to_response() {
+                    Err(err) => log::warn!("{}", err),
+                    Ok(response) => {
+                        if response.header.unsolicited {
+                            self.handle_unsolicited(level, io, fragment.address, &response, writer)
+                                .await?;
+                        } else {
+                            match self
+                                .handle_response(level, io, &response, task, writer)
+                                .await?
+                            {
+                                ResponseResult::Success => {
+                                    if response.header.control.fin {
+                                        return Ok(());
+                                    }
+                                    // continue to next iteration of the loop, read another reply
+                                    deadline = Instant::now() + self.reply_timeout;
                                 }
-                                // continue to next iteration of the loop, read another reply
-                                deadline = Instant::now() + self.reply_timeout;
-                            }
-                        };
+                            };
+                        }
                     }
                 }
-            }
+            };
         }
     }
 }

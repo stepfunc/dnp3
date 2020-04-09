@@ -8,12 +8,6 @@ use std::fmt::Formatter;
 pub enum HeaderParseError {
     UnknownFunction(u8),
     InsufficientBytes,
-    UnsolicitedBitNotAllowed(FunctionCode),
-    ExpectedFirAndFin(FunctionCode),
-    UnexpectedResponseFunction(FunctionCode),
-    UnexpectedRequestFunction(FunctionCode),
-    UnsolicitedResponseWithoutUnsBit,
-    ResponseWithUnsBit,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -27,29 +21,25 @@ pub enum ObjectParseError {
     ZeroLengthOctetData,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum RequestValidationError {
+    UnexpectedFunction(FunctionCode),
+    NonFirFin,
+    UnexpectedUnsBit(FunctionCode),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ResponseValidationError {
+    UnexpectedFunction(FunctionCode),
+    SolicitedResponseWithUnsBit,
+    UnsolicitedResponseWithoutUnsBit,
+}
+
 impl std::fmt::Display for HeaderParseError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             HeaderParseError::UnknownFunction(x) => write!(f, "unknown function: {:?}", x),
             HeaderParseError::InsufficientBytes => write!(f, "insufficient bytes"),
-            HeaderParseError::UnsolicitedBitNotAllowed(x) => {
-                write!(f, "UNS bit not allowed for function: {:?}", x)
-            }
-            HeaderParseError::ExpectedFirAndFin(x) => {
-                write!(f, "function {:?} must have fir/fin both set to 1", x)
-            }
-            HeaderParseError::UnexpectedResponseFunction(x) => {
-                write!(f, "expected response, but received {:?}", x)
-            }
-            HeaderParseError::UnexpectedRequestFunction(x) => {
-                write!(f, "expected a request, but received {:?}", x)
-            }
-            HeaderParseError::UnsolicitedResponseWithoutUnsBit => {
-                write!(f, "unsolicited responses must have the UNS bit set")
-            }
-            HeaderParseError::ResponseWithUnsBit => {
-                write!(f, "solicited responses may not have the UNS bit set")
-            }
         }
     }
 }
@@ -80,6 +70,38 @@ impl std::fmt::Display for ObjectParseError {
             ),
             ObjectParseError::ZeroLengthOctetData => {
                 f.write_str("octet-data may not be zero length")
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for RequestValidationError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            RequestValidationError::UnexpectedUnsBit(x) => {
+                write!(f, "UNS bit not allowed for function: {:?}", x)
+            }
+            RequestValidationError::NonFirFin => {
+                f.write_str("requests must must have both FIR and FIN set to 1")
+            }
+            RequestValidationError::UnexpectedFunction(x) => {
+                write!(f, "Function {:?} not allowed in requests", x)
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for ResponseValidationError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            ResponseValidationError::UnexpectedFunction(x) => {
+                write!(f, "function {:?} not allowed in responses", x)
+            }
+            ResponseValidationError::UnsolicitedResponseWithoutUnsBit => {
+                f.write_str("unsolicited responses must have the UNS bit set")
+            }
+            ResponseValidationError::SolicitedResponseWithUnsBit => {
+                f.write_str("solicited responses may not have the UNS bit set")
             }
         }
     }

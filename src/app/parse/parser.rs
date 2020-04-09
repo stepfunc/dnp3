@@ -5,7 +5,7 @@ use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::gen::variations::variation::Variation;
 use crate::app::header::{ParsedFragment, RequestHeader, ResponseHeader};
-use crate::app::parse::error::{HeaderParseError, ObjectParseError};
+use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::FixedSize;
@@ -262,24 +262,6 @@ pub struct Response<'a> {
     pub header: ResponseHeader,
     pub raw_objects: &'a [u8],
     pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
-}
-
-impl<'a> Response<'a> {
-    pub fn parse(
-        level: ParseLogLevel,
-        fragment: &'a [u8],
-    ) -> Result<Response<'a>, HeaderParseError> {
-        ParsedFragment::parse(level, fragment)?.to_response()
-    }
-}
-
-impl<'a> Request<'a> {
-    pub fn parse(
-        level: ParseLogLevel,
-        fragment: &'a [u8],
-    ) -> Result<Request<'a>, HeaderParseError> {
-        ParsedFragment::parse(level, fragment)?.to_request()
-    }
 }
 
 pub(crate) fn log_fragment(level: ParseLogLevel, fragment: &[u8]) {
@@ -541,6 +523,7 @@ mod test {
     use crate::app::gen::variations::variation::Variation::Group110;
     use crate::app::header::{Control, IIN};
     use crate::app::parse::bytes::Bytes;
+    use crate::app::parse::error::{RequestValidationError, ResponseValidationError};
     use crate::app::parse::prefix::Prefix;
     use crate::app::sequence::Sequence;
     use crate::app::types::{DoubleBit, Timestamp};
@@ -554,18 +537,24 @@ mod test {
         );
     }
 
-    fn test_response_parse_error(input: &[u8], err: HeaderParseError) {
+    fn test_request_validation_error(input: &[u8], err: RequestValidationError) {
         assert_eq!(
-            Response::parse(ParseLogLevel::Nothing, input)
+            ParsedFragment::parse(ParseLogLevel::Nothing, input)
+                .unwrap()
+                .to_request()
                 .err()
                 .unwrap(),
             err
         );
     }
 
-    fn test_request_parse_error(input: &[u8], err: HeaderParseError) {
+    fn test_response_validation_error(input: &[u8], err: ResponseValidationError) {
         assert_eq!(
-            Request::parse(ParseLogLevel::Nothing, input).err().unwrap(),
+            ParsedFragment::parse(ParseLogLevel::Nothing, input)
+                .unwrap()
+                .to_response()
+                .err()
+                .unwrap(),
             err
         );
     }
@@ -620,7 +609,10 @@ mod test {
     #[test]
     fn parses_valid_unsolicited_response() {
         let fragment = &[0b11010010, 0x82, 0xFF, 0xAA, 0x01, 0x02];
-        let response = Response::parse(ParseLogLevel::Nothing, fragment).unwrap();
+        let response = ParsedFragment::parse(ParseLogLevel::Nothing, fragment)
+            .unwrap()
+            .to_response()
+            .unwrap();
         let expected = ResponseHeader {
             control: Control {
                 fir: true,
@@ -646,37 +638,43 @@ mod test {
 
     #[test]
     fn fails_unsolicited_response_without_uns_bit() {
-        test_response_parse_error(
+        test_response_validation_error(
             &[0b11000000, 0x82, 0x00, 0x00],
-            HeaderParseError::UnsolicitedResponseWithoutUnsBit,
+            ResponseValidationError::UnsolicitedResponseWithoutUnsBit,
         );
     }
 
     #[test]
     fn fails_solicited_response_with_uns_bit() {
-        test_response_parse_error(
+        test_response_validation_error(
             &[0b11010000, 0x81, 0x00, 0x00],
-            HeaderParseError::ResponseWithUnsBit,
+            ResponseValidationError::SolicitedResponseWithUnsBit,
         );
     }
 
     #[test]
     fn fails_bad_request_function_with_uns_bit() {
-        test_request_parse_error(
+        test_request_validation_error(
             &[0b11010000, 0x02], // write with UNS
-            HeaderParseError::UnsolicitedBitNotAllowed(FunctionCode::Write),
+            RequestValidationError::UnexpectedUnsBit(FunctionCode::Write),
         );
     }
 
     #[test]
     fn confirms_may_or_may_not_have_uns_set() {
         {
-            let request = Request::parse(ParseLogLevel::Nothing, &[0b11010000, 0x00]).unwrap();
+            let request = ParsedFragment::parse(ParseLogLevel::Nothing, &[0b11010000, 0x00])
+                .unwrap()
+                .to_request()
+                .unwrap();
             assert_eq!(request.header.function, FunctionCode::Confirm);
             assert!(request.header.control.uns);
         }
         {
-            let request = Request::parse(ParseLogLevel::Nothing, &[0b11000000, 0x00]).unwrap();
+            let request = ParsedFragment::parse(ParseLogLevel::Nothing, &[0b11000000, 0x00])
+                .unwrap()
+                .to_request()
+                .unwrap();
             assert_eq!(request.header.function, FunctionCode::Confirm);
             assert!(!request.header.control.uns);
         }

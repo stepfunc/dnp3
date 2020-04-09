@@ -1,5 +1,7 @@
 use crate::app::gen::enums::FunctionCode;
-use crate::app::parse::error::{HeaderParseError, ObjectParseError};
+use crate::app::parse::error::{
+    HeaderParseError, ObjectParseError, RequestValidationError, ResponseValidationError,
+};
 use crate::app::parse::parser::{HeaderCollection, ParseLogLevel, Request, Response};
 use crate::app::sequence::Sequence;
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
@@ -185,17 +187,17 @@ pub struct ParsedFragment<'a> {
 }
 
 impl<'a> ParsedFragment<'a> {
-    pub fn to_request(&self) -> Result<Request<'a>, HeaderParseError> {
+    pub fn to_request(&self) -> Result<Request<'a>, RequestValidationError> {
         if self.iin.is_some() {
-            return Err(HeaderParseError::UnexpectedRequestFunction(self.function));
+            return Err(RequestValidationError::UnexpectedFunction(self.function));
         }
 
         if !(self.control.is_fir_and_fin()) {
-            return Err(HeaderParseError::ExpectedFirAndFin(self.function));
+            return Err(RequestValidationError::NonFirFin);
         }
 
         if self.control.uns && self.function != FunctionCode::Confirm {
-            return Err(HeaderParseError::UnsolicitedBitNotAllowed(self.function));
+            return Err(RequestValidationError::UnexpectedUnsBit(self.function));
         }
 
         Ok(Request {
@@ -205,19 +207,19 @@ impl<'a> ParsedFragment<'a> {
         })
     }
 
-    pub fn to_response(&self) -> Result<Response<'a>, HeaderParseError> {
+    pub fn to_response(&self) -> Result<Response<'a>, ResponseValidationError> {
         let (unsolicited, iin) = match (self.function, self.iin) {
             (FunctionCode::Response, Some(x)) => (false, x),
             (FunctionCode::UnsolicitedResponse, Some(x)) => (true, x),
-            _ => return Err(HeaderParseError::UnexpectedResponseFunction(self.function)),
+            _ => return Err(ResponseValidationError::UnexpectedFunction(self.function)),
         };
 
         if !unsolicited && self.control.uns {
-            return Err(HeaderParseError::ResponseWithUnsBit);
+            return Err(ResponseValidationError::SolicitedResponseWithUnsBit);
         }
 
         if unsolicited && !self.control.uns {
-            return Err(HeaderParseError::UnsolicitedResponseWithoutUnsBit);
+            return Err(ResponseValidationError::UnsolicitedResponseWithoutUnsBit);
         }
 
         Ok(Response {
