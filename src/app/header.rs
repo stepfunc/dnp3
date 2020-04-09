@@ -95,31 +95,31 @@ impl Control {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct IIN {
+    pub iin0: u8,
     pub iin1: u8,
-    pub iin2: u8,
 }
 
 impl std::fmt::Display for IIN {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "[iin1: 0x{:02X}, iin2: 0x{:02X}]", self.iin1, self.iin2)
+        write!(f, "[iin0: 0x{:02X}, iin1: 0x{:02X}]", self.iin0, self.iin1)
     }
 }
 
 impl IIN {
-    pub fn new(iin1: u8, iin2: u8) -> Self {
-        Self { iin1, iin2 }
+    pub fn new(iin0: u8, iin1: u8) -> Self {
+        Self { iin0, iin1 }
     }
 
     pub fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(Self {
+            iin0: cursor.read_u8()?,
             iin1: cursor.read_u8()?,
-            iin2: cursor.read_u8()?,
         })
     }
 
     pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.iin0)?;
         cursor.write_u8(self.iin1)?;
-        cursor.write_u8(self.iin2)?;
         Ok(())
     }
 }
