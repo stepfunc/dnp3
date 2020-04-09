@@ -758,8 +758,8 @@ mod test {
             },
             unsolicited: true,
             iin: IIN {
-                iin0: 0xFF,
-                iin1: 0xAA,
+                iin1: 0xFF,
+                iin2: 0xAA,
             },
         };
 

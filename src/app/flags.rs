@@ -1,4 +1,5 @@
 use crate::app::types::DoubleBit;
+use crate::util::bit::BitTest;
 use std::fmt::Formatter;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -6,94 +7,67 @@ pub struct Flags {
     pub value: u8,
 }
 
-pub(crate) mod masks {
-    const fn bit(x: u8) -> u8 {
-        1 << x
-    }
-
-    // these 3 bits can be reserved depending on type
-    pub const BIT5: u8 = bit(5);
-    pub const BIT6: u8 = bit(6);
-    pub const BIT7: u8 = bit(7);
-
-    pub const ONLINE: u8 = bit(0);
-    pub const RESTART: u8 = bit(1);
-    pub const COMM_LOST: u8 = bit(2);
-    pub const REMOTE_FORCED: u8 = bit(3);
-    pub const LOCAL_FORCED: u8 = bit(4);
-    pub const CHATTER_FILTER: u8 = BIT5;
-    pub const ROLLOVER: u8 = BIT5;
-    pub const OVER_RANGE: u8 = BIT5;
-    pub const DISCONTINUITY: u8 = BIT6;
-    pub const REFERENCE_ERR: u8 = BIT6;
-    pub const STATE: u8 = BIT7;
-}
-
 impl Flags {
-    pub const ONLINE: Flags = Flags::new(masks::ONLINE);
+    pub const ONLINE: Flags = Flags::new(0x01);
 
     pub const fn new(value: u8) -> Self {
         Self { value }
     }
 
-    fn is_set(self, mask: u8) -> bool {
-        self.value & mask != 0
-    }
-
     pub fn online(self) -> bool {
-        self.is_set(masks::ONLINE)
+        self.value.bit_0()
     }
 
     pub fn restart(self) -> bool {
-        self.is_set(masks::RESTART)
+        self.value.bit_1()
     }
 
     pub fn comm_lost(self) -> bool {
-        self.is_set(masks::COMM_LOST)
+        self.value.bit_2()
     }
 
     pub fn remote_forced(self) -> bool {
-        self.is_set(masks::REMOTE_FORCED)
+        self.value.bit_3()
     }
 
     pub fn local_forced(self) -> bool {
-        self.is_set(masks::LOCAL_FORCED)
+        self.value.bit_4()
     }
 
     pub fn chatter_filter(self) -> bool {
-        self.is_set(masks::CHATTER_FILTER)
+        self.value.bit_5()
     }
 
     pub fn rollover(self) -> bool {
-        self.is_set(masks::ROLLOVER)
+        self.value.bit_5()
     }
 
     pub fn discontinuity(self) -> bool {
-        self.is_set(masks::DISCONTINUITY)
+        self.value.bit_6()
     }
 
     pub fn over_range(self) -> bool {
-        self.is_set(masks::OVER_RANGE)
+        self.value.bit_5()
     }
 
     pub fn reference_err(self) -> bool {
-        self.is_set(masks::REFERENCE_ERR)
+        self.value.bit_6()
     }
 
     pub(crate) fn bit5(self) -> bool {
-        self.is_set(masks::BIT6)
+        self.value.bit_5()
     }
 
     pub(crate) fn bit6(self) -> bool {
-        self.is_set(masks::BIT6)
+        self.value.bit_6()
     }
 
     pub(crate) fn bit7(self) -> bool {
-        self.is_set(masks::BIT7)
+        self.value.bit_7()
     }
 
     pub fn state(self) -> bool {
-        self.is_set(masks::STATE)
+        self.value.bit_7()
     }
 
     pub fn double_bit_state(self) -> DoubleBit {

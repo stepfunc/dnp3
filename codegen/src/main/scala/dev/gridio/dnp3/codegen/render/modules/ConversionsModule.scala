@@ -32,7 +32,7 @@ object ConversionsModule extends Module {
     if(hasFlags) {
       "Flags::new(v.flags)"
     } else {
-      "Flags::new(masks::ONLINE)"
+      "Flags::ONLINE"
     }
   }
 

@@ -179,7 +179,7 @@ impl std::convert::From<Group20Var6> for Counter {
     fn from(v: Group20Var6) -> Self {
         Counter {
             value: v.value as u32,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Invalid,
         }
     }
@@ -189,7 +189,7 @@ impl std::convert::From<Group20Var5> for Counter {
     fn from(v: Group20Var5) -> Self {
         Counter {
             value: v.value,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Invalid,
         }
     }
@@ -259,7 +259,7 @@ impl std::convert::From<Group21Var10> for FrozenCounter {
     fn from(v: Group21Var10) -> Self {
         FrozenCounter {
             value: v.value as u32,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Invalid,
         }
     }
@@ -269,7 +269,7 @@ impl std::convert::From<Group21Var9> for FrozenCounter {
     fn from(v: Group21Var9) -> Self {
         FrozenCounter {
             value: v.value,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Invalid,
         }
     }
@@ -419,7 +419,7 @@ impl std::convert::From<Group30Var4> for Analog {
     fn from(v: Group30Var4) -> Self {
         Analog {
             value: v.value as f64,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Invalid,
         }
     }
@@ -429,7 +429,7 @@ impl std::convert::From<Group30Var3> for Analog {
     fn from(v: Group30Var3) -> Self {
         Analog {
             value: v.value as f64,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Invalid,
         }
     }
@@ -459,7 +459,7 @@ impl std::convert::From<Group43Var8> for AnalogOutputStatus {
     fn from(v: Group43Var8) -> Self {
         AnalogOutputStatus {
             value: v.value,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Synchronized(v.time),
         }
     }
@@ -469,7 +469,7 @@ impl std::convert::From<Group43Var7> for AnalogOutputStatus {
     fn from(v: Group43Var7) -> Self {
         AnalogOutputStatus {
             value: v.value as f64,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Synchronized(v.time),
         }
     }
@@ -479,7 +479,7 @@ impl std::convert::From<Group43Var6> for AnalogOutputStatus {
     fn from(v: Group43Var6) -> Self {
         AnalogOutputStatus {
             value: v.value,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Invalid,
         }
     }
@@ -489,7 +489,7 @@ impl std::convert::From<Group43Var5> for AnalogOutputStatus {
     fn from(v: Group43Var5) -> Self {
         AnalogOutputStatus {
             value: v.value as f64,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Invalid,
         }
     }
@@ -499,7 +499,7 @@ impl std::convert::From<Group43Var4> for AnalogOutputStatus {
     fn from(v: Group43Var4) -> Self {
         AnalogOutputStatus {
             value: v.value as f64,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Synchronized(v.time),
         }
     }
@@ -509,7 +509,7 @@ impl std::convert::From<Group43Var3> for AnalogOutputStatus {
     fn from(v: Group43Var3) -> Self {
         AnalogOutputStatus {
             value: v.value as f64,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Synchronized(v.time),
         }
     }
@@ -519,7 +519,7 @@ impl std::convert::From<Group43Var2> for AnalogOutputStatus {
     fn from(v: Group43Var2) -> Self {
         AnalogOutputStatus {
             value: v.value as f64,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Invalid,
         }
     }
@@ -529,7 +529,7 @@ impl std::convert::From<Group43Var1> for AnalogOutputStatus {
     fn from(v: Group43Var1) -> Self {
         AnalogOutputStatus {
             value: v.value as f64,
-            flags: Flags::new(masks::ONLINE),
+            flags: Flags::ONLINE,
             time: Time::Invalid,
         }
     }
