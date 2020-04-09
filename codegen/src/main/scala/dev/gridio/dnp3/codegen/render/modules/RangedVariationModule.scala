@@ -16,6 +16,7 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
       "use crate::master::handlers::MeasurementHandler;".eol ++
       "use crate::app::gen::enums::QualifierCode;".eol ++
+      "use crate::app::parse::error::ObjectParseError;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++

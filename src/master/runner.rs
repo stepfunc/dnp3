@@ -1,5 +1,5 @@
 use crate::app::format::write;
-use crate::app::parse::parser::{HeaderCollection, ObjectParseError, ParseLogLevel, Response};
+use crate::app::parse::parser::{HeaderCollection, ParseLogLevel, Response};
 use crate::app::sequence::Sequence;
 use crate::error::Error;
 use crate::link::header::Address;
@@ -8,6 +8,7 @@ use crate::transport::reader::Fragment;
 use crate::transport::{ReaderType, WriterType};
 
 use crate::app::header::ResponseHeader;
+use crate::app::parse::error::ObjectParseError;
 use crate::util::cursor::{WriteCursor, WriteError};
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};

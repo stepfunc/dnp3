@@ -1,4 +1,4 @@
-use crate::app::parse::parser::ObjectParseError;
+use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::ReadCursor;
 use std::fmt::Formatter;

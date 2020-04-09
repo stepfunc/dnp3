@@ -1,6 +1,7 @@
 pub mod bit;
 pub mod bytes;
 pub mod count;
+pub mod error;
 pub mod parser;
 pub mod prefix;
 pub mod range;

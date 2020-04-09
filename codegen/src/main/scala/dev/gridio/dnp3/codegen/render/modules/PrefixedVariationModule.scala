@@ -17,6 +17,7 @@ object PrefixedVariationModule extends Module {
       "use crate::app::parse::bytes::PrefixedBytesSequence;".eol ++
       "use crate::app::measurement::Time;".eol ++
       "use crate::master::handlers::MeasurementHandler;".eol ++
+      "use crate::app::parse::error::ObjectParseError;".eol ++
       space ++
       enumDefinition ++
       space ++

@@ -4,12 +4,12 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::gen::variations::variation::Variation;
-use crate::app::header::{HeaderParseError, ParsedFragment, RequestHeader, ResponseHeader};
+use crate::app::header::{ParsedFragment, RequestHeader, ResponseHeader};
+use crate::app::parse::error::{HeaderParseError, ObjectParseError};
 use crate::app::parse::prefix::Prefix;
-use crate::app::parse::range::{InvalidRange, Range};
+use crate::app::parse::range::Range;
 use crate::app::parse::traits::FixedSize;
-use crate::util::cursor::{ReadCursor, ReadError};
-use std::fmt::Formatter;
+use crate::util::cursor::ReadCursor;
 
 /// Controls how parsed ASDUs are logged
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -246,48 +246,6 @@ impl<'a> HeaderDetails<'a> {
             HeaderDetails::TwoByteCount(_, _) => QualifierCode::Count16,
             HeaderDetails::OneByteCountAndPrefix(_, _) => QualifierCode::CountAndPrefix8,
             HeaderDetails::TwoByteCountAndPrefix(_, _) => QualifierCode::CountAndPrefix16,
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ObjectParseError {
-    UnknownGroupVariation(u8, u8),
-    UnknownQualifier(u8),
-    InsufficientBytes,
-    InvalidRange(u16, u16),
-    InvalidQualifierForVariation(Variation, QualifierCode),
-    UnsupportedQualifierCode(QualifierCode),
-    ZeroLengthOctetData,
-}
-
-impl std::fmt::Display for ObjectParseError {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match self {
-            ObjectParseError::UnknownGroupVariation(g, v) => {
-                write!(f, "unknown group/variation: g{}v{}", g, v)
-            }
-            ObjectParseError::UnknownQualifier(q) => write!(f, "unknown qualifier: 0x{:02X}", q),
-            ObjectParseError::InsufficientBytes => f.write_str("insufficient bytes"),
-            ObjectParseError::InvalidRange(start, stop) => {
-                write!(f, "invalid range - start: {} stop: {}", start, stop)
-            }
-            ObjectParseError::InvalidQualifierForVariation(v, q) => write!(
-                f,
-                "{:?} may not be used with the qualifier: {} (0x{:02X})",
-                v,
-                q.description(),
-                q.as_u8()
-            ),
-            ObjectParseError::UnsupportedQualifierCode(q) => write!(
-                f,
-                "Unsupported qualifier code: {} (0x{:02X})",
-                q.description(),
-                q.as_u8()
-            ),
-            ObjectParseError::ZeroLengthOctetData => {
-                f.write_str("octet-data may not be zero length")
-            }
         }
     }
 }
@@ -561,24 +519,6 @@ impl<'a> RangedVariation<'a> {
             FunctionCode::Read => Self::parse_read(v, qualifier),
             _ => Self::parse_non_read(v, qualifier, range, cursor),
         }
-    }
-}
-
-impl std::convert::From<ReadError> for ObjectParseError {
-    fn from(_: ReadError) -> Self {
-        ObjectParseError::InsufficientBytes
-    }
-}
-
-impl std::convert::From<ReadError> for HeaderParseError {
-    fn from(_: ReadError) -> Self {
-        HeaderParseError::InsufficientBytes
-    }
-}
-
-impl std::convert::From<InvalidRange> for ObjectParseError {
-    fn from(r: InvalidRange) -> Self {
-        ObjectParseError::InvalidRange(r.start, r.stop)
     }
 }
 

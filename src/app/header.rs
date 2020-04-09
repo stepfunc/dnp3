@@ -1,7 +1,6 @@
 use crate::app::gen::enums::FunctionCode;
-use crate::app::parse::parser::{
-    HeaderCollection, ObjectParseError, ParseLogLevel, Request, Response,
-};
+use crate::app::parse::error::{HeaderParseError, ObjectParseError};
+use crate::app::parse::parser::{HeaderCollection, ParseLogLevel, Request, Response};
 use crate::app::sequence::Sequence;
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::Formatter;
@@ -127,53 +126,6 @@ impl IIN {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum HeaderParseError {
-    UnknownFunction(u8),
-    InsufficientBytes,
-    UnsolicitedBitNotAllowed(FunctionCode),
-    ExpectedFirAndFin(FunctionCode),
-    UnexpectedResponseFunction(FunctionCode),
-    UnexpectedRequestFunction(FunctionCode),
-    UnsolicitedResponseWithoutUnsBit,
-    ResponseWithUnsBit,
-}
-
-impl std::fmt::Display for HeaderParseError {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match self {
-            HeaderParseError::UnknownFunction(x) => write!(f, "unknown function: {:?}", x),
-            HeaderParseError::InsufficientBytes => write!(f, "insufficient bytes"),
-            HeaderParseError::UnsolicitedBitNotAllowed(x) => {
-                write!(f, "UNS bit not allowed for function: {:?}", x)
-            }
-            HeaderParseError::ExpectedFirAndFin(x) => {
-                write!(f, "function {:?} must have fir/fin both set to 1", x)
-            }
-            HeaderParseError::UnexpectedResponseFunction(x) => {
-                write!(f, "expected response, but received {:?}", x)
-            }
-            HeaderParseError::UnexpectedRequestFunction(x) => {
-                write!(f, "expected a request, but received {:?}", x)
-            }
-            HeaderParseError::UnsolicitedResponseWithoutUnsBit => {
-                write!(f, "unsolicited responses must have the UNS bit set")
-            }
-            HeaderParseError::ResponseWithUnsBit => {
-                write!(f, "solicited responses may not have the UNS bit set")
-            }
-        }
-    }
-}
-
-pub struct ParsedFragment<'a> {
-    pub control: Control,
-    pub function: FunctionCode,
-    pub iin: Option<IIN>,
-    pub raw_objects: &'a [u8],
-    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
-}
-
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct RequestHeader {
     pub control: Control,
@@ -185,6 +137,51 @@ pub struct ResponseHeader {
     pub control: Control,
     pub unsolicited: bool,
     pub iin: IIN,
+}
+
+impl RequestHeader {
+    pub fn new(control: Control, function: FunctionCode) -> Self {
+        Self { control, function }
+    }
+
+    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.control.write(cursor)?;
+        self.function.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl ResponseHeader {
+    pub fn new(control: Control, unsolicited: bool, iin: IIN) -> Self {
+        Self {
+            control,
+            unsolicited,
+            iin,
+        }
+    }
+
+    pub fn function(self) -> FunctionCode {
+        if self.unsolicited {
+            FunctionCode::UnsolicitedResponse
+        } else {
+            FunctionCode::Response
+        }
+    }
+
+    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.control.write(cursor)?;
+        self.function().write(cursor)?;
+        self.iin.write(cursor)?;
+        Ok(())
+    }
+}
+
+pub struct ParsedFragment<'a> {
+    pub control: Control,
+    pub function: FunctionCode,
+    pub iin: Option<IIN>,
+    pub raw_objects: &'a [u8],
+    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
 impl<'a> ParsedFragment<'a> {
@@ -279,42 +276,5 @@ impl<'a> std::fmt::Display for ParsedFragment<'a> {
                 self.raw_objects.len()
             ),
         }
-    }
-}
-
-impl RequestHeader {
-    pub fn new(control: Control, function: FunctionCode) -> Self {
-        Self { control, function }
-    }
-
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        self.control.write(cursor)?;
-        self.function.write(cursor)?;
-        Ok(())
-    }
-}
-
-impl ResponseHeader {
-    pub fn new(control: Control, unsolicited: bool, iin: IIN) -> Self {
-        Self {
-            control,
-            unsolicited,
-            iin,
-        }
-    }
-
-    pub fn function(self) -> FunctionCode {
-        if self.unsolicited {
-            FunctionCode::UnsolicitedResponse
-        } else {
-            FunctionCode::Response
-        }
-    }
-
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        self.control.write(cursor)?;
-        self.function().write(cursor)?;
-        self.iin.write(cursor)?;
-        Ok(())
     }
 }

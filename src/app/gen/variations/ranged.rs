@@ -15,6 +15,7 @@ use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::variation::Variation;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
 use crate::app::parse::bytes::RangedBytesSequence;
+use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::*;
 use crate::app::parse::range::{Range, RangedSequence};
 use crate::master::handlers::MeasurementHandler;
