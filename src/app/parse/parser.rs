@@ -4,12 +4,13 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::gen::variations::variation::Variation;
-use crate::app::header::{ParsedFragment, RequestHeader, ResponseHeader};
-use crate::app::parse::error::ObjectParseError;
+use crate::app::header::{Control, RequestHeader, ResponseHeader, IIN};
+use crate::app::parse::error::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::ReadCursor;
+use std::fmt::Formatter;
 
 /// Controls how parsed ASDUs are logged
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -90,6 +91,109 @@ impl ParseLogLevel {
             ParseLogLevel::Header => false,
             ParseLogLevel::ObjectHeaders => false,
             ParseLogLevel::ObjectValues => true,
+        }
+    }
+}
+
+pub struct ParsedFragment<'a> {
+    pub control: Control,
+    pub function: FunctionCode,
+    pub iin: Option<IIN>,
+    pub raw_objects: &'a [u8],
+    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
+}
+
+impl<'a> ParsedFragment<'a> {
+    pub fn to_request(&self) -> Result<Request<'a>, RequestValidationError> {
+        if self.iin.is_some() {
+            return Err(RequestValidationError::UnexpectedFunction(self.function));
+        }
+
+        if !(self.control.is_fir_and_fin()) {
+            return Err(RequestValidationError::NonFirFin);
+        }
+
+        if self.control.uns && self.function != FunctionCode::Confirm {
+            return Err(RequestValidationError::UnexpectedUnsBit(self.function));
+        }
+
+        Ok(Request {
+            header: RequestHeader::new(self.control, self.function),
+            raw_objects: self.raw_objects,
+            objects: self.objects,
+        })
+    }
+
+    pub fn to_response(&self) -> Result<Response<'a>, ResponseValidationError> {
+        let (unsolicited, iin) = match (self.function, self.iin) {
+            (FunctionCode::Response, Some(x)) => (false, x),
+            (FunctionCode::UnsolicitedResponse, Some(x)) => (true, x),
+            _ => return Err(ResponseValidationError::UnexpectedFunction(self.function)),
+        };
+
+        if !unsolicited && self.control.uns {
+            return Err(ResponseValidationError::SolicitedResponseWithUnsBit);
+        }
+
+        if unsolicited && !self.control.uns {
+            return Err(ResponseValidationError::UnsolicitedResponseWithoutUnsBit);
+        }
+
+        Ok(Response {
+            header: ResponseHeader::new(self.control, unsolicited, iin),
+            raw_objects: self.raw_objects,
+            objects: self.objects,
+        })
+    }
+
+    pub fn parse(level: ParseLogLevel, fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
+        let mut cursor = ReadCursor::new(fragment);
+
+        let control = Control::from(cursor.read_u8()?);
+        let raw_func = cursor.read_u8()?;
+        let function = match FunctionCode::from(raw_func) {
+            None => return Err(HeaderParseError::UnknownFunction(raw_func)),
+            Some(x) => x,
+        };
+        let iin = match function {
+            FunctionCode::Response => Some(IIN::parse(&mut cursor)?),
+            FunctionCode::UnsolicitedResponse => Some(IIN::parse(&mut cursor)?),
+            _ => None,
+        };
+
+        let objects = cursor.read_all();
+        let fragment = Self {
+            control,
+            function,
+            iin,
+            raw_objects: objects,
+            objects: HeaderCollection::parse(level, function, objects),
+        };
+        if level.log_header() {
+            log::info!("{}", fragment);
+        }
+        Ok(fragment)
+    }
+}
+
+impl<'a> std::fmt::Display for ParsedFragment<'a> {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self.iin {
+            Some(iin) => write!(
+                f,
+                "ctrl: {} func: {:?} iin: {} ... (len = {})",
+                self.control,
+                self.function,
+                iin,
+                self.raw_objects.len()
+            ),
+            None => write!(
+                f,
+                "ctrl: {} func: {:?} ... (len = {})",
+                self.control,
+                self.function,
+                self.raw_objects.len()
+            ),
         }
     }
 }
@@ -262,14 +366,6 @@ pub struct Response<'a> {
     pub header: ResponseHeader,
     pub raw_objects: &'a [u8],
     pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
-}
-
-pub(crate) fn log_fragment(level: ParseLogLevel, fragment: &[u8]) {
-    if !level.log_header() {
-        return;
-    }
-
-    ParsedFragment::parse(level, fragment).ok();
 }
 
 struct ObjectParser<'a> {

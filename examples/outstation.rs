@@ -1,5 +1,4 @@
-use dnp3rs::app::header::ParsedFragment;
-use dnp3rs::app::parse::parser::ParseLogLevel;
+use dnp3rs::app::parse::parser::{ParseLogLevel, ParsedFragment};
 use dnp3rs::transport::reader::Reader;
 use std::net::SocketAddr;
 use std::str::FromStr;
