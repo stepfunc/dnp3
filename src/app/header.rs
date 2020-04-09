@@ -95,96 +95,122 @@ impl Control {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+pub struct IIN1 {
+    pub value: u8,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct IIN2 {
+    pub value: u8,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct IIN {
-    pub iin1: u8,
-    pub iin2: u8,
+    pub iin1: IIN1,
+    pub iin2: IIN2,
+}
+
+impl IIN1 {
+    pub fn new(value: u8) -> Self {
+        Self { value }
+    }
+
+    pub fn get_broadcast(self) -> bool {
+        self.value.bit_0()
+    }
+
+    pub fn get_class_1_events(self) -> bool {
+        self.value.bit_1()
+    }
+
+    pub fn get_class_2_events(self) -> bool {
+        self.value.bit_2()
+    }
+
+    pub fn get_class_3_events(self) -> bool {
+        self.value.bit_3()
+    }
+
+    pub fn get_need_time(self) -> bool {
+        self.value.bit_4()
+    }
+
+    pub fn get_local_control(self) -> bool {
+        self.value.bit_5()
+    }
+
+    pub fn get_device_trouble(self) -> bool {
+        self.value.bit_6()
+    }
+
+    pub fn get_device_restart(self) -> bool {
+        self.value.bit_7()
+    }
+}
+
+impl IIN2 {
+    pub fn new(value: u8) -> Self {
+        Self { value }
+    }
+
+    pub fn get_no_func_code_support(self) -> bool {
+        self.value.bit_0()
+    }
+
+    pub fn get_object_unknown(self) -> bool {
+        self.value.bit_1()
+    }
+
+    pub fn get_parameter_error(self) -> bool {
+        self.value.bit_2()
+    }
+
+    pub fn get_event_buffer_overflow(self) -> bool {
+        self.value.bit_3()
+    }
+
+    pub fn get_already_executing(self) -> bool {
+        self.value.bit_4()
+    }
+
+    pub fn get_config_corrupt(self) -> bool {
+        self.value.bit_5()
+    }
+
+    pub fn get_reserved_2(self) -> bool {
+        self.value.bit_6()
+    }
+
+    pub fn get_reserved_1(self) -> bool {
+        self.value.bit_7()
+    }
 }
 
 impl std::fmt::Display for IIN {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "[iin1: 0x{:02X}, iin2: 0x{:02X}]", self.iin1, self.iin2)
+        write!(
+            f,
+            "[iin1: 0x{:02X}, iin2: 0x{:02X}]",
+            self.iin1.value, self.iin2.value
+        )
     }
 }
 
 impl IIN {
-    pub fn get_broadcast(self) -> bool {
-        self.iin1.bit_0()
-    }
-
-    pub fn get_class_1_events(self) -> bool {
-        self.iin1.bit_1()
-    }
-
-    pub fn get_class_2_events(self) -> bool {
-        self.iin1.bit_2()
-    }
-
-    pub fn get_class_3_events(self) -> bool {
-        self.iin1.bit_3()
-    }
-
-    pub fn get_need_time(self) -> bool {
-        self.iin1.bit_4()
-    }
-
-    pub fn get_local_control(self) -> bool {
-        self.iin1.bit_5()
-    }
-
-    pub fn get_device_trouble(self) -> bool {
-        self.iin1.bit_6()
-    }
-
-    pub fn get_device_restart(self) -> bool {
-        self.iin1.bit_7()
-    }
-
-    pub fn get_no_func_code_support(self) -> bool {
-        self.iin2.bit_0()
-    }
-
-    pub fn get_object_unknown(self) -> bool {
-        self.iin2.bit_1()
-    }
-
-    pub fn get_parameter_error(self) -> bool {
-        self.iin2.bit_2()
-    }
-
-    pub fn get_event_buffer_overflow(self) -> bool {
-        self.iin2.bit_3()
-    }
-
-    pub fn get_already_executing(self) -> bool {
-        self.iin2.bit_4()
-    }
-
-    pub fn get_config_corrupt(self) -> bool {
-        self.iin2.bit_5()
-    }
-
-    pub fn get_reserved_2(self) -> bool {
-        self.iin2.bit_6()
-    }
-
-    pub fn get_reserved_1(self) -> bool {
-        self.iin2.bit_7()
-    }
-
-    pub fn new(iin1: u8, iin2: u8) -> Self {
+    pub fn new(iin1: IIN1, iin2: IIN2) -> Self {
         Self { iin1, iin2 }
     }
 
     pub fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(Self {
-            iin1: cursor.read_u8()?,
-            iin2: cursor.read_u8()?,
+            iin1: IIN1::new(cursor.read_u8()?),
+            iin2: IIN2::new(cursor.read_u8()?),
         })
     }
 
     pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.iin1)?;
-        cursor.write_u8(self.iin2)?;
+        cursor.write_u8(self.iin1.value)?;
+        cursor.write_u8(self.iin2.value)?;
         Ok(())
     }
 }

@@ -661,7 +661,7 @@ mod test {
     use crate::app::gen::enums::CommandStatus;
     use crate::app::gen::variations::fixed::*;
     use crate::app::gen::variations::variation::Variation::Group110;
-    use crate::app::header::{Control, IIN};
+    use crate::app::header::{Control, IIN, IIN1, IIN2};
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::error::{RequestValidationError, ResponseValidationError};
     use crate::app::parse::prefix::Prefix;
@@ -758,8 +758,8 @@ mod test {
             },
             unsolicited: true,
             iin: IIN {
-                iin1: 0xFF,
-                iin2: 0xAA,
+                iin1: IIN1::new(0xFF),
+                iin2: IIN2::new(0xAA),
             },
         };
 
