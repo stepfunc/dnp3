@@ -92,8 +92,8 @@ pub struct ParsedFragment<'a> {
     pub control: Control,
     pub function: FunctionCode,
     pub iin: Option<IIN>,
-    pub raw_objects: &'a [u8],
     pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
+    pub raw_objects: &'a [u8],
 }
 
 impl<'a> ParsedFragment<'a> {
@@ -186,7 +186,7 @@ impl<'a> ParsedFragment<'a> {
         })
     }
 
-    pub fn parse(settings: ParseSettings, fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
+    fn parse_no_logging(fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
         let mut cursor = ReadCursor::new(fragment);
 
         let control = Control::from(cursor.read_u8()?);
@@ -206,15 +206,26 @@ impl<'a> ParsedFragment<'a> {
             control,
             function,
             iin,
-            raw_objects: objects,
             objects: HeaderCollection::parse(function, objects),
+            raw_objects: objects,
         };
 
-        if let Some(x) = fragment.display_view(settings) {
-            log::info!("{}", x);
-        }
-
         Ok(fragment)
+    }
+
+    pub fn parse(settings: ParseSettings, fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
+        let result = Self::parse_no_logging(fragment);
+        match &result {
+            Ok(fragment) => {
+                if let Some(view) = fragment.display_view(settings) {
+                    log::info!("{}", view);
+                }
+            }
+            Err(err) => {
+                log::warn!("error parsing fragment header: {}", err);
+            }
+        };
+        result
     }
 }
 
@@ -345,18 +356,29 @@ impl<'a> std::fmt::Display for ParsedFragmentDisplay<'a> {
         })?;
         self.fragment.format_header(f)?;
 
-        if !self.format_objects_headers {
-            return Ok(());
-        }
-
         match self.fragment.objects {
             Ok(headers) => {
+                if !self.format_objects_headers {
+                    return Ok(());
+                }
                 for header in headers.iter() {
                     f.write_str("\n")?;
                     header.format(self.format_object_values, f)?
                 }
             }
-            Err(_) => {}
+            Err(err) => {
+                // if an error occurred, we re-parse the object headers so we can log any headers before the error
+                for result in
+                    ObjectParser::one_pass(self.fragment.function, self.fragment.raw_objects)
+                {
+                    if let Ok(header) = result {
+                        f.write_str("\n")?;
+                        header.format(self.format_object_values, f)?;
+                    }
+                }
+                // log the original error after any valid headers that preceded it
+                log::warn!("{}", err);
+            }
         }
 
         Ok(())

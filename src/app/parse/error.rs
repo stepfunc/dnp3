@@ -39,7 +39,9 @@ impl std::fmt::Display for HeaderParseError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             HeaderParseError::UnknownFunction(x) => write!(f, "unknown function: {:?}", x),
-            HeaderParseError::InsufficientBytes => write!(f, "insufficient bytes"),
+            HeaderParseError::InsufficientBytes => {
+                write!(f, "insufficient bytes for application layer header")
+            }
         }
     }
 }
@@ -51,7 +53,9 @@ impl std::fmt::Display for ObjectParseError {
                 write!(f, "unknown group/variation: g{}v{}", g, v)
             }
             ObjectParseError::UnknownQualifier(q) => write!(f, "unknown qualifier: 0x{:02X}", q),
-            ObjectParseError::InsufficientBytes => f.write_str("insufficient bytes"),
+            ObjectParseError::InsufficientBytes => {
+                f.write_str("insufficient bytes for object header")
+            }
             ObjectParseError::InvalidRange(start, stop) => {
                 write!(f, "invalid range - start: {} stop: {}", start, stop)
             }
