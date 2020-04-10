@@ -1,1 +1,1 @@
-pub mod write;
+pub(crate) mod write;

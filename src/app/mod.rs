@@ -1,12 +1,12 @@
 pub mod flags;
-pub mod format;
+pub(crate) mod format;
 pub mod header;
 pub mod measurement;
 pub mod parse;
 pub mod sequence;
 pub mod types;
 pub mod gen {
-    pub mod conversion;
+    pub(crate) mod conversion;
     pub mod enums;
     pub mod variations {
         pub mod all;

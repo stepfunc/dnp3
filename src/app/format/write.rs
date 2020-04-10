@@ -4,12 +4,24 @@ use crate::app::header::{Control, RequestHeader};
 use crate::app::sequence::Sequence;
 use crate::util::cursor::{WriteCursor, WriteError};
 
-pub fn confirm_solicited(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+pub(crate) fn confirm_solicited(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
     RequestHeader::new(Control::request(seq), FunctionCode::Confirm).write(cursor)
 }
 
-pub fn confirm_unsolicited(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+pub(crate) fn confirm_unsolicited(
+    seq: Sequence,
+    cursor: &mut WriteCursor,
+) -> Result<(), WriteError> {
     RequestHeader::new(Control::unsolicited(seq), FunctionCode::Confirm).write(cursor)
+}
+
+pub(crate) fn write_all_objects(
+    variation: Variation,
+    cursor: &mut WriteCursor,
+) -> Result<(), WriteError> {
+    write_gv(variation, cursor)?;
+    write_qualifier(QualifierCode::AllObjects, cursor)?;
+    Ok(())
 }
 
 fn write_gv(variation: Variation, cursor: &mut WriteCursor) -> Result<(), WriteError> {
@@ -23,26 +35,20 @@ fn write_qualifier(qualifier: QualifierCode, cursor: &mut WriteCursor) -> Result
     cursor.write_u8(qualifier.as_u8())
 }
 
-pub fn write_all_objects(variation: Variation, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-    write_gv(variation, cursor)?;
-    write_qualifier(QualifierCode::AllObjects, cursor)?;
-    Ok(())
-}
-
-pub fn read_integrity(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-    RequestHeader::new(Control::request(seq), FunctionCode::Read).write(cursor)?;
-    write_all_objects(Variation::Group60Var2, cursor)?;
-    write_all_objects(Variation::Group60Var3, cursor)?;
-    write_all_objects(Variation::Group60Var4, cursor)?;
-    write_all_objects(Variation::Group60Var1, cursor)?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::app::sequence::Sequence;
     use crate::util::cursor::WriteCursor;
+
+    fn read_integrity(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        RequestHeader::new(Control::request(seq), FunctionCode::Read).write(cursor)?;
+        write_all_objects(Variation::Group60Var2, cursor)?;
+        write_all_objects(Variation::Group60Var3, cursor)?;
+        write_all_objects(Variation::Group60Var4, cursor)?;
+        write_all_objects(Variation::Group60Var1, cursor)?;
+        Ok(())
+    }
 
     #[test]
     fn formats_integrity_poll() {
