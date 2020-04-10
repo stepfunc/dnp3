@@ -12,28 +12,28 @@ enum ParseState {
     ReadBody(Header, usize), // the header + calculated trailer length
 }
 
-pub struct FramePayload {
+pub(crate) struct FramePayload {
     length: usize,
     buffer: [u8; super::constant::MAX_FRAME_PAYLOAD_LENGTH],
 }
 
 impl FramePayload {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             length: 0,
             buffer: [0; super::constant::MAX_FRAME_PAYLOAD_LENGTH],
         }
     }
 
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.length = 0;
     }
 
-    pub fn get(&self) -> &[u8] {
+    pub(crate) fn get(&self) -> &[u8] {
         &self.buffer[0..self.length]
     }
 
-    pub fn push(&mut self, data: &[u8]) -> Result<(), LogicError> {
+    pub(crate) fn push(&mut self, data: &[u8]) -> Result<(), LogicError> {
         let mut buff = self.buffer.as_mut();
         let dest = buff.np_get_mut(self.length..self.length + data.len())?;
         dest.copy_from_slice(data);
@@ -48,40 +48,40 @@ impl Default for FramePayload {
     }
 }
 
-pub struct Parser {
+pub(crate) struct Parser {
     state: ParseState,
 }
 
-impl std::convert::From<ReadError> for ParseError {
+impl From<ReadError> for ParseError {
     fn from(_: ReadError) -> Self {
         ParseError::BadLogic(LogicError::BadRead)
     }
 }
 
-impl std::convert::From<FrameError> for ParseError {
+impl From<FrameError> for ParseError {
     fn from(err: FrameError) -> Self {
         ParseError::BadFrame(err)
     }
 }
 
-impl std::convert::From<LogicError> for ParseError {
+impl From<LogicError> for ParseError {
     fn from(err: LogicError) -> Self {
         ParseError::BadLogic(err)
     }
 }
 
 impl Parser {
-    pub fn new() -> Parser {
+    pub(crate) fn new() -> Parser {
         Parser {
             state: ParseState::FindSync1,
         }
     }
 
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.state = ParseState::FindSync1;
     }
 
-    pub fn parse(
+    pub(crate) fn parse(
         &mut self,
         cursor: &mut ReadCursor,
         payload: &mut FramePayload,

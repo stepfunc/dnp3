@@ -1,11 +1,11 @@
 use crate::util::sequence::SequenceParams;
 
-pub struct TransportParams {}
+pub(crate) struct TransportParams {}
 impl SequenceParams for TransportParams {
     const NUM_BITS: u8 = 6; // 2^6 == 64
 }
 
-pub type Sequence = crate::util::sequence::Sequence<TransportParams>;
+pub(crate) type Sequence = crate::util::sequence::Sequence<TransportParams>;
 
 #[cfg(test)]
 mod test {

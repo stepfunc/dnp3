@@ -21,17 +21,17 @@ pub mod constant {
 }
 
 #[cfg(test)]
-pub mod test_data {
+pub(crate) mod test_data {
     use crate::link::function::Function;
     use crate::link::header::{Address, ControlField, Header};
 
-    pub struct TestFrame {
-        pub bytes: &'static [u8],
-        pub header: Header,
-        pub payload: &'static [u8],
+    pub(crate) struct TestFrame {
+        pub(crate) bytes: &'static [u8],
+        pub(crate) header: Header,
+        pub(crate) payload: &'static [u8],
     }
 
-    pub const RESET_LINK: TestFrame = TestFrame {
+    pub(crate) const RESET_LINK: TestFrame = TestFrame {
         bytes: &[0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21],
         header: Header {
             control: ControlField {
@@ -48,7 +48,7 @@ pub mod test_data {
         payload: &[],
     };
 
-    pub const ACK: TestFrame = TestFrame {
+    pub(crate) const ACK: TestFrame = TestFrame {
         bytes: &[0x05, 0x64, 0x05, 0x00, 0x00, 0x04, 0x01, 0x00, 0x19, 0xA6],
         header: Header {
             control: ControlField {
@@ -65,7 +65,7 @@ pub mod test_data {
         payload: &[],
     };
 
-    pub const CONFIRM_USER_DATA: TestFrame = TestFrame {
+    pub(crate) const CONFIRM_USER_DATA: TestFrame = TestFrame {
         bytes: &[
             // header
             0x05, 0x64, 0x14, 0xF3, 0x01, 0x00, 0x00, 0x04, 0x0A, 0x3B, // body
@@ -90,7 +90,7 @@ pub mod test_data {
         ],
     };
 
-    pub const UNCONFIRMED_USER_DATA: TestFrame = TestFrame {
+    pub(crate) const UNCONFIRMED_USER_DATA: TestFrame = TestFrame {
         bytes: &[
             0x05, 0x64, 0x12, 0xC4, 0x01, 0x00, 0x00, 0x04, 0x0E, 0x0B, 0xC0, 0xC5, 0x02, 0x32,
             0x01, 0x07, 0x01, 0xF8, 0xB8, 0x6C, 0xAA, 0xF0, 0x00, 0x98, 0x98,

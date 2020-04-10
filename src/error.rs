@@ -32,28 +32,28 @@ pub enum Error {
     BadLogic(LogicError),
 }
 
-impl std::convert::From<ParseError> for Error {
+impl From<ParseError> for Error {
     fn from(err: ParseError) -> Self {
         match err {
             ParseError::BadFrame(inner) => Error::BadFrame(inner),
-            ParseError::BadLogic(inner) => Error::BadLogic(inner),
+            ParseError::BadLogic(inner) => BadLogic(inner),
         }
     }
 }
 
-impl std::convert::From<LogicError> for Error {
+impl From<LogicError> for Error {
     fn from(err: LogicError) -> Self {
         BadLogic(err)
     }
 }
 
-impl std::convert::From<WriteError> for Error {
+impl From<WriteError> for Error {
     fn from(_: WriteError) -> Self {
         BadLogic(LogicError::BadWrite)
     }
 }
 
-impl std::convert::From<std::io::Error> for Error {
+impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Error::IO(err.kind())
     }

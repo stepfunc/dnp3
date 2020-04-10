@@ -17,31 +17,31 @@ use crate::app::types::{ControlCode, Timestamp};
 use crate::util::cursor::*;
 
 /// Time Delay - Fine
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group52Var2 {
     pub time: u16,
 }
 
 /// Time Delay - Coarse
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group52Var1 {
     pub time: u16,
 }
 
 /// Time and Date CTO - Absolute time, unsynchronized
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group51Var2 {
     pub time: Timestamp,
 }
 
 /// Time and Date CTO - Absolute time, synchronized
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group51Var1 {
     pub time: Timestamp,
 }
 
 /// Time and Date - Indexed absolute time and long interval
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group50Var4 {
     pub time: Timestamp,
     pub interval: u32,
@@ -49,19 +49,19 @@ pub struct Group50Var4 {
 }
 
 /// Time and Date - Absolute Time at last recorded time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group50Var3 {
     pub time: Timestamp,
 }
 
 /// Time and Date - Absolute Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group50Var1 {
     pub time: Timestamp,
 }
 
 /// Analog Command Event - Double-precision With Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group43Var8 {
     pub status: CommandStatus,
     pub value: f64,
@@ -69,7 +69,7 @@ pub struct Group43Var8 {
 }
 
 /// Analog Command Event - Single-precision With Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group43Var7 {
     pub status: CommandStatus,
     pub value: f32,
@@ -77,21 +77,21 @@ pub struct Group43Var7 {
 }
 
 /// Analog Command Event - Double-precision
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group43Var6 {
     pub status: CommandStatus,
     pub value: f64,
 }
 
 /// Analog Command Event - Single-precision
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group43Var5 {
     pub status: CommandStatus,
     pub value: f32,
 }
 
 /// Analog Command Event - 16-bit With Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group43Var4 {
     pub status: CommandStatus,
     pub value: i16,
@@ -99,7 +99,7 @@ pub struct Group43Var4 {
 }
 
 /// Analog Command Event - 32-bit With Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group43Var3 {
     pub status: CommandStatus,
     pub value: i32,
@@ -107,21 +107,21 @@ pub struct Group43Var3 {
 }
 
 /// Analog Command Event - 16-bit
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group43Var2 {
     pub status: CommandStatus,
     pub value: i16,
 }
 
 /// Analog Command Event - 32-bit
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group43Var1 {
     pub status: CommandStatus,
     pub value: i32,
 }
 
 /// Analog Output Event - Double-precision With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group42Var8 {
     pub flags: u8,
     pub value: f64,
@@ -129,7 +129,7 @@ pub struct Group42Var8 {
 }
 
 /// Analog Output Event - Single-precision With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group42Var7 {
     pub flags: u8,
     pub value: f32,
@@ -137,21 +137,21 @@ pub struct Group42Var7 {
 }
 
 /// Analog Output Event - Double-precision With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group42Var6 {
     pub flags: u8,
     pub value: f64,
 }
 
 /// Analog Output Event - Single-precision With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group42Var5 {
     pub flags: u8,
     pub value: f32,
 }
 
 /// Analog Output Event - 16-bit With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group42Var4 {
     pub flags: u8,
     pub value: i16,
@@ -159,7 +159,7 @@ pub struct Group42Var4 {
 }
 
 /// Analog Output Event - 32-bit With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group42Var3 {
     pub flags: u8,
     pub value: i32,
@@ -167,77 +167,77 @@ pub struct Group42Var3 {
 }
 
 /// Analog Output Event - 16-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group42Var2 {
     pub flags: u8,
     pub value: i16,
 }
 
 /// Analog Output Event - 32-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group42Var1 {
     pub flags: u8,
     pub value: i32,
 }
 
 /// Analog Output - Double-precision
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group41Var4 {
     pub value: f64,
     pub status: CommandStatus,
 }
 
 /// Analog Output - Single-precision
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group41Var3 {
     pub value: f32,
     pub status: CommandStatus,
 }
 
 /// Analog Output - 16-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group41Var2 {
     pub value: i16,
     pub status: CommandStatus,
 }
 
 /// Analog Output - 32-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group41Var1 {
     pub value: i32,
     pub status: CommandStatus,
 }
 
 /// Analog Output Status - Double-precision With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group40Var4 {
     pub flags: u8,
     pub value: f64,
 }
 
 /// Analog Output Status - Single-precision With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group40Var3 {
     pub flags: u8,
     pub value: f32,
 }
 
 /// Analog Output Status - 16-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group40Var2 {
     pub flags: u8,
     pub value: i16,
 }
 
 /// Analog Output Status - 32-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group40Var1 {
     pub flags: u8,
     pub value: i32,
 }
 
 /// Analog Input Event - Double-precision With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group32Var8 {
     pub flags: u8,
     pub value: f64,
@@ -245,7 +245,7 @@ pub struct Group32Var8 {
 }
 
 /// Analog Input Event - Single-precision With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group32Var7 {
     pub flags: u8,
     pub value: f32,
@@ -253,21 +253,21 @@ pub struct Group32Var7 {
 }
 
 /// Analog Input Event - Double-precision With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group32Var6 {
     pub flags: u8,
     pub value: f64,
 }
 
 /// Analog Input Event - Single-precision With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group32Var5 {
     pub flags: u8,
     pub value: f32,
 }
 
 /// Analog Input Event - 16-bit With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group32Var4 {
     pub flags: u8,
     pub value: i16,
@@ -275,7 +275,7 @@ pub struct Group32Var4 {
 }
 
 /// Analog Input Event - 32-bit With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group32Var3 {
     pub flags: u8,
     pub value: i32,
@@ -283,61 +283,61 @@ pub struct Group32Var3 {
 }
 
 /// Analog Input Event - 16-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group32Var2 {
     pub flags: u8,
     pub value: i16,
 }
 
 /// Analog Input Event - 32-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group32Var1 {
     pub flags: u8,
     pub value: i32,
 }
 
 /// Analog Input - Double-precision With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group30Var6 {
     pub flags: u8,
     pub value: f64,
 }
 
 /// Analog Input - Single-precision With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group30Var5 {
     pub flags: u8,
     pub value: f32,
 }
 
 /// Analog Input - 16-bit Without Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group30Var4 {
     pub value: i16,
 }
 
 /// Analog Input - 32-bit Without Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group30Var3 {
     pub value: i32,
 }
 
 /// Analog Input - 16-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group30Var2 {
     pub flags: u8,
     pub value: i16,
 }
 
 /// Analog Input - 32-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group30Var1 {
     pub flags: u8,
     pub value: i32,
 }
 
 /// Frozen Counter Event - 16-bit With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group23Var6 {
     pub flags: u8,
     pub value: u16,
@@ -345,7 +345,7 @@ pub struct Group23Var6 {
 }
 
 /// Frozen Counter Event - 32-bit With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group23Var5 {
     pub flags: u8,
     pub value: u32,
@@ -353,21 +353,21 @@ pub struct Group23Var5 {
 }
 
 /// Frozen Counter Event - 16-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group23Var2 {
     pub flags: u8,
     pub value: u16,
 }
 
 /// Frozen Counter Event - 32-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group23Var1 {
     pub flags: u8,
     pub value: u32,
 }
 
 /// Counter Event - 16-bit With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group22Var6 {
     pub flags: u8,
     pub value: u16,
@@ -375,7 +375,7 @@ pub struct Group22Var6 {
 }
 
 /// Counter Event - 32-bit With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group22Var5 {
     pub flags: u8,
     pub value: u32,
@@ -383,33 +383,33 @@ pub struct Group22Var5 {
 }
 
 /// Counter Event - 16-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group22Var2 {
     pub flags: u8,
     pub value: u16,
 }
 
 /// Counter Event - 32-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group22Var1 {
     pub flags: u8,
     pub value: u32,
 }
 
 /// Frozen Counter - 16-bit Without Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group21Var10 {
     pub value: u16,
 }
 
 /// Frozen Counter - 32-bit Without Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group21Var9 {
     pub value: u32,
 }
 
 /// Frozen Counter - 16-bit With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group21Var6 {
     pub flags: u8,
     pub value: u16,
@@ -417,7 +417,7 @@ pub struct Group21Var6 {
 }
 
 /// Frozen Counter - 32-bit With Flag and Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group21Var5 {
     pub flags: u8,
     pub value: u32,
@@ -425,60 +425,60 @@ pub struct Group21Var5 {
 }
 
 /// Frozen Counter - 16-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group21Var2 {
     pub flags: u8,
     pub value: u16,
 }
 
 /// Frozen Counter - 32-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group21Var1 {
     pub flags: u8,
     pub value: u32,
 }
 
 /// Counter - 16-bit Without Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group20Var6 {
     pub value: u16,
 }
 
 /// Counter - 32-bit Without Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group20Var5 {
     pub value: u32,
 }
 
 /// Counter - 16-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group20Var2 {
     pub flags: u8,
     pub value: u16,
 }
 
 /// Counter - 32-bit With Flag
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group20Var1 {
     pub flags: u8,
     pub value: u32,
 }
 
 /// Binary Command Event - With Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group13Var2 {
     pub flags: u8,
     pub time: Timestamp,
 }
 
 /// Binary Command Event - Without Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group13Var1 {
     pub flags: u8,
 }
 
 /// Binary Command - Control Relay Output Block
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group12Var1 {
     pub code: ControlCode,
     pub count: u8,
@@ -488,72 +488,72 @@ pub struct Group12Var1 {
 }
 
 /// Binary Output Event - Output Status With Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group11Var2 {
     pub flags: u8,
     pub time: Timestamp,
 }
 
 /// Binary Output Event - Output Status Without Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group11Var1 {
     pub flags: u8,
 }
 
 /// Binary Output - Output Status With Flags
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group10Var2 {
     pub flags: u8,
 }
 
 /// Double-bit Binary Input Event - With Relative Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group4Var3 {
     pub flags: u8,
     pub time: u16,
 }
 
 /// Double-bit Binary Input Event - With Absolute Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group4Var2 {
     pub flags: u8,
     pub time: Timestamp,
 }
 
 /// Double-bit Binary Input Event - Without Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group4Var1 {
     pub flags: u8,
 }
 
 /// Double-bit Binary Input - With Flags
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group3Var2 {
     pub flags: u8,
 }
 
 /// Binary Input Event - With Relative Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group2Var3 {
     pub flags: u8,
     pub time: u16,
 }
 
 /// Binary Input Event - With Absolute Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group2Var2 {
     pub flags: u8,
     pub time: Timestamp,
 }
 
 /// Binary Input Event - Without Time
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group2Var1 {
     pub flags: u8,
 }
 
 /// Binary Input - With Flags
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group1Var2 {
     pub flags: u8,
 }

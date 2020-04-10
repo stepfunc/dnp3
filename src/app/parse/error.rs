@@ -4,7 +4,7 @@ use crate::app::parse::range::InvalidRange;
 use crate::util::cursor::ReadError;
 use std::fmt::Formatter;
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum HeaderParseError {
     UnknownFunction(u8),
     InsufficientBytes,
@@ -111,19 +111,19 @@ impl std::fmt::Display for ResponseValidationError {
     }
 }
 
-impl std::convert::From<ReadError> for ObjectParseError {
+impl From<ReadError> for ObjectParseError {
     fn from(_: ReadError) -> Self {
         ObjectParseError::InsufficientBytes
     }
 }
 
-impl std::convert::From<ReadError> for HeaderParseError {
+impl From<ReadError> for HeaderParseError {
     fn from(_: ReadError) -> Self {
         HeaderParseError::InsufficientBytes
     }
 }
 
-impl std::convert::From<InvalidRange> for ObjectParseError {
+impl From<InvalidRange> for ObjectParseError {
     fn from(r: InvalidRange) -> Self {
         ObjectParseError::InvalidRange(r.start, r.stop)
     }

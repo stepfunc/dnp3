@@ -32,7 +32,11 @@ impl Reader {
     Returns a future that keeps reading until a frame is received or an error is returned
     This future can be dropped without losing any state.
     */
-    pub async fn read<R>(&mut self, io: &mut R, payload: &mut FramePayload) -> Result<Header, Error>
+    pub(crate) async fn read<R>(
+        &mut self,
+        io: &mut R,
+        payload: &mut FramePayload,
+    ) -> Result<Header, Error>
     where
         R: AsyncRead + Unpin,
     {

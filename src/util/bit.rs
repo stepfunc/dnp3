@@ -1,6 +1,6 @@
 use std::fmt::Formatter;
 
-pub trait Bitfield {
+pub(crate) trait Bitfield {
     const BIT_0: u8 = 0b0000_0001;
     const BIT_1: u8 = 0b0000_0010;
     const BIT_2: u8 = 0b0000_0100;
@@ -54,7 +54,7 @@ impl Bitfield for u8 {
     }
 }
 
-pub fn format_bitfield(
+pub(crate) fn format_bitfield(
     f: &mut Formatter,
     value: u8,
     name: &'static str,

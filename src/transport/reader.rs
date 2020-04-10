@@ -5,6 +5,7 @@ use crate::transport::header::Header;
 use crate::util::cursor::WriteError;
 use tokio::prelude::{AsyncRead, AsyncWrite};
 
+#[derive(Copy, Clone)]
 enum State {
     Empty,
     // last address, header, and accumulated length

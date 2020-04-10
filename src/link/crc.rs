@@ -25,15 +25,15 @@ const CRC_TABLE: [u16; 256] = [
 
 const CRC_OF_0564: u16 = 0x3F0D;
 
-pub fn calc_crc(slice: &[u8]) -> u16 {
+pub(crate) fn calc_crc(slice: &[u8]) -> u16 {
     !crc_increment(0, slice)
 }
 
-pub fn calc_crc_with_0564(slice: &[u8]) -> u16 {
+pub(crate) fn calc_crc_with_0564(slice: &[u8]) -> u16 {
     !crc_increment(CRC_OF_0564, slice)
 }
 
-pub fn crc_increment(mut acc: u16, slice: &[u8]) -> u16 {
+pub(crate) fn crc_increment(mut acc: u16, slice: &[u8]) -> u16 {
     for byte in slice {
         let index = ((acc as u8) ^ *byte) as usize;
         acc = CRC_TABLE[index] ^ (acc >> 8)

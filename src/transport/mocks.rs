@@ -4,7 +4,9 @@ use crate::link::header::Address;
 use crate::transport::reader::Fragment;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
+#[derive(Copy, Clone)]
 pub struct MockWriter;
+#[derive(Copy, Clone)]
 pub struct MockReader {
     buffer: [u8; 2048],
 }
@@ -36,15 +38,15 @@ impl MockWriter {
 }
 
 impl MockReader {
-    pub fn new(_master: bool, _address: u16) -> Self {
+    pub(crate) fn new(_master: bool, _address: u16) -> Self {
         Self::mock()
     }
 
-    pub fn mock() -> Self {
+    pub(crate) fn mock() -> Self {
         Self { buffer: [0; 2048] }
     }
 
-    pub async fn read<T>(&mut self, io: &mut T) -> Result<Fragment<'_>, Error>
+    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<Fragment<'_>, Error>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {

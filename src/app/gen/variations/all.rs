@@ -12,7 +12,7 @@
 
 use crate::app::gen::variations::variation::Variation;
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum AllObjectsVariation {
     Group1Var0,
     Group1Var2,

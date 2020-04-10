@@ -13,15 +13,15 @@ pub enum Function {
 }
 
 mod constants {
-    pub const PRI_RESET_LINK_STATES: u8 = 0x40;
-    pub const PRI_TEST_LINK_STATES: u8 = 0x42;
-    pub const PRI_CONFIRMED_USER_DATA: u8 = 0x43;
-    pub const PRI_UNCONFIRMED_USER_DATA: u8 = 0x44;
-    pub const PRI_REQUEST_LINK_STATUS: u8 = 0x49;
-    pub const SEC_ACK: u8 = 0x00;
-    pub const SEC_NACK: u8 = 0x01;
-    pub const SEC_LINK_STATUS: u8 = 0x0B;
-    pub const SEC_NOT_SUPPORTED: u8 = 0x0F;
+    pub(crate) const PRI_RESET_LINK_STATES: u8 = 0x40;
+    pub(crate) const PRI_TEST_LINK_STATES: u8 = 0x42;
+    pub(crate) const PRI_CONFIRMED_USER_DATA: u8 = 0x43;
+    pub(crate) const PRI_UNCONFIRMED_USER_DATA: u8 = 0x44;
+    pub(crate) const PRI_REQUEST_LINK_STATUS: u8 = 0x49;
+    pub(crate) const SEC_ACK: u8 = 0x00;
+    pub(crate) const SEC_NACK: u8 = 0x01;
+    pub(crate) const SEC_LINK_STATUS: u8 = 0x0B;
+    pub(crate) const SEC_NOT_SUPPORTED: u8 = 0x0F;
 }
 
 impl Function {

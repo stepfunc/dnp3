@@ -25,7 +25,7 @@ impl Group4Var3 {
     }
 }
 
-impl std::convert::From<bool> for Binary {
+impl From<bool> for Binary {
     fn from(x: bool) -> Self {
         Self {
             value: x,
@@ -35,7 +35,7 @@ impl std::convert::From<bool> for Binary {
     }
 }
 
-impl std::convert::From<bool> for BinaryOutputStatus {
+impl From<bool> for BinaryOutputStatus {
     fn from(x: bool) -> Self {
         Self {
             value: x,
@@ -45,7 +45,7 @@ impl std::convert::From<bool> for BinaryOutputStatus {
     }
 }
 
-impl std::convert::From<DoubleBit> for DoubleBitBinary {
+impl From<DoubleBit> for DoubleBitBinary {
     fn from(x: DoubleBit) -> Self {
         Self {
             value: x,

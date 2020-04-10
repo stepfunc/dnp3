@@ -26,14 +26,14 @@ pub struct DoubleBitSequence<'a> {
 }
 
 impl<'a> BitSequence<'a> {
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             bytes: &[],
             range: Range::empty(),
         }
     }
 
-    pub fn parse(range: Range, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
+    pub(crate) fn parse(range: Range, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
         let bytes = cursor.read_bytes(num_bytes_for_bits(range.get_count()))?;
 
         Ok(Self { bytes, range })
@@ -50,14 +50,14 @@ impl<'a> BitSequence<'a> {
 }
 
 impl<'a> DoubleBitSequence<'a> {
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             bytes: &[],
             range: Range::empty(),
         }
     }
 
-    pub fn parse(range: Range, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
+    pub(crate) fn parse(range: Range, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
         let bytes = cursor.read_bytes(num_bytes_for_double_bits(range.get_count()))?;
         Ok(Self { bytes, range })
     }
@@ -86,7 +86,7 @@ pub struct DoubleBitIterator<'a> {
     pos: usize,
 }
 
-impl<'a> Iterator for BitIterator<'a> {
+impl Iterator for BitIterator<'_> {
     type Item = (bool, u16);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -119,7 +119,7 @@ impl<'a> Iterator for BitIterator<'a> {
     }
 }
 
-impl<'a> Iterator for DoubleBitIterator<'a> {
+impl Iterator for DoubleBitIterator<'_> {
     type Item = (DoubleBit, u16);
 
     fn next(&mut self) -> Option<Self::Item> {

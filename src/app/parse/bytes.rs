@@ -8,7 +8,7 @@ pub struct Bytes<'a> {
     pub value: &'a [u8],
 }
 
-impl<'a> std::fmt::Display for Bytes<'a> {
+impl std::fmt::Display for Bytes<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.value.len() <= 3 {
             return write!(f, "{:02X?}", self.value);
@@ -65,7 +65,7 @@ impl<'a> Bytes<'a> {
 }
 
 impl<'a> RangedBytesSequence<'a> {
-    pub fn parse(
+    pub(crate) fn parse(
         variation: u8,
         index: u16,
         count: usize,
@@ -97,7 +97,7 @@ impl<'a, T> PrefixedBytesSequence<'a, T>
 where
     T: FixedSize,
 {
-    pub fn parse(
+    pub(crate) fn parse(
         variation: u8,
         count: u16,
         cursor: &mut ReadCursor<'a>,

@@ -33,7 +33,7 @@ impl Layer {
         self.reader.reset();
     }
 
-    pub async fn read<T>(
+    pub(crate) async fn read<T>(
         &mut self,
         io: &mut T,
         payload: &mut FramePayload,

@@ -1,5 +1,6 @@
 use crate::util::sequence::SequenceParams;
 
+#[derive(Copy, Clone)]
 pub struct AppParams;
 impl SequenceParams for AppParams {
     const NUM_BITS: u8 = 4;

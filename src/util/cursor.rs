@@ -4,33 +4,29 @@ pub struct ReadCursor<'a> {
     src: &'a [u8],
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct ReadError;
 
 impl<'a> ReadCursor<'a> {
-    pub fn empty() -> Self {
-        Self { src: &[] }
-    }
-
-    pub fn new(src: &'a [u8]) -> ReadCursor {
+    pub(crate) fn new(src: &'a [u8]) -> ReadCursor {
         ReadCursor { src }
     }
 
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.src.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.src.is_empty()
     }
 
-    pub fn read_all(&mut self) -> &'a [u8] {
+    pub(crate) fn read_all(&mut self) -> &'a [u8] {
         let ret = self.src;
         self.src = &[];
         ret
     }
 
-    pub fn read_u8(&mut self) -> Result<u8, ReadError> {
+    pub(crate) fn read_u8(&mut self) -> Result<u8, ReadError> {
         match self.src {
             [a, rest @ ..] => {
                 self.src = rest;
@@ -40,7 +36,7 @@ impl<'a> ReadCursor<'a> {
         }
     }
 
-    pub fn read_u16_le(&mut self) -> Result<u16, ReadError> {
+    pub(crate) fn read_u16_le(&mut self) -> Result<u16, ReadError> {
         match self.src {
             [b1, b2, rest @ ..] => {
                 self.src = rest;
@@ -50,11 +46,11 @@ impl<'a> ReadCursor<'a> {
         }
     }
 
-    pub fn read_i16_le(&mut self) -> Result<i16, ReadError> {
+    pub(crate) fn read_i16_le(&mut self) -> Result<i16, ReadError> {
         self.read_u16_le().map(|x| x as i16)
     }
 
-    pub fn read_u32_le(&mut self) -> Result<u32, ReadError> {
+    pub(crate) fn read_u32_le(&mut self) -> Result<u32, ReadError> {
         match self.src {
             [b1, b2, b3, b4, rest @ ..] => {
                 self.src = rest;
@@ -64,11 +60,11 @@ impl<'a> ReadCursor<'a> {
         }
     }
 
-    pub fn read_i32_le(&mut self) -> Result<i32, ReadError> {
+    pub(crate) fn read_i32_le(&mut self) -> Result<i32, ReadError> {
         self.read_u32_le().map(|x| x as i32)
     }
 
-    pub fn read_u48_le(&mut self) -> Result<u64, ReadError> {
+    pub(crate) fn read_u48_le(&mut self) -> Result<u64, ReadError> {
         match self.src {
             [b1, b2, b3, b4, b5, b6, rest @ ..] => {
                 self.src = rest;
@@ -83,19 +79,19 @@ impl<'a> ReadCursor<'a> {
         }
     }
 
-    pub fn read_f32_le(&mut self) -> Result<f32, ReadError> {
+    pub(crate) fn read_f32_le(&mut self) -> Result<f32, ReadError> {
         let mut bytes: [u8; 4] = [0; 4];
         bytes.copy_from_slice(self.read_bytes(4)?);
         Ok(f32::from_le_bytes(bytes))
     }
 
-    pub fn read_f64_le(&mut self) -> Result<f64, ReadError> {
+    pub(crate) fn read_f64_le(&mut self) -> Result<f64, ReadError> {
         let mut bytes: [u8; 8] = [0; 8];
         bytes.copy_from_slice(self.read_bytes(8)?);
         Ok(f64::from_le_bytes(bytes))
     }
 
-    pub fn read_bytes(&mut self, count: usize) -> Result<&'a [u8], ReadError> {
+    pub(crate) fn read_bytes(&mut self, count: usize) -> Result<&'a [u8], ReadError> {
         match (self.src.get(0..count), self.src.get(count..)) {
             (Some(first), Some(rest)) => {
                 self.src = rest;
@@ -111,7 +107,7 @@ pub struct WriteCursor<'a> {
     pos: usize,
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct WriteError;
 
 impl<'a> WriteCursor<'a> {

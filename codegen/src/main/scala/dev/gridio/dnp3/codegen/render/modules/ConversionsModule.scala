@@ -64,7 +64,7 @@ object ConversionsModule extends Module {
           }
       }
 
-      bracket(s"impl std::convert::From<${fs.name}> for ${name}") {
+      bracket(s"impl From<${fs.name}> for ${name}") {
         bracket(s"fn from(v: ${fs.name}) -> Self") {
           conversion
         }
@@ -96,7 +96,7 @@ object ConversionsModule extends Module {
           }
       }
 
-      bracket(s"impl std::convert::From<${fs.name}> for DoubleBitBinary") {
+      bracket(s"impl From<${fs.name}> for DoubleBitBinary") {
         bracket(s"fn from(v: ${fs.name}) -> Self") {
           conversion
         }
@@ -138,7 +138,7 @@ object ConversionsModule extends Module {
         }
       }
 
-      bracket(s"impl std::convert::From<${fs.name}> for ${name}") {
+      bracket(s"impl From<${fs.name}> for ${name}") {
         bracket(s"fn from(v: ${fs.name}) -> Self") {
           conversion
         }
@@ -182,7 +182,7 @@ object ConversionsModule extends Module {
         }
       }
 
-      bracket(s"impl std::convert::From<${fs.name}> for ${name}") {
+      bracket(s"impl From<${fs.name}> for ${name}") {
         bracket(s"fn from(v: ${fs.name}) -> Self") {
           conversion
         }

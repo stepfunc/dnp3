@@ -19,19 +19,19 @@ struct ResponseCount {
 }
 
 impl ResponseCount {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self { count: 0 }
     }
 
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.count = 0
     }
 
-    pub fn is_none(&self) -> bool {
+    pub(crate) fn is_none(&self) -> bool {
         self.count == 0
     }
 
-    pub fn increment(&mut self) {
+    pub(crate) fn increment(&mut self) {
         self.count += 1
     }
 }
@@ -67,31 +67,31 @@ pub enum TaskError {
     WriteError,
 }
 
-impl std::convert::From<WriteError> for TaskError {
+impl From<WriteError> for TaskError {
     fn from(_: WriteError) -> Self {
         TaskError::WriteError
     }
 }
 
-impl std::convert::From<Error> for TaskError {
+impl From<Error> for TaskError {
     fn from(err: Error) -> Self {
         TaskError::Lower(err)
     }
 }
 
-impl std::convert::From<tokio::time::Elapsed> for TaskError {
+impl From<tokio::time::Elapsed> for TaskError {
     fn from(_: tokio::time::Elapsed) -> Self {
         TaskError::ResponseTimeout
     }
 }
 
-impl std::convert::From<ObjectParseError> for TaskError {
+impl From<ObjectParseError> for TaskError {
     fn from(err: ObjectParseError) -> Self {
         TaskError::MalformedResponse(err)
     }
 }
 
-impl std::convert::From<ResponseError> for TaskError {
+impl From<ResponseError> for TaskError {
     fn from(err: ResponseError) -> Self {
         TaskError::BadResponse(err)
     }

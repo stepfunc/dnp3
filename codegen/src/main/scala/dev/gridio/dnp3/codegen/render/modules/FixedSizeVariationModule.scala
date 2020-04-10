@@ -60,7 +60,7 @@ object FixedSizeVariationModule extends Module {
 
   private def structDefinition(gv : FixedSize)(implicit indent: Indentation): Iterator[String] = {
     commented(gv.fullDesc).eol ++
-    "#[derive(Debug, PartialEq)]".eol ++
+    "#[derive(Copy, Clone, Debug, PartialEq)]".eol ++
     bracket(s"pub struct ${gv.name}") {
       gv.fields.map(f => s"pub ${f.name}: ${getFieldType(f.typ)},").iterator
     }

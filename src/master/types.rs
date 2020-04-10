@@ -1,3 +1,4 @@
+#[derive(Copy, Clone)]
 pub struct ClassScan {
     pub class1: bool,
     pub class2: bool,

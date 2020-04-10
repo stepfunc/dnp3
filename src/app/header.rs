@@ -85,11 +85,11 @@ impl Control {
         x
     }
 
-    pub fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+    pub(crate) fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(Self::from(cursor.read_u8()?))
     }
 
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         Ok(cursor.write_u8(self.to_u8())?)
     }
 }
@@ -231,14 +231,14 @@ impl IIN {
         Self { iin1, iin2 }
     }
 
-    pub fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+    pub(crate) fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(Self {
             iin1: IIN1::new(cursor.read_u8()?),
             iin2: IIN2::new(cursor.read_u8()?),
         })
     }
 
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.iin1.value)?;
         cursor.write_u8(self.iin2.value)?;
         Ok(())

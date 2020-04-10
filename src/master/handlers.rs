@@ -18,6 +18,7 @@ pub trait MeasurementHandler {
     fn handle_octet_string<'a>(&mut self, x: impl Iterator<Item = (Bytes<'a>, u16)>);
 }
 
+#[derive(Copy, Clone)]
 pub struct NullResponseHandler;
 
 impl NullResponseHandler {

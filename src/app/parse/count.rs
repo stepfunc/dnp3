@@ -59,7 +59,7 @@ pub struct CountIterator<'a, T> {
     phantom: std::marker::PhantomData<T>,
 }
 
-impl<'a, T> Iterator for CountIterator<'a, T>
+impl<T> Iterator for CountIterator<'_, T>
 where
     T: FixedSize,
 {

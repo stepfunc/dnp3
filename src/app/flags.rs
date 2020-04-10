@@ -83,15 +83,15 @@ pub(crate) mod format {
     }
 
     impl FlagFormatter {
-        pub fn new() -> Self {
+        fn new() -> Self {
             Self { prev: false }
         }
 
-        pub fn push(
+        fn push(
             &mut self,
             is_set: bool,
             text: &'static str,
-            f: &mut std::fmt::Formatter,
+            f: &mut Formatter,
         ) -> std::fmt::Result {
             if is_set {
                 if self.prev {
@@ -134,11 +134,11 @@ pub(crate) mod format {
             Ok(())
         }
 
-        pub fn push_debug_item<T>(
+        fn push_debug_item<T>(
             &mut self,
             name: &'static str,
             item: T,
-            f: &mut std::fmt::Formatter,
+            f: &mut Formatter,
         ) -> std::fmt::Result
         where
             T: std::fmt::Debug,
@@ -156,7 +156,7 @@ pub(crate) mod format {
     }
 
     impl BinaryFlagFormatter {
-        pub fn new(value: u8) -> Self {
+        pub(crate) fn new(value: u8) -> Self {
             Self {
                 flags: Flags::new(value),
             }
@@ -179,7 +179,7 @@ pub(crate) mod format {
     }
 
     impl DoubleBitBinaryFlagFormatter {
-        pub fn new(value: u8) -> Self {
+        pub(crate) fn new(value: u8) -> Self {
             Self {
                 flags: Flags::new(value),
             }
@@ -201,7 +201,7 @@ pub(crate) mod format {
     }
 
     impl BinaryOutputStatusFlagFormatter {
-        pub fn new(value: u8) -> Self {
+        pub(crate) fn new(value: u8) -> Self {
             Self {
                 flags: Flags::new(value),
             }
@@ -225,7 +225,7 @@ pub(crate) mod format {
     }
 
     impl CounterFlagFormatter {
-        pub fn new(value: u8) -> Self {
+        pub(crate) fn new(value: u8) -> Self {
             Self {
                 flags: Flags::new(value),
             }
@@ -249,7 +249,7 @@ pub(crate) mod format {
     }
 
     impl AnalogFlagFormatter {
-        pub fn new(value: u8) -> Self {
+        pub(crate) fn new(value: u8) -> Self {
             Self {
                 flags: Flags::new(value),
             }

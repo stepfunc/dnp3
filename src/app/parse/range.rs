@@ -1,7 +1,7 @@
 use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::{ReadCursor, ReadError};
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct InvalidRange {
     pub start: u16,
     pub stop: u16,
@@ -95,7 +95,7 @@ pub struct RangeIterator<'a, T> {
     phantom: std::marker::PhantomData<T>,
 }
 
-impl<'a, T> Iterator for RangeIterator<'a, T>
+impl<T> Iterator for RangeIterator<'_, T>
 where
     T: FixedSize,
 {

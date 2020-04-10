@@ -6,7 +6,7 @@ use crate::link::header::{Address, ControlField};
 use crate::util::cursor::{WriteCursor, WriteError};
 use crate::util::slice_ext::SliceExtNoPanic;
 
-impl std::convert::From<WriteError> for LogicError {
+impl From<WriteError> for LogicError {
     fn from(_: WriteError) -> Self {
         LogicError::BadWrite
     }
@@ -27,25 +27,25 @@ impl<'a> Payload<'a> {
     }
 }
 
-pub struct LinkFormatter {
+pub(crate) struct LinkFormatter {
     master: bool,
     address: u16,
 }
 
 impl LinkFormatter {
-    pub fn new(master: bool, address: u16) -> Self {
+    pub(crate) fn new(master: bool, address: u16) -> Self {
         Self { master, address }
     }
 
-    pub fn is_master(&self) -> bool {
+    pub(crate) fn is_master(&self) -> bool {
         self.master
     }
 
-    pub fn get_address(&self) -> u16 {
+    pub(crate) fn get_address(&self) -> u16 {
         self.address
     }
 
-    pub fn format_header_only(
+    pub(crate) fn format_header_only(
         &self,
         destination: u16,
         control: ControlField,
@@ -59,7 +59,7 @@ impl LinkFormatter {
         )
     }
 
-    pub fn format_unconfirmed_user_data(
+    pub(crate) fn format_unconfirmed_user_data(
         &self,
         dest: u16,
         payload: Payload,

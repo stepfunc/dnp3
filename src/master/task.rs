@@ -13,7 +13,7 @@ pub enum ResponseError {
     Todo,
 }
 
-pub enum ResponseResult {
+pub(crate) enum ResponseResult {
     /// the response completed the task
     Success,
     ///// run a new task - e.g. select then operate
@@ -25,13 +25,13 @@ pub enum TaskDetails {
 }
 
 impl TaskDetails {
-    pub fn is_read_request(&self) -> bool {
+    pub(crate) fn is_read_request(&self) -> bool {
         match self {
             TaskDetails::ClassScan(_, _) => true,
         }
     }
 
-    pub fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub(crate) fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         match self {
             TaskDetails::ClassScan(params, _) => {
                 RequestHeader::new(Control::request(seq), FunctionCode::Read).write(cursor)?;
@@ -52,7 +52,7 @@ impl TaskDetails {
         }
     }
 
-    pub fn handle(
+    pub(crate) fn handle(
         &mut self,
         response: ResponseHeader,
         headers: HeaderCollection,

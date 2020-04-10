@@ -47,7 +47,7 @@ impl ParseLogLevel {
     }
 }
 
-pub(crate) fn format_count_of_items<T, V>(f: &mut std::fmt::Formatter, iter: T) -> std::fmt::Result
+pub(crate) fn format_count_of_items<T, V>(f: &mut Formatter, iter: T) -> std::fmt::Result
 where
     T: Iterator<Item = V>,
     V: std::fmt::Display,
@@ -58,10 +58,7 @@ where
     Ok(())
 }
 
-pub(crate) fn format_indexed_items<T, V, I>(
-    f: &mut std::fmt::Formatter,
-    iter: T,
-) -> std::fmt::Result
+pub(crate) fn format_indexed_items<T, V, I>(f: &mut Formatter, iter: T) -> std::fmt::Result
 where
     T: Iterator<Item = (V, I)>,
     V: std::fmt::Display,
@@ -73,10 +70,7 @@ where
     Ok(())
 }
 
-pub(crate) fn format_prefixed_items<T, V, I>(
-    f: &mut std::fmt::Formatter,
-    iter: T,
-) -> std::fmt::Result
+pub(crate) fn format_prefixed_items<T, V, I>(f: &mut Formatter, iter: T) -> std::fmt::Result
 where
     T: Iterator<Item = Prefix<I, V>>,
     V: FixedSize + std::fmt::Display,
@@ -190,7 +184,7 @@ impl<'a> ParsedFragment<'a> {
     fn parse_no_logging(fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
         let mut cursor = ReadCursor::new(fragment);
 
-        let control = Control::from(cursor.read_u8()?);
+        let control = Control::parse(&mut cursor)?;
         let raw_func = cursor.read_u8()?;
         let function = match FunctionCode::from(raw_func) {
             None => return Err(HeaderParseError::UnknownFunction(raw_func)),
@@ -241,7 +235,7 @@ impl<'a> ObjectHeader<'a> {
         Self { variation, details }
     }
 
-    pub fn format(&self, format_values: bool, f: &mut Formatter) -> std::fmt::Result {
+    pub(crate) fn format(&self, format_values: bool, f: &mut Formatter) -> std::fmt::Result {
         match &self.details {
             HeaderDetails::AllObjects(_) => write!(
                 f,
@@ -347,8 +341,8 @@ pub(crate) struct ParsedFragmentDisplay<'a> {
     fragment: &'a ParsedFragment<'a>,
 }
 
-impl<'a> std::fmt::Display for ParsedFragmentDisplay<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl std::fmt::Display for ParsedFragmentDisplay<'_> {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         // always display the header
         f.write_str(if self.is_transmit {
             "APP TX - "
@@ -397,7 +391,7 @@ pub enum HeaderDetails<'a> {
     TwoByteCountAndPrefix(u16, PrefixedVariation<'a, u16>),
 }
 
-impl<'a> HeaderDetails<'a> {
+impl HeaderDetails<'_> {
     pub fn qualifier(&self) -> QualifierCode {
         match self {
             HeaderDetails::AllObjects(_) => QualifierCode::AllObjects,
@@ -471,7 +465,7 @@ impl<'a> Iterator for HeaderIterator<'a> {
 }
 
 impl<'a> ObjectParser<'a> {
-    pub fn parse(
+    pub(crate) fn parse(
         function: FunctionCode,
         data: &'a [u8],
     ) -> Result<HeaderCollection<'a>, ObjectParseError> {
@@ -620,7 +614,7 @@ impl<'a> Iterator for ObjectParser<'a> {
 }
 
 impl Variation {
-    pub fn parse(cursor: &mut ReadCursor) -> Result<Variation, ObjectParseError> {
+    pub(crate) fn parse(cursor: &mut ReadCursor) -> Result<Variation, ObjectParseError> {
         let group = cursor.read_u8()?;
         let var = cursor.read_u8()?;
         match Self::lookup(group, var) {
@@ -631,7 +625,7 @@ impl Variation {
 }
 
 impl<'a> RangedVariation<'a> {
-    pub fn parse(
+    pub(crate) fn parse(
         function: FunctionCode,
         qualifier: QualifierCode,
         v: Variation,
@@ -646,7 +640,7 @@ impl<'a> RangedVariation<'a> {
 }
 
 impl QualifierCode {
-    pub fn parse(cursor: &mut ReadCursor) -> Result<QualifierCode, ObjectParseError> {
+    pub(crate) fn parse(cursor: &mut ReadCursor) -> Result<QualifierCode, ObjectParseError> {
         let x = cursor.read_u8()?;
         match Self::from(x) {
             Some(qc) => Ok(qc),

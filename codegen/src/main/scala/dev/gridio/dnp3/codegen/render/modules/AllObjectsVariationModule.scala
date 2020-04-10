@@ -16,7 +16,7 @@ object AllObjectsVariationModule extends Module {
 
   private def variationEnumDefinition(implicit indent: Indentation) : Iterator[String] = {
 
-    "#[derive(Debug, PartialEq)]".eol ++
+    "#[derive(Copy, Clone, Debug, PartialEq)]".eol ++
       bracket("pub enum AllObjectsVariation") {
         variations.iterator.map(v => s"${v.name},")
       }
