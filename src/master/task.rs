@@ -4,7 +4,7 @@ use crate::app::sequence::Sequence;
 use crate::master::handlers::ResponseHandler;
 use crate::master::tasks::class_scan::ClassScanTask;
 use crate::master::tasks::command::CommandTask;
-use crate::master::types::{ClassScan, CommandRequest};
+use crate::master::types::{ClassScan, CommandHeader};
 use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone, Debug)]
@@ -68,10 +68,10 @@ impl MasterTask {
         }
     }
 
-    pub fn command(destination: u16, request: CommandRequest) -> Self {
+    pub fn command(destination: u16, headers: Vec<CommandHeader>) -> Self {
         Self {
             destination,
-            details: TaskDetails::Command(CommandTask { request }),
+            details: TaskDetails::Command(CommandTask::new(headers)),
         }
     }
 }

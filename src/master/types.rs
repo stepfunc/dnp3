@@ -1,4 +1,5 @@
 use crate::app::gen::variations::fixed::*;
+use crate::app::parse::traits::Index;
 
 #[derive(Copy, Clone)]
 pub struct ClassScan {
@@ -31,25 +32,18 @@ impl ClassScan {
     }
 }
 
+pub enum PrefixedCommandHeader<T>
+where
+    T: Index,
+{
+    G12V1(Vec<(Group12Var1, T)>),
+    G41V1(Vec<(Group41Var1, T)>),
+    G41V2(Vec<(Group41Var2, T)>),
+    G41V3(Vec<(Group41Var3, T)>),
+    G41V4(Vec<(Group41Var3, T)>),
+}
+
 pub enum CommandHeader {
-    G12V1PrefixedU8(Vec<(Group12Var1, u8)>),
-    G12V1Prefixed16(Vec<(Group12Var1, u16)>),
-    G41V1PrefixedU8(Vec<(Group41Var1, u8)>),
-    G41V1Prefixed16(Vec<(Group41Var1, u16)>),
-    G41V2PrefixedU8(Vec<(Group41Var2, u8)>),
-    G41V2PrefixedU16(Vec<(Group41Var2, u16)>),
-    G41V3PrefixedU8(Vec<(Group41Var3, u8)>),
-    G41V3PrefixedU16(Vec<(Group41Var3, u16)>),
-    G41V4PrefixedU8(Vec<(Group41Var3, u8)>),
-    G41V4PrefixedU16(Vec<(Group41Var3, u16)>),
-}
-
-pub struct CommandRequest {
-    pub(crate) headers: Vec<CommandHeader>,
-}
-
-impl CommandRequest {
-    pub fn new(headers: Vec<CommandHeader>) -> Self {
-        Self { headers }
-    }
+    U8(PrefixedCommandHeader<u8>),
+    U16(PrefixedCommandHeader<u16>),
 }

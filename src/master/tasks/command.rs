@@ -3,21 +3,25 @@ use crate::app::header::{Control, RequestHeader, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::task::{ResponseError, ResponseResult};
-use crate::master::types::{CommandHeader, CommandRequest};
+use crate::master::types::CommandHeader;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 pub(crate) struct CommandTask {
-    pub(crate) request: CommandRequest,
+    headers: Vec<CommandHeader>,
 }
 
 impl CommandTask {
+    pub(crate) fn new(headers: Vec<CommandHeader>) -> Self {
+        Self { headers }
+    }
+
     pub(crate) fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         RequestHeader::new(Control::request(seq), FunctionCode::DirectOperate).write(cursor)?;
 
-        for header in self.request.headers.iter() {
+        for header in self.headers.iter() {
             match header {
-                CommandHeader::G12V1PrefixedU8(_items) => {}
-                _ => {}
+                CommandHeader::U8(_header) => {}
+                CommandHeader::U16(_header) => {}
             }
         }
 

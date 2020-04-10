@@ -4,35 +4,49 @@ use crate::app::header::{Control, RequestHeader};
 use crate::app::sequence::Sequence;
 use crate::util::cursor::{WriteCursor, WriteError};
 
+pub(crate) struct HeaderWriter<'a, 'b> {
+    cursor: &'b mut WriteCursor<'a>,
+}
+
+pub(crate) fn start_request<'a, 'b>(
+    control: Control,
+    function: FunctionCode,
+    cursor: &'b mut WriteCursor<'a>,
+) -> Result<HeaderWriter<'a, 'b>, WriteError> {
+    let header = RequestHeader::new(control, function);
+    header.write(cursor)?;
+    Ok(HeaderWriter { cursor })
+}
+
 pub(crate) fn confirm_solicited(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-    RequestHeader::new(Control::request(seq), FunctionCode::Confirm).write(cursor)
+    start_request(Control::request(seq), FunctionCode::Confirm, cursor).map(|_| {})
+}
+
+impl<'a, 'b> HeaderWriter<'a, 'b> {
+    pub(crate) fn write_all_objects_header(
+        &mut self,
+        variation: Variation,
+    ) -> Result<(), WriteError> {
+        variation.write(self.cursor)?;
+        QualifierCode::AllObjects.write(self.cursor)?;
+        Ok(())
+    }
 }
 
 pub(crate) fn confirm_unsolicited(
     seq: Sequence,
     cursor: &mut WriteCursor,
 ) -> Result<(), WriteError> {
-    RequestHeader::new(Control::unsolicited(seq), FunctionCode::Confirm).write(cursor)
+    start_request(Control::unsolicited(seq), FunctionCode::Confirm, cursor).map(|_| {})
 }
 
-pub(crate) fn write_all_objects(
-    variation: Variation,
-    cursor: &mut WriteCursor,
-) -> Result<(), WriteError> {
-    write_gv(variation, cursor)?;
-    write_qualifier(QualifierCode::AllObjects, cursor)?;
-    Ok(())
-}
-
-fn write_gv(variation: Variation, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-    let (g, v) = variation.to_group_and_var();
-    cursor.write_u8(g)?;
-    cursor.write_u8(v)?;
-    Ok(())
-}
-
-fn write_qualifier(qualifier: QualifierCode, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-    cursor.write_u8(qualifier.as_u8())
+impl Variation {
+    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        let (g, v) = self.to_group_and_var();
+        cursor.write_u8(g)?;
+        cursor.write_u8(v)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -42,11 +56,11 @@ mod test {
     use crate::util::cursor::WriteCursor;
 
     fn read_integrity(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        RequestHeader::new(Control::request(seq), FunctionCode::Read).write(cursor)?;
-        write_all_objects(Variation::Group60Var2, cursor)?;
-        write_all_objects(Variation::Group60Var3, cursor)?;
-        write_all_objects(Variation::Group60Var4, cursor)?;
-        write_all_objects(Variation::Group60Var1, cursor)?;
+        let mut writer = start_request(Control::request(seq), FunctionCode::Read, cursor)?;
+        writer.write_all_objects_header(Variation::Group60Var2)?;
+        writer.write_all_objects_header(Variation::Group60Var3)?;
+        writer.write_all_objects_header(Variation::Group60Var4)?;
+        writer.write_all_objects_header(Variation::Group60Var1)?;
         Ok(())
     }
 

@@ -1,7 +1,7 @@
-use crate::app::format::write;
+use crate::app::format::write::start_request;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::gen::variations::variation::Variation;
-use crate::app::header::{Control, RequestHeader, ResponseHeader};
+use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::handlers::ResponseHandler;
@@ -16,18 +16,18 @@ pub(crate) struct ClassScanTask {
 
 impl ClassScanTask {
     pub(crate) fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        RequestHeader::new(Control::request(seq), FunctionCode::Read).write(cursor)?;
+        let mut writer = start_request(Control::request(seq), FunctionCode::Read, cursor)?;
         if self.scan.class1 {
-            write::write_all_objects(Variation::Group60Var2, cursor)?;
+            writer.write_all_objects_header(Variation::Group60Var2)?;
         }
         if self.scan.class2 {
-            write::write_all_objects(Variation::Group60Var3, cursor)?;
+            writer.write_all_objects_header(Variation::Group60Var3)?;
         }
         if self.scan.class3 {
-            write::write_all_objects(Variation::Group60Var4, cursor)?;
+            writer.write_all_objects_header(Variation::Group60Var4)?;
         }
         if self.scan.class0 {
-            write::write_all_objects(Variation::Group60Var1, cursor)?;
+            writer.write_all_objects_header(Variation::Group60Var1)?;
         }
         Ok(())
     }
