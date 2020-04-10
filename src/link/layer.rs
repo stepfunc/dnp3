@@ -11,7 +11,7 @@ enum SecondaryState {
     Reset(bool), // the next expect fcb
 }
 
-pub struct Layer {
+pub(crate) struct Layer {
     secondary_state: SecondaryState,
     formatter: LinkFormatter,
     reader: super::reader::Reader,
@@ -19,7 +19,7 @@ pub struct Layer {
 }
 
 impl Layer {
-    pub fn new(is_master: bool, address: u16) -> Self {
+    pub(crate) fn new(is_master: bool, address: u16) -> Self {
         Self {
             secondary_state: SecondaryState::NotReset,
             formatter: LinkFormatter::new(is_master, address),
@@ -28,7 +28,7 @@ impl Layer {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.secondary_state = SecondaryState::NotReset;
         self.reader.reset();
     }

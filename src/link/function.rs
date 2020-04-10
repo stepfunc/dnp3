@@ -1,5 +1,5 @@
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub enum Function {
+pub(crate) enum Function {
     PriResetLinkStates,
     PriTestLinkStates,
     PriConfirmedUserData,
@@ -25,7 +25,7 @@ mod constants {
 }
 
 impl Function {
-    pub fn from(byte: u8) -> Function {
+    pub(crate) fn from(byte: u8) -> Function {
         match byte {
             constants::PRI_RESET_LINK_STATES => Function::PriResetLinkStates,
             constants::PRI_TEST_LINK_STATES => Function::PriTestLinkStates,
@@ -40,7 +40,7 @@ impl Function {
         }
     }
 
-    pub fn to_u8(self) -> u8 {
+    pub(crate) fn to_u8(self) -> u8 {
         match self {
             Function::PriResetLinkStates => constants::PRI_RESET_LINK_STATES,
             Function::PriTestLinkStates => constants::PRI_TEST_LINK_STATES,

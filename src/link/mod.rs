@@ -1,23 +1,22 @@
 mod crc;
-pub mod formatter;
+pub(crate) mod formatter;
 mod function;
-pub mod header;
-pub mod layer;
-pub mod parser;
-pub mod reader;
+pub(crate) mod header;
+pub(crate) mod layer;
+pub(crate) mod parser;
+pub(crate) mod reader;
 
-pub mod constant {
-    pub const START1: u8 = 0x05;
-    pub const START2: u8 = 0x64;
+pub(crate) mod constant {
+    pub(crate) const START1: u8 = 0x05;
+    pub(crate) const START2: u8 = 0x64;
 
-    pub const MAX_FRAME_PAYLOAD_LENGTH: usize = 250;
-    pub const MAX_LINK_FRAME_LENGTH: usize = 292;
-    pub const MAX_APP_BYTES_PER_FRAME: usize = MAX_FRAME_PAYLOAD_LENGTH - 1;
-    pub const LINK_HEADER_SIZE: usize = 10;
-    pub const MIN_HEADER_LENGTH_VALUE: u8 = 5;
-    pub const MAX_BLOCK_SIZE: usize = 16;
-    pub const CRC_LENGTH: usize = 2;
-    pub const MAX_BLOCK_SIZE_WITH_CRC: usize = MAX_BLOCK_SIZE + CRC_LENGTH;
+    pub(crate) const MAX_FRAME_PAYLOAD_LENGTH: usize = 250;
+    pub(crate) const MAX_LINK_FRAME_LENGTH: usize = 292;
+    pub(crate) const MAX_APP_BYTES_PER_FRAME: usize = MAX_FRAME_PAYLOAD_LENGTH - 1;
+    pub(crate) const MIN_HEADER_LENGTH_VALUE: u8 = 5;
+    pub(crate) const MAX_BLOCK_SIZE: usize = 16;
+    pub(crate) const CRC_LENGTH: usize = 2;
+    pub(crate) const MAX_BLOCK_SIZE_WITH_CRC: usize = MAX_BLOCK_SIZE + CRC_LENGTH;
 }
 
 #[cfg(test)]

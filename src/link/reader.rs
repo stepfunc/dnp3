@@ -5,7 +5,7 @@ use crate::util::cursor::ReadCursor;
 use std::io::ErrorKind;
 use tokio::io::{AsyncRead, AsyncReadExt};
 
-pub struct Reader {
+pub(crate) struct Reader {
     parser: Parser,
     begin: usize,
     end: usize,
@@ -13,7 +13,7 @@ pub struct Reader {
 }
 
 impl Reader {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             parser: Parser::new(),
             begin: 0,
@@ -22,7 +22,7 @@ impl Reader {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.begin = 0;
         self.end = 0;
         self.parser.reset();

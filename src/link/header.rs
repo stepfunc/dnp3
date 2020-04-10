@@ -1,24 +1,24 @@
 use super::function::Function;
 
-pub mod constants {
-    pub const MASK_DIR: u8 = 0x80;
-    pub const MASK_PRM: u8 = 0x40;
-    pub const MASK_FCB: u8 = 0x20;
-    pub const MASK_FCV: u8 = 0x10;
-    pub const MASK_FUNC: u8 = 0x0F;
-    pub const MASK_FUNC_OR_PRM: u8 = MASK_PRM | MASK_FUNC;
+pub(crate) mod constants {
+    pub(crate) const MASK_DIR: u8 = 0x80;
+    pub(crate) const MASK_PRM: u8 = 0x40;
+    pub(crate) const MASK_FCB: u8 = 0x20;
+    pub(crate) const MASK_FCV: u8 = 0x10;
+    pub(crate) const MASK_FUNC: u8 = 0x0F;
+    pub(crate) const MASK_FUNC_OR_PRM: u8 = MASK_PRM | MASK_FUNC;
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct ControlField {
-    pub func: Function,
-    pub master: bool,
-    pub fcb: bool,
-    pub fcv: bool,
+pub(crate) struct ControlField {
+    pub(crate) func: Function,
+    pub(crate) master: bool,
+    pub(crate) fcb: bool,
+    pub(crate) fcv: bool,
 }
 
 impl ControlField {
-    pub fn new(master: bool, function: Function) -> Self {
+    pub(crate) fn new(master: bool, function: Function) -> Self {
         Self {
             func: function,
             master,
@@ -27,7 +27,7 @@ impl ControlField {
         }
     }
 
-    pub fn from(byte: u8) -> ControlField {
+    pub(crate) fn from(byte: u8) -> ControlField {
         ControlField {
             func: Function::from(byte & constants::MASK_FUNC_OR_PRM),
             master: (byte & constants::MASK_DIR) != 0,
@@ -36,7 +36,7 @@ impl ControlField {
         }
     }
 
-    pub fn to_u8(self) -> u8 {
+    pub(crate) fn to_u8(self) -> u8 {
         let mut ret = 0;
         ret |= if self.master { constants::MASK_DIR } else { 0 };
         // the PRM bit is part of the function code
@@ -63,13 +63,13 @@ impl Address {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Header {
-    pub control: ControlField,
-    pub address: Address,
+pub(crate) struct Header {
+    pub(crate) control: ControlField,
+    pub(crate) address: Address,
 }
 
 impl Header {
-    pub fn new(control: ControlField, address: Address) -> Header {
+    pub(crate) fn new(control: ControlField, address: Address) -> Header {
         Header { control, address }
     }
 }

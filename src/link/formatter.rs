@@ -13,13 +13,13 @@ impl From<WriteError> for LogicError {
 }
 
 #[derive(Copy, Clone)]
-pub struct Payload<'a> {
+pub(crate) struct Payload<'a> {
     transport: u8,
     app_data: &'a [u8],
 }
 
 impl<'a> Payload<'a> {
-    pub fn new(transport: u8, app_data: &'a [u8]) -> Self {
+    pub(crate) fn new(transport: u8, app_data: &'a [u8]) -> Self {
         Self {
             transport,
             app_data,
