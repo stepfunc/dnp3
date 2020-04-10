@@ -111,30 +111,30 @@ pub struct WriteCursor<'a> {
 pub struct WriteError;
 
 impl<'a> WriteCursor<'a> {
-    pub fn new(dest: &'a mut [u8]) -> WriteCursor<'a> {
+    pub(crate) fn new(dest: &'a mut [u8]) -> WriteCursor<'a> {
         WriteCursor { dest, pos: 0 }
     }
 
-    pub fn position(&self) -> usize {
+    pub(crate) fn position(&self) -> usize {
         self.pos
     }
 
-    pub fn written(&self) -> &[u8] {
+    pub(crate) fn written(&self) -> &[u8] {
         &self.dest[0..self.pos]
     }
 
-    pub fn written_since(&'a self, pos: usize) -> Result<&'a [u8], WriteError> {
+    pub(crate) fn written_since(&'a self, pos: usize) -> Result<&'a [u8], WriteError> {
         match self.dest.get(pos..self.pos) {
             Some(x) => Ok(x),
             None => Err(WriteError),
         }
     }
 
-    pub fn remaining(&self) -> usize {
+    pub(crate) fn remaining(&self) -> usize {
         self.dest.len() - self.pos
     }
 
-    pub fn write(&mut self, bytes: &[u8]) -> Result<(), WriteError> {
+    pub(crate) fn write(&mut self, bytes: &[u8]) -> Result<(), WriteError> {
         if self.remaining() < bytes.len() {
             return Err(WriteError);
         }
@@ -148,7 +148,21 @@ impl<'a> WriteCursor<'a> {
         Ok(())
     }
 
-    pub fn write_u8(&mut self, value: u8) -> Result<(), WriteError> {
+    pub(crate) fn skip(&mut self, count: usize) -> Result<(), WriteError> {
+        let new_pos = match self.pos.checked_add(count) {
+            Some(x) => x,
+            None => return Err(WriteError),
+        };
+
+        if new_pos > self.dest.len() {
+            return Err(WriteError);
+        }
+
+        self.pos = new_pos;
+        Ok(())
+    }
+
+    pub(crate) fn write_u8(&mut self, value: u8) -> Result<(), WriteError> {
         match self.dest.get_mut(self.pos) {
             Some(x) => {
                 *x = value;
@@ -159,7 +173,26 @@ impl<'a> WriteCursor<'a> {
         }
     }
 
-    pub fn write_u16_le(&mut self, value: u16) -> Result<(), WriteError> {
+    pub(crate) fn write_u8_at(&mut self, value: u8, pos: usize) -> Result<(), WriteError> {
+        match self.dest.get_mut(pos) {
+            Some(x) => {
+                *x = value;
+                Ok(())
+            }
+            None => Err(WriteError),
+        }
+    }
+
+    pub(crate) fn write_u16_le_at(&mut self, value: u16, mut pos: usize) -> Result<(), WriteError> {
+        for s in [0, 8].iter() {
+            let b = ((value >> *s) & 0xFF) as u8;
+            self.write_u8_at(b, pos)?;
+            pos += 1;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn write_u16_le(&mut self, value: u16) -> Result<(), WriteError> {
         if self.remaining() < 2 {
             // don't write any bytes if there's isn't space for the whole thing
             return Err(WriteError);
@@ -171,11 +204,11 @@ impl<'a> WriteCursor<'a> {
         Ok(())
     }
 
-    pub fn write_i16_le(&mut self, value: i16) -> Result<(), WriteError> {
+    pub(crate) fn write_i16_le(&mut self, value: i16) -> Result<(), WriteError> {
         self.write_u16_le(value as u16)
     }
 
-    pub fn write_u32_le(&mut self, value: u32) -> Result<(), WriteError> {
+    pub(crate) fn write_u32_le(&mut self, value: u32) -> Result<(), WriteError> {
         if self.remaining() < 4 {
             // don't write any bytes if there's isn't space for the whole thing
             return Err(WriteError);
@@ -187,11 +220,11 @@ impl<'a> WriteCursor<'a> {
         Ok(())
     }
 
-    pub fn write_i32_le(&mut self, value: i32) -> Result<(), WriteError> {
+    pub(crate) fn write_i32_le(&mut self, value: i32) -> Result<(), WriteError> {
         self.write_u32_le(value as u32)
     }
 
-    pub fn write_u48_le(&mut self, value: u64) -> Result<(), WriteError> {
+    pub(crate) fn write_u48_le(&mut self, value: u64) -> Result<(), WriteError> {
         if self.remaining() < 6 {
             // don't write any bytes if there's isn't space for the whole thing
             return Err(WriteError);
@@ -203,11 +236,32 @@ impl<'a> WriteCursor<'a> {
         Ok(())
     }
 
-    pub fn write_f32_le(&mut self, value: f32) -> Result<(), WriteError> {
+    pub(crate) fn write_f32_le(&mut self, value: f32) -> Result<(), WriteError> {
         self.write(&f32::to_le_bytes(value))
     }
 
-    pub fn write_f64_le(&mut self, value: f64) -> Result<(), WriteError> {
+    pub(crate) fn write_f64_le(&mut self, value: f64) -> Result<(), WriteError> {
         self.write(&f64::to_le_bytes(value))
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+
+    #[test]
+    fn can_write_at_arbitrary_positions() {
+        let mut buffer = [0u8; 3];
+        let mut cursor = WriteCursor::new(&mut buffer);
+
+        let pos1 = cursor.position();
+        cursor.skip(1).unwrap();
+        cursor.write_u8(42).unwrap();
+        let pos2 = cursor.position();
+        cursor.skip(1).unwrap();
+        assert_eq!(cursor.remaining(), 0);
+        cursor.write_u8_at(0x01, pos1).unwrap();
+        cursor.write_u8_at(0x03, pos2).unwrap();
+        assert_eq!(buffer, [1, 42, 3]);
     }
 }

@@ -1,6 +1,7 @@
 use crate::app::gen::enums::{FunctionCode, QualifierCode};
 use crate::app::gen::variations::variation::Variation;
 use crate::app::header::{Control, RequestHeader};
+use crate::app::parse::traits::{FixedSize, HasVariation, Index};
 use crate::app::sequence::Sequence;
 use crate::util::cursor::{WriteCursor, WriteError};
 
@@ -18,10 +19,6 @@ pub(crate) fn start_request<'a, 'b>(
     Ok(HeaderWriter { cursor })
 }
 
-pub(crate) fn confirm_solicited(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-    start_request(Control::request(seq), FunctionCode::Confirm, cursor).map(|_| {})
-}
-
 impl<'a, 'b> HeaderWriter<'a, 'b> {
     pub(crate) fn write_all_objects_header(
         &mut self,
@@ -31,6 +28,35 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         QualifierCode::AllObjects.write(self.cursor)?;
         Ok(())
     }
+
+    pub(crate) fn write_prefixed_header<'c, T, I>(
+        &mut self,
+        iter: impl Iterator<Item = &'c (T, I)>,
+    ) -> Result<(), WriteError>
+    where
+        T: FixedSize + HasVariation,
+        I: FixedSize + Index,
+        I: 'c,
+        T: 'c,
+    {
+        T::VARIATION.write(self.cursor)?;
+        I::count_and_prefix_qualifier().write(self.cursor)?;
+        let pos_of_count = self.cursor.position();
+        self.cursor.skip(I::SIZE as usize)?;
+
+        let mut count = I::zero();
+        for (v, i) in iter {
+            i.write(self.cursor)?;
+            v.write(self.cursor)?;
+            count.increment();
+        }
+
+        count.write_at(pos_of_count, self.cursor)
+    }
+}
+
+pub(crate) fn confirm_solicited(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    start_request(Control::request(seq), FunctionCode::Confirm, cursor).map(|_| {})
 }
 
 pub(crate) fn confirm_unsolicited(

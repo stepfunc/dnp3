@@ -1,5 +1,6 @@
+use crate::app::format::write::start_request;
 use crate::app::gen::enums::FunctionCode;
-use crate::app::header::{Control, RequestHeader, ResponseHeader};
+use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::task::{ResponseError, ResponseResult};
@@ -16,13 +17,10 @@ impl CommandTask {
     }
 
     pub(crate) fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        RequestHeader::new(Control::request(seq), FunctionCode::DirectOperate).write(cursor)?;
+        let mut writer = start_request(Control::request(seq), FunctionCode::DirectOperate, cursor)?;
 
         for header in self.headers.iter() {
-            match header {
-                CommandHeader::U8(_header) => {}
-                CommandHeader::U16(_header) => {}
-            }
+            header.write(&mut writer)?;
         }
 
         Ok(())

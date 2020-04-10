@@ -1,4 +1,5 @@
 use crate::app::gen::enums::QualifierCode;
+use crate::app::gen::variations::variation::Variation;
 use crate::util::cursor::*;
 
 pub trait FixedSize
@@ -11,9 +12,16 @@ where
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError>;
 }
 
+pub trait HasVariation {
+    const VARIATION: Variation;
+}
+
 pub trait Index {
+    fn zero() -> Self;
+    fn increment(&mut self);
     fn widen_to_u16(self) -> u16;
     fn count_and_prefix_qualifier() -> QualifierCode;
+    fn write_at(self, pos: usize, cursor: &mut WriteCursor) -> Result<(), WriteError>;
 }
 
 impl FixedSize for u8 {
@@ -38,19 +46,38 @@ impl FixedSize for u16 {
 }
 
 impl Index for u8 {
+    fn zero() -> Self {
+        0
+    }
+
+    fn increment(&mut self) {
+        *self += 1;
+    }
     fn widen_to_u16(self) -> u16 {
         self as u16
     }
     fn count_and_prefix_qualifier() -> QualifierCode {
         QualifierCode::CountAndPrefix8
     }
+    fn write_at(self, pos: usize, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8_at(self, pos)
+    }
 }
 
 impl Index for u16 {
+    fn zero() -> Self {
+        0
+    }
+    fn increment(&mut self) {
+        *self += 1;
+    }
     fn widen_to_u16(self) -> u16 {
         self
     }
     fn count_and_prefix_qualifier() -> QualifierCode {
         QualifierCode::CountAndPrefix16
+    }
+    fn write_at(self, pos: usize, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u16_le_at(self, pos)
     }
 }
