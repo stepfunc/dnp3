@@ -322,17 +322,14 @@ impl TaskRunner {
 mod test {
     use super::*;
     use crate::master::handlers::NullResponseHandler;
-    use crate::master::task::TaskDetails;
     use crate::master::types::ClassScan;
     use crate::transport::mocks::{MockReader, MockWriter};
     use tokio_test::io::Builder;
 
     #[test]
     fn performs_multi_fragmented_class_scan() {
-        let mut task = MasterTask::new(
-            1024,
-            TaskDetails::ClassScan(ClassScan::class1(), NullResponseHandler::create()),
-        );
+        let mut task =
+            MasterTask::class_scan(1024, ClassScan::class1(), NullResponseHandler::create());
 
         let mut runner = TaskRunner::new(Duration::from_secs(1), NullResponseHandler::create());
 

@@ -1,10 +1,8 @@
-use crate::app::format::write;
-use crate::app::gen::enums::FunctionCode;
-use crate::app::gen::variations::variation::Variation;
-use crate::app::header::{Control, RequestHeader, ResponseHeader};
+use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::handlers::ResponseHandler;
+use crate::master::tasks::class_scan::ClassScanTask;
 use crate::master::types::ClassScan;
 use crate::util::cursor::{WriteCursor, WriteError};
 
@@ -20,35 +18,20 @@ pub(crate) enum ResponseResult {
     //Transition(MasterTask),
 }
 
-pub enum TaskDetails {
-    ClassScan(ClassScan, Box<dyn ResponseHandler>),
+pub(crate) enum TaskDetails {
+    ClassScan(ClassScanTask),
 }
 
 impl TaskDetails {
     pub(crate) fn is_read_request(&self) -> bool {
         match self {
-            TaskDetails::ClassScan(_, _) => true,
+            TaskDetails::ClassScan(_) => true,
         }
     }
 
     pub(crate) fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         match self {
-            TaskDetails::ClassScan(params, _) => {
-                RequestHeader::new(Control::request(seq), FunctionCode::Read).write(cursor)?;
-                if params.class1 {
-                    write::write_all_objects(Variation::Group60Var2, cursor)?;
-                }
-                if params.class2 {
-                    write::write_all_objects(Variation::Group60Var3, cursor)?;
-                }
-                if params.class3 {
-                    write::write_all_objects(Variation::Group60Var4, cursor)?;
-                }
-                if params.class0 {
-                    write::write_all_objects(Variation::Group60Var1, cursor)?;
-                }
-                Ok(())
-            }
+            TaskDetails::ClassScan(task) => task.format(seq, cursor),
         }
     }
 
@@ -58,35 +41,25 @@ impl TaskDetails {
         headers: HeaderCollection,
     ) -> Result<ResponseResult, ResponseError> {
         match self {
-            TaskDetails::ClassScan(_, handler) => {
-                handler.handle(1024, response, headers);
-                Ok(ResponseResult::Success)
-            }
+            TaskDetails::ClassScan(task) => task.handle(response, headers),
         }
     }
 }
 
 pub struct MasterTask {
-    pub destination: u16,
-    pub details: TaskDetails,
+    pub(crate) destination: u16,
+    pub(crate) details: TaskDetails,
 }
 
 impl MasterTask {
-    pub fn new(destination: u16, details: TaskDetails) -> Self {
-        Self {
-            destination,
-            details,
-        }
-    }
-
     pub fn class_scan(
         destination: u16,
-        class_scan: ClassScan,
+        scan: ClassScan,
         handler: Box<dyn ResponseHandler>,
     ) -> Self {
         Self {
             destination,
-            details: TaskDetails::ClassScan(class_scan, handler),
+            details: TaskDetails::ClassScan(ClassScanTask { scan, handler }),
         }
     }
 }
