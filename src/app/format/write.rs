@@ -1,7 +1,7 @@
 use crate::app::gen::enums::{FunctionCode, QualifierCode};
 use crate::app::gen::variations::variation::Variation;
 use crate::app::header::{Control, RequestHeader};
-use crate::app::parse::traits::{FixedSize, HasVariation, Index};
+use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::sequence::Sequence;
 use crate::util::cursor::{WriteCursor, WriteError};
 
@@ -29,17 +29,15 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         Ok(())
     }
 
-    pub(crate) fn write_prefixed_header<'c, T, I>(
+    pub(crate) fn write_prefixed_header<'c, V, I>(
         &mut self,
-        iter: impl Iterator<Item = &'c (T, I)>,
+        iter: impl Iterator<Item = &'c (V, I)>,
     ) -> Result<(), WriteError>
     where
-        T: FixedSize + HasVariation,
-        I: FixedSize + Index,
-        I: 'c,
-        T: 'c,
+        V: FixedSizeVariation + 'c,
+        I: Index + 'c,
     {
-        T::VARIATION.write(self.cursor)?;
+        V::VARIATION.write(self.cursor)?;
         I::count_and_prefix_qualifier().write(self.cursor)?;
         let pos_of_count = self.cursor.position();
         self.cursor.skip(I::SIZE as usize)?;

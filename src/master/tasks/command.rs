@@ -4,7 +4,7 @@ use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::task::{ResponseError, ResponseResult};
-use crate::master::types::CommandHeader;
+use crate::master::types::{CommandError, CommandHeader};
 use crate::util::cursor::{WriteCursor, WriteError};
 
 pub(crate) struct CommandTask {
@@ -26,11 +26,32 @@ impl CommandTask {
         Ok(())
     }
 
+    fn compare(&self, headers: HeaderCollection) -> Result<(), CommandError> {
+        let mut iter = headers.iter();
+
+        for sent in &self.headers {
+            match iter.next() {
+                None => return Err(CommandError::HeaderCountMismatch),
+                Some(received) => sent.compare(received.details)?,
+            }
+        }
+
+        if iter.next().is_some() {
+            return Err(CommandError::HeaderCountMismatch);
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn handle(
         &mut self,
         _response: ResponseHeader,
-        _headers: HeaderCollection,
+        headers: HeaderCollection,
     ) -> Result<ResponseResult, ResponseError> {
+        let comparison = self.compare(headers);
+
+        log::warn!("result: {:?}", comparison);
+
         Ok(ResponseResult::Success)
     }
 }

@@ -1,20 +1,30 @@
-use crate::app::parse::traits::FixedSize;
+use crate::app::parse::traits::{FixedSize, FixedSizeVariation, Index};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 
 #[derive(Debug, PartialEq)]
 pub struct Prefix<I, V>
 where
-    I: FixedSize + std::fmt::Display,
-    V: FixedSize,
+    I: Index,
+    V: FixedSizeVariation,
 {
     pub index: I,
     pub value: V,
 }
 
+impl<I, V> Prefix<I, V>
+where
+    I: Index,
+    V: FixedSizeVariation,
+{
+    pub fn equals(&self, other: &(V, I)) -> bool {
+        self.index == other.1 && self.value == other.0
+    }
+}
+
 impl<I, V> FixedSize for Prefix<I, V>
 where
-    I: FixedSize + std::fmt::Display,
-    V: FixedSize,
+    I: Index,
+    V: FixedSizeVariation,
 {
     const SIZE: u8 = I::SIZE + V::SIZE;
 

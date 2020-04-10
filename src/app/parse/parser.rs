@@ -8,7 +8,7 @@ use crate::app::header::{Control, RequestHeader, ResponseHeader, IIN};
 use crate::app::parse::error::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
-use crate::app::parse::traits::FixedSize;
+use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
 
@@ -73,8 +73,8 @@ where
 pub(crate) fn format_prefixed_items<T, V, I>(f: &mut Formatter, iter: T) -> std::fmt::Result
 where
     T: Iterator<Item = Prefix<I, V>>,
-    V: FixedSize + std::fmt::Display,
-    I: FixedSize + std::fmt::Display,
+    V: FixedSizeVariation,
+    I: Index,
 {
     for x in iter {
         write!(f, "\nindex: {} {}", x.index, x.value)?;

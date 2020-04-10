@@ -1,6 +1,7 @@
 use crate::app::gen::enums::QualifierCode;
 use crate::app::gen::variations::variation::Variation;
 use crate::util::cursor::*;
+use std::fmt::Display;
 
 pub trait FixedSize
 where
@@ -12,16 +13,16 @@ where
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError>;
 }
 
-pub trait HasVariation {
-    const VARIATION: Variation;
-}
-
-pub trait Index {
+pub trait Index: FixedSize + PartialEq + Display {
     fn zero() -> Self;
     fn increment(&mut self);
     fn widen_to_u16(self) -> u16;
     fn count_and_prefix_qualifier() -> QualifierCode;
     fn write_at(self, pos: usize, cursor: &mut WriteCursor) -> Result<(), WriteError>;
+}
+
+pub trait FixedSizeVariation: FixedSize + PartialEq + Display {
+    const VARIATION: Variation;
 }
 
 impl FixedSize for u8 {

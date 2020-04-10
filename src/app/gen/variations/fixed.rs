@@ -13,7 +13,7 @@
 use crate::app::flags::format::*;
 use crate::app::gen::enums::CommandStatus;
 use crate::app::gen::variations::variation::Variation;
-use crate::app::parse::traits::{FixedSize, HasVariation};
+use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
 use crate::app::types::{ControlCode, Timestamp};
 use crate::util::cursor::*;
 
@@ -2768,310 +2768,310 @@ impl std::fmt::Display for Group1Var2 {
     }
 }
 
-impl HasVariation for Group52Var2 {
+impl FixedSizeVariation for Group52Var2 {
     const VARIATION: Variation = Variation::Group52Var2;
 }
 
-impl HasVariation for Group52Var1 {
+impl FixedSizeVariation for Group52Var1 {
     const VARIATION: Variation = Variation::Group52Var1;
 }
 
-impl HasVariation for Group51Var2 {
+impl FixedSizeVariation for Group51Var2 {
     const VARIATION: Variation = Variation::Group51Var2;
 }
 
-impl HasVariation for Group51Var1 {
+impl FixedSizeVariation for Group51Var1 {
     const VARIATION: Variation = Variation::Group51Var1;
 }
 
-impl HasVariation for Group50Var4 {
+impl FixedSizeVariation for Group50Var4 {
     const VARIATION: Variation = Variation::Group50Var4;
 }
 
-impl HasVariation for Group50Var3 {
+impl FixedSizeVariation for Group50Var3 {
     const VARIATION: Variation = Variation::Group50Var3;
 }
 
-impl HasVariation for Group50Var1 {
+impl FixedSizeVariation for Group50Var1 {
     const VARIATION: Variation = Variation::Group50Var1;
 }
 
-impl HasVariation for Group43Var8 {
+impl FixedSizeVariation for Group43Var8 {
     const VARIATION: Variation = Variation::Group43Var8;
 }
 
-impl HasVariation for Group43Var7 {
+impl FixedSizeVariation for Group43Var7 {
     const VARIATION: Variation = Variation::Group43Var7;
 }
 
-impl HasVariation for Group43Var6 {
+impl FixedSizeVariation for Group43Var6 {
     const VARIATION: Variation = Variation::Group43Var6;
 }
 
-impl HasVariation for Group43Var5 {
+impl FixedSizeVariation for Group43Var5 {
     const VARIATION: Variation = Variation::Group43Var5;
 }
 
-impl HasVariation for Group43Var4 {
+impl FixedSizeVariation for Group43Var4 {
     const VARIATION: Variation = Variation::Group43Var4;
 }
 
-impl HasVariation for Group43Var3 {
+impl FixedSizeVariation for Group43Var3 {
     const VARIATION: Variation = Variation::Group43Var3;
 }
 
-impl HasVariation for Group43Var2 {
+impl FixedSizeVariation for Group43Var2 {
     const VARIATION: Variation = Variation::Group43Var2;
 }
 
-impl HasVariation for Group43Var1 {
+impl FixedSizeVariation for Group43Var1 {
     const VARIATION: Variation = Variation::Group43Var1;
 }
 
-impl HasVariation for Group42Var8 {
+impl FixedSizeVariation for Group42Var8 {
     const VARIATION: Variation = Variation::Group42Var8;
 }
 
-impl HasVariation for Group42Var7 {
+impl FixedSizeVariation for Group42Var7 {
     const VARIATION: Variation = Variation::Group42Var7;
 }
 
-impl HasVariation for Group42Var6 {
+impl FixedSizeVariation for Group42Var6 {
     const VARIATION: Variation = Variation::Group42Var6;
 }
 
-impl HasVariation for Group42Var5 {
+impl FixedSizeVariation for Group42Var5 {
     const VARIATION: Variation = Variation::Group42Var5;
 }
 
-impl HasVariation for Group42Var4 {
+impl FixedSizeVariation for Group42Var4 {
     const VARIATION: Variation = Variation::Group42Var4;
 }
 
-impl HasVariation for Group42Var3 {
+impl FixedSizeVariation for Group42Var3 {
     const VARIATION: Variation = Variation::Group42Var3;
 }
 
-impl HasVariation for Group42Var2 {
+impl FixedSizeVariation for Group42Var2 {
     const VARIATION: Variation = Variation::Group42Var2;
 }
 
-impl HasVariation for Group42Var1 {
+impl FixedSizeVariation for Group42Var1 {
     const VARIATION: Variation = Variation::Group42Var1;
 }
 
-impl HasVariation for Group41Var4 {
+impl FixedSizeVariation for Group41Var4 {
     const VARIATION: Variation = Variation::Group41Var4;
 }
 
-impl HasVariation for Group41Var3 {
+impl FixedSizeVariation for Group41Var3 {
     const VARIATION: Variation = Variation::Group41Var3;
 }
 
-impl HasVariation for Group41Var2 {
+impl FixedSizeVariation for Group41Var2 {
     const VARIATION: Variation = Variation::Group41Var2;
 }
 
-impl HasVariation for Group41Var1 {
+impl FixedSizeVariation for Group41Var1 {
     const VARIATION: Variation = Variation::Group41Var1;
 }
 
-impl HasVariation for Group40Var4 {
+impl FixedSizeVariation for Group40Var4 {
     const VARIATION: Variation = Variation::Group40Var4;
 }
 
-impl HasVariation for Group40Var3 {
+impl FixedSizeVariation for Group40Var3 {
     const VARIATION: Variation = Variation::Group40Var3;
 }
 
-impl HasVariation for Group40Var2 {
+impl FixedSizeVariation for Group40Var2 {
     const VARIATION: Variation = Variation::Group40Var2;
 }
 
-impl HasVariation for Group40Var1 {
+impl FixedSizeVariation for Group40Var1 {
     const VARIATION: Variation = Variation::Group40Var1;
 }
 
-impl HasVariation for Group32Var8 {
+impl FixedSizeVariation for Group32Var8 {
     const VARIATION: Variation = Variation::Group32Var8;
 }
 
-impl HasVariation for Group32Var7 {
+impl FixedSizeVariation for Group32Var7 {
     const VARIATION: Variation = Variation::Group32Var7;
 }
 
-impl HasVariation for Group32Var6 {
+impl FixedSizeVariation for Group32Var6 {
     const VARIATION: Variation = Variation::Group32Var6;
 }
 
-impl HasVariation for Group32Var5 {
+impl FixedSizeVariation for Group32Var5 {
     const VARIATION: Variation = Variation::Group32Var5;
 }
 
-impl HasVariation for Group32Var4 {
+impl FixedSizeVariation for Group32Var4 {
     const VARIATION: Variation = Variation::Group32Var4;
 }
 
-impl HasVariation for Group32Var3 {
+impl FixedSizeVariation for Group32Var3 {
     const VARIATION: Variation = Variation::Group32Var3;
 }
 
-impl HasVariation for Group32Var2 {
+impl FixedSizeVariation for Group32Var2 {
     const VARIATION: Variation = Variation::Group32Var2;
 }
 
-impl HasVariation for Group32Var1 {
+impl FixedSizeVariation for Group32Var1 {
     const VARIATION: Variation = Variation::Group32Var1;
 }
 
-impl HasVariation for Group30Var6 {
+impl FixedSizeVariation for Group30Var6 {
     const VARIATION: Variation = Variation::Group30Var6;
 }
 
-impl HasVariation for Group30Var5 {
+impl FixedSizeVariation for Group30Var5 {
     const VARIATION: Variation = Variation::Group30Var5;
 }
 
-impl HasVariation for Group30Var4 {
+impl FixedSizeVariation for Group30Var4 {
     const VARIATION: Variation = Variation::Group30Var4;
 }
 
-impl HasVariation for Group30Var3 {
+impl FixedSizeVariation for Group30Var3 {
     const VARIATION: Variation = Variation::Group30Var3;
 }
 
-impl HasVariation for Group30Var2 {
+impl FixedSizeVariation for Group30Var2 {
     const VARIATION: Variation = Variation::Group30Var2;
 }
 
-impl HasVariation for Group30Var1 {
+impl FixedSizeVariation for Group30Var1 {
     const VARIATION: Variation = Variation::Group30Var1;
 }
 
-impl HasVariation for Group23Var6 {
+impl FixedSizeVariation for Group23Var6 {
     const VARIATION: Variation = Variation::Group23Var6;
 }
 
-impl HasVariation for Group23Var5 {
+impl FixedSizeVariation for Group23Var5 {
     const VARIATION: Variation = Variation::Group23Var5;
 }
 
-impl HasVariation for Group23Var2 {
+impl FixedSizeVariation for Group23Var2 {
     const VARIATION: Variation = Variation::Group23Var2;
 }
 
-impl HasVariation for Group23Var1 {
+impl FixedSizeVariation for Group23Var1 {
     const VARIATION: Variation = Variation::Group23Var1;
 }
 
-impl HasVariation for Group22Var6 {
+impl FixedSizeVariation for Group22Var6 {
     const VARIATION: Variation = Variation::Group22Var6;
 }
 
-impl HasVariation for Group22Var5 {
+impl FixedSizeVariation for Group22Var5 {
     const VARIATION: Variation = Variation::Group22Var5;
 }
 
-impl HasVariation for Group22Var2 {
+impl FixedSizeVariation for Group22Var2 {
     const VARIATION: Variation = Variation::Group22Var2;
 }
 
-impl HasVariation for Group22Var1 {
+impl FixedSizeVariation for Group22Var1 {
     const VARIATION: Variation = Variation::Group22Var1;
 }
 
-impl HasVariation for Group21Var10 {
+impl FixedSizeVariation for Group21Var10 {
     const VARIATION: Variation = Variation::Group21Var10;
 }
 
-impl HasVariation for Group21Var9 {
+impl FixedSizeVariation for Group21Var9 {
     const VARIATION: Variation = Variation::Group21Var9;
 }
 
-impl HasVariation for Group21Var6 {
+impl FixedSizeVariation for Group21Var6 {
     const VARIATION: Variation = Variation::Group21Var6;
 }
 
-impl HasVariation for Group21Var5 {
+impl FixedSizeVariation for Group21Var5 {
     const VARIATION: Variation = Variation::Group21Var5;
 }
 
-impl HasVariation for Group21Var2 {
+impl FixedSizeVariation for Group21Var2 {
     const VARIATION: Variation = Variation::Group21Var2;
 }
 
-impl HasVariation for Group21Var1 {
+impl FixedSizeVariation for Group21Var1 {
     const VARIATION: Variation = Variation::Group21Var1;
 }
 
-impl HasVariation for Group20Var6 {
+impl FixedSizeVariation for Group20Var6 {
     const VARIATION: Variation = Variation::Group20Var6;
 }
 
-impl HasVariation for Group20Var5 {
+impl FixedSizeVariation for Group20Var5 {
     const VARIATION: Variation = Variation::Group20Var5;
 }
 
-impl HasVariation for Group20Var2 {
+impl FixedSizeVariation for Group20Var2 {
     const VARIATION: Variation = Variation::Group20Var2;
 }
 
-impl HasVariation for Group20Var1 {
+impl FixedSizeVariation for Group20Var1 {
     const VARIATION: Variation = Variation::Group20Var1;
 }
 
-impl HasVariation for Group13Var2 {
+impl FixedSizeVariation for Group13Var2 {
     const VARIATION: Variation = Variation::Group13Var2;
 }
 
-impl HasVariation for Group13Var1 {
+impl FixedSizeVariation for Group13Var1 {
     const VARIATION: Variation = Variation::Group13Var1;
 }
 
-impl HasVariation for Group12Var1 {
+impl FixedSizeVariation for Group12Var1 {
     const VARIATION: Variation = Variation::Group12Var1;
 }
 
-impl HasVariation for Group11Var2 {
+impl FixedSizeVariation for Group11Var2 {
     const VARIATION: Variation = Variation::Group11Var2;
 }
 
-impl HasVariation for Group11Var1 {
+impl FixedSizeVariation for Group11Var1 {
     const VARIATION: Variation = Variation::Group11Var1;
 }
 
-impl HasVariation for Group10Var2 {
+impl FixedSizeVariation for Group10Var2 {
     const VARIATION: Variation = Variation::Group10Var2;
 }
 
-impl HasVariation for Group4Var3 {
+impl FixedSizeVariation for Group4Var3 {
     const VARIATION: Variation = Variation::Group4Var3;
 }
 
-impl HasVariation for Group4Var2 {
+impl FixedSizeVariation for Group4Var2 {
     const VARIATION: Variation = Variation::Group4Var2;
 }
 
-impl HasVariation for Group4Var1 {
+impl FixedSizeVariation for Group4Var1 {
     const VARIATION: Variation = Variation::Group4Var1;
 }
 
-impl HasVariation for Group3Var2 {
+impl FixedSizeVariation for Group3Var2 {
     const VARIATION: Variation = Variation::Group3Var2;
 }
 
-impl HasVariation for Group2Var3 {
+impl FixedSizeVariation for Group2Var3 {
     const VARIATION: Variation = Variation::Group2Var3;
 }
 
-impl HasVariation for Group2Var2 {
+impl FixedSizeVariation for Group2Var2 {
     const VARIATION: Variation = Variation::Group2Var2;
 }
 
-impl HasVariation for Group2Var1 {
+impl FixedSizeVariation for Group2Var1 {
     const VARIATION: Variation = Variation::Group2Var1;
 }
 
-impl HasVariation for Group1Var2 {
+impl FixedSizeVariation for Group1Var2 {
     const VARIATION: Variation = Variation::Group1Var2;
 }

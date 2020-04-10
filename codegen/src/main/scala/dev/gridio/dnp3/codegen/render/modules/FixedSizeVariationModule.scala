@@ -13,7 +13,7 @@ object FixedSizeVariationModule extends Module {
       }
     }
 
-    "use crate::app::parse::traits::{FixedSize, HasVariation};".eol ++
+    "use crate::app::parse::traits::{FixedSize, FixedSizeVariation};".eol ++
     "use crate::util::cursor::*;".eol ++
     "use crate::app::gen::enums::CommandStatus;".eol ++
     "use crate::app::types::{ControlCode, Timestamp};".eol ++
@@ -27,6 +27,7 @@ object FixedSizeVariationModule extends Module {
     spaced(variations.map(v => implDisplay(v)).iterator) ++
     space ++
     spaced(variations.map(v => implHasVariation(v)).iterator)
+
   }
 
   private def getFieldType(f: FixedSizeFieldType) : String = {
@@ -130,7 +131,7 @@ object FixedSizeVariationModule extends Module {
   }
 
   private def implHasVariation(gv : FixedSize)(implicit indent: Indentation): Iterator[String] = {
-    bracket(s"impl HasVariation for ${gv.name}") {
+    bracket(s"impl FixedSizeVariation for ${gv.name}") {
       s"const VARIATION : Variation = Variation::${gv.name};".eol
     }
   }
