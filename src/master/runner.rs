@@ -9,6 +9,7 @@ use crate::transport::{ReaderType, WriterType};
 use crate::app::header::ResponseHeader;
 use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;
+use crate::master::handlers::ResponseHandler;
 use crate::util::cursor::{WriteCursor, WriteError};
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
@@ -40,15 +41,17 @@ pub struct TaskRunner {
     seq: Sequence,
     reply_timeout: Duration,
     count: ResponseCount,
+    unsolicited_handler: Box<dyn ResponseHandler>,
     buffer: [u8; 2048],
 }
 
 impl TaskRunner {
-    pub fn new(reply_timeout: Duration) -> Self {
+    pub fn new(reply_timeout: Duration, unsolicited_handler: Box<dyn ResponseHandler>) -> Self {
         Self {
             seq: Sequence::default(),
             reply_timeout,
             count: ResponseCount::new(),
+            unsolicited_handler,
             buffer: [0; 2048],
         }
     }
@@ -147,7 +150,11 @@ impl TaskRunner {
     where
         T: AsyncWrite + Unpin,
     {
-        // TODO - invoke handling callback
+        if let Ok(objects) = rsp.objects {
+            self.unsolicited_handler
+                .handle(address.source, rsp.header, objects)
+        }
+
         if rsp.header.control.con {
             self.confirm_unsolicited(level, io, address.source, rsp.header.control.seq, writer)
                 .await?;
@@ -324,10 +331,10 @@ mod test {
     fn performs_multi_fragmented_class_scan() {
         let mut task = MasterTask::new(
             1024,
-            TaskDetails::ClassScan(ClassScan::class1(), Box::new(NullResponseHandler {})),
+            TaskDetails::ClassScan(ClassScan::class1(), NullResponseHandler::create()),
         );
 
-        let mut runner = TaskRunner::new(Duration::from_secs(1));
+        let mut runner = TaskRunner::new(Duration::from_secs(1), NullResponseHandler::create());
 
         let mut io = Builder::new()
             .write(&[0xC0, 0x01, 0x3C, 0x02, 0x06])

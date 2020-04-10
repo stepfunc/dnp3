@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut reader, mut writer) = dnp3rs::transport::create_transport_layer(true, 1);
 
-    let mut runner = TaskRunner::new(Duration::from_secs(1));
+    let mut runner = TaskRunner::new(Duration::from_secs(1), NullResponseHandler::create());
 
     loop {
         let mut task =
