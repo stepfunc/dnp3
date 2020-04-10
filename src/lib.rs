@@ -52,7 +52,6 @@ extern crate tokio_test;
 extern crate assert_matches;
 
 pub mod app;
-pub mod error;
 pub(crate) mod link;
 pub mod master;
 pub mod transport;

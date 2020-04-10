@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::link::error::LinkError;
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
 use crate::util::cursor::ReadCursor;
@@ -36,7 +36,7 @@ impl Reader {
         &mut self,
         io: &mut R,
         payload: &mut FramePayload,
-    ) -> Result<Header, Error>
+    ) -> Result<Header, LinkError>
     where
         R: AsyncRead + Unpin,
     {
@@ -67,7 +67,7 @@ impl Reader {
                     // now we can read more data
                     let count = io.read(&mut self.buffer[self.end..]).await?;
                     if count == 0 {
-                        return Err(Error::IO(ErrorKind::UnexpectedEof));
+                        return Err(LinkError::IO(ErrorKind::UnexpectedEof));
                     }
 
                     self.end += count;

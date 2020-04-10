@@ -1,7 +1,6 @@
 use crate::app::format::write;
 use crate::app::parse::parser::{HeaderCollection, ParseLogLevel, ParsedFragment, Response};
 use crate::app::sequence::Sequence;
-use crate::error::Error;
 use crate::link::header::Address;
 use crate::master::task::{MasterTask, ResponseError, ResponseResult};
 use crate::transport::reader::Fragment;
@@ -9,6 +8,7 @@ use crate::transport::{ReaderType, WriterType};
 
 use crate::app::header::ResponseHeader;
 use crate::app::parse::error::ObjectParseError;
+use crate::link::error::LinkError;
 use crate::util::cursor::{WriteCursor, WriteError};
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
@@ -56,7 +56,7 @@ impl TaskRunner {
 
 #[derive(Copy, Clone, Debug)]
 pub enum TaskError {
-    Lower(Error),
+    Lower(LinkError),
     MalformedResponse(ObjectParseError),
     BadResponse(ResponseError),
     NeverReceivedFir,
@@ -73,8 +73,8 @@ impl From<WriteError> for TaskError {
     }
 }
 
-impl From<Error> for TaskError {
-    fn from(err: Error) -> Self {
+impl From<LinkError> for TaskError {
+    fn from(err: LinkError) -> Self {
         TaskError::Lower(err)
     }
 }
@@ -105,7 +105,7 @@ impl TaskRunner {
         destination: u16,
         seq: Sequence,
         writer: &mut WriterType,
-    ) -> Result<(), Error>
+    ) -> Result<(), LinkError>
     where
         T: AsyncWrite + Unpin,
     {
@@ -124,7 +124,7 @@ impl TaskRunner {
         destination: u16,
         seq: Sequence,
         writer: &mut WriterType,
-    ) -> Result<(), Error>
+    ) -> Result<(), LinkError>
     where
         T: AsyncWrite + Unpin,
     {
@@ -143,7 +143,7 @@ impl TaskRunner {
         address: Address,
         rsp: &Response<'_>,
         writer: &mut WriterType,
-    ) -> Result<(), Error>
+    ) -> Result<(), LinkError>
     where
         T: AsyncWrite + Unpin,
     {

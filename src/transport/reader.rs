@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::link::error::LinkError;
 use crate::link::header::Address;
 use crate::link::parser::FramePayload;
 use crate::transport::header::Header;
@@ -37,7 +37,7 @@ impl Reader {
         self.link.reset();
     }
 
-    pub async fn read<T>(&mut self, io: &mut T) -> Result<Fragment<'_>, Error>
+    pub async fn read<T>(&mut self, io: &mut T) -> Result<Fragment<'_>, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -88,7 +88,7 @@ impl Reader {
         address: Address,
         header: Header,
         payload: &[u8],
-    ) -> Result<Option<usize>, Error> {
+    ) -> Result<Option<usize>, LinkError> {
         // FIR always clears the state
         if header.fir {
             self.state = State::Empty;

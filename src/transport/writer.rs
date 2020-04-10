@@ -1,5 +1,5 @@
 use crate::app::parse::parser::{ParseLogLevel, ParsedFragment};
-use crate::error::Error;
+use crate::link::error::LinkError;
 use crate::link::formatter::{LinkFormatter, Payload};
 use crate::transport::sequence::Sequence;
 use crate::util::cursor::WriteCursor;
@@ -43,7 +43,7 @@ impl Writer {
         io: &mut W,
         destination: u16,
         fragment: &[u8],
-    ) -> Result<(), Error>
+    ) -> Result<(), LinkError>
     where
         W: AsyncWrite + Unpin,
     {

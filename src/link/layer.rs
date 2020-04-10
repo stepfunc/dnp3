@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::link::error::LinkError;
 use crate::link::formatter::LinkFormatter;
 use crate::link::function::Function;
 use crate::link::header::{Address, ControlField};
@@ -37,7 +37,7 @@ impl Layer {
         &mut self,
         io: &mut T,
         payload: &mut FramePayload,
-    ) -> Result<Address, Error>
+    ) -> Result<Address, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -53,7 +53,7 @@ impl Layer {
         destination: u16,
         control: ControlField,
         io: &mut T,
-    ) -> Result<(), Error>
+    ) -> Result<(), LinkError>
     where
         T: AsyncWrite + Unpin,
     {
@@ -65,7 +65,7 @@ impl Layer {
         Ok(io.write_all(reply_frame).await?)
     }
 
-    async fn acknowledge<T>(&mut self, destination: u16, io: &mut T) -> Result<(), Error>
+    async fn acknowledge<T>(&mut self, destination: u16, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncWrite + Unpin,
     {
@@ -81,7 +81,7 @@ impl Layer {
         &mut self,
         io: &mut T,
         payload: &mut FramePayload,
-    ) -> Result<Option<Address>, Error>
+    ) -> Result<Option<Address>, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {

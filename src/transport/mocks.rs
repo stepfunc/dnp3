@@ -1,5 +1,5 @@
 use crate::app::parse::parser::ParseLogLevel;
-use crate::error::Error;
+use crate::link::error::LinkError;
 use crate::link::header::Address;
 use crate::transport::reader::Fragment;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -28,7 +28,7 @@ impl MockWriter {
         io: &mut W,
         _destination: u16,
         fragment: &[u8],
-    ) -> Result<(), Error>
+    ) -> Result<(), LinkError>
     where
         W: AsyncWrite + Unpin,
     {
@@ -46,7 +46,7 @@ impl MockReader {
         Self { buffer: [0; 2048] }
     }
 
-    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<Fragment<'_>, Error>
+    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<Fragment<'_>, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {

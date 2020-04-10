@@ -1,6 +1,6 @@
-use crate::error::LogicError;
 use crate::link::constant;
 use crate::link::crc::{calc_crc, calc_crc_with_0564};
+use crate::link::error::LogicError;
 use crate::link::function::Function;
 use crate::link::header::{Address, ControlField};
 use crate::util::cursor::{WriteCursor, WriteError};

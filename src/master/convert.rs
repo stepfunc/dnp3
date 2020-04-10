@@ -4,7 +4,7 @@ use crate::app::measurement::{Binary, BinaryOutputStatus, DoubleBitBinary, Time}
 use crate::app::types::DoubleBit;
 
 impl Group2Var3 {
-    pub(crate) fn to_measurement(&self, cto: Time) -> Binary {
+    pub(crate) fn to_measurement(self, cto: Time) -> Binary {
         let flags = Flags::new(self.flags);
         Binary {
             value: flags.state(),
@@ -15,7 +15,7 @@ impl Group2Var3 {
 }
 
 impl Group4Var3 {
-    pub(crate) fn to_measurement(&self, cto: Time) -> DoubleBitBinary {
+    pub(crate) fn to_measurement(self, cto: Time) -> DoubleBitBinary {
         let flags = Flags::new(self.flags);
         DoubleBitBinary {
             value: flags.double_bit_state(),

@@ -1,4 +1,4 @@
-use crate::error::LogicError;
+use crate::link::error::LogicError;
 use std::ops::Range;
 
 pub trait SliceExtNoPanic<T> {

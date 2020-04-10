@@ -1,5 +1,5 @@
-use crate::error::*;
 use crate::link::constant;
+use crate::link::error::*;
 use crate::link::header::{Address, ControlField, Header};
 use crate::util::cursor::{ReadCursor, ReadError};
 use crate::util::slice_ext::*;

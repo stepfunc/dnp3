@@ -1,4 +1,3 @@
-use crate::error::Error::BadLogic;
 use crate::util::cursor::WriteError;
 
 // these errors should never occur, but they are preferable to using
@@ -26,35 +25,35 @@ pub enum ParseError {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub enum Error {
+pub enum LinkError {
     IO(std::io::ErrorKind),
     BadFrame(FrameError),
     BadLogic(LogicError),
 }
 
-impl From<ParseError> for Error {
+impl From<ParseError> for LinkError {
     fn from(err: ParseError) -> Self {
         match err {
-            ParseError::BadFrame(inner) => Error::BadFrame(inner),
-            ParseError::BadLogic(inner) => BadLogic(inner),
+            ParseError::BadFrame(inner) => LinkError::BadFrame(inner),
+            ParseError::BadLogic(inner) => LinkError::BadLogic(inner),
         }
     }
 }
 
-impl From<LogicError> for Error {
+impl From<LogicError> for LinkError {
     fn from(err: LogicError) -> Self {
-        BadLogic(err)
+        LinkError::BadLogic(err)
     }
 }
 
-impl From<WriteError> for Error {
+impl From<WriteError> for LinkError {
     fn from(_: WriteError) -> Self {
-        BadLogic(LogicError::BadWrite)
+        LinkError::BadLogic(LogicError::BadWrite)
     }
 }
 
-impl From<std::io::Error> for Error {
+impl From<std::io::Error> for LinkError {
     fn from(err: std::io::Error) -> Self {
-        Error::IO(err.kind())
+        LinkError::IO(err.kind())
     }
 }
