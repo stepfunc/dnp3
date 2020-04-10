@@ -32,7 +32,7 @@ object AllObjectsVariationModule extends Module {
 
     bracket("impl AllObjectsVariation") {
       "#[rustfmt::skip]".eol ++
-      bracket("pub fn get(v: Variation) -> Option<AllObjectsVariation>") {
+      bracket("pub(crate) fn get(v: Variation) -> Option<AllObjectsVariation>") {
         bracket("match v") {
           variations.map(getMatcher) ++ "_ => None,".eol
         }

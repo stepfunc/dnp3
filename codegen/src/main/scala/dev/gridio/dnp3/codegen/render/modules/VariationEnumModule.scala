@@ -44,7 +44,7 @@ object VariationEnumModule extends Module {
         }
       }
 
-      bracket("pub fn lookup(group: u8, var: u8) -> Option<Variation>") {
+      bracket("pub(crate) fn lookup(group: u8, var: u8) -> Option<Variation>") {
         bracket("match group") {
           ObjectGroup.all.iterator.flatMap(matchVariation) ++ "_ => None,".eol
         }
@@ -63,7 +63,7 @@ object VariationEnumModule extends Module {
         }
       }
 
-      bracket("pub fn to_group_and_var(self) -> (u8, u8)") {
+      bracket("pub(crate) fn to_group_and_var(self) -> (u8, u8)") {
         bracket("match self") {
           ObjectGroup.allVariations.iterator.flatMap(matcher)
         }
@@ -82,7 +82,7 @@ object VariationEnumModule extends Module {
         }
       }
 
-      bracket("pub fn description(self) -> &'static str") {
+      bracket("pub(crate) fn description(self) -> &'static str") {
         bracket("match self") {
           ObjectGroup.allVariations.iterator.flatMap(matcher)
         }

@@ -120,7 +120,7 @@ pub enum Variation {
 }
 
 impl Variation {
-    pub fn lookup(group: u8, var: u8) -> Option<Variation> {
+    pub(crate) fn lookup(group: u8, var: u8) -> Option<Variation> {
         match group {
             1 => match var {
                 0 => Some(Variation::Group1Var0),
@@ -300,7 +300,7 @@ impl Variation {
         }
     }
 
-    pub fn to_group_and_var(self) -> (u8, u8) {
+    pub(crate) fn to_group_and_var(self) -> (u8, u8) {
         match self {
             Variation::Group1Var0 => (1, 0),
             Variation::Group1Var1 => (1, 1),
@@ -410,7 +410,7 @@ impl Variation {
         }
     }
 
-    pub fn description(self) -> &'static str {
+    pub(crate) fn description(self) -> &'static str {
         match self {
             Variation::Group1Var0 => "Binary Input - Any Variation",
             Variation::Group1Var1 => "Binary Input - Packed Format",
