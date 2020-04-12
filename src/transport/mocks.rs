@@ -1,13 +1,14 @@
 use crate::app::parse::parser::ParseLogLevel;
 use crate::link::error::LinkError;
 use crate::link::header::Address;
-use crate::transport::reader::Fragment;
+use crate::transport::assembler::Fragment;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 #[derive(Copy, Clone)]
 pub struct MockWriter;
 #[derive(Copy, Clone)]
 pub struct MockReader {
+    count: usize,
     buffer: [u8; 2048],
 }
 
@@ -43,18 +44,27 @@ impl MockReader {
     }
 
     pub(crate) fn mock() -> Self {
-        Self { buffer: [0; 2048] }
+        Self {
+            count: 0,
+            buffer: [0; 2048],
+        }
     }
 
-    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<Fragment<'_>, LinkError>
+    pub(crate) fn peek(&self) -> Option<Fragment> {
+        match self.count {
+            0 => None,
+            x => Some(Fragment {
+                address: Address::new(0, 0), // TODO?
+                data: &self.buffer[0..x],
+            }),
+        }
+    }
+
+    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let count = io.read(&mut self.buffer).await?;
-        let bytes = &self.buffer[0..count];
-        Ok(Fragment {
-            address: Address::new(0, 0),
-            data: bytes,
-        })
+        self.count = io.read(&mut self.buffer).await?;
+        Ok(())
     }
 }

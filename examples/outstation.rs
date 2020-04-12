@@ -17,8 +17,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let level = ParseLogLevel::Header;
 
     loop {
-        let asdu = reader.read(&mut socket).await.unwrap();
+        reader.read(&mut socket).await.unwrap();
 
-        ParsedFragment::parse(level.receive(), asdu.data).ok();
+        if let Some(fragment) = reader.peek() {
+            ParsedFragment::parse(level.receive(), fragment.data).ok();
+        }
     }
 }

@@ -1,9 +1,11 @@
-use crate::app::gen::enums::FunctionCode::AssignClass;
-use crate::app::types::DoubleBit::Indeterminate;
 use crate::link::header::Address;
 use crate::transport::header::Header;
-use crate::transport::reader::Fragment;
-use crate::util::cursor::WriteError;
+
+#[derive(Debug)]
+pub struct Fragment<'a> {
+    pub address: Address,
+    pub data: &'a [u8],
+}
 
 #[derive(Copy, Clone)]
 enum InternalState {
@@ -32,6 +34,10 @@ impl Assembler {
         }
     }
 
+    pub(crate) fn reset(&mut self) {
+        self.state = InternalState::Empty;
+    }
+
     pub(crate) fn peek(&self) -> Option<Fragment> {
         match self.state {
             InternalState::Complete(address, size) => Some(Fragment {
@@ -50,7 +56,7 @@ impl Assembler {
     ) -> AssemblyState {
         // FIR always clears the state
         if header.fir {
-            if let InternalState::Running(address, header, size) = self.state {
+            if let InternalState::Running(address, _, size) = self.state {
                 log::warn!(
                     "transport: received FIR - dropping {} assembled bytes from {}",
                     size,

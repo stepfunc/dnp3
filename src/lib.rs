@@ -1,5 +1,5 @@
 #![deny(
-//dead_code,
+dead_code,
 arithmetic_overflow,
 invalid_type_param_default,
 missing_fragment_specifier,
