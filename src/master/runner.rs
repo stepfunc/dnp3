@@ -37,6 +37,7 @@ impl ResponseCount {
 }
 
 pub struct TaskRunner {
+    level: ParseLogLevel,
     seq: Sequence,
     reply_timeout: Duration,
     count: ResponseCount,
@@ -45,8 +46,13 @@ pub struct TaskRunner {
 }
 
 impl TaskRunner {
-    pub fn new(reply_timeout: Duration, unsolicited_handler: Box<dyn ResponseHandler>) -> Self {
+    pub fn new(
+        level: ParseLogLevel,
+        reply_timeout: Duration,
+        unsolicited_handler: Box<dyn ResponseHandler>,
+    ) -> Self {
         Self {
+            level,
             seq: Sequence::default(),
             reply_timeout,
             count: ResponseCount::new(),
@@ -121,8 +127,8 @@ impl TaskRunner {
 
     async fn handle_non_read_response<T>(
         &mut self,
-        level: ParseLogLevel,
         io: &mut T,
+        source: u16,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
         task: &mut MasterTask,
@@ -143,16 +149,16 @@ impl TaskRunner {
         // but we'll confirm them if requested and log
         if header.control.con {
             log::warn!("received response requesting confirmation to non-read request");
-            Self::confirm(level, io, task.destination, header.control.seq, writer).await?;
+            Self::confirm(self.level, io, task.destination, header.control.seq, writer).await?;
         }
 
-        Ok(task.details.handle(header, objects)?)
+        Ok(task.details.handle(source, header, objects)?)
     }
 
     async fn handle_read_response<T>(
         &mut self,
-        level: ParseLogLevel,
         io: &mut T,
+        source: u16,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
         task: &mut MasterTask,
@@ -182,10 +188,10 @@ impl TaskRunner {
 
         // write a confirmation if required
         if header.control.con {
-            Self::confirm(level, io, task.destination, header.control.seq, writer).await?;
+            Self::confirm(self.level, io, task.destination, header.control.seq, writer).await?;
         }
 
-        let result = task.details.handle(header, objects)?;
+        let result = task.details.handle(source, header, objects)?;
 
         if !header.control.fin {
             self.seq.increment();
@@ -196,8 +202,8 @@ impl TaskRunner {
 
     async fn handle_response<T>(
         &mut self,
-        level: ParseLogLevel,
         io: &mut T,
+        source: u16,
         response: &Response<'_>,
         task: &mut MasterTask,
         writer: &mut WriterType,
@@ -208,17 +214,16 @@ impl TaskRunner {
         let objects = response.objects?;
 
         if task.details.is_read_request() {
-            self.handle_read_response(level, io, response.header, objects, task, writer)
+            self.handle_read_response(io, source, response.header, objects, task, writer)
                 .await
         } else {
-            self.handle_non_read_response(level, io, response.header, objects, task, writer)
+            self.handle_non_read_response(io, source, response.header, objects, task, writer)
                 .await
         }
     }
 
     pub async fn run<T>(
         &mut self,
-        level: ParseLogLevel,
         io: &mut T,
         task: &mut MasterTask,
         writer: &mut WriterType,
@@ -233,7 +238,7 @@ impl TaskRunner {
         let mut cursor = WriteCursor::new(&mut self.buffer);
         task.details.format(seq, &mut cursor)?;
         writer
-            .write(level, io, task.destination, cursor.written())
+            .write(self.level, io, task.destination, cursor.written())
             .await?;
 
         let mut deadline = Instant::now() + self.reply_timeout;
@@ -243,17 +248,23 @@ impl TaskRunner {
             tokio::time::timeout_at(deadline, reader.read(io)).await??;
 
             if let Some(fragment) = reader.peek() {
-                if let Ok(parsed) = ParsedFragment::parse(level.receive(), fragment.data) {
+                if let Ok(parsed) = ParsedFragment::parse(self.level.receive(), fragment.data) {
                     match parsed.to_response() {
                         Err(err) => log::warn!("{}", err),
                         Ok(response) => {
                             if response.header.unsolicited {
                                 self.unsolicited_handler
-                                    .handle(level, fragment.address, response, io, writer)
+                                    .handle(self.level, fragment.address, response, io, writer)
                                     .await?;
                             } else {
                                 match self
-                                    .handle_response(level, io, &response, task, writer)
+                                    .handle_response(
+                                        io,
+                                        fragment.address.source,
+                                        &response,
+                                        task,
+                                        writer,
+                                    )
                                     .await?
                                 {
                                     ResponseResult::Success => {
@@ -290,7 +301,11 @@ mod test {
             NullResponseHandler::create(),
         );
 
-        let mut runner = TaskRunner::new(Duration::from_secs(1), NullResponseHandler::create());
+        let mut runner = TaskRunner::new(
+            ParseLogLevel::Nothing,
+            Duration::from_secs(1),
+            NullResponseHandler::create(),
+        );
 
         let mut io = Builder::new()
             .write(&[0xC0, 0x01, 0x3C, 0x02, 0x06])
@@ -308,13 +323,6 @@ mod test {
 
         let mut writer = MockWriter::mock();
         let mut reader = MockReader::mock();
-        tokio_test::block_on(runner.run(
-            ParseLogLevel::Nothing,
-            &mut io,
-            &mut task,
-            &mut writer,
-            &mut reader,
-        ))
-        .unwrap();
+        tokio_test::block_on(runner.run(&mut io, &mut task, &mut writer, &mut reader)).unwrap();
     }
 }

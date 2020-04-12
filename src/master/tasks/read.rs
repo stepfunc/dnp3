@@ -38,11 +38,11 @@ impl ReadTask {
 
     pub(crate) fn handle(
         &mut self,
+        source: u16,
         response: ResponseHeader,
         headers: HeaderCollection,
     ) -> Result<ResponseResult, ResponseError> {
-        // TODO - provide the proper addressing
-        self.handler.handle(1024, response, headers);
+        self.handler.handle(source, response, headers);
         Ok(ResponseResult::Success)
     }
 }

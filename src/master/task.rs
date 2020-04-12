@@ -41,12 +41,13 @@ impl TaskDetails {
 
     pub(crate) fn handle(
         &mut self,
+        source: u16,
         response: ResponseHeader,
         headers: HeaderCollection,
     ) -> Result<ResponseResult, ResponseError> {
         match self {
-            TaskDetails::Read(task) => task.handle(response, headers),
-            TaskDetails::Command(task) => task.handle(response, headers),
+            TaskDetails::Read(task) => task.handle(source, response, headers),
+            TaskDetails::Command(task) => task.handle(source, response, headers),
         }
     }
 }

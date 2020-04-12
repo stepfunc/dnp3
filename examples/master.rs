@@ -19,7 +19,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut reader, mut writer) = dnp3rs::transport::create_transport_layer(true, 1);
 
-    let mut runner = TaskRunner::new(Duration::from_secs(1), NullResponseHandler::create());
+    let mut runner = TaskRunner::new(
+        ParseLogLevel::ObjectValues,
+        Duration::from_secs(1),
+        NullResponseHandler::create(),
+    );
 
     let crob = Group12Var1 {
         code: ControlCode {
@@ -49,13 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
 
         runner
-            .run(
-                ParseLogLevel::ObjectValues,
-                &mut socket,
-                &mut task,
-                &mut writer,
-                &mut reader,
-            )
+            .run(&mut socket, &mut task, &mut writer, &mut reader)
             .await
             .unwrap();
         tokio::time::delay_for(Duration::from_secs(2)).await;
