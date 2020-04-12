@@ -14,6 +14,7 @@ pub type ReaderType = crate::transport::mocks::MockReader;
 #[cfg(test)]
 pub type WriterType = crate::transport::mocks::MockWriter;
 
+pub(crate) mod assembler;
 pub(crate) mod header;
 pub mod reader;
 pub(crate) mod sequence;
