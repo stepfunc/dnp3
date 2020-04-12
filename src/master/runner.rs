@@ -1,7 +1,6 @@
 use crate::app::format::write;
 use crate::app::parse::parser::{HeaderCollection, ParseLogLevel, ParsedFragment, Response};
 use crate::app::sequence::Sequence;
-use crate::link::header::Address;
 use crate::master::task::{MasterTask, ResponseError, ResponseResult};
 use crate::transport::{ReaderType, WriterType};
 
@@ -9,6 +8,7 @@ use crate::app::header::ResponseHeader;
 use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;
 use crate::master::handlers::ResponseHandler;
+use crate::master::unsolicited::UnsolicitedHandler;
 use crate::util::cursor::{WriteCursor, WriteError};
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
@@ -40,7 +40,7 @@ pub struct TaskRunner {
     seq: Sequence,
     reply_timeout: Duration,
     count: ResponseCount,
-    unsolicited_handler: Box<dyn ResponseHandler>,
+    unsolicited_handler: UnsolicitedHandler,
     buffer: [u8; 2048],
 }
 
@@ -50,7 +50,7 @@ impl TaskRunner {
             seq: Sequence::default(),
             reply_timeout,
             count: ResponseCount::new(),
-            unsolicited_handler,
+            unsolicited_handler: UnsolicitedHandler::new(unsolicited_handler),
             buffer: [0; 2048],
         }
     }
@@ -100,8 +100,7 @@ impl From<ResponseError> for TaskError {
 }
 
 impl TaskRunner {
-    async fn confirm_solicited<T>(
-        &mut self,
+    async fn confirm<T>(
         level: ParseLogLevel,
         io: &mut T,
         destination: u16,
@@ -111,54 +110,12 @@ impl TaskRunner {
     where
         T: AsyncWrite + Unpin,
     {
-        let mut cursor = WriteCursor::new(&mut self.buffer);
+        let mut buffer: [u8; 2] = [0; 2];
+        let mut cursor = WriteCursor::new(&mut buffer);
         write::confirm_solicited(seq, &mut cursor)?;
         writer
             .write(level, io, destination, cursor.written())
             .await?;
-        Ok(())
-    }
-
-    async fn confirm_unsolicited<T>(
-        &mut self,
-        level: ParseLogLevel,
-        io: &mut T,
-        destination: u16,
-        seq: Sequence,
-        writer: &mut WriterType,
-    ) -> Result<(), LinkError>
-    where
-        T: AsyncWrite + Unpin,
-    {
-        let mut cursor = WriteCursor::new(&mut self.buffer);
-        write::confirm_unsolicited(seq, &mut cursor)?;
-        writer
-            .write(level, io, destination, cursor.written())
-            .await?;
-        Ok(())
-    }
-
-    async fn handle_unsolicited<T>(
-        &mut self,
-        level: ParseLogLevel,
-        io: &mut T,
-        address: Address,
-        rsp: &Response<'_>,
-        writer: &mut WriterType,
-    ) -> Result<(), LinkError>
-    where
-        T: AsyncWrite + Unpin,
-    {
-        if let Ok(objects) = rsp.objects {
-            self.unsolicited_handler
-                .handle(address.source, rsp.header, objects)
-        }
-
-        if rsp.header.control.con {
-            self.confirm_unsolicited(level, io, address.source, rsp.header.control.seq, writer)
-                .await?;
-        }
-
         Ok(())
     }
 
@@ -186,8 +143,7 @@ impl TaskRunner {
         // but we'll confirm them if requested and log
         if header.control.con {
             log::warn!("received response requesting confirmation to non-read request");
-            self.confirm_solicited(level, io, task.destination, header.control.seq, writer)
-                .await?;
+            Self::confirm(level, io, task.destination, header.control.seq, writer).await?;
         }
 
         Ok(task.details.handle(header, objects)?)
@@ -226,11 +182,7 @@ impl TaskRunner {
 
         // write a confirmation if required
         if header.control.con {
-            let mut cursor = WriteCursor::new(&mut self.buffer);
-            write::confirm_solicited(header.control.seq, &mut cursor)?;
-            writer
-                .write(level, io, task.destination, cursor.written())
-                .await?;
+            Self::confirm(level, io, task.destination, header.control.seq, writer).await?;
         }
 
         let result = task.details.handle(header, objects)?;
@@ -296,14 +248,9 @@ impl TaskRunner {
                         Err(err) => log::warn!("{}", err),
                         Ok(response) => {
                             if response.header.unsolicited {
-                                self.handle_unsolicited(
-                                    level,
-                                    io,
-                                    fragment.address,
-                                    &response,
-                                    writer,
-                                )
-                                .await?;
+                                self.unsolicited_handler
+                                    .handle(level, fragment.address, response, io, writer)
+                                    .await?;
                             } else {
                                 match self
                                     .handle_response(level, io, &response, task, writer)

@@ -174,6 +174,10 @@ impl<'a> ParsedFragment<'a> {
             return Err(ResponseValidationError::UnsolicitedResponseWithoutUnsBit);
         }
 
+        if unsolicited && !self.control.is_fir_and_fin() {
+            return Err(ResponseValidationError::UnsolicitedResponseWithoutFirAndFin);
+        }
+
         Ok(Response {
             header: ResponseHeader::new(self.control, unsolicited, iin),
             raw_objects: self.raw_objects,

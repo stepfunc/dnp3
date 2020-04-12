@@ -33,6 +33,7 @@ pub enum ResponseValidationError {
     UnexpectedFunction(FunctionCode),
     SolicitedResponseWithUnsBit,
     UnsolicitedResponseWithoutUnsBit,
+    UnsolicitedResponseWithoutFirAndFin,
 }
 
 impl std::fmt::Display for HeaderParseError {
@@ -106,6 +107,9 @@ impl std::fmt::Display for ResponseValidationError {
             }
             ResponseValidationError::SolicitedResponseWithUnsBit => {
                 f.write_str("solicited responses may not have the UNS bit set")
+            }
+            ResponseValidationError::UnsolicitedResponseWithoutFirAndFin => {
+                f.write_str("unsolicited responses must have FIR = 1 and FIN = 1")
             }
         }
     }

@@ -5,3 +5,4 @@ pub mod runner;
 pub mod task;
 pub(crate) mod tasks;
 pub mod types;
+pub(crate) mod unsolicited;
