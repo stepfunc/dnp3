@@ -2,6 +2,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::gen::enums::CommandStatus;
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
+use crate::app::gen::variations::variation::Variation;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::HeaderDetails;
 use crate::app::parse::prefix::Prefix;
@@ -36,6 +37,22 @@ impl ClassScan {
 
     pub fn integrity() -> Self {
         Self::new(true, true, true, true)
+    }
+
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        if self.class1 {
+            writer.write_all_objects_header(Variation::Group60Var2)?;
+        }
+        if self.class2 {
+            writer.write_all_objects_header(Variation::Group60Var3)?;
+        }
+        if self.class3 {
+            writer.write_all_objects_header(Variation::Group60Var4)?;
+        }
+        if self.class0 {
+            writer.write_all_objects_header(Variation::Group60Var1)?;
+        }
+        Ok(())
     }
 }
 
