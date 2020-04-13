@@ -3,7 +3,8 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::task::{ResponseError, ResponseResult};
+use crate::master::runner::TaskError;
+use crate::master::task::TaskStatus;
 use crate::master::types::{CommandError, CommandHeader};
 use crate::util::cursor::{WriteCursor, WriteError};
 
@@ -48,11 +49,15 @@ impl CommandTask {
         _source: u16,
         _response: ResponseHeader,
         headers: HeaderCollection,
-    ) -> Result<ResponseResult, ResponseError> {
+    ) -> TaskStatus {
         let comparison = self.compare(headers);
 
         log::warn!("result: {:?}", comparison);
 
-        Ok(ResponseResult::Success)
+        TaskStatus::Complete
+    }
+
+    pub(crate) fn on_error(&mut self, _error: TaskError) {
+        // TODO - notify some kind of handler
     }
 }

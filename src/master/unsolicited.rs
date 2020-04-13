@@ -3,7 +3,6 @@ use crate::link::error::LinkError;
 use crate::master::handlers::ResponseHandler;
 
 use crate::app::sequence::Sequence;
-use crate::link::header::Address;
 use crate::transport::WriterType;
 use crate::util::cursor::WriteCursor;
 use tokio::prelude::{AsyncRead, AsyncWrite};
@@ -21,8 +20,8 @@ impl UnsolicitedHandler {
     pub(crate) async fn handle<T>(
         &mut self,
         level: ParseLogLevel,
-        address: Address,
-        response: Response<'_>,
+        source: u16,
+        response: &Response<'_>,
         io: &mut T,
         writer: &mut WriterType,
     ) -> Result<(), LinkError>
@@ -30,19 +29,11 @@ impl UnsolicitedHandler {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         if let Ok(objects) = response.objects {
-            self.handler
-                .handle(address.source, response.header, objects);
+            self.handler.handle(source, response.header, objects);
         }
 
         if response.header.control.con {
-            Self::confirm(
-                level,
-                io,
-                address.source,
-                response.header.control.seq,
-                writer,
-            )
-            .await?;
+            Self::confirm(level, io, source, response.header.control.seq, writer).await?;
         }
 
         Ok(())

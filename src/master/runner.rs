@@ -1,7 +1,7 @@
 use crate::app::format::write;
 use crate::app::parse::parser::{HeaderCollection, ParseLogLevel, ParsedFragment, Response};
 use crate::app::sequence::Sequence;
-use crate::master::task::{MasterTask, ResponseError, ResponseResult};
+use crate::master::task::{MasterTask, TaskStatus};
 use crate::transport::{ReaderType, WriterType};
 
 use crate::app::header::ResponseHeader;
@@ -12,7 +12,6 @@ use crate::master::unsolicited::UnsolicitedHandler;
 use crate::util::cursor::{WriteCursor, WriteError};
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
-use tokio::time::Instant;
 
 struct ResponseCount {
     count: usize,
@@ -66,10 +65,8 @@ impl TaskRunner {
 pub enum TaskError {
     Lower(LinkError),
     MalformedResponse(ObjectParseError),
-    BadResponse(ResponseError),
     NeverReceivedFir,
     UnexpectedFir,
-    BadSequence,
     MultiFragmentResponse,
     ResponseTimeout,
     WriteError,
@@ -96,12 +93,6 @@ impl From<tokio::time::Elapsed> for TaskError {
 impl From<ObjectParseError> for TaskError {
     fn from(err: ObjectParseError) -> Self {
         TaskError::MalformedResponse(err)
-    }
-}
-
-impl From<ResponseError> for TaskError {
-    fn from(err: ResponseError) -> Self {
-        TaskError::BadResponse(err)
     }
 }
 
@@ -133,14 +124,10 @@ impl TaskRunner {
         objects: HeaderCollection<'_>,
         task: &mut MasterTask,
         writer: &mut WriterType,
-    ) -> Result<ResponseResult, TaskError>
+    ) -> Result<TaskStatus, TaskError>
     where
         T: AsyncWrite + Unpin,
     {
-        if header.control.seq.value() != self.seq.previous() {
-            return Err(TaskError::BadSequence);
-        }
-
         if !(header.control.is_fir_and_fin()) {
             return Err(TaskError::MultiFragmentResponse);
         }
@@ -152,7 +139,7 @@ impl TaskRunner {
             Self::confirm(self.level, io, task.destination, header.control.seq, writer).await?;
         }
 
-        Ok(task.details.handle(source, header, objects)?)
+        Ok(task.details.handle(source, header, objects))
     }
 
     async fn handle_read_response<T>(
@@ -163,15 +150,10 @@ impl TaskRunner {
         objects: HeaderCollection<'_>,
         task: &mut MasterTask,
         writer: &mut WriterType,
-    ) -> Result<ResponseResult, TaskError>
+    ) -> Result<TaskStatus, TaskError>
     where
         T: AsyncWrite + Unpin,
     {
-        // validate the sequence number
-        if header.control.seq.value() != self.seq.previous() {
-            return Err(TaskError::BadSequence);
-        }
-
         if header.control.fir && !self.count.is_none() {
             return Err(TaskError::UnexpectedFir);
         }
@@ -191,13 +173,13 @@ impl TaskRunner {
             Self::confirm(self.level, io, task.destination, header.control.seq, writer).await?;
         }
 
-        let result = task.details.handle(source, header, objects)?;
+        let status = task.details.handle(source, header, objects);
 
         if !header.control.fin {
             self.seq.increment();
         }
 
-        Ok(result)
+        Ok(status)
     }
 
     async fn handle_response<T>(
@@ -207,10 +189,27 @@ impl TaskRunner {
         response: &Response<'_>,
         task: &mut MasterTask,
         writer: &mut WriterType,
-    ) -> Result<ResponseResult, TaskError>
+    ) -> Result<TaskStatus, TaskError>
     where
-        T: AsyncWrite + Unpin,
+        T: AsyncRead + AsyncWrite + Unpin,
     {
+        if response.header.unsolicited {
+            self.unsolicited_handler
+                .handle(self.level, source, response, io, writer)
+                .await?;
+            return Ok(TaskStatus::ContinueWaiting);
+        }
+
+        if response.header.control.seq.value() != self.seq.previous() {
+            log::warn!(
+                "response with seq: {} doesn't match expected seq: {}",
+                response.header.control.seq.value(),
+                self.seq.previous()
+            );
+            return Ok(TaskStatus::ContinueWaiting);
+        }
+
+        // if we can't parse a response, this is a TaskError
         let objects = response.objects?;
 
         if task.details.is_read_request() {
@@ -220,6 +219,24 @@ impl TaskRunner {
             self.handle_non_read_response(io, source, response.header, objects, task, writer)
                 .await
         }
+    }
+
+    async fn send_request<T>(
+        &mut self,
+        io: &mut T,
+        task: &mut MasterTask,
+        writer: &mut WriterType,
+    ) -> Result<(), LinkError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        // format the request
+        let seq = self.seq.increment();
+        let mut cursor = WriteCursor::new(&mut self.buffer);
+        task.details.format(seq, &mut cursor)?;
+        writer
+            .write(self.level, io, task.destination, cursor.written())
+            .await
     }
 
     pub async fn run<T>(
@@ -232,49 +249,61 @@ impl TaskRunner {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        self.count.reset();
-        // format the request
-        let seq = self.seq.increment();
-        let mut cursor = WriteCursor::new(&mut self.buffer);
-        task.details.format(seq, &mut cursor)?;
-        writer
-            .write(self.level, io, task.destination, cursor.written())
-            .await?;
+        let result = self.run_impl(io, task, writer, reader).await;
 
-        let mut deadline = Instant::now() + self.reply_timeout;
+        if let Err(err) = result {
+            // notify the task that it didn't complete b/c of an error
+            task.details.on_error(err);
+        }
+
+        result
+    }
+
+    async fn run_impl<T>(
+        &mut self,
+        io: &mut T,
+        task: &mut MasterTask,
+        writer: &mut WriterType,
+        reader: &mut ReaderType,
+    ) -> Result<(), TaskError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        self.count.reset();
+
+        self.send_request(io, task, writer).await?;
+        let mut deadline = crate::util::timeout::Timeout::from_now(self.reply_timeout);
 
         // now enter a loop to read responses
         loop {
-            tokio::time::timeout_at(deadline, reader.read(io)).await??;
+            tokio::time::timeout_at(deadline.value, reader.read(io)).await??;
 
             if let Some(fragment) = reader.peek() {
                 if let Ok(parsed) = ParsedFragment::parse(self.level.receive(), fragment.data) {
                     match parsed.to_response() {
                         Err(err) => log::warn!("{}", err),
                         Ok(response) => {
-                            if response.header.unsolicited {
-                                self.unsolicited_handler
-                                    .handle(self.level, fragment.address, response, io, writer)
-                                    .await?;
-                            } else {
-                                match self
-                                    .handle_response(
-                                        io,
-                                        fragment.address.source,
-                                        &response,
-                                        task,
-                                        writer,
-                                    )
-                                    .await?
-                                {
-                                    ResponseResult::Success => {
-                                        if response.header.control.fin {
-                                            return Ok(());
-                                        }
-                                        // continue to next iteration of the loop, read another reply
-                                        deadline = Instant::now() + self.reply_timeout;
-                                    }
-                                };
+                            match self
+                                .handle_response(
+                                    io,
+                                    fragment.address.source,
+                                    &response,
+                                    task,
+                                    writer,
+                                )
+                                .await?
+                            {
+                                // we're done
+                                TaskStatus::Complete => return Ok(()),
+                                // go to next iteration of the loop without updating the timeout
+                                TaskStatus::ContinueWaiting => continue,
+                                // go to next iteration of the loop, but update the timeout for another response
+                                TaskStatus::ReadNextResponse => deadline.extend(self.reply_timeout),
+                                // format the request and go through the whole cycle again with a new timeout
+                                TaskStatus::ExecuteNextStep => {
+                                    self.send_request(io, task, writer).await?;
+                                    deadline.extend(self.reply_timeout)
+                                }
                             }
                         }
                     }

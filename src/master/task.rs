@@ -2,21 +2,22 @@ use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::handlers::ResponseHandler;
+use crate::master::runner::TaskError;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::{ReadRequest, ReadTask};
 use crate::master::types::CommandHeader;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone, Debug)]
-pub enum ResponseError {
-    Todo,
-}
-
-pub(crate) enum ResponseResult {
-    /// the response completed the task
-    Success,
-    ///// run a new task - e.g. select then operate
-    //Transition(MasterTask),
+pub enum TaskStatus {
+    /// go through the whole cycle of formatting and waiting for a reply again
+    ExecuteNextStep,
+    /// The response was not for the task, so keep waiting on the current timeout
+    ContinueWaiting,
+    /// read another response with a new timeout
+    ReadNextResponse,
+    /// The task is complete
+    Complete,
 }
 
 pub(crate) enum TaskDetails {
@@ -44,10 +45,17 @@ impl TaskDetails {
         source: u16,
         response: ResponseHeader,
         headers: HeaderCollection,
-    ) -> Result<ResponseResult, ResponseError> {
+    ) -> TaskStatus {
         match self {
             TaskDetails::Read(task) => task.handle(source, response, headers),
             TaskDetails::Command(task) => task.handle(source, response, headers),
+        }
+    }
+
+    pub(crate) fn on_error(&mut self, error: TaskError) {
+        match self {
+            TaskDetails::Read(task) => task.on_error(error),
+            TaskDetails::Command(task) => task.on_error(error),
         }
     }
 }
