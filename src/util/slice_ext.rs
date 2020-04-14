@@ -1,7 +1,7 @@
 use crate::link::error::LogicError;
 use std::ops::Range;
 
-pub trait SliceExtNoPanic<T> {
+pub(crate) trait SliceExtNoPanic<T> {
     fn np_split_at(&self, pos: usize) -> Result<(&[T], &[T]), LogicError>;
     fn np_split_at_no_error(&self, pos: usize) -> (&[T], &[T]);
     fn np_get(&self, range: Range<usize>) -> Result<&[T], LogicError>;
@@ -10,7 +10,7 @@ pub trait SliceExtNoPanic<T> {
     }
 }
 
-pub trait MutSliceExtNoPanic<T> {
+pub(crate) trait MutSliceExtNoPanic<T> {
     fn np_get_mut(&mut self, range: Range<usize>) -> Result<&mut [T], LogicError>;
     fn np_skip_mut(&mut self, count: usize) -> Result<&mut [T], LogicError>;
 }
