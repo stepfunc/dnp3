@@ -13,11 +13,12 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::net::TcpStream;
 
-struct PrintingHandler;
-impl CommandResultHandler for PrintingHandler {
+struct LoggingHandler;
+impl CommandResultHandler for LoggingHandler {
     fn handle(&mut self, result: Result<(), CommandTaskError>) {
-        if let Err(err) = result {
-            println!("command error: {}", err)
+        match result {
+            Err(err) => log::error!("command error: {}", err),
+            Ok(()) => log::info!("command request succeeded"),
         }
     }
 }
@@ -61,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (crob, 7),
                 (crob, 1),
             ]))],
-            Box::new(PrintingHandler {}),
+            Box::new(LoggingHandler {}),
         );
 
         runner
