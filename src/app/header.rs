@@ -238,11 +238,13 @@ impl IIN {
         })
     }
 
-    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.iin1.value)?;
-        cursor.write_u8(self.iin2.value)?;
-        Ok(())
-    }
+    /*
+        pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+            cursor.write_u8(self.iin1.value)?;
+            cursor.write_u8(self.iin2.value)?;
+            Ok(())
+        }
+    */
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -263,7 +265,7 @@ impl RequestHeader {
         Self { control, function }
     }
 
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.control.write(cursor)?;
         self.function.write(cursor)?;
         Ok(())
@@ -287,10 +289,12 @@ impl ResponseHeader {
         }
     }
 
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        self.control.write(cursor)?;
-        self.function().write(cursor)?;
-        self.iin.write(cursor)?;
-        Ok(())
-    }
+    /*
+        pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+            self.control.write(cursor)?;
+            self.function().write(cursor)?;
+            self.iin.write(cursor)?;
+            Ok(())
+        }
+    */
 }
