@@ -1,5 +1,5 @@
 pub(crate) mod bit;
-pub mod cursor;
+pub(crate) mod cursor;
 pub(crate) mod sequence;
 pub(crate) mod slice_ext;
-pub mod timeout;
+pub(crate) mod timeout;

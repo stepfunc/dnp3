@@ -55,4 +55,4 @@ pub mod app;
 pub(crate) mod link;
 pub mod master;
 pub mod transport;
-pub mod util;
+pub(crate) mod util;
