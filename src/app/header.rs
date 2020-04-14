@@ -33,7 +33,7 @@ impl Control {
     const CON_MASK: u8 = 0b0010_0000;
     const UNS_MASK: u8 = 0b0001_0000;
 
-    pub fn request(seq: Sequence) -> Self {
+    pub(crate) fn request(seq: Sequence) -> Self {
         Self {
             fir: true,
             fin: true,
@@ -43,7 +43,7 @@ impl Control {
         }
     }
 
-    pub fn unsolicited(seq: Sequence) -> Self {
+    pub(crate) fn unsolicited(seq: Sequence) -> Self {
         Self {
             fir: true,
             fin: true,
@@ -53,7 +53,7 @@ impl Control {
         }
     }
 
-    pub fn from(x: u8) -> Self {
+    pub(crate) fn from(x: u8) -> Self {
         Self {
             fir: x & Self::FIR_MASK != 0,
             fin: x & Self::FIN_MASK != 0,
@@ -67,7 +67,7 @@ impl Control {
         self.fir && self.fin
     }
 
-    pub fn to_u8(self) -> u8 {
+    pub(crate) fn to_u8(self) -> u8 {
         let mut x: u8 = 0;
         if self.fir {
             x |= Self::FIR_MASK;

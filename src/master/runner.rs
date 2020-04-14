@@ -276,10 +276,7 @@ impl TaskRunner {
     {
         let result = self.run_impl(io, task, writer, reader).await;
 
-        if let Err(err) = result {
-            // notify the task that it didn't complete b/c of an error
-            task.details.on_error(err);
-        }
+        task.details.on_complete(result);
 
         result
     }
@@ -342,7 +339,7 @@ impl TaskRunner {
 mod test {
     use super::*;
     use crate::master::handlers::NullReadHandler;
-    use crate::master::types::{ClassScan, ReadRequest};
+    use crate::master::types::{Classes, EventClasses, ReadRequest};
     use crate::transport::mocks::{MockReader, MockWriter};
     use tokio_test::io::Builder;
 
@@ -350,7 +347,7 @@ mod test {
     fn performs_multi_fragmented_class_scan() {
         let mut task = MasterTask::read(
             1024,
-            ReadRequest::ClassScan(ClassScan::class1()),
+            ReadRequest::ClassScan(Classes::new(false, EventClasses::new(true, false, false))),
             NullReadHandler::create(),
         );
 

@@ -8,13 +8,13 @@ pub trait ResponseHandler {
     fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
 }
 
-pub trait TaskErrorHandler {
-    fn on_error(&mut self, error: TaskError);
+pub trait TaskCompletionHandler {
+    fn on_complete(&mut self, result: Result<(), TaskError>);
 }
 
-pub trait ReadTaskHandler: ResponseHandler + TaskErrorHandler {}
+pub trait ReadTaskHandler: ResponseHandler + TaskCompletionHandler {}
 
-impl<T> ReadTaskHandler for T where T: ResponseHandler + TaskErrorHandler {}
+impl<T> ReadTaskHandler for T where T: ResponseHandler + TaskCompletionHandler {}
 
 pub trait MeasurementHandler {
     fn handle_binary(&mut self, x: impl Iterator<Item = (Binary, u16)>);
@@ -40,6 +40,6 @@ impl ResponseHandler for NullReadHandler {
     fn handle(&mut self, _source: u16, _header: ResponseHeader, _headers: HeaderCollection) {}
 }
 
-impl TaskErrorHandler for NullReadHandler {
-    fn on_error(&mut self, _error: TaskError) {}
+impl TaskCompletionHandler for NullReadHandler {
+    fn on_complete(&mut self, _result: Result<(), TaskError>) {}
 }

@@ -16,14 +16,14 @@ enum State {
 pub(crate) struct CommandTask {
     state: State,
     headers: Vec<CommandHeader>,
-    handler: Box<dyn CommandResultHandler>,
+    handler: Box<dyn CommandTaskHandler>,
 }
 
 impl CommandTask {
     fn new(
         state: State,
         headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandResultHandler>,
+        handler: Box<dyn CommandTaskHandler>,
     ) -> Self {
         Self {
             state,
@@ -34,14 +34,14 @@ impl CommandTask {
 
     pub(crate) fn select_before_operate(
         headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandResultHandler>,
+        handler: Box<dyn CommandTaskHandler>,
     ) -> Self {
         Self::new(State::Select, headers, handler)
     }
 
     pub(crate) fn direct_operate(
         headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandResultHandler>,
+        handler: Box<dyn CommandTaskHandler>,
     ) -> Self {
         Self::new(State::DirectOperate, headers, handler)
     }
@@ -86,7 +86,7 @@ impl CommandTask {
         headers: HeaderCollection,
     ) -> TaskStatus {
         if let Err(err) = self.compare(headers) {
-            self.handler.handle(Err(CommandTaskError::Response(err)));
+            self.handler.on_response(Err(err));
             return TaskStatus::Complete;
         }
 
@@ -97,13 +97,13 @@ impl CommandTask {
             }
             _ => {
                 // Complete w/ success
-                self.handler.handle(Ok(()));
+                self.handler.on_response(Ok(()));
                 TaskStatus::Complete
             }
         }
     }
 
-    pub(crate) fn on_error(&mut self, error: TaskError) {
-        self.handler.handle(Err(CommandTaskError::Task(error)));
+    pub(crate) fn on_complete(&mut self, result: Result<(), TaskError>) {
+        self.handler.on_complete(result);
     }
 }

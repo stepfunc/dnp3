@@ -1,34 +1,34 @@
 use crate::app::format::write::HeaderWriter;
+use crate::app::gen::enums::FunctionCode;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
-use crate::master::handlers::ReadTaskHandler;
+use crate::master::handlers::TaskCompletionHandler;
 use crate::master::runner::TaskError;
 use crate::master::task::TaskStatus;
-use crate::master::types::ReadRequest;
+use crate::master::types::BasicRequest;
 use crate::util::cursor::WriteError;
 
-pub(crate) struct ReadTask {
-    pub(crate) request: ReadRequest,
-    pub(crate) handler: Box<dyn ReadTaskHandler>,
+pub(crate) struct BasicResponseTask {
+    pub(crate) request: BasicRequest,
+    pub(crate) handler: Box<dyn TaskCompletionHandler>,
 }
 
-impl ReadTask {
+impl BasicResponseTask {
     pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         self.request.format(writer)
     }
 
+    pub(crate) fn function(&self) -> FunctionCode {
+        self.request.function()
+    }
+
     pub(crate) fn handle(
         &mut self,
-        source: u16,
-        response: ResponseHeader,
-        headers: HeaderCollection,
+        _source: u16,
+        _response: ResponseHeader,
+        _headers: HeaderCollection,
     ) -> TaskStatus {
-        self.handler.handle(source, response, headers);
-        if response.control.fin {
-            TaskStatus::Complete
-        } else {
-            TaskStatus::ReadNextResponse
-        }
+        TaskStatus::Complete
     }
 
     pub(crate) fn on_complete(&mut self, result: Result<(), TaskError>) {

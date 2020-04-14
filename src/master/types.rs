@@ -1,21 +1,27 @@
 use crate::app::format::write::HeaderWriter;
-use crate::app::gen::enums::CommandStatus;
+use crate::app::gen::enums::{CommandStatus, FunctionCode};
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::variation::Variation;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::HeaderDetails;
 use crate::app::parse::prefix::Prefix;
-use crate::app::parse::traits::{FixedSize, FixedSizeVariation, Index};
+use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::master::handlers::TaskCompletionHandler;
 use crate::master::runner::TaskError;
 use crate::util::cursor::WriteError;
 
 #[derive(Copy, Clone)]
-pub struct ClassScan {
+pub struct EventClasses {
     pub class1: bool,
     pub class2: bool,
     pub class3: bool,
+}
+
+#[derive(Copy, Clone)]
+pub struct Classes {
     pub class0: bool,
+    pub events: EventClasses,
 }
 
 #[derive(Copy, Clone)]
@@ -28,26 +34,21 @@ where
     pub stop: T,
 }
 
-impl ClassScan {
-    pub fn new(class1: bool, class2: bool, class3: bool, class0: bool) -> Self {
+impl EventClasses {
+    pub fn new(class1: bool, class2: bool, class3: bool) -> Self {
         Self {
             class1,
             class2,
             class3,
-            class0,
         }
     }
 
-    pub fn class1() -> Self {
-        Self::new(true, false, false, false)
-    }
-
-    pub fn class123() -> Self {
-        Self::new(true, true, true, false)
-    }
-
-    pub fn integrity() -> Self {
-        Self::new(true, true, true, true)
+    pub fn all() -> Self {
+        Self {
+            class1: true,
+            class2: true,
+            class3: true,
+        }
     }
 
     pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
@@ -60,6 +61,25 @@ impl ClassScan {
         if self.class3 {
             writer.write_all_objects_header(Variation::Group60Var4)?;
         }
+        Ok(())
+    }
+}
+
+impl Classes {
+    pub fn new(class0: bool, events: EventClasses) -> Self {
+        Self { events, class0 }
+    }
+
+    pub fn events(events: EventClasses) -> Self {
+        Self::new(false, events)
+    }
+
+    pub fn integrity() -> Self {
+        Self::new(true, EventClasses::all())
+    }
+
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        self.events.write(writer)?;
         if self.class0 {
             writer.write_all_objects_header(Variation::Group60Var1)?;
         }
@@ -86,13 +106,19 @@ where
 
 #[derive(Copy, Clone)]
 pub enum ReadRequest {
-    ClassScan(ClassScan),
+    ClassScan(Classes),
     Range8(RangeScan<u8>),
     Range16(RangeScan<u16>),
 }
 
+#[derive(Copy, Clone)]
+pub enum BasicRequest {
+    EnableUnsolicited(EventClasses),
+    DisableUnsolicited(EventClasses),
+}
+
 impl ReadRequest {
-    pub fn class_scan(scan: ClassScan) -> Self {
+    pub fn class_scan(scan: Classes) -> Self {
         ReadRequest::ClassScan(scan)
     }
 
@@ -106,16 +132,32 @@ impl ReadRequest {
 
     pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
-            ReadRequest::ClassScan(scan) => scan.write(writer),
+            ReadRequest::ClassScan(classes) => classes.write(writer),
             ReadRequest::Range8(scan) => scan.write(writer),
             ReadRequest::Range16(scan) => scan.write(writer),
         }
     }
 }
 
+impl BasicRequest {
+    pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        match self {
+            BasicRequest::EnableUnsolicited(classes) => classes.write(writer),
+            BasicRequest::DisableUnsolicited(classes) => classes.write(writer),
+        }
+    }
+
+    pub(crate) fn function(self) -> FunctionCode {
+        match self {
+            BasicRequest::EnableUnsolicited(_) => FunctionCode::EnabledUnsolicited,
+            BasicRequest::DisableUnsolicited(_) => FunctionCode::DisableUnsolicited,
+        }
+    }
+}
+
 pub enum PrefixedCommandHeader<I>
 where
-    I: Index + FixedSize,
+    I: Index,
 {
     G12V1(Vec<(Group12Var1, I)>),
     G41V1(Vec<(Group41Var1, I)>),
@@ -126,7 +168,7 @@ where
 
 impl<I> PrefixedCommandHeader<I>
 where
-    I: Index + FixedSize,
+    I: Index,
 {
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
@@ -231,8 +273,8 @@ impl std::fmt::Display for CommandTaskError {
     }
 }
 
-pub trait CommandResultHandler {
-    fn handle(&mut self, result: Result<(), CommandTaskError>);
+pub trait CommandTaskHandler: TaskCompletionHandler {
+    fn on_response(&mut self, result: Result<(), CommandResponseError>);
 }
 
 impl CommandHeader {

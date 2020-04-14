@@ -3,8 +3,8 @@ use dnp3rs::app::gen::variations::fixed::Group12Var1;
 use dnp3rs::app::gen::variations::variation::Variation;
 use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::app::types::ControlCode;
-use dnp3rs::master::handlers::NullReadHandler;
-use dnp3rs::master::runner::TaskRunner;
+use dnp3rs::master::handlers::{NullReadHandler, TaskCompletionHandler};
+use dnp3rs::master::runner::{TaskError, TaskRunner};
 use dnp3rs::master::task::MasterTask;
 use dnp3rs::master::types::*;
 use std::net::SocketAddr;
@@ -13,14 +13,23 @@ use std::time::Duration;
 use tokio::net::TcpStream;
 
 struct LoggingHandler;
-impl CommandResultHandler for LoggingHandler {
-    fn handle(&mut self, result: Result<(), CommandTaskError>) {
+impl CommandTaskHandler for LoggingHandler {
+    fn on_response(&mut self, result: Result<(), CommandResponseError>) {
         match result {
             Err(err) => log::warn!("command error: {}", err),
             Ok(()) => log::info!("command request succeeded"),
         }
     }
 }
+impl TaskCompletionHandler for LoggingHandler {
+    fn on_complete(&mut self, result: Result<(), TaskError>) {
+        if let Err(err) = result {
+            log::warn!("task error: {}", err)
+        }
+    }
+}
+
+const DESTINATION: u16 = 1024;
 
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,13 +47,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         let task1 = MasterTask::read(
-            1024,
-            ReadRequest::class_scan(ClassScan::integrity()),
+            DESTINATION,
+            ReadRequest::class_scan(Classes::integrity()),
             NullReadHandler::create(),
         );
 
         let task2 = MasterTask::select_before_operate(
-            1024,
+            DESTINATION,
             vec![CommandHeader::U8(PrefixedCommandHeader::G12V1(vec![
                 (
                     Group12Var1::from_code(ControlCode::from_op_type(OpType::LatchOn)),
@@ -62,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
 
         let task3 = MasterTask::read(
-            1024,
+            DESTINATION,
             ReadRequest::Range8(RangeScan::new(Variation::Group1Var2, 1, 5)),
             NullReadHandler::create(),
         );
