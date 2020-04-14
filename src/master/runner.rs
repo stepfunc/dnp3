@@ -10,6 +10,8 @@ use crate::link::error::LinkError;
 use crate::master::handlers::ResponseHandler;
 use crate::master::unsolicited::UnsolicitedHandler;
 use crate::util::cursor::{WriteCursor, WriteError};
+
+use std::fmt::Formatter;
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
 
@@ -61,7 +63,7 @@ impl TaskRunner {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskError {
     Lower(LinkError),
     MalformedResponse(ObjectParseError),
@@ -70,6 +72,28 @@ pub enum TaskError {
     MultiFragmentResponse,
     ResponseTimeout,
     WriteError,
+}
+
+impl std::fmt::Display for TaskError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            TaskError::Lower(_) => f.write_str("I/O error"),
+            TaskError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
+            TaskError::NeverReceivedFir => {
+                f.write_str("received non-FIR response before receiving FIR")
+            }
+            TaskError::UnexpectedFir => {
+                f.write_str("received FIR bit after already receiving FIR bit")
+            }
+            TaskError::MultiFragmentResponse => {
+                f.write_str("received unexpected multi-fragment response")
+            }
+            TaskError::ResponseTimeout => f.write_str("no response received within timeout"),
+            TaskError::WriteError => {
+                f.write_str("unable to serialize the task's request (insufficient buffer space)")
+            }
+        }
+    }
 }
 
 impl From<WriteError> for TaskError {

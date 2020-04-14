@@ -5,7 +5,7 @@ use crate::master::handlers::ResponseHandler;
 use crate::master::runner::TaskError;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::{ReadRequest, ReadTask};
-use crate::master::types::CommandHeader;
+use crate::master::types::{CommandHeader, CommandResultHandler};
 use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone, Debug)]
@@ -73,10 +73,25 @@ impl MasterTask {
         }
     }
 
-    pub fn command(destination: u16, headers: Vec<CommandHeader>) -> Self {
+    pub fn select_before_operate(
+        destination: u16,
+        headers: Vec<CommandHeader>,
+        handler: Box<dyn CommandResultHandler>,
+    ) -> Self {
         Self {
             destination,
-            details: TaskDetails::Command(CommandTask::new(headers)),
+            details: TaskDetails::Command(CommandTask::select_before_operate(headers, handler)),
+        }
+    }
+
+    pub fn direct_operate(
+        destination: u16,
+        headers: Vec<CommandHeader>,
+        handler: Box<dyn CommandResultHandler>,
+    ) -> Self {
+        Self {
+            destination,
+            details: TaskDetails::Command(CommandTask::direct_operate(headers, handler)),
         }
     }
 }

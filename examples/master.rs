@@ -5,11 +5,22 @@ use dnp3rs::app::types::ControlCode;
 use dnp3rs::master::handlers::NullResponseHandler;
 use dnp3rs::master::runner::TaskRunner;
 use dnp3rs::master::task::MasterTask;
-use dnp3rs::master::types::{CommandHeader, PrefixedCommandHeader};
+use dnp3rs::master::types::{
+    CommandHeader, CommandResultHandler, CommandTaskError, PrefixedCommandHeader,
+};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::net::TcpStream;
+
+struct PrintingHandler;
+impl CommandResultHandler for PrintingHandler {
+    fn handle(&mut self, result: Result<(), CommandTaskError>) {
+        if let Err(err) = result {
+            println!("command error: {}", err)
+        }
+    }
+}
 
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,12 +55,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             MasterTask::class_scan(1024, ClassScan::integrity(), NullResponseHandler::create());
         */
 
-        let mut task = MasterTask::command(
+        let mut task = MasterTask::select_before_operate(
             1024,
             vec![CommandHeader::U8(PrefixedCommandHeader::G12V1(vec![
                 (crob, 7),
                 (crob, 1),
             ]))],
+            Box::new(PrintingHandler {}),
         );
 
         runner

@@ -5,20 +5,58 @@ use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::runner::TaskError;
 use crate::master::task::TaskStatus;
-use crate::master::types::{CommandError, CommandHeader};
+use crate::master::types::{
+    CommandHeader, CommandResponseError, CommandResultHandler, CommandTaskError,
+};
 use crate::util::cursor::{WriteCursor, WriteError};
 
+enum State {
+    Select,
+    Operate,
+    DirectOperate,
+}
+
 pub(crate) struct CommandTask {
+    state: State,
     headers: Vec<CommandHeader>,
+    handler: Box<dyn CommandResultHandler>,
 }
 
 impl CommandTask {
-    pub(crate) fn new(headers: Vec<CommandHeader>) -> Self {
-        Self { headers }
+    fn new(
+        state: State,
+        headers: Vec<CommandHeader>,
+        handler: Box<dyn CommandResultHandler>,
+    ) -> Self {
+        Self {
+            state,
+            headers,
+            handler,
+        }
+    }
+
+    pub(crate) fn select_before_operate(
+        headers: Vec<CommandHeader>,
+        handler: Box<dyn CommandResultHandler>,
+    ) -> Self {
+        Self::new(State::Select, headers, handler)
+    }
+
+    pub(crate) fn direct_operate(
+        headers: Vec<CommandHeader>,
+        handler: Box<dyn CommandResultHandler>,
+    ) -> Self {
+        Self::new(State::DirectOperate, headers, handler)
     }
 
     pub(crate) fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        let mut writer = start_request(Control::request(seq), FunctionCode::DirectOperate, cursor)?;
+        let function = match self.state {
+            State::DirectOperate => FunctionCode::DirectOperate,
+            State::Select => FunctionCode::Select,
+            State::Operate => FunctionCode::Operate,
+        };
+
+        let mut writer = start_request(Control::request(seq), function, cursor)?;
 
         for header in self.headers.iter() {
             header.write(&mut writer)?;
@@ -27,18 +65,18 @@ impl CommandTask {
         Ok(())
     }
 
-    fn compare(&self, headers: HeaderCollection) -> Result<(), CommandError> {
+    fn compare(&self, headers: HeaderCollection) -> Result<(), CommandResponseError> {
         let mut iter = headers.iter();
 
         for sent in &self.headers {
             match iter.next() {
-                None => return Err(CommandError::HeaderCountMismatch),
+                None => return Err(CommandResponseError::HeaderCountMismatch),
                 Some(received) => sent.compare(received.details)?,
             }
         }
 
         if iter.next().is_some() {
-            return Err(CommandError::HeaderCountMismatch);
+            return Err(CommandResponseError::HeaderCountMismatch);
         }
 
         Ok(())
@@ -50,14 +88,25 @@ impl CommandTask {
         _response: ResponseHeader,
         headers: HeaderCollection,
     ) -> TaskStatus {
-        let comparison = self.compare(headers);
+        if let Err(err) = self.compare(headers) {
+            self.handler.handle(Err(CommandTaskError::Response(err)));
+            return TaskStatus::Complete;
+        }
 
-        log::warn!("result: {:?}", comparison);
-
-        TaskStatus::Complete
+        match self.state {
+            State::Select => {
+                self.state = State::Operate;
+                TaskStatus::ExecuteNextStep
+            }
+            _ => {
+                // Complete w/ success
+                self.handler.handle(Ok(()));
+                TaskStatus::Complete
+            }
+        }
     }
 
-    pub(crate) fn on_error(&mut self, _error: TaskError) {
-        // TODO - notify some kind of handler
+    pub(crate) fn on_error(&mut self, error: TaskError) {
+        self.handler.handle(Err(CommandTaskError::Task(error)));
     }
 }

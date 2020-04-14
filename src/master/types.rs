@@ -7,6 +7,7 @@ use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::HeaderDetails;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSize, FixedSizeVariation, Index};
+use crate::master::runner::TaskError;
 use crate::util::cursor::WriteError;
 
 #[derive(Copy, Clone)]
@@ -122,17 +123,60 @@ pub enum CommandHeader {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum CommandError {
-    // the outstation indicated that a command was not SUCCESS for the specified reason
+pub enum CommandResponseError {
+    /// the outstation indicated that a command was not SUCCESS for the specified reason
     BadStatus(CommandStatus),
-    // the number of headers in the response doesn't match the number in the request
+    /// the number of headers in the response doesn't match the number in the request
     HeaderCountMismatch,
-    // a header in the response doesn't match the request
+    /// a header in the response doesn't match the request
     HeaderTypeMismatch,
-    // the number of objects in one of the headers doesn't match the request
+    /// the number of objects in one of the headers doesn't match the request
     ObjectCountMismatch,
-    // a value in one of the objects in the response doesn't match the request
+    /// a value in one of the objects in the response doesn't match the request
     ObjectValueMismatch,
+}
+
+impl std::fmt::Display for CommandResponseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            CommandResponseError::BadStatus(status) => write!(
+                f,
+                "command status value other than Success was returned: {:?}",
+                status
+            ),
+            CommandResponseError::HeaderCountMismatch => f.write_str(
+                "response did not contain the same number of object headers as the request",
+            ),
+            CommandResponseError::HeaderTypeMismatch => {
+                f.write_str("response contained a header type different than the request")
+            }
+            CommandResponseError::ObjectCountMismatch => f.write_str(
+                "response header does not have the same number of objects as the request",
+            ),
+            CommandResponseError::ObjectValueMismatch => f.write_str(
+                "a value other than the status is different in the response than the request",
+            ),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum CommandTaskError {
+    Response(CommandResponseError),
+    Task(TaskError),
+}
+
+impl std::fmt::Display for CommandTaskError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            CommandTaskError::Response(x) => std::fmt::Display::fmt(x, f),
+            CommandTaskError::Task(x) => std::fmt::Display::fmt(x, f),
+        }
+    }
+}
+
+pub trait CommandResultHandler {
+    fn handle(&mut self, result: Result<(), CommandTaskError>);
 }
 
 impl CommandHeader {
@@ -146,7 +190,7 @@ impl CommandHeader {
     fn compare_items<V, I>(
         seq: CountSequence<'_, Prefix<I, V>>,
         sent: &[(V, I)],
-    ) -> Result<(), CommandError>
+    ) -> Result<(), CommandResponseError>
     where
         V: FixedSizeVariation + HasCommandStatus,
         I: Index,
@@ -155,86 +199,86 @@ impl CommandHeader {
 
         for item in sent {
             match received.next() {
-                None => return Err(CommandError::ObjectCountMismatch),
+                None => return Err(CommandResponseError::ObjectCountMismatch),
                 Some(x) => {
                     if x.value.status() != CommandStatus::Success {
-                        return Err(CommandError::BadStatus(x.value.status()));
+                        return Err(CommandResponseError::BadStatus(x.value.status()));
                     }
                     if !x.equals(item) {
-                        return Err(CommandError::ObjectValueMismatch);
+                        return Err(CommandResponseError::ObjectValueMismatch);
                     }
                 }
             }
         }
 
         if received.next().is_some() {
-            return Err(CommandError::ObjectCountMismatch);
+            return Err(CommandResponseError::ObjectCountMismatch);
         }
 
         Ok(())
     }
 
-    pub(crate) fn compare(&self, response: HeaderDetails) -> Result<(), CommandError> {
+    pub(crate) fn compare(&self, response: HeaderDetails) -> Result<(), CommandResponseError> {
         match self {
             CommandHeader::U8(PrefixedCommandHeader::G12V1(items)) => match response {
                 HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
-                _ => Err(CommandError::HeaderTypeMismatch),
+                _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::U16(PrefixedCommandHeader::G12V1(items)) => match response {
                 HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
-                _ => Err(CommandError::HeaderTypeMismatch),
+                _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::U8(PrefixedCommandHeader::G41V1(items)) => match response {
                 HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
-                _ => Err(CommandError::HeaderTypeMismatch),
+                _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::U16(PrefixedCommandHeader::G41V1(items)) => match response {
                 HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
-                _ => Err(CommandError::HeaderTypeMismatch),
+                _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::U8(PrefixedCommandHeader::G41V2(items)) => match response {
                 HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
                     Self::compare_items(seq, items)
                 }
-                _ => Err(CommandError::HeaderTypeMismatch),
+                _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::U16(PrefixedCommandHeader::G41V2(items)) => match response {
                 HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
                     Self::compare_items(seq, items)
                 }
-                _ => Err(CommandError::HeaderTypeMismatch),
+                _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::U8(PrefixedCommandHeader::G41V3(items)) => match response {
                 HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
                     Self::compare_items(seq, items)
                 }
-                _ => Err(CommandError::HeaderTypeMismatch),
+                _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::U16(PrefixedCommandHeader::G41V3(items)) => match response {
                 HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
                     Self::compare_items(seq, items)
                 }
-                _ => Err(CommandError::HeaderTypeMismatch),
+                _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::U8(PrefixedCommandHeader::G41V4(items)) => match response {
                 HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
                     Self::compare_items(seq, items)
                 }
-                _ => Err(CommandError::HeaderTypeMismatch),
+                _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::U16(PrefixedCommandHeader::G41V4(items)) => match response {
                 HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
                     Self::compare_items(seq, items)
                 }
-                _ => Err(CommandError::HeaderTypeMismatch),
+                _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
         }
     }
