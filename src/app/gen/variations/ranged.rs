@@ -10,16 +10,16 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::enums::QualifierCode;
+use crate::app::parse::range::{RangedSequence, Range};
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::variation::Variation;
-use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
-use crate::app::parse::bytes::RangedBytesSequence;
-use crate::app::parse::error::ObjectParseError;
-use crate::app::parse::parser::*;
-use crate::app::parse::range::{Range, RangedSequence};
-use crate::master::handlers::MeasurementHandler;
 use crate::util::cursor::ReadCursor;
+use crate::app::parse::parser::*;
+use crate::app::parse::bytes::RangedBytesSequence;
+use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
+use crate::master::handlers::MeasurementHandler;
+use crate::app::gen::enums::QualifierCode;
+use crate::app::parse::error::ObjectParseError;
 
 #[derive(Debug, PartialEq)]
 pub enum RangedVariation<'a> {
@@ -96,7 +96,6 @@ pub enum RangedVariation<'a> {
     Group110VarX(u8, RangedBytesSequence<'a>),
 }
 
-#[rustfmt::skip]
 impl<'a> RangedVariation<'a> {
     pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {

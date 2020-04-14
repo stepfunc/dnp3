@@ -299,7 +299,7 @@ impl Variation {
             _ => None,
         }
     }
-
+    
     pub(crate) fn to_group_and_var(self) -> (u8, u8) {
         match self {
             Variation::Group1Var0 => (1, 0),
@@ -409,7 +409,7 @@ impl Variation {
             Variation::Group113(x) => (113, x),
         }
     }
-
+    
     pub(crate) fn description(self) -> &'static str {
         match self {
             Variation::Group1Var0 => "Binary Input - Any Variation",

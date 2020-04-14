@@ -11,6 +11,7 @@ use crate::master::handlers::ResponseHandler;
 use crate::master::unsolicited::UnsolicitedHandler;
 use crate::util::cursor::{WriteCursor, WriteError};
 
+use crate::app::gen::enums::FunctionCode;
 use std::fmt::Formatter;
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
@@ -236,7 +237,7 @@ impl TaskRunner {
         // if we can't parse a response, this is a TaskError
         let objects = response.objects?;
 
-        if task.details.is_read_request() {
+        if task.details.function() == FunctionCode::Read {
             self.handle_read_response(io, source, response.header, objects, task, writer)
                 .await
         } else {

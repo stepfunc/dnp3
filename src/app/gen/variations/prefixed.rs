@@ -10,23 +10,20 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::variation::Variation;
-use crate::app::measurement::Time;
-use crate::app::parse::bytes::PrefixedBytesSequence;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::error::ObjectParseError;
-use crate::app::parse::parser::*;
-use crate::app::parse::prefix::Prefix;
-use crate::app::parse::traits::{FixedSize, Index};
-use crate::master::handlers::MeasurementHandler;
+use crate::app::gen::variations::fixed::*;
 use crate::util::cursor::ReadCursor;
+use crate::app::parse::parser::*;
+use crate::app::parse::traits::{FixedSize, Index};
+use crate::app::parse::prefix::Prefix;
+use crate::app::parse::bytes::PrefixedBytesSequence;
+use crate::app::measurement::Time;
+use crate::master::handlers::MeasurementHandler;
+use crate::app::parse::error::ObjectParseError;
 
 #[derive(Debug, PartialEq)]
-pub enum PrefixedVariation<'a, I>
-where
-    I: FixedSize + Index + std::fmt::Display,
-{
+pub enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
     /// Binary Input Event - Without Time
     Group2Var1(CountSequence<'a, Prefix<I, Group2Var1>>),
     /// Binary Input Event - With Absolute Time
@@ -125,7 +122,6 @@ where
     Group111VarX(u8, PrefixedBytesSequence<'a, I>),
 }
 
-#[rustfmt::skip]
 impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
     pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
         match v {

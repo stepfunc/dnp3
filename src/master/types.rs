@@ -130,11 +130,11 @@ where
 {
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
-            PrefixedCommandHeader::G12V1(items) => writer.write_prefixed_header(items.iter()),
-            PrefixedCommandHeader::G41V1(items) => writer.write_prefixed_header(items.iter()),
-            PrefixedCommandHeader::G41V2(items) => writer.write_prefixed_header(items.iter()),
-            PrefixedCommandHeader::G41V3(items) => writer.write_prefixed_header(items.iter()),
-            PrefixedCommandHeader::G41V4(items) => writer.write_prefixed_header(items.iter()),
+            PrefixedCommandHeader::G12V1(items) => writer.write_prefixed_items(items.iter()),
+            PrefixedCommandHeader::G41V1(items) => writer.write_prefixed_items(items.iter()),
+            PrefixedCommandHeader::G41V2(items) => writer.write_prefixed_items(items.iter()),
+            PrefixedCommandHeader::G41V3(items) => writer.write_prefixed_items(items.iter()),
+            PrefixedCommandHeader::G41V4(items) => writer.write_prefixed_items(items.iter()),
         }
     }
 }

@@ -74,7 +74,7 @@ object FixedSizeVariationModule extends Module {
     def fieldDisplayType(typ: FixedSizeFieldType): String = {
       typ match {
         case _ : EnumFieldType => "{:?}"
-        case _ : CustomFieldTypeU8 => "{:?}"
+        case _ : CustomFieldTypeU8 => "{}"
         case _ => "{}"
       }
     }
@@ -158,7 +158,6 @@ object FixedSizeVariationModule extends Module {
     }
 
     def implRead : Iterator[String] = {
-      "#[rustfmt::skip]".eol ++
         bracket(s"fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError>") {
           paren("Ok") {
             bracket(s"${gv.name}") {
@@ -171,7 +170,6 @@ object FixedSizeVariationModule extends Module {
     }
 
     def implWrite : Iterator[String] = {
-      "#[rustfmt::skip]".eol ++
         bracket(s"fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError>") {
             gv.fields.iterator.flatMap { f =>
               writeField(f).eol

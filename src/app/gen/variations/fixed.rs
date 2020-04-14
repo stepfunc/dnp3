@@ -10,12 +10,12 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::flags::format::*;
-use crate::app::gen::enums::CommandStatus;
-use crate::app::gen::variations::variation::Variation;
 use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
-use crate::app::types::{ControlCode, Timestamp};
 use crate::util::cursor::*;
+use crate::app::gen::enums::CommandStatus;
+use crate::app::types::{ControlCode, Timestamp};
+use crate::app::flags::format::*;
+use crate::app::gen::variations::variation::Variation;
 
 /// Time Delay - Fine
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -559,9 +559,9 @@ pub struct Group1Var2 {
     pub flags: u8,
 }
 
+
 impl FixedSize for Group52Var2 {
     const SIZE: u8 = 2;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group52Var2 {
@@ -569,7 +569,6 @@ impl FixedSize for Group52Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u16_le(self.time)?;
         Ok(())
@@ -578,7 +577,6 @@ impl FixedSize for Group52Var2 {
 
 impl FixedSize for Group52Var1 {
     const SIZE: u8 = 2;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group52Var1 {
@@ -586,7 +584,6 @@ impl FixedSize for Group52Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u16_le(self.time)?;
         Ok(())
@@ -595,7 +592,6 @@ impl FixedSize for Group52Var1 {
 
 impl FixedSize for Group51Var2 {
     const SIZE: u8 = 6;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group51Var2 {
@@ -603,7 +599,6 @@ impl FixedSize for Group51Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.time.write(cursor)?;
         Ok(())
@@ -612,7 +607,6 @@ impl FixedSize for Group51Var2 {
 
 impl FixedSize for Group51Var1 {
     const SIZE: u8 = 6;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group51Var1 {
@@ -620,7 +614,6 @@ impl FixedSize for Group51Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.time.write(cursor)?;
         Ok(())
@@ -629,7 +622,6 @@ impl FixedSize for Group51Var1 {
 
 impl FixedSize for Group50Var4 {
     const SIZE: u8 = 11;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group50Var4 {
@@ -639,7 +631,6 @@ impl FixedSize for Group50Var4 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.time.write(cursor)?;
         cursor.write_u32_le(self.interval)?;
@@ -650,7 +641,6 @@ impl FixedSize for Group50Var4 {
 
 impl FixedSize for Group50Var3 {
     const SIZE: u8 = 6;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group50Var3 {
@@ -658,7 +648,6 @@ impl FixedSize for Group50Var3 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.time.write(cursor)?;
         Ok(())
@@ -667,7 +656,6 @@ impl FixedSize for Group50Var3 {
 
 impl FixedSize for Group50Var1 {
     const SIZE: u8 = 6;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group50Var1 {
@@ -675,7 +663,6 @@ impl FixedSize for Group50Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.time.write(cursor)?;
         Ok(())
@@ -684,7 +671,6 @@ impl FixedSize for Group50Var1 {
 
 impl FixedSize for Group43Var8 {
     const SIZE: u8 = 15;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var8 {
@@ -694,7 +680,6 @@ impl FixedSize for Group43Var8 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_f64_le(self.value)?;
@@ -705,7 +690,6 @@ impl FixedSize for Group43Var8 {
 
 impl FixedSize for Group43Var7 {
     const SIZE: u8 = 11;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var7 {
@@ -715,7 +699,6 @@ impl FixedSize for Group43Var7 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_f32_le(self.value)?;
@@ -726,7 +709,6 @@ impl FixedSize for Group43Var7 {
 
 impl FixedSize for Group43Var6 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var6 {
@@ -735,7 +717,6 @@ impl FixedSize for Group43Var6 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_f64_le(self.value)?;
@@ -745,7 +726,6 @@ impl FixedSize for Group43Var6 {
 
 impl FixedSize for Group43Var5 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var5 {
@@ -754,7 +734,6 @@ impl FixedSize for Group43Var5 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_f32_le(self.value)?;
@@ -764,7 +743,6 @@ impl FixedSize for Group43Var5 {
 
 impl FixedSize for Group43Var4 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var4 {
@@ -774,7 +752,6 @@ impl FixedSize for Group43Var4 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_i16_le(self.value)?;
@@ -785,7 +762,6 @@ impl FixedSize for Group43Var4 {
 
 impl FixedSize for Group43Var3 {
     const SIZE: u8 = 11;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var3 {
@@ -795,7 +771,6 @@ impl FixedSize for Group43Var3 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_i32_le(self.value)?;
@@ -806,7 +781,6 @@ impl FixedSize for Group43Var3 {
 
 impl FixedSize for Group43Var2 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var2 {
@@ -815,7 +789,6 @@ impl FixedSize for Group43Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_i16_le(self.value)?;
@@ -825,7 +798,6 @@ impl FixedSize for Group43Var2 {
 
 impl FixedSize for Group43Var1 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group43Var1 {
@@ -834,7 +806,6 @@ impl FixedSize for Group43Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.status.as_u8())?;
         cursor.write_i32_le(self.value)?;
@@ -844,7 +815,6 @@ impl FixedSize for Group43Var1 {
 
 impl FixedSize for Group42Var8 {
     const SIZE: u8 = 15;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var8 {
@@ -854,7 +824,6 @@ impl FixedSize for Group42Var8 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f64_le(self.value)?;
@@ -865,7 +834,6 @@ impl FixedSize for Group42Var8 {
 
 impl FixedSize for Group42Var7 {
     const SIZE: u8 = 11;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var7 {
@@ -875,7 +843,6 @@ impl FixedSize for Group42Var7 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f32_le(self.value)?;
@@ -886,7 +853,6 @@ impl FixedSize for Group42Var7 {
 
 impl FixedSize for Group42Var6 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var6 {
@@ -895,7 +861,6 @@ impl FixedSize for Group42Var6 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f64_le(self.value)?;
@@ -905,7 +870,6 @@ impl FixedSize for Group42Var6 {
 
 impl FixedSize for Group42Var5 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var5 {
@@ -914,7 +878,6 @@ impl FixedSize for Group42Var5 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f32_le(self.value)?;
@@ -924,7 +887,6 @@ impl FixedSize for Group42Var5 {
 
 impl FixedSize for Group42Var4 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var4 {
@@ -934,7 +896,6 @@ impl FixedSize for Group42Var4 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i16_le(self.value)?;
@@ -945,7 +906,6 @@ impl FixedSize for Group42Var4 {
 
 impl FixedSize for Group42Var3 {
     const SIZE: u8 = 11;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var3 {
@@ -955,7 +915,6 @@ impl FixedSize for Group42Var3 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i32_le(self.value)?;
@@ -966,7 +925,6 @@ impl FixedSize for Group42Var3 {
 
 impl FixedSize for Group42Var2 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var2 {
@@ -975,7 +933,6 @@ impl FixedSize for Group42Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i16_le(self.value)?;
@@ -985,7 +942,6 @@ impl FixedSize for Group42Var2 {
 
 impl FixedSize for Group42Var1 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group42Var1 {
@@ -994,7 +950,6 @@ impl FixedSize for Group42Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i32_le(self.value)?;
@@ -1004,7 +959,6 @@ impl FixedSize for Group42Var1 {
 
 impl FixedSize for Group41Var4 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group41Var4 {
@@ -1013,7 +967,6 @@ impl FixedSize for Group41Var4 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_f64_le(self.value)?;
         cursor.write_u8(self.status.as_u8())?;
@@ -1023,7 +976,6 @@ impl FixedSize for Group41Var4 {
 
 impl FixedSize for Group41Var3 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group41Var3 {
@@ -1032,7 +984,6 @@ impl FixedSize for Group41Var3 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_f32_le(self.value)?;
         cursor.write_u8(self.status.as_u8())?;
@@ -1042,7 +993,6 @@ impl FixedSize for Group41Var3 {
 
 impl FixedSize for Group41Var2 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group41Var2 {
@@ -1051,7 +1001,6 @@ impl FixedSize for Group41Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_i16_le(self.value)?;
         cursor.write_u8(self.status.as_u8())?;
@@ -1061,7 +1010,6 @@ impl FixedSize for Group41Var2 {
 
 impl FixedSize for Group41Var1 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group41Var1 {
@@ -1070,7 +1018,6 @@ impl FixedSize for Group41Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_i32_le(self.value)?;
         cursor.write_u8(self.status.as_u8())?;
@@ -1080,7 +1027,6 @@ impl FixedSize for Group41Var1 {
 
 impl FixedSize for Group40Var4 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group40Var4 {
@@ -1089,7 +1035,6 @@ impl FixedSize for Group40Var4 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f64_le(self.value)?;
@@ -1099,7 +1044,6 @@ impl FixedSize for Group40Var4 {
 
 impl FixedSize for Group40Var3 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group40Var3 {
@@ -1108,7 +1052,6 @@ impl FixedSize for Group40Var3 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f32_le(self.value)?;
@@ -1118,7 +1061,6 @@ impl FixedSize for Group40Var3 {
 
 impl FixedSize for Group40Var2 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group40Var2 {
@@ -1127,7 +1069,6 @@ impl FixedSize for Group40Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i16_le(self.value)?;
@@ -1137,7 +1078,6 @@ impl FixedSize for Group40Var2 {
 
 impl FixedSize for Group40Var1 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group40Var1 {
@@ -1146,7 +1086,6 @@ impl FixedSize for Group40Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i32_le(self.value)?;
@@ -1156,7 +1095,6 @@ impl FixedSize for Group40Var1 {
 
 impl FixedSize for Group32Var8 {
     const SIZE: u8 = 15;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var8 {
@@ -1166,7 +1104,6 @@ impl FixedSize for Group32Var8 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f64_le(self.value)?;
@@ -1177,7 +1114,6 @@ impl FixedSize for Group32Var8 {
 
 impl FixedSize for Group32Var7 {
     const SIZE: u8 = 11;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var7 {
@@ -1187,7 +1123,6 @@ impl FixedSize for Group32Var7 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f32_le(self.value)?;
@@ -1198,7 +1133,6 @@ impl FixedSize for Group32Var7 {
 
 impl FixedSize for Group32Var6 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var6 {
@@ -1207,7 +1141,6 @@ impl FixedSize for Group32Var6 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f64_le(self.value)?;
@@ -1217,7 +1150,6 @@ impl FixedSize for Group32Var6 {
 
 impl FixedSize for Group32Var5 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var5 {
@@ -1226,7 +1158,6 @@ impl FixedSize for Group32Var5 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f32_le(self.value)?;
@@ -1236,7 +1167,6 @@ impl FixedSize for Group32Var5 {
 
 impl FixedSize for Group32Var4 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var4 {
@@ -1246,7 +1176,6 @@ impl FixedSize for Group32Var4 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i16_le(self.value)?;
@@ -1257,7 +1186,6 @@ impl FixedSize for Group32Var4 {
 
 impl FixedSize for Group32Var3 {
     const SIZE: u8 = 11;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var3 {
@@ -1267,7 +1195,6 @@ impl FixedSize for Group32Var3 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i32_le(self.value)?;
@@ -1278,7 +1205,6 @@ impl FixedSize for Group32Var3 {
 
 impl FixedSize for Group32Var2 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var2 {
@@ -1287,7 +1213,6 @@ impl FixedSize for Group32Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i16_le(self.value)?;
@@ -1297,7 +1222,6 @@ impl FixedSize for Group32Var2 {
 
 impl FixedSize for Group32Var1 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group32Var1 {
@@ -1306,7 +1230,6 @@ impl FixedSize for Group32Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i32_le(self.value)?;
@@ -1316,7 +1239,6 @@ impl FixedSize for Group32Var1 {
 
 impl FixedSize for Group30Var6 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var6 {
@@ -1325,7 +1247,6 @@ impl FixedSize for Group30Var6 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f64_le(self.value)?;
@@ -1335,7 +1256,6 @@ impl FixedSize for Group30Var6 {
 
 impl FixedSize for Group30Var5 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var5 {
@@ -1344,7 +1264,6 @@ impl FixedSize for Group30Var5 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_f32_le(self.value)?;
@@ -1354,7 +1273,6 @@ impl FixedSize for Group30Var5 {
 
 impl FixedSize for Group30Var4 {
     const SIZE: u8 = 2;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var4 {
@@ -1362,7 +1280,6 @@ impl FixedSize for Group30Var4 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_i16_le(self.value)?;
         Ok(())
@@ -1371,7 +1288,6 @@ impl FixedSize for Group30Var4 {
 
 impl FixedSize for Group30Var3 {
     const SIZE: u8 = 4;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var3 {
@@ -1379,7 +1295,6 @@ impl FixedSize for Group30Var3 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_i32_le(self.value)?;
         Ok(())
@@ -1388,7 +1303,6 @@ impl FixedSize for Group30Var3 {
 
 impl FixedSize for Group30Var2 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var2 {
@@ -1397,7 +1311,6 @@ impl FixedSize for Group30Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i16_le(self.value)?;
@@ -1407,7 +1320,6 @@ impl FixedSize for Group30Var2 {
 
 impl FixedSize for Group30Var1 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group30Var1 {
@@ -1416,7 +1328,6 @@ impl FixedSize for Group30Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i32_le(self.value)?;
@@ -1426,7 +1337,6 @@ impl FixedSize for Group30Var1 {
 
 impl FixedSize for Group23Var6 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group23Var6 {
@@ -1436,7 +1346,6 @@ impl FixedSize for Group23Var6 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.value)?;
@@ -1447,7 +1356,6 @@ impl FixedSize for Group23Var6 {
 
 impl FixedSize for Group23Var5 {
     const SIZE: u8 = 11;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group23Var5 {
@@ -1457,7 +1365,6 @@ impl FixedSize for Group23Var5 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u32_le(self.value)?;
@@ -1468,7 +1375,6 @@ impl FixedSize for Group23Var5 {
 
 impl FixedSize for Group23Var2 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group23Var2 {
@@ -1477,7 +1383,6 @@ impl FixedSize for Group23Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.value)?;
@@ -1487,7 +1392,6 @@ impl FixedSize for Group23Var2 {
 
 impl FixedSize for Group23Var1 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group23Var1 {
@@ -1496,7 +1400,6 @@ impl FixedSize for Group23Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u32_le(self.value)?;
@@ -1506,7 +1409,6 @@ impl FixedSize for Group23Var1 {
 
 impl FixedSize for Group22Var6 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group22Var6 {
@@ -1516,7 +1418,6 @@ impl FixedSize for Group22Var6 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.value)?;
@@ -1527,7 +1428,6 @@ impl FixedSize for Group22Var6 {
 
 impl FixedSize for Group22Var5 {
     const SIZE: u8 = 11;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group22Var5 {
@@ -1537,7 +1437,6 @@ impl FixedSize for Group22Var5 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u32_le(self.value)?;
@@ -1548,7 +1447,6 @@ impl FixedSize for Group22Var5 {
 
 impl FixedSize for Group22Var2 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group22Var2 {
@@ -1557,7 +1455,6 @@ impl FixedSize for Group22Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.value)?;
@@ -1567,7 +1464,6 @@ impl FixedSize for Group22Var2 {
 
 impl FixedSize for Group22Var1 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group22Var1 {
@@ -1576,7 +1472,6 @@ impl FixedSize for Group22Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u32_le(self.value)?;
@@ -1586,7 +1481,6 @@ impl FixedSize for Group22Var1 {
 
 impl FixedSize for Group21Var10 {
     const SIZE: u8 = 2;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var10 {
@@ -1594,7 +1488,6 @@ impl FixedSize for Group21Var10 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u16_le(self.value)?;
         Ok(())
@@ -1603,7 +1496,6 @@ impl FixedSize for Group21Var10 {
 
 impl FixedSize for Group21Var9 {
     const SIZE: u8 = 4;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var9 {
@@ -1611,7 +1503,6 @@ impl FixedSize for Group21Var9 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u32_le(self.value)?;
         Ok(())
@@ -1620,7 +1511,6 @@ impl FixedSize for Group21Var9 {
 
 impl FixedSize for Group21Var6 {
     const SIZE: u8 = 9;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var6 {
@@ -1630,7 +1520,6 @@ impl FixedSize for Group21Var6 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.value)?;
@@ -1641,7 +1530,6 @@ impl FixedSize for Group21Var6 {
 
 impl FixedSize for Group21Var5 {
     const SIZE: u8 = 11;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var5 {
@@ -1651,7 +1539,6 @@ impl FixedSize for Group21Var5 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u32_le(self.value)?;
@@ -1662,7 +1549,6 @@ impl FixedSize for Group21Var5 {
 
 impl FixedSize for Group21Var2 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var2 {
@@ -1671,7 +1557,6 @@ impl FixedSize for Group21Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.value)?;
@@ -1681,7 +1566,6 @@ impl FixedSize for Group21Var2 {
 
 impl FixedSize for Group21Var1 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group21Var1 {
@@ -1690,7 +1574,6 @@ impl FixedSize for Group21Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u32_le(self.value)?;
@@ -1700,7 +1583,6 @@ impl FixedSize for Group21Var1 {
 
 impl FixedSize for Group20Var6 {
     const SIZE: u8 = 2;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group20Var6 {
@@ -1708,7 +1590,6 @@ impl FixedSize for Group20Var6 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u16_le(self.value)?;
         Ok(())
@@ -1717,7 +1598,6 @@ impl FixedSize for Group20Var6 {
 
 impl FixedSize for Group20Var5 {
     const SIZE: u8 = 4;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group20Var5 {
@@ -1725,7 +1605,6 @@ impl FixedSize for Group20Var5 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u32_le(self.value)?;
         Ok(())
@@ -1734,7 +1613,6 @@ impl FixedSize for Group20Var5 {
 
 impl FixedSize for Group20Var2 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group20Var2 {
@@ -1743,7 +1621,6 @@ impl FixedSize for Group20Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.value)?;
@@ -1753,7 +1630,6 @@ impl FixedSize for Group20Var2 {
 
 impl FixedSize for Group20Var1 {
     const SIZE: u8 = 5;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group20Var1 {
@@ -1762,7 +1638,6 @@ impl FixedSize for Group20Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u32_le(self.value)?;
@@ -1772,7 +1647,6 @@ impl FixedSize for Group20Var1 {
 
 impl FixedSize for Group13Var2 {
     const SIZE: u8 = 7;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group13Var2 {
@@ -1781,7 +1655,6 @@ impl FixedSize for Group13Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         self.time.write(cursor)?;
@@ -1791,7 +1664,6 @@ impl FixedSize for Group13Var2 {
 
 impl FixedSize for Group13Var1 {
     const SIZE: u8 = 1;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group13Var1 {
@@ -1799,7 +1671,6 @@ impl FixedSize for Group13Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         Ok(())
@@ -1808,7 +1679,6 @@ impl FixedSize for Group13Var1 {
 
 impl FixedSize for Group12Var1 {
     const SIZE: u8 = 11;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group12Var1 {
@@ -1820,7 +1690,6 @@ impl FixedSize for Group12Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.code.as_u8())?;
         cursor.write_u8(self.count)?;
@@ -1833,7 +1702,6 @@ impl FixedSize for Group12Var1 {
 
 impl FixedSize for Group11Var2 {
     const SIZE: u8 = 7;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group11Var2 {
@@ -1842,7 +1710,6 @@ impl FixedSize for Group11Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         self.time.write(cursor)?;
@@ -1852,7 +1719,6 @@ impl FixedSize for Group11Var2 {
 
 impl FixedSize for Group11Var1 {
     const SIZE: u8 = 1;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group11Var1 {
@@ -1860,7 +1726,6 @@ impl FixedSize for Group11Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         Ok(())
@@ -1869,7 +1734,6 @@ impl FixedSize for Group11Var1 {
 
 impl FixedSize for Group10Var2 {
     const SIZE: u8 = 1;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group10Var2 {
@@ -1877,7 +1741,6 @@ impl FixedSize for Group10Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         Ok(())
@@ -1886,7 +1749,6 @@ impl FixedSize for Group10Var2 {
 
 impl FixedSize for Group4Var3 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group4Var3 {
@@ -1895,7 +1757,6 @@ impl FixedSize for Group4Var3 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.time)?;
@@ -1905,7 +1766,6 @@ impl FixedSize for Group4Var3 {
 
 impl FixedSize for Group4Var2 {
     const SIZE: u8 = 7;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group4Var2 {
@@ -1914,7 +1774,6 @@ impl FixedSize for Group4Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         self.time.write(cursor)?;
@@ -1924,7 +1783,6 @@ impl FixedSize for Group4Var2 {
 
 impl FixedSize for Group4Var1 {
     const SIZE: u8 = 1;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group4Var1 {
@@ -1932,7 +1790,6 @@ impl FixedSize for Group4Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         Ok(())
@@ -1941,7 +1798,6 @@ impl FixedSize for Group4Var1 {
 
 impl FixedSize for Group3Var2 {
     const SIZE: u8 = 1;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group3Var2 {
@@ -1949,7 +1805,6 @@ impl FixedSize for Group3Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         Ok(())
@@ -1958,7 +1813,6 @@ impl FixedSize for Group3Var2 {
 
 impl FixedSize for Group2Var3 {
     const SIZE: u8 = 3;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group2Var3 {
@@ -1967,7 +1821,6 @@ impl FixedSize for Group2Var3 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_u16_le(self.time)?;
@@ -1977,7 +1830,6 @@ impl FixedSize for Group2Var3 {
 
 impl FixedSize for Group2Var2 {
     const SIZE: u8 = 7;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group2Var2 {
@@ -1986,7 +1838,6 @@ impl FixedSize for Group2Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         self.time.write(cursor)?;
@@ -1996,7 +1847,6 @@ impl FixedSize for Group2Var2 {
 
 impl FixedSize for Group2Var1 {
     const SIZE: u8 = 1;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group2Var1 {
@@ -2004,7 +1854,6 @@ impl FixedSize for Group2Var1 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         Ok(())
@@ -2013,7 +1862,6 @@ impl FixedSize for Group2Var1 {
 
 impl FixedSize for Group1Var2 {
     const SIZE: u8 = 1;
-    #[rustfmt::skip]
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group1Var2 {
@@ -2021,12 +1869,12 @@ impl FixedSize for Group1Var2 {
             }
         )
     }
-    #[rustfmt::skip]
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         Ok(())
     }
 }
+
 
 impl std::fmt::Display for Group52Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -2054,11 +1902,7 @@ impl std::fmt::Display for Group51Var1 {
 
 impl std::fmt::Display for Group50Var4 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "time: {} interval: {} units: {}",
-            self.time, self.interval, self.units
-        )
+        write!(f, "time: {} interval: {} units: {}", self.time, self.interval, self.units)
     }
 }
 
@@ -2076,21 +1920,13 @@ impl std::fmt::Display for Group50Var1 {
 
 impl std::fmt::Display for Group43Var8 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "status: {:?} value: {} time: {}",
-            self.status, self.value, self.time
-        )
+        write!(f, "status: {:?} value: {} time: {}", self.status, self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group43Var7 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "status: {:?} value: {} time: {}",
-            self.status, self.value, self.time
-        )
+        write!(f, "status: {:?} value: {} time: {}", self.status, self.value, self.time)
     }
 }
 
@@ -2108,21 +1944,13 @@ impl std::fmt::Display for Group43Var5 {
 
 impl std::fmt::Display for Group43Var4 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "status: {:?} value: {} time: {}",
-            self.status, self.value, self.time
-        )
+        write!(f, "status: {:?} value: {} time: {}", self.status, self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group43Var3 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "status: {:?} value: {} time: {}",
-            self.status, self.value, self.time
-        )
+        write!(f, "status: {:?} value: {} time: {}", self.status, self.value, self.time)
     }
 }
 
@@ -2140,93 +1968,49 @@ impl std::fmt::Display for Group43Var1 {
 
 impl std::fmt::Display for Group42Var8 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group42Var7 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group42Var6 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group42Var5 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group42Var4 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group42Var3 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group42Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group42Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
@@ -2256,159 +2040,85 @@ impl std::fmt::Display for Group41Var1 {
 
 impl std::fmt::Display for Group40Var4 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group40Var3 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group40Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group40Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group32Var8 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group32Var7 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group32Var6 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group32Var5 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group32Var4 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group32Var3 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group32Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group32Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group30Var6 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group30Var5 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
@@ -2426,115 +2136,61 @@ impl std::fmt::Display for Group30Var3 {
 
 impl std::fmt::Display for Group30Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group30Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            AnalogFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group23Var6 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", CounterFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group23Var5 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", CounterFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group23Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", CounterFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group23Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", CounterFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group22Var6 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", CounterFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group22Var5 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", CounterFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group22Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", CounterFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group22Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", CounterFlagFormatter::new(self.flags), self.value)
     }
 }
 
@@ -2552,47 +2208,25 @@ impl std::fmt::Display for Group21Var9 {
 
 impl std::fmt::Display for Group21Var6 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", CounterFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group21Var5 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {} time: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value,
-            self.time
-        )
+        write!(f, "flags: {} value: {} time: {}", CounterFlagFormatter::new(self.flags), self.value, self.time)
     }
 }
 
 impl std::fmt::Display for Group21Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", CounterFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group21Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", CounterFlagFormatter::new(self.flags), self.value)
     }
 }
 
@@ -2610,149 +2244,85 @@ impl std::fmt::Display for Group20Var5 {
 
 impl std::fmt::Display for Group20Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", CounterFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group20Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} value: {}",
-            CounterFlagFormatter::new(self.flags),
-            self.value
-        )
+        write!(f, "flags: {} value: {}", CounterFlagFormatter::new(self.flags), self.value)
     }
 }
 
 impl std::fmt::Display for Group13Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} time: {}",
-            BinaryOutputStatusFlagFormatter::new(self.flags),
-            self.time
-        )
+        write!(f, "flags: {} time: {}", BinaryOutputStatusFlagFormatter::new(self.flags), self.time)
     }
 }
 
 impl std::fmt::Display for Group13Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {}",
-            BinaryOutputStatusFlagFormatter::new(self.flags)
-        )
+        write!(f, "flags: {}", BinaryOutputStatusFlagFormatter::new(self.flags))
     }
 }
 
 impl std::fmt::Display for Group12Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "code: {:?} count: {} on_time: {} off_time: {} status: {:?}",
-            self.code, self.count, self.on_time, self.off_time, self.status
-        )
+        write!(f, "code: {} count: {} on_time: {} off_time: {} status: {:?}", self.code, self.count, self.on_time, self.off_time, self.status)
     }
 }
 
 impl std::fmt::Display for Group11Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} time: {}",
-            BinaryOutputStatusFlagFormatter::new(self.flags),
-            self.time
-        )
+        write!(f, "flags: {} time: {}", BinaryOutputStatusFlagFormatter::new(self.flags), self.time)
     }
 }
 
 impl std::fmt::Display for Group11Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {}",
-            BinaryOutputStatusFlagFormatter::new(self.flags)
-        )
+        write!(f, "flags: {}", BinaryOutputStatusFlagFormatter::new(self.flags))
     }
 }
 
 impl std::fmt::Display for Group10Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {}",
-            BinaryOutputStatusFlagFormatter::new(self.flags)
-        )
+        write!(f, "flags: {}", BinaryOutputStatusFlagFormatter::new(self.flags))
     }
 }
 
 impl std::fmt::Display for Group4Var3 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} time: {}",
-            DoubleBitBinaryFlagFormatter::new(self.flags),
-            self.time
-        )
+        write!(f, "flags: {} time: {}", DoubleBitBinaryFlagFormatter::new(self.flags), self.time)
     }
 }
 
 impl std::fmt::Display for Group4Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} time: {}",
-            DoubleBitBinaryFlagFormatter::new(self.flags),
-            self.time
-        )
+        write!(f, "flags: {} time: {}", DoubleBitBinaryFlagFormatter::new(self.flags), self.time)
     }
 }
 
 impl std::fmt::Display for Group4Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {}",
-            DoubleBitBinaryFlagFormatter::new(self.flags)
-        )
+        write!(f, "flags: {}", DoubleBitBinaryFlagFormatter::new(self.flags))
     }
 }
 
 impl std::fmt::Display for Group3Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {}",
-            DoubleBitBinaryFlagFormatter::new(self.flags)
-        )
+        write!(f, "flags: {}", DoubleBitBinaryFlagFormatter::new(self.flags))
     }
 }
 
 impl std::fmt::Display for Group2Var3 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} time: {}",
-            BinaryFlagFormatter::new(self.flags),
-            self.time
-        )
+        write!(f, "flags: {} time: {}", BinaryFlagFormatter::new(self.flags), self.time)
     }
 }
 
 impl std::fmt::Display for Group2Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "flags: {} time: {}",
-            BinaryFlagFormatter::new(self.flags),
-            self.time
-        )
+        write!(f, "flags: {} time: {}", BinaryFlagFormatter::new(self.flags), self.time)
     }
 }
 
@@ -2768,310 +2338,312 @@ impl std::fmt::Display for Group1Var2 {
     }
 }
 
+
 impl FixedSizeVariation for Group52Var2 {
-    const VARIATION: Variation = Variation::Group52Var2;
+    const VARIATION : Variation = Variation::Group52Var2;
 }
 
 impl FixedSizeVariation for Group52Var1 {
-    const VARIATION: Variation = Variation::Group52Var1;
+    const VARIATION : Variation = Variation::Group52Var1;
 }
 
 impl FixedSizeVariation for Group51Var2 {
-    const VARIATION: Variation = Variation::Group51Var2;
+    const VARIATION : Variation = Variation::Group51Var2;
 }
 
 impl FixedSizeVariation for Group51Var1 {
-    const VARIATION: Variation = Variation::Group51Var1;
+    const VARIATION : Variation = Variation::Group51Var1;
 }
 
 impl FixedSizeVariation for Group50Var4 {
-    const VARIATION: Variation = Variation::Group50Var4;
+    const VARIATION : Variation = Variation::Group50Var4;
 }
 
 impl FixedSizeVariation for Group50Var3 {
-    const VARIATION: Variation = Variation::Group50Var3;
+    const VARIATION : Variation = Variation::Group50Var3;
 }
 
 impl FixedSizeVariation for Group50Var1 {
-    const VARIATION: Variation = Variation::Group50Var1;
+    const VARIATION : Variation = Variation::Group50Var1;
 }
 
 impl FixedSizeVariation for Group43Var8 {
-    const VARIATION: Variation = Variation::Group43Var8;
+    const VARIATION : Variation = Variation::Group43Var8;
 }
 
 impl FixedSizeVariation for Group43Var7 {
-    const VARIATION: Variation = Variation::Group43Var7;
+    const VARIATION : Variation = Variation::Group43Var7;
 }
 
 impl FixedSizeVariation for Group43Var6 {
-    const VARIATION: Variation = Variation::Group43Var6;
+    const VARIATION : Variation = Variation::Group43Var6;
 }
 
 impl FixedSizeVariation for Group43Var5 {
-    const VARIATION: Variation = Variation::Group43Var5;
+    const VARIATION : Variation = Variation::Group43Var5;
 }
 
 impl FixedSizeVariation for Group43Var4 {
-    const VARIATION: Variation = Variation::Group43Var4;
+    const VARIATION : Variation = Variation::Group43Var4;
 }
 
 impl FixedSizeVariation for Group43Var3 {
-    const VARIATION: Variation = Variation::Group43Var3;
+    const VARIATION : Variation = Variation::Group43Var3;
 }
 
 impl FixedSizeVariation for Group43Var2 {
-    const VARIATION: Variation = Variation::Group43Var2;
+    const VARIATION : Variation = Variation::Group43Var2;
 }
 
 impl FixedSizeVariation for Group43Var1 {
-    const VARIATION: Variation = Variation::Group43Var1;
+    const VARIATION : Variation = Variation::Group43Var1;
 }
 
 impl FixedSizeVariation for Group42Var8 {
-    const VARIATION: Variation = Variation::Group42Var8;
+    const VARIATION : Variation = Variation::Group42Var8;
 }
 
 impl FixedSizeVariation for Group42Var7 {
-    const VARIATION: Variation = Variation::Group42Var7;
+    const VARIATION : Variation = Variation::Group42Var7;
 }
 
 impl FixedSizeVariation for Group42Var6 {
-    const VARIATION: Variation = Variation::Group42Var6;
+    const VARIATION : Variation = Variation::Group42Var6;
 }
 
 impl FixedSizeVariation for Group42Var5 {
-    const VARIATION: Variation = Variation::Group42Var5;
+    const VARIATION : Variation = Variation::Group42Var5;
 }
 
 impl FixedSizeVariation for Group42Var4 {
-    const VARIATION: Variation = Variation::Group42Var4;
+    const VARIATION : Variation = Variation::Group42Var4;
 }
 
 impl FixedSizeVariation for Group42Var3 {
-    const VARIATION: Variation = Variation::Group42Var3;
+    const VARIATION : Variation = Variation::Group42Var3;
 }
 
 impl FixedSizeVariation for Group42Var2 {
-    const VARIATION: Variation = Variation::Group42Var2;
+    const VARIATION : Variation = Variation::Group42Var2;
 }
 
 impl FixedSizeVariation for Group42Var1 {
-    const VARIATION: Variation = Variation::Group42Var1;
+    const VARIATION : Variation = Variation::Group42Var1;
 }
 
 impl FixedSizeVariation for Group41Var4 {
-    const VARIATION: Variation = Variation::Group41Var4;
+    const VARIATION : Variation = Variation::Group41Var4;
 }
 
 impl FixedSizeVariation for Group41Var3 {
-    const VARIATION: Variation = Variation::Group41Var3;
+    const VARIATION : Variation = Variation::Group41Var3;
 }
 
 impl FixedSizeVariation for Group41Var2 {
-    const VARIATION: Variation = Variation::Group41Var2;
+    const VARIATION : Variation = Variation::Group41Var2;
 }
 
 impl FixedSizeVariation for Group41Var1 {
-    const VARIATION: Variation = Variation::Group41Var1;
+    const VARIATION : Variation = Variation::Group41Var1;
 }
 
 impl FixedSizeVariation for Group40Var4 {
-    const VARIATION: Variation = Variation::Group40Var4;
+    const VARIATION : Variation = Variation::Group40Var4;
 }
 
 impl FixedSizeVariation for Group40Var3 {
-    const VARIATION: Variation = Variation::Group40Var3;
+    const VARIATION : Variation = Variation::Group40Var3;
 }
 
 impl FixedSizeVariation for Group40Var2 {
-    const VARIATION: Variation = Variation::Group40Var2;
+    const VARIATION : Variation = Variation::Group40Var2;
 }
 
 impl FixedSizeVariation for Group40Var1 {
-    const VARIATION: Variation = Variation::Group40Var1;
+    const VARIATION : Variation = Variation::Group40Var1;
 }
 
 impl FixedSizeVariation for Group32Var8 {
-    const VARIATION: Variation = Variation::Group32Var8;
+    const VARIATION : Variation = Variation::Group32Var8;
 }
 
 impl FixedSizeVariation for Group32Var7 {
-    const VARIATION: Variation = Variation::Group32Var7;
+    const VARIATION : Variation = Variation::Group32Var7;
 }
 
 impl FixedSizeVariation for Group32Var6 {
-    const VARIATION: Variation = Variation::Group32Var6;
+    const VARIATION : Variation = Variation::Group32Var6;
 }
 
 impl FixedSizeVariation for Group32Var5 {
-    const VARIATION: Variation = Variation::Group32Var5;
+    const VARIATION : Variation = Variation::Group32Var5;
 }
 
 impl FixedSizeVariation for Group32Var4 {
-    const VARIATION: Variation = Variation::Group32Var4;
+    const VARIATION : Variation = Variation::Group32Var4;
 }
 
 impl FixedSizeVariation for Group32Var3 {
-    const VARIATION: Variation = Variation::Group32Var3;
+    const VARIATION : Variation = Variation::Group32Var3;
 }
 
 impl FixedSizeVariation for Group32Var2 {
-    const VARIATION: Variation = Variation::Group32Var2;
+    const VARIATION : Variation = Variation::Group32Var2;
 }
 
 impl FixedSizeVariation for Group32Var1 {
-    const VARIATION: Variation = Variation::Group32Var1;
+    const VARIATION : Variation = Variation::Group32Var1;
 }
 
 impl FixedSizeVariation for Group30Var6 {
-    const VARIATION: Variation = Variation::Group30Var6;
+    const VARIATION : Variation = Variation::Group30Var6;
 }
 
 impl FixedSizeVariation for Group30Var5 {
-    const VARIATION: Variation = Variation::Group30Var5;
+    const VARIATION : Variation = Variation::Group30Var5;
 }
 
 impl FixedSizeVariation for Group30Var4 {
-    const VARIATION: Variation = Variation::Group30Var4;
+    const VARIATION : Variation = Variation::Group30Var4;
 }
 
 impl FixedSizeVariation for Group30Var3 {
-    const VARIATION: Variation = Variation::Group30Var3;
+    const VARIATION : Variation = Variation::Group30Var3;
 }
 
 impl FixedSizeVariation for Group30Var2 {
-    const VARIATION: Variation = Variation::Group30Var2;
+    const VARIATION : Variation = Variation::Group30Var2;
 }
 
 impl FixedSizeVariation for Group30Var1 {
-    const VARIATION: Variation = Variation::Group30Var1;
+    const VARIATION : Variation = Variation::Group30Var1;
 }
 
 impl FixedSizeVariation for Group23Var6 {
-    const VARIATION: Variation = Variation::Group23Var6;
+    const VARIATION : Variation = Variation::Group23Var6;
 }
 
 impl FixedSizeVariation for Group23Var5 {
-    const VARIATION: Variation = Variation::Group23Var5;
+    const VARIATION : Variation = Variation::Group23Var5;
 }
 
 impl FixedSizeVariation for Group23Var2 {
-    const VARIATION: Variation = Variation::Group23Var2;
+    const VARIATION : Variation = Variation::Group23Var2;
 }
 
 impl FixedSizeVariation for Group23Var1 {
-    const VARIATION: Variation = Variation::Group23Var1;
+    const VARIATION : Variation = Variation::Group23Var1;
 }
 
 impl FixedSizeVariation for Group22Var6 {
-    const VARIATION: Variation = Variation::Group22Var6;
+    const VARIATION : Variation = Variation::Group22Var6;
 }
 
 impl FixedSizeVariation for Group22Var5 {
-    const VARIATION: Variation = Variation::Group22Var5;
+    const VARIATION : Variation = Variation::Group22Var5;
 }
 
 impl FixedSizeVariation for Group22Var2 {
-    const VARIATION: Variation = Variation::Group22Var2;
+    const VARIATION : Variation = Variation::Group22Var2;
 }
 
 impl FixedSizeVariation for Group22Var1 {
-    const VARIATION: Variation = Variation::Group22Var1;
+    const VARIATION : Variation = Variation::Group22Var1;
 }
 
 impl FixedSizeVariation for Group21Var10 {
-    const VARIATION: Variation = Variation::Group21Var10;
+    const VARIATION : Variation = Variation::Group21Var10;
 }
 
 impl FixedSizeVariation for Group21Var9 {
-    const VARIATION: Variation = Variation::Group21Var9;
+    const VARIATION : Variation = Variation::Group21Var9;
 }
 
 impl FixedSizeVariation for Group21Var6 {
-    const VARIATION: Variation = Variation::Group21Var6;
+    const VARIATION : Variation = Variation::Group21Var6;
 }
 
 impl FixedSizeVariation for Group21Var5 {
-    const VARIATION: Variation = Variation::Group21Var5;
+    const VARIATION : Variation = Variation::Group21Var5;
 }
 
 impl FixedSizeVariation for Group21Var2 {
-    const VARIATION: Variation = Variation::Group21Var2;
+    const VARIATION : Variation = Variation::Group21Var2;
 }
 
 impl FixedSizeVariation for Group21Var1 {
-    const VARIATION: Variation = Variation::Group21Var1;
+    const VARIATION : Variation = Variation::Group21Var1;
 }
 
 impl FixedSizeVariation for Group20Var6 {
-    const VARIATION: Variation = Variation::Group20Var6;
+    const VARIATION : Variation = Variation::Group20Var6;
 }
 
 impl FixedSizeVariation for Group20Var5 {
-    const VARIATION: Variation = Variation::Group20Var5;
+    const VARIATION : Variation = Variation::Group20Var5;
 }
 
 impl FixedSizeVariation for Group20Var2 {
-    const VARIATION: Variation = Variation::Group20Var2;
+    const VARIATION : Variation = Variation::Group20Var2;
 }
 
 impl FixedSizeVariation for Group20Var1 {
-    const VARIATION: Variation = Variation::Group20Var1;
+    const VARIATION : Variation = Variation::Group20Var1;
 }
 
 impl FixedSizeVariation for Group13Var2 {
-    const VARIATION: Variation = Variation::Group13Var2;
+    const VARIATION : Variation = Variation::Group13Var2;
 }
 
 impl FixedSizeVariation for Group13Var1 {
-    const VARIATION: Variation = Variation::Group13Var1;
+    const VARIATION : Variation = Variation::Group13Var1;
 }
 
 impl FixedSizeVariation for Group12Var1 {
-    const VARIATION: Variation = Variation::Group12Var1;
+    const VARIATION : Variation = Variation::Group12Var1;
 }
 
 impl FixedSizeVariation for Group11Var2 {
-    const VARIATION: Variation = Variation::Group11Var2;
+    const VARIATION : Variation = Variation::Group11Var2;
 }
 
 impl FixedSizeVariation for Group11Var1 {
-    const VARIATION: Variation = Variation::Group11Var1;
+    const VARIATION : Variation = Variation::Group11Var1;
 }
 
 impl FixedSizeVariation for Group10Var2 {
-    const VARIATION: Variation = Variation::Group10Var2;
+    const VARIATION : Variation = Variation::Group10Var2;
 }
 
 impl FixedSizeVariation for Group4Var3 {
-    const VARIATION: Variation = Variation::Group4Var3;
+    const VARIATION : Variation = Variation::Group4Var3;
 }
 
 impl FixedSizeVariation for Group4Var2 {
-    const VARIATION: Variation = Variation::Group4Var2;
+    const VARIATION : Variation = Variation::Group4Var2;
 }
 
 impl FixedSizeVariation for Group4Var1 {
-    const VARIATION: Variation = Variation::Group4Var1;
+    const VARIATION : Variation = Variation::Group4Var1;
 }
 
 impl FixedSizeVariation for Group3Var2 {
-    const VARIATION: Variation = Variation::Group3Var2;
+    const VARIATION : Variation = Variation::Group3Var2;
 }
 
 impl FixedSizeVariation for Group2Var3 {
-    const VARIATION: Variation = Variation::Group2Var3;
+    const VARIATION : Variation = Variation::Group2Var3;
 }
 
 impl FixedSizeVariation for Group2Var2 {
-    const VARIATION: Variation = Variation::Group2Var2;
+    const VARIATION : Variation = Variation::Group2Var2;
 }
 
 impl FixedSizeVariation for Group2Var1 {
-    const VARIATION: Variation = Variation::Group2Var1;
+    const VARIATION : Variation = Variation::Group2Var1;
 }
 
 impl FixedSizeVariation for Group1Var2 {
-    const VARIATION: Variation = Variation::Group1Var2;
+    const VARIATION : Variation = Variation::Group1Var2;
 }
+

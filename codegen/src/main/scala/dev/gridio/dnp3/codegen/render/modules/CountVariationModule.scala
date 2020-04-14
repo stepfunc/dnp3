@@ -53,7 +53,6 @@ object CountVariationModule extends Module {
       }
     }
 
-    "#[rustfmt::skip]".eol ++
     bracket("impl<'a> CountVariation<'a>") {
       bracket("pub(crate) fn parse(v: Variation, qualifier: QualifierCode, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError>") {
         bracket("match v") {

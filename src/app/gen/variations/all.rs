@@ -104,7 +104,6 @@ pub enum AllObjectsVariation {
 }
 
 impl AllObjectsVariation {
-    #[rustfmt::skip]
     pub(crate) fn get(v: Variation) -> Option<AllObjectsVariation> {
         match v {
             Variation::Group1Var0 => Some(AllObjectsVariation::Group1Var0),

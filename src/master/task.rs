@@ -1,4 +1,6 @@
-use crate::app::header::ResponseHeader;
+use crate::app::format::write::start_request;
+use crate::app::gen::enums::FunctionCode;
+use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::handlers::ReadTaskHandler;
@@ -9,7 +11,7 @@ use crate::master::types::{CommandHeader, CommandResultHandler, ReadRequest};
 use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone, Debug)]
-pub enum TaskStatus {
+pub(crate) enum TaskStatus {
     /// go through the whole cycle of formatting and waiting for a reply again
     ExecuteNextStep,
     /// The response was not for the task, so keep waiting on the current timeout
@@ -23,20 +25,24 @@ pub enum TaskStatus {
 pub(crate) enum TaskDetails {
     Read(ReadTask),
     Command(CommandTask),
+    //ClearRestartBit,
 }
 
 impl TaskDetails {
-    pub(crate) fn is_read_request(&self) -> bool {
+    pub(crate) fn function(&self) -> FunctionCode {
         match self {
-            TaskDetails::Read(_) => true,
-            TaskDetails::Command(_) => false,
+            TaskDetails::Read(_) => FunctionCode::Read,
+            TaskDetails::Command(x) => x.function(),
+            //TaskDetails::ClearRestartBit => FunctionCode::Write,
         }
     }
 
     pub(crate) fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        let mut writer = start_request(Control::request(seq), self.function(), cursor)?;
         match self {
-            TaskDetails::Read(task) => task.format(seq, cursor),
-            TaskDetails::Command(task) => task.format(seq, cursor),
+            TaskDetails::Read(task) => task.format(&mut writer),
+            TaskDetails::Command(task) => task.format(&mut writer),
+            //TaskDetails::ClearRestartBit => Ok(()), // TODO
         }
     }
 

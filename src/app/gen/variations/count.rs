@@ -10,13 +10,13 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::enums::QualifierCode;
-use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::variation::Variation;
+use crate::app::gen::variations::fixed::*;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::*;
 use crate::util::cursor::ReadCursor;
+use crate::app::parse::error::ObjectParseError;
+use crate::app::gen::enums::QualifierCode;
 
 #[derive(Debug, PartialEq)]
 pub enum CountVariation<'a> {
@@ -36,7 +36,6 @@ pub enum CountVariation<'a> {
     Group52Var2(CountSequence<'a, Group52Var2>),
 }
 
-#[rustfmt::skip]
 impl<'a> CountVariation<'a> {
     pub(crate) fn parse(v: Variation, qualifier: QualifierCode, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError> {
         match v {

@@ -45,7 +45,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         Ok(())
     }
 
-    pub(crate) fn write_prefixed_header<'c, V, I>(
+    pub(crate) fn write_prefixed_items<'c, V, I>(
         &mut self,
         iter: impl Iterator<Item = &'c (V, I)>,
     ) -> Result<(), WriteError>

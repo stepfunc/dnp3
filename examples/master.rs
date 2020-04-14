@@ -1,4 +1,4 @@
-use dnp3rs::app::gen::enums::{CommandStatus, OpType, TripCloseCode};
+use dnp3rs::app::gen::enums::{OpType, TripCloseCode};
 use dnp3rs::app::gen::variations::fixed::Group12Var1;
 use dnp3rs::app::gen::variations::variation::Variation;
 use dnp3rs::app::parse::parser::ParseLogLevel;
@@ -36,19 +36,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         NullReadHandler::create(),
     );
 
-    let crob = Group12Var1 {
-        code: ControlCode {
-            tcc: TripCloseCode::Nul,
-            clear: false,
-            queue: false,
-            op_type: OpType::LatchOn,
-        },
-        count: 1,
-        on_time: 0,
-        off_time: 0,
-        status: CommandStatus::Success,
-    };
-
     loop {
         let task1 = MasterTask::read(
             1024,
@@ -59,15 +46,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let task2 = MasterTask::select_before_operate(
             1024,
             vec![CommandHeader::U8(PrefixedCommandHeader::G12V1(vec![
-                (crob, 7),
-                (crob, 1),
+                (
+                    Group12Var1::from_code(ControlCode::from_op_type(OpType::LatchOn)),
+                    7,
+                ),
+                (
+                    Group12Var1::from_code(ControlCode::from_tcc_and_op_type(
+                        TripCloseCode::Trip,
+                        OpType::PulseOn,
+                    )),
+                    1,
+                ),
             ]))],
             Box::new(LoggingHandler {}),
         );
 
         let task3 = MasterTask::read(
             1024,
-            ReadRequest::Range8(RangeScan::new(Variation::Group20Var2, 1, 5)),
+            ReadRequest::Range8(RangeScan::new(Variation::Group1Var2, 1, 5)),
             NullReadHandler::create(),
         );
 

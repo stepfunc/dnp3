@@ -117,7 +117,6 @@ object PrefixedVariationModule extends Module {
       }
     }
 
-    "#[rustfmt::skip]".eol ++
     bracket("impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display") {
       bracket("pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError>") {
         bracket("match v") {

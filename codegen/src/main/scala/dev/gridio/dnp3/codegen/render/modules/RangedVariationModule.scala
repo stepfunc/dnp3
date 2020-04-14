@@ -154,8 +154,7 @@ object RangedVariationModule extends Module {
         //case _ => Iterator.empty
       }
     }
-
-    "#[rustfmt::skip]".eol ++
+    
     bracket("impl<'a> RangedVariation<'a>") {
       bracket("pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
         bracket("match v") {

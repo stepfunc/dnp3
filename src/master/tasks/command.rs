@@ -1,14 +1,11 @@
-use crate::app::format::write::start_request;
+use crate::app::format::write::HeaderWriter;
 use crate::app::gen::enums::FunctionCode;
-use crate::app::header::{Control, ResponseHeader};
+use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
-use crate::app::sequence::Sequence;
 use crate::master::runner::TaskError;
 use crate::master::task::TaskStatus;
-use crate::master::types::{
-    CommandHeader, CommandResponseError, CommandResultHandler, CommandTaskError,
-};
-use crate::util::cursor::{WriteCursor, WriteError};
+use crate::master::types::*;
+use crate::util::cursor::WriteError;
 
 enum State {
     Select,
@@ -49,17 +46,17 @@ impl CommandTask {
         Self::new(State::DirectOperate, headers, handler)
     }
 
-    pub(crate) fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        let function = match self.state {
+    pub(crate) fn function(&self) -> FunctionCode {
+        match self.state {
             State::DirectOperate => FunctionCode::DirectOperate,
             State::Select => FunctionCode::Select,
             State::Operate => FunctionCode::Operate,
-        };
+        }
+    }
 
-        let mut writer = start_request(Control::request(seq), function, cursor)?;
-
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         for header in self.headers.iter() {
-            header.write(&mut writer)?;
+            header.write(writer)?;
         }
 
         Ok(())

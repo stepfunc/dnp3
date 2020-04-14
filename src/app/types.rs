@@ -81,9 +81,16 @@ impl std::fmt::Display for DoubleBit {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ControlCode {
+    /// This field is used in conjunction with the `op_type` field to specify a control operation
     pub tcc: TripCloseCode,
+    /// Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that
+    /// index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it
+    /// would have if the command were allowed to complete normally.
     pub clear: bool,
+    /// This field is obsolete. Masters shall always set this bit to 0. Outstations that receive a
+    /// g12v1 object with this bit set shall reply with `CommandStatus::NotSupported`
     pub queue: bool,
+    /// This field is used in conjunction with the `tcc` field to specify a control operation
     pub op_type: OpType,
 }
 
@@ -92,6 +99,23 @@ impl ControlCode {
     const CR_MASK: u8 = 0b0010_0000;
     const QU_MASK: u8 = 0b0001_0000;
     const OP_MASK: u8 = 0b0000_1111;
+
+    pub fn new(tcc: TripCloseCode, op_type: OpType, clear: bool) -> Self {
+        Self {
+            tcc,
+            clear,
+            queue: false,
+            op_type,
+        }
+    }
+
+    pub fn from_op_type(value: OpType) -> Self {
+        Self::new(TripCloseCode::Nul, value, false)
+    }
+
+    pub fn from_tcc_and_op_type(tcc: TripCloseCode, op_type: OpType) -> Self {
+        Self::new(tcc, op_type, false)
+    }
 
     pub fn from(x: u8) -> Self {
         Self {
@@ -112,6 +136,16 @@ impl ControlCode {
         }
         x |= self.op_type.as_u8();
         x
+    }
+}
+
+impl std::fmt::Display for ControlCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "tcc: {:?} clear: {} queue: {} op_type: {:?}",
+            self.tcc, self.clear, self.queue, self.op_type
+        )
     }
 }
 
