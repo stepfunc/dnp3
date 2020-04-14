@@ -3,7 +3,7 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::handlers::ResponseHandler;
+use crate::master::handlers::ReadTaskHandler;
 use crate::master::runner::TaskError;
 use crate::master::task::TaskStatus;
 use crate::master::types::ClassScan;
@@ -28,7 +28,7 @@ impl ReadRequest {
 
 pub(crate) struct ReadTask {
     pub(crate) request: ReadRequest,
-    pub(crate) handler: Box<dyn ResponseHandler>,
+    pub(crate) handler: Box<dyn ReadTaskHandler>,
 }
 
 impl ReadTask {
@@ -51,7 +51,7 @@ impl ReadTask {
         }
     }
 
-    pub(crate) fn on_error(&mut self, _error: TaskError) {
-        // TODO - notify some kind of handler
+    pub(crate) fn on_error(&mut self, error: TaskError) {
+        self.handler.on_error(error)
     }
 }

@@ -2,12 +2,10 @@ use dnp3rs::app::gen::enums::{CommandStatus, OpType, TripCloseCode};
 use dnp3rs::app::gen::variations::fixed::Group12Var1;
 use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::app::types::ControlCode;
-use dnp3rs::master::handlers::NullResponseHandler;
+use dnp3rs::master::handlers::NullReadHandler;
 use dnp3rs::master::runner::TaskRunner;
 use dnp3rs::master::task::MasterTask;
-use dnp3rs::master::types::{
-    CommandHeader, CommandResultHandler, CommandTaskError, PrefixedCommandHeader,
-};
+use dnp3rs::master::types::*;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
@@ -17,7 +15,7 @@ struct LoggingHandler;
 impl CommandResultHandler for LoggingHandler {
     fn handle(&mut self, result: Result<(), CommandTaskError>) {
         match result {
-            Err(err) => log::error!("command error: {}", err),
+            Err(err) => log::warn!("command error: {}", err),
             Ok(()) => log::info!("command request succeeded"),
         }
     }
@@ -34,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut runner = TaskRunner::new(
         ParseLogLevel::ObjectValues,
         Duration::from_secs(1),
-        NullResponseHandler::create(),
+        NullReadHandler::create(),
     );
 
     let crob = Group12Var1 {

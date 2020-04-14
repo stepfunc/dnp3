@@ -340,7 +340,7 @@ impl TaskRunner {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::master::handlers::NullResponseHandler;
+    use crate::master::handlers::NullReadHandler;
     use crate::master::tasks::read::ReadRequest;
     use crate::master::types::ClassScan;
     use crate::transport::mocks::{MockReader, MockWriter};
@@ -351,13 +351,13 @@ mod test {
         let mut task = MasterTask::read(
             1024,
             ReadRequest::ClassScan(ClassScan::class1()),
-            NullResponseHandler::create(),
+            NullReadHandler::create(),
         );
 
         let mut runner = TaskRunner::new(
             ParseLogLevel::Nothing,
             Duration::from_secs(1),
-            NullResponseHandler::create(),
+            NullReadHandler::create(),
         );
 
         let mut io = Builder::new()

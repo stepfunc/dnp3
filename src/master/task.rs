@@ -1,7 +1,7 @@
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::handlers::ResponseHandler;
+use crate::master::handlers::ReadTaskHandler;
 use crate::master::runner::TaskError;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::{ReadRequest, ReadTask};
@@ -66,7 +66,7 @@ pub struct MasterTask {
 }
 
 impl MasterTask {
-    pub fn read(destination: u16, request: ReadRequest, handler: Box<dyn ResponseHandler>) -> Self {
+    pub fn read(destination: u16, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> Self {
         Self {
             destination,
             details: TaskDetails::Read(ReadTask { request, handler }),
