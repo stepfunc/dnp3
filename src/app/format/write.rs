@@ -29,6 +29,22 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         Ok(())
     }
 
+    pub(crate) fn write_range_only<T>(
+        &mut self,
+        variation: Variation,
+        start: T,
+        stop: T,
+    ) -> Result<(), WriteError>
+    where
+        T: Index,
+    {
+        variation.write(self.cursor)?;
+        T::RANGE_QUALIFIER.write(self.cursor)?;
+        start.write(self.cursor)?;
+        stop.write(self.cursor)?;
+        Ok(())
+    }
+
     pub(crate) fn write_prefixed_header<'c, V, I>(
         &mut self,
         iter: impl Iterator<Item = &'c (V, I)>,
@@ -38,7 +54,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         I: Index + 'c,
     {
         V::VARIATION.write(self.cursor)?;
-        I::count_and_prefix_qualifier().write(self.cursor)?;
+        I::COUNT_AND_PREFIX_QUALIFIER.write(self.cursor)?;
         let pos_of_count = self.cursor.position();
         self.cursor.skip(I::SIZE as usize)?;
 

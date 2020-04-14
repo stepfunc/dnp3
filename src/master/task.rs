@@ -4,8 +4,8 @@ use crate::app::sequence::Sequence;
 use crate::master::handlers::ReadTaskHandler;
 use crate::master::runner::TaskError;
 use crate::master::tasks::command::CommandTask;
-use crate::master::tasks::read::{ReadRequest, ReadTask};
-use crate::master::types::{CommandHeader, CommandResultHandler};
+use crate::master::tasks::read::ReadTask;
+use crate::master::types::{CommandHeader, CommandResultHandler, ReadRequest};
 use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone, Debug)]

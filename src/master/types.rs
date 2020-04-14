@@ -18,6 +18,16 @@ pub struct ClassScan {
     pub class0: bool,
 }
 
+#[derive(Copy, Clone)]
+pub struct RangeScan<T>
+where
+    T: Index,
+{
+    pub variation: Variation,
+    pub start: T,
+    pub stop: T,
+}
+
 impl ClassScan {
     pub fn new(class1: bool, class2: bool, class3: bool, class0: bool) -> Self {
         Self {
@@ -54,6 +64,52 @@ impl ClassScan {
             writer.write_all_objects_header(Variation::Group60Var1)?;
         }
         Ok(())
+    }
+}
+
+impl<T> RangeScan<T>
+where
+    T: Index,
+{
+    pub fn new(variation: Variation, start: T, stop: T) -> Self {
+        Self {
+            variation,
+            start,
+            stop,
+        }
+    }
+
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        writer.write_range_only(self.variation, self.start, self.stop)
+    }
+}
+
+#[derive(Copy, Clone)]
+pub enum ReadRequest {
+    ClassScan(ClassScan),
+    Range8(RangeScan<u8>),
+    Range16(RangeScan<u16>),
+}
+
+impl ReadRequest {
+    pub fn class_scan(scan: ClassScan) -> Self {
+        ReadRequest::ClassScan(scan)
+    }
+
+    pub fn one_byte_range(variation: Variation, start: u8, stop: u8) -> Self {
+        ReadRequest::Range8(RangeScan::new(variation, start, stop))
+    }
+
+    pub fn two_byte_range(variation: Variation, start: u16, stop: u16) -> Self {
+        ReadRequest::Range16(RangeScan::new(variation, start, stop))
+    }
+
+    pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        match self {
+            ReadRequest::ClassScan(scan) => scan.write(writer),
+            ReadRequest::Range8(scan) => scan.write(writer),
+            ReadRequest::Range16(scan) => scan.write(writer),
+        }
     }
 }
 

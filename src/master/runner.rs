@@ -341,8 +341,7 @@ impl TaskRunner {
 mod test {
     use super::*;
     use crate::master::handlers::NullReadHandler;
-    use crate::master::tasks::read::ReadRequest;
-    use crate::master::types::ClassScan;
+    use crate::master::types::{ClassScan, ReadRequest};
     use crate::transport::mocks::{MockReader, MockWriter};
     use tokio_test::io::Builder;
 

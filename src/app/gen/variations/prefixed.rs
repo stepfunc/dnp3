@@ -178,7 +178,7 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
             Variation::Group43Var8 => Ok(PrefixedVariation::Group43Var8(CountSequence::parse(count, cursor)?)),
             Variation::Group111(0) => Err(ObjectParseError::ZeroLengthOctetData),
             Variation::Group111(x) => Ok(PrefixedVariation::Group111VarX(x, PrefixedBytesSequence::parse(x, count, cursor)?)),
-            _ => Err(ObjectParseError::InvalidQualifierForVariation(v, I::count_and_prefix_qualifier())),
+            _ => Err(ObjectParseError::InvalidQualifierForVariation(v, I::COUNT_AND_PREFIX_QUALIFIER)),
         }
     }
     

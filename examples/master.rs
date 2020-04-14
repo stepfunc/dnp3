@@ -1,5 +1,6 @@
 use dnp3rs::app::gen::enums::{CommandStatus, OpType, TripCloseCode};
 use dnp3rs::app::gen::variations::fixed::Group12Var1;
+use dnp3rs::app::gen::variations::variation::Variation;
 use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::app::types::ControlCode;
 use dnp3rs::master::handlers::NullReadHandler;
@@ -49,12 +50,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     loop {
-        /*
-        let mut task =
-            MasterTask::class_scan(1024, ClassScan::integrity(), NullResponseHandler::create());
-        */
+        let task1 = MasterTask::read(
+            1024,
+            ReadRequest::class_scan(ClassScan::integrity()),
+            NullReadHandler::create(),
+        );
 
-        let mut task = MasterTask::select_before_operate(
+        let task2 = MasterTask::select_before_operate(
             1024,
             vec![CommandHeader::U8(PrefixedCommandHeader::G12V1(vec![
                 (crob, 7),
@@ -63,10 +65,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Box::new(LoggingHandler {}),
         );
 
-        runner
-            .run(&mut socket, &mut task, &mut writer, &mut reader)
-            .await
-            .unwrap();
-        tokio::time::delay_for(Duration::from_secs(2)).await;
+        let task3 = MasterTask::read(
+            1024,
+            ReadRequest::Range8(RangeScan::new(Variation::Group20Var2, 1, 5)),
+            NullReadHandler::create(),
+        );
+
+        for task in [task1, task2, task3].iter_mut() {
+            runner
+                .run(&mut socket, task, &mut writer, &mut reader)
+                .await
+                .unwrap();
+            tokio::time::delay_for(Duration::from_secs(2)).await;
+        }
     }
 }

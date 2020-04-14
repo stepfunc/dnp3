@@ -1,4 +1,4 @@
-use crate::app::format::write::{start_request, HeaderWriter};
+use crate::app::format::write::start_request;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
@@ -6,25 +6,8 @@ use crate::app::sequence::Sequence;
 use crate::master::handlers::ReadTaskHandler;
 use crate::master::runner::TaskError;
 use crate::master::task::TaskStatus;
-use crate::master::types::ClassScan;
+use crate::master::types::ReadRequest;
 use crate::util::cursor::{WriteCursor, WriteError};
-
-#[derive(Copy, Clone)]
-pub enum ReadRequest {
-    ClassScan(ClassScan),
-}
-
-impl ReadRequest {
-    pub fn class_scan(scan: ClassScan) -> Self {
-        ReadRequest::ClassScan(scan)
-    }
-
-    pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        match self {
-            ReadRequest::ClassScan(scan) => scan.write(writer),
-        }
-    }
-}
 
 pub(crate) struct ReadTask {
     pub(crate) request: ReadRequest,
