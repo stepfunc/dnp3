@@ -1,7 +1,7 @@
 use crate::app::format::write;
 use crate::app::parse::parser::{HeaderCollection, ParseLogLevel, ParsedFragment, Response};
 use crate::app::sequence::Sequence;
-use crate::master::task::{MasterTask, TaskStatus};
+use crate::master::request::{MasterRequest, RequestStatus};
 use crate::transport::{ReaderType, WriterType};
 
 use crate::app::header::ResponseHeader;
@@ -38,7 +38,7 @@ impl ResponseCount {
     }
 }
 
-pub struct TaskRunner {
+pub struct RequestRunner {
     level: ParseLogLevel,
     seq: Sequence,
     reply_timeout: Duration,
@@ -47,7 +47,7 @@ pub struct TaskRunner {
     buffer: [u8; 2048],
 }
 
-impl TaskRunner {
+impl RequestRunner {
     pub fn new(
         level: ParseLogLevel,
         reply_timeout: Duration,
@@ -65,7 +65,7 @@ impl TaskRunner {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum TaskError {
+pub enum RequestError {
     Lower(LinkError),
     MalformedResponse(ObjectParseError),
     NeverReceivedFir,
@@ -75,53 +75,53 @@ pub enum TaskError {
     WriteError,
 }
 
-impl std::fmt::Display for TaskError {
+impl std::fmt::Display for RequestError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            TaskError::Lower(_) => f.write_str("I/O error"),
-            TaskError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
-            TaskError::NeverReceivedFir => {
+            RequestError::Lower(_) => f.write_str("I/O error"),
+            RequestError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
+            RequestError::NeverReceivedFir => {
                 f.write_str("received non-FIR response before receiving FIR")
             }
-            TaskError::UnexpectedFir => {
+            RequestError::UnexpectedFir => {
                 f.write_str("received FIR bit after already receiving FIR bit")
             }
-            TaskError::MultiFragmentResponse => {
+            RequestError::MultiFragmentResponse => {
                 f.write_str("received unexpected multi-fragment response")
             }
-            TaskError::ResponseTimeout => f.write_str("no response received within timeout"),
-            TaskError::WriteError => {
+            RequestError::ResponseTimeout => f.write_str("no response received within timeout"),
+            RequestError::WriteError => {
                 f.write_str("unable to serialize the task's request (insufficient buffer space)")
             }
         }
     }
 }
 
-impl From<WriteError> for TaskError {
+impl From<WriteError> for RequestError {
     fn from(_: WriteError) -> Self {
-        TaskError::WriteError
+        RequestError::WriteError
     }
 }
 
-impl From<LinkError> for TaskError {
+impl From<LinkError> for RequestError {
     fn from(err: LinkError) -> Self {
-        TaskError::Lower(err)
+        RequestError::Lower(err)
     }
 }
 
-impl From<tokio::time::Elapsed> for TaskError {
+impl From<tokio::time::Elapsed> for RequestError {
     fn from(_: tokio::time::Elapsed) -> Self {
-        TaskError::ResponseTimeout
+        RequestError::ResponseTimeout
     }
 }
 
-impl From<ObjectParseError> for TaskError {
+impl From<ObjectParseError> for RequestError {
     fn from(err: ObjectParseError) -> Self {
-        TaskError::MalformedResponse(err)
+        RequestError::MalformedResponse(err)
     }
 }
 
-impl TaskRunner {
+impl RequestRunner {
     async fn confirm<T>(
         level: ParseLogLevel,
         io: &mut T,
@@ -147,14 +147,14 @@ impl TaskRunner {
         source: u16,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
-        task: &mut MasterTask,
+        task: &mut MasterRequest,
         writer: &mut WriterType,
-    ) -> Result<TaskStatus, TaskError>
+    ) -> Result<RequestStatus, RequestError>
     where
         T: AsyncWrite + Unpin,
     {
         if !(header.control.is_fir_and_fin()) {
-            return Err(TaskError::MultiFragmentResponse);
+            return Err(RequestError::MultiFragmentResponse);
         }
 
         // non-read responses REALLY shouldn't request confirmation
@@ -173,18 +173,18 @@ impl TaskRunner {
         source: u16,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
-        task: &mut MasterTask,
+        task: &mut MasterRequest,
         writer: &mut WriterType,
-    ) -> Result<TaskStatus, TaskError>
+    ) -> Result<RequestStatus, RequestError>
     where
         T: AsyncWrite + Unpin,
     {
         if header.control.fir && !self.count.is_none() {
-            return Err(TaskError::UnexpectedFir);
+            return Err(RequestError::UnexpectedFir);
         }
 
         if !header.control.fir && self.count.is_none() {
-            return Err(TaskError::NeverReceivedFir);
+            return Err(RequestError::NeverReceivedFir);
         }
 
         if !header.control.fin && !header.control.con {
@@ -212,9 +212,9 @@ impl TaskRunner {
         io: &mut T,
         source: u16,
         response: &Response<'_>,
-        task: &mut MasterTask,
+        task: &mut MasterRequest,
         writer: &mut WriterType,
-    ) -> Result<TaskStatus, TaskError>
+    ) -> Result<RequestStatus, RequestError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -222,7 +222,7 @@ impl TaskRunner {
             self.unsolicited_handler
                 .handle(self.level, source, response, io, writer)
                 .await?;
-            return Ok(TaskStatus::ContinueWaiting);
+            return Ok(RequestStatus::ContinueWaiting);
         }
 
         if response.header.control.seq.value() != self.seq.previous() {
@@ -231,7 +231,7 @@ impl TaskRunner {
                 response.header.control.seq.value(),
                 self.seq.previous()
             );
-            return Ok(TaskStatus::ContinueWaiting);
+            return Ok(RequestStatus::ContinueWaiting);
         }
 
         // if we can't parse a response, this is a TaskError
@@ -249,7 +249,7 @@ impl TaskRunner {
     async fn send_request<T>(
         &mut self,
         io: &mut T,
-        task: &mut MasterTask,
+        task: &mut MasterRequest,
         writer: &mut WriterType,
     ) -> Result<(), LinkError>
     where
@@ -267,10 +267,10 @@ impl TaskRunner {
     pub async fn run<T>(
         &mut self,
         io: &mut T,
-        task: &mut MasterTask,
+        task: &mut MasterRequest,
         writer: &mut WriterType,
         reader: &mut ReaderType,
-    ) -> Result<(), TaskError>
+    ) -> Result<(), RequestError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -284,10 +284,10 @@ impl TaskRunner {
     async fn run_impl<T>(
         &mut self,
         io: &mut T,
-        task: &mut MasterTask,
+        task: &mut MasterRequest,
         writer: &mut WriterType,
         reader: &mut ReaderType,
-    ) -> Result<(), TaskError>
+    ) -> Result<(), RequestError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -316,13 +316,15 @@ impl TaskRunner {
                                 .await?
                             {
                                 // we're done
-                                TaskStatus::Complete => return Ok(()),
+                                RequestStatus::Complete => return Ok(()),
                                 // go to next iteration of the loop without updating the timeout
-                                TaskStatus::ContinueWaiting => continue,
+                                RequestStatus::ContinueWaiting => continue,
                                 // go to next iteration of the loop, but update the timeout for another response
-                                TaskStatus::ReadNextResponse => deadline.extend(self.reply_timeout),
+                                RequestStatus::ReadNextResponse => {
+                                    deadline.extend(self.reply_timeout)
+                                }
                                 // format the request and go through the whole cycle again with a new timeout
-                                TaskStatus::ExecuteNextStep => {
+                                RequestStatus::ExecuteNextStep => {
                                     self.send_request(io, task, writer).await?;
                                     deadline.extend(self.reply_timeout)
                                 }
@@ -345,13 +347,13 @@ mod test {
 
     #[test]
     fn performs_multi_fragmented_class_scan() {
-        let mut task = MasterTask::read(
+        let mut task = MasterRequest::read(
             1024,
             ReadRequest::ClassScan(Classes::new(false, EventClasses::new(true, false, false))),
             NullReadHandler::create(),
         );
 
-        let mut runner = TaskRunner::new(
+        let mut runner = RequestRunner::new(
             ParseLogLevel::Nothing,
             Duration::from_secs(1),
             NullReadHandler::create(),

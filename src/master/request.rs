@@ -3,18 +3,18 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::handlers::{ReadTaskHandler, TaskCompletionHandler};
-use crate::master::runner::TaskError;
-use crate::master::tasks::command::CommandTask;
-use crate::master::tasks::read::ReadTask;
-use crate::master::tasks::simple::BasicResponseTask;
+use crate::master::handlers::{ReadTaskHandler, RequestCompletionHandler};
+use crate::master::requests::basic::BasicRequestImpl;
+use crate::master::requests::command::CommandRequestImpl;
+use crate::master::requests::read::ReadRequestImpl;
+use crate::master::runner::RequestError;
 use crate::master::types::{
     BasicRequest, CommandHeader, CommandTaskHandler, EventClasses, ReadRequest,
 };
 use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum TaskStatus {
+pub(crate) enum RequestStatus {
     /// go through the whole cycle of formatting and waiting for a reply again
     ExecuteNextStep,
     /// The response was not for the task, so keep waiting on the current timeout
@@ -25,27 +25,27 @@ pub(crate) enum TaskStatus {
     Complete,
 }
 
-pub(crate) enum TaskDetails {
-    Read(ReadTask),
-    Command(CommandTask),
-    BasicRequest(BasicResponseTask),
+pub(crate) enum RequestDetails {
+    Read(ReadRequestImpl),
+    Command(CommandRequestImpl),
+    EmptyResponse(BasicRequestImpl),
 }
 
-impl TaskDetails {
+impl RequestDetails {
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
-            TaskDetails::Read(_) => FunctionCode::Read,
-            TaskDetails::Command(x) => x.function(),
-            TaskDetails::BasicRequest(x) => x.function(),
+            RequestDetails::Read(_) => FunctionCode::Read,
+            RequestDetails::Command(x) => x.function(),
+            RequestDetails::EmptyResponse(x) => x.function(),
         }
     }
 
     pub(crate) fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         let mut writer = start_request(Control::request(seq), self.function(), cursor)?;
         match self {
-            TaskDetails::Read(task) => task.format(&mut writer),
-            TaskDetails::Command(task) => task.format(&mut writer),
-            TaskDetails::BasicRequest(task) => task.format(&mut writer),
+            RequestDetails::Read(task) => task.format(&mut writer),
+            RequestDetails::Command(task) => task.format(&mut writer),
+            RequestDetails::EmptyResponse(task) => task.format(&mut writer),
         }
     }
 
@@ -54,44 +54,44 @@ impl TaskDetails {
         source: u16,
         response: ResponseHeader,
         headers: HeaderCollection,
-    ) -> TaskStatus {
+    ) -> RequestStatus {
         match self {
-            TaskDetails::Read(task) => task.handle(source, response, headers),
-            TaskDetails::Command(task) => task.handle(source, response, headers),
-            TaskDetails::BasicRequest(task) => task.handle(source, response, headers),
+            RequestDetails::Read(task) => task.handle(source, response, headers),
+            RequestDetails::Command(task) => task.handle(source, response, headers),
+            RequestDetails::EmptyResponse(task) => task.handle(source, response, headers),
         }
     }
 
-    pub(crate) fn on_complete(&mut self, result: Result<(), TaskError>) {
+    pub(crate) fn on_complete(&mut self, result: Result<(), RequestError>) {
         match self {
-            TaskDetails::Read(task) => task.on_complete(result),
-            TaskDetails::Command(task) => task.on_complete(result),
-            TaskDetails::BasicRequest(task) => task.on_complete(result),
+            RequestDetails::Read(task) => task.on_complete(result),
+            RequestDetails::Command(task) => task.on_complete(result),
+            RequestDetails::EmptyResponse(task) => task.on_complete(result),
         }
     }
 }
 
-pub struct MasterTask {
+pub struct MasterRequest {
     pub(crate) destination: u16,
-    pub(crate) details: TaskDetails,
+    pub(crate) details: RequestDetails,
 }
 
-impl MasterTask {
+impl MasterRequest {
     pub fn read(destination: u16, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> Self {
         Self {
             destination,
-            details: TaskDetails::Read(ReadTask { request, handler }),
+            details: RequestDetails::Read(ReadRequestImpl { request, handler }),
         }
     }
 
     pub fn disable_unsolicited(
         destination: u16,
         classes: EventClasses,
-        handler: Box<dyn TaskCompletionHandler>,
+        handler: Box<dyn RequestCompletionHandler>,
     ) -> Self {
         Self {
             destination,
-            details: TaskDetails::BasicRequest(BasicResponseTask {
+            details: RequestDetails::EmptyResponse(BasicRequestImpl {
                 request: BasicRequest::DisableUnsolicited(classes),
                 handler,
             }),
@@ -101,11 +101,11 @@ impl MasterTask {
     pub fn enable_unsolicited(
         destination: u16,
         classes: EventClasses,
-        handler: Box<dyn TaskCompletionHandler>,
+        handler: Box<dyn RequestCompletionHandler>,
     ) -> Self {
         Self {
             destination,
-            details: TaskDetails::BasicRequest(BasicResponseTask {
+            details: RequestDetails::EmptyResponse(BasicRequestImpl {
                 request: BasicRequest::EnableUnsolicited(classes),
                 handler,
             }),
@@ -119,7 +119,9 @@ impl MasterTask {
     ) -> Self {
         Self {
             destination,
-            details: TaskDetails::Command(CommandTask::select_before_operate(headers, handler)),
+            details: RequestDetails::Command(CommandRequestImpl::select_before_operate(
+                headers, handler,
+            )),
         }
     }
 
@@ -130,7 +132,7 @@ impl MasterTask {
     ) -> Self {
         Self {
             destination,
-            details: TaskDetails::Command(CommandTask::direct_operate(headers, handler)),
+            details: RequestDetails::Command(CommandRequestImpl::direct_operate(headers, handler)),
         }
     }
 }

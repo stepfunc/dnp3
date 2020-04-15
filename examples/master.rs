@@ -3,9 +3,9 @@ use dnp3rs::app::gen::variations::fixed::Group12Var1;
 use dnp3rs::app::gen::variations::variation::Variation;
 use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::app::types::ControlCode;
-use dnp3rs::master::handlers::{NullReadHandler, TaskCompletionHandler};
-use dnp3rs::master::runner::{TaskError, TaskRunner};
-use dnp3rs::master::task::MasterTask;
+use dnp3rs::master::handlers::{NullReadHandler, RequestCompletionHandler};
+use dnp3rs::master::request::MasterRequest;
+use dnp3rs::master::runner::{RequestError, RequestRunner};
 use dnp3rs::master::types::*;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -21,8 +21,8 @@ impl CommandTaskHandler for LoggingHandler {
         }
     }
 }
-impl TaskCompletionHandler for LoggingHandler {
-    fn on_complete(&mut self, result: Result<(), TaskError>) {
+impl RequestCompletionHandler for LoggingHandler {
+    fn on_complete(&mut self, result: Result<(), RequestError>) {
         if let Err(err) = result {
             log::warn!("task error: {}", err)
         }
@@ -39,20 +39,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut reader, mut writer) = dnp3rs::transport::create_transport_layer(true, 1);
 
-    let mut runner = TaskRunner::new(
+    let mut runner = RequestRunner::new(
         ParseLogLevel::ObjectValues,
         Duration::from_secs(1),
         NullReadHandler::create(),
     );
 
     loop {
-        let task1 = MasterTask::read(
+        let task1 = MasterRequest::read(
             DESTINATION,
             ReadRequest::class_scan(Classes::integrity()),
             NullReadHandler::create(),
         );
 
-        let task2 = MasterTask::select_before_operate(
+        let task2 = MasterRequest::select_before_operate(
             DESTINATION,
             vec![CommandHeader::U8(PrefixedCommandHeader::G12V1(vec![
                 (
@@ -70,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Box::new(LoggingHandler {}),
         );
 
-        let task3 = MasterTask::read(
+        let task3 = MasterRequest::read(
             DESTINATION,
             ReadRequest::Range8(RangeScan::new(Variation::Group1Var2, 1, 5)),
             NullReadHandler::create(),

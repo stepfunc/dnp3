@@ -2,19 +2,19 @@ use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::parser::HeaderCollection;
-use crate::master::runner::TaskError;
+use crate::master::runner::RequestError;
 
 pub trait ResponseHandler {
     fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
 }
 
-pub trait TaskCompletionHandler {
-    fn on_complete(&mut self, result: Result<(), TaskError>);
+pub trait RequestCompletionHandler {
+    fn on_complete(&mut self, result: Result<(), RequestError>);
 }
 
-pub trait ReadTaskHandler: ResponseHandler + TaskCompletionHandler {}
+pub trait ReadTaskHandler: ResponseHandler + RequestCompletionHandler {}
 
-impl<T> ReadTaskHandler for T where T: ResponseHandler + TaskCompletionHandler {}
+impl<T> ReadTaskHandler for T where T: ResponseHandler + RequestCompletionHandler {}
 
 pub trait MeasurementHandler {
     fn handle_binary(&mut self, x: impl Iterator<Item = (Binary, u16)>);
@@ -40,6 +40,6 @@ impl ResponseHandler for NullReadHandler {
     fn handle(&mut self, _source: u16, _header: ResponseHeader, _headers: HeaderCollection) {}
 }
 
-impl TaskCompletionHandler for NullReadHandler {
-    fn on_complete(&mut self, _result: Result<(), TaskError>) {}
+impl RequestCompletionHandler for NullReadHandler {
+    fn on_complete(&mut self, _result: Result<(), RequestError>) {}
 }

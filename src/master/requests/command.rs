@@ -2,8 +2,8 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
-use crate::master::runner::TaskError;
-use crate::master::task::TaskStatus;
+use crate::master::request::RequestStatus;
+use crate::master::runner::RequestError;
 use crate::master::types::*;
 use crate::util::cursor::WriteError;
 
@@ -13,13 +13,13 @@ enum State {
     DirectOperate,
 }
 
-pub(crate) struct CommandTask {
+pub(crate) struct CommandRequestImpl {
     state: State,
     headers: Vec<CommandHeader>,
     handler: Box<dyn CommandTaskHandler>,
 }
 
-impl CommandTask {
+impl CommandRequestImpl {
     fn new(
         state: State,
         headers: Vec<CommandHeader>,
@@ -84,26 +84,26 @@ impl CommandTask {
         _source: u16,
         _response: ResponseHeader,
         headers: HeaderCollection,
-    ) -> TaskStatus {
+    ) -> RequestStatus {
         if let Err(err) = self.compare(headers) {
             self.handler.on_response(Err(err));
-            return TaskStatus::Complete;
+            return RequestStatus::Complete;
         }
 
         match self.state {
             State::Select => {
                 self.state = State::Operate;
-                TaskStatus::ExecuteNextStep
+                RequestStatus::ExecuteNextStep
             }
             _ => {
                 // Complete w/ success
                 self.handler.on_response(Ok(()));
-                TaskStatus::Complete
+                RequestStatus::Complete
             }
         }
     }
 
-    pub(crate) fn on_complete(&mut self, result: Result<(), TaskError>) {
+    pub(crate) fn on_complete(&mut self, result: Result<(), RequestError>) {
         self.handler.on_complete(result);
     }
 }

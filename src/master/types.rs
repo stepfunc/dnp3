@@ -7,8 +7,8 @@ use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::HeaderDetails;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::master::handlers::TaskCompletionHandler;
-use crate::master::runner::TaskError;
+use crate::master::handlers::RequestCompletionHandler;
+use crate::master::runner::RequestError;
 use crate::util::cursor::WriteError;
 
 #[derive(Copy, Clone)]
@@ -261,7 +261,7 @@ impl std::fmt::Display for CommandResponseError {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandTaskError {
     Response(CommandResponseError),
-    Task(TaskError),
+    Task(RequestError),
 }
 
 impl std::fmt::Display for CommandTaskError {
@@ -273,7 +273,7 @@ impl std::fmt::Display for CommandTaskError {
     }
 }
 
-pub trait CommandTaskHandler: TaskCompletionHandler {
+pub trait CommandTaskHandler: RequestCompletionHandler {
     fn on_response(&mut self, result: Result<(), CommandResponseError>);
 }
 
