@@ -390,7 +390,5 @@ mod test {
         let mut reader = MockReader::mock();
         tokio_test::block_on(runner.run(&mut io, &mut task, &mut writer, &mut reader)).unwrap();
         assert_eq!(session.seq(), 3);
-
-
     }
 }

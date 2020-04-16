@@ -8,9 +8,16 @@ use crate::master::types::{
     BasicRequest, CommandHeader, CommandTaskHandler, EventClasses, ReadRequest,
 };
 
+pub(crate) enum RestartIINState {
+    Cleared,
+    Asserted,
+    Failed,
+}
+
 struct Shared {
     destination: u16,
     seq: Sequence,
+    restart: RestartIINState,
 }
 
 impl Shared {
@@ -18,6 +25,7 @@ impl Shared {
         Self {
             destination,
             seq: Sequence::default(),
+            restart: RestartIINState::Cleared,
         }
     }
 }
@@ -59,6 +67,24 @@ impl Session {
         self.shared.borrow().seq.previous()
     }
 
+    pub fn on_restart_iin_observed(&mut self) {
+        let mut shared = self.shared.borrow_mut();
+        if let RestartIINState::Cleared = shared.restart {
+            shared.restart = RestartIINState::Asserted;
+        }
+    }
+
+    pub fn on_clear_restart_iin_failed(&mut self) {
+        self.shared.borrow_mut().restart = RestartIINState::Failed;
+    }
+
+    pub fn on_clear_restart_iin_success(&mut self) {
+        self.shared.borrow_mut().restart = RestartIINState::Cleared;
+    }
+}
+
+// helpers to produce request tasks
+impl Session {
     pub fn disable_unsolicited(
         &self,
         classes: EventClasses,
