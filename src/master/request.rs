@@ -3,9 +3,9 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::requests::basic::BasicRequestImpl;
-use crate::master::requests::command::CommandRequestImpl;
-use crate::master::requests::read::ReadRequestImpl;
+use crate::master::requests::auto::AutoRequestDetails;
+use crate::master::requests::command::CommandRequestDetails;
+use crate::master::requests::read::ReadRequestDetails;
 use crate::master::runner::RequestError;
 use crate::master::session::Session;
 use crate::util::cursor::{WriteCursor, WriteError};
@@ -23,9 +23,9 @@ pub(crate) enum RequestStatus {
 }
 
 pub(crate) enum RequestDetails {
-    Read(ReadRequestImpl),
-    Command(CommandRequestImpl),
-    EmptyResponse(BasicRequestImpl),
+    Read(ReadRequestDetails),
+    Command(CommandRequestDetails),
+    Auto(AutoRequestDetails),
 }
 
 impl RequestDetails {
@@ -33,7 +33,7 @@ impl RequestDetails {
         match self {
             RequestDetails::Read(_) => FunctionCode::Read,
             RequestDetails::Command(x) => x.function(),
-            RequestDetails::EmptyResponse(x) => x.function(),
+            RequestDetails::Auto(x) => x.function(),
         }
     }
 
@@ -42,20 +42,21 @@ impl RequestDetails {
         match self {
             RequestDetails::Read(task) => task.format(&mut writer),
             RequestDetails::Command(task) => task.format(&mut writer),
-            RequestDetails::EmptyResponse(task) => task.format(&mut writer),
+            RequestDetails::Auto(task) => task.format(&mut writer),
         }
     }
 
     pub(crate) fn handle(
         &mut self,
+        session: &mut Session,
         source: u16,
         response: ResponseHeader,
         headers: HeaderCollection,
     ) -> RequestStatus {
         match self {
             RequestDetails::Read(task) => task.handle(source, response, headers),
-            RequestDetails::Command(task) => task.handle(source, response, headers),
-            RequestDetails::EmptyResponse(task) => task.handle(source, response, headers),
+            RequestDetails::Command(task) => task.handle(headers),
+            RequestDetails::Auto(task) => task.handle(session, response, headers),
         }
     }
 
@@ -63,7 +64,7 @@ impl RequestDetails {
         match self {
             RequestDetails::Read(task) => task.on_complete(result),
             RequestDetails::Command(task) => task.on_complete(result),
-            RequestDetails::EmptyResponse(task) => task.on_complete(result),
+            RequestDetails::Auto(task) => task.on_complete(result),
         }
     }
 }
@@ -77,62 +78,4 @@ impl MasterRequest {
     pub(crate) fn new(session: Session, details: RequestDetails) -> Self {
         Self { session, details }
     }
-
-    /*
-    pub fn read(session: Session, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> Self {
-        Self::new(session, RequestDetails::Read(ReadRequestImpl { request, handler }))
-    }
-
-    pub fn disable_unsolicited(
-        session: Session,
-        classes: EventClasses,
-        handler: Box<dyn RequestCompletionHandler>,
-    ) -> Self {
-        Self {
-            session,
-            details: RequestDetails::EmptyResponse(BasicRequestImpl {
-                request: BasicRequest::DisableUnsolicited(classes),
-                handler,
-            }),
-        }
-    }
-
-    pub fn enable_unsolicited(
-        session: Session,
-        classes: EventClasses,
-        handler: Box<dyn RequestCompletionHandler>,
-    ) -> Self {
-        Self {
-            session,
-            details: RequestDetails::EmptyResponse(BasicRequestImpl {
-                request: BasicRequest::EnableUnsolicited(classes),
-                handler,
-            }),
-        }
-    }
-
-    pub fn select_before_operate(
-        session: Session,
-        headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandTaskHandler>,
-    ) -> Self {
-        Self {
-            session,
-            details: RequestDetails::Command(CommandRequestImpl::select_before_operate(
-                headers, handler,
-            )),
-        }
-    }
-
-    pub fn direct_operate(
-        session: Session,
-        headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandTaskHandler>,
-    ) -> Self {
-        Self {
-            session,
-            details: RequestDetails::Command(CommandRequestImpl::direct_operate(headers, handler)),
-        }
-    }
-    */
 }

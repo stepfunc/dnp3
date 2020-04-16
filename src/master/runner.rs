@@ -167,7 +167,9 @@ impl RequestRunner {
             .await?;
         }
 
-        Ok(task.details.handle(source, header, objects))
+        Ok(task
+            .details
+            .handle(&mut task.session, source, header, objects))
     }
 
     async fn handle_read_response<T>(
@@ -208,7 +210,9 @@ impl RequestRunner {
             .await?;
         }
 
-        let status = task.details.handle(source, header, objects);
+        let status = task
+            .details
+            .handle(&mut task.session, source, header, objects);
 
         if !header.control.fin {
             task.session.increment_seq();
@@ -234,6 +238,17 @@ impl RequestRunner {
                 .await?;
             return Ok(RequestStatus::ContinueWaiting);
         }
+
+        if source != task.session.destination() {
+            log::warn!(
+                "Received unexpected solicited response from address: {}",
+                source
+            );
+            return Ok(RequestStatus::ContinueWaiting);
+        }
+
+        // this allows us to detect things like RESTART, NEED_TIME, and EVENT_BUFFER_OVERFLOW
+        task.session.process_response_iin(response.header.iin);
 
         if response.header.control.seq.value() != task.session.previous_seq() {
             log::warn!(
@@ -350,6 +365,7 @@ impl RequestRunner {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::link::header::Address;
     use crate::master::handlers::NullReadHandler;
     use crate::master::session::Session;
     use crate::master::types::{Classes, EventClasses, ReadRequest};
@@ -359,7 +375,6 @@ mod test {
     #[test]
     fn performs_multi_fragmented_class_scan() {
         let session = Session::new(1024);
-        assert_eq!(session.seq(), 0);
 
         let mut task = session.read(
             ReadRequest::ClassScan(Classes::new(false, EventClasses::new(true, false, false))),
@@ -387,8 +402,8 @@ mod test {
             .build();
 
         let mut writer = MockWriter::mock();
-        let mut reader = MockReader::mock();
+        let mut reader = MockReader::mock(Address::new(1, 1024));
         tokio_test::block_on(runner.run(&mut io, &mut task, &mut writer, &mut reader)).unwrap();
-        assert_eq!(session.seq(), 3);
+        assert_eq!(session.previous_seq(), 2);
     }
 }

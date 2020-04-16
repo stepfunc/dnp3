@@ -1,5 +1,6 @@
 use crate::app::gen::enums::{FunctionCode, QualifierCode};
 use crate::app::gen::variations::variation::Variation;
+use crate::app::gen::variations::variation::Variation::Group80Var1;
 use crate::app::header::{Control, RequestHeader};
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::sequence::Sequence;
@@ -42,6 +43,12 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         T::RANGE_QUALIFIER.write(self.cursor)?;
         start.write(self.cursor)?;
         stop.write(self.cursor)?;
+        Ok(())
+    }
+
+    pub(crate) fn write_clear_restart(&mut self) -> Result<(), WriteError> {
+        self.write_range_only(Group80Var1, 7u8, 7u8)?;
+        self.cursor.write_u8(0)?;
         Ok(())
     }
 

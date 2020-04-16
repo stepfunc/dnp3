@@ -9,6 +9,7 @@ pub struct MockWriter;
 #[derive(Copy, Clone)]
 pub struct MockReader {
     count: usize,
+    address: Address,
     buffer: [u8; 2048],
 }
 
@@ -40,12 +41,13 @@ impl MockWriter {
 
 impl MockReader {
     pub(crate) fn new(_master: bool, _address: u16) -> Self {
-        Self::mock()
+        Self::mock(Address::new(0, 0))
     }
 
-    pub(crate) fn mock() -> Self {
+    pub(crate) fn mock(address: Address) -> Self {
         Self {
             count: 0,
+            address,
             buffer: [0; 2048],
         }
     }
@@ -54,7 +56,7 @@ impl MockReader {
         match self.count {
             0 => None,
             x => Some(Fragment {
-                address: Address::new(0, 0), // TODO?
+                address: self.address,
                 data: &self.buffer[0..x],
             }),
         }

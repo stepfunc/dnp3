@@ -1,8 +1,7 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::enums::FunctionCode;
-use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
-use crate::master::request::RequestStatus;
+use crate::master::request::{RequestDetails, RequestStatus};
 use crate::master::runner::RequestError;
 use crate::master::types::*;
 use crate::util::cursor::WriteError;
@@ -13,36 +12,36 @@ enum State {
     DirectOperate,
 }
 
-pub(crate) struct CommandRequestImpl {
+pub(crate) struct CommandRequestDetails {
     state: State,
     headers: Vec<CommandHeader>,
     handler: Box<dyn CommandTaskHandler>,
 }
 
-impl CommandRequestImpl {
+impl CommandRequestDetails {
     fn new(
         state: State,
         headers: Vec<CommandHeader>,
         handler: Box<dyn CommandTaskHandler>,
-    ) -> Self {
-        Self {
+    ) -> RequestDetails {
+        RequestDetails::Command(Self {
             state,
             headers,
             handler,
-        }
+        })
     }
 
     pub(crate) fn select_before_operate(
         headers: Vec<CommandHeader>,
         handler: Box<dyn CommandTaskHandler>,
-    ) -> Self {
+    ) -> RequestDetails {
         Self::new(State::Select, headers, handler)
     }
 
     pub(crate) fn direct_operate(
         headers: Vec<CommandHeader>,
         handler: Box<dyn CommandTaskHandler>,
-    ) -> Self {
+    ) -> RequestDetails {
         Self::new(State::DirectOperate, headers, handler)
     }
 
@@ -79,12 +78,7 @@ impl CommandRequestImpl {
         Ok(())
     }
 
-    pub(crate) fn handle(
-        &mut self,
-        _source: u16,
-        _response: ResponseHeader,
-        headers: HeaderCollection,
-    ) -> RequestStatus {
+    pub(crate) fn handle(&mut self, headers: HeaderCollection) -> RequestStatus {
         if let Err(err) = self.compare(headers) {
             self.handler.on_response(Err(err));
             return RequestStatus::Complete;

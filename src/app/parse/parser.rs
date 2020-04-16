@@ -443,6 +443,10 @@ impl<'a> HeaderCollection<'a> {
         ObjectParser::parse(function, data)
     }
 
+    pub fn is_empty(&self) -> bool {
+        return self.data.is_empty();
+    }
+
     /// return and iterator of the headers that lazily parses them
     pub fn iter(&self) -> HeaderIterator<'a> {
         HeaderIterator {

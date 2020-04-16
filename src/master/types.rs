@@ -112,7 +112,8 @@ pub enum ReadRequest {
 }
 
 #[derive(Copy, Clone)]
-pub enum BasicRequest {
+pub enum AutoRequest {
+    ClearRestartBit,
     EnableUnsolicited(EventClasses),
     DisableUnsolicited(EventClasses),
 }
@@ -139,18 +140,28 @@ impl ReadRequest {
     }
 }
 
-impl BasicRequest {
+impl AutoRequest {
     pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
-            BasicRequest::EnableUnsolicited(classes) => classes.write(writer),
-            BasicRequest::DisableUnsolicited(classes) => classes.write(writer),
+            AutoRequest::ClearRestartBit => writer.write_clear_restart(),
+            AutoRequest::EnableUnsolicited(classes) => classes.write(writer),
+            AutoRequest::DisableUnsolicited(classes) => classes.write(writer),
         }
     }
 
     pub(crate) fn function(self) -> FunctionCode {
         match self {
-            BasicRequest::EnableUnsolicited(_) => FunctionCode::EnabledUnsolicited,
-            BasicRequest::DisableUnsolicited(_) => FunctionCode::DisableUnsolicited,
+            AutoRequest::ClearRestartBit => FunctionCode::Write,
+            AutoRequest::EnableUnsolicited(_) => FunctionCode::EnabledUnsolicited,
+            AutoRequest::DisableUnsolicited(_) => FunctionCode::DisableUnsolicited,
+        }
+    }
+
+    pub(crate) fn description(self) -> &'static str {
+        match self {
+            AutoRequest::ClearRestartBit => "clear restart IIN bit",
+            AutoRequest::EnableUnsolicited(_) => "enable unsolicited reporting",
+            AutoRequest::DisableUnsolicited(_) => "disable unsolicited reporting",
         }
     }
 }
