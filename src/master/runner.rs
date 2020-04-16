@@ -40,28 +40,10 @@ impl ResponseCount {
 
 pub struct RequestRunner {
     level: ParseLogLevel,
-    seq: Sequence,
-    reply_timeout: Duration,
+    response_timeout: Duration,
     count: ResponseCount,
     unsolicited_handler: UnsolicitedHandler,
     buffer: [u8; 2048],
-}
-
-impl RequestRunner {
-    pub fn new(
-        level: ParseLogLevel,
-        reply_timeout: Duration,
-        unsolicited_handler: Box<dyn ResponseHandler>,
-    ) -> Self {
-        Self {
-            level,
-            seq: Sequence::default(),
-            reply_timeout,
-            count: ResponseCount::new(),
-            unsolicited_handler: UnsolicitedHandler::new(unsolicited_handler),
-            buffer: [0; 2048],
-        }
-    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -122,6 +104,20 @@ impl From<ObjectParseError> for RequestError {
 }
 
 impl RequestRunner {
+    pub fn new(
+        level: ParseLogLevel,
+        response_timeout: Duration,
+        unsolicited_handler: Box<dyn ResponseHandler>,
+    ) -> Self {
+        Self {
+            level,
+            response_timeout,
+            count: ResponseCount::new(),
+            unsolicited_handler: UnsolicitedHandler::new(unsolicited_handler),
+            buffer: [0; 2048],
+        }
+    }
+
     async fn confirm<T>(
         level: ParseLogLevel,
         io: &mut T,
@@ -161,7 +157,14 @@ impl RequestRunner {
         // but we'll confirm them if requested and log
         if header.control.con {
             log::warn!("received response requesting confirmation to non-read request");
-            Self::confirm(self.level, io, task.destination, header.control.seq, writer).await?;
+            Self::confirm(
+                self.level,
+                io,
+                task.session.destination(),
+                header.control.seq,
+                writer,
+            )
+            .await?;
         }
 
         Ok(task.details.handle(source, header, objects))
@@ -195,13 +198,20 @@ impl RequestRunner {
 
         // write a confirmation if required
         if header.control.con {
-            Self::confirm(self.level, io, task.destination, header.control.seq, writer).await?;
+            Self::confirm(
+                self.level,
+                io,
+                task.session.destination(),
+                header.control.seq,
+                writer,
+            )
+            .await?;
         }
 
         let status = task.details.handle(source, header, objects);
 
         if !header.control.fin {
-            self.seq.increment();
+            task.session.increment_seq();
         }
 
         Ok(status)
@@ -225,11 +235,11 @@ impl RequestRunner {
             return Ok(RequestStatus::ContinueWaiting);
         }
 
-        if response.header.control.seq.value() != self.seq.previous() {
+        if response.header.control.seq.value() != task.session.previous_seq() {
             log::warn!(
                 "response with seq: {} doesn't match expected seq: {}",
                 response.header.control.seq.value(),
-                self.seq.previous()
+                task.session.previous_seq()
             );
             return Ok(RequestStatus::ContinueWaiting);
         }
@@ -256,11 +266,11 @@ impl RequestRunner {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         // format the request
-        let seq = self.seq.increment();
+        let seq = task.session.increment_seq();
         let mut cursor = WriteCursor::new(&mut self.buffer);
         task.details.format(seq, &mut cursor)?;
         writer
-            .write(self.level, io, task.destination, cursor.written())
+            .write(self.level, io, task.session.destination(), cursor.written())
             .await
     }
 
@@ -294,7 +304,7 @@ impl RequestRunner {
         self.count.reset();
 
         self.send_request(io, task, writer).await?;
-        let mut deadline = crate::util::timeout::Timeout::from_now(self.reply_timeout);
+        let mut deadline = crate::util::timeout::Timeout::from_now(self.response_timeout);
 
         // now enter a loop to read responses
         loop {
@@ -321,12 +331,12 @@ impl RequestRunner {
                                 RequestStatus::ContinueWaiting => continue,
                                 // go to next iteration of the loop, but update the timeout for another response
                                 RequestStatus::ReadNextResponse => {
-                                    deadline.extend(self.reply_timeout)
+                                    deadline.extend(self.response_timeout)
                                 }
                                 // format the request and go through the whole cycle again with a new timeout
                                 RequestStatus::ExecuteNextStep => {
                                     self.send_request(io, task, writer).await?;
-                                    deadline.extend(self.reply_timeout)
+                                    deadline.extend(self.response_timeout)
                                 }
                             }
                         }
@@ -341,14 +351,17 @@ impl RequestRunner {
 mod test {
     use super::*;
     use crate::master::handlers::NullReadHandler;
+    use crate::master::session::Session;
     use crate::master::types::{Classes, EventClasses, ReadRequest};
     use crate::transport::mocks::{MockReader, MockWriter};
     use tokio_test::io::Builder;
 
     #[test]
     fn performs_multi_fragmented_class_scan() {
-        let mut task = MasterRequest::read(
-            1024,
+        let session = Session::new(1024);
+        assert_eq!(session.seq(), 0);
+
+        let mut task = session.read(
             ReadRequest::ClassScan(Classes::new(false, EventClasses::new(true, false, false))),
             NullReadHandler::create(),
         );
@@ -376,5 +389,8 @@ mod test {
         let mut writer = MockWriter::mock();
         let mut reader = MockReader::mock();
         tokio_test::block_on(runner.run(&mut io, &mut task, &mut writer, &mut reader)).unwrap();
+        assert_eq!(session.seq(), 3);
+
+
     }
 }

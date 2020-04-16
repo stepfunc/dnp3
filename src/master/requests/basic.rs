@@ -14,6 +14,10 @@ pub(crate) struct BasicRequestImpl {
 }
 
 impl BasicRequestImpl {
+    pub(crate) fn new(request: BasicRequest, handler: Box<dyn RequestCompletionHandler>) -> Self {
+        Self { request, handler }
+    }
+
     pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         self.request.format(writer)
     }

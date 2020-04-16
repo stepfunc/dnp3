@@ -4,8 +4,8 @@ use dnp3rs::app::gen::variations::variation::Variation;
 use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::app::types::ControlCode;
 use dnp3rs::master::handlers::{NullReadHandler, RequestCompletionHandler};
-use dnp3rs::master::request::MasterRequest;
 use dnp3rs::master::runner::{RequestError, RequestRunner};
+use dnp3rs::master::session::Session;
 use dnp3rs::master::types::*;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -29,8 +29,6 @@ impl RequestCompletionHandler for LoggingHandler {
     }
 }
 
-const DESTINATION: u16 = 1024;
-
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
@@ -45,15 +43,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         NullReadHandler::create(),
     );
 
+    let session = Session::new(1024);
+
     loop {
-        let task1 = MasterRequest::read(
-            DESTINATION,
+        let task1 = session.read(
             ReadRequest::class_scan(Classes::integrity()),
             NullReadHandler::create(),
         );
 
-        let task2 = MasterRequest::select_before_operate(
-            DESTINATION,
+        let task2 = session.select_before_operate(
             vec![CommandHeader::U8(PrefixedCommandHeader::G12V1(vec![
                 (
                     Group12Var1::from_code(ControlCode::from_op_type(OpType::LatchOn)),
@@ -70,8 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Box::new(LoggingHandler {}),
         );
 
-        let task3 = MasterRequest::read(
-            DESTINATION,
+        let task3 = session.read(
             ReadRequest::Range8(RangeScan::new(Variation::Group1Var2, 1, 5)),
             NullReadHandler::create(),
         );

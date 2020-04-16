@@ -3,17 +3,14 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::handlers::{ReadTaskHandler, RequestCompletionHandler};
 use crate::master::requests::basic::BasicRequestImpl;
 use crate::master::requests::command::CommandRequestImpl;
 use crate::master::requests::read::ReadRequestImpl;
 use crate::master::runner::RequestError;
-use crate::master::types::{
-    BasicRequest, CommandHeader, CommandTaskHandler, EventClasses, ReadRequest,
-};
+use crate::master::session::Session;
 use crate::util::cursor::{WriteCursor, WriteError};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub(crate) enum RequestStatus {
     /// go through the whole cycle of formatting and waiting for a reply again
     ExecuteNextStep,
@@ -72,25 +69,27 @@ impl RequestDetails {
 }
 
 pub struct MasterRequest {
-    pub(crate) destination: u16,
+    pub(crate) session: Session,
     pub(crate) details: RequestDetails,
 }
 
 impl MasterRequest {
-    pub fn read(destination: u16, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> Self {
-        Self {
-            destination,
-            details: RequestDetails::Read(ReadRequestImpl { request, handler }),
-        }
+    pub(crate) fn new(session: Session, details: RequestDetails) -> Self {
+        Self { session, details }
+    }
+
+    /*
+    pub fn read(session: Session, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> Self {
+        Self::new(session, RequestDetails::Read(ReadRequestImpl { request, handler }))
     }
 
     pub fn disable_unsolicited(
-        destination: u16,
+        session: Session,
         classes: EventClasses,
         handler: Box<dyn RequestCompletionHandler>,
     ) -> Self {
         Self {
-            destination,
+            session,
             details: RequestDetails::EmptyResponse(BasicRequestImpl {
                 request: BasicRequest::DisableUnsolicited(classes),
                 handler,
@@ -99,12 +98,12 @@ impl MasterRequest {
     }
 
     pub fn enable_unsolicited(
-        destination: u16,
+        session: Session,
         classes: EventClasses,
         handler: Box<dyn RequestCompletionHandler>,
     ) -> Self {
         Self {
-            destination,
+            session,
             details: RequestDetails::EmptyResponse(BasicRequestImpl {
                 request: BasicRequest::EnableUnsolicited(classes),
                 handler,
@@ -113,12 +112,12 @@ impl MasterRequest {
     }
 
     pub fn select_before_operate(
-        destination: u16,
+        session: Session,
         headers: Vec<CommandHeader>,
         handler: Box<dyn CommandTaskHandler>,
     ) -> Self {
         Self {
-            destination,
+            session,
             details: RequestDetails::Command(CommandRequestImpl::select_before_operate(
                 headers, handler,
             )),
@@ -126,13 +125,14 @@ impl MasterRequest {
     }
 
     pub fn direct_operate(
-        destination: u16,
+        session: Session,
         headers: Vec<CommandHeader>,
         handler: Box<dyn CommandTaskHandler>,
     ) -> Self {
         Self {
-            destination,
+            session,
             details: RequestDetails::Command(CommandRequestImpl::direct_operate(headers, handler)),
         }
     }
+    */
 }
