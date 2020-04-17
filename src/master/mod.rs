@@ -7,4 +7,3 @@ pub mod runner;
 pub mod session;
 pub mod task;
 pub mod types;
-pub(crate) mod unsolicited;

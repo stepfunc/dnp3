@@ -13,7 +13,10 @@ pub(crate) struct ReadRequestDetails {
 }
 
 impl ReadRequestDetails {
-    pub(crate) fn new(request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> RequestDetails {
+    pub(crate) fn create(
+        request: ReadRequest,
+        handler: Box<dyn ReadTaskHandler>,
+    ) -> RequestDetails {
         RequestDetails::Read(Self { request, handler })
     }
 

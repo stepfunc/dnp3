@@ -19,7 +19,7 @@ pub(crate) struct CommandRequestDetails {
 }
 
 impl CommandRequestDetails {
-    fn new(
+    fn create(
         state: State,
         headers: Vec<CommandHeader>,
         handler: Box<dyn CommandTaskHandler>,
@@ -35,14 +35,14 @@ impl CommandRequestDetails {
         headers: Vec<CommandHeader>,
         handler: Box<dyn CommandTaskHandler>,
     ) -> RequestDetails {
-        Self::new(State::Select, headers, handler)
+        Self::create(State::Select, headers, handler)
     }
 
     pub(crate) fn direct_operate(
         headers: Vec<CommandHeader>,
         handler: Box<dyn CommandTaskHandler>,
     ) -> RequestDetails {
-        Self::new(State::DirectOperate, headers, handler)
+        Self::create(State::DirectOperate, headers, handler)
     }
 
     pub(crate) fn function(&self) -> FunctionCode {

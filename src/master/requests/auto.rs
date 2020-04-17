@@ -15,7 +15,7 @@ pub(crate) struct AutoRequestDetails {
 }
 
 impl AutoRequestDetails {
-    pub(crate) fn new(
+    pub(crate) fn create(
         request: AutoRequest,
         handler: Box<dyn RequestCompletionHandler>,
     ) -> RequestDetails {
@@ -43,7 +43,7 @@ impl AutoRequestDetails {
         match self.request {
             AutoRequest::DisableUnsolicited(_) => {}
             AutoRequest::EnableUnsolicited(_) => {}
-            AutoRequest::ClearRestartBit => self.handle_clear_restart_response(session, &response),
+            AutoRequest::ClearRestartBit => self.handle_clear_restart_response(session, response),
         }
 
         RequestStatus::Complete
@@ -52,7 +52,7 @@ impl AutoRequestDetails {
     pub(crate) fn handle_clear_restart_response(
         &mut self,
         session: &mut Session,
-        response: &ResponseHeader,
+        response: ResponseHeader,
     ) {
         if response.iin.iin1.get_device_restart() {
             // prevents all future retries b/c the device doesn't handle this properly

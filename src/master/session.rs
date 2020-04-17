@@ -82,7 +82,7 @@ impl Session {
 // helpers to produce request tasks
 impl Session {
     pub fn read(&self, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> MasterRequest {
-        MasterRequest::new(self.clone(), ReadRequestDetails::new(request, handler))
+        MasterRequest::new(self.clone(), ReadRequestDetails::create(request, handler))
     }
 
     pub fn disable_unsolicited(
@@ -92,7 +92,7 @@ impl Session {
     ) -> MasterRequest {
         MasterRequest::new(
             self.clone(),
-            AutoRequestDetails::new(AutoRequest::DisableUnsolicited(classes), handler),
+            AutoRequestDetails::create(AutoRequest::DisableUnsolicited(classes), handler),
         )
     }
 
@@ -103,7 +103,7 @@ impl Session {
     ) -> MasterRequest {
         MasterRequest::new(
             self.clone(),
-            AutoRequestDetails::new(AutoRequest::DisableUnsolicited(classes), handler),
+            AutoRequestDetails::create(AutoRequest::DisableUnsolicited(classes), handler),
         )
     }
 

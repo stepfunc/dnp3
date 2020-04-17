@@ -8,7 +8,6 @@ use crate::app::header::ResponseHeader;
 use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;
 use crate::master::handlers::ResponseHandler;
-use crate::master::unsolicited::UnsolicitedHandler;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 use crate::app::gen::enums::FunctionCode;
@@ -42,7 +41,7 @@ pub struct RequestRunner {
     level: ParseLogLevel,
     response_timeout: Duration,
     count: ResponseCount,
-    unsolicited_handler: UnsolicitedHandler,
+    unsolicited_handler: Box<dyn ResponseHandler>,
     buffer: [u8; 2048],
 }
 
@@ -113,13 +112,13 @@ impl RequestRunner {
             level,
             response_timeout,
             count: ResponseCount::new(),
-            unsolicited_handler: UnsolicitedHandler::new(unsolicited_handler),
+            unsolicited_handler,
             buffer: [0; 2048],
         }
     }
 
-    async fn confirm<T>(
-        level: ParseLogLevel,
+    async fn confirm_solicited<T>(
+        &mut self,
         io: &mut T,
         destination: u16,
         seq: Sequence,
@@ -128,12 +127,53 @@ impl RequestRunner {
     where
         T: AsyncWrite + Unpin,
     {
-        let mut buffer: [u8; 2] = [0; 2];
-        let mut cursor = WriteCursor::new(&mut buffer);
+        let mut cursor = WriteCursor::new(&mut self.buffer);
         write::confirm_solicited(seq, &mut cursor)?;
         writer
-            .write(level, io, destination, cursor.written())
+            .write(self.level, io, destination, cursor.written())
             .await?;
+        Ok(())
+    }
+
+    async fn confirm_unsolicited<T>(
+        &mut self,
+        io: &mut T,
+        destination: u16,
+        seq: Sequence,
+        writer: &mut WriterType,
+    ) -> Result<(), LinkError>
+    where
+        T: AsyncWrite + Unpin,
+    {
+        let mut cursor = WriteCursor::new(&mut self.buffer);
+        crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
+
+        writer
+            .write(self.level, io, destination, cursor.written())
+            .await?;
+        Ok(())
+    }
+
+    pub(crate) async fn handle_unsolicited<T>(
+        &mut self,
+        source: u16,
+        response: &Response<'_>,
+        io: &mut T,
+        writer: &mut WriterType,
+    ) -> Result<(), LinkError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        if let Ok(objects) = response.objects {
+            self.unsolicited_handler
+                .handle(source, response.header, objects);
+        }
+
+        if response.header.control.con {
+            self.confirm_unsolicited(io, source, response.header.control.seq, writer)
+                .await?;
+        }
+
         Ok(())
     }
 
@@ -157,14 +197,8 @@ impl RequestRunner {
         // but we'll confirm them if requested and log
         if header.control.con {
             log::warn!("received response requesting confirmation to non-read request");
-            Self::confirm(
-                self.level,
-                io,
-                task.session.destination(),
-                header.control.seq,
-                writer,
-            )
-            .await?;
+            self.confirm_solicited(io, task.session.destination(), header.control.seq, writer)
+                .await?;
         }
 
         Ok(task
@@ -200,14 +234,8 @@ impl RequestRunner {
 
         // write a confirmation if required
         if header.control.con {
-            Self::confirm(
-                self.level,
-                io,
-                task.session.destination(),
-                header.control.seq,
-                writer,
-            )
-            .await?;
+            self.confirm_solicited(io, task.session.destination(), header.control.seq, writer)
+                .await?;
         }
 
         let status = task
@@ -233,8 +261,7 @@ impl RequestRunner {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         if response.header.unsolicited {
-            self.unsolicited_handler
-                .handle(self.level, source, response, io, writer)
+            self.handle_unsolicited(source, response, io, writer)
                 .await?;
             return Ok(RequestStatus::ContinueWaiting);
         }

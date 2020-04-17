@@ -444,7 +444,7 @@ impl<'a> HeaderCollection<'a> {
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.data.is_empty();
+        self.data.is_empty()
     }
 
     /// return and iterator of the headers that lazily parses them
