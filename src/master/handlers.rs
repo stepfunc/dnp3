@@ -12,6 +12,10 @@ pub trait RequestCompletionHandler {
     fn on_complete(&mut self, result: Result<(), RequestError>);
 }
 
+pub trait SessionHandler: ResponseHandler {
+    // TODO - add additional methods
+}
+
 pub trait ReadTaskHandler: ResponseHandler + RequestCompletionHandler {}
 
 impl<T> ReadTaskHandler for T where T: ResponseHandler + RequestCompletionHandler {}
@@ -28,18 +32,20 @@ pub trait MeasurementHandler {
 }
 
 #[derive(Copy, Clone)]
-pub struct NullReadHandler;
+pub struct NullHandler;
 
-impl NullReadHandler {
-    pub fn create() -> Box<NullReadHandler> {
+impl NullHandler {
+    pub fn boxed() -> Box<NullHandler> {
         Box::new(Self {})
     }
 }
 
-impl ResponseHandler for NullReadHandler {
+impl ResponseHandler for NullHandler {
     fn handle(&mut self, _source: u16, _header: ResponseHeader, _headers: HeaderCollection) {}
 }
 
-impl RequestCompletionHandler for NullReadHandler {
+impl SessionHandler for NullHandler {}
+
+impl RequestCompletionHandler for NullHandler {
     fn on_complete(&mut self, _result: Result<(), RequestError>) {}
 }

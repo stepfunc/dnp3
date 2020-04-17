@@ -1,5 +1,4 @@
 use crate::app::parse::parser::ParseLogLevel;
-use crate::master::handlers::ResponseHandler;
 use crate::master::runner::RequestRunner;
 use tokio::prelude::{AsyncRead, AsyncWrite};
 
@@ -25,9 +24,9 @@ pub enum SessionError {
 }
 
 impl MasterTask {
-    pub fn new(config: Configuration, unsolicited_handler: Box<dyn ResponseHandler>) -> Self {
+    pub fn new(config: Configuration) -> Self {
         Self {
-            _runner: RequestRunner::new(config.level, config.response_timeout, unsolicited_handler),
+            _runner: RequestRunner::new(config.level, config.response_timeout),
         }
     }
 

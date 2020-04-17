@@ -7,10 +7,10 @@ use crate::transport::{ReaderType, WriterType};
 use crate::app::header::ResponseHeader;
 use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;
-use crate::master::handlers::ResponseHandler;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 use crate::app::gen::enums::FunctionCode;
+use crate::master::session::SessionMap;
 use std::fmt::Formatter;
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
@@ -41,7 +41,7 @@ pub struct RequestRunner {
     level: ParseLogLevel,
     response_timeout: Duration,
     count: ResponseCount,
-    unsolicited_handler: Box<dyn ResponseHandler>,
+    sessions: SessionMap,
     buffer: [u8; 2048],
 }
 
@@ -103,16 +103,12 @@ impl From<ObjectParseError> for RequestError {
 }
 
 impl RequestRunner {
-    pub fn new(
-        level: ParseLogLevel,
-        response_timeout: Duration,
-        unsolicited_handler: Box<dyn ResponseHandler>,
-    ) -> Self {
+    pub fn new(level: ParseLogLevel, response_timeout: Duration) -> Self {
         Self {
             level,
             response_timeout,
             count: ResponseCount::new(),
-            unsolicited_handler,
+            sessions: SessionMap::new(),
             buffer: [0; 2048],
         }
     }
@@ -164,9 +160,19 @@ impl RequestRunner {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
+        let session = match self.sessions.get(source) {
+            Some(session) => session,
+            None => {
+                log::warn!(
+                    "received unsolicited response from unknown address: {}",
+                    source
+                );
+                return Ok(());
+            }
+        };
+
         if let Ok(objects) = response.objects {
-            self.unsolicited_handler
-                .handle(source, response.header, objects);
+            session.handle_unsolicited(source, response.header, objects);
         }
 
         if response.header.control.con {
@@ -197,7 +203,7 @@ impl RequestRunner {
         // but we'll confirm them if requested and log
         if header.control.con {
             log::warn!("received response requesting confirmation to non-read request");
-            self.confirm_solicited(io, task.session.destination(), header.control.seq, writer)
+            self.confirm_solicited(io, task.session.address(), header.control.seq, writer)
                 .await?;
         }
 
@@ -234,7 +240,7 @@ impl RequestRunner {
 
         // write a confirmation if required
         if header.control.con {
-            self.confirm_solicited(io, task.session.destination(), header.control.seq, writer)
+            self.confirm_solicited(io, task.session.address(), header.control.seq, writer)
                 .await?;
         }
 
@@ -266,7 +272,7 @@ impl RequestRunner {
             return Ok(RequestStatus::ContinueWaiting);
         }
 
-        if source != task.session.destination() {
+        if source != task.session.address() {
             log::warn!(
                 "Received unexpected solicited response from address: {}",
                 source
@@ -312,7 +318,7 @@ impl RequestRunner {
         let mut cursor = WriteCursor::new(&mut self.buffer);
         task.details.format(seq, &mut cursor)?;
         writer
-            .write(self.level, io, task.session.destination(), cursor.written())
+            .write(self.level, io, task.session.address(), cursor.written())
             .await
     }
 
@@ -393,7 +399,7 @@ impl RequestRunner {
 mod test {
     use super::*;
     use crate::link::header::Address;
-    use crate::master::handlers::NullReadHandler;
+    use crate::master::handlers::NullHandler;
     use crate::master::session::Session;
     use crate::master::types::{Classes, EventClasses, ReadRequest};
     use crate::transport::mocks::{MockReader, MockWriter};
@@ -401,18 +407,14 @@ mod test {
 
     #[test]
     fn performs_multi_fragmented_class_scan() {
-        let session = Session::new(1024);
+        let session = Session::new(1024, NullHandler::boxed());
 
         let mut task = session.read(
             ReadRequest::ClassScan(Classes::new(false, EventClasses::new(true, false, false))),
-            NullReadHandler::create(),
+            NullHandler::boxed(),
         );
 
-        let mut runner = RequestRunner::new(
-            ParseLogLevel::Nothing,
-            Duration::from_secs(1),
-            NullReadHandler::create(),
-        );
+        let mut runner = RequestRunner::new(ParseLogLevel::Nothing, Duration::from_secs(1));
 
         let mut io = Builder::new()
             .write(&[0xC0, 0x01, 0x3C, 0x02, 0x06])

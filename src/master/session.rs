@@ -1,6 +1,7 @@
-use crate::app::header::IIN;
+use crate::app::header::{ResponseHeader, IIN};
+use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::handlers::{ReadTaskHandler, RequestCompletionHandler};
+use crate::master::handlers::{ReadTaskHandler, RequestCompletionHandler, SessionHandler};
 use crate::master::request::MasterRequest;
 use crate::master::requests::auto::AutoRequestDetails;
 use crate::master::requests::command::CommandRequestDetails;
@@ -8,25 +9,43 @@ use crate::master::requests::read::ReadRequestDetails;
 use crate::master::types::{
     AutoRequest, CommandHeader, CommandTaskHandler, EventClasses, ReadRequest,
 };
+use std::collections::BTreeMap;
 
-pub(crate) enum RestartIINState {
-    Cleared,
-    Asserted,
+pub(crate) enum AutoTaskState {
+    /// The task doesn't need to run
+    Idle,
+    /// The task needs to run
+    Pending,
+    /// The task has permanently failed
     Failed,
 }
 
+pub(crate) struct TaskStates {
+    clear_restart_iin: AutoTaskState,
+}
+
+impl TaskStates {
+    pub(crate) fn new() -> Self {
+        Self {
+            clear_restart_iin: AutoTaskState::Idle,
+        }
+    }
+}
+
 struct Shared {
-    destination: u16,
+    address: u16,
     seq: Sequence,
-    restart: RestartIINState,
+    tasks: TaskStates,
+    handler: Box<dyn SessionHandler>,
 }
 
 impl Shared {
-    pub(crate) fn new(destination: u16) -> Self {
+    pub(crate) fn new(address: u16, handler: Box<dyn SessionHandler>) -> Self {
         Self {
-            destination,
+            address,
             seq: Sequence::default(),
-            restart: RestartIINState::Cleared,
+            tasks: TaskStates::new(),
+            handler,
         }
     }
 }
@@ -37,14 +56,42 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(destination: u16) -> Self {
+    pub fn new(destination: u16, handler: Box<dyn SessionHandler>) -> Self {
         Self {
-            shared: std::rc::Rc::new(std::cell::RefCell::new(Shared::new(destination))),
+            shared: std::rc::Rc::new(std::cell::RefCell::new(Shared::new(destination, handler))),
         }
     }
 
-    pub fn destination(&self) -> u16 {
-        self.shared.borrow().destination
+    pub fn address(&self) -> u16 {
+        self.shared.borrow().address
+    }
+
+    pub fn handle_unsolicited(
+        &mut self,
+        source: u16,
+        header: ResponseHeader,
+        objects: HeaderCollection,
+    ) {
+        self.shared
+            .borrow_mut()
+            .handler
+            .handle(source, header, objects)
+    }
+}
+
+pub(crate) struct SessionMap {
+    sessions: BTreeMap<u16, Session>,
+}
+
+impl SessionMap {
+    pub(crate) fn new() -> Self {
+        Self {
+            sessions: BTreeMap::new(),
+        }
+    }
+
+    pub(crate) fn get(&mut self, address: u16) -> Option<&mut Session> {
+        self.sessions.get_mut(&address)
     }
 }
 
@@ -65,17 +112,18 @@ impl Session {
 
     fn on_restart_iin_observed(&mut self) {
         let mut shared = self.shared.borrow_mut();
-        if let RestartIINState::Cleared = shared.restart {
-            shared.restart = RestartIINState::Asserted;
+        if let AutoTaskState::Idle = shared.tasks.clear_restart_iin {
+            log::warn!("device restart detected (address == {}", shared.address);
+            shared.tasks.clear_restart_iin = AutoTaskState::Pending;
         }
     }
 
     pub(crate) fn on_clear_restart_iin_failed(&mut self) {
-        self.shared.borrow_mut().restart = RestartIINState::Failed;
+        self.shared.borrow_mut().tasks.clear_restart_iin = AutoTaskState::Failed;
     }
 
     pub(crate) fn on_clear_restart_iin_success(&mut self) {
-        self.shared.borrow_mut().restart = RestartIINState::Cleared;
+        self.shared.borrow_mut().tasks.clear_restart_iin = AutoTaskState::Idle;
     }
 }
 

@@ -3,7 +3,7 @@ use dnp3rs::app::gen::variations::fixed::Group12Var1;
 use dnp3rs::app::gen::variations::variation::Variation;
 use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::app::types::ControlCode;
-use dnp3rs::master::handlers::{NullReadHandler, RequestCompletionHandler};
+use dnp3rs::master::handlers::{NullHandler, RequestCompletionHandler};
 use dnp3rs::master::runner::{RequestError, RequestRunner};
 use dnp3rs::master::session::Session;
 use dnp3rs::master::types::*;
@@ -37,18 +37,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut reader, mut writer) = dnp3rs::transport::create_transport_layer(true, 1);
 
-    let mut runner = RequestRunner::new(
-        ParseLogLevel::ObjectValues,
-        Duration::from_secs(1),
-        NullReadHandler::create(),
-    );
+    let mut runner = RequestRunner::new(ParseLogLevel::ObjectValues, Duration::from_secs(1));
 
-    let session = Session::new(1024);
+    let session = Session::new(1024, NullHandler::boxed());
 
     loop {
         let task1 = session.read(
             ReadRequest::class_scan(Classes::integrity()),
-            NullReadHandler::create(),
+            NullHandler::boxed(),
         );
 
         let task2 = session.select_before_operate(
@@ -70,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let task3 = session.read(
             ReadRequest::Range8(RangeScan::new(Variation::Group1Var2, 1, 5)),
-            NullReadHandler::create(),
+            NullHandler::boxed(),
         );
 
         for task in [task1, task2, task3].iter_mut() {
