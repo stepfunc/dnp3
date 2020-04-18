@@ -34,6 +34,7 @@ impl MockWriter {
     where
         W: AsyncWrite + Unpin,
     {
+        println!("{:?}", fragment);
         io.write(fragment).await?;
         Ok(())
     }

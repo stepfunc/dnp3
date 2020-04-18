@@ -1,7 +1,7 @@
-use crate::app::parse::parser::ParseLogLevel;
-use crate::master::runner::RequestRunner;
-use tokio::prelude::{AsyncRead, AsyncWrite};
+// use crate::app::parse::parser::ParseLogLevel;
+//use tokio::prelude::{AsyncRead, AsyncWrite};
 
+/*
 /// Configuration of a master task
 pub struct MasterTask {
     _runner: RequestRunner,
@@ -37,3 +37,4 @@ impl MasterTask {
         SessionError::Shutdown
     }
 }
+*/

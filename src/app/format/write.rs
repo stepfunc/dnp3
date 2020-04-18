@@ -21,6 +21,14 @@ pub(crate) fn start_request<'a, 'b>(
 }
 
 impl<'a, 'b> HeaderWriter<'a, 'b> {
+    pub(crate) fn write_class1230(&mut self) -> Result<(), WriteError> {
+        self.write_all_objects_header(Variation::Group60Var2)?;
+        self.write_all_objects_header(Variation::Group60Var3)?;
+        self.write_all_objects_header(Variation::Group60Var4)?;
+        self.write_all_objects_header(Variation::Group60Var1)?;
+        Ok(())
+    }
+
     pub(crate) fn write_all_objects_header(
         &mut self,
         variation: Variation,

@@ -103,12 +103,12 @@ impl From<ObjectParseError> for RequestError {
 }
 
 impl RequestRunner {
-    pub fn new(level: ParseLogLevel, response_timeout: Duration) -> Self {
+    pub fn new(level: ParseLogLevel, response_timeout: Duration, sessions: SessionMap) -> Self {
         Self {
             level,
             response_timeout,
             count: ResponseCount::new(),
-            sessions: SessionMap::new(),
+            sessions,
             buffer: [0; 2048],
         }
     }
@@ -322,13 +322,30 @@ impl RequestRunner {
             .await
     }
 
-    pub async fn run<T>(
+    pub async fn run_tasks<T>(
+        &mut self,
+        io: &mut T,
+        writer: &mut WriterType,
+        reader: &mut ReaderType,
+    ) -> Result<(), LinkError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        loop {
+            match self.sessions.next_task() {
+                Some(mut task) => self.run_task(io, &mut task, writer, reader).await?,
+                None => return Ok(()),
+            }
+        }
+    }
+
+    async fn run_task<T>(
         &mut self,
         io: &mut T,
         task: &mut MasterRequest,
         writer: &mut WriterType,
         reader: &mut ReaderType,
-    ) -> Result<(), RequestError>
+    ) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -336,7 +353,10 @@ impl RequestRunner {
 
         task.details.on_complete(result);
 
-        result
+        match result {
+            Err(RequestError::Lower(err)) => Err(err),
+            _ => Ok(()),
+        }
     }
 
     async fn run_impl<T>(
@@ -400,24 +420,21 @@ mod test {
     use super::*;
     use crate::link::header::Address;
     use crate::master::handlers::NullHandler;
-    use crate::master::session::Session;
-    use crate::master::types::{Classes, EventClasses, ReadRequest};
+    use crate::master::session::SessionConfig;
     use crate::transport::mocks::{MockReader, MockWriter};
     use tokio_test::io::Builder;
 
     #[test]
     fn performs_multi_fragmented_class_scan() {
-        let session = Session::new(1024, NullHandler::boxed());
+        let mut map = SessionMap::new();
+        assert!(map.register(1024, SessionConfig::none(), NullHandler::boxed()));
 
-        let mut task = session.read(
-            ReadRequest::ClassScan(Classes::new(false, EventClasses::new(true, false, false))),
-            NullHandler::boxed(),
-        );
-
-        let mut runner = RequestRunner::new(ParseLogLevel::Nothing, Duration::from_secs(1));
+        let mut runner = RequestRunner::new(ParseLogLevel::Nothing, Duration::from_secs(1), map);
 
         let mut io = Builder::new()
-            .write(&[0xC0, 0x01, 0x3C, 0x02, 0x06])
+            .write(&[
+                0xC0, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
+            ])
             // FIR=1, FIN=0, CON=1, SEQ = 0
             .read(&[0xA0, 0x81, 0x00, 0x00])
             // confirm
@@ -432,7 +449,6 @@ mod test {
 
         let mut writer = MockWriter::mock();
         let mut reader = MockReader::mock(Address::new(1, 1024));
-        tokio_test::block_on(runner.run(&mut io, &mut task, &mut writer, &mut reader)).unwrap();
-        assert_eq!(session.previous_seq(), 2);
+        tokio_test::block_on(runner.run_tasks(&mut io, &mut writer, &mut reader)).unwrap();
     }
 }

@@ -62,9 +62,9 @@ impl RequestDetails {
 
     pub(crate) fn on_complete(&mut self, result: Result<(), RequestError>) {
         match self {
+            RequestDetails::Auto(_) => {}
             RequestDetails::Read(task) => task.on_complete(result),
             RequestDetails::Command(task) => task.on_complete(result),
-            RequestDetails::Auto(task) => task.on_complete(result),
         }
     }
 }
