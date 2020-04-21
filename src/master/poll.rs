@@ -40,6 +40,17 @@ impl Poll {
         }
     }
 
+    pub(crate) fn is_ready(&self, now: Instant) -> bool {
+        if let Some(next) = self.next.get() {
+            return next <= now;
+        }
+        false
+    }
+
+    pub(crate) fn next(&self) -> Option<Instant> {
+        self.next.get()
+    }
+
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         self.request.format(writer)
     }

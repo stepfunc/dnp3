@@ -10,7 +10,7 @@ use crate::link::error::LinkError;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 use crate::app::gen::enums::FunctionCode;
-use crate::master::session::SessionMap;
+use crate::master::session::{NextRequest, SessionMap};
 use std::fmt::Formatter;
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
@@ -207,9 +207,7 @@ impl RequestRunner {
                 .await?;
         }
 
-        Ok(task
-            .details
-            .handle(&mut task.session, source, header, objects))
+        Ok(task.details.handle(&task.session, source, header, objects))
     }
 
     async fn handle_read_response<T>(
@@ -244,9 +242,7 @@ impl RequestRunner {
                 .await?;
         }
 
-        let status = task
-            .details
-            .handle(&mut task.session, source, header, objects);
+        let status = task.details.handle(&task.session, source, header, objects);
 
         if !header.control.fin {
             task.session.increment_seq();
@@ -333,8 +329,11 @@ impl RequestRunner {
     {
         loop {
             match self.sessions.next_task() {
-                Some(mut task) => self.run_task(io, &mut task, writer, reader).await?,
-                None => return Ok(()),
+                NextRequest::Now(mut task) => self.run_task(io, &mut task, writer, reader).await?,
+                NextRequest::NotBefore(time) => {
+                    tokio::time::delay_until(tokio::time::Instant::from_std(time)).await
+                }
+                NextRequest::None => return Ok(()),
             }
         }
     }
@@ -420,14 +419,19 @@ mod test {
     use super::*;
     use crate::link::header::Address;
     use crate::master::handlers::NullHandler;
-    use crate::master::session::SessionConfig;
+    use crate::master::session::{Session, SessionConfig};
     use crate::transport::mocks::{MockReader, MockWriter};
     use tokio_test::io::Builder;
 
     #[test]
     fn performs_multi_fragmented_class_scan() {
         let mut map = SessionMap::new();
-        assert!(map.register(1024, SessionConfig::none(), NullHandler::boxed()));
+
+        assert!(map.register(Session::new(
+            1024,
+            SessionConfig::none(),
+            NullHandler::boxed()
+        )));
 
         let mut runner = RequestRunner::new(ParseLogLevel::Nothing, Duration::from_secs(1), map);
 

@@ -10,8 +10,9 @@ use crate::master::requests::read::ReadRequestDetails;
 use crate::master::types::{
     AutoRequest, CommandHeader, CommandTaskHandler, EventClasses, ReadRequest,
 };
+use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[derive(Copy, Clone)]
 pub struct SessionConfig {
@@ -90,6 +91,7 @@ pub(crate) struct SessionHandle {
     inner: std::rc::Rc<Shared>,
 }
 
+// TODO - remove this clone
 #[derive(Clone)]
 pub struct Session {
     config: SessionConfig,
@@ -179,6 +181,12 @@ impl SessionHandle {
     }
 }
 
+pub enum NextRequest {
+    None,
+    Now(MasterRequest),
+    NotBefore(Instant),
+}
+
 impl Session {
     pub fn new(address: u16, config: SessionConfig, handler: Box<dyn SessionHandler>) -> Self {
         Self {
@@ -194,9 +202,9 @@ impl Session {
         self.polls.push(Poll::new(request, period));
     }
 
-    pub fn next_request(&self) -> Option<MasterRequest> {
+    pub fn next_request(&self, now: Instant) -> NextRequest {
         if self.handle.inner.tasks.clear_restart_iin.get().is_pending() {
-            return Some(self.clear_restart_iin());
+            return NextRequest::Now(self.clear_restart_iin());
         }
         if self.config.disable_unsol_classes.any()
             && self
@@ -207,10 +215,10 @@ impl Session {
                 .get()
                 .is_pending()
         {
-            return Some(self.disable_unsolicited(self.config.disable_unsol_classes));
+            return NextRequest::Now(self.disable_unsolicited(self.config.disable_unsol_classes));
         }
         if self.handle.inner.tasks.integrity_scan.get().is_pending() {
-            return Some(self.integrity());
+            return NextRequest::Now(self.integrity());
         }
         if self.config.enable_unsol_classes.any()
             && self
@@ -221,15 +229,38 @@ impl Session {
                 .get()
                 .is_pending()
         {
-            return Some(self.enable_unsolicited(self.config.enable_unsol_classes));
+            return NextRequest::Now(self.enable_unsolicited(self.config.enable_unsol_classes));
         }
-        None
+
+        let mut earliest = Smallest::<Instant>::new();
+
+        for poll in &self.polls {
+            if poll.is_ready(now) {
+                return NextRequest::Now(self.poll(poll.to_request()));
+            }
+
+            if let Some(x) = poll.next() {
+                earliest.observe(x)
+            }
+        }
+
+        if let Some(x) = earliest.value() {
+            return NextRequest::NotBefore(x);
+        }
+
+        NextRequest::None
     }
 }
 
 pub struct SessionMap {
     sessions: BTreeMap<u16, Session>,
     priority: VecDeque<Session>,
+}
+
+impl Default for SessionMap {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SessionMap {
@@ -240,19 +271,14 @@ impl SessionMap {
         }
     }
 
-    pub fn register(
-        &mut self,
-        address: u16,
-        config: SessionConfig,
-        handler: Box<dyn SessionHandler>,
-    ) -> bool {
+    pub fn register(&mut self, session: Session) -> bool {
+        let address = session.handle.address();
         if self.sessions.contains_key(&address) {
             return false;
         }
 
-        let session = Session::new(address, config, handler);
         self.sessions.insert(address, session.clone());
-        self.priority.push_front(session.clone());
+        self.priority.push_front(session);
         true
     }
 
@@ -260,21 +286,30 @@ impl SessionMap {
         self.sessions.get(&address).map(|x| x.handle.clone())
     }
 
-    pub(crate) fn next_task(&mut self) -> Option<MasterRequest> {
+    pub(crate) fn next_task(&mut self) -> NextRequest {
+        let now = std::time::Instant::now();
+
+        let mut earliest = Smallest::<Instant>::new();
+
         // don't try to rotate the tasks more times than the length of the queue
         for _ in 0..self.priority.len() {
             if let Some(session) = self.priority.front() {
-                match session.next_request() {
-                    Some(task) => return Some(task),
-                    None => {
+                match session.next_request(now) {
+                    NextRequest::Now(request) => return NextRequest::Now(request),
+                    NextRequest::None => {
                         // move the current front to the back
                         self.priority.rotate_left(1);
                     }
+                    NextRequest::NotBefore(x) => earliest.observe(x),
                 }
             }
         }
 
-        None
+        if let Some(x) = earliest.value() {
+            return NextRequest::NotBefore(x);
+        }
+
+        NextRequest::None
     }
 }
 
@@ -285,6 +320,10 @@ impl Session {
             self.handle.clone(),
             ReadRequestDetails::create(request, handler),
         )
+    }
+
+    fn poll(&self, request: AutoRequest) -> MasterRequest {
+        MasterRequest::new(self.handle.clone(), AutoRequestDetails::create(request))
     }
 
     fn clear_restart_iin(&self) -> MasterRequest {
