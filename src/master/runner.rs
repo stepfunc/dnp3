@@ -12,7 +12,7 @@ use crate::util::cursor::{WriteCursor, WriteError};
 use crate::app::gen::enums::FunctionCode;
 use crate::master::session::{NextRequest, SessionMap};
 use std::fmt::Formatter;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::prelude::{AsyncRead, AsyncWrite};
 
 struct ResponseCount {
@@ -37,11 +37,26 @@ impl ResponseCount {
     }
 }
 
-pub struct RequestRunner {
+#[derive(Copy, Clone)]
+pub enum Message {
+    HelloWorld,
+}
+
+#[derive(Copy, Clone, Debug)]
+struct Shutdown;
+
+#[derive(Copy, Clone, Debug)]
+pub enum RunError {
+    Link(LinkError),
+    Shutdown,
+}
+
+pub struct Runner {
     level: ParseLogLevel,
     response_timeout: Duration,
     count: ResponseCount,
     sessions: SessionMap,
+    request_queue: tokio::sync::mpsc::Receiver<Message>,
     buffer: [u8; 2048],
 }
 
@@ -54,6 +69,7 @@ pub enum RequestError {
     MultiFragmentResponse,
     ResponseTimeout,
     WriteError,
+    Shutdown,
 }
 
 impl std::fmt::Display for RequestError {
@@ -73,6 +89,9 @@ impl std::fmt::Display for RequestError {
             RequestError::ResponseTimeout => f.write_str("no response received within timeout"),
             RequestError::WriteError => {
                 f.write_str("unable to serialize the task's request (insufficient buffer space)")
+            }
+            RequestError::Shutdown => {
+                f.write_str("the master was shutdown while executing the task")
             }
         }
     }
@@ -102,14 +121,130 @@ impl From<ObjectParseError> for RequestError {
     }
 }
 
-impl RequestRunner {
-    pub fn new(level: ParseLogLevel, response_timeout: Duration, sessions: SessionMap) -> Self {
-        Self {
+impl From<LinkError> for RunError {
+    fn from(err: LinkError) -> Self {
+        RunError::Link(err)
+    }
+}
+
+impl From<Shutdown> for RunError {
+    fn from(_: Shutdown) -> Self {
+        RunError::Shutdown
+    }
+}
+
+impl From<Shutdown> for RequestError {
+    fn from(_: Shutdown) -> Self {
+        RequestError::Shutdown
+    }
+}
+
+impl Runner {
+    pub fn new(
+        level: ParseLogLevel,
+        response_timeout: Duration,
+        sessions: SessionMap,
+    ) -> (Self, tokio::sync::mpsc::Sender<Message>) {
+        let (tx, rx) = tokio::sync::mpsc::channel(100); // TODO - configurable size
+        let runner = Self {
             level,
             response_timeout,
             count: ResponseCount::new(),
             sessions,
+            request_queue: rx,
             buffer: [0; 2048],
+        };
+        (runner, tx)
+    }
+
+    async fn idle_until<T>(
+        &mut self,
+        instant: Instant,
+        io: &mut T,
+        writer: &mut WriterType,
+        reader: &mut ReaderType,
+    ) -> Result<(), RunError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        loop {
+            tokio::select! {
+                result = self.process_message() => {
+                   result?;
+                }
+                result = reader.read(io) => {
+                   result?;
+                   self.handle_fragment_while_idle(io, writer, reader).await?;
+                }
+                _ = tokio::time::delay_until(tokio::time::Instant::from_std(instant)) => {
+                   return Ok(());
+                }
+            }
+        }
+    }
+
+    async fn idle_forever<T>(
+        &mut self,
+        io: &mut T,
+        writer: &mut WriterType,
+        reader: &mut ReaderType,
+    ) -> Result<(), RunError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        loop {
+            tokio::select! {
+                result = self.process_message() => {
+                   result?;
+                }
+                result = reader.read(io) => {
+                   result?;
+                   self.handle_fragment_while_idle(io, writer, reader).await?;
+                }
+            }
+        }
+    }
+
+    async fn handle_fragment_while_idle<T>(
+        &mut self,
+        io: &mut T,
+        writer: &mut WriterType,
+        reader: &mut ReaderType,
+    ) -> Result<(), RunError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        if let Some(fragment) = reader.peek() {
+            if let Ok(parsed) = ParsedFragment::parse(self.level.receive(), fragment.data) {
+                match parsed.to_response() {
+                    Err(err) => log::warn!("{}", err),
+                    Ok(response) => {
+                        if response.header.unsolicited {
+                            self.handle_unsolicited(fragment.address.source, &response, io, writer)
+                                .await?;
+                        } else {
+                            log::warn!(
+                                "unexpected response with sequence: {}",
+                                response.header.control.seq.value()
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn process_message(&mut self) -> Result<(), Shutdown> {
+        match self.request_queue.recv().await {
+            Some(x) => {
+                match x {
+                    // TODO - handle real messages!
+                    Message::HelloWorld => {}
+                }
+                Ok(())
+            }
+            None => Err(Shutdown),
         }
     }
 
@@ -318,22 +453,20 @@ impl RequestRunner {
             .await
     }
 
-    pub async fn run_tasks<T>(
+    pub async fn run<T>(
         &mut self,
         io: &mut T,
         writer: &mut WriterType,
         reader: &mut ReaderType,
-    ) -> Result<(), LinkError>
+    ) -> Result<(), RunError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
             match self.sessions.next_task() {
                 NextRequest::Now(mut task) => self.run_task(io, &mut task, writer, reader).await?,
-                NextRequest::NotBefore(time) => {
-                    tokio::time::delay_until(tokio::time::Instant::from_std(time)).await
-                }
-                NextRequest::None => return Ok(()),
+                NextRequest::NotBefore(time) => self.idle_until(time, io, writer, reader).await?,
+                NextRequest::None => self.idle_forever(io, writer, reader).await?,
             }
         }
     }
@@ -344,7 +477,7 @@ impl RequestRunner {
         task: &mut MasterRequest,
         writer: &mut WriterType,
         reader: &mut ReaderType,
-    ) -> Result<(), LinkError>
+    ) -> Result<(), RunError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -353,7 +486,8 @@ impl RequestRunner {
         task.details.on_complete(result);
 
         match result {
-            Err(RequestError::Lower(err)) => Err(err),
+            Err(RequestError::Lower(err)) => Err(RunError::Link(err)),
+            Err(RequestError::Shutdown) => Err(RunError::Shutdown),
             _ => Ok(()),
         }
     }
@@ -375,53 +509,71 @@ impl RequestRunner {
 
         // now enter a loop to read responses
         loop {
-            tokio::time::timeout_at(deadline.value, reader.read(io)).await??;
+            tokio::select! {
+                _ = tokio::time::delay_until(deadline.value) => {
+                     return Err(RequestError::ResponseTimeout);
+                }
+                x = reader.read(io)  => {
+                    x?;
+                }
+                y = self.process_message() => {
+                    y?;
+                    continue;
+                }
+            }
 
-            if let Some(fragment) = reader.peek() {
-                if let Ok(parsed) = ParsedFragment::parse(self.level.receive(), fragment.data) {
-                    match parsed.to_response() {
-                        Err(err) => log::warn!("{}", err),
-                        Ok(response) => {
-                            match self
-                                .handle_response(
-                                    io,
-                                    fragment.address.source,
-                                    &response,
-                                    task,
-                                    writer,
-                                )
-                                .await?
-                            {
-                                // we're done
-                                RequestStatus::Complete => return Ok(()),
-                                // go to next iteration of the loop without updating the timeout
-                                RequestStatus::ContinueWaiting => continue,
-                                // go to next iteration of the loop, but update the timeout for another response
-                                RequestStatus::ReadNextResponse => {
-                                    deadline.extend(self.response_timeout)
-                                }
-                                // format the request and go through the whole cycle again with a new timeout
-                                RequestStatus::ExecuteNextStep => {
-                                    self.send_request(io, task, writer).await?;
-                                    deadline.extend(self.response_timeout)
-                                }
-                            }
-                        }
-                    }
-                };
+            match self.process_response(io, task, writer, reader).await? {
+                // we're done
+                RequestStatus::Complete => return Ok(()),
+                // go to next iteration of the loop without updating the timeout
+                RequestStatus::ContinueWaiting => continue,
+                // go to next iteration of the loop, but update the timeout for another response
+                RequestStatus::ReadNextResponse => deadline.extend(self.response_timeout),
+                // format the request and go through the whole cycle again with a new timeout
+                RequestStatus::ExecuteNextStep => {
+                    self.send_request(io, task, writer).await?;
+                    deadline.extend(self.response_timeout)
+                }
             }
         }
+    }
+
+    async fn process_response<T>(
+        &mut self,
+        io: &mut T,
+        task: &mut MasterRequest,
+        writer: &mut WriterType,
+        reader: &mut ReaderType,
+    ) -> Result<RequestStatus, RequestError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        if let Some(fragment) = reader.peek() {
+            if let Ok(parsed) = ParsedFragment::parse(self.level.receive(), fragment.data) {
+                match parsed.to_response() {
+                    Err(err) => log::warn!("{}", err),
+                    Ok(response) => {
+                        return self
+                            .handle_response(io, fragment.address.source, &response, task, writer)
+                            .await
+                    }
+                }
+            };
+        }
+        Ok(RequestStatus::ContinueWaiting)
     }
 }
 
 #[cfg(test)]
 mod test {
+    /*
     use super::*;
     use crate::link::header::Address;
     use crate::master::handlers::NullHandler;
     use crate::master::session::{Session, SessionConfig};
     use crate::transport::mocks::{MockReader, MockWriter};
     use tokio_test::io::Builder;
+
 
     #[test]
     fn performs_multi_fragmented_class_scan() {
@@ -433,7 +585,7 @@ mod test {
             NullHandler::boxed()
         )));
 
-        let mut runner = RequestRunner::new(ParseLogLevel::Nothing, Duration::from_secs(1), map);
+        let (mut runner, _handle) = Runner::new(ParseLogLevel::Nothing, Duration::from_secs(1), map);
 
         let mut io = Builder::new()
             .write(&[
@@ -453,6 +605,8 @@ mod test {
 
         let mut writer = MockWriter::mock();
         let mut reader = MockReader::mock(Address::new(1, 1024));
-        tokio_test::block_on(runner.run_tasks(&mut io, &mut writer, &mut reader)).unwrap();
+        let mut task =
+        tokio_test::block_on(runner.run_task(&mut io, &mut writer, &mut reader)).unwrap();
     }
+    */
 }

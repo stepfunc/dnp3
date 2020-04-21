@@ -1,6 +1,6 @@
 use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::master::handlers::NullHandler;
-use dnp3rs::master::runner::RequestRunner;
+use dnp3rs::master::runner::Runner;
 use dnp3rs::master::session::{Session, SessionConfig, SessionMap};
 use dnp3rs::master::types::{Classes, EventClasses, ReadRequest};
 use std::net::SocketAddr;
@@ -8,7 +8,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::net::TcpStream;
 
-fn get_session_map() -> SessionMap {
+fn get_sessions() -> SessionMap {
     let mut sessions = SessionMap::new();
     let mut session = Session::new(1024, SessionConfig::default(), NullHandler::boxed());
     session.add_poll(
@@ -27,14 +27,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut reader, mut writer) = dnp3rs::transport::create_transport_layer(true, 1);
 
-    let mut runner = RequestRunner::new(
+    let (mut runner, _handle) = Runner::new(
         ParseLogLevel::ObjectValues,
         Duration::from_secs(1),
-        get_session_map(),
+        get_sessions(),
     );
 
     runner
-        .run_tasks(&mut socket, &mut writer, &mut reader)
+        .run(&mut socket, &mut writer, &mut reader)
         .await
         .unwrap();
 
