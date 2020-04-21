@@ -77,6 +77,13 @@ impl TaskStates {
             enabled_unsolicited: std::cell::Cell::new(AutoTaskState::Pending),
         }
     }
+
+    pub(crate) fn reset(&self) {
+        self.disable_unsolicited.set(AutoTaskState::Pending);
+        self.clear_restart_iin.set(AutoTaskState::Idle);
+        self.integrity_scan.set(AutoTaskState::Pending);
+        self.enabled_unsolicited.set(AutoTaskState::Pending);
+    }
 }
 
 struct Shared {
@@ -107,6 +114,7 @@ impl Shared {
 }
 
 impl Session {
+
     pub(crate) fn address(&self) -> u16 {
         self.inner.address
     }
@@ -255,6 +263,12 @@ impl SessionMap {
         Self {
             sessions: BTreeMap::new(),
             priority: VecDeque::new(),
+        }
+    }
+
+    pub fn reset(&mut self) {
+        for (_, session) in &mut self.sessions {
+            session.inner.tasks.reset();
         }
     }
 

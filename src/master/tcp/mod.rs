@@ -54,13 +54,12 @@ impl MasterTask {
                 }
             }
 
+            self.runner.reset();
             self.reader.reset();
             self.writer.reset();
 
-            // TODO - implement a reconnect delay
 
-            // TODO - do we need to reset the runner?
-            //runner.reset();
+            // TODO - implement a reconnect delay
         }
     }
 }

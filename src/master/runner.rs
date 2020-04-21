@@ -167,6 +167,10 @@ impl Runner {
         }
     }
 
+    pub(crate) fn reset(&mut self) {
+
+    }
+
     async fn idle_until<T>(
         &mut self,
         instant: Instant,
