@@ -3,7 +3,7 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::request::{RequestDetails, RequestStatus};
-use crate::master::session::SessionHandle;
+use crate::master::session::Session;
 use crate::master::types::AutoRequest;
 use crate::util::cursor::WriteError;
 
@@ -26,7 +26,7 @@ impl AutoRequestDetails {
 
     pub(crate) fn handle(
         &mut self,
-        session: &SessionHandle,
+        session: &Session,
         header: ResponseHeader,
         objects: HeaderCollection,
     ) -> RequestStatus {
