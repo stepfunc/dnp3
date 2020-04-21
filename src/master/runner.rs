@@ -11,6 +11,7 @@ use crate::util::cursor::{WriteCursor, WriteError};
 
 use crate::app::gen::enums::FunctionCode;
 use crate::master::session::{NextRequest, SessionMap};
+use crate::master::types::CommandHeader;
 use std::fmt::Formatter;
 use std::time::{Duration, Instant};
 use tokio::prelude::{AsyncRead, AsyncWrite};
@@ -37,9 +38,13 @@ impl ResponseCount {
     }
 }
 
-#[derive(Copy, Clone)]
-pub enum Message {
-    HelloWorld,
+enum Message {
+    Command(Vec<CommandHeader>),
+}
+
+#[derive(Clone)]
+pub struct MasterHandle {
+    sender: tokio::sync::mpsc::Sender<Message>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -144,7 +149,7 @@ impl Runner {
         level: ParseLogLevel,
         response_timeout: Duration,
         sessions: SessionMap,
-    ) -> (Self, tokio::sync::mpsc::Sender<Message>) {
+    ) -> (Self, MasterHandle) {
         let (tx, rx) = tokio::sync::mpsc::channel(100); // TODO - configurable size
         let runner = Self {
             level,
@@ -154,7 +159,7 @@ impl Runner {
             request_queue: rx,
             buffer: [0; 2048],
         };
-        (runner, tx)
+        (runner, MasterHandle { sender: tx })
     }
 
     async fn idle_until<T>(
@@ -240,7 +245,9 @@ impl Runner {
             Some(x) => {
                 match x {
                     // TODO - handle real messages!
-                    Message::HelloWorld => {}
+                    Message::Command(_headers) => {
+                        log::warn!("received command headers!");
+                    }
                 }
                 Ok(())
             }
@@ -458,15 +465,19 @@ impl Runner {
         io: &mut T,
         writer: &mut WriterType,
         reader: &mut ReaderType,
-    ) -> Result<(), RunError>
+    ) -> RunError
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            match self.sessions.next_task() {
-                NextRequest::Now(mut task) => self.run_task(io, &mut task, writer, reader).await?,
-                NextRequest::NotBefore(time) => self.idle_until(time, io, writer, reader).await?,
-                NextRequest::None => self.idle_forever(io, writer, reader).await?,
+            let result = match self.sessions.next_task() {
+                NextRequest::Now(mut task) => self.run_task(io, &mut task, writer, reader).await,
+                NextRequest::NotBefore(time) => self.idle_until(time, io, writer, reader).await,
+                NextRequest::None => self.idle_forever(io, writer, reader).await,
+            };
+
+            if let Err(err) = result {
+                return err;
             }
         }
     }

@@ -19,6 +19,8 @@ impl MockWriter {
         Self {}
     }
 
+    pub(crate) fn reset(&mut self) {}
+
     pub fn mock() -> Self {
         Self {}
     }
@@ -44,6 +46,8 @@ impl MockReader {
     pub(crate) fn new(_master: bool, _address: u16) -> Self {
         Self::mock(Address::new(0, 0))
     }
+
+    pub(crate) fn reset(&mut self) {}
 
     pub(crate) fn mock(address: Address) -> Self {
         Self {

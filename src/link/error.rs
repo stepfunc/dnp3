@@ -31,6 +31,20 @@ pub enum LinkError {
     BadLogic(LogicError),
 }
 
+impl std::fmt::Display for LinkError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            LinkError::IO(err) => write!(f, "{:?}", err),
+            LinkError::BadFrame(_err) => f.write_str("bad frame"),
+            LinkError::BadLogic(_err) => f.write_str("bad internal logic"),
+            /*
+            LinkError::BadFrame(err) => write!(f, "{}", err),
+            LinkError::BadLogic(err) => write!(f, "{}", err),
+            */
+        }
+    }
+}
+
 impl From<ParseError> for LinkError {
     fn from(err: ParseError) -> Self {
         match err {

@@ -6,4 +6,5 @@ pub mod request;
 pub(crate) mod requests;
 pub mod runner;
 pub mod session;
+pub mod tcp;
 pub mod types;
