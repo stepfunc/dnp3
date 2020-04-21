@@ -7,7 +7,7 @@ use crate::master::requests::auto::AutoRequestDetails;
 use crate::master::requests::command::CommandRequestDetails;
 use crate::master::requests::read::ReadRequestDetails;
 use crate::master::runner::RequestError;
-use crate::master::session::Session;
+use crate::master::session::SessionHandle;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone)]
@@ -48,7 +48,7 @@ impl RequestDetails {
 
     pub(crate) fn handle(
         &mut self,
-        session: &mut Session,
+        session: &SessionHandle,
         source: u16,
         response: ResponseHeader,
         headers: HeaderCollection,
@@ -70,12 +70,12 @@ impl RequestDetails {
 }
 
 pub struct MasterRequest {
-    pub(crate) session: Session,
+    pub(crate) session: SessionHandle,
     pub(crate) details: RequestDetails,
 }
 
 impl MasterRequest {
-    pub(crate) fn new(session: Session, details: RequestDetails) -> Self {
+    pub(crate) fn new(session: SessionHandle, details: RequestDetails) -> Self {
         Self { session, details }
     }
 }

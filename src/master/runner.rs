@@ -172,7 +172,7 @@ impl RequestRunner {
         };
 
         if let Ok(objects) = response.objects {
-            session.handle_unsolicited(source, response.header, objects);
+            session.handle_response(response.header, objects);
         }
 
         if response.header.control.con {

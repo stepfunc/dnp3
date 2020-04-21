@@ -8,6 +8,7 @@ use crate::app::parse::parser::HeaderDetails;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::master::handlers::RequestCompletionHandler;
+use crate::master::poll::Poll;
 use crate::master::runner::RequestError;
 use crate::util::cursor::WriteError;
 
@@ -123,12 +124,13 @@ pub enum ReadRequest {
     Range16(RangeScan<u16>),
 }
 
-#[derive(Copy, Clone)]
-pub enum AutoRequest {
+#[derive(Clone)]
+pub(crate) enum AutoRequest {
     ClearRestartBit,
     IntegrityScan,
     EnableUnsolicited(EventClasses),
     DisableUnsolicited(EventClasses),
+    PeriodicPoll(Poll),
 }
 
 impl ReadRequest {
@@ -154,39 +156,40 @@ impl ReadRequest {
 }
 
 impl AutoRequest {
-    pub(crate) fn expects_empty_response(self) -> bool {
-        match self {
-            AutoRequest::IntegrityScan => false,
-            AutoRequest::ClearRestartBit => true,
-            AutoRequest::EnableUnsolicited(_) => true,
-            AutoRequest::DisableUnsolicited(_) => true,
+    pub(crate) fn expects_empty_response(&self) -> bool {
+        match self.function() {
+            FunctionCode::Read => false,
+            _ => false,
         }
     }
 
-    pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
             AutoRequest::IntegrityScan => writer.write_class1230(),
             AutoRequest::ClearRestartBit => writer.write_clear_restart(),
             AutoRequest::EnableUnsolicited(classes) => classes.write(writer),
             AutoRequest::DisableUnsolicited(classes) => classes.write(writer),
+            AutoRequest::PeriodicPoll(poll) => poll.write(writer),
         }
     }
 
-    pub(crate) fn function(self) -> FunctionCode {
+    pub(crate) fn function(&self) -> FunctionCode {
         match self {
             AutoRequest::IntegrityScan => FunctionCode::Read,
             AutoRequest::ClearRestartBit => FunctionCode::Write,
             AutoRequest::EnableUnsolicited(_) => FunctionCode::EnabledUnsolicited,
             AutoRequest::DisableUnsolicited(_) => FunctionCode::DisableUnsolicited,
+            AutoRequest::PeriodicPoll(_) => FunctionCode::Read,
         }
     }
 
-    pub(crate) fn description(self) -> &'static str {
+    pub(crate) fn description(&self) -> &'static str {
         match self {
             AutoRequest::IntegrityScan => "startup integrity scan",
             AutoRequest::ClearRestartBit => "clear restart IIN bit",
             AutoRequest::EnableUnsolicited(_) => "enable unsolicited reporting",
             AutoRequest::DisableUnsolicited(_) => "disable unsolicited reporting",
+            AutoRequest::PeriodicPoll(_) => "periodic poll",
         }
     }
 }
