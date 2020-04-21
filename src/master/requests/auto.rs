@@ -3,7 +3,7 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::request::{RequestDetails, RequestStatus};
-use crate::master::session::Session;
+use crate::master::session::SessionHandle;
 use crate::master::types::AutoRequest;
 use crate::util::cursor::WriteError;
 
@@ -26,7 +26,7 @@ impl AutoRequestDetails {
 
     pub(crate) fn handle(
         &mut self,
-        session: &mut Session,
+        session: &SessionHandle,
         header: ResponseHeader,
         objects: HeaderCollection,
     ) -> RequestStatus {
@@ -37,11 +37,20 @@ impl AutoRequestDetails {
             );
         }
 
-        match self.request {
-            AutoRequest::IntegrityScan => {
-                // TODO handle the data!
-                session.on_integrity_scan_response(header);
+        match &mut self.request {
+            AutoRequest::PeriodicPoll(poll) => {
+                session.handle_response(header, objects);
                 if header.control.fin {
+                    poll.success();
+                    RequestStatus::Complete
+                } else {
+                    RequestStatus::ReadNextResponse
+                }
+            }
+            AutoRequest::IntegrityScan => {
+                session.handle_response(header, objects);
+                if header.control.fin {
+                    session.on_integrity_scan_complete();
                     RequestStatus::Complete
                 } else {
                     RequestStatus::ReadNextResponse
