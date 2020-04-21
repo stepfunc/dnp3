@@ -22,7 +22,8 @@ impl MasterTask {
         endpoint: SocketAddr,
         sessions: SessionMap,
     ) -> (Self, MasterHandle) {
-        let (runner, handle) = Runner::new(level, response_timeout, sessions);
+        let (tx, rx) = tokio::sync::mpsc::channel(100); // TODO
+        let runner = Runner::new(level, response_timeout, sessions, rx);
         let (reader, writer) = crate::transport::create_transport_layer(true, address);
         let task = Self {
             endpoint,
@@ -30,7 +31,7 @@ impl MasterTask {
             reader,
             writer,
         };
-        (task, handle)
+        (task, MasterHandle::new(tx))
     }
 
     pub async fn run(&mut self) {
@@ -67,7 +68,9 @@ impl MasterTask {
 /*
 async fn spawn_master_task(address: u16, level: ParseLogLevel, timeout: Duration, endpoint: SocketAddr, sessions: SessionMap) -> MasterHandle  {
     let (mut task, handle) = MasterTask::new(address, level, timeout, endpoint, sessions);
-    tokio::spawn(async move { task.run() });
+    tokio::spawn(async move {
+        task.run()
+    });
     handle
 }
 */

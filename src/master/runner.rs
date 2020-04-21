@@ -38,13 +38,19 @@ impl ResponseCount {
     }
 }
 
-enum Message {
+pub(crate) enum Message {
     Command(Vec<CommandHeader>),
 }
 
 #[derive(Clone)]
 pub struct MasterHandle {
     sender: tokio::sync::mpsc::Sender<Message>,
+}
+
+impl MasterHandle {
+    pub(crate) fn new(sender: tokio::sync::mpsc::Sender<Message>) -> Self {
+        Self { sender }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -61,7 +67,7 @@ pub struct Runner {
     response_timeout: Duration,
     count: ResponseCount,
     sessions: SessionMap,
-    request_queue: tokio::sync::mpsc::Receiver<Message>,
+    user_queue: tokio::sync::mpsc::Receiver<Message>,
     buffer: [u8; 2048],
 }
 
@@ -145,21 +151,20 @@ impl From<Shutdown> for RequestError {
 }
 
 impl Runner {
-    pub fn new(
+    pub(crate) fn new(
         level: ParseLogLevel,
         response_timeout: Duration,
         sessions: SessionMap,
-    ) -> (Self, MasterHandle) {
-        let (tx, rx) = tokio::sync::mpsc::channel(100); // TODO - configurable size
-        let runner = Self {
+        user_queue: tokio::sync::mpsc::Receiver<Message>,
+    ) -> Self {
+        Self {
             level,
             response_timeout,
             count: ResponseCount::new(),
             sessions,
-            request_queue: rx,
+            user_queue,
             buffer: [0; 2048],
-        };
-        (runner, MasterHandle { sender: tx })
+        }
     }
 
     async fn idle_until<T>(
@@ -241,7 +246,7 @@ impl Runner {
     }
 
     async fn process_message(&mut self) -> Result<(), Shutdown> {
-        match self.request_queue.recv().await {
+        match self.user_queue.recv().await {
             Some(x) => {
                 match x {
                     // TODO - handle real messages!
