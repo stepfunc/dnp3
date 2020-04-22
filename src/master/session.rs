@@ -126,6 +126,10 @@ impl Session {
         if let AutoTaskState::Idle = self.tasks.clear_restart_iin {
             log::warn!("device restart detected (address == {})", self.address);
             self.tasks.clear_restart_iin = AutoTaskState::Pending;
+            // also redo the startup sequence
+            self.tasks.disable_unsolicited = AutoTaskState::Pending;
+            self.tasks.enabled_unsolicited = AutoTaskState::Pending;
+            self.tasks.integrity_scan = AutoTaskState::Pending;
         }
     }
 

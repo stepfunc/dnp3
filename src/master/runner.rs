@@ -633,7 +633,7 @@ mod test {
     use tokio_test::io::Builder;
 
     #[tokio::test]
-    async fn performs_startup_sequence() {
+    async fn performs_startup_sequence_with_device_restart_asserted() {
         let map = SessionMap::single(Session::new(
             1024,
             SessionConfig::default(),
@@ -648,20 +648,24 @@ mod test {
             .write(&[
                 0xC0, 0x15, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
             ])
-            // response
-            .read(&[0xC0, 0x81, 0x00, 0x00])
+            // response w/ DEVICE_RESTART asserted
+            .read(&[0xC0, 0x81, 0x80, 0x00])
+            // clear the restart bit
+            .write(&[0xC1, 0x02, 0x50, 0x01, 0x00, 0x07, 0x07, 0x00])
+            // response w/ DEVICE_RESTART cleared
+            .read(&[0xC1, 0x81, 0x00, 0x00])
             // integrity poll
             .write(&[
-                0xC1, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
-            ])
-            // response
-            .read(&[0xC1, 0x81, 0x00, 0x00])
-            // enable unsolicited
-            .write(&[
-                0xC2, 0x14, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
+                0xC2, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
             ])
             // response
             .read(&[0xC2, 0x81, 0x00, 0x00])
+            // enable unsolicited
+            .write(&[
+                0xC3, 0x14, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
+            ])
+            // response
+            .read(&[0xC3, 0x81, 0x00, 0x00])
             .build_with_handle();
 
         let mut writer = MockWriter::mock();
@@ -670,11 +674,10 @@ mod test {
         let mut task = tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));
 
         tokio_test::assert_pending!(task.poll());
-        drop(tx);
-        let err = tokio_test::assert_ready!(task.poll());
-        assert_eq!(err, RunError::Shutdown);
+        drop(tx); // causes the task to shutdown
+        tokio_test::assert_ready_eq!(task.poll(), RunError::Shutdown);
         drop(task);
-        assert_eq!(writer.num_writes(), 3);
-        assert_eq!(reader.num_reads(), 3);
+        assert_eq!(writer.num_writes(), 4);
+        assert_eq!(reader.num_reads(), 4);
     }
 }
