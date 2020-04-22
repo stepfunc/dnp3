@@ -69,7 +69,7 @@ impl RequestDetails {
     }
 }
 
-pub struct MasterRequest {
+pub(crate) struct MasterRequest {
     pub(crate) address: u16,
     pub(crate) details: RequestDetails,
 }

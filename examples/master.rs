@@ -1,7 +1,7 @@
 use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::master::handlers::NullHandler;
 use dnp3rs::master::session::{Session, SessionConfig, SessionMap};
-use dnp3rs::master::tcp::MasterTask;
+use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
 use dnp3rs::master::types::{Classes, EventClasses, ReadRequest};
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -27,12 +27,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (mut task, _handle) = MasterTask::new(
         1,
         ParseLogLevel::ObjectValues,
+        ReconnectStrategy::default(),
         Duration::from_secs(1),
         address,
         get_sessions(),
     );
 
-    task.run().await;
+    task.run().await.ok();
 
     Ok(())
 }

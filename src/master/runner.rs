@@ -13,6 +13,7 @@ use crate::app::gen::enums::FunctionCode;
 use crate::master::session::{Next, NoSession, SessionMap};
 use crate::master::types::CommandHeader;
 use std::fmt::Formatter;
+use std::ops::Add;
 use std::time::{Duration, Instant};
 use tokio::prelude::{AsyncRead, AsyncWrite};
 
@@ -54,15 +55,15 @@ impl MasterHandle {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct Shutdown;
+pub struct Shutdown;
 
 #[derive(Copy, Clone, Debug)]
-pub enum RunError {
+pub(crate) enum RunError {
     Link(LinkError),
     Shutdown,
 }
 
-pub struct Runner {
+pub(crate) struct Runner {
     level: ParseLogLevel,
     response_timeout: Duration,
     count: ResponseCount,
@@ -175,7 +176,9 @@ impl Runner {
         }
     }
 
-    pub(crate) fn reset(&mut self) {}
+    pub(crate) fn reset(&mut self) {
+        // TODO
+    }
 
     async fn idle_until<T>(
         &mut self,
@@ -488,7 +491,23 @@ impl Runner {
         Ok(())
     }
 
-    pub async fn run<T>(
+    pub(crate) async fn delay_for(&mut self, duration: Duration) -> Result<(), Shutdown> {
+        let deadline = Instant::now().add(duration);
+
+        loop {
+            tokio::select! {
+                // TODO - fail incoming commands since no connection
+                result = self.process_message() => {
+                   result?;
+                }
+                _ = tokio::time::delay_until(tokio::time::Instant::from_std(deadline)) => {
+                   return Ok(());
+                }
+            }
+        }
+    }
+
+    pub(crate) async fn run<T>(
         &mut self,
         io: &mut T,
         writer: &mut WriterType,

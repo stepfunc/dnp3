@@ -155,7 +155,7 @@ impl Session {
     }
 }
 
-pub enum Next<T> {
+pub(crate) enum Next<T> {
     None,
     Now(T),
     NotBefore(Instant),
@@ -166,7 +166,7 @@ impl Session {
         self.polls.add(request, period)
     }
 
-    pub fn next_request(&self, now: Instant) -> Next<MasterRequest> {
+    pub(crate) fn next_request(&self, now: Instant) -> Next<MasterRequest> {
         if self.tasks.clear_restart_iin.is_pending() {
             return Next::Now(self.clear_restart_iin());
         }
@@ -275,7 +275,7 @@ impl SessionMap {
 
 // helpers to produce request tasks
 impl Session {
-    pub fn read(&self, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> MasterRequest {
+    fn read(&self, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> MasterRequest {
         MasterRequest::new(self.address, ReadRequestDetails::create(request, handler))
     }
 
@@ -311,7 +311,7 @@ impl Session {
         )
     }
 
-    pub fn select_before_operate(
+    fn select_before_operate(
         &self,
         headers: Vec<CommandHeader>,
         handler: Box<dyn CommandTaskHandler>,
@@ -322,7 +322,7 @@ impl Session {
         )
     }
 
-    pub fn direct_operate(
+    fn direct_operate(
         &self,
         headers: Vec<CommandHeader>,
         handler: Box<dyn CommandTaskHandler>,
