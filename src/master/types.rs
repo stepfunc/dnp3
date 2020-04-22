@@ -8,7 +8,6 @@ use crate::app::parse::parser::HeaderDetails;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::master::handlers::RequestCompletionHandler;
-use crate::master::poll::Poll;
 use crate::master::runner::RequestError;
 use crate::util::cursor::WriteError;
 
@@ -130,7 +129,7 @@ pub(crate) enum AutoRequest {
     IntegrityScan,
     EnableUnsolicited(EventClasses),
     DisableUnsolicited(EventClasses),
-    PeriodicPoll(Poll),
+    PeriodicPoll(ReadRequest, u64),
 }
 
 impl ReadRequest {
@@ -169,7 +168,7 @@ impl AutoRequest {
             AutoRequest::ClearRestartBit => writer.write_clear_restart(),
             AutoRequest::EnableUnsolicited(classes) => classes.write(writer),
             AutoRequest::DisableUnsolicited(classes) => classes.write(writer),
-            AutoRequest::PeriodicPoll(poll) => poll.write(writer),
+            AutoRequest::PeriodicPoll(request, _) => request.format(writer),
         }
     }
 
@@ -179,7 +178,7 @@ impl AutoRequest {
             AutoRequest::ClearRestartBit => FunctionCode::Write,
             AutoRequest::EnableUnsolicited(_) => FunctionCode::EnabledUnsolicited,
             AutoRequest::DisableUnsolicited(_) => FunctionCode::DisableUnsolicited,
-            AutoRequest::PeriodicPoll(_) => FunctionCode::Read,
+            AutoRequest::PeriodicPoll(_, _) => FunctionCode::Read,
         }
     }
 
@@ -189,7 +188,7 @@ impl AutoRequest {
             AutoRequest::ClearRestartBit => "clear restart IIN bit",
             AutoRequest::EnableUnsolicited(_) => "enable unsolicited reporting",
             AutoRequest::DisableUnsolicited(_) => "disable unsolicited reporting",
-            AutoRequest::PeriodicPoll(_) => "periodic poll",
+            AutoRequest::PeriodicPoll(_, _) => "periodic poll",
         }
     }
 }

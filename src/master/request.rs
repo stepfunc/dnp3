@@ -48,7 +48,7 @@ impl RequestDetails {
 
     pub(crate) fn handle(
         &mut self,
-        session: &Session,
+        session: &mut Session,
         source: u16,
         response: ResponseHeader,
         headers: HeaderCollection,
@@ -70,12 +70,12 @@ impl RequestDetails {
 }
 
 pub struct MasterRequest {
-    pub(crate) session: Session,
+    pub(crate) address: u16,
     pub(crate) details: RequestDetails,
 }
 
 impl MasterRequest {
-    pub(crate) fn new(session: Session, details: RequestDetails) -> Self {
-        Self { session, details }
+    pub(crate) fn new(address: u16, details: RequestDetails) -> Self {
+        Self { address, details }
     }
 }

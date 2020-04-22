@@ -58,7 +58,6 @@ impl MasterTask {
             self.reader.reset();
             self.writer.reset();
 
-
             // TODO - implement a reconnect delay
         }
     }

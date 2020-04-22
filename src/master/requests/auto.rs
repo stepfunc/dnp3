@@ -26,7 +26,7 @@ impl AutoRequestDetails {
 
     pub(crate) fn handle(
         &mut self,
-        session: &Session,
+        session: &mut Session,
         header: ResponseHeader,
         objects: HeaderCollection,
     ) -> RequestStatus {
@@ -37,11 +37,11 @@ impl AutoRequestDetails {
             );
         }
 
-        match &mut self.request {
-            AutoRequest::PeriodicPoll(poll) => {
+        match &self.request {
+            AutoRequest::PeriodicPoll(_, id) => {
                 session.handle_response(header, objects);
                 if header.control.fin {
-                    poll.success();
+                    session.complete_poll(*id);
                     RequestStatus::Complete
                 } else {
                     RequestStatus::ReadNextResponse

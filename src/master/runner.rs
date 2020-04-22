@@ -10,7 +10,7 @@ use crate::link::error::LinkError;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 use crate::app::gen::enums::FunctionCode;
-use crate::master::session::{NextRequest, SessionMap};
+use crate::master::session::{Next, NoSession, SessionMap};
 use crate::master::types::CommandHeader;
 use std::fmt::Formatter;
 use std::time::{Duration, Instant};
@@ -80,6 +80,7 @@ pub enum RequestError {
     MultiFragmentResponse,
     ResponseTimeout,
     WriteError,
+    SessionRemoved(u16),
     Shutdown,
 }
 
@@ -104,6 +105,7 @@ impl std::fmt::Display for RequestError {
             RequestError::Shutdown => {
                 f.write_str("the master was shutdown while executing the task")
             }
+            RequestError::SessionRemoved(x) => write!(f, "session removed: {}", x),
         }
     }
 }
@@ -150,6 +152,12 @@ impl From<Shutdown> for RequestError {
     }
 }
 
+impl From<NoSession> for RequestError {
+    fn from(x: NoSession) -> Self {
+        RequestError::SessionRemoved(x.address)
+    }
+}
+
 impl Runner {
     pub(crate) fn new(
         level: ParseLogLevel,
@@ -160,16 +168,14 @@ impl Runner {
         Self {
             level,
             response_timeout,
-            count: ResponseCount::new(),
             sessions,
+            count: ResponseCount::new(),
             user_queue,
             buffer: [0; 2048],
         }
     }
 
-    pub(crate) fn reset(&mut self) {
-
-    }
+    pub(crate) fn reset(&mut self) {}
 
     async fn idle_until<T>(
         &mut self,
@@ -311,7 +317,7 @@ impl Runner {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let session = match self.sessions.get(source) {
+        let session = match self.sessions.get_mut(source).ok() {
             Some(session) => session,
             None => {
                 log::warn!(
@@ -337,10 +343,9 @@ impl Runner {
     async fn handle_non_read_response<T>(
         &mut self,
         io: &mut T,
-        source: u16,
+        task: &mut MasterRequest,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
-        task: &mut MasterRequest,
         writer: &mut WriterType,
     ) -> Result<RequestStatus, RequestError>
     where
@@ -354,20 +359,24 @@ impl Runner {
         // but we'll confirm them if requested and log
         if header.control.con {
             log::warn!("received response requesting confirmation to non-read request");
-            self.confirm_solicited(io, task.session.address(), header.control.seq, writer)
+            self.confirm_solicited(io, task.address, header.control.seq, writer)
                 .await?;
         }
 
-        Ok(task.details.handle(&task.session, source, header, objects))
+        Ok(task.details.handle(
+            self.sessions.get_mut(task.address)?,
+            task.address,
+            header,
+            objects,
+        ))
     }
 
     async fn handle_read_response<T>(
         &mut self,
         io: &mut T,
-        source: u16,
+        task: &mut MasterRequest,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
-        task: &mut MasterRequest,
         writer: &mut WriterType,
     ) -> Result<RequestStatus, RequestError>
     where
@@ -389,14 +398,19 @@ impl Runner {
 
         // write a confirmation if required
         if header.control.con {
-            self.confirm_solicited(io, task.session.address(), header.control.seq, writer)
+            self.confirm_solicited(io, task.address, header.control.seq, writer)
                 .await?;
         }
 
-        let status = task.details.handle(&task.session, source, header, objects);
+        let status = task.details.handle(
+            self.sessions.get_mut(task.address)?,
+            task.address,
+            header,
+            objects,
+        );
 
         if !header.control.fin {
-            task.session.increment_seq();
+            self.sessions.get_mut(task.address)?.increment_seq();
         }
 
         Ok(status)
@@ -405,9 +419,9 @@ impl Runner {
     async fn handle_response<T>(
         &mut self,
         io: &mut T,
+        task: &mut MasterRequest,
         source: u16,
         response: &Response<'_>,
-        task: &mut MasterRequest,
         writer: &mut WriterType,
     ) -> Result<RequestStatus, RequestError>
     where
@@ -419,7 +433,7 @@ impl Runner {
             return Ok(RequestStatus::ContinueWaiting);
         }
 
-        if source != task.session.address() {
+        if source != task.address {
             log::warn!(
                 "Received unexpected solicited response from address: {}",
                 source
@@ -428,13 +442,17 @@ impl Runner {
         }
 
         // this allows us to detect things like RESTART, NEED_TIME, and EVENT_BUFFER_OVERFLOW
-        task.session.process_response_iin(response.header.iin);
+        self.sessions
+            .get_mut(task.address)?
+            .process_response_iin(response.header.iin);
 
-        if response.header.control.seq.value() != task.session.previous_seq() {
+        if response.header.control.seq.value()
+            != self.sessions.get_mut(task.address)?.previous_seq()
+        {
             log::warn!(
                 "response with seq: {} doesn't match expected seq: {}",
                 response.header.control.seq.value(),
-                task.session.previous_seq()
+                self.sessions.get(task.address)?.previous_seq()
             );
             return Ok(RequestStatus::ContinueWaiting);
         }
@@ -443,10 +461,10 @@ impl Runner {
         let objects = response.objects?;
 
         if task.details.function() == FunctionCode::Read {
-            self.handle_read_response(io, source, response.header, objects, task, writer)
+            self.handle_read_response(io, task, response.header, objects, writer)
                 .await
         } else {
-            self.handle_non_read_response(io, source, response.header, objects, task, writer)
+            self.handle_non_read_response(io, task, response.header, objects, writer)
                 .await
         }
     }
@@ -456,17 +474,18 @@ impl Runner {
         io: &mut T,
         task: &mut MasterRequest,
         writer: &mut WriterType,
-    ) -> Result<(), LinkError>
+    ) -> Result<(), RequestError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
         // format the request
-        let seq = task.session.increment_seq();
+        let seq = self.sessions.get_mut(task.address)?.increment_seq();
         let mut cursor = WriteCursor::new(&mut self.buffer);
         task.details.format(seq, &mut cursor)?;
         writer
-            .write(self.level, io, task.session.address(), cursor.written())
-            .await
+            .write(self.level, io, task.address, cursor.written())
+            .await?;
+        Ok(())
     }
 
     pub async fn run<T>(
@@ -480,9 +499,9 @@ impl Runner {
     {
         loop {
             let result = match self.sessions.next_task() {
-                NextRequest::Now(mut task) => self.run_task(io, &mut task, writer, reader).await,
-                NextRequest::NotBefore(time) => self.idle_until(time, io, writer, reader).await,
-                NextRequest::None => self.idle_forever(io, writer, reader).await,
+                Next::Now(mut task) => self.run_task(io, &mut task, writer, reader).await,
+                Next::NotBefore(time) => self.idle_until(time, io, writer, reader).await,
+                Next::None => self.idle_forever(io, writer, reader).await,
             };
 
             if let Err(err) = result {
@@ -525,6 +544,7 @@ impl Runner {
         self.count.reset();
 
         self.send_request(io, task, writer).await?;
+
         let mut deadline = crate::util::timeout::Timeout::from_now(self.response_timeout);
 
         // now enter a loop to read responses
@@ -574,7 +594,7 @@ impl Runner {
                     Err(err) => log::warn!("{}", err),
                     Ok(response) => {
                         return self
-                            .handle_response(io, fragment.address.source, &response, task, writer)
+                            .handle_response(io, task, fragment.address.source, &response, writer)
                             .await
                     }
                 }
