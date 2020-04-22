@@ -5,9 +5,12 @@ use crate::transport::assembler::Fragment;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 #[derive(Copy, Clone)]
-pub struct MockWriter;
+pub struct MockWriter {
+    num_writes: usize,
+}
 #[derive(Copy, Clone)]
 pub struct MockReader {
+    num_reads: usize,
     count: usize,
     address: Address,
     buffer: [u8; 2048],
@@ -15,14 +18,18 @@ pub struct MockReader {
 
 // same signature as the real transport writer
 impl MockWriter {
-    pub fn new(_master: bool, _address: u16) -> Self {
-        Self {}
+    pub(crate) fn new(_master: bool, _address: u16) -> Self {
+        Self::mock()
     }
 
     pub(crate) fn reset(&mut self) {}
 
     pub fn mock() -> Self {
-        Self {}
+        Self { num_writes: 0 }
+    }
+
+    pub(crate) fn num_writes(&self) -> usize {
+        self.num_writes
     }
 
     // just write the fragment directly to the I/O
@@ -36,7 +43,8 @@ impl MockWriter {
     where
         W: AsyncWrite + Unpin,
     {
-        println!("{:?}", fragment);
+        self.num_writes += 1;
+        println!("mock tx: {:?}", fragment);
         io.write(fragment).await?;
         Ok(())
     }
@@ -47,10 +55,15 @@ impl MockReader {
         Self::mock(Address::new(0, 0))
     }
 
+    pub(crate) fn num_reads(&self) -> usize {
+        self.num_reads
+    }
+
     pub(crate) fn reset(&mut self) {}
 
     pub(crate) fn mock(address: Address) -> Self {
         Self {
+            num_reads: 0,
             count: 0,
             address,
             buffer: [0; 2048],
@@ -72,6 +85,8 @@ impl MockReader {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         self.count = io.read(&mut self.buffer).await?;
+        self.num_reads += 1;
+        println!("mock rx: {:?}", &self.buffer[0..self.count]);
         Ok(())
     }
 }

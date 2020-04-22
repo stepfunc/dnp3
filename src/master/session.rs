@@ -211,6 +211,12 @@ impl SessionMap {
         }
     }
 
+    pub fn single(session: Session) -> Self {
+        let mut map = SessionMap::new();
+        map.register(session);
+        map
+    }
+
     pub fn reset(&mut self) {
         for session in &mut self.sessions.values_mut() {
             session.tasks.reset();
@@ -275,9 +281,11 @@ impl SessionMap {
 
 // helpers to produce request tasks
 impl Session {
+    /*
     fn read(&self, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> MasterRequest {
         MasterRequest::new(self.address, ReadRequestDetails::create(request, handler))
     }
+    */
 
     fn poll(&self, request: AutoRequest) -> MasterRequest {
         MasterRequest::new(self.address, AutoRequestDetails::create(request))
@@ -311,6 +319,7 @@ impl Session {
         )
     }
 
+    /*
     fn select_before_operate(
         &self,
         headers: Vec<CommandHeader>,
@@ -332,4 +341,5 @@ impl Session {
             CommandRequestDetails::direct_operate(headers, handler),
         )
     }
+    */
 }

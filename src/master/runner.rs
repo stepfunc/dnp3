@@ -57,7 +57,7 @@ impl MasterHandle {
 #[derive(Copy, Clone, Debug)]
 pub struct Shutdown;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum RunError {
     Link(LinkError),
     Shutdown,
@@ -177,7 +177,7 @@ impl Runner {
     }
 
     pub(crate) fn reset(&mut self) {
-        // TODO
+        self.sessions.reset()
     }
 
     async fn idle_until<T>(
@@ -310,7 +310,7 @@ impl Runner {
         Ok(())
     }
 
-    pub(crate) async fn handle_unsolicited<T>(
+    async fn handle_unsolicited<T>(
         &mut self,
         source: u16,
         response: &Response<'_>,
@@ -625,7 +625,6 @@ impl Runner {
 
 #[cfg(test)]
 mod test {
-    /*
     use super::*;
     use crate::link::header::Address;
     use crate::master::handlers::NullHandler;
@@ -633,39 +632,49 @@ mod test {
     use crate::transport::mocks::{MockReader, MockWriter};
     use tokio_test::io::Builder;
 
-
-    #[test]
-    fn performs_multi_fragmented_class_scan() {
-        let mut map = SessionMap::new();
-
-        assert!(map.register(Session::new(
+    #[tokio::test]
+    async fn performs_startup_sequence() {
+        let map = SessionMap::single(Session::new(
             1024,
-            SessionConfig::none(),
-            NullHandler::boxed()
-        )));
+            SessionConfig::default(),
+            NullHandler::boxed(),
+        ));
 
-        let (mut runner, _handle) = Runner::new(ParseLogLevel::Nothing, Duration::from_secs(1), map);
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
+        let mut runner = Runner::new(ParseLogLevel::Nothing, Duration::from_secs(1), map, rx);
 
-        let mut io = Builder::new()
+        let (mut io, _handle) = Builder::new()
+            // disable unsolicited
             .write(&[
-                0xC0, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
+                0xC0, 0x15, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
             ])
-            // FIR=1, FIN=0, CON=1, SEQ = 0
-            .read(&[0xA0, 0x81, 0x00, 0x00])
-            // confirm
-            .write(&[0xC0, 0x00])
-            // FIR=0, FIN=0, CON=1, SEQ = 1
-            .read(&[0x21, 0x81, 0x00, 0x00])
-            // confirm
-            .write(&[0xC1, 0x00])
-            // FIR=0, FIN=1, CON=0, SEQ = 2
-            .read(&[0x42, 0x81, 0x00, 0x00])
-            .build();
+            // response
+            .read(&[0xC0, 0x81, 0x00, 0x00])
+            // integrity poll
+            .write(&[
+                0xC1, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
+            ])
+            // response
+            .read(&[0xC1, 0x81, 0x00, 0x00])
+            // enable unsolicited
+            .write(&[
+                0xC2, 0x14, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
+            ])
+            // response
+            .read(&[0xC2, 0x81, 0x00, 0x00])
+            .build_with_handle();
 
         let mut writer = MockWriter::mock();
         let mut reader = MockReader::mock(Address::new(1, 1024));
-        let mut task =
-        tokio_test::block_on(runner.run_task(&mut io, &mut writer, &mut reader)).unwrap();
+
+        let mut task = tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));
+
+        tokio_test::assert_pending!(task.poll());
+        drop(tx);
+        let err = tokio_test::assert_ready!(task.poll());
+        assert_eq!(err, RunError::Shutdown);
+        drop(task);
+        assert_eq!(writer.num_writes(), 3);
+        assert_eq!(reader.num_reads(), 3);
     }
-    */
 }
