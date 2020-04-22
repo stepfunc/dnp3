@@ -15,6 +15,18 @@ pub struct MasterTask {
 }
 
 impl MasterTask {
+    pub fn spawn(
+        address: u16,
+        level: ParseLogLevel,
+        timeout: Duration,
+        endpoint: SocketAddr,
+        sessions: SessionMap,
+    ) -> MasterHandle {
+        let (mut task, handle) = MasterTask::new(address, level, timeout, endpoint, sessions);
+        tokio::spawn(async move { task.run().await });
+        handle
+    }
+
     pub fn new(
         address: u16,
         level: ParseLogLevel,
@@ -58,18 +70,7 @@ impl MasterTask {
             self.reader.reset();
             self.writer.reset();
 
-
             // TODO - implement a reconnect delay
         }
     }
 }
-
-/*
-async fn spawn_master_task(address: u16, level: ParseLogLevel, timeout: Duration, endpoint: SocketAddr, sessions: SessionMap) -> MasterHandle  {
-    let (mut task, handle) = MasterTask::new(address, level, timeout, endpoint, sessions);
-    tokio::spawn(async move {
-        task.run()
-    });
-    handle
-}
-*/

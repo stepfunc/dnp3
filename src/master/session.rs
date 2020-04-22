@@ -2,7 +2,7 @@ use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::handlers::{ReadTaskHandler, SessionHandler};
-use crate::master::poll::Poll;
+use crate::master::poll::PollMap;
 use crate::master::request::MasterRequest;
 use crate::master::requests::auto::AutoRequestDetails;
 use crate::master::requests::command::CommandRequestDetails;
@@ -62,71 +62,58 @@ impl AutoTaskState {
 
 #[derive(Clone)]
 pub(crate) struct TaskStates {
-    disable_unsolicited: std::cell::Cell<AutoTaskState>,
-    clear_restart_iin: std::cell::Cell<AutoTaskState>,
-    integrity_scan: std::cell::Cell<AutoTaskState>,
-    enabled_unsolicited: std::cell::Cell<AutoTaskState>,
+    disable_unsolicited: AutoTaskState,
+    clear_restart_iin: AutoTaskState,
+    integrity_scan: AutoTaskState,
+    enabled_unsolicited: AutoTaskState,
 }
 
 impl TaskStates {
     pub(crate) fn new() -> Self {
         Self {
-            disable_unsolicited: std::cell::Cell::new(AutoTaskState::Pending),
-            clear_restart_iin: std::cell::Cell::new(AutoTaskState::Idle),
-            integrity_scan: std::cell::Cell::new(AutoTaskState::Pending),
-            enabled_unsolicited: std::cell::Cell::new(AutoTaskState::Pending),
+            disable_unsolicited: AutoTaskState::Pending,
+            clear_restart_iin: AutoTaskState::Idle,
+            integrity_scan: AutoTaskState::Pending,
+            enabled_unsolicited: AutoTaskState::Pending,
         }
     }
 
-    pub(crate) fn reset(&self) {
-        self.disable_unsolicited.set(AutoTaskState::Pending);
-        self.clear_restart_iin.set(AutoTaskState::Idle);
-        self.integrity_scan.set(AutoTaskState::Pending);
-        self.enabled_unsolicited.set(AutoTaskState::Pending);
+    pub(crate) fn reset(&mut self) {
+        *self = Self::new();
     }
 }
 
-struct Shared {
-    address: u16,
-    seq: std::cell::Cell<Sequence>,
-    tasks: TaskStates,
-    handler: std::cell::RefCell<Box<dyn SessionHandler>>,
-    config: SessionConfig,
-    polls: std::cell::RefCell<Vec<Poll>>,
-}
-
-#[derive(Clone)]
 pub struct Session {
-    inner: std::rc::Rc<Shared>,
-}
-
-impl Shared {
-    fn new(address: u16, config: SessionConfig, handler: Box<dyn SessionHandler>) -> Self {
-        Self {
-            address,
-            seq: std::cell::Cell::new(Sequence::default()),
-            tasks: TaskStates::new(),
-            handler: std::cell::RefCell::new(handler),
-            config,
-            polls: std::cell::RefCell::new(Vec::new()),
-        }
-    }
+    address: u16,
+    seq: Sequence,
+    tasks: TaskStates,
+    handler: Box<dyn SessionHandler>,
+    config: SessionConfig,
+    polls: PollMap,
 }
 
 impl Session {
-
-    pub(crate) fn address(&self) -> u16 {
-        self.inner.address
+    pub fn new(address: u16, config: SessionConfig, handler: Box<dyn SessionHandler>) -> Self {
+        Self {
+            address,
+            seq: Sequence::default(),
+            tasks: TaskStates::new(),
+            handler,
+            config,
+            polls: PollMap::new(),
+        }
     }
 
-    pub(crate) fn increment_seq(&self) -> Sequence {
-        let value = self.inner.seq.get();
-        self.inner.seq.set(Sequence::new(value.next()));
-        value
+    pub(crate) fn complete_poll(&mut self, id: u64) {
+        self.polls.complete(id)
+    }
+
+    pub(crate) fn increment_seq(&mut self) -> Sequence {
+        self.seq.increment()
     }
 
     pub(crate) fn previous_seq(&self) -> u8 {
-        self.inner.seq.get().previous()
+        self.seq.previous()
     }
 
     pub(crate) fn process_response_iin(&mut self, iin: IIN) {
@@ -135,127 +122,85 @@ impl Session {
         }
     }
 
-    pub(crate) fn on_restart_iin_observed(&self) {
-        if let AutoTaskState::Idle = self.inner.tasks.clear_restart_iin.get() {
-            log::warn!(
-                "device restart detected (address == {})",
-                self.inner.address
-            );
-            self.inner
-                .tasks
-                .clear_restart_iin
-                .set(AutoTaskState::Pending);
+    pub(crate) fn on_restart_iin_observed(&mut self) {
+        if let AutoTaskState::Idle = self.tasks.clear_restart_iin {
+            log::warn!("device restart detected (address == {})", self.address);
+            self.tasks.clear_restart_iin = AutoTaskState::Pending;
         }
     }
 
-    pub(crate) fn on_integrity_scan_complete(&self) {
-        self.inner.tasks.integrity_scan.set(AutoTaskState::Idle);
+    pub(crate) fn on_integrity_scan_complete(&mut self) {
+        self.tasks.integrity_scan = AutoTaskState::Idle;
     }
 
-    pub(crate) fn on_clear_restart_iin_response(&self, iin: IIN) {
-        if iin.iin1.get_device_restart() {
-            self.inner
-                .tasks
-                .clear_restart_iin
-                .set(AutoTaskState::Failed);
+    pub(crate) fn on_clear_restart_iin_response(&mut self, iin: IIN) {
+        self.tasks.clear_restart_iin = if iin.iin1.get_device_restart() {
+            log::warn!("device failed to clear restart IIN bit");
+            AutoTaskState::Failed
         } else {
-            self.inner.tasks.clear_restart_iin.set(AutoTaskState::Idle);
+            AutoTaskState::Idle
         }
     }
 
-    pub(crate) fn on_enable_unsolicited_response(&self, _iin: IIN) {
-        self.inner
-            .tasks
-            .enabled_unsolicited
-            .set(AutoTaskState::Idle);
+    pub(crate) fn on_enable_unsolicited_response(&mut self, _iin: IIN) {
+        self.tasks.enabled_unsolicited = AutoTaskState::Idle;
     }
 
-    pub(crate) fn on_disable_unsolicited_response(&self, _iin: IIN) {
-        self.inner
-            .tasks
-            .disable_unsolicited
-            .set(AutoTaskState::Idle);
+    pub(crate) fn on_disable_unsolicited_response(&mut self, _iin: IIN) {
+        self.tasks.disable_unsolicited = AutoTaskState::Idle;
     }
 
-    pub(crate) fn handle_response(&self, header: ResponseHeader, objects: HeaderCollection) {
-        self.inner
-            .handler
-            .borrow_mut()
-            .handle(self.address(), header, objects)
+    pub(crate) fn handle_response(&mut self, header: ResponseHeader, objects: HeaderCollection) {
+        self.handler.handle(self.address, header, objects);
     }
 }
 
-pub enum NextRequest {
+pub enum Next<T> {
     None,
-    Now(MasterRequest),
+    Now(T),
     NotBefore(Instant),
 }
 
 impl Session {
-    pub fn new(address: u16, config: SessionConfig, handler: Box<dyn SessionHandler>) -> Self {
-        Self {
-            inner: std::rc::Rc::new(Shared::new(address, config, handler)),
-        }
-    }
-
     pub fn add_poll(&mut self, request: ReadRequest, period: Duration) {
-        self.inner
-            .polls
-            .borrow_mut()
-            .push(Poll::new(request, period));
+        self.polls.add(request, period)
     }
 
-    pub fn next_request(&self, now: Instant) -> NextRequest {
-        if self.inner.tasks.clear_restart_iin.get().is_pending() {
-            return NextRequest::Now(self.clear_restart_iin());
+    pub fn next_request(&self, now: Instant) -> Next<MasterRequest> {
+        if self.tasks.clear_restart_iin.is_pending() {
+            return Next::Now(self.clear_restart_iin());
         }
-        if self.inner.config.disable_unsol_classes.any()
-            && self.inner.tasks.disable_unsolicited.get().is_pending()
-        {
-            return NextRequest::Now(
-                self.disable_unsolicited(self.inner.config.disable_unsol_classes),
-            );
+        if self.config.disable_unsol_classes.any() && self.tasks.disable_unsolicited.is_pending() {
+            return Next::Now(self.disable_unsolicited(self.config.disable_unsol_classes));
         }
-        if self.inner.tasks.integrity_scan.get().is_pending() {
-            return NextRequest::Now(self.integrity());
+        if self.tasks.integrity_scan.is_pending() {
+            return Next::Now(self.integrity());
         }
-        if self.inner.config.enable_unsol_classes.any()
-            && self.inner.tasks.enabled_unsolicited.get().is_pending()
-        {
-            return NextRequest::Now(
-                self.enable_unsolicited(self.inner.config.enable_unsol_classes),
-            );
+        if self.config.enable_unsol_classes.any() && self.tasks.enabled_unsolicited.is_pending() {
+            return Next::Now(self.enable_unsolicited(self.config.enable_unsol_classes));
         }
 
-        let mut earliest = Smallest::<Instant>::new();
-
-        for poll in self.inner.polls.borrow().iter() {
-            if poll.is_ready(now) {
-                return NextRequest::Now(self.poll(poll.to_request()));
-            }
-
-            if let Some(x) = poll.next() {
-                earliest.observe(x)
-            }
+        match self.polls.next(now) {
+            Next::None => Next::None,
+            Next::NotBefore(x) => Next::NotBefore(x),
+            Next::Now(x) => Next::Now(self.poll(x)),
         }
-
-        if let Some(x) = earliest.value() {
-            return NextRequest::NotBefore(x);
-        }
-
-        NextRequest::None
     }
 }
 
 pub struct SessionMap {
     sessions: BTreeMap<u16, Session>,
-    priority: VecDeque<Session>,
+    priority: VecDeque<u16>,
 }
 
 impl Default for SessionMap {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub(crate) struct NoSession {
+    pub(crate) address: u16,
 }
 
 impl SessionMap {
@@ -267,86 +212,98 @@ impl SessionMap {
     }
 
     pub fn reset(&mut self) {
-        for (_, session) in &mut self.sessions {
-            session.inner.tasks.reset();
+        for session in &mut self.sessions.values_mut() {
+            session.tasks.reset();
         }
     }
 
     pub fn register(&mut self, session: Session) -> bool {
-        if self.sessions.contains_key(&session.inner.address) {
+        if self.sessions.contains_key(&session.address) {
             return false;
         }
 
-        self.sessions.insert(session.inner.address, session.clone());
-        self.priority.push_front(session);
+        self.priority.push_back(session.address);
+        self.sessions.insert(session.address, session);
         true
     }
 
-    pub(crate) fn get(&mut self, address: u16) -> Option<&Session> {
-        self.sessions.get(&address)
+    pub(crate) fn get(&mut self, address: u16) -> Result<&Session, NoSession> {
+        match self.sessions.get(&address) {
+            Some(x) => Ok(x),
+            None => Err(NoSession { address }),
+        }
     }
 
-    pub(crate) fn next_task(&mut self) -> NextRequest {
+    pub(crate) fn get_mut(&mut self, address: u16) -> Result<&mut Session, NoSession> {
+        match self.sessions.get_mut(&address) {
+            Some(x) => Ok(x),
+            None => Err(NoSession { address }),
+        }
+    }
+
+    pub(crate) fn next_task(&mut self) -> Next<MasterRequest> {
         let now = std::time::Instant::now();
 
         let mut earliest = Smallest::<Instant>::new();
 
         // don't try to rotate the tasks more times than the length of the queue
         for _ in 0..self.priority.len() {
-            if let Some(session) = self.priority.front() {
-                match session.next_request(now) {
-                    NextRequest::Now(request) => return NextRequest::Now(request),
-                    NextRequest::None => {
-                        // move the current front to the back
-                        self.priority.rotate_left(1);
+            if let Some(address) = self.priority.front() {
+                if let Some(session) = self.sessions.get(address) {
+                    match session.next_request(now) {
+                        Next::Now(request) => return Next::Now(request),
+                        Next::None => {
+                            // move the current front to the back
+                            self.priority.rotate_left(1);
+                        }
+                        Next::NotBefore(x) => earliest.observe(x),
                     }
-                    NextRequest::NotBefore(x) => earliest.observe(x),
                 }
             }
         }
 
         if let Some(x) = earliest.value() {
-            return NextRequest::NotBefore(x);
+            return Next::NotBefore(x);
         }
 
-        NextRequest::None
+        Next::None
     }
 }
 
 // helpers to produce request tasks
 impl Session {
     pub fn read(&self, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> MasterRequest {
-        MasterRequest::new(self.clone(), ReadRequestDetails::create(request, handler))
+        MasterRequest::new(self.address, ReadRequestDetails::create(request, handler))
     }
 
     fn poll(&self, request: AutoRequest) -> MasterRequest {
-        MasterRequest::new(self.clone(), AutoRequestDetails::create(request))
+        MasterRequest::new(self.address, AutoRequestDetails::create(request))
     }
 
     fn clear_restart_iin(&self) -> MasterRequest {
         MasterRequest::new(
-            self.clone(),
+            self.address,
             AutoRequestDetails::create(AutoRequest::ClearRestartBit),
         )
     }
 
     fn integrity(&self) -> MasterRequest {
         MasterRequest::new(
-            self.clone(),
+            self.address,
             AutoRequestDetails::create(AutoRequest::IntegrityScan),
         )
     }
 
     fn disable_unsolicited(&self, classes: EventClasses) -> MasterRequest {
         MasterRequest::new(
-            self.clone(),
+            self.address,
             AutoRequestDetails::create(AutoRequest::DisableUnsolicited(classes)),
         )
     }
 
     fn enable_unsolicited(&self, classes: EventClasses) -> MasterRequest {
         MasterRequest::new(
-            self.clone(),
+            self.address,
             AutoRequestDetails::create(AutoRequest::EnableUnsolicited(classes)),
         )
     }
@@ -357,7 +314,7 @@ impl Session {
         handler: Box<dyn CommandTaskHandler>,
     ) -> MasterRequest {
         MasterRequest::new(
-            self.clone(),
+            self.address,
             CommandRequestDetails::select_before_operate(headers, handler),
         )
     }
@@ -368,7 +325,7 @@ impl Session {
         handler: Box<dyn CommandTaskHandler>,
     ) -> MasterRequest {
         MasterRequest::new(
-            self.clone(),
+            self.address,
             CommandRequestDetails::direct_operate(headers, handler),
         )
     }
