@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 log = "0.4"
 chrono = "0.4"
-tokio = { version = "^0.2.11", features = ["tcp", "sync", "io-util", "time", "rt-core", "rt-threaded", "macros"]}
+tokio = { version = "^0.2.11", features = ["tcp", "sync", "io-util", "io-std", "time", "rt-core", "rt-threaded", "macros"]}
 
 [dev-dependencies]
 assert_matches = "1.2"

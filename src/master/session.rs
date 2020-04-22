@@ -212,7 +212,7 @@ impl SessionMap {
     }
 
     pub fn reset(&mut self) {
-        for (_, session) in &mut self.sessions {
+        for session in &mut self.sessions.values_mut() {
             session.tasks.reset();
         }
     }

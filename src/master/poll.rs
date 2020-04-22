@@ -39,7 +39,7 @@ impl PollMap {
     pub(crate) fn next(&self, now: Instant) -> Next<AutoRequest> {
         let mut earliest = Smallest::<Instant>::new();
 
-        for (_, poll) in &self.polls {
+        for poll in self.polls.values() {
             if poll.is_ready(now) {
                 return Next::Now(poll.to_request());
             }
