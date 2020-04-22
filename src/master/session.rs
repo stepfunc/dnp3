@@ -247,16 +247,19 @@ impl SessionMap {
         let mut earliest = Smallest::<Instant>::new();
 
         // don't try to rotate the tasks more times than the length of the queue
-        for _ in 0..self.priority.len() {
-            if let Some(address) = self.priority.front() {
+        for index in 0..self.priority.len() {
+            if let Some(address) = self.priority.get(index) {
                 if let Some(session) = self.sessions.get(address) {
                     match session.next_request(now) {
-                        Next::Now(request) => return Next::Now(request),
-                        Next::None => {
-                            // move the current front to the back
-                            self.priority.rotate_left(1);
+                        Next::Now(request) => {
+                            // just before returning, move this session to last priority
+                            if let Some(x) = self.priority.remove(index) {
+                                self.priority.push_back(x);
+                            }
+                            return Next::Now(request);
                         }
                         Next::NotBefore(x) => earliest.observe(x),
+                        Next::None => {}
                     }
                 }
             }
