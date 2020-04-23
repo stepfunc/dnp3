@@ -3,7 +3,7 @@ use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::handlers::ReadTaskHandler;
 use crate::master::request::{RequestDetails, RequestStatus};
-use crate::master::runner::RequestError;
+use crate::master::runner::TaskError;
 use crate::master::types::ReadRequest;
 use crate::util::cursor::WriteError;
 
@@ -38,7 +38,7 @@ impl ReadRequestDetails {
         }
     }
 
-    pub(crate) fn on_complete(&mut self, result: Result<(), RequestError>) {
+    pub(crate) fn on_complete(&mut self, result: Result<(), TaskError>) {
         self.handler.on_complete(result)
     }
 }

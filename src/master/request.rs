@@ -7,7 +7,7 @@ use crate::master::association::Association;
 use crate::master::requests::auto::AutoRequestDetails;
 use crate::master::requests::command::CommandRequestDetails;
 use crate::master::requests::read::ReadRequestDetails;
-use crate::master::runner::RequestError;
+use crate::master::runner::TaskError;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone)]
@@ -60,7 +60,7 @@ impl RequestDetails {
         }
     }
 
-    pub(crate) fn on_complete(&mut self, result: Result<(), RequestError>) {
+    pub(crate) fn on_complete(&mut self, result: Result<(), TaskError>) {
         match self {
             RequestDetails::Auto(_) => {}
             RequestDetails::Read(task) => task.on_complete(result),

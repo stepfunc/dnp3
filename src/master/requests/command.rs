@@ -2,7 +2,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::request::{RequestDetails, RequestStatus};
-use crate::master::runner::RequestError;
+use crate::master::runner::TaskError;
 use crate::master::types::*;
 use crate::util::cursor::WriteError;
 
@@ -80,7 +80,7 @@ impl CommandRequestDetails {
 
     pub(crate) fn handle(&mut self, headers: HeaderCollection) -> RequestStatus {
         if let Err(err) = self.compare(headers) {
-            self.handler.on_response(Err(err));
+            self.handler.on_command_complete(Err(err.into()));
             return RequestStatus::Complete;
         }
 
@@ -91,13 +91,13 @@ impl CommandRequestDetails {
             }
             _ => {
                 // Complete w/ success
-                self.handler.on_response(Ok(()));
+                self.handler.on_command_complete(Ok(()));
                 RequestStatus::Complete
             }
         }
     }
 
-    pub(crate) fn on_complete(&mut self, result: Result<(), RequestError>) {
+    pub(crate) fn on_complete(&mut self, result: Result<(), TaskError>) {
         self.handler.on_complete(result);
     }
 }

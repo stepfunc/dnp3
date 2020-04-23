@@ -10,8 +10,9 @@ use crate::link::error::LinkError;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 use crate::app::gen::enums::FunctionCode;
-use crate::master::association::{Next, NoSession, SessionMap};
-use crate::master::types::CommandHeader;
+use crate::master::association::{AssociationMap, Next, NoSession};
+use crate::master::types::{CommandHeader, CommandTaskError, CommandTaskHandler};
+use std::collections::VecDeque;
 use std::fmt::Formatter;
 use std::ops::Add;
 use std::time::{Duration, Instant};
@@ -39,8 +40,27 @@ impl ResponseCount {
     }
 }
 
+#[derive(Copy, Clone)]
+pub(crate) enum CommandMode {
+    DirectOperate,
+    SelectBeforeOperate,
+}
+
 pub(crate) enum Message {
-    Command(Vec<CommandHeader>),
+    Command(
+        u16,
+        CommandMode,
+        Vec<CommandHeader>,
+        Box<dyn CommandTaskHandler>,
+    ),
+}
+
+impl Message {
+    pub(crate) fn on_send_failure(self) {
+        match self {
+            Message::Command(_, _, _, mut handler) => handler.on_complete(Err(TaskError::Shutdown)),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -51,6 +71,42 @@ pub struct MasterHandle {
 impl MasterHandle {
     pub(crate) fn new(sender: tokio::sync::mpsc::Sender<Message>) -> Self {
         Self { sender }
+    }
+
+    pub async fn direct_operate(
+        &mut self,
+        address: u16,
+        headers: Vec<CommandHeader>,
+        handler: Box<dyn CommandTaskHandler>,
+    ) {
+        self.operate_impl(CommandMode::DirectOperate, address, headers, handler)
+            .await;
+    }
+
+    pub async fn select_before_operate(
+        &mut self,
+        address: u16,
+        headers: Vec<CommandHeader>,
+        handler: Box<dyn CommandTaskHandler>,
+    ) {
+        self.operate_impl(CommandMode::SelectBeforeOperate, address, headers, handler)
+            .await;
+    }
+
+    async fn operate_impl(
+        &mut self,
+        mode: CommandMode,
+        address: u16,
+        headers: Vec<CommandHeader>,
+        handler: Box<dyn CommandTaskHandler>,
+    ) {
+        if let Err(tokio::sync::mpsc::error::SendError(msg)) = self
+            .sender
+            .send(Message::Command(address, mode, headers, handler))
+            .await
+        {
+            msg.on_send_failure();
+        }
     }
 }
 
@@ -67,71 +123,83 @@ pub(crate) struct Runner {
     level: ParseLogLevel,
     response_timeout: Duration,
     count: ResponseCount,
-    sessions: SessionMap,
+    associations: AssociationMap,
     user_queue: tokio::sync::mpsc::Receiver<Message>,
+    command_queue: VecDeque<MasterRequest>,
     buffer: [u8; 2048],
 }
 
+/// Errors that can occur while executing a master task
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum RequestError {
+pub enum TaskError {
+    /// An error occurred at the link or transport level
     Lower(LinkError),
+    /// A response to the task's request was malformed
     MalformedResponse(ObjectParseError),
+    /// Received a non-FIR response when expecting the FIR bit
     NeverReceivedFir,
+    /// Received FIR bit after already receiving FIR
     UnexpectedFir,
+    /// Received a multi-fragmented response when expecting FIR/FIN
     MultiFragmentResponse,
+    /// The response timed-out
     ResponseTimeout,
+    /// Insufficient buffer space to serialize the request
     WriteError,
-    SessionRemoved(u16),
+    /// The requested association does not exist (not configured)
+    NoSuchAssociation(u16),
+    /// There is not connection at the transport level
+    NoConnection,
+    /// The master was shutdown
     Shutdown,
 }
 
-impl std::fmt::Display for RequestError {
+impl std::fmt::Display for TaskError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            RequestError::Lower(_) => f.write_str("I/O error"),
-            RequestError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
-            RequestError::NeverReceivedFir => {
+            TaskError::Lower(_) => f.write_str("I/O error"),
+            TaskError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
+            TaskError::NeverReceivedFir => {
                 f.write_str("received non-FIR response before receiving FIR")
             }
-            RequestError::UnexpectedFir => {
+            TaskError::UnexpectedFir => {
                 f.write_str("received FIR bit after already receiving FIR bit")
             }
-            RequestError::MultiFragmentResponse => {
+            TaskError::MultiFragmentResponse => {
                 f.write_str("received unexpected multi-fragment response")
             }
-            RequestError::ResponseTimeout => f.write_str("no response received within timeout"),
-            RequestError::WriteError => {
+            TaskError::ResponseTimeout => f.write_str("no response received within timeout"),
+            TaskError::WriteError => {
                 f.write_str("unable to serialize the task's request (insufficient buffer space)")
             }
-            RequestError::Shutdown => {
-                f.write_str("the master was shutdown while executing the task")
-            }
-            RequestError::SessionRemoved(x) => write!(f, "session removed: {}", x),
+            TaskError::Shutdown => f.write_str("the master was shutdown while executing the task"),
+            TaskError::NoConnection => f.write_str("no connection"),
+            TaskError::NoSuchAssociation(x) => write!(f, "no association with address: {}", x),
         }
     }
 }
 
-impl From<WriteError> for RequestError {
+impl From<WriteError> for TaskError {
     fn from(_: WriteError) -> Self {
-        RequestError::WriteError
+        TaskError::WriteError
     }
 }
 
-impl From<LinkError> for RequestError {
+impl From<LinkError> for TaskError {
     fn from(err: LinkError) -> Self {
-        RequestError::Lower(err)
+        TaskError::Lower(err)
     }
 }
 
-impl From<tokio::time::Elapsed> for RequestError {
+impl From<tokio::time::Elapsed> for TaskError {
     fn from(_: tokio::time::Elapsed) -> Self {
-        RequestError::ResponseTimeout
+        TaskError::ResponseTimeout
     }
 }
 
-impl From<ObjectParseError> for RequestError {
+impl From<ObjectParseError> for TaskError {
     fn from(err: ObjectParseError) -> Self {
-        RequestError::MalformedResponse(err)
+        TaskError::MalformedResponse(err)
     }
 }
 
@@ -147,15 +215,15 @@ impl From<Shutdown> for RunError {
     }
 }
 
-impl From<Shutdown> for RequestError {
+impl From<Shutdown> for TaskError {
     fn from(_: Shutdown) -> Self {
-        RequestError::Shutdown
+        TaskError::Shutdown
     }
 }
 
-impl From<NoSession> for RequestError {
+impl From<NoSession> for TaskError {
     fn from(x: NoSession) -> Self {
-        RequestError::SessionRemoved(x.address)
+        TaskError::NoSuchAssociation(x.address)
     }
 }
 
@@ -163,21 +231,22 @@ impl Runner {
     pub(crate) fn new(
         level: ParseLogLevel,
         response_timeout: Duration,
-        sessions: SessionMap,
+        associations: AssociationMap,
         user_queue: tokio::sync::mpsc::Receiver<Message>,
     ) -> Self {
         Self {
             level,
             response_timeout,
-            sessions,
+            associations,
             count: ResponseCount::new(),
             user_queue,
+            command_queue: VecDeque::new(),
             buffer: [0; 2048],
         }
     }
 
     pub(crate) fn reset(&mut self) {
-        self.sessions.reset()
+        self.associations.reset()
     }
 
     async fn idle_until<T>(
@@ -192,8 +261,11 @@ impl Runner {
     {
         loop {
             tokio::select! {
-                result = self.process_message() => {
-                   result?;
+                result = self.process_message_while_connected() => {
+                   if result? {
+                       // we need to recheck the tasks
+                       return Ok(());
+                   }
                 }
                 result = reader.read(io) => {
                    result?;
@@ -217,8 +289,11 @@ impl Runner {
     {
         loop {
             tokio::select! {
-                result = self.process_message() => {
-                   result?;
+                result = self.process_message_while_connected() => {
+                   if result? {
+                       // we need to recheck the tasks
+                       return Ok(());
+                   }
                 }
                 result = reader.read(io) => {
                    result?;
@@ -258,18 +333,41 @@ impl Runner {
         Ok(())
     }
 
-    async fn process_message(&mut self) -> Result<(), Shutdown> {
+    async fn process_message_while_connected(&mut self) -> Result<bool, Shutdown> {
         match self.user_queue.recv().await {
-            Some(x) => {
-                match x {
-                    // TODO - handle real messages!
-                    Message::Command(_headers) => {
-                        log::warn!("received command headers!");
+            Some(x) => match x {
+                Message::Command(address, mode, headers, mut handler) => {
+                    match self.associations.get(address).ok() {
+                        Some(association) => {
+                            self.command_queue
+                                .push_back(association.operate(mode, headers, handler));
+                            Ok(true)
+                        }
+                        None => {
+                            log::warn!(
+                                "no association for command request with address: {}",
+                                address
+                            );
+                            handler.on_complete(Err(TaskError::NoSuchAssociation(address)));
+                            Ok(false)
+                        }
                     }
                 }
-                Ok(())
-            }
-            None => Err(Shutdown),
+            },
+            None => return Err(Shutdown),
+        }
+    }
+
+    async fn process_message_while_disconnected(&mut self) -> Result<(), Shutdown> {
+        match self.user_queue.recv().await {
+            Some(x) => match x {
+                Message::Command(_, _, _, mut handler) => {
+                    handler
+                        .on_command_complete(Err(CommandTaskError::Task(TaskError::NoConnection)));
+                    Ok(())
+                }
+            },
+            None => return Err(Shutdown),
         }
     }
 
@@ -320,7 +418,7 @@ impl Runner {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let session = match self.sessions.get_mut(source).ok() {
+        let session = match self.associations.get_mut(source).ok() {
             Some(session) => session,
             None => {
                 log::warn!(
@@ -350,12 +448,12 @@ impl Runner {
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
         writer: &mut WriterType,
-    ) -> Result<RequestStatus, RequestError>
+    ) -> Result<RequestStatus, TaskError>
     where
         T: AsyncWrite + Unpin,
     {
         if !(header.control.is_fir_and_fin()) {
-            return Err(RequestError::MultiFragmentResponse);
+            return Err(TaskError::MultiFragmentResponse);
         }
 
         // non-read responses REALLY shouldn't request confirmation
@@ -367,7 +465,7 @@ impl Runner {
         }
 
         Ok(task.details.handle(
-            self.sessions.get_mut(task.address)?,
+            self.associations.get_mut(task.address)?,
             task.address,
             header,
             objects,
@@ -381,16 +479,16 @@ impl Runner {
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
         writer: &mut WriterType,
-    ) -> Result<RequestStatus, RequestError>
+    ) -> Result<RequestStatus, TaskError>
     where
         T: AsyncWrite + Unpin,
     {
         if header.control.fir && !self.count.is_none() {
-            return Err(RequestError::UnexpectedFir);
+            return Err(TaskError::UnexpectedFir);
         }
 
         if !header.control.fir && self.count.is_none() {
-            return Err(RequestError::NeverReceivedFir);
+            return Err(TaskError::NeverReceivedFir);
         }
 
         if !header.control.fin && !header.control.con {
@@ -406,14 +504,14 @@ impl Runner {
         }
 
         let status = task.details.handle(
-            self.sessions.get_mut(task.address)?,
+            self.associations.get_mut(task.address)?,
             task.address,
             header,
             objects,
         );
 
         if !header.control.fin {
-            self.sessions.get_mut(task.address)?.increment_seq();
+            self.associations.get_mut(task.address)?.increment_seq();
         }
 
         Ok(status)
@@ -426,7 +524,7 @@ impl Runner {
         source: u16,
         response: &Response<'_>,
         writer: &mut WriterType,
-    ) -> Result<RequestStatus, RequestError>
+    ) -> Result<RequestStatus, TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -445,15 +543,17 @@ impl Runner {
         }
 
         // this allows us to detect things like RESTART, NEED_TIME, and EVENT_BUFFER_OVERFLOW
-        self.sessions
+        self.associations
             .get_mut(task.address)?
             .process_response_iin(response.header.iin);
 
-        if response.header.control.seq.value() != self.sessions.get(task.address)?.previous_seq() {
+        if response.header.control.seq.value()
+            != self.associations.get(task.address)?.previous_seq()
+        {
             log::warn!(
                 "response with seq: {} doesn't match expected seq: {}",
                 response.header.control.seq.value(),
-                self.sessions.get(task.address)?.previous_seq()
+                self.associations.get(task.address)?.previous_seq()
             );
             return Ok(RequestStatus::ContinueWaiting);
         }
@@ -475,12 +575,12 @@ impl Runner {
         io: &mut T,
         task: &mut MasterRequest,
         writer: &mut WriterType,
-    ) -> Result<(), RequestError>
+    ) -> Result<(), TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
         // format the request
-        let seq = self.sessions.get_mut(task.address)?.increment_seq();
+        let seq = self.associations.get_mut(task.address)?.increment_seq();
         let mut cursor = WriteCursor::new(&mut self.buffer);
         task.details.format(seq, &mut cursor)?;
         writer
@@ -494,8 +594,7 @@ impl Runner {
 
         loop {
             tokio::select! {
-                // TODO - fail incoming commands since no connection
-                result = self.process_message() => {
+                result = self.process_message_while_disconnected() => {
                    result?;
                 }
                 _ = tokio::time::delay_until(tokio::time::Instant::from_std(deadline)) => {
@@ -503,6 +602,14 @@ impl Runner {
                 }
             }
         }
+    }
+
+    fn get_next_task(&mut self) -> Next<MasterRequest> {
+        if let Some(x) = self.command_queue.pop_front() {
+            return Next::Now(x);
+        }
+
+        self.associations.next_task()
     }
 
     pub(crate) async fn run<T>(
@@ -515,7 +622,7 @@ impl Runner {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            let result = match self.sessions.next_task() {
+            let result = match self.get_next_task() {
                 Next::Now(mut task) => self.run_task(io, &mut task, writer, reader).await,
                 Next::NotBefore(time) => self.idle_until(time, io, writer, reader).await,
                 Next::None => self.idle_forever(io, writer, reader).await,
@@ -542,8 +649,8 @@ impl Runner {
         task.details.on_complete(result);
 
         match result {
-            Err(RequestError::Lower(err)) => Err(RunError::Link(err)),
-            Err(RequestError::Shutdown) => Err(RunError::Shutdown),
+            Err(TaskError::Lower(err)) => Err(RunError::Link(err)),
+            Err(TaskError::Shutdown) => Err(RunError::Shutdown),
             _ => Ok(()),
         }
     }
@@ -554,7 +661,7 @@ impl Runner {
         task: &mut MasterRequest,
         writer: &mut WriterType,
         reader: &mut ReaderType,
-    ) -> Result<(), RequestError>
+    ) -> Result<(), TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -568,12 +675,13 @@ impl Runner {
         loop {
             tokio::select! {
                 _ = tokio::time::delay_until(deadline.value) => {
-                     return Err(RequestError::ResponseTimeout);
+                     log::warn!("no response within timeout ({} ms)", self.response_timeout.as_millis());
+                     return Err(TaskError::ResponseTimeout);
                 }
                 x = reader.read(io)  => {
                     x?;
                 }
-                y = self.process_message() => {
+                y = self.process_message_while_connected() => {
                     y?;
                     continue;
                 }
@@ -601,7 +709,7 @@ impl Runner {
         task: &mut MasterRequest,
         writer: &mut WriterType,
         reader: &mut ReaderType,
-    ) -> Result<RequestStatus, RequestError>
+    ) -> Result<RequestStatus, TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -632,7 +740,7 @@ mod test {
 
     #[tokio::test]
     async fn performs_startup_sequence_with_device_restart_asserted() {
-        let map = SessionMap::single(Association::new(
+        let map = AssociationMap::single(Association::new(
             1024,
             AssociationConfig::default(),
             NullHandler::boxed(),

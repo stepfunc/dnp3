@@ -1,12 +1,12 @@
 use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::handlers::{AssociationHandler, ReadTaskHandler};
+use crate::master::handlers::AssociationHandler;
 use crate::master::poll::PollMap;
 use crate::master::request::MasterRequest;
 use crate::master::requests::auto::AutoRequestDetails;
 use crate::master::requests::command::CommandRequestDetails;
-use crate::master::requests::read::ReadRequestDetails;
+use crate::master::runner::CommandMode;
 use crate::master::types::{
     AutoRequest, CommandHeader, CommandTaskHandler, EventClasses, ReadRequest,
 };
@@ -196,12 +196,12 @@ impl Association {
     }
 }
 
-pub struct SessionMap {
+pub struct AssociationMap {
     sessions: BTreeMap<u16, Association>,
     priority: VecDeque<u16>,
 }
 
-impl Default for SessionMap {
+impl Default for AssociationMap {
     fn default() -> Self {
         Self::new()
     }
@@ -211,7 +211,7 @@ pub(crate) struct NoSession {
     pub(crate) address: u16,
 }
 
-impl SessionMap {
+impl AssociationMap {
     pub fn new() -> Self {
         Self {
             sessions: BTreeMap::new(),
@@ -220,7 +220,7 @@ impl SessionMap {
     }
 
     pub fn single(session: Association) -> Self {
-        let mut map = SessionMap::new();
+        let mut map = AssociationMap::new();
         map.register(session);
         map
     }
@@ -327,27 +327,22 @@ impl Association {
         )
     }
 
-    /*
-    fn select_before_operate(
+    pub(crate) fn operate(
         &self,
+        mode: CommandMode,
         headers: Vec<CommandHeader>,
         handler: Box<dyn CommandTaskHandler>,
     ) -> MasterRequest {
         MasterRequest::new(
             self.address,
-            CommandRequestDetails::select_before_operate(headers, handler),
+            match mode {
+                CommandMode::DirectOperate => {
+                    CommandRequestDetails::direct_operate(headers, handler)
+                }
+                CommandMode::SelectBeforeOperate => {
+                    CommandRequestDetails::select_before_operate(headers, handler)
+                }
+            },
         )
     }
-
-    fn direct_operate(
-        &self,
-        headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandTaskHandler>,
-    ) -> MasterRequest {
-        MasterRequest::new(
-            self.address,
-            CommandRequestDetails::direct_operate(headers, handler),
-        )
-    }
-    */
 }

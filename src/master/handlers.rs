@@ -2,14 +2,14 @@ use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::parser::HeaderCollection;
-use crate::master::runner::RequestError;
+use crate::master::runner::TaskError;
 
 pub trait ResponseHandler: Send {
     fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
 }
 
 pub trait RequestCompletionHandler: Send {
-    fn on_complete(&mut self, result: Result<(), RequestError>);
+    fn on_complete(&mut self, result: Result<(), TaskError>);
 }
 
 pub trait AssociationHandler: ResponseHandler {
@@ -47,5 +47,5 @@ impl ResponseHandler for NullHandler {
 impl AssociationHandler for NullHandler {}
 
 impl RequestCompletionHandler for NullHandler {
-    fn on_complete(&mut self, _result: Result<(), RequestError>) {}
+    fn on_complete(&mut self, _result: Result<(), TaskError>) {}
 }

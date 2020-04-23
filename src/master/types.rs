@@ -8,7 +8,7 @@ use crate::app::parse::parser::HeaderDetails;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::master::handlers::RequestCompletionHandler;
-use crate::master::runner::RequestError;
+use crate::master::runner::TaskError;
 use crate::util::cursor::WriteError;
 
 #[derive(Copy, Clone)]
@@ -260,6 +260,8 @@ pub enum CommandHeader {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandResponseError {
+    /// the command failed before receiving a response
+    Request(TaskError),
     /// the outstation indicated that a command was not SUCCESS for the specified reason
     BadStatus(CommandStatus),
     /// the number of headers in the response doesn't match the number in the request
@@ -275,6 +277,7 @@ pub enum CommandResponseError {
 impl std::fmt::Display for CommandResponseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            CommandResponseError::Request(err) => write!(f, "{}", err),
             CommandResponseError::BadStatus(status) => write!(
                 f,
                 "command status value other than Success was returned: {:?}",
@@ -296,10 +299,13 @@ impl std::fmt::Display for CommandResponseError {
     }
 }
 
+/// Parent error type for command tasks
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandTaskError {
+    /// The task failed b/c of an unexpected response
     Response(CommandResponseError),
-    Task(RequestError),
+    /// The task failed b/c of a task execution error
+    Task(TaskError),
 }
 
 impl std::fmt::Display for CommandTaskError {
@@ -312,7 +318,34 @@ impl std::fmt::Display for CommandTaskError {
 }
 
 pub trait CommandTaskHandler: RequestCompletionHandler {
-    fn on_response(&mut self, result: Result<(), CommandResponseError>);
+    /// Invoked when the command task succeeds or fails
+    fn on_command_complete(&mut self, result: Result<(), CommandTaskError>);
+}
+
+impl<T> RequestCompletionHandler for T
+where
+    T: CommandTaskHandler,
+{
+    /// If an error occurs, we forward it to `on_command_complete`
+    /// successful completion, means that the other completion
+    /// handler was already invoked
+    fn on_complete(&mut self, result: Result<(), TaskError>) {
+        if let Err(err) = result {
+            self.on_command_complete(Err(err.into()));
+        }
+    }
+}
+
+impl From<CommandResponseError> for CommandTaskError {
+    fn from(err: CommandResponseError) -> Self {
+        CommandTaskError::Response(err)
+    }
+}
+
+impl From<TaskError> for CommandTaskError {
+    fn from(err: TaskError) -> Self {
+        CommandTaskError::Task(err)
+    }
 }
 
 impl CommandHeader {

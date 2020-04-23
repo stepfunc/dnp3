@@ -1,4 +1,4 @@
-use crate::master::association::SessionMap;
+use crate::master::association::AssociationMap;
 
 use crate::app::parse::parser::ParseLogLevel;
 use crate::master::runner::{MasterHandle, RunError, Runner, Shutdown};
@@ -82,7 +82,7 @@ impl MasterTask {
         strategy: ReconnectStrategy,
         timeout: Duration,
         endpoint: SocketAddr,
-        sessions: SessionMap,
+        sessions: AssociationMap,
     ) -> MasterHandle {
         let (mut task, handle) =
             MasterTask::new(address, level, strategy, timeout, endpoint, sessions);
@@ -96,7 +96,7 @@ impl MasterTask {
         strategy: ReconnectStrategy,
         response_timeout: Duration,
         endpoint: SocketAddr,
-        sessions: SessionMap,
+        sessions: AssociationMap,
     ) -> (Self, MasterHandle) {
         let (tx, rx) = tokio::sync::mpsc::channel(100); // TODO
         let runner = Runner::new(level, response_timeout, sessions, rx);
