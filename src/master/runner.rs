@@ -450,7 +450,7 @@ impl Runner {
             .process_response_iin(response.header.iin);
 
         if response.header.control.seq.value()
-            != self.sessions.get_mut(task.address)?.previous_seq()
+            != self.sessions.get(task.address)?.previous_seq()
         {
             log::warn!(
                 "response with seq: {} doesn't match expected seq: {}",
