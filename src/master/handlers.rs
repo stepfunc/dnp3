@@ -12,7 +12,7 @@ pub trait RequestCompletionHandler: Send {
     fn on_complete(&mut self, result: Result<(), RequestError>);
 }
 
-pub trait SessionHandler: ResponseHandler {
+pub trait AssociationHandler: ResponseHandler {
     // TODO - add additional methods
 }
 
@@ -44,7 +44,7 @@ impl ResponseHandler for NullHandler {
     fn handle(&mut self, _source: u16, _header: ResponseHeader, _headers: HeaderCollection) {}
 }
 
-impl SessionHandler for NullHandler {}
+impl AssociationHandler for NullHandler {}
 
 impl RequestCompletionHandler for NullHandler {
     fn on_complete(&mut self, _result: Result<(), RequestError>) {}

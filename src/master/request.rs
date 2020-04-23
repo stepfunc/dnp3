@@ -3,11 +3,11 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
+use crate::master::association::Association;
 use crate::master::requests::auto::AutoRequestDetails;
 use crate::master::requests::command::CommandRequestDetails;
 use crate::master::requests::read::ReadRequestDetails;
 use crate::master::runner::RequestError;
-use crate::master::session::Session;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone)]
@@ -48,7 +48,7 @@ impl RequestDetails {
 
     pub(crate) fn handle(
         &mut self,
-        session: &mut Session,
+        session: &mut Association,
         source: u16,
         response: ResponseHeader,
         headers: HeaderCollection,

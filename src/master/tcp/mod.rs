@@ -1,4 +1,4 @@
-use crate::master::session::SessionMap;
+use crate::master::association::SessionMap;
 
 use crate::app::parse::parser::ParseLogLevel;
 use crate::master::runner::{MasterHandle, RunError, Runner, Shutdown};

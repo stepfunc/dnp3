@@ -1,7 +1,7 @@
 use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::handlers::{ReadTaskHandler, SessionHandler};
+use crate::master::handlers::{AssociationHandler, ReadTaskHandler};
 use crate::master::poll::PollMap;
 use crate::master::request::MasterRequest;
 use crate::master::requests::auto::AutoRequestDetails;
@@ -15,14 +15,14 @@ use std::collections::{BTreeMap, VecDeque};
 use std::time::{Duration, Instant};
 
 #[derive(Copy, Clone)]
-pub struct SessionConfig {
+pub struct AssociationConfig {
     /// The event classes to disable on startup
     pub(crate) disable_unsol_classes: EventClasses,
     /// The event classes to enable on startup
     pub(crate) enable_unsol_classes: EventClasses,
 }
 
-impl SessionConfig {
+impl AssociationConfig {
     pub fn new(disable_unsol_classes: EventClasses, enable_unsol_classes: EventClasses) -> Self {
         Self {
             disable_unsol_classes,
@@ -31,13 +31,13 @@ impl SessionConfig {
     }
 
     pub fn none() -> Self {
-        SessionConfig::new(EventClasses::none(), EventClasses::none())
+        AssociationConfig::new(EventClasses::none(), EventClasses::none())
     }
 }
 
-impl Default for SessionConfig {
+impl Default for AssociationConfig {
     fn default() -> Self {
-        SessionConfig::new(EventClasses::all(), EventClasses::all())
+        AssociationConfig::new(EventClasses::all(), EventClasses::all())
     }
 }
 
@@ -83,17 +83,21 @@ impl TaskStates {
     }
 }
 
-pub struct Session {
+pub struct Association {
     address: u16,
     seq: Sequence,
     tasks: TaskStates,
-    handler: Box<dyn SessionHandler>,
-    config: SessionConfig,
+    handler: Box<dyn AssociationHandler>,
+    config: AssociationConfig,
     polls: PollMap,
 }
 
-impl Session {
-    pub fn new(address: u16, config: SessionConfig, handler: Box<dyn SessionHandler>) -> Self {
+impl Association {
+    pub fn new(
+        address: u16,
+        config: AssociationConfig,
+        handler: Box<dyn AssociationHandler>,
+    ) -> Self {
         Self {
             address,
             seq: Sequence::default(),
@@ -165,7 +169,7 @@ pub(crate) enum Next<T> {
     NotBefore(Instant),
 }
 
-impl Session {
+impl Association {
     pub fn add_poll(&mut self, request: ReadRequest, period: Duration) {
         self.polls.add(request, period)
     }
@@ -193,7 +197,7 @@ impl Session {
 }
 
 pub struct SessionMap {
-    sessions: BTreeMap<u16, Session>,
+    sessions: BTreeMap<u16, Association>,
     priority: VecDeque<u16>,
 }
 
@@ -215,7 +219,7 @@ impl SessionMap {
         }
     }
 
-    pub fn single(session: Session) -> Self {
+    pub fn single(session: Association) -> Self {
         let mut map = SessionMap::new();
         map.register(session);
         map
@@ -227,7 +231,7 @@ impl SessionMap {
         }
     }
 
-    pub fn register(&mut self, session: Session) -> bool {
+    pub fn register(&mut self, session: Association) -> bool {
         if self.sessions.contains_key(&session.address) {
             return false;
         }
@@ -237,14 +241,14 @@ impl SessionMap {
         true
     }
 
-    pub(crate) fn get(&mut self, address: u16) -> Result<&Session, NoSession> {
+    pub(crate) fn get(&mut self, address: u16) -> Result<&Association, NoSession> {
         match self.sessions.get(&address) {
             Some(x) => Ok(x),
             None => Err(NoSession { address }),
         }
     }
 
-    pub(crate) fn get_mut(&mut self, address: u16) -> Result<&mut Session, NoSession> {
+    pub(crate) fn get_mut(&mut self, address: u16) -> Result<&mut Association, NoSession> {
         match self.sessions.get_mut(&address) {
             Some(x) => Ok(x),
             None => Err(NoSession { address }),
@@ -284,7 +288,7 @@ impl SessionMap {
 }
 
 // helpers to produce request tasks
-impl Session {
+impl Association {
     /*
     fn read(&self, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> MasterRequest {
         MasterRequest::new(self.address, ReadRequestDetails::create(request, handler))

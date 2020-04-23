@@ -1,3 +1,4 @@
+pub mod association;
 pub(crate) mod convert;
 pub mod extract;
 pub mod handlers;
@@ -5,6 +6,5 @@ pub(crate) mod poll;
 pub(crate) mod request;
 pub(crate) mod requests;
 pub(crate) mod runner;
-pub mod session;
 pub mod tcp;
 pub mod types;

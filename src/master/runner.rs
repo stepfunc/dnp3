@@ -10,7 +10,7 @@ use crate::link::error::LinkError;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 use crate::app::gen::enums::FunctionCode;
-use crate::master::session::{Next, NoSession, SessionMap};
+use crate::master::association::{Next, NoSession, SessionMap};
 use crate::master::types::CommandHeader;
 use std::fmt::Formatter;
 use std::ops::Add;
@@ -449,9 +449,7 @@ impl Runner {
             .get_mut(task.address)?
             .process_response_iin(response.header.iin);
 
-        if response.header.control.seq.value()
-            != self.sessions.get(task.address)?.previous_seq()
-        {
+        if response.header.control.seq.value() != self.sessions.get(task.address)?.previous_seq() {
             log::warn!(
                 "response with seq: {} doesn't match expected seq: {}",
                 response.header.control.seq.value(),
@@ -627,16 +625,16 @@ impl Runner {
 mod test {
     use super::*;
     use crate::link::header::Address;
+    use crate::master::association::{Association, AssociationConfig};
     use crate::master::handlers::NullHandler;
-    use crate::master::session::{Session, SessionConfig};
     use crate::transport::mocks::{MockReader, MockWriter};
     use tokio_test::io::Builder;
 
     #[tokio::test]
     async fn performs_startup_sequence_with_device_restart_asserted() {
-        let map = SessionMap::single(Session::new(
+        let map = SessionMap::single(Association::new(
             1024,
-            SessionConfig::default(),
+            AssociationConfig::default(),
             NullHandler::boxed(),
         ));
 

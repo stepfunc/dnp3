@@ -1,4 +1,4 @@
-use crate::master::session::Next;
+use crate::master::association::Next;
 use crate::master::types::{AutoRequest, ReadRequest};
 use crate::util::Smallest;
 use std::collections::BTreeMap;
