@@ -6,6 +6,9 @@ use dnp3rs::master::types::{Classes, EventClasses, ReadRequest};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
+use tokio::stream::StreamExt;
+
+use tokio_util::codec::{FramedRead, LinesCodec};
 
 fn get_sessions() -> SessionMap {
     let mut sessions = SessionMap::new();
@@ -22,18 +25,22 @@ fn get_sessions() -> SessionMap {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
 
-    let address = SocketAddr::from_str("127.0.0.1:20000")?;
-
-    let (mut task, _handle) = MasterTask::new(
+    // spawn the master onto another task
+    let _handle = MasterTask::spawn(
         1,
         ParseLogLevel::ObjectValues,
         ReconnectStrategy::default(),
         Duration::from_secs(1),
-        address,
+        SocketAddr::from_str("127.0.0.1:20000")?,
         get_sessions(),
     );
 
-    task.run().await.ok();
+    let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
-    Ok(())
+    loop {
+        match reader.next().await.unwrap()?.as_str() {
+            "x" => return Ok(()),
+            s => println!("unknown command: {}", s),
+        }
+    }
 }
