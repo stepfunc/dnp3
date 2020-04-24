@@ -1,4 +1,4 @@
-use crate::app::format::write::start_request;
+use crate::app::format::write::{start_request, HeaderWriter};
 use crate::app::gen::enums::FunctionCode;
 use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
@@ -30,6 +30,11 @@ pub(crate) enum TaskType {
     Read(ReadTask),
     /// NonRead tasks always require FIR/FIN == 1, but might require multiple read/response cycles, e.g. SBO
     NonRead(NonReadTask),
+}
+
+pub(crate) trait RequestWriter {
+    fn function(&self) -> FunctionCode;
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError>;
 }
 
 pub(crate) enum ReadTask {
@@ -64,6 +69,19 @@ impl TaskType {
         }
     }
     */
+}
+
+impl RequestWriter for ReadTask {
+    fn function(&self) -> FunctionCode {
+        FunctionCode::Read
+    }
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        match self {
+            ReadTask::PeriodicPoll => Ok(()),     // TODO
+            ReadTask::StartupIntegrity => Ok(()), // TODO
+        }
+    }
 }
 
 impl NonReadTask {
