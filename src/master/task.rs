@@ -8,7 +8,6 @@ use crate::master::runner::TaskError;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
 use crate::util::cursor::{WriteCursor, WriteError};
-use std::process::Command;
 
 #[derive(Copy, Clone)]
 pub(crate) enum TaskStatus {
@@ -80,6 +79,19 @@ impl RequestWriter for ReadTask {
         match self {
             ReadTask::PeriodicPoll => Ok(()),     // TODO
             ReadTask::StartupIntegrity => Ok(()), // TODO
+        }
+    }
+}
+
+impl RequestWriter for NonReadTask {
+    fn function(&self) -> FunctionCode {
+        self.function()
+    }
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        match self {
+            NonReadTask::Auto(t) => t.format(writer),
+            NonReadTask::Command(t) => t.format(writer),
         }
     }
 }

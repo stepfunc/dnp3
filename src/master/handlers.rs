@@ -13,7 +13,7 @@ pub trait ResponseHandler: Send {
 /// The user can select to implement it using FnOnce or a
 /// one-shot reply channel
 pub enum CallbackOnce<T> {
-    BoxedFn(Box<dyn FnOnce(T) -> () + Send>),
+    BoxedFn(Box<dyn FnOnce(T) -> () + Send + Sync>),
     OneShot(tokio::sync::oneshot::Sender<T>),
 }
 

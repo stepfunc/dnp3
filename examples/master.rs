@@ -4,6 +4,7 @@ use dnp3rs::master::handlers::NullHandler;
 use dnp3rs::master::runner::CommandMode;
 use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
 use dnp3rs::master::types::{Classes, EventClasses, ReadRequest};
+use dnp3rs::util::timeout::Timeout;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
@@ -29,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         1,
         ParseLogLevel::ObjectValues,
         ReconnectStrategy::default(),
-        Duration::from_secs(1),
+        Timeout::from_secs(1).unwrap(),
         SocketAddr::from_str("127.0.0.1:20000")?,
         AssociationMap::single(get_association()),
     );

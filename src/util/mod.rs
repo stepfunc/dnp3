@@ -2,6 +2,7 @@ pub(crate) mod bit;
 pub(crate) mod cursor;
 pub(crate) mod sequence;
 pub(crate) mod slice_ext;
+pub mod timeout;
 
 pub(crate) struct Smallest<T>
 where
