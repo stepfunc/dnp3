@@ -1,8 +1,9 @@
 use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::master::association::{Association, AssociationConfig, AssociationMap};
-use dnp3rs::master::handlers::{CommandTaskHandler, NullHandler};
+use dnp3rs::master::handlers::NullHandler;
+use dnp3rs::master::runner::CommandMode;
 use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
-use dnp3rs::master::types::{Classes, CommandTaskError, EventClasses, ReadRequest};
+use dnp3rs::master::types::{Classes, EventClasses, ReadRequest};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
@@ -17,16 +18,6 @@ fn get_association() -> Association {
         Duration::from_secs(5),
     );
     association
-}
-
-struct LoggingHandler;
-impl CommandTaskHandler for LoggingHandler {
-    fn on_command_complete(&mut self, result: Result<(), CommandTaskError>) {
-        match result {
-            Ok(()) => log::info!("success"),
-            Err(err) => log::warn!("error: {}", err),
-        }
-    }
 }
 
 #[tokio::main(threaded_scheduler)]
@@ -49,9 +40,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
             "c" => {
-                handle
-                    .direct_operate(1024, vec![], Box::new(LoggingHandler {}))
-                    .await;
+                match handle
+                    .operate(1024, CommandMode::DirectOperate, vec![])
+                    .await
+                {
+                    Ok(()) => log::info!("success"),
+                    Err(err) => log::warn!("error: {}", err),
+                }
             }
             s => println!("unknown command: {}", s),
         }

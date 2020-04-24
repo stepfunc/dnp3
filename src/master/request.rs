@@ -54,7 +54,8 @@ impl RequestDetails {
     ) -> RequestStatus {
         match self {
             // TODO - RequestDetails::Read(task) => task.handle(source, response, headers),
-            RequestDetails::Command(task) => task.handle(headers),
+            RequestDetails::Command(_task) => RequestStatus::Complete, // TODO - task.handle(headers),
+
             RequestDetails::Auto(task) => task.handle(session, response, headers),
         }
     }

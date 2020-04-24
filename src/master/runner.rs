@@ -11,8 +11,8 @@ use crate::util::cursor::{WriteCursor, WriteError};
 
 use crate::app::gen::enums::FunctionCode;
 use crate::master::association::{AssociationMap, Next, NoSession};
-use crate::master::handlers::CommandTaskHandler;
-use crate::master::types::{CommandHeader, CommandTaskError};
+use crate::master::handlers::{CallbackOnce, CommandCallback, CommandResult};
+use crate::master::types::{CommandError, CommandHeader};
 use std::collections::VecDeque;
 use std::fmt::Formatter;
 use std::ops::Add;
@@ -41,25 +41,22 @@ impl ResponseCount {
     }
 }
 
-#[derive(Copy, Clone)]
-pub(crate) enum CommandMode {
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum CommandMode {
     DirectOperate,
     SelectBeforeOperate,
 }
 
 pub(crate) enum Message {
-    Command(
-        u16,
-        CommandMode,
-        Vec<CommandHeader>,
-        Box<dyn CommandTaskHandler>,
-    ),
+    Command(u16, CommandMode, Vec<CommandHeader>, CommandCallback),
 }
 
 impl Message {
     pub(crate) fn on_send_failure(self) {
         match self {
-            Message::Command(_, _, _, mut handler) => handler.on_complete(Err(TaskError::Shutdown)),
+            Message::Command(_, _, _, callback) => {
+                callback.complete(Err(TaskError::Shutdown.into()))
+            }
         }
     }
 }
@@ -74,40 +71,56 @@ impl MasterHandle {
         Self { sender }
     }
 
-    pub async fn direct_operate(
+    pub async fn operate(
         &mut self,
         address: u16,
+        mode: CommandMode,
         headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandTaskHandler>,
-    ) {
-        self.operate_impl(CommandMode::DirectOperate, address, headers, handler)
+    ) -> CommandResult {
+        let (tx, rx) = tokio::sync::oneshot::channel::<CommandResult>();
+        self.send_operate_message(mode, address, headers, CallbackOnce::OneShot(tx))
             .await;
+        rx.await?
     }
 
-    pub async fn select_before_operate(
+    pub async fn operate_cb<F>(
         &mut self,
         address: u16,
+        mode: CommandMode,
         headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandTaskHandler>,
-    ) {
-        self.operate_impl(CommandMode::SelectBeforeOperate, address, headers, handler)
-            .await;
+        callback: F,
+    ) where
+        F: FnOnce(CommandResult) -> () + Send + 'static,
+    {
+        self.send_operate_message(
+            mode,
+            address,
+            headers,
+            CallbackOnce::BoxedFn(Box::new(callback)),
+        )
+        .await;
     }
 
-    async fn operate_impl(
+    async fn send_operate_message(
         &mut self,
         mode: CommandMode,
         address: u16,
         headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandTaskHandler>,
+        callback: CommandCallback,
     ) {
         if let Err(tokio::sync::mpsc::error::SendError(msg)) = self
             .sender
-            .send(Message::Command(address, mode, headers, handler))
+            .send(Message::Command(address, mode, headers, callback))
             .await
         {
             msg.on_send_failure();
         }
+    }
+}
+
+impl From<tokio::sync::oneshot::error::RecvError> for CommandError {
+    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
+        CommandError::Task(TaskError::Shutdown)
     }
 }
 
@@ -337,7 +350,7 @@ impl Runner {
     async fn process_message_while_connected(&mut self) -> Result<bool, Shutdown> {
         match self.user_queue.recv().await {
             Some(x) => match x {
-                Message::Command(address, mode, headers, mut handler) => {
+                Message::Command(address, mode, headers, handler) => {
                     match self.associations.get(address).ok() {
                         Some(association) => {
                             self.command_queue
@@ -349,7 +362,7 @@ impl Runner {
                                 "no association for command request with address: {}",
                                 address
                             );
-                            handler.on_complete(Err(TaskError::NoSuchAssociation(address)));
+                            handler.complete(Err(TaskError::NoSuchAssociation(address).into()));
                             Ok(false)
                         }
                     }
@@ -362,9 +375,8 @@ impl Runner {
     async fn process_message_while_disconnected(&mut self) -> Result<(), Shutdown> {
         match self.user_queue.recv().await {
             Some(x) => match x {
-                Message::Command(_, _, _, mut handler) => {
-                    handler
-                        .on_command_complete(Err(CommandTaskError::Task(TaskError::NoConnection)));
+                Message::Command(_, _, _, handler) => {
+                    handler.complete(Err(CommandError::Task(TaskError::NoConnection)));
                     Ok(())
                 }
             },

@@ -1,7 +1,7 @@
 use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::handlers::{AssociationHandler, CommandTaskHandler};
+use crate::master::handlers::{AssociationHandler, CommandCallback};
 use crate::master::poll::PollMap;
 use crate::master::request::MasterRequest;
 use crate::master::requests::auto::AutoRequestDetails;
@@ -329,18 +329,11 @@ impl Association {
         &self,
         mode: CommandMode,
         headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandTaskHandler>,
+        callback: CommandCallback,
     ) -> MasterRequest {
         MasterRequest::new(
             self.address,
-            match mode {
-                CommandMode::DirectOperate => {
-                    CommandRequestDetails::direct_operate(headers, handler)
-                }
-                CommandMode::SelectBeforeOperate => {
-                    CommandRequestDetails::select_before_operate(headers, handler)
-                }
-            },
+            CommandRequestDetails::operate(mode, headers, callback),
         )
     }
 }

@@ -1,9 +1,9 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::parse::parser::HeaderCollection;
-use crate::master::handlers::CommandTaskHandler;
+use crate::master::handlers::CommandCallback;
 use crate::master::request::{RequestDetails, RequestStatus};
-use crate::master::runner::TaskError;
+use crate::master::runner::{CommandMode, TaskError};
 use crate::master::types::*;
 use crate::util::cursor::WriteError;
 
@@ -16,34 +16,37 @@ enum State {
 pub(crate) struct CommandRequestDetails {
     state: State,
     headers: Vec<CommandHeader>,
-    handler: Box<dyn CommandTaskHandler>,
+    callback: CommandCallback,
+}
+
+impl CommandMode {
+    fn to_state(self) -> State {
+        match self {
+            CommandMode::DirectOperate => State::DirectOperate,
+            CommandMode::SelectBeforeOperate => State::Select,
+        }
+    }
 }
 
 impl CommandRequestDetails {
     fn create(
         state: State,
         headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandTaskHandler>,
+        callback: CommandCallback,
     ) -> RequestDetails {
         RequestDetails::Command(Self {
             state,
             headers,
-            handler,
+            callback,
         })
     }
 
-    pub(crate) fn select_before_operate(
+    pub(crate) fn operate(
+        mode: CommandMode,
         headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandTaskHandler>,
+        callback: CommandCallback,
     ) -> RequestDetails {
-        Self::create(State::Select, headers, handler)
-    }
-
-    pub(crate) fn direct_operate(
-        headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandTaskHandler>,
-    ) -> RequestDetails {
-        Self::create(State::DirectOperate, headers, handler)
+        Self::create(mode.to_state(), headers, callback)
     }
 
     pub(crate) fn function(&self) -> FunctionCode {
@@ -79,9 +82,11 @@ impl CommandRequestDetails {
         Ok(())
     }
 
-    pub(crate) fn handle(&mut self, headers: HeaderCollection) -> RequestStatus {
+    pub(crate) fn handle(&mut self, _headers: HeaderCollection) -> RequestStatus {
+        RequestStatus::Complete
+        /*
         if let Err(err) = self.compare(headers) {
-            self.handler.on_command_complete(Err(err.into()));
+            self.callback.complete(Err(err.into()));
             return RequestStatus::Complete;
         }
 
@@ -92,13 +97,14 @@ impl CommandRequestDetails {
             }
             _ => {
                 // Complete w/ success
-                self.handler.on_command_complete(Ok(()));
+                self.callback.complete(Ok(()));
                 RequestStatus::Complete
             }
         }
+        */
     }
 
-    pub(crate) fn on_complete(&mut self, result: Result<(), TaskError>) {
-        self.handler.on_complete(result);
+    pub(crate) fn on_complete(&mut self, _result: Result<(), TaskError>) {
+        // self.callback.complete(result); // TODO
     }
 }

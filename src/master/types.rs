@@ -300,31 +300,31 @@ impl std::fmt::Display for CommandResponseError {
 
 /// Parent error type for command tasks
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum CommandTaskError {
-    /// The task failed b/c of an unexpected response
-    Response(CommandResponseError),
-    /// The task failed b/c of a task execution error
+pub enum CommandError {
+    /// failed b/c of a generic task execution error
     Task(TaskError),
+    /// task failed b/c of an unexpected response
+    Response(CommandResponseError),
 }
 
-impl std::fmt::Display for CommandTaskError {
+impl std::fmt::Display for CommandError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            CommandTaskError::Response(x) => std::fmt::Display::fmt(x, f),
-            CommandTaskError::Task(x) => std::fmt::Display::fmt(x, f),
+            CommandError::Response(x) => std::fmt::Display::fmt(x, f),
+            CommandError::Task(x) => std::fmt::Display::fmt(x, f),
         }
     }
 }
 
-impl From<CommandResponseError> for CommandTaskError {
+impl From<CommandResponseError> for CommandError {
     fn from(err: CommandResponseError) -> Self {
-        CommandTaskError::Response(err)
+        CommandError::Response(err)
     }
 }
 
-impl From<TaskError> for CommandTaskError {
+impl From<TaskError> for CommandError {
     fn from(err: TaskError) -> Self {
-        CommandTaskError::Task(err)
+        CommandError::Task(err)
     }
 }
 

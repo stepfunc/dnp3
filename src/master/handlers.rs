@@ -3,7 +3,7 @@ use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::runner::TaskError;
-use crate::master::types::CommandTaskError;
+use crate::master::types::CommandError;
 
 pub trait ResponseHandler: Send {
     fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
@@ -13,14 +13,14 @@ pub trait ResponseHandler: Send {
 /// The user can select to implement it using FnOnce or a
 /// one-shot reply channel
 pub enum CallbackOnce<T> {
-    Dynamic(Box<dyn FnOnce(T) -> () + Send>),
+    BoxedFn(Box<dyn FnOnce(T) -> () + Send>),
     OneShot(tokio::sync::oneshot::Sender<T>),
 }
 
 impl<T> CallbackOnce<T> {
     pub(crate) fn complete(self, value: T) {
         match self {
-            CallbackOnce::Dynamic(func) => func(value),
+            CallbackOnce::BoxedFn(func) => func(value),
             CallbackOnce::OneShot(s) => {
                 s.send(value).ok();
             }
@@ -32,24 +32,8 @@ pub trait RequestCompletionHandler: Send {
     fn on_complete(&mut self, result: Result<(), TaskError>);
 }
 
-pub trait CommandTaskHandler: RequestCompletionHandler {
-    /// Invoked when the command task succeeds or fails
-    fn on_command_complete(&mut self, result: Result<(), CommandTaskError>);
-}
-
-impl<T> RequestCompletionHandler for T
-where
-    T: CommandTaskHandler,
-{
-    /// If an error occurs, we forward it to `on_command_complete`
-    /// successful completion, means that the other completion
-    /// handler was already invoked
-    fn on_complete(&mut self, result: Result<(), TaskError>) {
-        if let Err(err) = result {
-            self.on_command_complete(Err(err.into()));
-        }
-    }
-}
+pub type CommandResult = Result<(), CommandError>;
+pub type CommandCallback = CallbackOnce<CommandResult>;
 
 pub trait AssociationHandler: ResponseHandler {
     // TODO - add additional methods
