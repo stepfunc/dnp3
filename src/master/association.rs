@@ -3,10 +3,10 @@ use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::handlers::{AssociationHandler, CommandCallback};
 use crate::master::poll::PollMap;
-use crate::master::task::Task;
-use crate::master::tasks::auto::AutoRequestDetails;
-use crate::master::tasks::command::CommandTaskDetails;
 use crate::master::runner::CommandMode;
+use crate::master::task::Task;
+use crate::master::tasks::auto::AutoTask;
+use crate::master::tasks::command::CommandTask;
 use crate::master::types::{AutoRequest, CommandHeader, EventClasses, ReadRequest};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
@@ -294,34 +294,28 @@ impl Association {
     */
 
     fn poll(&self, request: AutoRequest) -> Task {
-        Task::new(self.address, AutoRequestDetails::create(request))
+        Task::new(self.address, AutoTask::create(request))
     }
 
     fn clear_restart_iin(&self) -> Task {
-        Task::new(
-            self.address,
-            AutoRequestDetails::create(AutoRequest::ClearRestartBit),
-        )
+        Task::new(self.address, AutoTask::create(AutoRequest::ClearRestartBit))
     }
 
     fn integrity(&self) -> Task {
-        Task::new(
-            self.address,
-            AutoRequestDetails::create(AutoRequest::IntegrityScan),
-        )
+        Task::new(self.address, AutoTask::create(AutoRequest::IntegrityScan))
     }
 
     fn disable_unsolicited(&self, classes: EventClasses) -> Task {
         Task::new(
             self.address,
-            AutoRequestDetails::create(AutoRequest::DisableUnsolicited(classes)),
+            AutoTask::create(AutoRequest::DisableUnsolicited(classes)),
         )
     }
 
     fn enable_unsolicited(&self, classes: EventClasses) -> Task {
         Task::new(
             self.address,
-            AutoRequestDetails::create(AutoRequest::EnableUnsolicited(classes)),
+            AutoTask::create(AutoRequest::EnableUnsolicited(classes)),
         )
     }
 
@@ -331,9 +325,6 @@ impl Association {
         headers: Vec<CommandHeader>,
         callback: CommandCallback,
     ) -> Task {
-        Task::new(
-            self.address,
-            CommandTaskDetails::operate(mode, headers, callback),
-        )
+        Task::new(self.address, CommandTask::operate(mode, headers, callback))
     }
 }

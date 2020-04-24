@@ -3,17 +3,17 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::association::Association;
-use crate::master::task::{TaskDetails, TaskStatus};
+use crate::master::task::{NonReadTask, TaskStatus, TaskType};
 use crate::master::types::AutoRequest;
 use crate::util::cursor::WriteError;
 
-pub(crate) struct AutoRequestDetails {
+pub(crate) struct AutoTask {
     pub(crate) request: AutoRequest,
 }
 
-impl AutoRequestDetails {
-    pub(crate) fn create(request: AutoRequest) -> TaskDetails {
-        TaskDetails::Auto(Self { request })
+impl AutoTask {
+    pub(crate) fn create(request: AutoRequest) -> TaskType {
+        TaskType::NonRead(NonReadTask::Auto(Self { request }))
     }
 
     pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {

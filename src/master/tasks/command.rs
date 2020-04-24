@@ -2,8 +2,8 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::handlers::CommandCallback;
-use crate::master::task::{TaskDetails, TaskStatus};
 use crate::master::runner::{CommandMode, TaskError};
+use crate::master::task::{NonReadTask, TaskStatus, TaskType};
 use crate::master::types::*;
 use crate::util::cursor::WriteError;
 
@@ -13,7 +13,7 @@ enum State {
     DirectOperate,
 }
 
-pub(crate) struct CommandTaskDetails {
+pub(crate) struct CommandTask {
     state: State,
     headers: Vec<CommandHeader>,
     callback: CommandCallback,
@@ -28,13 +28,9 @@ impl CommandMode {
     }
 }
 
-impl CommandTaskDetails {
-    fn create(
-        state: State,
-        headers: Vec<CommandHeader>,
-        callback: CommandCallback,
-    ) -> TaskDetails {
-        TaskDetails::Command(Self {
+impl CommandTask {
+    fn create(state: State, headers: Vec<CommandHeader>, callback: CommandCallback) -> TaskType {
+        NonReadTask::command(Self {
             state,
             headers,
             callback,
@@ -45,7 +41,7 @@ impl CommandTaskDetails {
         mode: CommandMode,
         headers: Vec<CommandHeader>,
         callback: CommandCallback,
-    ) -> TaskDetails {
+    ) -> TaskType {
         Self::create(mode.to_state(), headers, callback)
     }
 

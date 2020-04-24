@@ -454,6 +454,7 @@ impl Runner {
         Ok(())
     }
 
+    /*
     async fn handle_non_read_response<T>(
         &mut self,
         io: &mut T,
@@ -484,7 +485,9 @@ impl Runner {
             objects,
         ))
     }
+    */
 
+    /*
     async fn handle_read_response<T>(
         &mut self,
         io: &mut T,
@@ -529,7 +532,9 @@ impl Runner {
 
         Ok(status)
     }
+    */
 
+    /*
     async fn handle_response<T>(
         &mut self,
         io: &mut T,
@@ -582,11 +587,13 @@ impl Runner {
                 .await
         }
     }
+    */
 
+    /*
     async fn send_request<T>(
         &mut self,
         io: &mut T,
-        task: &mut Task,
+        task: &Task,
         writer: &mut WriterType,
     ) -> Result<(), TaskError>
     where
@@ -601,6 +608,7 @@ impl Runner {
             .await?;
         Ok(())
     }
+    */
 
     pub(crate) async fn delay_for(&mut self, duration: Duration) -> Result<(), Shutdown> {
         let deadline = Instant::now().add(duration);
@@ -636,7 +644,7 @@ impl Runner {
     {
         loop {
             let result = match self.get_next_task() {
-                Next::Now(mut task) => self.run_task(io, &mut task, writer, reader).await,
+                Next::Now(task) => self.run_task(io, task, writer, reader).await,
                 Next::NotBefore(time) => self.idle_until(time, io, writer, reader).await,
                 Next::None => self.idle_forever(io, writer, reader).await,
             };
@@ -650,13 +658,16 @@ impl Runner {
     async fn run_task<T>(
         &mut self,
         io: &mut T,
-        task: &mut Task,
+        task: Task,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), RunError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
+        Ok(())
+
+        /*
         let result = self.run_impl(io, task, writer, reader).await;
 
         task.details.on_complete(result);
@@ -666,22 +677,28 @@ impl Runner {
             Err(TaskError::Shutdown) => Err(RunError::Shutdown),
             _ => Ok(()),
         }
+        */
     }
 
     async fn run_impl<T>(
         &mut self,
         io: &mut T,
-        task: &mut Task,
+        task: Task,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
+        /*
         self.count.reset();
 
-        self.send_request(io, task, writer).await?;
+        self.send_request(io, &task, writer).await?;
+        */
 
+        Ok(())
+
+        /*
         let mut deadline = crate::util::timeout::Timeout::from_now(self.response_timeout);
 
         // now enter a loop to read responses
@@ -714,8 +731,10 @@ impl Runner {
                 }
             }
         }
+        */
     }
 
+    /*
     async fn process_response<T>(
         &mut self,
         io: &mut T,
@@ -740,6 +759,7 @@ impl Runner {
         }
         Ok(TaskStatus::ContinueWaiting)
     }
+    */
 }
 
 #[cfg(test)]
