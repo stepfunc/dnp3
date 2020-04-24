@@ -6,7 +6,6 @@ use crate::app::sequence::Sequence;
 use crate::master::association::Association;
 use crate::master::requests::auto::AutoRequestDetails;
 use crate::master::requests::command::CommandRequestDetails;
-use crate::master::requests::read::ReadRequestDetails;
 use crate::master::runner::TaskError;
 use crate::util::cursor::{WriteCursor, WriteError};
 
@@ -23,7 +22,7 @@ pub(crate) enum RequestStatus {
 }
 
 pub(crate) enum RequestDetails {
-    Read(ReadRequestDetails),
+    // TODO - Read(ReadRequestDetails),
     Command(CommandRequestDetails),
     Auto(AutoRequestDetails),
 }
@@ -31,7 +30,7 @@ pub(crate) enum RequestDetails {
 impl RequestDetails {
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
-            RequestDetails::Read(_) => FunctionCode::Read,
+            // TODO - RequestDetails::Read(_) => FunctionCode::Read,
             RequestDetails::Command(x) => x.function(),
             RequestDetails::Auto(x) => x.function(),
         }
@@ -40,7 +39,7 @@ impl RequestDetails {
     pub(crate) fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         let mut writer = start_request(Control::request(seq), self.function(), cursor)?;
         match self {
-            RequestDetails::Read(task) => task.format(&mut writer),
+            // TODO - RequestDetails::Read(task) => task.format(&mut writer),
             RequestDetails::Command(task) => task.format(&mut writer),
             RequestDetails::Auto(task) => task.format(&mut writer),
         }
@@ -49,12 +48,12 @@ impl RequestDetails {
     pub(crate) fn handle(
         &mut self,
         session: &mut Association,
-        source: u16,
+        _source: u16,
         response: ResponseHeader,
         headers: HeaderCollection,
     ) -> RequestStatus {
         match self {
-            RequestDetails::Read(task) => task.handle(source, response, headers),
+            // TODO - RequestDetails::Read(task) => task.handle(source, response, headers),
             RequestDetails::Command(task) => task.handle(headers),
             RequestDetails::Auto(task) => task.handle(session, response, headers),
         }
@@ -63,7 +62,7 @@ impl RequestDetails {
     pub(crate) fn on_complete(&mut self, result: Result<(), TaskError>) {
         match self {
             RequestDetails::Auto(_) => {}
-            RequestDetails::Read(task) => task.on_complete(result),
+            // TODO - RequestDetails::Read(task) => task.on_complete(result),
             RequestDetails::Command(task) => task.on_complete(result),
         }
     }

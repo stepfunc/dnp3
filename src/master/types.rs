@@ -7,7 +7,6 @@ use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::HeaderDetails;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::master::handlers::RequestCompletionHandler;
 use crate::master::runner::TaskError;
 use crate::util::cursor::WriteError;
 
@@ -313,25 +312,6 @@ impl std::fmt::Display for CommandTaskError {
         match self {
             CommandTaskError::Response(x) => std::fmt::Display::fmt(x, f),
             CommandTaskError::Task(x) => std::fmt::Display::fmt(x, f),
-        }
-    }
-}
-
-pub trait CommandTaskHandler: RequestCompletionHandler {
-    /// Invoked when the command task succeeds or fails
-    fn on_command_complete(&mut self, result: Result<(), CommandTaskError>);
-}
-
-impl<T> RequestCompletionHandler for T
-where
-    T: CommandTaskHandler,
-{
-    /// If an error occurs, we forward it to `on_command_complete`
-    /// successful completion, means that the other completion
-    /// handler was already invoked
-    fn on_complete(&mut self, result: Result<(), TaskError>) {
-        if let Err(err) = result {
-            self.on_command_complete(Err(err.into()));
         }
     }
 }

@@ -1,15 +1,13 @@
 use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::handlers::AssociationHandler;
+use crate::master::handlers::{AssociationHandler, CommandTaskHandler};
 use crate::master::poll::PollMap;
 use crate::master::request::MasterRequest;
 use crate::master::requests::auto::AutoRequestDetails;
 use crate::master::requests::command::CommandRequestDetails;
 use crate::master::runner::CommandMode;
-use crate::master::types::{
-    AutoRequest, CommandHeader, CommandTaskHandler, EventClasses, ReadRequest,
-};
+use crate::master::types::{AutoRequest, CommandHeader, EventClasses, ReadRequest};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use std::time::{Duration, Instant};

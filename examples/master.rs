@@ -1,10 +1,8 @@
 use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::master::association::{Association, AssociationConfig, AssociationMap};
-use dnp3rs::master::handlers::NullHandler;
+use dnp3rs::master::handlers::{CommandTaskHandler, NullHandler};
 use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
-use dnp3rs::master::types::{
-    Classes, CommandTaskError, CommandTaskHandler, EventClasses, ReadRequest,
-};
+use dnp3rs::master::types::{Classes, CommandTaskError, EventClasses, ReadRequest};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;

@@ -3,6 +3,7 @@ use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::runner::TaskError;
+use crate::master::types::CommandTaskError;
 
 pub trait ResponseHandler: Send {
     fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
@@ -10,6 +11,25 @@ pub trait ResponseHandler: Send {
 
 pub trait RequestCompletionHandler: Send {
     fn on_complete(&mut self, result: Result<(), TaskError>);
+}
+
+pub trait CommandTaskHandler: RequestCompletionHandler {
+    /// Invoked when the command task succeeds or fails
+    fn on_command_complete(&mut self, result: Result<(), CommandTaskError>);
+}
+
+impl<T> RequestCompletionHandler for T
+where
+    T: CommandTaskHandler,
+{
+    /// If an error occurs, we forward it to `on_command_complete`
+    /// successful completion, means that the other completion
+    /// handler was already invoked
+    fn on_complete(&mut self, result: Result<(), TaskError>) {
+        if let Err(err) = result {
+            self.on_command_complete(Err(err.into()));
+        }
+    }
 }
 
 pub trait AssociationHandler: ResponseHandler {

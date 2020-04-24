@@ -1,6 +1,7 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::parse::parser::HeaderCollection;
+use crate::master::handlers::CommandTaskHandler;
 use crate::master::request::{RequestDetails, RequestStatus};
 use crate::master::runner::TaskError;
 use crate::master::types::*;

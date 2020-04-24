@@ -11,7 +11,8 @@ use crate::util::cursor::{WriteCursor, WriteError};
 
 use crate::app::gen::enums::FunctionCode;
 use crate::master::association::{AssociationMap, Next, NoSession};
-use crate::master::types::{CommandHeader, CommandTaskError, CommandTaskHandler};
+use crate::master::handlers::CommandTaskHandler;
+use crate::master::types::{CommandHeader, CommandTaskError};
 use std::collections::VecDeque;
 use std::fmt::Formatter;
 use std::ops::Add;
@@ -354,7 +355,7 @@ impl Runner {
                     }
                 }
             },
-            None => return Err(Shutdown),
+            None => Err(Shutdown),
         }
     }
 
@@ -367,7 +368,7 @@ impl Runner {
                     Ok(())
                 }
             },
-            None => return Err(Shutdown),
+            None => Err(Shutdown),
         }
     }
 
