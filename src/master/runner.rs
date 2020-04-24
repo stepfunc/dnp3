@@ -1,7 +1,7 @@
 use crate::app::format::write;
 use crate::app::parse::parser::{HeaderCollection, ParseLogLevel, ParsedFragment, Response};
 use crate::app::sequence::Sequence;
-use crate::master::request::{MasterRequest, RequestStatus};
+use crate::master::task::{Task, TaskStatus};
 use crate::transport::{ReaderType, WriterType};
 
 use crate::app::header::ResponseHeader;
@@ -139,7 +139,7 @@ pub(crate) struct Runner {
     count: ResponseCount,
     associations: AssociationMap,
     user_queue: tokio::sync::mpsc::Receiver<Message>,
-    command_queue: VecDeque<MasterRequest>,
+    command_queue: VecDeque<Task>,
     buffer: [u8; 2048],
 }
 
@@ -457,11 +457,11 @@ impl Runner {
     async fn handle_non_read_response<T>(
         &mut self,
         io: &mut T,
-        task: &mut MasterRequest,
+        task: &mut Task,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
         writer: &mut WriterType,
-    ) -> Result<RequestStatus, TaskError>
+    ) -> Result<TaskStatus, TaskError>
     where
         T: AsyncWrite + Unpin,
     {
@@ -488,11 +488,11 @@ impl Runner {
     async fn handle_read_response<T>(
         &mut self,
         io: &mut T,
-        task: &mut MasterRequest,
+        task: &mut Task,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
         writer: &mut WriterType,
-    ) -> Result<RequestStatus, TaskError>
+    ) -> Result<TaskStatus, TaskError>
     where
         T: AsyncWrite + Unpin,
     {
@@ -533,18 +533,18 @@ impl Runner {
     async fn handle_response<T>(
         &mut self,
         io: &mut T,
-        task: &mut MasterRequest,
+        task: &mut Task,
         source: u16,
         response: &Response<'_>,
         writer: &mut WriterType,
-    ) -> Result<RequestStatus, TaskError>
+    ) -> Result<TaskStatus, TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
         if response.header.unsolicited {
             self.handle_unsolicited(source, response, io, writer)
                 .await?;
-            return Ok(RequestStatus::ContinueWaiting);
+            return Ok(TaskStatus::ContinueWaiting);
         }
 
         if source != task.address {
@@ -552,7 +552,7 @@ impl Runner {
                 "Received unexpected solicited response from address: {}",
                 source
             );
-            return Ok(RequestStatus::ContinueWaiting);
+            return Ok(TaskStatus::ContinueWaiting);
         }
 
         // this allows us to detect things like RESTART, NEED_TIME, and EVENT_BUFFER_OVERFLOW
@@ -568,7 +568,7 @@ impl Runner {
                 response.header.control.seq.value(),
                 self.associations.get(task.address)?.previous_seq()
             );
-            return Ok(RequestStatus::ContinueWaiting);
+            return Ok(TaskStatus::ContinueWaiting);
         }
 
         // if we can't parse a response, this is a TaskError
@@ -586,7 +586,7 @@ impl Runner {
     async fn send_request<T>(
         &mut self,
         io: &mut T,
-        task: &mut MasterRequest,
+        task: &mut Task,
         writer: &mut WriterType,
     ) -> Result<(), TaskError>
     where
@@ -617,7 +617,7 @@ impl Runner {
         }
     }
 
-    fn get_next_task(&mut self) -> Next<MasterRequest> {
+    fn get_next_task(&mut self) -> Next<Task> {
         if let Some(x) = self.command_queue.pop_front() {
             return Next::Now(x);
         }
@@ -650,7 +650,7 @@ impl Runner {
     async fn run_task<T>(
         &mut self,
         io: &mut T,
-        task: &mut MasterRequest,
+        task: &mut Task,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), RunError>
@@ -671,7 +671,7 @@ impl Runner {
     async fn run_impl<T>(
         &mut self,
         io: &mut T,
-        task: &mut MasterRequest,
+        task: &mut Task,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), TaskError>
@@ -702,13 +702,13 @@ impl Runner {
 
             match self.process_response(io, task, writer, reader).await? {
                 // we're done
-                RequestStatus::Complete => return Ok(()),
+                TaskStatus::Complete => return Ok(()),
                 // go to next iteration of the loop without updating the timeout
-                RequestStatus::ContinueWaiting => continue,
+                TaskStatus::ContinueWaiting => continue,
                 // go to next iteration of the loop, but update the timeout for another response
-                RequestStatus::ReadNextResponse => deadline.extend(self.response_timeout),
+                TaskStatus::ReadNextResponse => deadline.extend(self.response_timeout),
                 // format the request and go through the whole cycle again with a new timeout
-                RequestStatus::ExecuteNextStep => {
+                TaskStatus::ExecuteNextStep => {
                     self.send_request(io, task, writer).await?;
                     deadline.extend(self.response_timeout)
                 }
@@ -719,10 +719,10 @@ impl Runner {
     async fn process_response<T>(
         &mut self,
         io: &mut T,
-        task: &mut MasterRequest,
+        task: &mut Task,
         writer: &mut WriterType,
         reader: &mut ReaderType,
-    ) -> Result<RequestStatus, TaskError>
+    ) -> Result<TaskStatus, TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -738,7 +738,7 @@ impl Runner {
                 }
             };
         }
-        Ok(RequestStatus::ContinueWaiting)
+        Ok(TaskStatus::ContinueWaiting)
     }
 }
 

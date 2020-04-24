@@ -87,10 +87,10 @@ impl std::fmt::Display for RequestValidationError {
                 write!(f, "UNS bit not allowed for function: {:?}", x)
             }
             RequestValidationError::NonFirFin => {
-                f.write_str("requests must must have both FIR and FIN set to 1")
+                f.write_str("tasks must must have both FIR and FIN set to 1")
             }
             RequestValidationError::UnexpectedFunction(x) => {
-                write!(f, "Function {:?} not allowed in requests", x)
+                write!(f, "Function {:?} not allowed in tasks", x)
             }
         }
     }

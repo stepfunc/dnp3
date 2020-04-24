@@ -2,22 +2,22 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::handlers::ReadTaskHandler;
-use crate::master::request::{RequestDetails, RequestStatus};
+use crate::master::task::{TaskDetails, TaskStatus};
 use crate::master::runner::TaskError;
 use crate::master::types::ReadRequest;
 use crate::util::cursor::WriteError;
 
-pub(crate) struct ReadRequestDetails {
+pub(crate) struct ReadTaskDetails {
     request: ReadRequest,
     handler: Box<dyn ReadTaskHandler>,
 }
 
-impl ReadRequestDetails {
+impl ReadTaskDetails {
     pub(crate) fn create(
         request: ReadRequest,
         handler: Box<dyn ReadTaskHandler>,
-    ) -> RequestDetails {
-        RequestDetails::Read(Self { request, handler })
+    ) -> TaskDetails {
+        TaskDetails::Read(Self { request, handler })
     }
 
     pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
@@ -29,12 +29,12 @@ impl ReadRequestDetails {
         source: u16,
         response: ResponseHeader,
         headers: HeaderCollection,
-    ) -> RequestStatus {
+    ) -> TaskStatus {
         self.handler.handle(source, response, headers);
         if response.control.fin {
-            RequestStatus::Complete
+            TaskStatus::Complete
         } else {
-            RequestStatus::ReadNextResponse
+            TaskStatus::ReadNextResponse
         }
     }
 

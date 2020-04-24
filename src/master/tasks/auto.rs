@@ -3,7 +3,7 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::association::Association;
-use crate::master::request::{RequestDetails, RequestStatus};
+use crate::master::task::{TaskDetails, TaskStatus};
 use crate::master::types::AutoRequest;
 use crate::util::cursor::WriteError;
 
@@ -12,8 +12,8 @@ pub(crate) struct AutoRequestDetails {
 }
 
 impl AutoRequestDetails {
-    pub(crate) fn create(request: AutoRequest) -> RequestDetails {
-        RequestDetails::Auto(Self { request })
+    pub(crate) fn create(request: AutoRequest) -> TaskDetails {
+        TaskDetails::Auto(Self { request })
     }
 
     pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
@@ -29,7 +29,7 @@ impl AutoRequestDetails {
         session: &mut Association,
         header: ResponseHeader,
         objects: HeaderCollection,
-    ) -> RequestStatus {
+    ) -> TaskStatus {
         if self.request.expects_empty_response() && !objects.is_empty() {
             log::warn!(
                 "ignoring objects headers reply to {}",
@@ -42,31 +42,31 @@ impl AutoRequestDetails {
                 session.handle_response(header, objects);
                 if header.control.fin {
                     session.complete_poll(*id);
-                    RequestStatus::Complete
+                    TaskStatus::Complete
                 } else {
-                    RequestStatus::ReadNextResponse
+                    TaskStatus::ReadNextResponse
                 }
             }
             AutoRequest::IntegrityScan => {
                 session.handle_response(header, objects);
                 if header.control.fin {
                     session.on_integrity_scan_complete();
-                    RequestStatus::Complete
+                    TaskStatus::Complete
                 } else {
-                    RequestStatus::ReadNextResponse
+                    TaskStatus::ReadNextResponse
                 }
             }
             AutoRequest::DisableUnsolicited(_) => {
                 session.on_disable_unsolicited_response(header.iin);
-                RequestStatus::Complete
+                TaskStatus::Complete
             }
             AutoRequest::EnableUnsolicited(_) => {
                 session.on_enable_unsolicited_response(header.iin);
-                RequestStatus::Complete
+                TaskStatus::Complete
             }
             AutoRequest::ClearRestartBit => {
                 session.on_clear_restart_iin_response(header.iin);
-                RequestStatus::Complete
+                TaskStatus::Complete
             }
         }
     }

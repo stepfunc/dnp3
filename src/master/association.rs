@@ -3,9 +3,9 @@ use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::handlers::{AssociationHandler, CommandCallback};
 use crate::master::poll::PollMap;
-use crate::master::request::MasterRequest;
-use crate::master::requests::auto::AutoRequestDetails;
-use crate::master::requests::command::CommandRequestDetails;
+use crate::master::task::Task;
+use crate::master::tasks::auto::AutoRequestDetails;
+use crate::master::tasks::command::CommandTaskDetails;
 use crate::master::runner::CommandMode;
 use crate::master::types::{AutoRequest, CommandHeader, EventClasses, ReadRequest};
 use crate::util::Smallest;
@@ -172,7 +172,7 @@ impl Association {
         self.polls.add(request, period)
     }
 
-    pub(crate) fn next_request(&self, now: Instant) -> Next<MasterRequest> {
+    pub(crate) fn next_request(&self, now: Instant) -> Next<Task> {
         if self.tasks.clear_restart_iin.is_pending() {
             return Next::Now(self.clear_restart_iin());
         }
@@ -253,7 +253,7 @@ impl AssociationMap {
         }
     }
 
-    pub(crate) fn next_task(&mut self) -> Next<MasterRequest> {
+    pub(crate) fn next_task(&mut self) -> Next<Task> {
         let now = std::time::Instant::now();
 
         let mut earliest = Smallest::<Instant>::new();
@@ -293,33 +293,33 @@ impl Association {
     }
     */
 
-    fn poll(&self, request: AutoRequest) -> MasterRequest {
-        MasterRequest::new(self.address, AutoRequestDetails::create(request))
+    fn poll(&self, request: AutoRequest) -> Task {
+        Task::new(self.address, AutoRequestDetails::create(request))
     }
 
-    fn clear_restart_iin(&self) -> MasterRequest {
-        MasterRequest::new(
+    fn clear_restart_iin(&self) -> Task {
+        Task::new(
             self.address,
             AutoRequestDetails::create(AutoRequest::ClearRestartBit),
         )
     }
 
-    fn integrity(&self) -> MasterRequest {
-        MasterRequest::new(
+    fn integrity(&self) -> Task {
+        Task::new(
             self.address,
             AutoRequestDetails::create(AutoRequest::IntegrityScan),
         )
     }
 
-    fn disable_unsolicited(&self, classes: EventClasses) -> MasterRequest {
-        MasterRequest::new(
+    fn disable_unsolicited(&self, classes: EventClasses) -> Task {
+        Task::new(
             self.address,
             AutoRequestDetails::create(AutoRequest::DisableUnsolicited(classes)),
         )
     }
 
-    fn enable_unsolicited(&self, classes: EventClasses) -> MasterRequest {
-        MasterRequest::new(
+    fn enable_unsolicited(&self, classes: EventClasses) -> Task {
+        Task::new(
             self.address,
             AutoRequestDetails::create(AutoRequest::EnableUnsolicited(classes)),
         )
@@ -330,10 +330,10 @@ impl Association {
         mode: CommandMode,
         headers: Vec<CommandHeader>,
         callback: CommandCallback,
-    ) -> MasterRequest {
-        MasterRequest::new(
+    ) -> Task {
+        Task::new(
             self.address,
-            CommandRequestDetails::operate(mode, headers, callback),
+            CommandTaskDetails::operate(mode, headers, callback),
         )
     }
 }

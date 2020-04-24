@@ -4,13 +4,13 @@ use crate::app::header::{Control, ResponseHeader};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::association::Association;
-use crate::master::requests::auto::AutoRequestDetails;
-use crate::master::requests::command::CommandRequestDetails;
+use crate::master::tasks::auto::AutoRequestDetails;
+use crate::master::tasks::command::CommandTaskDetails;
 use crate::master::runner::TaskError;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone)]
-pub(crate) enum RequestStatus {
+pub(crate) enum TaskStatus {
     /// go through the whole cycle of formatting and waiting for a reply again
     ExecuteNextStep,
     /// The response was not for the task, so keep waiting on the current timeout
@@ -21,18 +21,18 @@ pub(crate) enum RequestStatus {
     Complete,
 }
 
-pub(crate) enum RequestDetails {
+pub(crate) enum TaskDetails {
     // TODO - Read(ReadRequestDetails),
-    Command(CommandRequestDetails),
+    Command(CommandTaskDetails),
     Auto(AutoRequestDetails),
 }
 
-impl RequestDetails {
+impl TaskDetails {
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
             // TODO - RequestDetails::Read(_) => FunctionCode::Read,
-            RequestDetails::Command(x) => x.function(),
-            RequestDetails::Auto(x) => x.function(),
+            TaskDetails::Command(x) => x.function(),
+            TaskDetails::Auto(x) => x.function(),
         }
     }
 
@@ -40,8 +40,8 @@ impl RequestDetails {
         let mut writer = start_request(Control::request(seq), self.function(), cursor)?;
         match self {
             // TODO - RequestDetails::Read(task) => task.format(&mut writer),
-            RequestDetails::Command(task) => task.format(&mut writer),
-            RequestDetails::Auto(task) => task.format(&mut writer),
+            TaskDetails::Command(task) => task.format(&mut writer),
+            TaskDetails::Auto(task) => task.format(&mut writer),
         }
     }
 
@@ -51,31 +51,31 @@ impl RequestDetails {
         _source: u16,
         response: ResponseHeader,
         headers: HeaderCollection,
-    ) -> RequestStatus {
+    ) -> TaskStatus {
         match self {
             // TODO - RequestDetails::Read(task) => task.handle(source, response, headers),
-            RequestDetails::Command(_task) => RequestStatus::Complete, // TODO - task.handle(headers),
+            TaskDetails::Command(_task) => TaskStatus::Complete, // TODO - task.handle(headers),
 
-            RequestDetails::Auto(task) => task.handle(session, response, headers),
+            TaskDetails::Auto(task) => task.handle(session, response, headers),
         }
     }
 
     pub(crate) fn on_complete(&mut self, result: Result<(), TaskError>) {
         match self {
-            RequestDetails::Auto(_) => {}
+            TaskDetails::Auto(_) => {}
             // TODO - RequestDetails::Read(task) => task.on_complete(result),
-            RequestDetails::Command(task) => task.on_complete(result),
+            TaskDetails::Command(task) => task.on_complete(result),
         }
     }
 }
 
-pub(crate) struct MasterRequest {
+pub(crate) struct Task {
     pub(crate) address: u16,
-    pub(crate) details: RequestDetails,
+    pub(crate) details: TaskDetails,
 }
 
-impl MasterRequest {
-    pub(crate) fn new(address: u16, details: RequestDetails) -> Self {
+impl Task {
+    pub(crate) fn new(address: u16, details: TaskDetails) -> Self {
         Self { address, details }
     }
 }

@@ -2,7 +2,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::gen::enums::FunctionCode;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::handlers::CommandCallback;
-use crate::master::request::{RequestDetails, RequestStatus};
+use crate::master::task::{TaskDetails, TaskStatus};
 use crate::master::runner::{CommandMode, TaskError};
 use crate::master::types::*;
 use crate::util::cursor::WriteError;
@@ -13,7 +13,7 @@ enum State {
     DirectOperate,
 }
 
-pub(crate) struct CommandRequestDetails {
+pub(crate) struct CommandTaskDetails {
     state: State,
     headers: Vec<CommandHeader>,
     callback: CommandCallback,
@@ -28,13 +28,13 @@ impl CommandMode {
     }
 }
 
-impl CommandRequestDetails {
+impl CommandTaskDetails {
     fn create(
         state: State,
         headers: Vec<CommandHeader>,
         callback: CommandCallback,
-    ) -> RequestDetails {
-        RequestDetails::Command(Self {
+    ) -> TaskDetails {
+        TaskDetails::Command(Self {
             state,
             headers,
             callback,
@@ -45,7 +45,7 @@ impl CommandRequestDetails {
         mode: CommandMode,
         headers: Vec<CommandHeader>,
         callback: CommandCallback,
-    ) -> RequestDetails {
+    ) -> TaskDetails {
         Self::create(mode.to_state(), headers, callback)
     }
 
@@ -82,8 +82,8 @@ impl CommandRequestDetails {
         Ok(())
     }
 
-    pub(crate) fn handle(&mut self, _headers: HeaderCollection) -> RequestStatus {
-        RequestStatus::Complete
+    pub(crate) fn handle(&mut self, _headers: HeaderCollection) -> TaskStatus {
+        TaskStatus::Complete
         /*
         if let Err(err) = self.compare(headers) {
             self.callback.complete(Err(err.into()));
