@@ -9,6 +9,25 @@ pub trait ResponseHandler: Send {
     fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
 }
 
+/// A generic callback type that can only be invoked once.
+/// The user can select to implement it using FnOnce or a
+/// one-shot reply channel
+pub enum CallbackOnce<T> {
+    Dynamic(Box<dyn FnOnce(T) -> () + Send>),
+    OneShot(tokio::sync::oneshot::Sender<T>),
+}
+
+impl<T> CallbackOnce<T> {
+    pub(crate) fn complete(self, value: T) {
+        match self {
+            CallbackOnce::Dynamic(func) => func(value),
+            CallbackOnce::OneShot(s) => {
+                s.send(value).ok();
+            }
+        }
+    }
+}
+
 pub trait RequestCompletionHandler: Send {
     fn on_complete(&mut self, result: Result<(), TaskError>);
 }
