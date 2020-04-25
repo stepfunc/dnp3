@@ -11,41 +11,17 @@ use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;
 use crate::util::cursor::{WriteCursor, WriteError};
 
-use crate::app::format::write::{start_request, HeaderWriter};
-use crate::app::gen::enums::FunctionCode;
+use crate::app::format::write::start_request;
 use crate::master::association::{AssociationMap, Next, NoSession};
 use crate::master::handlers::{CallbackOnce, CommandCallback, CommandResult};
-use crate::master::types::{CommandError, CommandHeader, ReadRequest};
+use crate::master::types::{CommandError, CommandHeader};
 
 use crate::util::timeout::Timeout;
 use std::collections::VecDeque;
 use std::fmt::Formatter;
 use std::ops::Add;
-use std::panic::resume_unwind;
 use std::time::{Duration, Instant};
 use tokio::prelude::{AsyncRead, AsyncWrite};
-
-struct ResponseCount {
-    count: usize,
-}
-
-impl ResponseCount {
-    pub(crate) fn new() -> Self {
-        Self { count: 0 }
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.count = 0
-    }
-
-    pub(crate) fn is_none(&self) -> bool {
-        self.count == 0
-    }
-
-    pub(crate) fn increment(&mut self) {
-        self.count += 1
-    }
-}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandMode {
@@ -142,7 +118,6 @@ pub(crate) enum RunError {
 pub(crate) struct Runner {
     level: ParseLogLevel,
     timeout: Timeout,
-    count: ResponseCount,
     associations: AssociationMap,
     user_queue: tokio::sync::mpsc::Receiver<Message>,
     command_queue: VecDeque<Task>,
@@ -258,11 +233,6 @@ enum ReadResponseAction {
     Complete,
 }
 
-enum NonReadResponseAction {
-    Complete,
-    Next(NonReadTask),
-}
-
 impl Runner {
     pub(crate) fn new(
         level: ParseLogLevel,
@@ -274,7 +244,6 @@ impl Runner {
             level,
             timeout: response_timeout,
             associations,
-            count: ResponseCount::new(),
             user_queue,
             command_queue: VecDeque::new(),
             buffer: [0; 2048],
@@ -570,7 +539,7 @@ impl Runner {
                 self.run_read_task(io, task.address, t, writer, reader)
                     .await
             }
-            TaskType::NonRead(mut t) => {
+            TaskType::NonRead(t) => {
                 self.run_non_read_task(io, task.address, t, writer, reader)
                     .await
             }
@@ -610,7 +579,7 @@ impl Runner {
             let deadline = self.timeout.from_now();
 
             loop {
-                if let Err(err) = self.read_next_response(io, deadline, writer, reader).await {
+                if let Err(err) = self.read_next_response(io, deadline, reader).await {
                     task.on_task_error(err);
                     return Err(err);
                 }
@@ -622,7 +591,7 @@ impl Runner {
                     // continue reading responses until timeout
                     Ok(None) => continue,
                     Ok(Some(response)) => {
-                        let association = match self.associations.get_mut(address) {
+                        match self.associations.get_mut(address) {
                             Err(x) => {
                                 task.on_task_error(x.into());
                                 return Err(x.into());
@@ -638,7 +607,7 @@ impl Runner {
                                     }
                                 }
                             }
-                        };
+                        }
                     }
                     Err(err) => {
                         task.on_task_error(err);
@@ -712,7 +681,7 @@ impl Runner {
         &mut self,
         io: &mut T,
         address: u16,
-        mut task: ReadTask,
+        task: ReadTask,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), TaskError>
@@ -724,11 +693,10 @@ impl Runner {
 
         // read responses until we get a FIN or an error occurs
         loop {
-            let mut deadline = self.timeout.from_now();
+            let deadline = self.timeout.from_now();
 
             loop {
-                self.read_next_response(io, deadline, writer, reader)
-                    .await?;
+                self.read_next_response(io, deadline, reader).await?;
                 match self
                     .process_read_response(address, is_first, seq, io, writer, reader)
                     .await?
@@ -736,7 +704,10 @@ impl Runner {
                     // continue reading responses on the inner loop
                     ReadResponseAction::Ignore => continue,
                     // read task complete
-                    ReadResponseAction::Complete => return Ok(()),
+                    ReadResponseAction::Complete => {
+                        task.complete(self.associations.get_mut(address)?);
+                        return Ok(());
+                    }
                     // break to the outer loop and read another response
                     ReadResponseAction::ReadNext => {
                         is_first = false;
@@ -765,9 +736,9 @@ impl Runner {
             None => return Ok(ReadResponseAction::Ignore),
         };
 
-        let parsed = match ParsedFragment::parse(self.level.receive(), fragment.data) {
-            Ok(parsed) => parsed,
-            Err(err) => return Ok(ReadResponseAction::Ignore),
+        let parsed = match ParsedFragment::parse(self.level.receive(), fragment.data).ok() {
+            Some(parsed) => parsed,
+            None => return Ok(ReadResponseAction::Ignore),
         };
 
         let response = match parsed.to_response() {
@@ -836,7 +807,6 @@ impl Runner {
         &mut self,
         io: &mut T,
         deadline: tokio::time::Instant,
-        writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), TaskError>
     where

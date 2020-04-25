@@ -4,7 +4,7 @@ use crate::app::sequence::Sequence;
 use crate::master::handlers::{AssociationHandler, CommandCallback};
 use crate::master::poll::PollMap;
 use crate::master::runner::CommandMode;
-use crate::master::task::Task;
+use crate::master::task::{ReadTask, Task, TaskType};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
 use crate::master::types::{AutoRequest, CommandHeader, EventClasses, ReadRequest};
@@ -114,10 +114,6 @@ impl Association {
         self.seq.increment()
     }
 
-    pub(crate) fn previous_seq(&self) -> u8 {
-        self.seq.previous()
-    }
-
     pub(crate) fn process_iin(&mut self, iin: IIN) {
         if iin.iin1.get_device_restart() {
             self.on_restart_iin_observed()
@@ -180,7 +176,7 @@ impl Association {
             return Next::Now(self.disable_unsolicited(self.config.disable_unsol_classes));
         }
         if self.tasks.integrity_scan.is_pending() {
-            // TODO - return Next::Now(self.integrity());
+            return Next::Now(self.integrity());
         }
         if self.config.enable_unsol_classes.any() && self.tasks.enabled_unsolicited.is_pending() {
             return Next::Now(self.enable_unsolicited(self.config.enable_unsol_classes));
@@ -290,6 +286,10 @@ impl AssociationMap {
 impl Association {
     fn poll(&self, request: AutoRequest) -> Task {
         Task::new(self.address, AutoTask::create(request))
+    }
+
+    fn integrity(&self) -> Task {
+        Task::new(self.address, TaskType::Read(ReadTask::StartupIntegrity))
     }
 
     fn clear_restart_iin(&self) -> Task {

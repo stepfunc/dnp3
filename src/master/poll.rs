@@ -1,11 +1,13 @@
+use crate::app::format::write::HeaderWriter;
 use crate::master::association::Next;
 use crate::master::types::{AutoRequest, ReadRequest};
+use crate::util::cursor::WriteError;
 use crate::util::Smallest;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 pub(crate) struct Poll {
-    id: u64,
+    pub(crate) id: u64,
     request: ReadRequest,
     period: Duration,
     next: Option<Instant>,
@@ -65,6 +67,10 @@ impl Poll {
             period,
             next: Instant::now().checked_add(period),
         }
+    }
+
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        self.request.format(writer)
     }
 
     pub(crate) fn reset_next(&mut self) {

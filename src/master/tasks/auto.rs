@@ -3,7 +3,6 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::association::Association;
-use crate::master::runner::TaskError;
 use crate::master::task::{NonReadTask, NonReadTaskStatus, TaskType};
 use crate::master::types::AutoRequest;
 use crate::util::cursor::WriteError;

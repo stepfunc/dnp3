@@ -1,13 +1,12 @@
-use crate::app::format::write::{start_request, HeaderWriter};
+use crate::app::format::write::HeaderWriter;
 use crate::app::gen::enums::FunctionCode;
-use crate::app::header::{Control, ResponseHeader};
-use crate::app::parse::parser::{HeaderCollection, Response};
-use crate::app::sequence::Sequence;
+use crate::app::parse::parser::Response;
 use crate::master::association::Association;
+use crate::master::poll::Poll;
 use crate::master::runner::TaskError;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
-use crate::util::cursor::{WriteCursor, WriteError};
+use crate::util::cursor::WriteError;
 
 pub(crate) enum NonReadTaskStatus {
     /// The task is complete
@@ -33,7 +32,7 @@ pub(crate) trait RequestWriter {
 
 pub(crate) enum ReadTask {
     /// Periodic polls that are configured when creating associations
-    PeriodicPoll,
+    PeriodicPoll(Poll),
     /// Integrity poll that occurs during startup, or after outstation restarts
     StartupIntegrity,
 }
@@ -52,8 +51,8 @@ impl RequestWriter for ReadTask {
 
     fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
-            ReadTask::PeriodicPoll => Ok(()),     // TODO
-            ReadTask::StartupIntegrity => Ok(()), // TODO
+            ReadTask::PeriodicPoll(poll) => poll.format(writer),
+            ReadTask::StartupIntegrity => writer.write_class1230(),
         }
     }
 }
@@ -71,15 +70,16 @@ impl RequestWriter for NonReadTask {
     }
 }
 
+impl ReadTask {
+    pub(crate) fn complete(self, association: &mut Association) {
+        match self {
+            ReadTask::StartupIntegrity => association.on_integrity_scan_complete(),
+            ReadTask::PeriodicPoll(poll) => association.complete_poll(poll.id),
+        }
+    }
+}
+
 impl NonReadTask {
-    pub(crate) fn command(task: CommandTask) -> TaskType {
-        TaskType::NonRead(NonReadTask::Command(task))
-    }
-
-    pub(crate) fn auto(task: AutoTask) -> TaskType {
-        TaskType::NonRead(NonReadTask::Auto(task))
-    }
-
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
             NonReadTask::Command(task) => task.function(),
@@ -90,7 +90,7 @@ impl NonReadTask {
     pub(crate) fn on_task_error(self, err: TaskError) {
         match self {
             NonReadTask::Command(task) => task.on_task_error(err),
-            NonReadTask::Auto(task) => {}
+            NonReadTask::Auto(_) => {}
         }
     }
 
@@ -101,9 +101,9 @@ impl NonReadTask {
     ) -> NonReadTaskStatus {
         match self {
             NonReadTask::Command(task) => task.handle(response),
-            NonReadTask::Auto(task) => match response.objects {
-                Ok(headers) => task.handle(association, response.header, headers),
-                Err(err) => NonReadTaskStatus::Complete,
+            NonReadTask::Auto(task) => match response.objects.ok() {
+                Some(headers) => task.handle(association, response.header, headers),
+                None => NonReadTaskStatus::Complete,
             },
         }
     }

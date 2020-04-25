@@ -142,7 +142,6 @@ impl ReadRequest {
         ReadRequest::Range16(RangeScan::new(variation, start, stop))
     }
 
-    /*
     pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
             ReadRequest::ClassScan(classes) => classes.write(writer),
@@ -150,7 +149,6 @@ impl ReadRequest {
             ReadRequest::Range16(scan) => scan.write(writer),
         }
     }
-    */
 }
 
 impl AutoRequest {
