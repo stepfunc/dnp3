@@ -1,10 +1,12 @@
 use crate::app::format::write;
-use crate::app::parse::parser::{HeaderCollection, ParseLogLevel, ParsedFragment, Response};
+use crate::app::parse::parser::{ParseLogLevel, ParsedFragment, Response};
 use crate::app::sequence::Sequence;
-use crate::master::task::{NonReadTask, ReadTask, RequestWriter, Task, TaskStatus, TaskType};
+use crate::master::task::{
+    NonReadTask, NonReadTaskStatus, ReadTask, RequestWriter, Task, TaskType,
+};
 use crate::transport::{ReaderType, WriterType};
 
-use crate::app::header::{Control, RequestHeader, ResponseHeader};
+use crate::app::header::Control;
 use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;
 use crate::util::cursor::{WriteCursor, WriteError};
@@ -19,6 +21,7 @@ use crate::util::timeout::Timeout;
 use std::collections::VecDeque;
 use std::fmt::Formatter;
 use std::ops::Add;
+use std::panic::resume_unwind;
 use std::time::{Duration, Instant};
 use tokio::prelude::{AsyncRead, AsyncWrite};
 
@@ -345,24 +348,34 @@ impl Runner {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        if let Some(fragment) = reader.peek() {
-            if let Ok(parsed) = ParsedFragment::parse(self.level.receive(), fragment.data) {
-                match parsed.to_response() {
-                    Err(err) => log::warn!("{}", err),
-                    Ok(response) => {
-                        if response.header.unsolicited {
-                            self.handle_unsolicited(fragment.address.source, &response, io, writer)
-                                .await?;
-                        } else {
-                            log::warn!(
-                                "unexpected response with sequence: {}",
-                                response.header.control.seq.value()
-                            )
-                        }
-                    }
-                }
+        let fragment = match reader.peek() {
+            None => return Ok(()),
+            Some(x) => x,
+        };
+
+        let parsed = match ParsedFragment::parse(self.level.receive(), fragment.data).ok() {
+            None => return Ok(()),
+            Some(x) => x,
+        };
+
+        let response = match parsed.to_response() {
+            Err(err) => {
+                log::warn!("{}", err);
+                return Ok(());
             }
+            Ok(x) => x,
+        };
+
+        if response.header.unsolicited {
+            self.handle_unsolicited(fragment.address.source, &response, io, writer)
+                .await?;
+        } else {
+            log::warn!(
+                "unexpected response with sequence: {}",
+                response.header.control.seq.value()
+            )
         }
+
         Ok(())
     }
 
@@ -461,6 +474,8 @@ impl Runner {
             }
         };
 
+        session.process_iin(response.header.iin);
+
         if let Ok(objects) = response.objects {
             session.handle_response(response.header, objects);
         }
@@ -472,141 +487,6 @@ impl Runner {
 
         Ok(())
     }
-
-    /*
-    async fn handle_non_read_response<T>(
-        &mut self,
-        io: &mut T,
-        task: &mut Task,
-        header: ResponseHeader,
-        objects: HeaderCollection<'_>,
-        writer: &mut WriterType,
-    ) -> Result<TaskStatus, TaskError>
-    where
-        T: AsyncWrite + Unpin,
-    {
-        if !(header.control.is_fir_and_fin()) {
-            return Err(TaskError::MultiFragmentResponse);
-        }
-
-        // non-read responses REALLY shouldn't request confirmation
-        // but we'll confirm them if requested and log
-        if header.control.con {
-            log::warn!("received response requesting confirmation to non-read request");
-            self.confirm_solicited(io, task.address, header.control.seq, writer)
-                .await?;
-        }
-
-        Ok(task.details.handle(
-            self.associations.get_mut(task.address)?,
-            task.address,
-            header,
-            objects,
-        ))
-    }
-    */
-
-    /*
-    async fn handle_read_response<T>(
-        &mut self,
-        io: &mut T,
-        task: &mut Task,
-        header: ResponseHeader,
-        objects: HeaderCollection<'_>,
-        writer: &mut WriterType,
-    ) -> Result<TaskStatus, TaskError>
-    where
-        T: AsyncWrite + Unpin,
-    {
-        if header.control.fir && !self.count.is_none() {
-            return Err(TaskError::UnexpectedFir);
-        }
-
-        if !header.control.fir && self.count.is_none() {
-            return Err(TaskError::NeverReceivedFir);
-        }
-
-        if !header.control.fin && !header.control.con {
-            log::warn!("received non-FIN response NOT requesting confirmation")
-        }
-
-        self.count.increment();
-
-        // write a confirmation if required
-        if header.control.con {
-            self.confirm_solicited(io, task.address, header.control.seq, writer)
-                .await?;
-        }
-
-        let status = task.details.handle(
-            self.associations.get_mut(task.address)?,
-            task.address,
-            header,
-            objects,
-        );
-
-        if !header.control.fin {
-            self.associations.get_mut(task.address)?.increment_seq();
-        }
-
-        Ok(status)
-    }
-    */
-
-    /*
-    async fn handle_response<T>(
-        &mut self,
-        io: &mut T,
-        task: &mut Task,
-        source: u16,
-        response: &Response<'_>,
-        writer: &mut WriterType,
-    ) -> Result<TaskStatus, TaskError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
-        if response.header.unsolicited {
-            self.handle_unsolicited(source, response, io, writer)
-                .await?;
-            return Ok(TaskStatus::ContinueWaiting);
-        }
-
-        if source != task.address {
-            log::warn!(
-                "Received unexpected solicited response from address: {}",
-                source
-            );
-            return Ok(TaskStatus::ContinueWaiting);
-        }
-
-        // this allows us to detect things like RESTART, NEED_TIME, and EVENT_BUFFER_OVERFLOW
-        self.associations
-            .get_mut(task.address)?
-            .process_response_iin(response.header.iin);
-
-        if response.header.control.seq.value()
-            != self.associations.get(task.address)?.previous_seq()
-        {
-            log::warn!(
-                "response with seq: {} doesn't match expected seq: {}",
-                response.header.control.seq.value(),
-                self.associations.get(task.address)?.previous_seq()
-            );
-            return Ok(TaskStatus::ContinueWaiting);
-        }
-
-        // if we can't parse a response, this is a TaskError
-        let objects = response.objects?;
-
-        if task.details.function() == FunctionCode::Read {
-            self.handle_read_response(io, task, response.header, objects, writer)
-                .await
-        } else {
-            self.handle_non_read_response(io, task, response.header, objects, writer)
-                .await
-        }
-    }
-    */
 
     async fn send_request<T, U>(
         &mut self,
@@ -719,12 +599,113 @@ impl Runner {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            let seq = self.send_request(io, address, &task, writer).await?;
+            let seq = match self.send_request(io, address, &task, writer).await {
+                Ok(seq) => seq,
+                Err(err) => {
+                    task.on_task_error(err);
+                    return Err(err);
+                }
+            };
+
+            let deadline = self.timeout.from_now();
 
             loop {
-                return Ok(());
+                if let Err(err) = self.read_next_response(io, deadline, writer, reader).await {
+                    task.on_task_error(err);
+                    return Err(err);
+                }
+
+                match self
+                    .validate_non_read_response(address, seq, io, reader, writer)
+                    .await
+                {
+                    // continue reading responses until timeout
+                    Ok(None) => continue,
+                    Ok(Some(response)) => {
+                        let association = match self.associations.get_mut(address) {
+                            Err(x) => {
+                                task.on_task_error(x.into());
+                                return Err(x.into());
+                            }
+                            Ok(association) => {
+                                association.process_iin(response.header.iin);
+                                match task.handle(association, response) {
+                                    NonReadTaskStatus::Complete => return Ok(()),
+                                    NonReadTaskStatus::Next(next) => {
+                                        task = next;
+                                        // break from the inner loop and execute the next request
+                                        break;
+                                    }
+                                }
+                            }
+                        };
+                    }
+                    Err(err) => {
+                        task.on_task_error(err);
+                        return Err(err);
+                    }
+                }
             }
         }
+    }
+
+    async fn validate_non_read_response<'a, T>(
+        &mut self,
+        address: u16,
+        seq: Sequence,
+        io: &mut T,
+        reader: &'a mut ReaderType,
+        writer: &mut WriterType,
+    ) -> Result<Option<Response<'a>>, TaskError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        let fragment = match reader.peek() {
+            None => return Ok(None),
+            Some(x) => x,
+        };
+
+        let parsed = match ParsedFragment::parse(self.level.receive(), fragment.data).ok() {
+            None => return Ok(None),
+            Some(x) => x,
+        };
+
+        let response = match parsed.to_response() {
+            Err(err) => {
+                log::warn!("{}", err);
+                return Ok(None);
+            }
+            Ok(x) => x,
+        };
+
+        if response.header.unsolicited {
+            self.handle_unsolicited(fragment.address.source, &response, io, writer)
+                .await?;
+            return Ok(None);
+        }
+
+        if fragment.address.source != address {
+            log::warn!(
+                "Received response from {} while expecting response from {}",
+                fragment.address.source,
+                address
+            );
+            return Ok(None);
+        }
+
+        if response.header.control.seq != seq {
+            log::warn!(
+                "unexpected sequence number is response: {}",
+                response.header.control.seq.value()
+            );
+            return Ok(None);
+        }
+
+        if !response.header.control.is_fir_and_fin() {
+            return Err(TaskError::MultiFragmentResponse);
+        }
+
+        Ok(Some(response))
     }
 
     async fn run_read_task<T>(
@@ -743,7 +724,7 @@ impl Runner {
 
         // read responses until we get a FIN or an error occurs
         loop {
-            let mut deadline = self.timeout.deadline_from_now();
+            let mut deadline = self.timeout.from_now();
 
             loop {
                 self.read_next_response(io, deadline, writer, reader)
@@ -835,11 +816,10 @@ impl Runner {
             return Err(TaskError::NonFinWithoutCon);
         }
 
-        // the response is valid, invoke the handler
+        let association = self.associations.get_mut(address)?;
+        association.process_iin(response.header.iin);
         // TODO - invoke task specific handler if present
-        self.associations
-            .get_mut(address)?
-            .handle_response(response.header, response.objects?);
+        association.handle_response(response.header, response.objects?);
 
         if response.header.control.con {
             self.confirm_solicited(io, address, seq, writer).await?;

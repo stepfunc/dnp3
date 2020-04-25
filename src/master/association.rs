@@ -118,7 +118,7 @@ impl Association {
         self.seq.previous()
     }
 
-    pub(crate) fn process_response_iin(&mut self, iin: IIN) {
+    pub(crate) fn process_iin(&mut self, iin: IIN) {
         if iin.iin1.get_device_restart() {
             self.on_restart_iin_observed()
         }
@@ -180,7 +180,7 @@ impl Association {
             return Next::Now(self.disable_unsolicited(self.config.disable_unsol_classes));
         }
         if self.tasks.integrity_scan.is_pending() {
-            return Next::Now(self.integrity());
+            // TODO - return Next::Now(self.integrity());
         }
         if self.config.enable_unsol_classes.any() && self.tasks.enabled_unsolicited.is_pending() {
             return Next::Now(self.enable_unsolicited(self.config.enable_unsol_classes));
@@ -205,6 +205,7 @@ impl Default for AssociationMap {
     }
 }
 
+#[derive(Copy, Clone)]
 pub(crate) struct NoSession {
     pub(crate) address: u16,
 }
@@ -287,22 +288,12 @@ impl AssociationMap {
 
 // helpers to produce request tasks
 impl Association {
-    /*
-    fn read(&self, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> MasterRequest {
-        MasterRequest::new(self.address, ReadRequestDetails::create(request, handler))
-    }
-    */
-
     fn poll(&self, request: AutoRequest) -> Task {
         Task::new(self.address, AutoTask::create(request))
     }
 
     fn clear_restart_iin(&self) -> Task {
         Task::new(self.address, AutoTask::create(AutoRequest::ClearRestartBit))
-    }
-
-    fn integrity(&self) -> Task {
-        Task::new(self.address, AutoTask::create(AutoRequest::IntegrityScan))
     }
 
     fn disable_unsolicited(&self, classes: EventClasses) -> Task {

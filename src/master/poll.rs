@@ -41,7 +41,7 @@ impl PollMap {
 
         for poll in self.polls.values() {
             if poll.is_ready(now) {
-                return Next::Now(poll.to_request());
+                // TODO - return Next::Now(poll.to_request());
             }
 
             if let Some(x) = poll.next() {
@@ -80,9 +80,5 @@ impl Poll {
 
     pub(crate) fn next(&self) -> Option<Instant> {
         self.next
-    }
-
-    pub(crate) fn to_request(&self) -> AutoRequest {
-        AutoRequest::PeriodicPoll(self.request, self.id)
     }
 }

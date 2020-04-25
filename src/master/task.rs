@@ -1,7 +1,7 @@
 use crate::app::format::write::{start_request, HeaderWriter};
 use crate::app::gen::enums::FunctionCode;
 use crate::app::header::{Control, ResponseHeader};
-use crate::app::parse::parser::HeaderCollection;
+use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::sequence::Sequence;
 use crate::master::association::Association;
 use crate::master::runner::TaskError;
@@ -9,16 +9,11 @@ use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
 use crate::util::cursor::{WriteCursor, WriteError};
 
-#[derive(Copy, Clone)]
-pub(crate) enum TaskStatus {
-    /// go through the whole cycle of formatting and waiting for a reply again
-    ExecuteNextStep,
-    /// The response was not for the task, so keep waiting on the current timeout
-    ContinueWaiting,
-    /// read another response with a new timeout
-    ReadNextResponse,
+pub(crate) enum NonReadTaskStatus {
     /// The task is complete
     Complete,
+    /// Another task follows
+    Next(NonReadTask),
 }
 
 /// There are two broad categories of tasks. Reads
@@ -48,26 +43,6 @@ pub(crate) enum NonReadTask {
     Auto(AutoTask),
     /// commands initiated from the user API
     Command(CommandTask),
-}
-
-impl TaskType {
-    // this method just gets used for formatting the request
-    /*
-    pub(crate) fn function(&self) -> FunctionCode {
-        match self {
-            TaskType::Read(_) => FunctionCode::Read,
-            TaskType::NonRead(task) => task.function(),
-        }
-    }
-
-    pub(crate) fn format(&self, seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        let mut writer = start_request(Control::request(seq), self.function(), cursor)?;
-        match self {
-            TaskType::Read(task) => task.format(&mut writer),
-            TaskType::NonRead(task) => task.format(&mut writer),
-        }
-    }
-    */
 }
 
 impl RequestWriter for ReadTask {
@@ -109,6 +84,27 @@ impl NonReadTask {
         match self {
             NonReadTask::Command(task) => task.function(),
             NonReadTask::Auto(task) => task.function(),
+        }
+    }
+
+    pub(crate) fn on_task_error(self, err: TaskError) {
+        match self {
+            NonReadTask::Command(task) => task.on_task_error(err),
+            NonReadTask::Auto(task) => {}
+        }
+    }
+
+    pub(crate) fn handle(
+        self,
+        association: &mut Association,
+        response: Response,
+    ) -> NonReadTaskStatus {
+        match self {
+            NonReadTask::Command(task) => task.handle(response),
+            NonReadTask::Auto(task) => match response.objects {
+                Ok(headers) => task.handle(association, response.header, headers),
+                Err(err) => NonReadTaskStatus::Complete,
+            },
         }
     }
 }

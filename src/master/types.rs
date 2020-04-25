@@ -125,10 +125,8 @@ pub enum ReadRequest {
 #[derive(Clone)]
 pub(crate) enum AutoRequest {
     ClearRestartBit,
-    IntegrityScan,
     EnableUnsolicited(EventClasses),
     DisableUnsolicited(EventClasses),
-    PeriodicPoll(ReadRequest, u64),
 }
 
 impl ReadRequest {
@@ -144,6 +142,7 @@ impl ReadRequest {
         ReadRequest::Range16(RangeScan::new(variation, start, stop))
     }
 
+    /*
     pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
             ReadRequest::ClassScan(classes) => classes.write(writer),
@@ -151,43 +150,31 @@ impl ReadRequest {
             ReadRequest::Range16(scan) => scan.write(writer),
         }
     }
+    */
 }
 
 impl AutoRequest {
-    pub(crate) fn expects_empty_response(&self) -> bool {
-        match self.function() {
-            FunctionCode::Read => false,
-            _ => false,
-        }
-    }
-
     pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
-            AutoRequest::IntegrityScan => writer.write_class1230(),
             AutoRequest::ClearRestartBit => writer.write_clear_restart(),
             AutoRequest::EnableUnsolicited(classes) => classes.write(writer),
             AutoRequest::DisableUnsolicited(classes) => classes.write(writer),
-            AutoRequest::PeriodicPoll(request, _) => request.format(writer),
         }
     }
 
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
-            AutoRequest::IntegrityScan => FunctionCode::Read,
             AutoRequest::ClearRestartBit => FunctionCode::Write,
             AutoRequest::EnableUnsolicited(_) => FunctionCode::EnabledUnsolicited,
             AutoRequest::DisableUnsolicited(_) => FunctionCode::DisableUnsolicited,
-            AutoRequest::PeriodicPoll(_, _) => FunctionCode::Read,
         }
     }
 
     pub(crate) fn description(&self) -> &'static str {
         match self {
-            AutoRequest::IntegrityScan => "startup integrity scan",
             AutoRequest::ClearRestartBit => "clear restart IIN bit",
             AutoRequest::EnableUnsolicited(_) => "enable unsolicited reporting",
             AutoRequest::DisableUnsolicited(_) => "disable unsolicited reporting",
-            AutoRequest::PeriodicPoll(_, _) => "periodic poll",
         }
     }
 }

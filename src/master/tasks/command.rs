@@ -1,9 +1,9 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::enums::FunctionCode;
-use crate::app::parse::parser::HeaderCollection;
+use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::master::handlers::CommandCallback;
 use crate::master::runner::{CommandMode, TaskError};
-use crate::master::task::{NonReadTask, TaskStatus, TaskType};
+use crate::master::task::{NonReadTask, NonReadTaskStatus, TaskType};
 use crate::master::types::*;
 use crate::util::cursor::WriteError;
 
@@ -29,12 +29,32 @@ impl CommandMode {
 }
 
 impl CommandTask {
-    fn create(state: State, headers: Vec<CommandHeader>, callback: CommandCallback) -> TaskType {
-        NonReadTask::command(Self {
+    fn new(state: State, headers: Vec<CommandHeader>, callback: CommandCallback) -> Self {
+        Self {
             state,
             headers,
             callback,
-        })
+        }
+    }
+
+    fn change_state(self, state: State) -> NonReadTask {
+        Self::get_non_read_task(state, self.headers, self.callback)
+    }
+
+    fn get_task_type(
+        state: State,
+        headers: Vec<CommandHeader>,
+        callback: CommandCallback,
+    ) -> TaskType {
+        TaskType::NonRead(Self::get_non_read_task(state, headers, callback))
+    }
+
+    fn get_non_read_task(
+        state: State,
+        headers: Vec<CommandHeader>,
+        callback: CommandCallback,
+    ) -> NonReadTask {
+        NonReadTask::Command(CommandTask::new(state, headers, callback))
     }
 
     pub(crate) fn operate(
@@ -42,7 +62,7 @@ impl CommandTask {
         headers: Vec<CommandHeader>,
         callback: CommandCallback,
     ) -> TaskType {
-        Self::create(mode.to_state(), headers, callback)
+        Self::get_task_type(mode.to_state(), headers, callback)
     }
 
     pub(crate) fn function(&self) -> FunctionCode {
@@ -78,29 +98,32 @@ impl CommandTask {
         Ok(())
     }
 
-    pub(crate) fn handle(&mut self, _headers: HeaderCollection) -> TaskStatus {
-        TaskStatus::Complete
-        /*
+    pub(crate) fn on_task_error(self, err: TaskError) {
+        self.callback.complete(Err(err.into()))
+    }
+
+    pub(crate) fn handle(self, response: Response) -> NonReadTaskStatus {
+        let headers = match response.objects {
+            Ok(x) => x,
+            Err(err) => {
+                self.callback
+                    .complete(Err(TaskError::MalformedResponse(err).into()));
+                return NonReadTaskStatus::Complete;
+            }
+        };
+
         if let Err(err) = self.compare(headers) {
             self.callback.complete(Err(err.into()));
-            return RequestStatus::Complete;
+            return NonReadTaskStatus::Complete;
         }
 
         match self.state {
-            State::Select => {
-                self.state = State::Operate;
-                RequestStatus::ExecuteNextStep
-            }
+            State::Select => NonReadTaskStatus::Next(self.change_state(State::Operate)),
             _ => {
                 // Complete w/ success
                 self.callback.complete(Ok(()));
-                RequestStatus::Complete
+                NonReadTaskStatus::Complete
             }
         }
-        */
-    }
-
-    pub(crate) fn on_complete(&mut self, _result: Result<(), TaskError>) {
-        // self.callback.complete(result); // TODO
     }
 }
