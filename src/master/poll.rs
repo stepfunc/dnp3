@@ -1,11 +1,12 @@
 use crate::app::format::write::HeaderWriter;
 use crate::master::association::Next;
-use crate::master::types::{AutoRequest, ReadRequest};
+use crate::master::types::ReadRequest;
 use crate::util::cursor::WriteError;
 use crate::util::Smallest;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
+#[derive(Copy, Clone)]
 pub(crate) struct Poll {
     pub(crate) id: u64,
     request: ReadRequest,
@@ -38,12 +39,12 @@ impl PollMap {
         }
     }
 
-    pub(crate) fn next(&self, now: Instant) -> Next<AutoRequest> {
+    pub(crate) fn next(&self, now: Instant) -> Next<Poll> {
         let mut earliest = Smallest::<Instant>::new();
 
         for poll in self.polls.values() {
             if poll.is_ready(now) {
-                // TODO - return Next::Now(poll.to_request());
+                return Next::Now(*poll);
             }
 
             if let Some(x) = poll.next() {

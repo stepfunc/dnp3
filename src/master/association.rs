@@ -2,7 +2,7 @@ use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::handlers::{AssociationHandler, CommandCallback};
-use crate::master::poll::PollMap;
+use crate::master::poll::{Poll, PollMap};
 use crate::master::runner::CommandMode;
 use crate::master::task::{ReadTask, Task, TaskType};
 use crate::master::tasks::auto::AutoTask;
@@ -284,8 +284,8 @@ impl AssociationMap {
 
 // helpers to produce request tasks
 impl Association {
-    fn poll(&self, request: AutoRequest) -> Task {
-        Task::new(self.address, AutoTask::create(request))
+    fn poll(&self, poll: Poll) -> Task {
+        Task::new(self.address, TaskType::Read(ReadTask::PeriodicPoll(poll)))
     }
 
     fn integrity(&self) -> Task {
