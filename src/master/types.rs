@@ -209,37 +209,101 @@ where
     }
 }
 
-trait HasCommandStatus {
+pub trait Command {
     fn status(&self) -> CommandStatus;
+    fn to_header<I>(&self, index: I) -> CommandHeader
+    where
+        I: Index;
 }
 
-impl HasCommandStatus for Group12Var1 {
+impl Command for Group12Var1 {
     fn status(&self) -> CommandStatus {
         self.status
     }
-}
 
-impl HasCommandStatus for Group41Var1 {
-    fn status(&self) -> CommandStatus {
-        self.status
+    fn to_header<I>(&self, index: I) -> CommandHeader
+    where
+        I: Index,
+    {
+        I::get_command_header(PrefixedCommandHeader::G12V1(vec![(*self, index)]))
     }
 }
 
-impl HasCommandStatus for Group41Var2 {
+impl Command for Group41Var1 {
     fn status(&self) -> CommandStatus {
         self.status
     }
-}
-
-impl HasCommandStatus for Group41Var3 {
-    fn status(&self) -> CommandStatus {
-        self.status
+    fn to_header<I>(&self, index: I) -> CommandHeader
+    where
+        I: Index,
+    {
+        I::get_command_header(PrefixedCommandHeader::G41V1(vec![(*self, index)]))
     }
 }
 
-impl HasCommandStatus for Group41Var4 {
+impl Command for Group41Var2 {
     fn status(&self) -> CommandStatus {
         self.status
+    }
+    fn to_header<I>(&self, index: I) -> CommandHeader
+    where
+        I: Index,
+    {
+        I::get_command_header(PrefixedCommandHeader::G41V2(vec![(*self, index)]))
+    }
+}
+
+impl Command for Group41Var3 {
+    fn status(&self) -> CommandStatus {
+        self.status
+    }
+    fn to_header<I>(&self, index: I) -> CommandHeader
+    where
+        I: Index,
+    {
+        I::get_command_header(PrefixedCommandHeader::G41V3(vec![(*self, index)]))
+    }
+}
+
+impl Command for Group41Var4 {
+    fn status(&self) -> CommandStatus {
+        self.status
+    }
+    fn to_header<I>(&self, index: I) -> CommandHeader
+    where
+        I: Index,
+    {
+        I::get_command_header(PrefixedCommandHeader::G41V4(vec![(*self, index)]))
+    }
+}
+
+pub struct CommandBuilder {
+    headers: Vec<CommandHeader>,
+}
+
+impl CommandBuilder {
+    pub fn new() -> Self {
+        Self {
+            headers: Vec::new(),
+        }
+    }
+
+    pub fn add<C, I>(&mut self, command: C, index: I)
+    where
+        C: Command,
+        I: Index,
+    {
+        self.headers.push(command.to_header(index));
+    }
+
+    pub fn build(self) -> Vec<CommandHeader> {
+        self.headers
+    }
+}
+
+impl Default for CommandBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -261,7 +325,7 @@ impl CommandHeader {
         sent: &[(V, I)],
     ) -> Result<(), CommandResponseError>
     where
-        V: FixedSizeVariation + HasCommandStatus,
+        V: FixedSizeVariation + Command,
         I: Index,
     {
         let mut received = seq.iter();

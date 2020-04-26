@@ -1,12 +1,11 @@
 use dnp3rs::app::gen::enums::OpType;
 use dnp3rs::app::gen::variations::fixed::Group12Var1;
 use dnp3rs::app::parse::parser::ParseLogLevel;
-use dnp3rs::app::types::ControlCode;
 use dnp3rs::master::association::{Association, AssociationConfig};
 use dnp3rs::master::null::NullHandler;
 use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
 use dnp3rs::master::types::{
-    Classes, CommandHeader, CommandMode, EventClasses, PrefixedCommandHeader, ReadRequest,
+    Classes, CommandBuilder, CommandHeader, CommandMode, EventClasses, ReadRequest,
 };
 use dnp3rs::util::timeout::Timeout;
 use std::net::SocketAddr;
@@ -25,10 +24,10 @@ fn get_association() -> Association {
     association
 }
 
-fn get_command_headers(command: Group12Var1, index: u16) -> Vec<CommandHeader> {
-    vec![CommandHeader::U16(PrefixedCommandHeader::G12V1(vec![(
-        command, index,
-    )]))]
+fn get_command(command: Group12Var1, index: u16) -> Vec<CommandHeader> {
+    let mut builder = CommandBuilder::new();
+    builder.add(command, index);
+    builder.build()
 }
 
 #[tokio::main(threaded_scheduler)]
@@ -52,10 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
             "c" => {
-                let headers = get_command_headers(
-                    Group12Var1::from_code(ControlCode::from_op_type(OpType::LatchOn)),
-                    3,
-                );
+                let headers = get_command(Group12Var1::from_op_type(OpType::LatchOn), 3);
                 match association
                     .operate(CommandMode::SelectBeforeOperate, headers)
                     .await

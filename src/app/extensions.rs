@@ -1,4 +1,4 @@
-use crate::app::gen::enums::CommandStatus;
+use crate::app::gen::enums::{CommandStatus, OpType};
 use crate::app::gen::variations::fixed::Group12Var1;
 use crate::app::types::ControlCode;
 
@@ -22,6 +22,21 @@ impl Group12Var1 {
     pub fn from_code(code: ControlCode) -> Self {
         Self {
             code,
+            count: 1,
+            on_time: 1000,
+            off_time: 1000,
+            status: CommandStatus::Success,
+        }
+    }
+
+    /// construct a `Group12Var1` instance from an `OpType`. Other fields are set to the following defaults:
+    /// * count = 1
+    /// * on_time = 1000
+    /// * off_time = 1000
+    /// * status = `CommandStatus::Success`
+    pub fn from_op_type(op: OpType) -> Self {
+        Self {
+            code: ControlCode::from_op_type(op),
             count: 1,
             on_time: 1000,
             off_time: 1000,
