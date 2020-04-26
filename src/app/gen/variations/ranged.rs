@@ -17,7 +17,7 @@ use crate::util::cursor::ReadCursor;
 use crate::app::parse::parser::*;
 use crate::app::parse::bytes::RangedBytesSequence;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
-use crate::master::handlers::MeasurementHandler;
+use crate::master::handle::MeasurementHandler;
 use crate::app::gen::enums::QualifierCode;
 use crate::app::parse::error::ObjectParseError;
 

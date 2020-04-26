@@ -3,11 +3,10 @@ use dnp3rs::app::gen::variations::fixed::Group12Var1;
 use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::app::types::ControlCode;
 use dnp3rs::master::association::{Association, AssociationConfig};
-use dnp3rs::master::handlers::NullHandler;
-use dnp3rs::master::runner::CommandMode;
+use dnp3rs::master::null::NullHandler;
 use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
 use dnp3rs::master::types::{
-    Classes, CommandHeader, EventClasses, PrefixedCommandHeader, ReadRequest,
+    Classes, CommandHeader, CommandMode, EventClasses, PrefixedCommandHeader, ReadRequest,
 };
 use dnp3rs::util::timeout::Timeout;
 use std::net::SocketAddr;

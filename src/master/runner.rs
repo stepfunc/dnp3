@@ -7,142 +7,19 @@ use crate::master::task::{
 use crate::transport::{ReaderType, WriterType};
 
 use crate::app::header::Control;
-use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;
-use crate::util::cursor::{WriteCursor, WriteError};
+use crate::util::cursor::WriteCursor;
 
 use crate::app::format::write::start_request;
-use crate::master::association::{Association, AssociationMap, Next, NoSession};
-use crate::master::handlers::{CallbackOnce, CommandCallback, CommandResult};
-use crate::master::types::{CommandError, CommandHeader};
-
+use crate::master::association::{AssociationMap, Next};
+use crate::master::handle::Message;
 use crate::util::timeout::Timeout;
+
+use crate::master::error::{CommandError, Shutdown, TaskError};
 use std::collections::VecDeque;
-use std::fmt::Formatter;
 use std::ops::Add;
 use std::time::{Duration, Instant};
 use tokio::prelude::{AsyncRead, AsyncWrite};
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum CommandMode {
-    DirectOperate,
-    SelectBeforeOperate,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum AssociationError {
-    Shutdown,
-    DuplicateAddress,
-}
-
-pub(crate) enum Message {
-    Command(u16, CommandMode, Vec<CommandHeader>, CommandCallback),
-    AddAssociation(Association, CallbackOnce<Result<(), AssociationError>>),
-}
-
-impl Message {
-    pub(crate) fn on_send_failure(self) {
-        match self {
-            Message::Command(_, _, _, callback) => {
-                callback.complete(Err(TaskError::Shutdown.into()))
-            }
-            Message::AddAssociation(_, callback) => {
-                callback.complete(Err(AssociationError::Shutdown))
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct MasterHandle {
-    sender: tokio::sync::mpsc::Sender<Message>,
-}
-
-#[derive(Debug)]
-pub struct AssociationHandle {
-    address: u16,
-    sender: tokio::sync::mpsc::Sender<Message>,
-}
-
-impl MasterHandle {
-    pub(crate) fn new(sender: tokio::sync::mpsc::Sender<Message>) -> Self {
-        Self { sender }
-    }
-
-    pub async fn add_association(
-        &mut self,
-        association: Association,
-    ) -> Result<AssociationHandle, AssociationError> {
-        let address = association.get_address();
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
-        if self
-            .sender
-            .send(Message::AddAssociation(
-                association,
-                CallbackOnce::OneShot(tx),
-            ))
-            .await
-            .is_err()
-        {
-            return Err(AssociationError::Shutdown);
-        }
-        rx.await?
-            .map(|_| (AssociationHandle::new(address, self.sender.clone())))
-    }
-}
-
-impl AssociationHandle {
-    pub(crate) fn new(address: u16, sender: tokio::sync::mpsc::Sender<Message>) -> Self {
-        Self { address, sender }
-    }
-
-    pub async fn operate(
-        &mut self,
-        mode: CommandMode,
-        headers: Vec<CommandHeader>,
-    ) -> CommandResult {
-        let (tx, rx) = tokio::sync::oneshot::channel::<CommandResult>();
-        self.send_operate_message(mode, headers, CallbackOnce::OneShot(tx))
-            .await;
-        rx.await?
-    }
-
-    pub async fn operate_cb<F>(
-        &mut self,
-        mode: CommandMode,
-        headers: Vec<CommandHeader>,
-        callback: F,
-    ) where
-        F: FnOnce(CommandResult) -> () + Send + Sync + 'static,
-    {
-        self.send_operate_message(mode, headers, CallbackOnce::BoxedFn(Box::new(callback)))
-            .await;
-    }
-
-    async fn send_operate_message(
-        &mut self,
-        mode: CommandMode,
-        headers: Vec<CommandHeader>,
-        callback: CommandCallback,
-    ) {
-        if let Err(tokio::sync::mpsc::error::SendError(msg)) = self
-            .sender
-            .send(Message::Command(self.address, mode, headers, callback))
-            .await
-        {
-            msg.on_send_failure();
-        }
-    }
-}
-
-impl From<tokio::sync::oneshot::error::RecvError> for CommandError {
-    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        CommandError::Task(TaskError::Shutdown)
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct Shutdown;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum RunError {
@@ -157,115 +34,6 @@ pub(crate) struct Runner {
     user_queue: tokio::sync::mpsc::Receiver<Message>,
     command_queue: VecDeque<Task>,
     buffer: [u8; 2048],
-}
-
-/// Errors that can occur while executing a master task
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum TaskError {
-    /// An error occurred at the link or transport level
-    Lower(LinkError),
-    /// A response to the task's request was malformed
-    MalformedResponse(ObjectParseError),
-    /// Non-final response not requesting confirmation
-    NonFinWithoutCon,
-    /// Received a non-FIR response when expecting the FIR bit
-    NeverReceivedFir,
-    /// Received FIR bit after already receiving FIR
-    UnexpectedFir,
-    /// Received a multi-fragmented response when expecting FIR/FIN
-    MultiFragmentResponse,
-    /// The response timed-out
-    ResponseTimeout,
-    /// Insufficient buffer space to serialize the request
-    WriteError,
-    /// The requested association does not exist (not configured)
-    NoSuchAssociation(u16),
-    /// There is not connection at the transport level
-    NoConnection,
-    /// The master was shutdown
-    Shutdown,
-}
-
-impl std::fmt::Display for TaskError {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match self {
-            TaskError::Lower(_) => f.write_str("I/O error"),
-            TaskError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
-            TaskError::NonFinWithoutCon => {
-                f.write_str("outstation responses with FIN == 0 must request confirmation")
-            }
-            TaskError::NeverReceivedFir => {
-                f.write_str("received non-FIR response before receiving FIR")
-            }
-            TaskError::UnexpectedFir => {
-                f.write_str("received FIR bit after already receiving FIR bit")
-            }
-            TaskError::MultiFragmentResponse => {
-                f.write_str("received unexpected multi-fragment response")
-            }
-            TaskError::ResponseTimeout => f.write_str("no response received within timeout"),
-            TaskError::WriteError => {
-                f.write_str("unable to serialize the task's request (insufficient buffer space)")
-            }
-            TaskError::Shutdown => f.write_str("the master was shutdown while executing the task"),
-            TaskError::NoConnection => f.write_str("no connection"),
-            TaskError::NoSuchAssociation(x) => write!(f, "no association with address: {}", x),
-        }
-    }
-}
-
-impl From<WriteError> for TaskError {
-    fn from(_: WriteError) -> Self {
-        TaskError::WriteError
-    }
-}
-
-impl From<LinkError> for TaskError {
-    fn from(err: LinkError) -> Self {
-        TaskError::Lower(err)
-    }
-}
-
-impl From<tokio::time::Elapsed> for TaskError {
-    fn from(_: tokio::time::Elapsed) -> Self {
-        TaskError::ResponseTimeout
-    }
-}
-
-impl From<ObjectParseError> for TaskError {
-    fn from(err: ObjectParseError) -> Self {
-        TaskError::MalformedResponse(err)
-    }
-}
-
-impl From<LinkError> for RunError {
-    fn from(err: LinkError) -> Self {
-        RunError::Link(err)
-    }
-}
-
-impl From<Shutdown> for RunError {
-    fn from(_: Shutdown) -> Self {
-        RunError::Shutdown
-    }
-}
-
-impl From<Shutdown> for TaskError {
-    fn from(_: Shutdown) -> Self {
-        TaskError::Shutdown
-    }
-}
-
-impl From<NoSession> for TaskError {
-    fn from(x: NoSession) -> Self {
-        TaskError::NoSuchAssociation(x.address)
-    }
-}
-
-impl From<tokio::sync::oneshot::error::RecvError> for AssociationError {
-    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        AssociationError::Shutdown
-    }
 }
 
 enum ReadResponseAction {
@@ -666,6 +434,8 @@ impl Runner {
         }
     }
 
+    // As of 1.43, clippy erroneously says these lifetimes aren't required
+    #[allow(clippy::needless_lifetimes)]
     async fn validate_non_read_response<'a, T>(
         &mut self,
         address: u16,
@@ -884,7 +654,8 @@ mod test {
     use super::*;
     use crate::link::header::Address;
     use crate::master::association::{Association, AssociationConfig};
-    use crate::master::handlers::NullHandler;
+    use crate::master::handle::MasterHandle;
+    use crate::master::null::NullHandler;
     use crate::transport::mocks::{MockReader, MockWriter};
     use tokio_test::io::Builder;
 

@@ -2,7 +2,7 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::fixed::*;
 use crate::app::measurement::*;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
-use crate::master::handlers::MeasurementHandler;
+use crate::master::handle::MeasurementHandler;
 
 /// Extract measurements from a HeaderCollection, sinking them into
 /// something that implements `MeasurementHandler`
@@ -73,7 +73,7 @@ mod test {
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::types::Timestamp;
-    use crate::master::handlers::MeasurementHandler;
+    use crate::master::handle::MeasurementHandler;
 
     #[derive(Debug)]
     enum Header {

@@ -1,13 +1,13 @@
 use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::handlers::{AssociationHandler, CommandCallback};
+use crate::master::error::AssociationError;
+use crate::master::handle::{AssociationHandler, CommandCallback};
 use crate::master::poll::{Poll, PollMap};
-use crate::master::runner::{AssociationError, CommandMode};
 use crate::master::task::{ReadTask, Task, TaskType};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
-use crate::master::types::{AutoRequest, CommandHeader, EventClasses, ReadRequest};
+use crate::master::types::{AutoRequest, CommandHeader, CommandMode, EventClasses, ReadRequest};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use std::time::{Duration, Instant};
@@ -206,7 +206,7 @@ impl Default for AssociationMap {
 }
 
 #[derive(Copy, Clone)]
-pub(crate) struct NoSession {
+pub(crate) struct NoAssociation {
     pub(crate) address: u16,
 }
 
@@ -232,7 +232,7 @@ impl AssociationMap {
 
     pub fn register(&mut self, session: Association) -> Result<(), AssociationError> {
         if self.sessions.contains_key(&session.address) {
-            return Err(AssociationError::DuplicateAddress);
+            return Err(AssociationError::DuplicateAddress(session.address));
         }
 
         self.priority.push_back(session.address);
@@ -240,17 +240,17 @@ impl AssociationMap {
         Ok(())
     }
 
-    pub(crate) fn get(&mut self, address: u16) -> Result<&Association, NoSession> {
+    pub(crate) fn get(&mut self, address: u16) -> Result<&Association, NoAssociation> {
         match self.sessions.get(&address) {
             Some(x) => Ok(x),
-            None => Err(NoSession { address }),
+            None => Err(NoAssociation { address }),
         }
     }
 
-    pub(crate) fn get_mut(&mut self, address: u16) -> Result<&mut Association, NoSession> {
+    pub(crate) fn get_mut(&mut self, address: u16) -> Result<&mut Association, NoAssociation> {
         match self.sessions.get_mut(&address) {
             Some(x) => Ok(x),
-            None => Err(NoSession { address }),
+            None => Err(NoAssociation { address }),
         }
     }
 

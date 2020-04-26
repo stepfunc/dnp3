@@ -1,5 +1,7 @@
 use crate::app::parse::parser::ParseLogLevel;
-use crate::master::runner::{MasterHandle, RunError, Runner, Shutdown};
+use crate::master::error::Shutdown;
+use crate::master::handle::MasterHandle;
+use crate::master::runner::{RunError, Runner};
 use crate::transport::{ReaderType, WriterType};
 use crate::util::timeout::Timeout;
 use std::net::SocketAddr;
@@ -107,7 +109,11 @@ impl MasterTask {
         (task, MasterHandle::new(tx))
     }
 
-    pub async fn run(&mut self) -> Result<(), Shutdown> {
+    async fn run(&mut self) {
+        self.run_impl().await.ok();
+    }
+
+    async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
             match TcpStream::connect(self.endpoint).await {
                 Err(err) => {

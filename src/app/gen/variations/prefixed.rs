@@ -19,7 +19,7 @@ use crate::app::parse::traits::{FixedSize, Index};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::bytes::PrefixedBytesSequence;
 use crate::app::measurement::Time;
-use crate::master::handlers::MeasurementHandler;
+use crate::master::handle::MeasurementHandler;
 use crate::app::parse::error::ObjectParseError;
 
 #[derive(Debug, PartialEq)]

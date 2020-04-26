@@ -7,8 +7,14 @@ use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::HeaderDetails;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::master::runner::TaskError;
+use crate::master::error::CommandResponseError;
 use crate::util::cursor::WriteError;
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum CommandMode {
+    DirectOperate,
+    SelectBeforeOperate,
+}
 
 #[derive(Copy, Clone)]
 pub struct EventClasses {
@@ -240,77 +246,6 @@ impl HasCommandStatus for Group41Var4 {
 pub enum CommandHeader {
     U8(PrefixedCommandHeader<u8>),
     U16(PrefixedCommandHeader<u16>),
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum CommandResponseError {
-    /// the command failed before receiving a response
-    Request(TaskError),
-    /// the outstation indicated that a command was not SUCCESS for the specified reason
-    BadStatus(CommandStatus),
-    /// the number of headers in the response doesn't match the number in the request
-    HeaderCountMismatch,
-    /// a header in the response doesn't match the request
-    HeaderTypeMismatch,
-    /// the number of objects in one of the headers doesn't match the request
-    ObjectCountMismatch,
-    /// a value in one of the objects in the response doesn't match the request
-    ObjectValueMismatch,
-}
-
-impl std::fmt::Display for CommandResponseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            CommandResponseError::Request(err) => write!(f, "{}", err),
-            CommandResponseError::BadStatus(status) => write!(
-                f,
-                "command status value other than Success was returned: {:?}",
-                status
-            ),
-            CommandResponseError::HeaderCountMismatch => f.write_str(
-                "response did not contain the same number of object headers as the request",
-            ),
-            CommandResponseError::HeaderTypeMismatch => {
-                f.write_str("response contained a header type different than the request")
-            }
-            CommandResponseError::ObjectCountMismatch => f.write_str(
-                "response header does not have the same number of objects as the request",
-            ),
-            CommandResponseError::ObjectValueMismatch => f.write_str(
-                "a value other than the status is different in the response than the request",
-            ),
-        }
-    }
-}
-
-/// Parent error type for command tasks
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum CommandError {
-    /// failed b/c of a generic task execution error
-    Task(TaskError),
-    /// task failed b/c of an unexpected response
-    Response(CommandResponseError),
-}
-
-impl std::fmt::Display for CommandError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            CommandError::Response(x) => std::fmt::Display::fmt(x, f),
-            CommandError::Task(x) => std::fmt::Display::fmt(x, f),
-        }
-    }
-}
-
-impl From<CommandResponseError> for CommandError {
-    fn from(err: CommandResponseError) -> Self {
-        CommandError::Response(err)
-    }
-}
-
-impl From<TaskError> for CommandError {
-    fn from(err: TaskError) -> Self {
-        CommandError::Task(err)
-    }
 }
 
 impl CommandHeader {
