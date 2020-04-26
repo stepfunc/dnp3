@@ -1,10 +1,15 @@
+use dnp3rs::app::gen::enums::OpType;
+use dnp3rs::app::gen::variations::fixed::Group12Var1;
 use dnp3rs::app::parse::parser::ParseLogLevel;
-use dnp3rs::master::association::{Association, AssociationConfig, AssociationMap};
+use dnp3rs::app::types::ControlCode;
+use dnp3rs::master::association::{Association, AssociationConfig};
 use dnp3rs::master::handlers::NullHandler;
+use dnp3rs::master::runner::CommandMode;
 use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
 use dnp3rs::master::types::{
-    Classes, CommandTaskError, CommandTaskHandler, EventClasses, ReadRequest,
+    Classes, CommandHeader, EventClasses, PrefixedCommandHeader, ReadRequest,
 };
+use dnp3rs::util::timeout::Timeout;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
@@ -21,14 +26,10 @@ fn get_association() -> Association {
     association
 }
 
-struct LoggingHandler;
-impl CommandTaskHandler for LoggingHandler {
-    fn on_command_complete(&mut self, result: Result<(), CommandTaskError>) {
-        match result {
-            Ok(()) => log::info!("success"),
-            Err(err) => log::warn!("error: {}", err),
-        }
-    }
+fn get_command_headers(command: Group12Var1, index: u16) -> Vec<CommandHeader> {
+    vec![CommandHeader::U16(PrefixedCommandHeader::G12V1(vec![(
+        command, index,
+    )]))]
 }
 
 #[tokio::main(threaded_scheduler)]
@@ -36,14 +37,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
 
     // spawn the master onto another task
-    let mut handle = MasterTask::spawn(
+    let mut master = MasterTask::spawn(
         1,
         ParseLogLevel::ObjectValues,
         ReconnectStrategy::default(),
-        Duration::from_secs(1),
+        Timeout::from_secs(1).unwrap(),
         SocketAddr::from_str("127.0.0.1:20000")?,
-        AssociationMap::single(get_association()),
     );
+
+    let mut association = master.add_association(get_association()).await.unwrap();
 
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
@@ -51,9 +53,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
             "c" => {
-                handle
-                    .direct_operate(1024, vec![], Box::new(LoggingHandler {}))
-                    .await;
+                let headers = get_command_headers(
+                    Group12Var1::from_code(ControlCode::from_op_type(OpType::LatchOn)),
+                    3,
+                );
+                match association
+                    .operate(CommandMode::SelectBeforeOperate, headers)
+                    .await
+                {
+                    Ok(()) => log::info!("success"),
+                    Err(err) => log::warn!("error: {}", err),
+                }
             }
             s => println!("unknown command: {}", s),
         }

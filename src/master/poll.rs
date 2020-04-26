@@ -1,11 +1,14 @@
+use crate::app::format::write::HeaderWriter;
 use crate::master::association::Next;
-use crate::master::types::{AutoRequest, ReadRequest};
+use crate::master::types::ReadRequest;
+use crate::util::cursor::WriteError;
 use crate::util::Smallest;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
+#[derive(Copy, Clone)]
 pub(crate) struct Poll {
-    id: u64,
+    pub(crate) id: u64,
     request: ReadRequest,
     period: Duration,
     next: Option<Instant>,
@@ -36,12 +39,12 @@ impl PollMap {
         }
     }
 
-    pub(crate) fn next(&self, now: Instant) -> Next<AutoRequest> {
+    pub(crate) fn next(&self, now: Instant) -> Next<Poll> {
         let mut earliest = Smallest::<Instant>::new();
 
         for poll in self.polls.values() {
             if poll.is_ready(now) {
-                return Next::Now(poll.to_request());
+                return Next::Now(*poll);
             }
 
             if let Some(x) = poll.next() {
@@ -67,6 +70,10 @@ impl Poll {
         }
     }
 
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        self.request.format(writer)
+    }
+
     pub(crate) fn reset_next(&mut self) {
         self.next = Instant::now().checked_add(self.period)
     }
@@ -80,9 +87,5 @@ impl Poll {
 
     pub(crate) fn next(&self) -> Option<Instant> {
         self.next
-    }
-
-    pub(crate) fn to_request(&self) -> AutoRequest {
-        AutoRequest::PeriodicPoll(self.request, self.id)
     }
 }

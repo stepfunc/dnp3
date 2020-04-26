@@ -1,8 +1,7 @@
-use crate::master::association::AssociationMap;
-
 use crate::app::parse::parser::ParseLogLevel;
 use crate::master::runner::{MasterHandle, RunError, Runner, Shutdown};
 use crate::transport::{ReaderType, WriterType};
+use crate::util::timeout::Timeout;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::TcpStream;
@@ -80,12 +79,10 @@ impl MasterTask {
         address: u16,
         level: ParseLogLevel,
         strategy: ReconnectStrategy,
-        timeout: Duration,
+        timeout: Timeout,
         endpoint: SocketAddr,
-        sessions: AssociationMap,
     ) -> MasterHandle {
-        let (mut task, handle) =
-            MasterTask::new(address, level, strategy, timeout, endpoint, sessions);
+        let (mut task, handle) = MasterTask::new(address, level, strategy, timeout, endpoint);
         tokio::spawn(async move { task.run().await });
         handle
     }
@@ -94,12 +91,11 @@ impl MasterTask {
         address: u16,
         level: ParseLogLevel,
         strategy: ReconnectStrategy,
-        response_timeout: Duration,
+        response_timeout: Timeout,
         endpoint: SocketAddr,
-        sessions: AssociationMap,
     ) -> (Self, MasterHandle) {
         let (tx, rx) = tokio::sync::mpsc::channel(100); // TODO
-        let runner = Runner::new(level, response_timeout, sessions, rx);
+        let runner = Runner::new(level, response_timeout, rx);
         let (reader, writer) = crate::transport::create_transport_layer(true, address);
         let task = Self {
             endpoint,

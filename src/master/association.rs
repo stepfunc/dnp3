@@ -1,15 +1,13 @@
 use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::handlers::AssociationHandler;
-use crate::master::poll::PollMap;
-use crate::master::request::MasterRequest;
-use crate::master::requests::auto::AutoRequestDetails;
-use crate::master::requests::command::CommandRequestDetails;
-use crate::master::runner::CommandMode;
-use crate::master::types::{
-    AutoRequest, CommandHeader, CommandTaskHandler, EventClasses, ReadRequest,
-};
+use crate::master::handlers::{AssociationHandler, CommandCallback};
+use crate::master::poll::{Poll, PollMap};
+use crate::master::runner::{AssociationError, CommandMode};
+use crate::master::task::{ReadTask, Task, TaskType};
+use crate::master::tasks::auto::AutoTask;
+use crate::master::tasks::command::CommandTask;
+use crate::master::types::{AutoRequest, CommandHeader, EventClasses, ReadRequest};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use std::time::{Duration, Instant};
@@ -108,6 +106,10 @@ impl Association {
         }
     }
 
+    pub(crate) fn get_address(&self) -> u16 {
+        self.address
+    }
+
     pub(crate) fn complete_poll(&mut self, id: u64) {
         self.polls.complete(id)
     }
@@ -116,11 +118,7 @@ impl Association {
         self.seq.increment()
     }
 
-    pub(crate) fn previous_seq(&self) -> u8 {
-        self.seq.previous()
-    }
-
-    pub(crate) fn process_response_iin(&mut self, iin: IIN) {
+    pub(crate) fn process_iin(&mut self, iin: IIN) {
         if iin.iin1.get_device_restart() {
             self.on_restart_iin_observed()
         }
@@ -174,7 +172,7 @@ impl Association {
         self.polls.add(request, period)
     }
 
-    pub(crate) fn next_request(&self, now: Instant) -> Next<MasterRequest> {
+    pub(crate) fn next_request(&self, now: Instant) -> Next<Task> {
         if self.tasks.clear_restart_iin.is_pending() {
             return Next::Now(self.clear_restart_iin());
         }
@@ -207,6 +205,7 @@ impl Default for AssociationMap {
     }
 }
 
+#[derive(Copy, Clone)]
 pub(crate) struct NoSession {
     pub(crate) address: u16,
 }
@@ -221,7 +220,7 @@ impl AssociationMap {
 
     pub fn single(session: Association) -> Self {
         let mut map = AssociationMap::new();
-        map.register(session);
+        map.register(session).ok();
         map
     }
 
@@ -231,14 +230,14 @@ impl AssociationMap {
         }
     }
 
-    pub fn register(&mut self, session: Association) -> bool {
+    pub fn register(&mut self, session: Association) -> Result<(), AssociationError> {
         if self.sessions.contains_key(&session.address) {
-            return false;
+            return Err(AssociationError::DuplicateAddress);
         }
 
         self.priority.push_back(session.address);
         self.sessions.insert(session.address, session);
-        true
+        Ok(())
     }
 
     pub(crate) fn get(&mut self, address: u16) -> Result<&Association, NoSession> {
@@ -255,7 +254,7 @@ impl AssociationMap {
         }
     }
 
-    pub(crate) fn next_task(&mut self) -> Next<MasterRequest> {
+    pub(crate) fn next_task(&mut self) -> Next<Task> {
         let now = std::time::Instant::now();
 
         let mut earliest = Smallest::<Instant>::new();
@@ -289,41 +288,29 @@ impl AssociationMap {
 
 // helpers to produce request tasks
 impl Association {
-    /*
-    fn read(&self, request: ReadRequest, handler: Box<dyn ReadTaskHandler>) -> MasterRequest {
-        MasterRequest::new(self.address, ReadRequestDetails::create(request, handler))
-    }
-    */
-
-    fn poll(&self, request: AutoRequest) -> MasterRequest {
-        MasterRequest::new(self.address, AutoRequestDetails::create(request))
+    fn poll(&self, poll: Poll) -> Task {
+        Task::new(self.address, TaskType::Read(ReadTask::PeriodicPoll(poll)))
     }
 
-    fn clear_restart_iin(&self) -> MasterRequest {
-        MasterRequest::new(
+    fn integrity(&self) -> Task {
+        Task::new(self.address, TaskType::Read(ReadTask::StartupIntegrity))
+    }
+
+    fn clear_restart_iin(&self) -> Task {
+        Task::new(self.address, AutoTask::create(AutoRequest::ClearRestartBit))
+    }
+
+    fn disable_unsolicited(&self, classes: EventClasses) -> Task {
+        Task::new(
             self.address,
-            AutoRequestDetails::create(AutoRequest::ClearRestartBit),
+            AutoTask::create(AutoRequest::DisableUnsolicited(classes)),
         )
     }
 
-    fn integrity(&self) -> MasterRequest {
-        MasterRequest::new(
+    fn enable_unsolicited(&self, classes: EventClasses) -> Task {
+        Task::new(
             self.address,
-            AutoRequestDetails::create(AutoRequest::IntegrityScan),
-        )
-    }
-
-    fn disable_unsolicited(&self, classes: EventClasses) -> MasterRequest {
-        MasterRequest::new(
-            self.address,
-            AutoRequestDetails::create(AutoRequest::DisableUnsolicited(classes)),
-        )
-    }
-
-    fn enable_unsolicited(&self, classes: EventClasses) -> MasterRequest {
-        MasterRequest::new(
-            self.address,
-            AutoRequestDetails::create(AutoRequest::EnableUnsolicited(classes)),
+            AutoTask::create(AutoRequest::EnableUnsolicited(classes)),
         )
     }
 
@@ -331,18 +318,8 @@ impl Association {
         &self,
         mode: CommandMode,
         headers: Vec<CommandHeader>,
-        handler: Box<dyn CommandTaskHandler>,
-    ) -> MasterRequest {
-        MasterRequest::new(
-            self.address,
-            match mode {
-                CommandMode::DirectOperate => {
-                    CommandRequestDetails::direct_operate(headers, handler)
-                }
-                CommandMode::SelectBeforeOperate => {
-                    CommandRequestDetails::select_before_operate(headers, handler)
-                }
-            },
-        )
+        callback: CommandCallback,
+    ) -> Task {
+        Task::new(self.address, CommandTask::operate(mode, headers, callback))
     }
 }

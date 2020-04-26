@@ -7,7 +7,6 @@ use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::HeaderDetails;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::master::handlers::RequestCompletionHandler;
 use crate::master::runner::TaskError;
 use crate::util::cursor::WriteError;
 
@@ -126,10 +125,8 @@ pub enum ReadRequest {
 #[derive(Clone)]
 pub(crate) enum AutoRequest {
     ClearRestartBit,
-    IntegrityScan,
     EnableUnsolicited(EventClasses),
     DisableUnsolicited(EventClasses),
-    PeriodicPoll(ReadRequest, u64),
 }
 
 impl ReadRequest {
@@ -155,40 +152,27 @@ impl ReadRequest {
 }
 
 impl AutoRequest {
-    pub(crate) fn expects_empty_response(&self) -> bool {
-        match self.function() {
-            FunctionCode::Read => false,
-            _ => false,
-        }
-    }
-
     pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
-            AutoRequest::IntegrityScan => writer.write_class1230(),
             AutoRequest::ClearRestartBit => writer.write_clear_restart(),
             AutoRequest::EnableUnsolicited(classes) => classes.write(writer),
             AutoRequest::DisableUnsolicited(classes) => classes.write(writer),
-            AutoRequest::PeriodicPoll(request, _) => request.format(writer),
         }
     }
 
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
-            AutoRequest::IntegrityScan => FunctionCode::Read,
             AutoRequest::ClearRestartBit => FunctionCode::Write,
             AutoRequest::EnableUnsolicited(_) => FunctionCode::EnabledUnsolicited,
             AutoRequest::DisableUnsolicited(_) => FunctionCode::DisableUnsolicited,
-            AutoRequest::PeriodicPoll(_, _) => FunctionCode::Read,
         }
     }
 
     pub(crate) fn description(&self) -> &'static str {
         match self {
-            AutoRequest::IntegrityScan => "startup integrity scan",
             AutoRequest::ClearRestartBit => "clear restart IIN bit",
             AutoRequest::EnableUnsolicited(_) => "enable unsolicited reporting",
             AutoRequest::DisableUnsolicited(_) => "disable unsolicited reporting",
-            AutoRequest::PeriodicPoll(_, _) => "periodic poll",
         }
     }
 }
@@ -301,50 +285,31 @@ impl std::fmt::Display for CommandResponseError {
 
 /// Parent error type for command tasks
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum CommandTaskError {
-    /// The task failed b/c of an unexpected response
-    Response(CommandResponseError),
-    /// The task failed b/c of a task execution error
+pub enum CommandError {
+    /// failed b/c of a generic task execution error
     Task(TaskError),
+    /// task failed b/c of an unexpected response
+    Response(CommandResponseError),
 }
 
-impl std::fmt::Display for CommandTaskError {
+impl std::fmt::Display for CommandError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            CommandTaskError::Response(x) => std::fmt::Display::fmt(x, f),
-            CommandTaskError::Task(x) => std::fmt::Display::fmt(x, f),
+            CommandError::Response(x) => std::fmt::Display::fmt(x, f),
+            CommandError::Task(x) => std::fmt::Display::fmt(x, f),
         }
     }
 }
 
-pub trait CommandTaskHandler: RequestCompletionHandler {
-    /// Invoked when the command task succeeds or fails
-    fn on_command_complete(&mut self, result: Result<(), CommandTaskError>);
-}
-
-impl<T> RequestCompletionHandler for T
-where
-    T: CommandTaskHandler,
-{
-    /// If an error occurs, we forward it to `on_command_complete`
-    /// successful completion, means that the other completion
-    /// handler was already invoked
-    fn on_complete(&mut self, result: Result<(), TaskError>) {
-        if let Err(err) = result {
-            self.on_command_complete(Err(err.into()));
-        }
-    }
-}
-
-impl From<CommandResponseError> for CommandTaskError {
+impl From<CommandResponseError> for CommandError {
     fn from(err: CommandResponseError) -> Self {
-        CommandTaskError::Response(err)
+        CommandError::Response(err)
     }
 }
 
-impl From<TaskError> for CommandTaskError {
+impl From<TaskError> for CommandError {
     fn from(err: TaskError) -> Self {
-        CommandTaskError::Task(err)
+        CommandError::Task(err)
     }
 }
 

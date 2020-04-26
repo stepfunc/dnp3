@@ -3,14 +3,37 @@ use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::runner::TaskError;
+use crate::master::types::CommandError;
 
 pub trait ResponseHandler: Send {
     fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
 }
 
+/// A generic callback type that can only be invoked once.
+/// The user can select to implement it using FnOnce or a
+/// one-shot reply channel
+pub enum CallbackOnce<T> {
+    BoxedFn(Box<dyn FnOnce(T) -> () + Send + Sync>),
+    OneShot(tokio::sync::oneshot::Sender<T>),
+}
+
+impl<T> CallbackOnce<T> {
+    pub(crate) fn complete(self, value: T) {
+        match self {
+            CallbackOnce::BoxedFn(func) => func(value),
+            CallbackOnce::OneShot(s) => {
+                s.send(value).ok();
+            }
+        }
+    }
+}
+
 pub trait RequestCompletionHandler: Send {
     fn on_complete(&mut self, result: Result<(), TaskError>);
 }
+
+pub type CommandResult = Result<(), CommandError>;
+pub type CommandCallback = CallbackOnce<CommandResult>;
 
 pub trait AssociationHandler: ResponseHandler {
     // TODO - add additional methods
