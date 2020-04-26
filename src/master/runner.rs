@@ -58,7 +58,7 @@ pub struct MasterHandle {
     sender: tokio::sync::mpsc::Sender<Message>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct AssociationHandle {
     address: u16,
     sender: tokio::sync::mpsc::Sender<Message>,
