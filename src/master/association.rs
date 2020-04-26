@@ -3,7 +3,7 @@ use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::handlers::{AssociationHandler, CommandCallback};
 use crate::master::poll::{Poll, PollMap};
-use crate::master::runner::CommandMode;
+use crate::master::runner::{AssociationError, CommandMode};
 use crate::master::task::{ReadTask, Task, TaskType};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
@@ -104,6 +104,10 @@ impl Association {
             config,
             polls: PollMap::new(),
         }
+    }
+
+    pub(crate) fn get_address(&self) -> u16 {
+        self.address
     }
 
     pub(crate) fn complete_poll(&mut self, id: u64) {
@@ -216,7 +220,7 @@ impl AssociationMap {
 
     pub fn single(session: Association) -> Self {
         let mut map = AssociationMap::new();
-        map.register(session);
+        map.register(session).ok();
         map
     }
 
@@ -226,14 +230,14 @@ impl AssociationMap {
         }
     }
 
-    pub fn register(&mut self, session: Association) -> bool {
+    pub fn register(&mut self, session: Association) -> Result<(), AssociationError> {
         if self.sessions.contains_key(&session.address) {
-            return false;
+            return Err(AssociationError::DuplicateAddress);
         }
 
         self.priority.push_back(session.address);
         self.sessions.insert(session.address, session);
-        true
+        Ok(())
     }
 
     pub(crate) fn get(&mut self, address: u16) -> Result<&Association, NoSession> {

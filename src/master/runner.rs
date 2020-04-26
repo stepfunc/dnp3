@@ -12,7 +12,7 @@ use crate::link::error::LinkError;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 use crate::app::format::write::start_request;
-use crate::master::association::{AssociationMap, Next, NoSession};
+use crate::master::association::{Association, AssociationMap, Next, NoSession};
 use crate::master::handlers::{CallbackOnce, CommandCallback, CommandResult};
 use crate::master::types::{CommandError, CommandHeader};
 
@@ -29,8 +29,15 @@ pub enum CommandMode {
     SelectBeforeOperate,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum AssociationError {
+    Shutdown,
+    DuplicateAddress,
+}
+
 pub(crate) enum Message {
     Command(u16, CommandMode, Vec<CommandHeader>, CommandCallback),
+    AddAssociation(Association, CallbackOnce<Result<(), AssociationError>>),
 }
 
 impl Message {
@@ -38,6 +45,9 @@ impl Message {
         match self {
             Message::Command(_, _, _, callback) => {
                 callback.complete(Err(TaskError::Shutdown.into()))
+            }
+            Message::AddAssociation(_, callback) => {
+                callback.complete(Err(AssociationError::Shutdown))
             }
         }
     }
@@ -48,51 +58,76 @@ pub struct MasterHandle {
     sender: tokio::sync::mpsc::Sender<Message>,
 }
 
+#[derive(Clone, Debug)]
+pub struct AssociationHandle {
+    address: u16,
+    sender: tokio::sync::mpsc::Sender<Message>,
+}
+
 impl MasterHandle {
     pub(crate) fn new(sender: tokio::sync::mpsc::Sender<Message>) -> Self {
         Self { sender }
     }
 
+    pub async fn add_association(
+        &mut self,
+        association: Association,
+    ) -> Result<AssociationHandle, AssociationError> {
+        let address = association.get_address();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
+        if self
+            .sender
+            .send(Message::AddAssociation(
+                association,
+                CallbackOnce::OneShot(tx),
+            ))
+            .await
+            .is_err()
+        {
+            return Err(AssociationError::Shutdown);
+        }
+        rx.await?
+            .map(|_| (AssociationHandle::new(address, self.sender.clone())))
+    }
+}
+
+impl AssociationHandle {
+    pub(crate) fn new(address: u16, sender: tokio::sync::mpsc::Sender<Message>) -> Self {
+        Self { address, sender }
+    }
+
     pub async fn operate(
         &mut self,
-        address: u16,
         mode: CommandMode,
         headers: Vec<CommandHeader>,
     ) -> CommandResult {
         let (tx, rx) = tokio::sync::oneshot::channel::<CommandResult>();
-        self.send_operate_message(mode, address, headers, CallbackOnce::OneShot(tx))
+        self.send_operate_message(mode, headers, CallbackOnce::OneShot(tx))
             .await;
         rx.await?
     }
 
     pub async fn operate_cb<F>(
         &mut self,
-        address: u16,
         mode: CommandMode,
         headers: Vec<CommandHeader>,
         callback: F,
     ) where
         F: FnOnce(CommandResult) -> () + Send + Sync + 'static,
     {
-        self.send_operate_message(
-            mode,
-            address,
-            headers,
-            CallbackOnce::BoxedFn(Box::new(callback)),
-        )
-        .await;
+        self.send_operate_message(mode, headers, CallbackOnce::BoxedFn(Box::new(callback)))
+            .await;
     }
 
     async fn send_operate_message(
         &mut self,
         mode: CommandMode,
-        address: u16,
         headers: Vec<CommandHeader>,
         callback: CommandCallback,
     ) {
         if let Err(tokio::sync::mpsc::error::SendError(msg)) = self
             .sender
-            .send(Message::Command(address, mode, headers, callback))
+            .send(Message::Command(self.address, mode, headers, callback))
             .await
         {
             msg.on_send_failure();
@@ -227,6 +262,12 @@ impl From<NoSession> for TaskError {
     }
 }
 
+impl From<tokio::sync::oneshot::error::RecvError> for AssociationError {
+    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
+        AssociationError::Shutdown
+    }
+}
+
 enum ReadResponseAction {
     Ignore,
     ReadNext,
@@ -237,13 +278,12 @@ impl Runner {
     pub(crate) fn new(
         level: ParseLogLevel,
         response_timeout: Timeout,
-        associations: AssociationMap,
         user_queue: tokio::sync::mpsc::Receiver<Message>,
     ) -> Self {
         Self {
             level,
             timeout: response_timeout,
-            associations,
+            associations: AssociationMap::new(),
             user_queue,
             command_queue: VecDeque::new(),
             buffer: [0; 2048],
@@ -368,6 +408,10 @@ impl Runner {
                         }
                     }
                 }
+                Message::AddAssociation(association, callback) => {
+                    callback.complete(self.associations.register(association));
+                    Ok(true)
+                }
             },
             None => Err(Shutdown),
         }
@@ -376,8 +420,12 @@ impl Runner {
     async fn process_message_while_disconnected(&mut self) -> Result<(), Shutdown> {
         match self.user_queue.recv().await {
             Some(x) => match x {
-                Message::Command(_, _, _, handler) => {
-                    handler.complete(Err(CommandError::Task(TaskError::NoConnection)));
+                Message::Command(_, _, _, callback) => {
+                    callback.complete(Err(CommandError::Task(TaskError::NoConnection)));
+                    Ok(())
+                }
+                Message::AddAssociation(association, callback) => {
+                    callback.complete(self.associations.register(association));
                     Ok(())
                 }
             },
@@ -549,8 +597,8 @@ impl Runner {
         match result {
             Ok(()) => Ok(()),
             Err(err) => match err {
-                TaskError::Shutdown => return Err(RunError::Shutdown),
-                TaskError::Lower(err) => return Err(RunError::Link(err)),
+                TaskError::Shutdown => Err(RunError::Shutdown),
+                TaskError::Lower(err) => Err(RunError::Link(err)),
                 _ => Ok(()),
             },
         }
@@ -842,19 +890,9 @@ mod test {
 
     #[tokio::test]
     async fn performs_startup_sequence_with_device_restart_asserted() {
-        let map = AssociationMap::single(Association::new(
-            1024,
-            AssociationConfig::default(),
-            NullHandler::boxed(),
-        ));
-
         let (tx, rx) = tokio::sync::mpsc::channel(1);
-        let mut runner = Runner::new(
-            ParseLogLevel::Nothing,
-            Timeout::from_secs(1).unwrap(),
-            map,
-            rx,
-        );
+        let mut runner = Runner::new(ParseLogLevel::Nothing, Timeout::from_secs(1).unwrap(), rx);
+        let mut master = MasterHandle::new(tx);
 
         let (mut io, _handle) = Builder::new()
             // disable unsolicited
@@ -884,12 +922,26 @@ mod test {
         let mut writer = MockWriter::mock();
         let mut reader = MockReader::mock(Address::new(1, 1024));
 
-        let mut task = tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));
+        let mut master_task =
+            tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));
+        let association =
+            {
+                let mut add_task = tokio_test::task::spawn(master.add_association(
+                    Association::new(1024, AssociationConfig::default(), NullHandler::boxed()),
+                ));
+                tokio_test::assert_pending!(add_task.poll());
+                tokio_test::assert_pending!(master_task.poll());
+                tokio_test::assert_ready_ok!(add_task.poll())
+            };
 
-        tokio_test::assert_pending!(task.poll());
-        drop(tx); // causes the task to shutdown
-        tokio_test::assert_ready_eq!(task.poll(), RunError::Shutdown);
-        drop(task);
+        tokio_test::assert_pending!(master_task.poll());
+
+        // causes the task to shutdown
+        drop(master);
+        drop(association);
+
+        tokio_test::assert_ready_eq!(master_task.poll(), RunError::Shutdown);
+        drop(master_task);
         assert_eq!(writer.num_writes(), 4);
         assert_eq!(reader.num_reads(), 4);
     }
