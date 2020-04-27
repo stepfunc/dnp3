@@ -106,6 +106,10 @@ impl Association {
         }
     }
 
+    pub fn add_poll(&mut self, request: ReadRequest, period: Duration) {
+        self.polls.add(request, period)
+    }
+
     pub(crate) fn get_address(&self) -> u16 {
         self.address
     }
@@ -159,18 +163,6 @@ impl Association {
     pub(crate) fn handle_response(&mut self, header: ResponseHeader, objects: HeaderCollection) {
         self.handler.handle(self.address, header, objects);
     }
-}
-
-pub(crate) enum Next<T> {
-    None,
-    Now(T),
-    NotBefore(Instant),
-}
-
-impl Association {
-    pub fn add_poll(&mut self, request: ReadRequest, period: Duration) {
-        self.polls.add(request, period)
-    }
 
     pub(crate) fn next_request(&self, now: Instant) -> Next<Task> {
         if self.tasks.clear_restart_iin.is_pending() {
@@ -192,6 +184,12 @@ impl Association {
             Next::Now(x) => Next::Now(self.poll(x)),
         }
     }
+}
+
+pub(crate) enum Next<T> {
+    None,
+    Now(T),
+    NotBefore(Instant),
 }
 
 pub(crate) struct AssociationMap {
