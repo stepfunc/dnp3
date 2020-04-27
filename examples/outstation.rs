@@ -1,4 +1,4 @@
-use dnp3rs::app::parse::parser::{ParseLogLevel, ParsedFragment};
+use dnp3rs::app::parse::parser::{DecodeLogLevel, ParsedFragment};
 use dnp3rs::transport::reader::Reader;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut reader = Reader::new(false, 1024);
 
-    let level = ParseLogLevel::Header;
+    let level = DecodeLogLevel::Header;
 
     loop {
         reader.read(&mut socket).await.unwrap();

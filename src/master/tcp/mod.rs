@@ -1,4 +1,4 @@
-use crate::app::parse::parser::ParseLogLevel;
+use crate::app::parse::parser::DecodeLogLevel;
 use crate::master::error::Shutdown;
 use crate::master::handle::MasterHandle;
 use crate::master::runner::{RunError, Runner};
@@ -79,7 +79,7 @@ pub struct MasterTask {
 impl MasterTask {
     pub fn spawn(
         address: u16,
-        level: ParseLogLevel,
+        level: DecodeLogLevel,
         strategy: ReconnectStrategy,
         timeout: Timeout,
         endpoint: SocketAddr,
@@ -91,7 +91,7 @@ impl MasterTask {
 
     pub fn new(
         address: u16,
-        level: ParseLogLevel,
+        level: DecodeLogLevel,
         strategy: ReconnectStrategy,
         response_timeout: Timeout,
         endpoint: SocketAddr,

@@ -1,7 +1,7 @@
 use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
-use crate::app::parse::parser::HeaderCollection;
+use crate::app::parse::parser::{DecodeLogLevel, HeaderCollection};
 use crate::master::association::Association;
 use crate::master::error::{AssociationError, CommandError, TaskError};
 use crate::master::types::{CommandHeaders, CommandMode};
@@ -9,8 +9,9 @@ use crate::master::types::{CommandHeaders, CommandMode};
 /// messages sent from the handles to the master task via an mpsc
 pub(crate) enum Message {
     Command(u16, CommandMode, CommandHeaders, CommandCallback),
-    AddAssociation(Association, CallbackOnce<Result<(), AssociationError>>),
+    AddAssociation(Association, Promise<Result<(), AssociationError>>),
     RemoveAssociation(u16),
+    SetDecodeLogLevel(DecodeLogLevel),
 }
 
 impl Message {
@@ -23,6 +24,7 @@ impl Message {
                 callback.complete(Err(AssociationError::Shutdown))
             }
             Message::RemoveAssociation(_) => {}
+            Message::SetDecodeLogLevel(_) => {}
         }
     }
 }
@@ -43,6 +45,13 @@ impl MasterHandle {
         Self { sender }
     }
 
+    pub async fn set_decode_log_level(&mut self, level: DecodeLogLevel) {
+        self.sender
+            .send(Message::SetDecodeLogLevel(level))
+            .await
+            .ok();
+    }
+
     pub async fn add_association(
         &mut self,
         association: Association,
@@ -51,10 +60,7 @@ impl MasterHandle {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
         if self
             .sender
-            .send(Message::AddAssociation(
-                association,
-                CallbackOnce::OneShot(tx),
-            ))
+            .send(Message::AddAssociation(association, Promise::OneShot(tx)))
             .await
             .is_err()
         {
@@ -91,7 +97,7 @@ impl AssociationHandle {
 
     pub async fn operate(&mut self, mode: CommandMode, headers: CommandHeaders) -> CommandResult {
         let (tx, rx) = tokio::sync::oneshot::channel::<CommandResult>();
-        self.send_operate_message(mode, headers, CallbackOnce::OneShot(tx))
+        self.send_operate_message(mode, headers, Promise::OneShot(tx))
             .await;
         rx.await?
     }
@@ -100,7 +106,7 @@ impl AssociationHandle {
     where
         F: FnOnce(CommandResult) -> () + Send + Sync + 'static,
     {
-        self.send_operate_message(mode, headers, CallbackOnce::BoxedFn(Box::new(callback)))
+        self.send_operate_message(mode, headers, Promise::BoxedFn(Box::new(callback)))
             .await;
     }
 
@@ -124,19 +130,19 @@ pub trait ResponseHandler: Send {
     fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
 }
 
-/// A generic callback type that can only be invoked once.
+/// A generic callback type that must be invoked once and only once.
 /// The user can select to implement it using FnOnce or a
 /// one-shot reply channel
-pub enum CallbackOnce<T> {
+pub enum Promise<T> {
     BoxedFn(Box<dyn FnOnce(T) -> () + Send + Sync>),
     OneShot(tokio::sync::oneshot::Sender<T>),
 }
 
-impl<T> CallbackOnce<T> {
+impl<T> Promise<T> {
     pub(crate) fn complete(self, value: T) {
         match self {
-            CallbackOnce::BoxedFn(func) => func(value),
-            CallbackOnce::OneShot(s) => {
+            Promise::BoxedFn(func) => func(value),
+            Promise::OneShot(s) => {
                 s.send(value).ok();
             }
         }
@@ -144,7 +150,7 @@ impl<T> CallbackOnce<T> {
 }
 
 pub type CommandResult = Result<(), CommandError>;
-pub type CommandCallback = CallbackOnce<CommandResult>;
+pub type CommandCallback = Promise<CommandResult>;
 
 pub trait AssociationHandler: ResponseHandler {
     // TODO - add additional methods

@@ -12,9 +12,9 @@ use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
 
-/// Controls how parsed ASDUs are logged
+/// Controls how transmitted and received ASDUs are logged
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ParseLogLevel {
+pub enum DecodeLogLevel {
     /// Log nothing
     Nothing,
     /// Log the header-only
@@ -26,21 +26,21 @@ pub enum ParseLogLevel {
 }
 
 #[derive(Copy, Clone)]
-pub struct ParseSettings {
+pub struct DecodeSettings {
     is_transmit: bool,
-    level: ParseLogLevel,
+    level: DecodeLogLevel,
 }
 
-impl ParseLogLevel {
-    pub fn transmit(self) -> ParseSettings {
-        ParseSettings {
+impl DecodeLogLevel {
+    pub fn transmit(self) -> DecodeSettings {
+        DecodeSettings {
             is_transmit: true,
             level: self,
         }
     }
 
-    pub fn receive(self) -> ParseSettings {
-        ParseSettings {
+    pub fn receive(self) -> DecodeSettings {
+        DecodeSettings {
             is_transmit: false,
             level: self,
         }
@@ -93,23 +93,23 @@ pub struct ParsedFragment<'a> {
 impl<'a> ParsedFragment<'a> {
     pub(crate) fn display_view(
         &'a self,
-        settings: ParseSettings,
+        settings: DecodeSettings,
     ) -> Option<ParsedFragmentDisplay<'a>> {
         match settings.level {
-            ParseLogLevel::Nothing => None,
-            ParseLogLevel::Header => Some(ParsedFragmentDisplay {
+            DecodeLogLevel::Nothing => None,
+            DecodeLogLevel::Header => Some(ParsedFragmentDisplay {
                 is_transmit: settings.is_transmit,
                 format_objects_headers: false,
                 format_object_values: false,
                 fragment: self,
             }),
-            ParseLogLevel::ObjectHeaders => Some(ParsedFragmentDisplay {
+            DecodeLogLevel::ObjectHeaders => Some(ParsedFragmentDisplay {
                 is_transmit: settings.is_transmit,
                 format_objects_headers: true,
                 format_object_values: false,
                 fragment: self,
             }),
-            ParseLogLevel::ObjectValues => Some(ParsedFragmentDisplay {
+            DecodeLogLevel::ObjectValues => Some(ParsedFragmentDisplay {
                 is_transmit: settings.is_transmit,
                 format_objects_headers: true,
                 format_object_values: true,
@@ -159,7 +159,7 @@ impl<'a> ParsedFragment<'a> {
         })
     }
 
-    pub fn to_response(&self) -> Result<Response<'a>, ResponseValidationError> {
+    pub(crate) fn to_response(&self) -> Result<Response<'a>, ResponseValidationError> {
         let (unsolicited, iin) = match (self.function, self.iin) {
             (FunctionCode::Response, Some(x)) => (false, x),
             (FunctionCode::UnsolicitedResponse, Some(x)) => (true, x),
@@ -212,7 +212,7 @@ impl<'a> ParsedFragment<'a> {
         Ok(fragment)
     }
 
-    pub fn parse(settings: ParseSettings, fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
+    pub fn parse(settings: DecodeSettings, fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
         let result = Self::parse_no_logging(fragment);
         match &result {
             Ok(fragment) => {
@@ -677,7 +677,7 @@ mod test {
 
     fn test_request_validation_error(input: &[u8], err: RequestValidationError) {
         assert_eq!(
-            ParsedFragment::parse(ParseLogLevel::Nothing.receive(), input)
+            ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), input)
                 .unwrap()
                 .to_request()
                 .err()
@@ -688,7 +688,7 @@ mod test {
 
     fn test_response_validation_error(input: &[u8], err: ResponseValidationError) {
         assert_eq!(
-            ParsedFragment::parse(ParseLogLevel::Nothing.receive(), input)
+            ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), input)
                 .unwrap()
                 .to_response()
                 .err()
@@ -721,7 +721,7 @@ mod test {
     #[test]
     fn parses_valid_request() {
         let fragment = &[0xC2, 0x02, 0xAA];
-        let request = ParsedFragment::parse(ParseLogLevel::Nothing.receive(), fragment)
+        let request = ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), fragment)
             .unwrap()
             .to_request()
             .unwrap();
@@ -747,7 +747,7 @@ mod test {
     #[test]
     fn parses_valid_unsolicited_response() {
         let fragment = &[0b11010010, 0x82, 0xFF, 0xAA, 0x01, 0x02];
-        let response = ParsedFragment::parse(ParseLogLevel::Nothing.receive(), fragment)
+        let response = ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), fragment)
             .unwrap()
             .to_response()
             .unwrap();
@@ -802,7 +802,7 @@ mod test {
     fn confirms_may_or_may_not_have_uns_set() {
         {
             let request =
-                ParsedFragment::parse(ParseLogLevel::Nothing.receive(), &[0b11010000, 0x00])
+                ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), &[0b11010000, 0x00])
                     .unwrap()
                     .to_request()
                     .unwrap();
@@ -811,7 +811,7 @@ mod test {
         }
         {
             let request =
-                ParsedFragment::parse(ParseLogLevel::Nothing.receive(), &[0b11000000, 0x00])
+                ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), &[0b11000000, 0x00])
                     .unwrap()
                     .to_request()
                     .unwrap();

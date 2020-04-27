@@ -1,6 +1,6 @@
 use dnp3rs::app::gen::enums::OpType;
 use dnp3rs::app::gen::variations::fixed::Group12Var1;
-use dnp3rs::app::parse::parser::ParseLogLevel;
+use dnp3rs::app::parse::parser::DecodeLogLevel;
 use dnp3rs::master::association::{Association, AssociationConfig};
 use dnp3rs::master::null::NullHandler;
 use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // spawn the master onto another task
     let mut master = MasterTask::spawn(
         1,
-        ParseLogLevel::ObjectValues,
+        DecodeLogLevel::ObjectValues,
         ReconnectStrategy::default(),
         Timeout::from_secs(1).unwrap(),
         SocketAddr::from_str("127.0.0.1:20000")?,

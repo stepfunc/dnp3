@@ -1,5 +1,5 @@
 use crate::app::format::write;
-use crate::app::parse::parser::{ParseLogLevel, ParsedFragment, Response};
+use crate::app::parse::parser::{DecodeLogLevel, ParsedFragment, Response};
 use crate::app::sequence::Sequence;
 use crate::master::task::{
     NonReadTask, NonReadTaskStatus, ReadTask, RequestWriter, Task, TaskType,
@@ -12,10 +12,11 @@ use crate::util::cursor::WriteCursor;
 
 use crate::app::format::write::start_request;
 use crate::master::association::{AssociationMap, Next};
-use crate::master::handle::Message;
+use crate::master::handle::{CommandCallback, Message};
 use crate::util::timeout::Timeout;
 
 use crate::master::error::{CommandError, Shutdown, TaskError};
+use crate::master::types::{CommandHeaders, CommandMode};
 use std::collections::VecDeque;
 use std::ops::Add;
 use std::time::{Duration, Instant};
@@ -28,7 +29,7 @@ pub(crate) enum RunError {
 }
 
 pub(crate) struct Runner {
-    level: ParseLogLevel,
+    level: DecodeLogLevel,
     timeout: Timeout,
     associations: AssociationMap,
     user_queue: tokio::sync::mpsc::Receiver<Message>,
@@ -44,7 +45,7 @@ enum ReadResponseAction {
 
 impl Runner {
     pub(crate) fn new(
-        level: ParseLogLevel,
+        level: DecodeLogLevel,
         response_timeout: Timeout,
         user_queue: tokio::sync::mpsc::Receiver<Message>,
     ) -> Self {
@@ -74,7 +75,7 @@ impl Runner {
     {
         loop {
             tokio::select! {
-                result = self.process_message_while_connected() => {
+                result = self.process_message(true) => {
                    // we need to recheck the tasks
                    return Ok(result?);
                 }
@@ -100,7 +101,7 @@ impl Runner {
     {
         loop {
             tokio::select! {
-                result = self.process_message_while_connected() => {
+                result = self.process_message(true) => {
                    // we need to recheck the tasks
                    return Ok(result?);
                 }
@@ -152,42 +153,16 @@ impl Runner {
         Ok(())
     }
 
-    async fn process_message_while_connected(&mut self) -> Result<(), Shutdown> {
+    async fn process_message(&mut self, is_connected: bool) -> Result<(), Shutdown> {
         match self.user_queue.recv().await {
             Some(x) => {
                 match x {
-                    Message::Command(address, mode, headers, handler) => {
-                        match self.associations.get(address).ok() {
-                            Some(association) => {
-                                self.command_queue
-                                    .push_back(association.operate(mode, headers, handler));
-                            }
-                            None => {
-                                log::warn!(
-                                    "no association for command request with address: {}",
-                                    address
-                                );
-                                handler.complete(Err(TaskError::NoSuchAssociation(address).into()));
-                            }
+                    Message::Command(address, mode, headers, callback) => {
+                        if is_connected {
+                            self.queue_command(address, mode, headers, callback);
+                        } else {
+                            callback.complete(Err(CommandError::Task(TaskError::NoConnection)));
                         }
-                    }
-                    Message::AddAssociation(association, callback) => {
-                        callback.complete(self.associations.register(association));
-                    }
-                    Message::RemoveAssociation(address) => self.associations.remove(address),
-                }
-                Ok(())
-            }
-            None => Err(Shutdown),
-        }
-    }
-
-    async fn process_message_while_disconnected(&mut self) -> Result<(), Shutdown> {
-        match self.user_queue.recv().await {
-            Some(x) => {
-                match x {
-                    Message::Command(_, _, _, callback) => {
-                        callback.complete(Err(CommandError::Task(TaskError::NoConnection)));
                     }
                     Message::AddAssociation(association, callback) => {
                         callback.complete(self.associations.register(association));
@@ -195,10 +170,35 @@ impl Runner {
                     Message::RemoveAssociation(address) => {
                         self.associations.remove(address);
                     }
+                    Message::SetDecodeLogLevel(level) => {
+                        self.level = level;
+                    }
                 };
                 Ok(())
             }
             None => Err(Shutdown),
+        }
+    }
+
+    fn queue_command(
+        &mut self,
+        address: u16,
+        mode: CommandMode,
+        headers: CommandHeaders,
+        callback: CommandCallback,
+    ) {
+        match self.associations.get(address).ok() {
+            Some(association) => {
+                self.command_queue
+                    .push_back(association.operate(mode, headers, callback));
+            }
+            None => {
+                log::warn!(
+                    "no association for command request with address: {}",
+                    address
+                );
+                callback.complete(Err(TaskError::NoSuchAssociation(address).into()));
+            }
         }
     }
 
@@ -301,7 +301,7 @@ impl Runner {
 
         loop {
             tokio::select! {
-                result = self.process_message_while_disconnected() => {
+                result = self.process_message(false) => {
                    result?;
                 }
                 _ = tokio::time::delay_until(tokio::time::Instant::from_std(deadline)) => {
@@ -637,13 +637,11 @@ impl Runner {
                          log::warn!("no response within timeout: {}", self.timeout);
                          return Err(TaskError::ResponseTimeout);
                     }
-                    //
                     x = reader.read(io)  => {
                         return Ok(x?);
                     }
-                    // unless shutdown, proceed to next event
-                    y = self.process_message_while_connected() => {
-                        y?;
+                    y = self.process_message(true) => {
+                        y?; // unless shutdown, proceed to next event
                     }
             }
         }
@@ -663,7 +661,7 @@ mod test {
     #[tokio::test]
     async fn performs_startup_sequence_with_device_restart_asserted() {
         let (tx, rx) = tokio::sync::mpsc::channel(1);
-        let mut runner = Runner::new(ParseLogLevel::Nothing, Timeout::from_secs(1).unwrap(), rx);
+        let mut runner = Runner::new(DecodeLogLevel::Nothing, Timeout::from_secs(1).unwrap(), rx);
         let mut master = MasterHandle::new(tx);
 
         let (mut io, _handle) = Builder::new()

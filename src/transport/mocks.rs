@@ -1,4 +1,4 @@
-use crate::app::parse::parser::ParseLogLevel;
+use crate::app::parse::parser::DecodeLogLevel;
 use crate::link::error::LinkError;
 use crate::link::header::Address;
 use crate::transport::assembler::Fragment;
@@ -35,7 +35,7 @@ impl MockWriter {
     // just write the fragment directly to the I/O
     pub async fn write<W>(
         &mut self,
-        _level: ParseLogLevel,
+        _level: DecodeLogLevel,
         io: &mut W,
         _destination: u16,
         fragment: &[u8],

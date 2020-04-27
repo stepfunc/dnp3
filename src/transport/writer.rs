@@ -1,4 +1,4 @@
-use crate::app::parse::parser::{ParseLogLevel, ParsedFragment};
+use crate::app::parse::parser::{DecodeLogLevel, ParsedFragment};
 use crate::link::error::LinkError;
 use crate::link::formatter::{LinkFormatter, Payload};
 use crate::transport::sequence::Sequence;
@@ -39,7 +39,7 @@ impl Writer {
 
     pub async fn write<W>(
         &mut self,
-        level: ParseLogLevel,
+        level: DecodeLogLevel,
         io: &mut W,
         destination: u16,
         fragment: &[u8],
@@ -47,7 +47,7 @@ impl Writer {
     where
         W: AsyncWrite + Unpin,
     {
-        if level != ParseLogLevel::Nothing {
+        if level != DecodeLogLevel::Nothing {
             ParsedFragment::parse(level.transmit(), fragment).ok();
         }
 
