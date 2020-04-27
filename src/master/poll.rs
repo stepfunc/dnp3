@@ -4,7 +4,8 @@ use crate::master::types::ReadRequest;
 use crate::util::cursor::WriteError;
 use crate::util::Smallest;
 use std::collections::BTreeMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use tokio::time::Instant;
 
 #[derive(Copy, Clone)]
 pub(crate) struct Poll {

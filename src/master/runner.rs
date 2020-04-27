@@ -19,8 +19,9 @@ use crate::master::error::{CommandError, Shutdown, TaskError};
 use crate::master::types::{CommandHeaders, CommandMode};
 use std::collections::VecDeque;
 use std::ops::Add;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
+use tokio::time::Instant;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum RunError {
@@ -83,7 +84,7 @@ impl Runner {
                    result?;
                    self.handle_fragment_while_idle(io, writer, reader).await?;
                 }
-                _ = tokio::time::delay_until(tokio::time::Instant::from_std(instant)) => {
+                _ = tokio::time::delay_until(instant) => {
                    return Ok(());
                 }
             }
@@ -304,7 +305,7 @@ impl Runner {
                 result = self.process_message(false) => {
                    result?;
                 }
-                _ = tokio::time::delay_until(tokio::time::Instant::from_std(deadline)) => {
+                _ = tokio::time::delay_until(deadline) => {
                    return Ok(());
                 }
             }
@@ -625,7 +626,7 @@ impl Runner {
     async fn read_next_response<T>(
         &mut self,
         io: &mut T,
-        deadline: tokio::time::Instant,
+        deadline: Instant,
         reader: &mut ReaderType,
     ) -> Result<(), TaskError>
     where

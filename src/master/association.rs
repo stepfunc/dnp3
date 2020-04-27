@@ -10,7 +10,8 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::types::{AutoRequest, CommandHeaders, CommandMode, EventClasses, ReadRequest};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use tokio::time::Instant;
 
 #[derive(Copy, Clone)]
 pub struct AssociationConfig {
@@ -81,6 +82,9 @@ impl TaskStates {
     }
 }
 
+/// A logical connection between a master and an outstation
+/// as defined by the DNP3 standard. A master manages requests
+/// and responses for multiple associations (i.e. multi-drop).
 pub struct Association {
     address: u16,
     seq: Sequence,
@@ -91,6 +95,10 @@ pub struct Association {
 }
 
 impl Association {
+    /// Create a new association:
+    /// * `address` is the DNP3 link-layer address of the outstation
+    /// * `config` controls the behavior of the master for this outstation
+    /// * `handler` is a callback trait invoked when events occur for this outstation
     pub fn new(
         address: u16,
         config: AssociationConfig,
@@ -106,6 +114,10 @@ impl Association {
         }
     }
 
+    /// Add a poll to the association
+    /// * `request` defines what data is being requested
+    /// * `period` defines how often the READ operation is performed. The first poll
+    /// is performed
     pub fn add_poll(&mut self, request: ReadRequest, period: Duration) {
         self.polls.add(request, period)
     }
@@ -252,7 +264,7 @@ impl AssociationMap {
     }
 
     pub(crate) fn next_task(&mut self) -> Next<Task> {
-        let now = std::time::Instant::now();
+        let now = Instant::now();
 
         let mut earliest = Smallest::<Instant>::new();
 
