@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         SocketAddr::from_str("127.0.0.1:20000")?,
     );
 
-    let mut association = master.add_association(get_association()).await.unwrap();
+    let mut association = master.add_association(get_association()).await?;
 
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 

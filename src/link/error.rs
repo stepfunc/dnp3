@@ -1,7 +1,8 @@
 use crate::util::cursor::WriteError;
 
-// these errors should never occur, but they are preferable to using
-// functions that could panic
+/// these errors should never occur, but they are preferable to using
+/// functions that could panic. If they ever were to happen, they indicate
+/// a buy in the library itself
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum LogicError {
     BadRead,
@@ -9,6 +10,9 @@ pub enum LogicError {
     BadSize,
 }
 
+/// Errors that can occur when parsing a link-layer frame. On session-oriented transports,
+/// such as TCP/TLS, these errors percolate up to the main master/outstation task and kill
+/// the communication session. On serial, they are just discarded.
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum FrameError {
     UnexpectedStart1(u8),
@@ -34,13 +38,31 @@ pub enum LinkError {
 impl std::fmt::Display for LinkError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            LinkError::IO(err) => write!(f, "{:?}", err),
-            LinkError::BadFrame(_err) => f.write_str("bad frame"),
-            LinkError::BadLogic(_err) => f.write_str("bad internal logic"),
-            /*
+            LinkError::IO(kind) => write!(f, "{}", std::io::Error::from(*kind)),
             LinkError::BadFrame(err) => write!(f, "{}", err),
             LinkError::BadLogic(err) => write!(f, "{}", err),
-            */
+        }
+    }
+}
+
+impl std::fmt::Display for FrameError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            FrameError::BadBodyCRC => f.write_str("bad CRC value in frame payload"),
+            FrameError::BadLength(x) => write!(f, "bad frame length: {}", x),
+            FrameError::BadHeaderCRC => f.write_str("bad CRC value in frame header"),
+            FrameError::UnexpectedStart1(x) => write!(f, "bad frame start1: {} != 0x05", x),
+            FrameError::UnexpectedStart2(x) => write!(f, "bad frame start1: {} != 0x64", x),
+        }
+    }
+}
+
+impl std::fmt::Display for LogicError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            LogicError::BadRead => f.write_str("read operation was out-of-bounds"),
+            LogicError::BadSize => f.write_str("size was out-of-bounds"),
+            LogicError::BadWrite => f.write_str("writer operation was out-of-bounds"),
         }
     }
 }

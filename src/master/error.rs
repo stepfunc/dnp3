@@ -4,6 +4,7 @@ use crate::link::error::LinkError;
 use crate::master::association::NoAssociation;
 use crate::master::runner::RunError;
 use crate::util::cursor::WriteError;
+use std::error::Error;
 
 /// Indicates that a task has shutdown
 pub(crate) struct Shutdown;
@@ -68,6 +69,21 @@ pub enum CommandError {
     Task(TaskError),
     /// task failed b/c of an unexpected response
     Response(CommandResponseError),
+}
+
+impl std::fmt::Display for AssociationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            AssociationError::Shutdown => {
+                f.write_str("operation failed b/c the master has been shutdown")
+            }
+            AssociationError::DuplicateAddress(address) => write!(
+                f,
+                "master already contains association with outstation address: {}",
+                address
+            ),
+        }
+    }
 }
 
 impl std::fmt::Display for CommandResponseError {
@@ -203,3 +219,8 @@ impl From<TaskError> for CommandError {
         CommandError::Task(err)
     }
 }
+
+impl Error for AssociationError {}
+impl Error for TaskError {}
+impl Error for CommandError {}
+impl Error for CommandResponseError {}
