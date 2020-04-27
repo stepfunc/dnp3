@@ -43,7 +43,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
             "n" => master.set_decode_log_level(DecodeLogLevel::Nothing).await,
-            "v" => master.set_decode_log_level(DecodeLogLevel::ObjectValues).await,
+            "v" => {
+                master
+                    .set_decode_log_level(DecodeLogLevel::ObjectValues)
+                    .await
+            }
             "c" => {
                 match association
                     .operate(

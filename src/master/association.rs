@@ -7,7 +7,7 @@ use crate::master::poll::{Poll, PollMap};
 use crate::master::task::{ReadTask, Task, TaskType};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
-use crate::master::types::{AutoRequest, CommandHeaders, CommandMode, EventClasses, ReadRequest};
+use crate::master::types::{CommandHeaders, CommandMode, EventClasses, ReadRequest};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use std::time::Duration;
@@ -306,21 +306,15 @@ impl Association {
     }
 
     fn clear_restart_iin(&self) -> Task {
-        Task::new(self.address, AutoTask::create(AutoRequest::ClearRestartBit))
+        Task::new(self.address, AutoTask::ClearRestartBit.wrap())
     }
 
     fn disable_unsolicited(&self, classes: EventClasses) -> Task {
-        Task::new(
-            self.address,
-            AutoTask::create(AutoRequest::DisableUnsolicited(classes)),
-        )
+        Task::new(self.address, AutoTask::DisableUnsolicited(classes).wrap())
     }
 
     fn enable_unsolicited(&self, classes: EventClasses) -> Task {
-        Task::new(
-            self.address,
-            AutoTask::create(AutoRequest::EnableUnsolicited(classes)),
-        )
+        Task::new(self.address, AutoTask::EnableUnsolicited(classes).wrap())
     }
 
     pub(crate) fn operate(

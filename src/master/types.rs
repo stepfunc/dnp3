@@ -1,5 +1,5 @@
 use crate::app::format::write::HeaderWriter;
-use crate::app::gen::enums::{CommandStatus, FunctionCode};
+use crate::app::gen::enums::CommandStatus;
 use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::variation::Variation;
@@ -128,13 +128,6 @@ pub enum ReadRequest {
     Range16(RangeScan<u16>),
 }
 
-#[derive(Clone)]
-pub(crate) enum AutoRequest {
-    ClearRestartBit,
-    EnableUnsolicited(EventClasses),
-    DisableUnsolicited(EventClasses),
-}
-
 impl ReadRequest {
     pub fn class_scan(scan: Classes) -> Self {
         ReadRequest::ClassScan(scan)
@@ -153,32 +146,6 @@ impl ReadRequest {
             ReadRequest::ClassScan(classes) => classes.write(writer),
             ReadRequest::Range8(scan) => scan.write(writer),
             ReadRequest::Range16(scan) => scan.write(writer),
-        }
-    }
-}
-
-impl AutoRequest {
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        match self {
-            AutoRequest::ClearRestartBit => writer.write_clear_restart(),
-            AutoRequest::EnableUnsolicited(classes) => classes.write(writer),
-            AutoRequest::DisableUnsolicited(classes) => classes.write(writer),
-        }
-    }
-
-    pub(crate) fn function(&self) -> FunctionCode {
-        match self {
-            AutoRequest::ClearRestartBit => FunctionCode::Write,
-            AutoRequest::EnableUnsolicited(_) => FunctionCode::EnabledUnsolicited,
-            AutoRequest::DisableUnsolicited(_) => FunctionCode::DisableUnsolicited,
-        }
-    }
-
-    pub(crate) fn description(&self) -> &'static str {
-        match self {
-            AutoRequest::ClearRestartBit => "clear restart IIN bit",
-            AutoRequest::EnableUnsolicited(_) => "enable unsolicited reporting",
-            AutoRequest::DisableUnsolicited(_) => "disable unsolicited reporting",
         }
     }
 }
