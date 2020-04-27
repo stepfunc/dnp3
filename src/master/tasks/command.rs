@@ -15,7 +15,7 @@ enum State {
 
 pub(crate) struct CommandTask {
     state: State,
-    headers: Vec<CommandHeader>,
+    headers: CommandHeaders,
     callback: CommandCallback,
 }
 
@@ -29,7 +29,7 @@ impl CommandMode {
 }
 
 impl CommandTask {
-    fn new(state: State, headers: Vec<CommandHeader>, callback: CommandCallback) -> Self {
+    fn new(state: State, headers: CommandHeaders, callback: CommandCallback) -> Self {
         Self {
             state,
             headers,
@@ -41,17 +41,13 @@ impl CommandTask {
         Self::get_non_read_task(state, self.headers, self.callback)
     }
 
-    fn get_task_type(
-        state: State,
-        headers: Vec<CommandHeader>,
-        callback: CommandCallback,
-    ) -> TaskType {
+    fn get_task_type(state: State, headers: CommandHeaders, callback: CommandCallback) -> TaskType {
         TaskType::NonRead(Self::get_non_read_task(state, headers, callback))
     }
 
     fn get_non_read_task(
         state: State,
-        headers: Vec<CommandHeader>,
+        headers: CommandHeaders,
         callback: CommandCallback,
     ) -> NonReadTask {
         NonReadTask::Command(CommandTask::new(state, headers, callback))
@@ -59,7 +55,7 @@ impl CommandTask {
 
     pub(crate) fn operate(
         mode: CommandMode,
-        headers: Vec<CommandHeader>,
+        headers: CommandHeaders,
         callback: CommandCallback,
     ) -> TaskType {
         Self::get_task_type(mode.to_state(), headers, callback)
@@ -74,28 +70,11 @@ impl CommandTask {
     }
 
     pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        for header in self.headers.iter() {
-            header.write(writer)?;
-        }
-
-        Ok(())
+        self.headers.write(writer)
     }
 
     fn compare(&self, headers: HeaderCollection) -> Result<(), CommandResponseError> {
-        let mut iter = headers.iter();
-
-        for sent in &self.headers {
-            match iter.next() {
-                None => return Err(CommandResponseError::HeaderCountMismatch),
-                Some(received) => sent.compare(received.details)?,
-            }
-        }
-
-        if iter.next().is_some() {
-            return Err(CommandResponseError::HeaderCountMismatch);
-        }
-
-        Ok(())
+        self.headers.compare(headers)
     }
 
     pub(crate) fn on_task_error(self, err: TaskError) {

@@ -4,12 +4,13 @@ use crate::app::parse::bytes::Bytes;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::association::Association;
 use crate::master::error::{AssociationError, CommandError, TaskError};
-use crate::master::types::{CommandHeader, CommandMode};
+use crate::master::types::{CommandHeaders, CommandMode};
 
 /// messages sent from the handles to the master task via an mpsc
 pub(crate) enum Message {
-    Command(u16, CommandMode, Vec<CommandHeader>, CommandCallback),
+    Command(u16, CommandMode, CommandHeaders, CommandCallback),
     AddAssociation(Association, CallbackOnce<Result<(), AssociationError>>),
+    RemoveAssociation(u16),
 }
 
 impl Message {
@@ -21,6 +22,7 @@ impl Message {
             Message::AddAssociation(_, callback) => {
                 callback.complete(Err(AssociationError::Shutdown))
             }
+            Message::RemoveAssociation(_) => {}
         }
     }
 }
@@ -61,6 +63,21 @@ impl MasterHandle {
         rx.await?
             .map(|_| (AssociationHandle::new(address, self.sender.clone())))
     }
+
+    pub async fn remove_association(
+        &mut self,
+        handle: AssociationHandle,
+    ) -> Result<(), AssociationError> {
+        if self
+            .sender
+            .send(Message::RemoveAssociation(handle.address))
+            .await
+            .is_err()
+        {
+            return Err(AssociationError::Shutdown);
+        }
+        Ok(())
+    }
 }
 
 impl AssociationHandle {
@@ -68,23 +85,19 @@ impl AssociationHandle {
         Self { address, sender }
     }
 
-    pub async fn operate(
-        &mut self,
-        mode: CommandMode,
-        headers: Vec<CommandHeader>,
-    ) -> CommandResult {
+    pub fn address(&self) -> u16 {
+        self.address
+    }
+
+    pub async fn operate(&mut self, mode: CommandMode, headers: CommandHeaders) -> CommandResult {
         let (tx, rx) = tokio::sync::oneshot::channel::<CommandResult>();
         self.send_operate_message(mode, headers, CallbackOnce::OneShot(tx))
             .await;
         rx.await?
     }
 
-    pub async fn operate_cb<F>(
-        &mut self,
-        mode: CommandMode,
-        headers: Vec<CommandHeader>,
-        callback: F,
-    ) where
+    pub async fn operate_cb<F>(&mut self, mode: CommandMode, headers: CommandHeaders, callback: F)
+    where
         F: FnOnce(CommandResult) -> () + Send + Sync + 'static,
     {
         self.send_operate_message(mode, headers, CallbackOnce::BoxedFn(Box::new(callback)))
@@ -94,7 +107,7 @@ impl AssociationHandle {
     async fn send_operate_message(
         &mut self,
         mode: CommandMode,
-        headers: Vec<CommandHeader>,
+        headers: CommandHeaders,
         callback: CommandCallback,
     ) {
         if let Err(tokio::sync::mpsc::error::SendError(msg)) = self

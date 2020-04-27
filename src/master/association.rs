@@ -7,7 +7,7 @@ use crate::master::poll::{Poll, PollMap};
 use crate::master::task::{ReadTask, Task, TaskType};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
-use crate::master::types::{AutoRequest, CommandHeader, CommandMode, EventClasses, ReadRequest};
+use crate::master::types::{AutoRequest, CommandHeaders, CommandMode, EventClasses, ReadRequest};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use std::time::{Duration, Instant};
@@ -194,8 +194,8 @@ impl Association {
     }
 }
 
-pub struct AssociationMap {
-    sessions: BTreeMap<u16, Association>,
+pub(crate) struct AssociationMap {
+    map: BTreeMap<u16, Association>,
     priority: VecDeque<u16>,
 }
 
@@ -211,44 +211,43 @@ pub(crate) struct NoAssociation {
 }
 
 impl AssociationMap {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            sessions: BTreeMap::new(),
+            map: BTreeMap::new(),
             priority: VecDeque::new(),
         }
     }
 
-    pub fn single(session: Association) -> Self {
-        let mut map = AssociationMap::new();
-        map.register(session).ok();
-        map
-    }
-
-    pub fn reset(&mut self) {
-        for session in &mut self.sessions.values_mut() {
+    pub(crate) fn reset(&mut self) {
+        for session in &mut self.map.values_mut() {
             session.tasks.reset();
         }
     }
 
-    pub fn register(&mut self, session: Association) -> Result<(), AssociationError> {
-        if self.sessions.contains_key(&session.address) {
+    pub(crate) fn register(&mut self, session: Association) -> Result<(), AssociationError> {
+        if self.map.contains_key(&session.address) {
             return Err(AssociationError::DuplicateAddress(session.address));
         }
 
         self.priority.push_back(session.address);
-        self.sessions.insert(session.address, session);
+        self.map.insert(session.address, session);
         Ok(())
     }
 
+    pub(crate) fn remove(&mut self, address: u16) {
+        self.map.remove(&address);
+        self.priority.retain(|x| *x != address);
+    }
+
     pub(crate) fn get(&mut self, address: u16) -> Result<&Association, NoAssociation> {
-        match self.sessions.get(&address) {
+        match self.map.get(&address) {
             Some(x) => Ok(x),
             None => Err(NoAssociation { address }),
         }
     }
 
     pub(crate) fn get_mut(&mut self, address: u16) -> Result<&mut Association, NoAssociation> {
-        match self.sessions.get_mut(&address) {
+        match self.map.get_mut(&address) {
             Some(x) => Ok(x),
             None => Err(NoAssociation { address }),
         }
@@ -262,7 +261,7 @@ impl AssociationMap {
         // don't try to rotate the tasks more times than the length of the queue
         for index in 0..self.priority.len() {
             if let Some(address) = self.priority.get(index) {
-                if let Some(session) = self.sessions.get(address) {
+                if let Some(session) = self.map.get(address) {
                     match session.next_request(now) {
                         Next::Now(request) => {
                             // just before returning, move this session to last priority
@@ -317,7 +316,7 @@ impl Association {
     pub(crate) fn operate(
         &self,
         mode: CommandMode,
-        headers: Vec<CommandHeader>,
+        headers: CommandHeaders,
         callback: CommandCallback,
     ) -> Task {
         Task::new(self.address, CommandTask::operate(mode, headers, callback))

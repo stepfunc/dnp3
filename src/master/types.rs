@@ -4,7 +4,7 @@ use crate::app::gen::variations::fixed::*;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::variation::Variation;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::HeaderDetails;
+use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::master::error::CommandResponseError;
@@ -277,6 +277,37 @@ impl Command for Group41Var4 {
     }
 }
 
+pub struct CommandHeaders {
+    headers: Vec<CommandHeader>,
+}
+
+impl CommandHeaders {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        for header in self.headers.iter() {
+            header.write(writer)?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn compare(&self, headers: HeaderCollection) -> Result<(), CommandResponseError> {
+        let mut iter = headers.iter();
+
+        for sent in &self.headers {
+            match iter.next() {
+                None => return Err(CommandResponseError::HeaderCountMismatch),
+                Some(received) => sent.compare(received.details)?,
+            }
+        }
+
+        if iter.next().is_some() {
+            return Err(CommandResponseError::HeaderCountMismatch);
+        }
+
+        Ok(())
+    }
+}
+
 pub struct CommandBuilder {
     headers: Vec<CommandHeader>,
 }
@@ -296,8 +327,20 @@ impl CommandBuilder {
         self.headers.push(command.to_header(index));
     }
 
-    pub fn build(self) -> Vec<CommandHeader> {
-        self.headers
+    pub fn single<C, I>(command: C, index: I) -> CommandHeaders
+    where
+        C: Command,
+        I: Index,
+    {
+        let mut builder = Self::new();
+        builder.add(command, index);
+        builder.build()
+    }
+
+    pub fn build(self) -> CommandHeaders {
+        CommandHeaders {
+            headers: self.headers,
+        }
     }
 }
 

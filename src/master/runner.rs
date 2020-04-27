@@ -180,6 +180,10 @@ impl Runner {
                     callback.complete(self.associations.register(association));
                     Ok(true)
                 }
+                Message::RemoveAssociation(address) => {
+                    self.associations.remove(address);
+                    Ok(false)
+                }
             },
             None => Err(Shutdown),
         }
@@ -187,16 +191,20 @@ impl Runner {
 
     async fn process_message_while_disconnected(&mut self) -> Result<(), Shutdown> {
         match self.user_queue.recv().await {
-            Some(x) => match x {
-                Message::Command(_, _, _, callback) => {
-                    callback.complete(Err(CommandError::Task(TaskError::NoConnection)));
-                    Ok(())
-                }
-                Message::AddAssociation(association, callback) => {
-                    callback.complete(self.associations.register(association));
-                    Ok(())
-                }
-            },
+            Some(x) => {
+                match x {
+                    Message::Command(_, _, _, callback) => {
+                        callback.complete(Err(CommandError::Task(TaskError::NoConnection)));
+                    }
+                    Message::AddAssociation(association, callback) => {
+                        callback.complete(self.associations.register(association));
+                    }
+                    Message::RemoveAssociation(address) => {
+                        self.associations.remove(address);
+                    }
+                };
+                Ok(())
+            }
             None => Err(Shutdown),
         }
     }

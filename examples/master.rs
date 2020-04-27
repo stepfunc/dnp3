@@ -4,9 +4,7 @@ use dnp3rs::app::parse::parser::ParseLogLevel;
 use dnp3rs::master::association::{Association, AssociationConfig};
 use dnp3rs::master::null::NullHandler;
 use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
-use dnp3rs::master::types::{
-    Classes, CommandBuilder, CommandHeader, CommandMode, EventClasses, ReadRequest,
-};
+use dnp3rs::master::types::{Classes, CommandBuilder, CommandMode, EventClasses, ReadRequest};
 use dnp3rs::util::timeout::Timeout;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -22,12 +20,6 @@ fn get_association() -> Association {
         Duration::from_secs(5),
     );
     association
-}
-
-fn get_command(command: Group12Var1, index: u16) -> Vec<CommandHeader> {
-    let mut builder = CommandBuilder::new();
-    builder.add(command, index);
-    builder.build()
 }
 
 #[tokio::main(threaded_scheduler)]
@@ -51,9 +43,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
             "c" => {
-                let headers = get_command(Group12Var1::from_op_type(OpType::LatchOn), 3);
                 match association
-                    .operate(CommandMode::SelectBeforeOperate, headers)
+                    .operate(
+                        CommandMode::SelectBeforeOperate,
+                        CommandBuilder::single(Group12Var1::from_op_type(OpType::LatchOn), 3u16),
+                    )
                     .await
                 {
                     Ok(()) => log::info!("success"),
