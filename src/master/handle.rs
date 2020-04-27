@@ -8,7 +8,7 @@ use crate::master::types::{CommandHeaders, CommandMode};
 
 /// messages sent from the handles to the master task via an mpsc
 pub(crate) enum Message {
-    Command(u16, CommandMode, CommandHeaders, CommandCallback),
+    Command(u16, CommandMode, CommandHeaders, Promise<CommandResult>),
     AddAssociation(Association, Promise<Result<(), AssociationError>>),
     RemoveAssociation(u16),
     SetDecodeLogLevel(DecodeLogLevel),
@@ -17,11 +17,9 @@ pub(crate) enum Message {
 impl Message {
     pub(crate) fn on_send_failure(self) {
         match self {
-            Message::Command(_, _, _, callback) => {
-                callback.complete(Err(TaskError::Shutdown.into()))
-            }
-            Message::AddAssociation(_, callback) => {
-                callback.complete(Err(AssociationError::Shutdown))
+            Message::Command(_, _, _, promise) => promise.complete(Err(TaskError::Shutdown.into())),
+            Message::AddAssociation(_, promise) => {
+                promise.complete(Err(AssociationError::Shutdown))
             }
             Message::RemoveAssociation(_) => {}
             Message::SetDecodeLogLevel(_) => {}
@@ -114,11 +112,11 @@ impl AssociationHandle {
         &mut self,
         mode: CommandMode,
         headers: CommandHeaders,
-        callback: CommandCallback,
+        promise: Promise<CommandResult>,
     ) {
         if let Err(tokio::sync::mpsc::error::SendError(msg)) = self
             .sender
-            .send(Message::Command(self.address, mode, headers, callback))
+            .send(Message::Command(self.address, mode, headers, promise))
             .await
         {
             msg.on_send_failure();
@@ -150,7 +148,6 @@ impl<T> Promise<T> {
 }
 
 pub type CommandResult = Result<(), CommandError>;
-pub type CommandCallback = Promise<CommandResult>;
 
 pub trait AssociationHandler: ResponseHandler {
     // TODO - add additional methods

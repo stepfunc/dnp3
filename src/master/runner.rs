@@ -12,7 +12,7 @@ use crate::util::cursor::WriteCursor;
 
 use crate::app::format::write::start_request;
 use crate::master::association::{AssociationMap, Next};
-use crate::master::handle::{CommandCallback, Message};
+use crate::master::handle::{CommandResult, Message, Promise};
 use crate::util::timeout::Timeout;
 
 use crate::master::error::{CommandError, Shutdown, TaskError};
@@ -185,19 +185,19 @@ impl Runner {
         address: u16,
         mode: CommandMode,
         headers: CommandHeaders,
-        callback: CommandCallback,
+        promise: Promise<CommandResult>,
     ) {
         match self.associations.get(address).ok() {
             Some(association) => {
                 self.command_queue
-                    .push_back(association.operate(mode, headers, callback));
+                    .push_back(association.operate(mode, headers, promise));
             }
             None => {
                 log::warn!(
                     "no association for command request with address: {}",
                     address
                 );
-                callback.complete(Err(TaskError::NoSuchAssociation(address).into()));
+                promise.complete(Err(TaskError::NoSuchAssociation(address).into()));
             }
         }
     }

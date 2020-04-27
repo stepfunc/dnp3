@@ -2,7 +2,7 @@ use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::error::AssociationError;
-use crate::master::handle::{AssociationHandler, CommandCallback};
+use crate::master::handle::{AssociationHandler, CommandResult, Promise};
 use crate::master::poll::{Poll, PollMap};
 use crate::master::task::{ReadTask, Task, TaskType};
 use crate::master::tasks::auto::AutoTask;
@@ -317,8 +317,8 @@ impl Association {
         &self,
         mode: CommandMode,
         headers: CommandHeaders,
-        callback: CommandCallback,
+        promise: Promise<CommandResult>,
     ) -> Task {
-        Task::new(self.address, CommandTask::operate(mode, headers, callback))
+        Task::new(self.address, CommandTask::operate(mode, headers, promise))
     }
 }
