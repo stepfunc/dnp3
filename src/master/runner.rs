@@ -75,10 +75,8 @@ impl Runner {
         loop {
             tokio::select! {
                 result = self.process_message_while_connected() => {
-                   if result? {
-                       // we need to recheck the tasks
-                       return Ok(());
-                   }
+                   // we need to recheck the tasks
+                   return Ok(result?);
                 }
                 result = reader.read(io) => {
                    result?;
@@ -103,10 +101,8 @@ impl Runner {
         loop {
             tokio::select! {
                 result = self.process_message_while_connected() => {
-                   if result? {
-                       // we need to recheck the tasks
-                       return Ok(());
-                   }
+                   // we need to recheck the tasks
+                   return Ok(result?);
                 }
                 result = reader.read(io) => {
                    result?;
@@ -156,35 +152,32 @@ impl Runner {
         Ok(())
     }
 
-    async fn process_message_while_connected(&mut self) -> Result<bool, Shutdown> {
+    async fn process_message_while_connected(&mut self) -> Result<(), Shutdown> {
         match self.user_queue.recv().await {
-            Some(x) => match x {
-                Message::Command(address, mode, headers, handler) => {
-                    match self.associations.get(address).ok() {
-                        Some(association) => {
-                            self.command_queue
-                                .push_back(association.operate(mode, headers, handler));
-                            Ok(true)
-                        }
-                        None => {
-                            log::warn!(
-                                "no association for command request with address: {}",
-                                address
-                            );
-                            handler.complete(Err(TaskError::NoSuchAssociation(address).into()));
-                            Ok(false)
+            Some(x) => {
+                match x {
+                    Message::Command(address, mode, headers, handler) => {
+                        match self.associations.get(address).ok() {
+                            Some(association) => {
+                                self.command_queue
+                                    .push_back(association.operate(mode, headers, handler));
+                            }
+                            None => {
+                                log::warn!(
+                                    "no association for command request with address: {}",
+                                    address
+                                );
+                                handler.complete(Err(TaskError::NoSuchAssociation(address).into()));
+                            }
                         }
                     }
+                    Message::AddAssociation(association, callback) => {
+                        callback.complete(self.associations.register(association));
+                    }
+                    Message::RemoveAssociation(address) => self.associations.remove(address),
                 }
-                Message::AddAssociation(association, callback) => {
-                    callback.complete(self.associations.register(association));
-                    Ok(true)
-                }
-                Message::RemoveAssociation(address) => {
-                    self.associations.remove(address);
-                    Ok(false)
-                }
-            },
+                Ok(())
+            }
             None => Err(Shutdown),
         }
     }
