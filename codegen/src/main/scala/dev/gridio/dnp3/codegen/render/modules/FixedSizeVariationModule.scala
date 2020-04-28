@@ -163,7 +163,7 @@ object FixedSizeVariationModule extends Module {
     def writeField(f : FixedSizeField) : String = {
       def write(suffix: String) = s"cursor.write_${getCursorSuffix(f.typ)}(self.${f.name}${suffix})?;"
       f.typ match {
-        case _ : EnumFieldType => write(".as_u8()")
+        case _ : EnumFieldType => s"self.${f.name}.write(cursor)?;"
         case CustomFieldTypeU8(name) => write(".as_u8()")
         case TimestampField => s"self.${f.name}.write(cursor)?;"
         case _ => write("")

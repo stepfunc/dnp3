@@ -55,7 +55,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Err(err) = association
                     .operate(
                         CommandMode::SelectBeforeOperate,
-                        CommandBuilder::single(Group12Var1::from_op_type(OpType::LatchOn), 3u16),
+                        CommandBuilder::single_u16_header(
+                            Group12Var1::from_op_type(OpType::LatchOn),
+                            3u16,
+                        ),
                     )
                     .await
                 {

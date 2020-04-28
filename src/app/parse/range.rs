@@ -40,7 +40,7 @@ impl Range {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct RangedSequence<'a, T>
+pub(crate) struct RangedSequence<'a, T>
 where
     T: FixedSize,
 {
@@ -66,10 +66,6 @@ where
         Self::new(Range::empty(), &[])
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.data.is_empty()
-    }
-
     pub(crate) fn new(range: Range, data: &'a [u8]) -> Self {
         Self {
             range,
@@ -78,7 +74,7 @@ where
         }
     }
 
-    pub fn iter(&self) -> RangeIterator<'a, T> {
+    pub(crate) fn iter(&self) -> RangeIterator<'a, T> {
         RangeIterator {
             index: self.range.start,
             remaining: self.range.count,
@@ -88,7 +84,7 @@ where
     }
 }
 
-pub struct RangeIterator<'a, T> {
+pub(crate) struct RangeIterator<'a, T> {
     index: u16,
     remaining: usize,
     cursor: ReadCursor<'a>,

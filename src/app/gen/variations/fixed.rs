@@ -681,7 +681,7 @@ impl FixedSize for Group43Var8 {
         )
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         cursor.write_f64_le(self.value)?;
         self.time.write(cursor)?;
         Ok(())
@@ -700,7 +700,7 @@ impl FixedSize for Group43Var7 {
         )
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         cursor.write_f32_le(self.value)?;
         self.time.write(cursor)?;
         Ok(())
@@ -718,7 +718,7 @@ impl FixedSize for Group43Var6 {
         )
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         cursor.write_f64_le(self.value)?;
         Ok(())
     }
@@ -735,7 +735,7 @@ impl FixedSize for Group43Var5 {
         )
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         cursor.write_f32_le(self.value)?;
         Ok(())
     }
@@ -753,7 +753,7 @@ impl FixedSize for Group43Var4 {
         )
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         cursor.write_i16_le(self.value)?;
         self.time.write(cursor)?;
         Ok(())
@@ -772,7 +772,7 @@ impl FixedSize for Group43Var3 {
         )
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         cursor.write_i32_le(self.value)?;
         self.time.write(cursor)?;
         Ok(())
@@ -790,7 +790,7 @@ impl FixedSize for Group43Var2 {
         )
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         cursor.write_i16_le(self.value)?;
         Ok(())
     }
@@ -807,7 +807,7 @@ impl FixedSize for Group43Var1 {
         )
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         cursor.write_i32_le(self.value)?;
         Ok(())
     }
@@ -969,7 +969,7 @@ impl FixedSize for Group41Var4 {
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_f64_le(self.value)?;
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         Ok(())
     }
 }
@@ -986,7 +986,7 @@ impl FixedSize for Group41Var3 {
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_f32_le(self.value)?;
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         Ok(())
     }
 }
@@ -1003,7 +1003,7 @@ impl FixedSize for Group41Var2 {
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_i16_le(self.value)?;
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         Ok(())
     }
 }
@@ -1020,7 +1020,7 @@ impl FixedSize for Group41Var1 {
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_i32_le(self.value)?;
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         Ok(())
     }
 }
@@ -1695,7 +1695,7 @@ impl FixedSize for Group12Var1 {
         cursor.write_u8(self.count)?;
         cursor.write_u32_le(self.on_time)?;
         cursor.write_u32_le(self.off_time)?;
-        cursor.write_u8(self.status.as_u8())?;
+        self.status.write(cursor)?;
         Ok(())
     }
 }

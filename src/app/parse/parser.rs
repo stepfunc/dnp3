@@ -975,14 +975,14 @@ mod test {
         assert_matches!(
             headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
-                assert!(seq.is_empty())
+                assert!(seq.iter().next().is_none())
             }
         );
 
         assert_matches!(
             headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(07, 09, RangedVariation::Group1Var2(seq)) => {
-                assert!(seq.is_empty())
+                assert!(seq.iter().next().is_none())
             }
         );
 
