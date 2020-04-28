@@ -1,5 +1,5 @@
 [package]
-name = "dnp3rs"
+name = "dnp3"
 version = "0.1.0"
 authors = ["Adam Crain <jadamcrain@automatak.com>"]
 edition = "2018"

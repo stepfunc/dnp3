@@ -1,11 +1,11 @@
-use dnp3rs::app::gen::enums::OpType;
-use dnp3rs::app::gen::variations::fixed::Group12Var1;
-use dnp3rs::app::parse::parser::DecodeLogLevel;
-use dnp3rs::app::timeout::Timeout;
-use dnp3rs::master::association::{Association, Configuration};
-use dnp3rs::master::null::NullHandler;
-use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
-use dnp3rs::master::types::{
+use dnp3::app::gen::enums::OpType;
+use dnp3::app::gen::variations::fixed::Group12Var1;
+use dnp3::app::parse::parser::DecodeLogLevel;
+use dnp3::app::timeout::Timeout;
+use dnp3::master::association::{Association, Configuration};
+use dnp3::master::null::NullHandler;
+use dnp3::master::tcp::{MasterTask, ReconnectStrategy};
+use dnp3::master::types::{
     Classes, CommandBuilder, CommandMode, EventClasses, ReadRequest, TimeSyncProcedure,
 };
 use std::net::SocketAddr;
