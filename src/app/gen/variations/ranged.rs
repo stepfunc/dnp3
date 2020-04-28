@@ -22,7 +22,7 @@ use crate::app::gen::enums::QualifierCode;
 use crate::app::parse::error::ObjectParseError;
 
 #[derive(Debug, PartialEq)]
-pub enum RangedVariation<'a> {
+pub(crate) enum RangedVariation<'a> {
     /// Binary Input - Any Variation
     Group1Var0,
     /// Binary Input - Packed Format

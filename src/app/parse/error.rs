@@ -32,9 +32,10 @@ pub enum ObjectParseError {
     ZeroLengthOctetData,
 }
 
+/*
 /// errors that occur when interpreting a header as a request header
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum RequestValidationError {
+pub(crate) enum RequestValidationError {
     /// function code not allowed in requests
     UnexpectedFunction(FunctionCode),
     /// request with either FIR or FIN == 0
@@ -42,6 +43,7 @@ pub enum RequestValidationError {
     /// request with an UNS bit that doesn't match the function code (only allowed in Confirm)
     UnexpectedUnsBit(FunctionCode),
 }
+*/
 
 /// errors that occur when interpreting a header as a response header
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -100,6 +102,7 @@ impl std::fmt::Display for ObjectParseError {
     }
 }
 
+/*
 impl std::fmt::Display for RequestValidationError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
@@ -115,6 +118,7 @@ impl std::fmt::Display for RequestValidationError {
         }
     }
 }
+*/
 
 impl std::fmt::Display for ResponseValidationError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {

@@ -1,3 +1,5 @@
+use crate::link::header::Address;
+
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport reader during testing.
 /// If Rust eventually allows `async fn` in traits, this can be removed
@@ -19,6 +21,12 @@ pub(crate) mod header;
 pub(crate) mod reader;
 pub(crate) mod sequence;
 pub(crate) mod writer;
+
+#[derive(Debug)]
+pub(crate) struct Fragment<'a> {
+    pub(crate) address: Address,
+    pub(crate) data: &'a [u8],
+}
 
 pub(crate) mod constants {
     pub(crate) const FIN_MASK: u8 = 0b1000_0000;

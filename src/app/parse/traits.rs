@@ -25,7 +25,7 @@ pub trait Index: FixedSize + PartialEq + Display {
     const RANGE_QUALIFIER: QualifierCode;
 }
 
-pub trait FixedSizeVariation: FixedSize + PartialEq + Display {
+pub(crate) trait FixedSizeVariation: FixedSize + PartialEq + Display {
     const VARIATION: Variation;
 }
 

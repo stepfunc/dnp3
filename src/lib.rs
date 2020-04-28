@@ -10,7 +10,7 @@
 //! * Idiomatic C API for integration with legacy code
 
 #![deny(
-// dead_code,
+dead_code,
 arithmetic_overflow,
 invalid_type_param_default,
 missing_fragment_specifier,
@@ -64,9 +64,10 @@ extern crate assert_matches;
 
 /// application layer
 pub mod app;
-/// master api
+/// master API
 pub mod master;
 
 pub(crate) mod link;
+#[cfg_attr(test, allow(dead_code))]
 pub(crate) mod transport;
 pub(crate) mod util;

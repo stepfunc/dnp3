@@ -20,11 +20,11 @@ pub mod gen {
     pub(crate) mod conversion;
     pub mod enums;
     pub mod variations {
-        pub mod all;
-        pub mod count;
+        pub(crate) mod all;
+        pub(crate) mod count;
         pub mod fixed;
-        pub mod prefixed;
-        pub mod ranged;
+        pub(crate) mod prefixed;
+        pub(crate) mod ranged;
         pub mod variation;
     }
 }

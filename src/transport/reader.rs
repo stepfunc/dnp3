@@ -1,7 +1,8 @@
 use crate::link::error::LinkError;
 use crate::link::parser::FramePayload;
-use crate::transport::assembler::{Assembler, AssemblyState, Fragment};
+use crate::transport::assembler::{Assembler, AssemblyState};
 use crate::transport::header::Header;
+use crate::transport::Fragment;
 use tokio::prelude::{AsyncRead, AsyncWrite};
 
 pub(crate) struct Reader {

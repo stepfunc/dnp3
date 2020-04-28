@@ -13,14 +13,14 @@ fn num_bytes_for_double_bits(count: usize) -> usize {
 
 /// zero-copy type used to iterate over a collection of bits without allocating
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub struct BitSequence<'a> {
+pub(crate) struct BitSequence<'a> {
     bytes: &'a [u8],
     range: Range,
 }
 
 /// zero-copy type used to iterate over a collection of double bits without allocating
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub struct DoubleBitSequence<'a> {
+pub(crate) struct DoubleBitSequence<'a> {
     bytes: &'a [u8],
     range: Range,
 }
@@ -39,7 +39,7 @@ impl<'a> BitSequence<'a> {
         Ok(Self { bytes, range })
     }
 
-    pub fn iter(&self) -> BitIterator<'a> {
+    pub(crate) fn iter(&self) -> BitIterator<'a> {
         BitIterator::<'a> {
             index: self.range.get_start(),
             bytes: self.bytes,
@@ -62,7 +62,7 @@ impl<'a> DoubleBitSequence<'a> {
         Ok(Self { bytes, range })
     }
 
-    pub fn iter(&self) -> DoubleBitIterator<'a> {
+    pub(crate) fn iter(&self) -> DoubleBitIterator<'a> {
         DoubleBitIterator::<'a> {
             index: self.range.get_start(),
             bytes: self.bytes,
@@ -72,14 +72,14 @@ impl<'a> DoubleBitSequence<'a> {
     }
 }
 
-pub struct BitIterator<'a> {
+pub(crate) struct BitIterator<'a> {
     index: u16,
     bytes: &'a [u8],
     count: usize,
     pos: usize,
 }
 
-pub struct DoubleBitIterator<'a> {
+pub(crate) struct DoubleBitIterator<'a> {
     index: u16,
     bytes: &'a [u8],
     count: usize,

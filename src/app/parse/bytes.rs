@@ -22,7 +22,7 @@ impl std::fmt::Display for Bytes<'_> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct RangedBytesSequence<'a> {
+pub(crate) struct RangedBytesSequence<'a> {
     bytes: &'a [u8],
     index: u16,
     size: usize,
@@ -30,7 +30,7 @@ pub struct RangedBytesSequence<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct RangedBytesIterator<'a> {
+pub(crate) struct RangedBytesIterator<'a> {
     cursor: ReadCursor<'a>,
     index: u16,
     size: usize,
@@ -38,7 +38,7 @@ pub struct RangedBytesIterator<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct PrefixedBytesSequence<'a, T>
+pub(crate) struct PrefixedBytesSequence<'a, T>
 where
     T: FixedSize,
 {
@@ -48,7 +48,7 @@ where
     phantom: std::marker::PhantomData<T>,
 }
 
-pub struct PrefixedBytesIterator<'a, T>
+pub(crate) struct PrefixedBytesIterator<'a, T>
 where
     T: FixedSize,
 {
@@ -59,7 +59,7 @@ where
 }
 
 impl<'a> Bytes<'a> {
-    pub fn new(value: &'a [u8]) -> Self {
+    pub(crate) fn new(value: &'a [u8]) -> Self {
         Self { value }
     }
 }
@@ -83,7 +83,7 @@ impl<'a> RangedBytesSequence<'a> {
         })
     }
 
-    pub fn iter(&self) -> RangedBytesIterator<'a> {
+    pub(crate) fn iter(&self) -> RangedBytesIterator<'a> {
         RangedBytesIterator {
             cursor: ReadCursor::new(self.bytes),
             index: self.index,
@@ -116,7 +116,7 @@ where
         })
     }
 
-    pub fn iter(&self) -> PrefixedBytesIterator<'a, T> {
+    pub(crate) fn iter(&self) -> PrefixedBytesIterator<'a, T> {
         PrefixedBytesIterator {
             cursor: ReadCursor::new(self.bytes),
             size: self.size,

@@ -139,7 +139,7 @@ impl<'a> ParsedFragment<'a> {
         }
     }
 
-    #[cfg(test)]
+    /*
     pub(crate) fn to_request(&self) -> Result<Request<'a>, RequestValidationError> {
         if self.iin.is_some() {
             return Err(RequestValidationError::UnexpectedFunction(self.function));
@@ -159,6 +159,7 @@ impl<'a> ParsedFragment<'a> {
             objects: self.objects,
         })
     }
+    */
 
     pub(crate) fn to_response(&self) -> Result<Response<'a>, ResponseValidationError> {
         let (function, iin) = match (self.function, self.iin) {
@@ -391,7 +392,7 @@ impl std::fmt::Display for ParsedFragmentDisplay<'_> {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum HeaderDetails<'a> {
+pub(crate) enum HeaderDetails<'a> {
     AllObjects(AllObjectsVariation),
     OneByteStartStop(u8, u8, RangedVariation<'a>),
     TwoByteStartStop(u16, u16, RangedVariation<'a>),
@@ -402,7 +403,7 @@ pub enum HeaderDetails<'a> {
 }
 
 impl HeaderDetails<'_> {
-    pub fn qualifier(&self) -> QualifierCode {
+    pub(crate) fn qualifier(&self) -> QualifierCode {
         match self {
             HeaderDetails::AllObjects(_) => QualifierCode::AllObjects,
             HeaderDetails::OneByteStartStop(_, _, _) => QualifierCode::Range8,
@@ -683,7 +684,7 @@ mod test {
     use crate::app::gen::variations::variation::Variation::Group110;
     use crate::app::header::{Control, IIN, IIN1, IIN2};
     use crate::app::parse::bytes::Bytes;
-    use crate::app::parse::error::{RequestValidationError, ResponseValidationError};
+    use crate::app::parse::error::ResponseValidationError;
     use crate::app::parse::prefix::Prefix;
     use crate::app::sequence::Sequence;
     use crate::app::types::{DoubleBit, Timestamp};
@@ -692,6 +693,7 @@ mod test {
         assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);
     }
 
+    /*
     fn test_request_validation_error(input: &[u8], err: RequestValidationError) {
         assert_eq!(
             ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), input)
@@ -702,6 +704,7 @@ mod test {
             err
         );
     }
+    */
 
     fn test_response_validation_error(input: &[u8], err: ResponseValidationError) {
         assert_eq!(
@@ -735,6 +738,7 @@ mod test {
         }
     }
 
+    /*
     #[test]
     fn parses_valid_request() {
         let fragment = &[0xC2, 0x02, 0xAA];
@@ -760,6 +764,7 @@ mod test {
             ObjectParseError::InsufficientBytes
         )
     }
+    */
 
     #[test]
     fn parses_valid_unsolicited_response() {
@@ -807,6 +812,7 @@ mod test {
         );
     }
 
+    /*
     #[test]
     fn fails_bad_request_function_with_uns_bit() {
         test_request_validation_error(
@@ -814,7 +820,9 @@ mod test {
             RequestValidationError::UnexpectedUnsBit(FunctionCode::Write),
         );
     }
+    */
 
+    /*
     #[test]
     fn confirms_may_or_may_not_have_uns_set() {
         {
@@ -836,6 +844,7 @@ mod test {
             assert!(!request.header.control.uns);
         }
     }
+    */
 
     #[test]
     fn parses_integrity_scan() {

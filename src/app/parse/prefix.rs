@@ -2,13 +2,13 @@ use crate::app::parse::traits::{FixedSize, FixedSizeVariation, Index};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 
 #[derive(Debug, PartialEq)]
-pub struct Prefix<I, V>
+pub(crate) struct Prefix<I, V>
 where
     I: Index,
     V: FixedSizeVariation,
 {
-    pub index: I,
-    pub value: V,
+    pub(crate) index: I,
+    pub(crate) value: V,
 }
 
 impl<I, V> Prefix<I, V>
@@ -16,7 +16,7 @@ where
     I: Index,
     V: FixedSizeVariation,
 {
-    pub fn equals(&self, other: &(V, I)) -> bool {
+    pub(crate) fn equals(&self, other: &(V, I)) -> bool {
         self.index == other.1 && self.value == other.0
     }
 }

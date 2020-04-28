@@ -19,7 +19,7 @@ use crate::app::parse::error::ObjectParseError;
 use crate::app::gen::enums::QualifierCode;
 
 #[derive(Debug, PartialEq)]
-pub enum CountVariation<'a> {
+pub(crate) enum CountVariation<'a> {
     /// Time and Date - Absolute Time
     Group50Var1(CountSequence<'a, Group50Var1>),
     /// Time and Date - Absolute Time at last recorded time

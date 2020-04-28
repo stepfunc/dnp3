@@ -23,7 +23,7 @@ use crate::master::handle::ReadHandler;
 use crate::app::parse::error::ObjectParseError;
 
 #[derive(Debug, PartialEq)]
-pub enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
+pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
     /// Binary Input Event - Without Time
     Group2Var1(CountSequence<'a, Prefix<I, Group2Var1>>),
     /// Binary Input Event - With Absolute Time
