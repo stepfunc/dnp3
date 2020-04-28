@@ -5,7 +5,7 @@ use crate::transport::sequence::Sequence;
 use crate::util::cursor::WriteCursor;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
-pub struct Writer {
+pub(crate) struct Writer {
     formatter: LinkFormatter,
     seq: Sequence,
     buffer: [u8; crate::link::constant::MAX_LINK_FRAME_LENGTH],
@@ -25,7 +25,7 @@ impl Writer {
         acc | seq.value()
     }
 
-    pub fn new(master: bool, address: u16) -> Self {
+    pub(crate) fn new(master: bool, address: u16) -> Self {
         Self {
             formatter: LinkFormatter::new(master, address),
             seq: Sequence::default(),
@@ -33,11 +33,11 @@ impl Writer {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.seq.reset();
     }
 
-    pub async fn write<W>(
+    pub(crate) async fn write<W>(
         &mut self,
         level: DecodeLogLevel,
         io: &mut W,

@@ -2,9 +2,9 @@ use crate::link::header::Address;
 use crate::transport::header::Header;
 
 #[derive(Debug)]
-pub struct Fragment<'a> {
-    pub address: Address,
-    pub data: &'a [u8],
+pub(crate) struct Fragment<'a> {
+    pub(crate) address: Address,
+    pub(crate) data: &'a [u8],
 }
 
 #[derive(Copy, Clone)]

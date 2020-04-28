@@ -5,11 +5,11 @@ use crate::transport::assembler::Fragment;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 #[derive(Copy, Clone)]
-pub struct MockWriter {
+pub(crate) struct MockWriter {
     num_writes: usize,
 }
 #[derive(Copy, Clone)]
-pub struct MockReader {
+pub(crate) struct MockReader {
     num_reads: usize,
     count: usize,
     address: Address,
@@ -24,7 +24,7 @@ impl MockWriter {
 
     pub(crate) fn reset(&mut self) {}
 
-    pub fn mock() -> Self {
+    pub(crate) fn mock() -> Self {
         Self { num_writes: 0 }
     }
 
@@ -33,7 +33,7 @@ impl MockWriter {
     }
 
     // just write the fragment directly to the I/O
-    pub async fn write<W>(
+    pub(crate) async fn write<W>(
         &mut self,
         _level: DecodeLogLevel,
         io: &mut W,
