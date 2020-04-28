@@ -15,16 +15,20 @@ pub mod sequence;
 pub mod timeout;
 pub mod types;
 
+/// generated implementations of enums and variations
 #[rustfmt::skip]
 pub mod gen {
     pub(crate) mod conversion;
+    /// generated protocol-defined enumerations
     pub mod enums;
     pub mod variations {
         pub(crate) mod all;
         pub(crate) mod count;
+        /// publicly exported fixed-size variations
         pub mod fixed;
         pub(crate) mod prefixed;
         pub(crate) mod ranged;
+        /// enumeration of all variations
         pub mod variation;
     }
 }
