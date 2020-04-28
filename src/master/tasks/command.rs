@@ -3,7 +3,7 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::master::error::{CommandResponseError, TaskError};
 use crate::master::handle::{CommandResult, Promise};
-use crate::master::task::{NonReadTask, NonReadTaskStatus, TaskType};
+use crate::master::task::{NonReadTask, TaskType};
 use crate::master::types::*;
 use crate::util::cursor::WriteError;
 
@@ -73,7 +73,7 @@ impl CommandTask {
         }
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         self.headers.write(writer)
     }
 
@@ -85,27 +85,27 @@ impl CommandTask {
         self.promise.complete(Err(err.into()))
     }
 
-    pub(crate) fn handle(self, response: Response) -> NonReadTaskStatus {
+    pub(crate) fn handle(self, response: Response) -> Option<NonReadTask> {
         let headers = match response.objects {
             Ok(x) => x,
             Err(err) => {
                 self.promise
                     .complete(Err(TaskError::MalformedResponse(err).into()));
-                return NonReadTaskStatus::Complete;
+                return None;
             }
         };
 
         if let Err(err) = self.compare(headers) {
             self.promise.complete(Err(err.into()));
-            return NonReadTaskStatus::Complete;
+            return None;
         }
 
         match self.state {
-            State::Select => NonReadTaskStatus::Next(self.change_state(State::Operate)),
+            State::Select => Some(self.change_state(State::Operate)),
             _ => {
                 // Complete w/ success
                 self.promise.complete(Ok(()));
-                NonReadTaskStatus::Complete
+                None
             }
         }
     }

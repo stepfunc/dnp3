@@ -25,6 +25,8 @@ pub enum TaskError {
     Lower(LinkError),
     /// A response to the task's request was malformed
     MalformedResponse(ObjectParseError),
+    /// The response contains headers that don't match the request
+    UnexpectedResponseHeaders,
     /// Non-final response not requesting confirmation
     NonFinWithoutCon,
     /// Received a non-FIR response when expecting the FIR bit
@@ -60,6 +62,16 @@ pub enum CommandResponseError {
     ObjectCountMismatch,
     /// a value in one of the objects in the response doesn't match the request
     ObjectValueMismatch,
+}
+
+/// parent error type for time sync tasks
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum TimeSyncError {
+    Task(TaskError),
+    ClockRollback,
+    SystemTimeNotUnix,
+    BadOutstationTimeDelay(u16),
+    Overflow,
 }
 
 /// parent error type for command tasks
@@ -125,6 +137,9 @@ impl std::fmt::Display for TaskError {
         match self {
             TaskError::Lower(_) => f.write_str("I/O error"),
             TaskError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
+            TaskError::UnexpectedResponseHeaders => {
+                f.write_str("response contains headers that don't match the request")
+            }
             TaskError::NonFinWithoutCon => {
                 f.write_str("outstation responses with FIN == 0 must request confirmation")
             }
@@ -144,6 +159,24 @@ impl std::fmt::Display for TaskError {
             TaskError::Shutdown => f.write_str("the master was shutdown while executing the task"),
             TaskError::NoConnection => f.write_str("no connection"),
             TaskError::NoSuchAssociation(x) => write!(f, "no association with address: {}", x),
+        }
+    }
+}
+
+impl std::fmt::Display for TimeSyncError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TimeSyncError::Task(err) => write!(f, "{}", err),
+            TimeSyncError::SystemTimeNotUnix => {
+                f.write_str("the system time cannot be converted to unix time")
+            }
+            TimeSyncError::BadOutstationTimeDelay(x) => write!(
+                f,
+                "outstation time delay ({}) exceeded the response delay",
+                x
+            ),
+            TimeSyncError::Overflow => f.write_str("overflow in calculation"),
+            TimeSyncError::ClockRollback => f.write_str("detected a clock rollback"),
         }
     }
 }
@@ -220,7 +253,14 @@ impl From<TaskError> for CommandError {
     }
 }
 
+impl From<TaskError> for TimeSyncError {
+    fn from(err: TaskError) -> Self {
+        TimeSyncError::Task(err)
+    }
+}
+
 impl Error for AssociationError {}
 impl Error for TaskError {}
 impl Error for CommandError {}
 impl Error for CommandResponseError {}
+impl Error for TimeSyncError {}

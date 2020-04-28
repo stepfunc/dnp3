@@ -3,7 +3,7 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::association::Association;
-use crate::master::task::{NonReadTask, NonReadTaskStatus, TaskType};
+use crate::master::task::{NonReadTask, TaskType};
 use crate::master::types::EventClasses;
 use crate::util::cursor::WriteError;
 
@@ -19,7 +19,7 @@ impl AutoTask {
         TaskType::NonRead(NonReadTask::Auto(self))
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
             AutoTask::ClearRestartBit => writer.write_clear_restart(),
             AutoTask::EnableUnsolicited(classes) => classes.write(writer),
@@ -48,7 +48,7 @@ impl AutoTask {
         association: &mut Association,
         header: ResponseHeader,
         objects: HeaderCollection,
-    ) -> NonReadTaskStatus {
+    ) -> Option<NonReadTask> {
         if !objects.is_empty() {
             log::warn!("ignoring object headers in reply to {}", self.description());
         }
@@ -56,16 +56,15 @@ impl AutoTask {
         match &self {
             AutoTask::DisableUnsolicited(_) => {
                 association.on_disable_unsolicited_response(header.iin);
-                NonReadTaskStatus::Complete
             }
             AutoTask::EnableUnsolicited(_) => {
                 association.on_enable_unsolicited_response(header.iin);
-                NonReadTaskStatus::Complete
             }
             AutoTask::ClearRestartBit => {
                 association.on_clear_restart_iin_response(header.iin);
-                NonReadTaskStatus::Complete
             }
-        }
+        };
+
+        None
     }
 }

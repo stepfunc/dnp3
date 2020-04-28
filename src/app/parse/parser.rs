@@ -453,6 +453,17 @@ impl<'a> HeaderCollection<'a> {
             parser: ObjectParser::one_pass(self.function, self.data),
         }
     }
+
+    pub fn get_only_header(&self) -> Option<ObjectHeader<'a>> {
+        let mut iter = self.iter();
+        match iter.next() {
+            None => None,
+            Some(x) => match iter.next() {
+                Some(_) => None,
+                None => Some(x),
+            },
+        }
+    }
 }
 
 pub struct HeaderIterator<'a> {

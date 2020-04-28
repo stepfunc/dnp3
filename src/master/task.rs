@@ -6,14 +6,8 @@ use crate::master::error::TaskError;
 use crate::master::poll::Poll;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
+use crate::master::tasks::time::TimeSyncTask;
 use crate::util::cursor::WriteError;
-
-pub(crate) enum NonReadTaskStatus {
-    /// The task is complete
-    Complete,
-    /// Another task follows
-    Next(NonReadTask),
-}
 
 /// There are two broad categories of tasks. Reads
 /// require handling for multi-fragmented responses.
@@ -42,6 +36,8 @@ pub(crate) enum NonReadTask {
     Auto(AutoTask),
     /// commands initiated from the user API
     Command(CommandTask),
+    /// time synchronization
+    TimeSync(TimeSyncTask),
 }
 
 impl RequestWriter for ReadTask {
@@ -64,8 +60,9 @@ impl RequestWriter for NonReadTask {
 
     fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
-            NonReadTask::Auto(t) => t.format(writer),
-            NonReadTask::Command(t) => t.format(writer),
+            NonReadTask::Auto(t) => t.write(writer),
+            NonReadTask::Command(t) => t.write(writer),
+            NonReadTask::TimeSync(t) => t.write(writer),
         }
     }
 }
@@ -80,31 +77,39 @@ impl ReadTask {
 }
 
 impl NonReadTask {
+    pub(crate) fn wrap(self) -> TaskType {
+        TaskType::NonRead(self)
+    }
+
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
             NonReadTask::Command(task) => task.function(),
             NonReadTask::Auto(task) => task.function(),
+            NonReadTask::TimeSync(task) => task.function(),
         }
     }
 
     pub(crate) fn on_task_error(self, err: TaskError) {
         match self {
             NonReadTask::Command(task) => task.on_task_error(err),
+            NonReadTask::TimeSync(task) => task.on_task_error(err),
             NonReadTask::Auto(_) => {}
         }
     }
 
     pub(crate) fn handle(
         self,
+        request_tx: std::time::SystemTime,
         association: &mut Association,
         response: Response,
-    ) -> NonReadTaskStatus {
+    ) -> Option<NonReadTask> {
         match self {
             NonReadTask::Command(task) => task.handle(response),
             NonReadTask::Auto(task) => match response.objects.ok() {
                 Some(headers) => task.handle(association, response.header, headers),
-                None => NonReadTaskStatus::Complete,
+                None => None,
             },
+            NonReadTask::TimeSync(task) => task.handle(association, request_tx, response),
         }
     }
 }

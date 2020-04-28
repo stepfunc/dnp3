@@ -4,39 +4,63 @@ use crate::app::sequence::Sequence;
 use crate::master::error::AssociationError;
 use crate::master::handle::{AssociationHandler, CommandResult, Promise};
 use crate::master::poll::{Poll, PollMap};
+use crate::master::task::NonReadTask::TimeSync;
 use crate::master::task::{ReadTask, Task, TaskType};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
+use crate::master::tasks::time::TimeSyncTask;
 use crate::master::types::{CommandHeaders, CommandMode, EventClasses, ReadRequest};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use std::time::Duration;
 use tokio::time::Instant;
 
+/// Defines if and how the master performs automatic time synchronization
+#[derive(Copy, Clone)]
+pub enum AutoTimeSync {
+    /// no automatic time synchronization
+    None,
+    /// record current time followed by write g50v3
+    LanProcedure,
+    /// delay measure followed by write g50v1
+    NonLanProcedure,
+}
+
 #[derive(Copy, Clone)]
 pub struct AssociationConfig {
     /// The event classes to disable on startup
-    pub(crate) disable_unsol_classes: EventClasses,
+    pub disable_unsol_classes: EventClasses,
     /// The event classes to enable on startup
-    pub(crate) enable_unsol_classes: EventClasses,
+    pub enable_unsol_classes: EventClasses,
+    /// automatic time synchronization based on NEED_TIME IIN bit
+    pub auto_time_sync: AutoTimeSync,
 }
 
 impl AssociationConfig {
-    pub fn new(disable_unsol_classes: EventClasses, enable_unsol_classes: EventClasses) -> Self {
+    pub fn new(
+        disable_unsol_classes: EventClasses,
+        enable_unsol_classes: EventClasses,
+        auto_time_sync: AutoTimeSync,
+    ) -> Self {
         Self {
             disable_unsol_classes,
             enable_unsol_classes,
+            auto_time_sync,
         }
     }
 
     pub fn none() -> Self {
-        AssociationConfig::new(EventClasses::none(), EventClasses::none())
+        AssociationConfig::new(
+            EventClasses::none(),
+            EventClasses::none(),
+            AutoTimeSync::None,
+        )
     }
 }
 
 impl Default for AssociationConfig {
     fn default() -> Self {
-        AssociationConfig::new(EventClasses::all(), EventClasses::all())
+        AssociationConfig::new(EventClasses::all(), EventClasses::all(), AutoTimeSync::None)
     }
 }
 
@@ -57,12 +81,19 @@ impl AutoTaskState {
             _ => false,
         }
     }
+
+    pub(crate) fn set_pending_if_idle(&mut self) {
+        if let AutoTaskState::Idle = self {
+            *self = AutoTaskState::Pending;
+        }
+    }
 }
 
 #[derive(Clone)]
 pub(crate) struct TaskStates {
     disable_unsolicited: AutoTaskState,
     clear_restart_iin: AutoTaskState,
+    time_sync: AutoTaskState,
     integrity_scan: AutoTaskState,
     enabled_unsolicited: AutoTaskState,
 }
@@ -72,6 +103,7 @@ impl TaskStates {
         Self {
             disable_unsolicited: AutoTaskState::Pending,
             clear_restart_iin: AutoTaskState::Idle,
+            time_sync: AutoTaskState::Idle,
             integrity_scan: AutoTaskState::Pending,
             enabled_unsolicited: AutoTaskState::Pending,
         }
@@ -116,10 +148,13 @@ impl Association {
 
     /// Add a poll to the association
     /// * `request` defines what data is being requested
-    /// * `period` defines how often the READ operation is performed. The first poll
-    /// is performed
+    /// * `period` defines how often the READ operation is performed
     pub fn add_poll(&mut self, request: ReadRequest, period: Duration) {
         self.polls.add(request, period)
+    }
+
+    pub(crate) fn get_system_time(&self) -> std::time::SystemTime {
+        self.handler.get_system_time()
     }
 
     pub(crate) fn get_address(&self) -> u16 {
@@ -137,6 +172,9 @@ impl Association {
     pub(crate) fn process_iin(&mut self, iin: IIN) {
         if iin.iin1.get_device_restart() {
             self.on_restart_iin_observed()
+        }
+        if iin.iin1.get_need_time() {
+            self.tasks.time_sync.set_pending_if_idle();
         }
     }
 
@@ -164,6 +202,15 @@ impl Association {
         }
     }
 
+    pub(crate) fn on_time_sync_iin_response(&mut self, iin: IIN) {
+        self.tasks.time_sync = if iin.iin1.get_need_time() {
+            log::warn!("device failed to clear NEED_TIME IIN bit");
+            AutoTaskState::Failed
+        } else {
+            AutoTaskState::Idle
+        }
+    }
+
     pub(crate) fn on_enable_unsolicited_response(&mut self, _iin: IIN) {
         self.tasks.enabled_unsolicited = AutoTaskState::Idle;
     }
@@ -179,6 +226,13 @@ impl Association {
     pub(crate) fn next_request(&self, now: Instant) -> Next<Task> {
         if self.tasks.clear_restart_iin.is_pending() {
             return Next::Now(self.clear_restart_iin());
+        }
+        if self.tasks.time_sync.is_pending() {
+            match self.config.auto_time_sync {
+                AutoTimeSync::None => {}
+                AutoTimeSync::LanProcedure => return Next::Now(self.lan_time_sync()),
+                AutoTimeSync::NonLanProcedure => return Next::Now(self.non_lan_time_sync()),
+            }
         }
         if self.config.disable_unsol_classes.any() && self.tasks.disable_unsolicited.is_pending() {
             return Next::Now(self.disable_unsolicited(self.config.disable_unsol_classes));
@@ -311,6 +365,20 @@ impl Association {
 
     fn disable_unsolicited(&self, classes: EventClasses) -> Task {
         Task::new(self.address, AutoTask::DisableUnsolicited(classes).wrap())
+    }
+
+    fn lan_time_sync(&self) -> Task {
+        Task::new(
+            self.address,
+            TimeSync(TimeSyncTask::get_lan_procedure(Promise::Empty)).wrap(),
+        )
+    }
+
+    fn non_lan_time_sync(&self) -> Task {
+        Task::new(
+            self.address,
+            TimeSync(TimeSyncTask::get_non_lan_procedure(Promise::Empty)).wrap(),
+        )
     }
 
     fn enable_unsolicited(&self, classes: EventClasses) -> Task {

@@ -1,9 +1,7 @@
 use crate::app::format::write;
 use crate::app::parse::parser::{DecodeLogLevel, ParsedFragment, Response};
 use crate::app::sequence::Sequence;
-use crate::master::task::{
-    NonReadTask, NonReadTaskStatus, ReadTask, RequestWriter, Task, TaskType,
-};
+use crate::master::task::{NonReadTask, ReadTask, RequestWriter, Task, TaskType};
 use crate::transport::{ReaderType, WriterType};
 
 use crate::app::header::Control;
@@ -394,6 +392,8 @@ impl Runner {
                 }
             };
 
+            let request_tx = std::time::SystemTime::now();
+
             let deadline = self.timeout.from_now();
 
             loop {
@@ -416,9 +416,9 @@ impl Runner {
                             }
                             Ok(association) => {
                                 association.process_iin(response.header.iin);
-                                match task.handle(association, response) {
-                                    NonReadTaskStatus::Complete => return Ok(()),
-                                    NonReadTaskStatus::Next(next) => {
+                                match task.handle(request_tx, association, response) {
+                                    None => return Ok(()),
+                                    Some(next) => {
                                         task = next;
                                         // break from the inner loop and execute the next request
                                         break;

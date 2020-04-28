@@ -82,6 +82,17 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
 
         count.write_at(pos_of_count, self.cursor)
     }
+
+    pub(crate) fn write_count_of_one<V>(&mut self, item: V) -> Result<(), WriteError>
+    where
+        V: FixedSizeVariation,
+    {
+        V::VARIATION.write(self.cursor)?;
+        QualifierCode::Count8.write(self.cursor)?;
+        self.cursor.write_u8(1)?;
+        item.write(self.cursor)?;
+        Ok(())
+    }
 }
 
 pub(crate) fn confirm_solicited(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {

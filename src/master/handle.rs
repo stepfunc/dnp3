@@ -3,7 +3,7 @@ use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::parser::{DecodeLogLevel, HeaderCollection};
 use crate::master::association::Association;
-use crate::master::error::{AssociationError, CommandError, TaskError};
+use crate::master::error::{AssociationError, CommandError, TaskError, TimeSyncError};
 use crate::master::types::{CommandHeaders, CommandMode};
 
 /// messages sent from the handles to the master task via an mpsc
@@ -124,14 +124,11 @@ impl AssociationHandle {
     }
 }
 
-pub trait ResponseHandler: Send {
-    fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
-}
-
 /// A generic callback type that must be invoked once and only once.
 /// The user can select to implement it using FnOnce or a
 /// one-shot reply channel
 pub enum Promise<T> {
+    Empty,
     BoxedFn(Box<dyn FnOnce(T) -> () + Send + Sync>),
     OneShot(tokio::sync::oneshot::Sender<T>),
 }
@@ -139,6 +136,7 @@ pub enum Promise<T> {
 impl<T> Promise<T> {
     pub(crate) fn complete(self, value: T) {
         match self {
+            Promise::Empty => {}
             Promise::BoxedFn(func) => func(value),
             Promise::OneShot(s) => {
                 s.send(value).ok();
@@ -148,9 +146,14 @@ impl<T> Promise<T> {
 }
 
 pub type CommandResult = Result<(), CommandError>;
+pub type TimeSyncResult = Result<(), TimeSyncError>;
+
+pub trait ResponseHandler: Send {
+    fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
+}
 
 pub trait AssociationHandler: ResponseHandler {
-    // TODO - add additional methods
+    fn get_system_time(&self) -> std::time::SystemTime;
 }
 
 pub trait MeasurementHandler {

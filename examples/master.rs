@@ -1,7 +1,7 @@
 use dnp3rs::app::gen::enums::OpType;
 use dnp3rs::app::gen::variations::fixed::Group12Var1;
 use dnp3rs::app::parse::parser::DecodeLogLevel;
-use dnp3rs::master::association::{Association, AssociationConfig};
+use dnp3rs::master::association::{Association, AssociationConfig, AutoTimeSync};
 use dnp3rs::master::null::NullHandler;
 use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
 use dnp3rs::master::types::{Classes, CommandBuilder, CommandMode, EventClasses, ReadRequest};
@@ -13,8 +13,9 @@ use tokio::stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
 fn get_association() -> Association {
-    let mut association =
-        Association::new(1024, AssociationConfig::default(), NullHandler::boxed());
+    let mut config = AssociationConfig::default();
+    config.auto_time_sync = AutoTimeSync::LanProcedure;
+    let mut association = Association::new(1024, config, NullHandler::boxed());
     association.add_poll(
         ReadRequest::ClassScan(Classes::events(EventClasses::all())),
         Duration::from_secs(5),
