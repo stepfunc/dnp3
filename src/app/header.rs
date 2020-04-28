@@ -4,12 +4,18 @@ use crate::util::bit::{format_bitfield, Bitfield};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::Formatter;
 
+/// Control field in the application-layer header
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Control {
+    /// FIR bit - set if the first fragment in a multi-fragmented response
     pub fir: bool,
+    /// FIN bit - set if the final fragment in a multi-fragmented response
     pub fin: bool,
+    /// FIN bit - set if the fragment is requesting confirmation
     pub con: bool,
+    /// UNS bit - set if sequence number is interpreted for unsolicited responses
     pub uns: bool,
+    /// sequence number
     pub seq: Sequence,
 }
 
@@ -94,93 +100,118 @@ impl Control {
     }
 }
 
+/// Internal Indications Byte #1
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct IIN1 {
+    /// underlying value for IIN1
     pub value: u8,
 }
 
+/// Internal Indications Byte #2
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct IIN2 {
+    /// underlying value for IIN2
     pub value: u8,
 }
 
+/// Internal Indications (2 bytes)
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct IIN {
+    /// IIN byte #1
     pub iin1: IIN1,
+    /// IIN byte #2
     pub iin2: IIN2,
 }
 
 impl IIN1 {
+    /// Construct IIN1 from its underlying value
     pub fn new(value: u8) -> Self {
         Self { value }
     }
 
+    /// test IIN.1 to see if the BROADCAST bit is set
     pub fn get_broadcast(self) -> bool {
         self.value.bit_0()
     }
 
+    /// test IIN.1 to see if the CLASS_1_EVENTS bit is set
     pub fn get_class_1_events(self) -> bool {
         self.value.bit_1()
     }
 
+    /// test IIN.1 to see if the CLASS_2_EVENTS bit is set
     pub fn get_class_2_events(self) -> bool {
         self.value.bit_2()
     }
 
+    /// test IIN.1 to see if the CLASS_3_EVENTS bit is set
     pub fn get_class_3_events(self) -> bool {
         self.value.bit_3()
     }
 
+    /// test IIN.1 to see if the NEED_TIME bit is set
     pub fn get_need_time(self) -> bool {
         self.value.bit_4()
     }
 
+    /// test IIN.1 to see if the LOCAL_CONTROL bit is set
     pub fn get_local_control(self) -> bool {
         self.value.bit_5()
     }
 
+    /// test IIN.1 to see if the DEVICE_TROUBLE bit is set
     pub fn get_device_trouble(self) -> bool {
         self.value.bit_6()
     }
 
+    /// test IIN.1 to see if the DEVICE_RESTART bit is set
     pub fn get_device_restart(self) -> bool {
         self.value.bit_7()
     }
 }
 
 impl IIN2 {
+    /// Construct IIN2 from its underlying value
     pub fn new(value: u8) -> Self {
         Self { value }
     }
 
+    /// test IIN.2 to see if the NO_FUNC_CODE_SUPPORT bit is set
     pub fn get_no_func_code_support(self) -> bool {
         self.value.bit_0()
     }
 
+    /// test IIN.2 to see if the OBJECT_UNKNOWN bit is set
     pub fn get_object_unknown(self) -> bool {
         self.value.bit_1()
     }
 
+    /// test IIN.2 to see if the GET_PARAMETER_ERROR bit is set
     pub fn get_parameter_error(self) -> bool {
         self.value.bit_2()
     }
 
+    /// test IIN.2 to see if the EVENT_BUFFER_OVERFLOW bit is set
     pub fn get_event_buffer_overflow(self) -> bool {
         self.value.bit_3()
     }
 
+    /// test IIN.2 to see if the ALREADY_EXECUTING bit is set
     pub fn get_already_executing(self) -> bool {
         self.value.bit_4()
     }
 
+    /// test IIN.2 to see if the CONFIG_CORRUPT bit is set
     pub fn get_config_corrupt(self) -> bool {
         self.value.bit_5()
     }
 
+    /// test IIN.2 to see if the RESERVED_2 bit is set
     pub fn get_reserved_2(self) -> bool {
         self.value.bit_6()
     }
 
+    /// test IIN.2 to see if the RESERVED_1 bit is set
     pub fn get_reserved_1(self) -> bool {
         self.value.bit_7()
     }
@@ -227,6 +258,7 @@ impl std::fmt::Display for IIN2 {
 }
 
 impl IIN {
+    /// construct an IIN from `IIN1` and `IIN2`
     pub fn new(iin1: IIN1, iin2: IIN2) -> Self {
         Self { iin1, iin2 }
     }
@@ -253,21 +285,50 @@ impl IIN {
     */
 }
 
+impl Default for IIN {
+    fn default() -> Self {
+        IIN::new(IIN1::new(0), IIN2::new(0))
+    }
+}
+
+/// application-layer header for requests
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct RequestHeader {
+    /// control field
     pub control: Control,
+    /// function code
     pub function: FunctionCode,
 }
 
+/// Only 2 function codes allowed in responses
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ResponseFunction {
+    Response,
+    UnsolicitedResponse,
+}
+
+/// application-layer header for responses
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ResponseHeader {
+    /// control field
     pub control: Control,
-    pub unsolicited: bool,
+    /// Function code limited to Response or UnsolicitedResponse
+    pub function: ResponseFunction,
+    /// internal indications field
     pub iin: IIN,
 }
 
+impl ResponseFunction {
+    pub fn is_unsolicited(self) -> bool {
+        match self {
+            ResponseFunction::Response => false,
+            ResponseFunction::UnsolicitedResponse => true,
+        }
+    }
+}
+
 impl RequestHeader {
-    pub fn new(control: Control, function: FunctionCode) -> Self {
+    pub(crate) fn new(control: Control, function: FunctionCode) -> Self {
         Self { control, function }
     }
 
@@ -279,15 +340,16 @@ impl RequestHeader {
 }
 
 impl ResponseHeader {
-    pub fn new(control: Control, unsolicited: bool, iin: IIN) -> Self {
+    pub(crate) fn new(control: Control, function: ResponseFunction, iin: IIN) -> Self {
         Self {
             control,
-            unsolicited,
+            function,
             iin,
         }
     }
 
-    pub fn function(self) -> FunctionCode {
+    /*
+    pub(crate) fn function(self) -> FunctionCode {
         if self.unsolicited {
             FunctionCode::UnsolicitedResponse
         } else {
@@ -295,12 +357,11 @@ impl ResponseHeader {
         }
     }
 
-    /*
-        pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-            self.control.write(cursor)?;
-            self.function().write(cursor)?;
-            self.iin.write(cursor)?;
-            Ok(())
-        }
+    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.control.write(cursor)?;
+        self.function().write(cursor)?;
+        self.iin.write(cursor)?;
+        Ok(())
+    }
     */
 }

@@ -1,9 +1,9 @@
 use crate::app::parse::parser::DecodeLogLevel;
+use crate::app::timeout::Timeout;
 use crate::master::error::Shutdown;
 use crate::master::handle::MasterHandle;
 use crate::master::runner::{RunError, Runner};
 use crate::transport::{ReaderType, WriterType};
-use crate::util::timeout::Timeout;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::TcpStream;

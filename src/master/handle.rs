@@ -1,7 +1,7 @@
 use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
-use crate::app::parse::parser::{DecodeLogLevel, HeaderCollection};
+use crate::app::parse::parser::DecodeLogLevel;
 use crate::master::association::Association;
 use crate::master::error::{AssociationError, CommandError, TaskError, TimeSyncError};
 use crate::master::task::{Task, TaskType};
@@ -37,7 +37,7 @@ pub struct MasterHandle {
     sender: tokio::sync::mpsc::Sender<Message>,
 }
 
-/// A handle used to make requests against
+/// handle used to make requests against
 #[derive(Debug)]
 pub struct AssociationHandle {
     address: u16,
@@ -177,21 +177,33 @@ impl<T> Promise<T> {
 
 pub type CommandResult = Result<(), CommandError>;
 
+/*
 pub trait ResponseHandler: Send {
     fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
 }
+*/
 
-pub trait AssociationHandler: ResponseHandler {
+pub trait AssociationHandler: Send {
     fn get_system_time(&self) -> std::time::SystemTime;
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler;
 }
 
-pub trait MeasurementHandler {
-    fn handle_binary(&mut self, x: impl Iterator<Item = (Binary, u16)>);
-    fn handle_double_bit_binary(&mut self, x: impl Iterator<Item = (DoubleBitBinary, u16)>);
-    fn handle_binary_output_status(&mut self, x: impl Iterator<Item = (BinaryOutputStatus, u16)>);
-    fn handle_counter(&mut self, x: impl Iterator<Item = (Counter, u16)>);
-    fn handle_frozen_counter(&mut self, x: impl Iterator<Item = (FrozenCounter, u16)>);
-    fn handle_analog(&mut self, x: impl Iterator<Item = (Analog, u16)>);
-    fn handle_analog_output_status(&mut self, x: impl Iterator<Item = (AnalogOutputStatus, u16)>);
-    fn handle_octet_string<'a>(&mut self, x: impl Iterator<Item = (Bytes<'a>, u16)>);
+pub trait ReadHandler {
+    fn begin_fragment(&mut self, header: ResponseHeader);
+    fn end_fragment(&mut self, header: ResponseHeader);
+
+    fn handle_binary(&mut self, iter: &mut dyn Iterator<Item = (Binary, u16)>);
+    fn handle_double_bit_binary(&mut self, iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>);
+    fn handle_binary_output_status(
+        &mut self,
+        iter: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
+    );
+    fn handle_counter(&mut self, iter: &mut dyn Iterator<Item = (Counter, u16)>);
+    fn handle_frozen_counter(&mut self, iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>);
+    fn handle_analog(&mut self, iter: &mut dyn Iterator<Item = (Analog, u16)>);
+    fn handle_analog_output_status(
+        &mut self,
+        iter: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
+    );
+    fn handle_octet_string<'a>(&mut self, iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>);
 }

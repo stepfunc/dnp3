@@ -4,7 +4,7 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::gen::variations::variation::Variation;
-use crate::app::header::{Control, RequestHeader, ResponseHeader, IIN};
+use crate::app::header::{Control, RequestHeader, ResponseFunction, ResponseHeader, IIN};
 use crate::app::parse::error::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
@@ -26,20 +26,20 @@ pub enum DecodeLogLevel {
 }
 
 #[derive(Copy, Clone)]
-pub struct DecodeSettings {
+pub(crate) struct DecodeSettings {
     is_transmit: bool,
     level: DecodeLogLevel,
 }
 
 impl DecodeLogLevel {
-    pub fn transmit(self) -> DecodeSettings {
+    pub(crate) fn transmit(self) -> DecodeSettings {
         DecodeSettings {
             is_transmit: true,
             level: self,
         }
     }
 
-    pub fn receive(self) -> DecodeSettings {
+    pub(crate) fn receive(self) -> DecodeSettings {
         DecodeSettings {
             is_transmit: false,
             level: self,
@@ -82,12 +82,12 @@ where
     Ok(())
 }
 
-pub struct ParsedFragment<'a> {
-    pub control: Control,
-    pub function: FunctionCode,
-    pub iin: Option<IIN>,
-    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
-    pub raw_objects: &'a [u8],
+pub(crate) struct ParsedFragment<'a> {
+    pub(crate) control: Control,
+    pub(crate) function: FunctionCode,
+    pub(crate) iin: Option<IIN>,
+    pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
+    pub(crate) raw_objects: &'a [u8],
 }
 
 impl<'a> ParsedFragment<'a> {
@@ -139,7 +139,8 @@ impl<'a> ParsedFragment<'a> {
         }
     }
 
-    pub fn to_request(&self) -> Result<Request<'a>, RequestValidationError> {
+    #[cfg(test)]
+    pub(crate) fn to_request(&self) -> Result<Request<'a>, RequestValidationError> {
         if self.iin.is_some() {
             return Err(RequestValidationError::UnexpectedFunction(self.function));
         }
@@ -160,26 +161,28 @@ impl<'a> ParsedFragment<'a> {
     }
 
     pub(crate) fn to_response(&self) -> Result<Response<'a>, ResponseValidationError> {
-        let (unsolicited, iin) = match (self.function, self.iin) {
-            (FunctionCode::Response, Some(x)) => (false, x),
-            (FunctionCode::UnsolicitedResponse, Some(x)) => (true, x),
+        let (function, iin) = match (self.function, self.iin) {
+            (FunctionCode::Response, Some(x)) => (ResponseFunction::Response, x),
+            (FunctionCode::UnsolicitedResponse, Some(x)) => {
+                (ResponseFunction::UnsolicitedResponse, x)
+            }
             _ => return Err(ResponseValidationError::UnexpectedFunction(self.function)),
         };
 
-        if !unsolicited && self.control.uns {
+        if !function.is_unsolicited() && self.control.uns {
             return Err(ResponseValidationError::SolicitedResponseWithUnsBit);
         }
 
-        if unsolicited && !self.control.uns {
+        if function.is_unsolicited() && !self.control.uns {
             return Err(ResponseValidationError::UnsolicitedResponseWithoutUnsBit);
         }
 
-        if unsolicited && !self.control.is_fir_and_fin() {
+        if function.is_unsolicited() && !self.control.is_fir_and_fin() {
             return Err(ResponseValidationError::UnsolicitedResponseWithoutFirAndFin);
         }
 
         Ok(Response {
-            header: ResponseHeader::new(self.control, unsolicited, iin),
+            header: ResponseHeader::new(self.control, function, iin),
             raw_objects: self.raw_objects,
             objects: self.objects,
         })
@@ -212,7 +215,10 @@ impl<'a> ParsedFragment<'a> {
         Ok(fragment)
     }
 
-    pub fn parse(settings: DecodeSettings, fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
+    pub(crate) fn parse(
+        settings: DecodeSettings,
+        fragment: &'a [u8],
+    ) -> Result<Self, HeaderParseError> {
         let result = Self::parse_no_logging(fragment);
         match &result {
             Ok(fragment) => {
@@ -229,9 +235,9 @@ impl<'a> ParsedFragment<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ObjectHeader<'a> {
-    pub variation: Variation,
-    pub details: HeaderDetails<'a>,
+pub(crate) struct ObjectHeader<'a> {
+    pub(crate) variation: Variation,
+    pub(crate) details: HeaderDetails<'a>,
 }
 
 impl<'a> ObjectHeader<'a> {
@@ -410,17 +416,17 @@ impl HeaderDetails<'_> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Request<'a> {
-    pub header: RequestHeader,
-    pub raw_objects: &'a [u8],
-    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
+pub(crate) struct Request<'a> {
+    pub(crate) header: RequestHeader,
+    pub(crate) raw_objects: &'a [u8],
+    pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Response<'a> {
-    pub header: ResponseHeader,
-    pub raw_objects: &'a [u8],
-    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
+pub(crate) struct Response<'a> {
+    pub(crate) header: ResponseHeader,
+    pub(crate) raw_objects: &'a [u8],
+    pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
 struct ObjectParser<'a> {
@@ -432,29 +438,29 @@ struct ObjectParser<'a> {
 /// An abstract collection of pre-validated object headers
 /// that can provide an iterator of the headers.
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct HeaderCollection<'a> {
+pub(crate) struct HeaderCollection<'a> {
     function: FunctionCode,
     data: &'a [u8],
 }
 
 impl<'a> HeaderCollection<'a> {
     /// parse the the raw header data in accordance with the provided function code
-    pub fn parse(function: FunctionCode, data: &'a [u8]) -> Result<Self, ObjectParseError> {
+    pub(crate) fn parse(function: FunctionCode, data: &'a [u8]) -> Result<Self, ObjectParseError> {
         ObjectParser::parse(function, data)
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
     /// return and iterator of the headers that lazily parses them
-    pub fn iter(&self) -> HeaderIterator<'a> {
+    pub(crate) fn iter(&self) -> HeaderIterator<'a> {
         HeaderIterator {
             parser: ObjectParser::one_pass(self.function, self.data),
         }
     }
 
-    pub fn get_only_header(&self) -> Option<ObjectHeader<'a>> {
+    pub(crate) fn get_only_header(&self) -> Option<ObjectHeader<'a>> {
         let mut iter = self.iter();
         match iter.next() {
             None => None,
@@ -466,7 +472,7 @@ impl<'a> HeaderCollection<'a> {
     }
 }
 
-pub struct HeaderIterator<'a> {
+pub(crate) struct HeaderIterator<'a> {
     parser: ObjectParser<'a>,
 }
 
@@ -770,7 +776,7 @@ mod test {
                 uns: true,
                 seq: Sequence::new(0x02),
             },
-            unsolicited: true,
+            function: ResponseFunction::UnsolicitedResponse,
             iin: IIN {
                 iin1: IIN1::new(0xFF),
                 iin2: IIN2::new(0xAA),

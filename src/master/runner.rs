@@ -9,9 +9,9 @@ use crate::link::error::LinkError;
 use crate::util::cursor::WriteCursor;
 
 use crate::app::format::write::start_request;
+use crate::app::timeout::Timeout;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::handle::Message;
-use crate::util::timeout::Timeout;
 
 use crate::master::error::{Shutdown, TaskError};
 use std::collections::VecDeque;
@@ -147,7 +147,7 @@ impl Runner {
             Ok(x) => x,
         };
 
-        if response.header.unsolicited {
+        if response.header.function.is_unsolicited() {
             self.handle_unsolicited(fragment.address.source, &response, io, writer)
                 .await?;
         } else {
@@ -469,7 +469,7 @@ impl Runner {
             Ok(x) => x,
         };
 
-        if response.header.unsolicited {
+        if response.header.function.is_unsolicited() {
             self.handle_unsolicited(fragment.address.source, &response, io, writer)
                 .await?;
             return Ok(None);
@@ -571,7 +571,7 @@ impl Runner {
             }
         };
 
-        if response.header.unsolicited {
+        if response.header.function.is_unsolicited() {
             self.handle_unsolicited(fragment.address.source, &response, io, writer)
                 .await?;
             return Ok(ReadResponseAction::Ignore);

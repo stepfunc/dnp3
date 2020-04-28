@@ -11,6 +11,8 @@ pub mod measurement;
 pub mod parse;
 /// application layer sequence number
 pub mod sequence;
+/// types for handling timeouts
+pub mod timeout;
 pub mod types;
 
 #[rustfmt::skip]

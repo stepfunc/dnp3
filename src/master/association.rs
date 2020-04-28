@@ -2,6 +2,7 @@ use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::error::AssociationError;
+use crate::master::extract::extract_measurements;
 use crate::master::handle::{AssociationHandler, Promise};
 use crate::master::poll::{Poll, PollMap};
 use crate::master::task::NonReadTask::TimeSync;
@@ -200,7 +201,7 @@ impl Association {
     }
 
     pub(crate) fn handle_response(&mut self, header: ResponseHeader, objects: HeaderCollection) {
-        self.handler.handle(self.address, header, objects);
+        extract_measurements(header, objects, self.handler.get_read_handler());
     }
 
     pub(crate) fn next_request(&self, now: Instant) -> Next<Task> {
