@@ -7,6 +7,7 @@ use crate::master::handle::TimeSyncResult;
 use crate::master::runner::RunError;
 use crate::util::cursor::WriteError;
 use std::error::Error;
+use tokio::sync::oneshot::error::RecvError;
 
 /// Indicates that a task has shutdown
 pub(crate) struct Shutdown;
@@ -199,12 +200,6 @@ impl std::fmt::Display for TimeSyncError {
     }
 }
 
-impl From<tokio::sync::oneshot::error::RecvError> for CommandError {
-    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        CommandError::Task(TaskError::Shutdown)
-    }
-}
-
 impl From<WriteError> for TaskError {
     fn from(_: WriteError) -> Self {
         TaskError::WriteError
@@ -253,12 +248,6 @@ impl From<NoAssociation> for TaskError {
     }
 }
 
-impl From<tokio::sync::oneshot::error::RecvError> for AssociationError {
-    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        AssociationError::Shutdown
-    }
-}
-
 impl From<CommandResponseError> for CommandError {
     fn from(err: CommandResponseError) -> Self {
         CommandError::Response(err)
@@ -274,6 +263,24 @@ impl From<TaskError> for CommandError {
 impl From<TaskError> for TimeSyncError {
     fn from(err: TaskError) -> Self {
         TimeSyncError::Task(err)
+    }
+}
+
+impl From<RecvError> for AssociationError {
+    fn from(_: RecvError) -> Self {
+        AssociationError::Shutdown
+    }
+}
+
+impl From<RecvError> for CommandError {
+    fn from(_: RecvError) -> Self {
+        CommandError::Task(TaskError::Shutdown)
+    }
+}
+
+impl From<RecvError> for TimeSyncError {
+    fn from(_: RecvError) -> Self {
+        TimeSyncError::Task(TaskError::Shutdown)
     }
 }
 

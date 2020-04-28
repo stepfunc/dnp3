@@ -43,22 +43,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
-            "n" => master.set_decode_log_level(DecodeLogLevel::Nothing).await,
-            "v" => {
+            "dln" => master.set_decode_log_level(DecodeLogLevel::Nothing).await,
+            "dlv" => {
                 master
                     .set_decode_log_level(DecodeLogLevel::ObjectValues)
                     .await
             }
-            "c" => {
-                match association
+            "cmd" => {
+                if let Err(err) = association
                     .operate(
                         CommandMode::SelectBeforeOperate,
                         CommandBuilder::single(Group12Var1::from_op_type(OpType::LatchOn), 3u16),
                     )
                     .await
                 {
-                    Ok(()) => log::info!("success"),
-                    Err(err) => log::warn!("error: {}", err),
+                    log::warn!("error: {}", err);
+                }
+            }
+            "lts" => {
+                if let Err(err) = association.perform_lan_time_sync().await {
+                    log::warn!("error: {}", err);
+                }
+            }
+            "nts" => {
+                if let Err(err) = association.perform_non_lan_time_sync().await {
+                    log::warn!("error: {}", err);
                 }
             }
             s => println!("unknown command: {}", s),

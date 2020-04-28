@@ -10,11 +10,10 @@ use crate::util::cursor::WriteCursor;
 
 use crate::app::format::write::start_request;
 use crate::master::association::{AssociationMap, Next};
-use crate::master::handle::{CommandResult, Message, Promise};
+use crate::master::handle::Message;
 use crate::util::timeout::Timeout;
 
-use crate::master::error::{CommandError, Shutdown, TaskError};
-use crate::master::types::{CommandHeaders, CommandMode};
+use crate::master::error::{Shutdown, TaskError};
 use std::collections::VecDeque;
 use std::ops::Add;
 use std::time::Duration;
@@ -165,11 +164,11 @@ impl Runner {
         match self.user_queue.recv().await {
             Some(x) => {
                 match x {
-                    Message::Command(address, mode, headers, callback) => {
+                    Message::QueueTask(task) => {
                         if is_connected {
-                            self.queue_command(address, mode, headers, callback);
+                            self.queue_task(task);
                         } else {
-                            callback.complete(Err(CommandError::Task(TaskError::NoConnection)));
+                            task.details.on_task_error(TaskError::NoConnection);
                         }
                     }
                     Message::AddAssociation(association, callback) => {
@@ -188,24 +187,15 @@ impl Runner {
         }
     }
 
-    fn queue_command(
-        &mut self,
-        address: u16,
-        mode: CommandMode,
-        headers: CommandHeaders,
-        promise: Promise<CommandResult>,
-    ) {
-        match self.associations.get(address).ok() {
-            Some(association) => {
-                self.request_queue
-                    .push_back(association.operate(mode, headers, promise));
+    fn queue_task(&mut self, task: Task) {
+        match self.associations.get(task.address).ok() {
+            Some(_association) => {
+                self.request_queue.push_back(task);
             }
             None => {
-                log::warn!(
-                    "no association for command request with address: {}",
-                    address
-                );
-                promise.complete(Err(TaskError::NoSuchAssociation(address).into()));
+                log::warn!("no association for task with address: {}", task.address);
+                task.details
+                    .on_task_error(TaskError::NoSuchAssociation(task.address));
             }
         }
     }

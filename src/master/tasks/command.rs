@@ -3,7 +3,7 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::master::error::{CommandResponseError, TaskError};
 use crate::master::handle::{CommandResult, Promise};
-use crate::master::task::{NonReadTask, TaskType};
+use crate::master::task::NonReadTask;
 use crate::master::types::*;
 use crate::util::cursor::WriteError;
 
@@ -29,6 +29,18 @@ impl CommandMode {
 }
 
 impl CommandTask {
+    pub(crate) fn from_mode(
+        mode: CommandMode,
+        headers: CommandHeaders,
+        promise: Promise<CommandResult>,
+    ) -> Self {
+        Self {
+            state: mode.to_state(),
+            headers,
+            promise,
+        }
+    }
+
     fn new(state: State, headers: CommandHeaders, promise: Promise<CommandResult>) -> Self {
         Self {
             state,
@@ -37,32 +49,12 @@ impl CommandTask {
         }
     }
 
-    fn change_state(self, state: State) -> NonReadTask {
-        Self::get_non_read_task(state, self.headers, self.promise)
+    fn change_state(self, state: State) -> Self {
+        Self::new(state, self.headers, self.promise)
     }
 
-    fn get_task_type(
-        state: State,
-        headers: CommandHeaders,
-        promise: Promise<CommandResult>,
-    ) -> TaskType {
-        TaskType::NonRead(Self::get_non_read_task(state, headers, promise))
-    }
-
-    fn get_non_read_task(
-        state: State,
-        headers: CommandHeaders,
-        promise: Promise<CommandResult>,
-    ) -> NonReadTask {
-        NonReadTask::Command(CommandTask::new(state, headers, promise))
-    }
-
-    pub(crate) fn operate(
-        mode: CommandMode,
-        headers: CommandHeaders,
-        promise: Promise<CommandResult>,
-    ) -> TaskType {
-        Self::get_task_type(mode.to_state(), headers, promise)
+    pub(crate) fn wrap(self) -> NonReadTask {
+        NonReadTask::Command(self)
     }
 
     pub(crate) fn function(&self) -> FunctionCode {
@@ -101,7 +93,7 @@ impl CommandTask {
         }
 
         match self.state {
-            State::Select => Some(self.change_state(State::Operate)),
+            State::Select => Some(self.change_state(State::Operate).wrap()),
             _ => {
                 // Complete w/ success
                 self.promise.complete(Ok(()));

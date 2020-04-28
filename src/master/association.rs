@@ -2,14 +2,13 @@ use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::master::error::AssociationError;
-use crate::master::handle::{AssociationHandler, CommandResult, Promise};
+use crate::master::handle::{AssociationHandler, Promise};
 use crate::master::poll::{Poll, PollMap};
 use crate::master::task::NonReadTask::TimeSync;
 use crate::master::task::{ReadTask, Task, TaskType};
 use crate::master::tasks::auto::AutoTask;
-use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::time::TimeSyncTask;
-use crate::master::types::{CommandHeaders, CommandMode, EventClasses, ReadRequest};
+use crate::master::types::{EventClasses, ReadRequest};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use std::time::Duration;
@@ -383,14 +382,5 @@ impl Association {
 
     fn enable_unsolicited(&self, classes: EventClasses) -> Task {
         Task::new(self.address, AutoTask::EnableUnsolicited(classes).wrap())
-    }
-
-    pub(crate) fn operate(
-        &self,
-        mode: CommandMode,
-        headers: CommandHeaders,
-        promise: Promise<CommandResult>,
-    ) -> Task {
-        Task::new(self.address, CommandTask::operate(mode, headers, promise))
     }
 }
