@@ -4,12 +4,12 @@ use crate::app::parse::bytes::Bytes;
 use crate::app::parse::parser::{DecodeLogLevel, HeaderCollection};
 use crate::master::association::Association;
 use crate::master::error::{AssociationError, CommandError, TaskError, TimeSyncError};
-use crate::master::task::Task;
+use crate::master::task::{Task, TaskType};
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::time::TimeSyncTask;
-use crate::master::types::{CommandHeaders, CommandMode};
+use crate::master::types::{CommandHeaders, CommandMode, TimeSyncProcedure};
 
-/// messages sent from the handles to the master task via an mpsc
+// messages sent from the handles to the master task via an mpsc
 pub(crate) enum Message {
     QueueTask(Task),
     AddAssociation(Association, Promise<Result<(), AssociationError>>),
@@ -37,6 +37,7 @@ pub struct MasterHandle {
     sender: tokio::sync::mpsc::Sender<Message>,
 }
 
+/// A handle used to make requests against
 #[derive(Debug)]
 pub struct AssociationHandle {
     address: u16,
@@ -72,21 +73,6 @@ impl MasterHandle {
         rx.await?
             .map(|_| (AssociationHandle::new(address, self.sender.clone())))
     }
-
-    pub async fn remove_association(
-        &mut self,
-        handle: AssociationHandle,
-    ) -> Result<(), AssociationError> {
-        if self
-            .sender
-            .send(Message::RemoveAssociation(handle.address))
-            .await
-            .is_err()
-        {
-            return Err(AssociationError::Shutdown);
-        }
-        Ok(())
-    }
 }
 
 impl AssociationHandle {
@@ -98,46 +84,73 @@ impl AssociationHandle {
         self.address
     }
 
+    pub fn callbacks(self) -> CallbackAssociationHandle {
+        CallbackAssociationHandle { inner: self }
+    }
+
+    pub async fn remove(mut self) {
+        self.sender
+            .send(Message::RemoveAssociation(self.address))
+            .await
+            .ok();
+    }
+
     pub async fn operate(&mut self, mode: CommandMode, headers: CommandHeaders) -> CommandResult {
         let (tx, rx) = tokio::sync::oneshot::channel::<CommandResult>();
         let task = CommandTask::from_mode(mode, headers, Promise::OneShot(tx));
-        self.send_task(Task::new(self.address, task.wrap().wrap()))
-            .await;
+        self.send_task(task.wrap().wrap()).await;
         rx.await?
     }
 
-    pub async fn perform_lan_time_sync(&mut self) -> Result<(), TimeSyncError> {
+    pub async fn perform_time_sync(
+        &mut self,
+        procedure: TimeSyncProcedure,
+    ) -> Result<(), TimeSyncError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
-        let task = TimeSyncTask::get_lan_procedure(false, Promise::OneShot(tx));
-        self.send_task(Task::new(self.address, task.wrap().wrap()))
-            .await;
+        let task = TimeSyncTask::get_procedure(procedure, false, Promise::OneShot(tx));
+        self.send_task(task.wrap().wrap()).await;
         rx.await?
     }
 
-    pub async fn perform_non_lan_time_sync(&mut self) -> Result<(), TimeSyncError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
-        let task = TimeSyncTask::get_non_lan_procedure(false, Promise::OneShot(tx));
-        self.send_task(Task::new(self.address, task.wrap().wrap()))
-            .await;
-        rx.await?
+    async fn send_task(&mut self, task: TaskType) {
+        if let Err(tokio::sync::mpsc::error::SendError(msg)) = self
+            .sender
+            .send(Message::QueueTask(Task::new(self.address, task)))
+            .await
+        {
+            msg.on_send_failure();
+        }
+    }
+}
+
+pub struct CallbackAssociationHandle {
+    inner: AssociationHandle,
+}
+
+impl CallbackAssociationHandle {
+    pub fn address(&self) -> u16 {
+        self.inner.address
     }
 
-    /*
-    pub async fn operate_cb<F>(&mut self, mode: CommandMode, headers: CommandHeaders, callback: F)
+    pub async fn remove(self) {
+        self.inner.remove().await
+    }
+
+    pub async fn operate<F>(&mut self, mode: CommandMode, headers: CommandHeaders, callback: F)
     where
         F: FnOnce(CommandResult) -> () + Send + Sync + 'static,
     {
         let task = CommandTask::from_mode(mode, headers, Promise::BoxedFn(Box::new(callback)));
-        self.send_task(Task::new(self.address, task.wrap().wrap())).await;
+        self.inner.send_task(task.wrap().wrap()).await;
     }
-    */
 
-    async fn send_task(&mut self, task: Task) {
-        if let Err(tokio::sync::mpsc::error::SendError(msg)) =
-            self.sender.send(Message::QueueTask(task)).await
-        {
-            msg.on_send_failure();
-        }
+    pub async fn perform_time_sync<F>(&mut self, procedure: TimeSyncProcedure, callback: F)
+    where
+        F: FnOnce(Result<(), TimeSyncError>) -> () + Send + Sync + 'static,
+    {
+        let task =
+            TimeSyncTask::get_procedure(procedure, false, Promise::BoxedFn(Box::new(callback)));
+        self.inner.send_task(task.wrap().wrap()).await;
     }
 }
 
@@ -163,7 +176,6 @@ impl<T> Promise<T> {
 }
 
 pub type CommandResult = Result<(), CommandError>;
-pub type TimeSyncResult = Result<(), TimeSyncError>;
 
 pub trait ResponseHandler: Send {
     fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);

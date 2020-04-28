@@ -16,6 +16,12 @@ pub enum CommandMode {
     SelectBeforeOperate,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum TimeSyncProcedure {
+    LAN,
+    NonLAN,
+}
+
 #[derive(Copy, Clone)]
 pub struct EventClasses {
     pub class1: bool,

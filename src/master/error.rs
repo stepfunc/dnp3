@@ -3,7 +3,6 @@ use crate::app::header::{IIN, IIN2};
 use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;
 use crate::master::association::NoAssociation;
-use crate::master::handle::TimeSyncResult;
 use crate::master::runner::RunError;
 use crate::util::cursor::WriteError;
 use std::error::Error;
@@ -80,7 +79,7 @@ pub enum TimeSyncError {
 }
 
 impl TimeSyncError {
-    pub(crate) fn from_iin(iin: IIN) -> TimeSyncResult {
+    pub(crate) fn from_iin(iin: IIN) -> Result<(), TimeSyncError> {
         if iin.iin1.get_need_time() {
             return Err(TimeSyncError::StillNeedsTime);
         }

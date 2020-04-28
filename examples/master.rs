@@ -1,10 +1,12 @@
 use dnp3rs::app::gen::enums::OpType;
 use dnp3rs::app::gen::variations::fixed::Group12Var1;
 use dnp3rs::app::parse::parser::DecodeLogLevel;
-use dnp3rs::master::association::{Association, AssociationConfig, AutoTimeSync};
+use dnp3rs::master::association::{Association, Configuration};
 use dnp3rs::master::null::NullHandler;
 use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
-use dnp3rs::master::types::{Classes, CommandBuilder, CommandMode, EventClasses, ReadRequest};
+use dnp3rs::master::types::{
+    Classes, CommandBuilder, CommandMode, EventClasses, ReadRequest, TimeSyncProcedure,
+};
 use dnp3rs::util::timeout::Timeout;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -13,8 +15,8 @@ use tokio::stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
 fn get_association() -> Association {
-    let mut config = AssociationConfig::default();
-    config.auto_time_sync = AutoTimeSync::LanProcedure;
+    let mut config = Configuration::default();
+    config.auto_time_sync = Some(TimeSyncProcedure::LAN);
     let mut association = Association::new(1024, config, NullHandler::boxed());
     association.add_poll(
         ReadRequest::ClassScan(Classes::events(EventClasses::all())),
@@ -61,12 +63,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "lts" => {
-                if let Err(err) = association.perform_lan_time_sync().await {
+                if let Err(err) = association.perform_time_sync(TimeSyncProcedure::LAN).await {
                     log::warn!("error: {}", err);
                 }
             }
             "nts" => {
-                if let Err(err) = association.perform_non_lan_time_sync().await {
+                if let Err(err) = association
+                    .perform_time_sync(TimeSyncProcedure::NonLAN)
+                    .await
+                {
                     log::warn!("error: {}", err);
                 }
             }

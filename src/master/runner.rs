@@ -655,7 +655,7 @@ impl Runner {
 mod test {
     use super::*;
     use crate::link::header::Address;
-    use crate::master::association::{Association, AssociationConfig};
+    use crate::master::association::{Association, Configuration};
     use crate::master::handle::MasterHandle;
     use crate::master::null::NullHandler;
     use crate::transport::mocks::{MockReader, MockWriter};
@@ -700,7 +700,7 @@ mod test {
         let association =
             {
                 let mut add_task = tokio_test::task::spawn(master.add_association(
-                    Association::new(1024, AssociationConfig::default(), NullHandler::boxed()),
+                    Association::new(1024, Configuration::default(), NullHandler::boxed()),
                 ));
                 tokio_test::assert_pending!(add_task.poll());
                 tokio_test::assert_pending!(master_task.poll());

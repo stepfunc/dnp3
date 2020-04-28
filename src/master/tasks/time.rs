@@ -6,8 +6,9 @@ use crate::app::parse::parser::{HeaderDetails, Response};
 use crate::app::types::Timestamp;
 use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
-use crate::master::handle::{Promise, TimeSyncResult};
+use crate::master::handle::Promise;
 use crate::master::task::NonReadTask;
+use crate::master::types::TimeSyncProcedure;
 use crate::util::cursor::WriteError;
 use std::convert::TryFrom;
 use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};
@@ -22,11 +23,20 @@ enum State {
 pub(crate) struct TimeSyncTask {
     is_auto_task: bool,
     state: State,
-    promise: Promise<TimeSyncResult>,
+    promise: Promise<Result<(), TimeSyncError>>,
+}
+
+impl TimeSyncProcedure {
+    fn get_start_state(&self) -> State {
+        match self {
+            TimeSyncProcedure::LAN => State::RecordCurrentTime,
+            TimeSyncProcedure::NonLAN => State::MeasureDelay,
+        }
+    }
 }
 
 impl TimeSyncTask {
-    fn new(is_auto_task: bool, state: State, promise: Promise<TimeSyncResult>) -> Self {
+    fn new(is_auto_task: bool, state: State, promise: Promise<Result<(), TimeSyncError>>) -> Self {
         Self {
             is_auto_task,
             state,
@@ -38,15 +48,12 @@ impl TimeSyncTask {
         TimeSyncTask::new(self.is_auto_task, state, self.promise)
     }
 
-    pub(crate) fn get_non_lan_procedure(
+    pub(crate) fn get_procedure(
+        procedure: TimeSyncProcedure,
         is_auto_task: bool,
-        promise: Promise<TimeSyncResult>,
+        promise: Promise<Result<(), TimeSyncError>>,
     ) -> Self {
-        Self::new(is_auto_task, State::MeasureDelay, promise)
-    }
-
-    pub(crate) fn get_lan_procedure(is_auto_task: bool, promise: Promise<TimeSyncResult>) -> Self {
-        Self::new(is_auto_task, State::RecordCurrentTime, promise)
+        Self::new(is_auto_task, procedure.get_start_state(), promise)
     }
 
     pub(crate) fn wrap(self) -> NonReadTask {

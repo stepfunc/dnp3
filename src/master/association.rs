@@ -8,38 +8,27 @@ use crate::master::task::NonReadTask::TimeSync;
 use crate::master::task::{ReadTask, Task, TaskType};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
-use crate::master::types::{EventClasses, ReadRequest};
+use crate::master::types::{EventClasses, ReadRequest, TimeSyncProcedure};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use std::time::Duration;
 use tokio::time::Instant;
 
-/// Defines if and how the master performs automatic time synchronization
 #[derive(Copy, Clone)]
-pub enum AutoTimeSync {
-    /// no automatic time synchronization
-    None,
-    /// record current time followed by write g50v3
-    LanProcedure,
-    /// delay measure followed by write g50v1
-    NonLanProcedure,
-}
-
-#[derive(Copy, Clone)]
-pub struct AssociationConfig {
+pub struct Configuration {
     /// The event classes to disable on startup
     pub disable_unsol_classes: EventClasses,
     /// The event classes to enable on startup
     pub enable_unsol_classes: EventClasses,
     /// automatic time synchronization based on NEED_TIME IIN bit
-    pub auto_time_sync: AutoTimeSync,
+    pub auto_time_sync: Option<TimeSyncProcedure>,
 }
 
-impl AssociationConfig {
+impl Configuration {
     pub fn new(
         disable_unsol_classes: EventClasses,
         enable_unsol_classes: EventClasses,
-        auto_time_sync: AutoTimeSync,
+        auto_time_sync: Option<TimeSyncProcedure>,
     ) -> Self {
         Self {
             disable_unsol_classes,
@@ -49,17 +38,13 @@ impl AssociationConfig {
     }
 
     pub fn none() -> Self {
-        AssociationConfig::new(
-            EventClasses::none(),
-            EventClasses::none(),
-            AutoTimeSync::None,
-        )
+        Configuration::new(EventClasses::none(), EventClasses::none(), None)
     }
 }
 
-impl Default for AssociationConfig {
+impl Default for Configuration {
     fn default() -> Self {
-        AssociationConfig::new(EventClasses::all(), EventClasses::all(), AutoTimeSync::None)
+        Configuration::new(EventClasses::all(), EventClasses::all(), None)
     }
 }
 
@@ -121,7 +106,7 @@ pub struct Association {
     seq: Sequence,
     tasks: TaskStates,
     handler: Box<dyn AssociationHandler>,
-    config: AssociationConfig,
+    config: Configuration,
     polls: PollMap,
 }
 
@@ -130,11 +115,7 @@ impl Association {
     /// * `address` is the DNP3 link-layer address of the outstation
     /// * `config` controls the behavior of the master for this outstation
     /// * `handler` is a callback trait invoked when events occur for this outstation
-    pub fn new(
-        address: u16,
-        config: AssociationConfig,
-        handler: Box<dyn AssociationHandler>,
-    ) -> Self {
+    pub fn new(address: u16, config: Configuration, handler: Box<dyn AssociationHandler>) -> Self {
         Self {
             address,
             seq: Sequence::default(),
@@ -227,10 +208,8 @@ impl Association {
             return Next::Now(self.clear_restart_iin());
         }
         if self.tasks.time_sync.is_pending() {
-            match self.config.auto_time_sync {
-                AutoTimeSync::None => {}
-                AutoTimeSync::LanProcedure => return Next::Now(self.lan_time_sync()),
-                AutoTimeSync::NonLanProcedure => return Next::Now(self.non_lan_time_sync()),
+            if let Some(x) = self.config.auto_time_sync {
+                return Next::Now(self.time_sync(x));
             }
         }
         if self.config.disable_unsol_classes.any() && self.tasks.disable_unsolicited.is_pending() {
@@ -366,17 +345,10 @@ impl Association {
         Task::new(self.address, AutoTask::DisableUnsolicited(classes).wrap())
     }
 
-    fn lan_time_sync(&self) -> Task {
+    fn time_sync(&self, procedure: TimeSyncProcedure) -> Task {
         Task::new(
             self.address,
-            TimeSync(TimeSyncTask::get_lan_procedure(true, Promise::Empty)).wrap(),
-        )
-    }
-
-    fn non_lan_time_sync(&self) -> Task {
-        Task::new(
-            self.address,
-            TimeSync(TimeSyncTask::get_non_lan_procedure(true, Promise::Empty)).wrap(),
+            TimeSync(TimeSyncTask::get_procedure(procedure, true, Promise::Empty)).wrap(),
         )
     }
 
