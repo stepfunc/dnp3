@@ -11,12 +11,20 @@ use crate::util::cursor::WriteError;
 
 /// There are two broad categories of tasks. Reads
 /// require handling for multi-fragmented responses.
-///
 pub(crate) enum TaskType {
     /// Reads require handling for multi-fragmented responses
     Read(ReadTask),
     /// NonRead tasks always require FIR/FIN == 1, but might require multiple read/response cycles, e.g. SBO
     NonRead(NonReadTask),
+}
+
+impl TaskType {
+    pub(crate) fn on_task_error(self, err: TaskError) {
+        match self {
+            TaskType::NonRead(task) => task.on_task_error(err),
+            TaskType::Read(task) => task.on_task_error(err),
+        }
+    }
 }
 
 pub(crate) trait RequestWriter {
@@ -72,6 +80,13 @@ impl ReadTask {
         match self {
             ReadTask::StartupIntegrity => association.on_integrity_scan_complete(),
             ReadTask::PeriodicPoll(poll) => association.complete_poll(poll.id),
+        }
+    }
+
+    pub(crate) fn on_task_error(self, _err: TaskError) {
+        match self {
+            ReadTask::StartupIntegrity => {}
+            ReadTask::PeriodicPoll(_) => {}
         }
     }
 }

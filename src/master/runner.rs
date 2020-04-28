@@ -32,7 +32,7 @@ pub(crate) struct Runner {
     timeout: Timeout,
     associations: AssociationMap,
     user_queue: tokio::sync::mpsc::Receiver<Message>,
-    command_queue: VecDeque<Task>,
+    request_queue: VecDeque<Task>,
     buffer: [u8; 2048],
 }
 
@@ -53,13 +53,22 @@ impl Runner {
             timeout: response_timeout,
             associations: AssociationMap::new(),
             user_queue,
-            command_queue: VecDeque::new(),
+            request_queue: VecDeque::new(),
             buffer: [0; 2048],
         }
     }
 
-    pub(crate) fn reset(&mut self) {
-        self.associations.reset()
+    fn reset(&mut self, err: RunError) {
+        self.associations.reset();
+
+        // fail any pending requests
+        while let Some(task) = self.request_queue.pop_front() {
+            let task_err = match err {
+                RunError::Shutdown => TaskError::Shutdown,
+                RunError::Link(_) => TaskError::NoConnection,
+            };
+            task.details.on_task_error(task_err);
+        }
     }
 
     async fn idle_until<T>(
@@ -188,7 +197,7 @@ impl Runner {
     ) {
         match self.associations.get(address).ok() {
             Some(association) => {
-                self.command_queue
+                self.request_queue
                     .push_back(association.operate(mode, headers, promise));
             }
             None => {
@@ -311,7 +320,7 @@ impl Runner {
     }
 
     fn get_next_task(&mut self) -> Next<Task> {
-        if let Some(x) = self.command_queue.pop_front() {
+        if let Some(x) = self.request_queue.pop_front() {
             return Next::Now(x);
         }
 
@@ -335,6 +344,9 @@ impl Runner {
             };
 
             if let Err(err) = result {
+                self.reset(err);
+                writer.reset();
+                reader.reset();
                 return err;
             }
         }
