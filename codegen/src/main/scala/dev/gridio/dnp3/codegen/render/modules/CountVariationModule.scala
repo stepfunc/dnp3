@@ -28,7 +28,7 @@ object CountVariationModule extends Module {
     }
 
     "#[derive(Debug, PartialEq)]".eol ++
-      bracket("pub enum CountVariation<'a>") {
+      bracket("pub(crate) enum CountVariation<'a>") {
         variations.iterator.flatMap(v =>  commented(v.fullDesc).eol ++ definition(v))
       }
 
@@ -39,12 +39,6 @@ object CountVariationModule extends Module {
     def parseMatcher(v : Variation) : String = {
       v match {
         case _ : FixedSize => s"Variation::${v.name} => Ok(CountVariation::${v.name}(CountSequence::parse(count, cursor)?)),"
-      }
-    }
-
-    def logMatcher(v : Variation) : String = {
-      v match {
-        case _ : FixedSize => s"CountVariation::${v.name}(seq) => log_count_of_items(level, seq.iter()),"
       }
     }
     def fmtMatcher(v : Variation) : String = {
@@ -64,14 +58,6 @@ object CountVariationModule extends Module {
           variations.map(fmtMatcher).iterator
         }
       }
-      /*
-      ++ space ++
-      bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
-        bracket("match self") {
-          variations.map(logMatcher).iterator
-        }
-      }
-       */
     }
 
   }
