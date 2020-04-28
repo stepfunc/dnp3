@@ -3,7 +3,7 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::master::error::{CommandResponseError, TaskError};
 use crate::master::handle::{CommandResult, Promise};
-use crate::master::task::{NonReadTask, NonReadTaskStatus, TaskType};
+use crate::master::task::NonReadTask;
 use crate::master::types::*;
 use crate::util::cursor::WriteError;
 
@@ -29,6 +29,18 @@ impl CommandMode {
 }
 
 impl CommandTask {
+    pub(crate) fn from_mode(
+        mode: CommandMode,
+        headers: CommandHeaders,
+        promise: Promise<CommandResult>,
+    ) -> Self {
+        Self {
+            state: mode.to_state(),
+            headers,
+            promise,
+        }
+    }
+
     fn new(state: State, headers: CommandHeaders, promise: Promise<CommandResult>) -> Self {
         Self {
             state,
@@ -37,32 +49,12 @@ impl CommandTask {
         }
     }
 
-    fn change_state(self, state: State) -> NonReadTask {
-        Self::get_non_read_task(state, self.headers, self.promise)
+    fn change_state(self, state: State) -> Self {
+        Self::new(state, self.headers, self.promise)
     }
 
-    fn get_task_type(
-        state: State,
-        headers: CommandHeaders,
-        promise: Promise<CommandResult>,
-    ) -> TaskType {
-        TaskType::NonRead(Self::get_non_read_task(state, headers, promise))
-    }
-
-    fn get_non_read_task(
-        state: State,
-        headers: CommandHeaders,
-        promise: Promise<CommandResult>,
-    ) -> NonReadTask {
-        NonReadTask::Command(CommandTask::new(state, headers, promise))
-    }
-
-    pub(crate) fn operate(
-        mode: CommandMode,
-        headers: CommandHeaders,
-        promise: Promise<CommandResult>,
-    ) -> TaskType {
-        Self::get_task_type(mode.to_state(), headers, promise)
+    pub(crate) fn wrap(self) -> NonReadTask {
+        NonReadTask::Command(self)
     }
 
     pub(crate) fn function(&self) -> FunctionCode {
@@ -73,7 +65,7 @@ impl CommandTask {
         }
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         self.headers.write(writer)
     }
 
@@ -85,27 +77,27 @@ impl CommandTask {
         self.promise.complete(Err(err.into()))
     }
 
-    pub(crate) fn handle(self, response: Response) -> NonReadTaskStatus {
+    pub(crate) fn handle(self, response: Response) -> Option<NonReadTask> {
         let headers = match response.objects {
             Ok(x) => x,
             Err(err) => {
                 self.promise
                     .complete(Err(TaskError::MalformedResponse(err).into()));
-                return NonReadTaskStatus::Complete;
+                return None;
             }
         };
 
         if let Err(err) = self.compare(headers) {
             self.promise.complete(Err(err.into()));
-            return NonReadTaskStatus::Complete;
+            return None;
         }
 
         match self.state {
-            State::Select => NonReadTaskStatus::Next(self.change_state(State::Operate)),
+            State::Select => Some(self.change_state(State::Operate).wrap()),
             _ => {
                 // Complete w/ success
                 self.promise.complete(Ok(()));
-                NonReadTaskStatus::Complete
+                None
             }
         }
     }

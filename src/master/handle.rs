@@ -3,12 +3,15 @@ use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::parser::{DecodeLogLevel, HeaderCollection};
 use crate::master::association::Association;
-use crate::master::error::{AssociationError, CommandError, TaskError};
+use crate::master::error::{AssociationError, CommandError, TaskError, TimeSyncError};
+use crate::master::task::Task;
+use crate::master::tasks::command::CommandTask;
+use crate::master::tasks::time::TimeSyncTask;
 use crate::master::types::{CommandHeaders, CommandMode};
 
 /// messages sent from the handles to the master task via an mpsc
 pub(crate) enum Message {
-    Command(u16, CommandMode, CommandHeaders, Promise<CommandResult>),
+    QueueTask(Task),
     AddAssociation(Association, Promise<Result<(), AssociationError>>),
     RemoveAssociation(u16),
     SetDecodeLogLevel(DecodeLogLevel),
@@ -17,7 +20,9 @@ pub(crate) enum Message {
 impl Message {
     pub(crate) fn on_send_failure(self) {
         match self {
-            Message::Command(_, _, _, promise) => promise.complete(Err(TaskError::Shutdown.into())),
+            Message::QueueTask(task) => {
+                task.details.on_task_error(TaskError::Shutdown);
+            }
             Message::AddAssociation(_, promise) => {
                 promise.complete(Err(AssociationError::Shutdown))
             }
@@ -95,43 +100,52 @@ impl AssociationHandle {
 
     pub async fn operate(&mut self, mode: CommandMode, headers: CommandHeaders) -> CommandResult {
         let (tx, rx) = tokio::sync::oneshot::channel::<CommandResult>();
-        self.send_operate_message(mode, headers, Promise::OneShot(tx))
+        let task = CommandTask::from_mode(mode, headers, Promise::OneShot(tx));
+        self.send_task(Task::new(self.address, task.wrap().wrap()))
             .await;
         rx.await?
     }
 
+    pub async fn perform_lan_time_sync(&mut self) -> Result<(), TimeSyncError> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
+        let task = TimeSyncTask::get_lan_procedure(false, Promise::OneShot(tx));
+        self.send_task(Task::new(self.address, task.wrap().wrap()))
+            .await;
+        rx.await?
+    }
+
+    pub async fn perform_non_lan_time_sync(&mut self) -> Result<(), TimeSyncError> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
+        let task = TimeSyncTask::get_non_lan_procedure(false, Promise::OneShot(tx));
+        self.send_task(Task::new(self.address, task.wrap().wrap()))
+            .await;
+        rx.await?
+    }
+
+    /*
     pub async fn operate_cb<F>(&mut self, mode: CommandMode, headers: CommandHeaders, callback: F)
     where
         F: FnOnce(CommandResult) -> () + Send + Sync + 'static,
     {
-        self.send_operate_message(mode, headers, Promise::BoxedFn(Box::new(callback)))
-            .await;
+        let task = CommandTask::from_mode(mode, headers, Promise::BoxedFn(Box::new(callback)));
+        self.send_task(Task::new(self.address, task.wrap().wrap())).await;
     }
+    */
 
-    async fn send_operate_message(
-        &mut self,
-        mode: CommandMode,
-        headers: CommandHeaders,
-        promise: Promise<CommandResult>,
-    ) {
-        if let Err(tokio::sync::mpsc::error::SendError(msg)) = self
-            .sender
-            .send(Message::Command(self.address, mode, headers, promise))
-            .await
+    async fn send_task(&mut self, task: Task) {
+        if let Err(tokio::sync::mpsc::error::SendError(msg)) =
+            self.sender.send(Message::QueueTask(task)).await
         {
             msg.on_send_failure();
         }
     }
 }
 
-pub trait ResponseHandler: Send {
-    fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
-}
-
 /// A generic callback type that must be invoked once and only once.
 /// The user can select to implement it using FnOnce or a
 /// one-shot reply channel
 pub enum Promise<T> {
+    Empty,
     BoxedFn(Box<dyn FnOnce(T) -> () + Send + Sync>),
     OneShot(tokio::sync::oneshot::Sender<T>),
 }
@@ -139,6 +153,7 @@ pub enum Promise<T> {
 impl<T> Promise<T> {
     pub(crate) fn complete(self, value: T) {
         match self {
+            Promise::Empty => {}
             Promise::BoxedFn(func) => func(value),
             Promise::OneShot(s) => {
                 s.send(value).ok();
@@ -148,9 +163,14 @@ impl<T> Promise<T> {
 }
 
 pub type CommandResult = Result<(), CommandError>;
+pub type TimeSyncResult = Result<(), TimeSyncError>;
+
+pub trait ResponseHandler: Send {
+    fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
+}
 
 pub trait AssociationHandler: ResponseHandler {
-    // TODO - add additional methods
+    fn get_system_time(&self) -> std::time::SystemTime;
 }
 
 pub trait MeasurementHandler {

@@ -1,9 +1,7 @@
 use crate::app::format::write;
 use crate::app::parse::parser::{DecodeLogLevel, ParsedFragment, Response};
 use crate::app::sequence::Sequence;
-use crate::master::task::{
-    NonReadTask, NonReadTaskStatus, ReadTask, RequestWriter, Task, TaskType,
-};
+use crate::master::task::{NonReadTask, ReadTask, RequestWriter, Task, TaskType};
 use crate::transport::{ReaderType, WriterType};
 
 use crate::app::header::Control;
@@ -12,11 +10,10 @@ use crate::util::cursor::WriteCursor;
 
 use crate::app::format::write::start_request;
 use crate::master::association::{AssociationMap, Next};
-use crate::master::handle::{CommandResult, Message, Promise};
+use crate::master::handle::Message;
 use crate::util::timeout::Timeout;
 
-use crate::master::error::{CommandError, Shutdown, TaskError};
-use crate::master::types::{CommandHeaders, CommandMode};
+use crate::master::error::{Shutdown, TaskError};
 use std::collections::VecDeque;
 use std::ops::Add;
 use std::time::Duration;
@@ -34,7 +31,7 @@ pub(crate) struct Runner {
     timeout: Timeout,
     associations: AssociationMap,
     user_queue: tokio::sync::mpsc::Receiver<Message>,
-    command_queue: VecDeque<Task>,
+    request_queue: VecDeque<Task>,
     buffer: [u8; 2048],
 }
 
@@ -55,13 +52,22 @@ impl Runner {
             timeout: response_timeout,
             associations: AssociationMap::new(),
             user_queue,
-            command_queue: VecDeque::new(),
+            request_queue: VecDeque::new(),
             buffer: [0; 2048],
         }
     }
 
-    pub(crate) fn reset(&mut self) {
-        self.associations.reset()
+    fn reset(&mut self, err: RunError) {
+        self.associations.reset();
+
+        // fail any pending requests
+        while let Some(task) = self.request_queue.pop_front() {
+            let task_err = match err {
+                RunError::Shutdown => TaskError::Shutdown,
+                RunError::Link(_) => TaskError::NoConnection,
+            };
+            task.details.on_task_error(task_err);
+        }
     }
 
     async fn idle_until<T>(
@@ -158,11 +164,11 @@ impl Runner {
         match self.user_queue.recv().await {
             Some(x) => {
                 match x {
-                    Message::Command(address, mode, headers, callback) => {
+                    Message::QueueTask(task) => {
                         if is_connected {
-                            self.queue_command(address, mode, headers, callback);
+                            self.queue_task(task);
                         } else {
-                            callback.complete(Err(CommandError::Task(TaskError::NoConnection)));
+                            task.details.on_task_error(TaskError::NoConnection);
                         }
                     }
                     Message::AddAssociation(association, callback) => {
@@ -181,24 +187,15 @@ impl Runner {
         }
     }
 
-    fn queue_command(
-        &mut self,
-        address: u16,
-        mode: CommandMode,
-        headers: CommandHeaders,
-        promise: Promise<CommandResult>,
-    ) {
-        match self.associations.get(address).ok() {
-            Some(association) => {
-                self.command_queue
-                    .push_back(association.operate(mode, headers, promise));
+    fn queue_task(&mut self, task: Task) {
+        match self.associations.get(task.address).ok() {
+            Some(_association) => {
+                self.request_queue.push_back(task);
             }
             None => {
-                log::warn!(
-                    "no association for command request with address: {}",
-                    address
-                );
-                promise.complete(Err(TaskError::NoSuchAssociation(address).into()));
+                log::warn!("no association for task with address: {}", task.address);
+                task.details
+                    .on_task_error(TaskError::NoSuchAssociation(task.address));
             }
         }
     }
@@ -313,7 +310,7 @@ impl Runner {
     }
 
     fn get_next_task(&mut self) -> Next<Task> {
-        if let Some(x) = self.command_queue.pop_front() {
+        if let Some(x) = self.request_queue.pop_front() {
             return Next::Now(x);
         }
 
@@ -337,6 +334,9 @@ impl Runner {
             };
 
             if let Err(err) = result {
+                self.reset(err);
+                writer.reset();
+                reader.reset();
                 return err;
             }
         }
@@ -394,6 +394,8 @@ impl Runner {
                 }
             };
 
+            let request_tx = std::time::SystemTime::now();
+
             let deadline = self.timeout.from_now();
 
             loop {
@@ -416,9 +418,9 @@ impl Runner {
                             }
                             Ok(association) => {
                                 association.process_iin(response.header.iin);
-                                match task.handle(association, response) {
-                                    NonReadTaskStatus::Complete => return Ok(()),
-                                    NonReadTaskStatus::Next(next) => {
+                                match task.handle(request_tx, association, response) {
+                                    None => return Ok(()),
+                                    Some(next) => {
                                         task = next;
                                         // break from the inner loop and execute the next request
                                         break;

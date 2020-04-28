@@ -1,10 +1,13 @@
 use crate::app::gen::enums::CommandStatus;
+use crate::app::header::{IIN, IIN2};
 use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;
 use crate::master::association::NoAssociation;
+use crate::master::handle::TimeSyncResult;
 use crate::master::runner::RunError;
 use crate::util::cursor::WriteError;
 use std::error::Error;
+use tokio::sync::oneshot::error::RecvError;
 
 /// Indicates that a task has shutdown
 pub(crate) struct Shutdown;
@@ -25,6 +28,8 @@ pub enum TaskError {
     Lower(LinkError),
     /// A response to the task's request was malformed
     MalformedResponse(ObjectParseError),
+    /// The response contains headers that don't match the request
+    UnexpectedResponseHeaders,
     /// Non-final response not requesting confirmation
     NonFinWithoutCon,
     /// Received a non-FIR response when expecting the FIR bit
@@ -60,6 +65,30 @@ pub enum CommandResponseError {
     ObjectCountMismatch,
     /// a value in one of the objects in the response doesn't match the request
     ObjectValueMismatch,
+}
+
+/// parent error type for time sync tasks
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum TimeSyncError {
+    Task(TaskError),
+    ClockRollback,
+    SystemTimeNotUnix,
+    BadOutstationTimeDelay(u16),
+    Overflow,
+    StillNeedsTime,
+    IINError(IIN2),
+}
+
+impl TimeSyncError {
+    pub(crate) fn from_iin(iin: IIN) -> TimeSyncResult {
+        if iin.iin1.get_need_time() {
+            return Err(TimeSyncError::StillNeedsTime);
+        }
+        if iin.has_request_error() {
+            return Err(TimeSyncError::IINError(iin.iin2));
+        }
+        Ok(())
+    }
 }
 
 /// parent error type for command tasks
@@ -125,6 +154,9 @@ impl std::fmt::Display for TaskError {
         match self {
             TaskError::Lower(_) => f.write_str("I/O error"),
             TaskError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
+            TaskError::UnexpectedResponseHeaders => {
+                f.write_str("response contains headers that don't match the request")
+            }
             TaskError::NonFinWithoutCon => {
                 f.write_str("outstation responses with FIN == 0 must request confirmation")
             }
@@ -148,9 +180,23 @@ impl std::fmt::Display for TaskError {
     }
 }
 
-impl From<tokio::sync::oneshot::error::RecvError> for CommandError {
-    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        CommandError::Task(TaskError::Shutdown)
+impl std::fmt::Display for TimeSyncError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TimeSyncError::Task(err) => write!(f, "{}", err),
+            TimeSyncError::SystemTimeNotUnix => {
+                f.write_str("the system time cannot be converted to unix time")
+            }
+            TimeSyncError::BadOutstationTimeDelay(x) => write!(
+                f,
+                "outstation time delay ({}) exceeded the response delay",
+                x
+            ),
+            TimeSyncError::Overflow => f.write_str("overflow in calculation"),
+            TimeSyncError::ClockRollback => f.write_str("detected a clock rollback"),
+            TimeSyncError::StillNeedsTime => f.write_str("outstation did not clear NEED_TIME bit"),
+            TimeSyncError::IINError(iin2) => write!(f, "outstation indicated an error: {}", iin2),
+        }
     }
 }
 
@@ -202,12 +248,6 @@ impl From<NoAssociation> for TaskError {
     }
 }
 
-impl From<tokio::sync::oneshot::error::RecvError> for AssociationError {
-    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        AssociationError::Shutdown
-    }
-}
-
 impl From<CommandResponseError> for CommandError {
     fn from(err: CommandResponseError) -> Self {
         CommandError::Response(err)
@@ -220,7 +260,32 @@ impl From<TaskError> for CommandError {
     }
 }
 
+impl From<TaskError> for TimeSyncError {
+    fn from(err: TaskError) -> Self {
+        TimeSyncError::Task(err)
+    }
+}
+
+impl From<RecvError> for AssociationError {
+    fn from(_: RecvError) -> Self {
+        AssociationError::Shutdown
+    }
+}
+
+impl From<RecvError> for CommandError {
+    fn from(_: RecvError) -> Self {
+        CommandError::Task(TaskError::Shutdown)
+    }
+}
+
+impl From<RecvError> for TimeSyncError {
+    fn from(_: RecvError) -> Self {
+        TimeSyncError::Task(TaskError::Shutdown)
+    }
+}
+
 impl Error for AssociationError {}
 impl Error for TaskError {}
 impl Error for CommandError {}
 impl Error for CommandResponseError {}
+impl Error for TimeSyncError {}

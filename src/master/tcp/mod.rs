@@ -132,9 +132,6 @@ impl MasterTask {
                         RunError::Link(err) => {
                             let delay = self.back_off.min_delay();
                             log::warn!("{} - waiting { }ms to reconnect", err, delay.as_millis());
-                            self.runner.reset();
-                            self.reader.reset();
-                            self.writer.reset();
                             self.runner.delay_for(delay).await?;
                         }
                     }
