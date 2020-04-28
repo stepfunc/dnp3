@@ -20,21 +20,33 @@ enum State {
 }
 
 pub(crate) struct TimeSyncTask {
+    is_auto_task: bool,
     state: State,
     promise: Promise<TimeSyncResult>,
 }
 
 impl TimeSyncTask {
-    fn new(state: State, promise: Promise<TimeSyncResult>) -> Self {
-        Self { state, promise }
+    fn new(is_auto_task: bool, state: State, promise: Promise<TimeSyncResult>) -> Self {
+        Self {
+            is_auto_task,
+            state,
+            promise,
+        }
     }
 
-    pub(crate) fn get_non_lan_procedure(promise: Promise<TimeSyncResult>) -> Self {
-        Self::new(State::MeasureDelay, promise)
+    fn change_state(self, state: State) -> Self {
+        TimeSyncTask::new(self.is_auto_task, state, self.promise)
     }
 
-    pub(crate) fn get_lan_procedure(promise: Promise<TimeSyncResult>) -> Self {
-        Self::new(State::RecordCurrentTime, promise)
+    pub(crate) fn get_non_lan_procedure(
+        is_auto_task: bool,
+        promise: Promise<TimeSyncResult>,
+    ) -> Self {
+        Self::new(is_auto_task, State::MeasureDelay, promise)
+    }
+
+    pub(crate) fn get_lan_procedure(is_auto_task: bool, promise: Promise<TimeSyncResult>) -> Self {
+        Self::new(is_auto_task, State::RecordCurrentTime, promise)
     }
 
     pub(crate) fn wrap(self) -> NonReadTask {
@@ -155,7 +167,10 @@ impl TimeSyncTask {
             Ok(x) => x,
         };
 
-        Some(TimeSyncTask::new(State::WriteAbsoluteTime(timestamp), self.promise).wrap())
+        Some(
+            self.change_state(State::WriteAbsoluteTime(timestamp))
+                .wrap(),
+        )
     }
 
     fn handle_write_absolute_time(
@@ -163,7 +178,11 @@ impl TimeSyncTask {
         association: &mut Association,
         response: Response,
     ) -> Option<NonReadTask> {
-        association.on_time_sync_iin_response(response.header.iin);
+        if self.is_auto_task {
+            association.on_time_sync_iin_response(response.header.iin);
+        }
+        self.promise
+            .complete(TimeSyncError::from_iin(response.header.iin));
         None
     }
 
@@ -180,13 +199,10 @@ impl TimeSyncTask {
             Ok(x) => x,
         };
 
-        Some(TimeSyncTask::new(State::WriteLastRecordedTime(timestamp), self.promise).wrap())
-    }
-
-    fn convert_to_timestamp(time: SystemTime) -> Result<Timestamp, TimeSyncError> {
-        Ok(Timestamp::new(u64::try_from(
-            time.duration_since(UNIX_EPOCH)?.as_millis(),
-        )?))
+        Some(
+            self.change_state(State::WriteLastRecordedTime(timestamp))
+                .wrap(),
+        )
     }
 
     fn handle_write_last_recorded_time(
@@ -194,8 +210,18 @@ impl TimeSyncTask {
         association: &mut Association,
         response: Response,
     ) -> Option<NonReadTask> {
-        association.on_time_sync_iin_response(response.header.iin);
+        if self.is_auto_task {
+            association.on_time_sync_iin_response(response.header.iin);
+        }
+        self.promise
+            .complete(TimeSyncError::from_iin(response.header.iin));
         None
+    }
+
+    fn convert_to_timestamp(time: SystemTime) -> Result<Timestamp, TimeSyncError> {
+        Ok(Timestamp::new(u64::try_from(
+            time.duration_since(UNIX_EPOCH)?.as_millis(),
+        )?))
     }
 
     fn get_timestamp(

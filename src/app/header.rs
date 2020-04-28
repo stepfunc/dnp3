@@ -238,6 +238,12 @@ impl IIN {
         })
     }
 
+    pub(crate) fn has_request_error(self) -> bool {
+        self.iin2.get_no_func_code_support()
+            || self.iin2.get_object_unknown()
+            || self.iin2.get_parameter_error()
+    }
+
     /*
         pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
             cursor.write_u8(self.iin1.value)?;

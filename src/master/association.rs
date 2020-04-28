@@ -370,14 +370,14 @@ impl Association {
     fn lan_time_sync(&self) -> Task {
         Task::new(
             self.address,
-            TimeSync(TimeSyncTask::get_lan_procedure(Promise::Empty)).wrap(),
+            TimeSync(TimeSyncTask::get_lan_procedure(true, Promise::Empty)).wrap(),
         )
     }
 
     fn non_lan_time_sync(&self) -> Task {
         Task::new(
             self.address,
-            TimeSync(TimeSyncTask::get_non_lan_procedure(Promise::Empty)).wrap(),
+            TimeSync(TimeSyncTask::get_non_lan_procedure(true, Promise::Empty)).wrap(),
         )
     }
 

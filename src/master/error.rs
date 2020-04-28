@@ -1,7 +1,9 @@
 use crate::app::gen::enums::CommandStatus;
+use crate::app::header::{IIN, IIN2};
 use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;
 use crate::master::association::NoAssociation;
+use crate::master::handle::TimeSyncResult;
 use crate::master::runner::RunError;
 use crate::util::cursor::WriteError;
 use std::error::Error;
@@ -72,6 +74,20 @@ pub enum TimeSyncError {
     SystemTimeNotUnix,
     BadOutstationTimeDelay(u16),
     Overflow,
+    StillNeedsTime,
+    IINError(IIN2),
+}
+
+impl TimeSyncError {
+    pub(crate) fn from_iin(iin: IIN) -> TimeSyncResult {
+        if iin.iin1.get_need_time() {
+            return Err(TimeSyncError::StillNeedsTime);
+        }
+        if iin.has_request_error() {
+            return Err(TimeSyncError::IINError(iin.iin2));
+        }
+        Ok(())
+    }
 }
 
 /// parent error type for command tasks
@@ -177,6 +193,8 @@ impl std::fmt::Display for TimeSyncError {
             ),
             TimeSyncError::Overflow => f.write_str("overflow in calculation"),
             TimeSyncError::ClockRollback => f.write_str("detected a clock rollback"),
+            TimeSyncError::StillNeedsTime => f.write_str("outstation did not clear NEED_TIME bit"),
+            TimeSyncError::IINError(iin2) => write!(f, "outstation indicated an error: {}", iin2),
         }
     }
 }
