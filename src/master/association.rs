@@ -349,7 +349,7 @@ impl Association {
     fn time_sync(&self, procedure: TimeSyncProcedure) -> Task {
         Task::new(
             self.address,
-            TimeSync(TimeSyncTask::get_procedure(procedure, true, Promise::Empty)).wrap(),
+            TimeSync(TimeSyncTask::get_procedure(procedure, true, Promise::None)).wrap(),
         )
     }
 

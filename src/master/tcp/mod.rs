@@ -1,7 +1,7 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::app::timeout::Timeout;
 use crate::master::error::Shutdown;
-use crate::master::handle::MasterHandle;
+use crate::master::handle::{Listener, MasterHandle};
 use crate::master::runner::{RunError, Runner};
 use crate::transport::{ReaderType, WriterType};
 use std::net::SocketAddr;
@@ -21,6 +21,16 @@ impl ReconnectStrategy {
             max_delay,
         }
     }
+}
+
+/// state of TCP client connection
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ClientState {
+    Connecting,
+    Connected,
+    WaitAfterFailedConnect(Duration),
+    WaitAfterDisconnect(Duration),
+    Shutdown,
 }
 
 struct ExponentialBackOff {
@@ -74,6 +84,7 @@ pub struct MasterTask {
     runner: Runner,
     reader: ReaderType,
     writer: WriterType,
+    listener: Listener<ClientState>,
 }
 
 impl MasterTask {
@@ -88,8 +99,10 @@ impl MasterTask {
         strategy: ReconnectStrategy,
         timeout: Timeout,
         endpoint: SocketAddr,
+        listener: Listener<ClientState>,
     ) -> MasterHandle {
-        let (mut task, handle) = MasterTask::new(address, level, strategy, timeout, endpoint);
+        let (mut task, handle) =
+            MasterTask::new(address, level, strategy, timeout, endpoint, listener);
         tokio::spawn(async move { task.run().await });
         handle
     }
@@ -108,6 +121,7 @@ impl MasterTask {
         strategy: ReconnectStrategy,
         response_timeout: Timeout,
         endpoint: SocketAddr,
+        listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
         let (tx, rx) = tokio::sync::mpsc::channel(100); // TODO
         let runner = Runner::new(level, response_timeout, rx);
@@ -118,6 +132,7 @@ impl MasterTask {
             runner,
             reader,
             writer,
+            listener,
         };
         (task, MasterHandle::new(tx))
     }
@@ -130,23 +145,33 @@ impl MasterTask {
 
     async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
+            self.listener.update(ClientState::Connecting);
             match TcpStream::connect(self.endpoint).await {
                 Err(err) => {
                     let delay = self.back_off.on_connect_failure();
                     log::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
+                    self.listener
+                        .update(ClientState::WaitAfterFailedConnect(delay));
                     self.runner.delay_for(delay).await?;
                 }
                 Ok(mut socket) => {
+                    log::info!("connected to: {}", self.endpoint);
                     self.back_off.on_connect_success();
+                    self.listener.update(ClientState::Connected);
                     match self
                         .runner
                         .run(&mut socket, &mut self.writer, &mut self.reader)
                         .await
                     {
-                        RunError::Shutdown => return Err(Shutdown),
+                        RunError::Shutdown => {
+                            self.listener.update(ClientState::Shutdown);
+                            return Err(Shutdown);
+                        }
                         RunError::Link(err) => {
                             let delay = self.back_off.min_delay();
-                            log::warn!("{} - waiting { }ms to reconnect", err, delay.as_millis());
+                            log::warn!("{} - waiting {} ms to reconnect", err, delay.as_millis());
+                            self.listener
+                                .update(ClientState::WaitAfterDisconnect(delay));
                             self.runner.delay_for(delay).await?;
                         }
                     }

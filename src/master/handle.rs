@@ -157,21 +157,47 @@ impl CallbackAssociationHandle {
     }
 }
 
+/// A generic listener type that can be invoked multiple times.
+/// The user can select to implement it using FnMut, Watch, or not at all.
+pub enum Listener<T> {
+    /// nothing is listening
+    None,
+    /// listener is a boxed FnMut
+    BoxedFn(Box<dyn FnMut(T) -> () + Send + Sync>),
+    /// listener is a broadcast channel
+    Watch(tokio::sync::broadcast::Sender<T>),
+}
+
 /// A generic callback type that must be invoked once and only once.
 /// The user can select to implement it using FnOnce or a
 /// one-shot reply channel
 pub enum Promise<T> {
-    Empty,
+    /// nothing happens when the promise is completed
+    None,
+    /// Box<FnOnce> is consumed when the promise is completed
     BoxedFn(Box<dyn FnOnce(T) -> () + Send + Sync>),
+    /// one-shot reply channel is consumed when the promise is completed
     OneShot(tokio::sync::oneshot::Sender<T>),
 }
 
 impl<T> Promise<T> {
     pub(crate) fn complete(self, value: T) {
         match self {
-            Promise::Empty => {}
+            Promise::None => {}
             Promise::BoxedFn(func) => func(value),
             Promise::OneShot(s) => {
+                s.send(value).ok();
+            }
+        }
+    }
+}
+
+impl<T> Listener<T> {
+    pub(crate) fn update(&mut self, value: T) {
+        match self {
+            Listener::None => {}
+            Listener::BoxedFn(func) => func(value),
+            Listener::Watch(s) => {
                 s.send(value).ok();
             }
         }

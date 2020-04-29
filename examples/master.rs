@@ -3,7 +3,7 @@ use dnp3::app::parse::DecodeLogLevel;
 use dnp3::app::timeout::Timeout;
 use dnp3::app::variations::Group12Var1;
 use dnp3::master::association::{Association, Configuration};
-use dnp3::master::handle::NullHandler;
+use dnp3::master::handle::{Listener, NullHandler};
 use dnp3::master::request::{
     Classes, CommandBuilder, CommandMode, EventClasses, ReadRequest, TimeSyncProcedure,
 };
@@ -36,6 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ReconnectStrategy::default(),
         Timeout::from_secs(1).unwrap(),
         SocketAddr::from_str("127.0.0.1:20000")?,
+        Listener::None,
     );
 
     let mut association = master.add_association(get_association()).await?;
