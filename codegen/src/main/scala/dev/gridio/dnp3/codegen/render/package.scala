@@ -36,4 +36,10 @@ package object render {
       inner
     } ++ ")".eol
   }
+
+  def parenSemi(s: String)(inner: => Iterator[String])(implicit indent: Indentation): Iterator[String] = {
+    (s + "(").eol ++ indent {
+      inner
+    } ++ ");".eol
+  }
 }

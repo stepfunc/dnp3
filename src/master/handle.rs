@@ -1,3 +1,5 @@
+use crate::app::gen::enums::QualifierCode;
+use crate::app::gen::variations::variation::Variation;
 use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
@@ -185,24 +187,56 @@ pub trait AssociationHandler: Send {
     }
 }
 
+/// Information about the object header from which the measurement values were mapped
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct HeaderInfo {
+    /// underlying variation
+    pub variation: Variation,
+    /// qualifier code used in the header
+    pub qualifier: QualifierCode,
+}
+
+impl HeaderInfo {
+    pub(crate) fn new(variation: Variation, qualifier: QualifierCode) -> Self {
+        Self {
+            variation,
+            qualifier,
+        }
+    }
+}
+
 pub trait ReadHandler {
     fn begin_fragment(&mut self, header: ResponseHeader);
     fn end_fragment(&mut self, header: ResponseHeader);
 
-    fn handle_binary(&mut self, iter: &mut dyn Iterator<Item = (Binary, u16)>);
-    fn handle_double_bit_binary(&mut self, iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>);
+    fn handle_binary(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Binary, u16)>);
+    fn handle_double_bit_binary(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
+    );
     fn handle_binary_output_status(
         &mut self,
+        info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
     );
-    fn handle_counter(&mut self, iter: &mut dyn Iterator<Item = (Counter, u16)>);
-    fn handle_frozen_counter(&mut self, iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>);
-    fn handle_analog(&mut self, iter: &mut dyn Iterator<Item = (Analog, u16)>);
+    fn handle_counter(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Counter, u16)>);
+    fn handle_frozen_counter(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
+    );
+    fn handle_analog(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Analog, u16)>);
     fn handle_analog_output_status(
         &mut self,
+        info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
     );
-    fn handle_octet_string<'a>(&mut self, iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>);
+    fn handle_octet_string<'a>(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+    );
 }
 
 /// no-op default association handler type
@@ -221,33 +255,53 @@ impl ReadHandler for NullHandler {
 
     fn end_fragment(&mut self, _header: ResponseHeader) {}
 
-    fn handle_binary(&mut self, _iter: &mut dyn Iterator<Item = (Binary, u16)>) {}
+    fn handle_binary(&mut self, _info: HeaderInfo, _iter: &mut dyn Iterator<Item = (Binary, u16)>) {
+    }
 
     fn handle_double_bit_binary(
         &mut self,
+        _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
     ) {
     }
 
     fn handle_binary_output_status(
         &mut self,
+        _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
     ) {
     }
 
-    fn handle_counter(&mut self, _iter: &mut dyn Iterator<Item = (Counter, u16)>) {}
+    fn handle_counter(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (Counter, u16)>,
+    ) {
+    }
 
-    fn handle_frozen_counter(&mut self, _iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>) {}
+    fn handle_frozen_counter(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
+    ) {
+    }
 
-    fn handle_analog(&mut self, _iter: &mut dyn Iterator<Item = (Analog, u16)>) {}
+    fn handle_analog(&mut self, _info: HeaderInfo, _iter: &mut dyn Iterator<Item = (Analog, u16)>) {
+    }
 
     fn handle_analog_output_status(
         &mut self,
+        _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
     ) {
     }
 
-    fn handle_octet_string<'a>(&mut self, _iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>) {}
+    fn handle_octet_string<'a>(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+    ) {
+    }
 }
 
 impl AssociationHandler for NullHandler {

@@ -14,7 +14,7 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::parser::*;".eol ++
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
-      "use crate::master::handle::ReadHandler;".eol ++
+      "use crate::master::handle::{ReadHandler, HeaderInfo};".eol ++
       "use crate::app::gen::enums::QualifierCode;".eol ++
       "use crate::app::parse::error::ObjectParseError;".eol ++
       space ++
@@ -109,12 +109,30 @@ object RangedVariationModule extends Module {
       }
     }
 
+    def getVariationMatcher(v: Variation): Iterator[String] = {
+      v match {
+        case _ : AnyVariation => {
+          s"RangedVariation::${v.name} => Variation::${v.name},".eol
+        }
+        case _ : SizedByVariation => {
+          s"RangedVariation::${v.parent.name}Var0 => Variation::${v.parent.name}(0),".eol ++
+          s"RangedVariation::${v.parent.name}VarX(x, _) => Variation::${v.parent.name}(*x),".eol
+        }
+        case _ => {
+          s"RangedVariation::${v.name}(_) => Variation::${v.name},".eol
+        }
+      }
+    }
+
+
     def getExtractMatcher(v: Variation): Iterator[String] = {
 
       def simpleExtract(v: Variation): Iterator[String] = {
         bracket(s"RangedVariation::${v.name}(seq) =>") {
-          s"handler.handle_${getMeasName(v)}(&mut seq.iter().map(|(v,i)| (v.into(), i)));".eol ++
-          "true".eol
+          parenSemi(s"handler.handle_${getMeasName(v)}") {
+            "HeaderInfo::new(self.variation(), qualifier),".eol ++
+            "&mut seq.iter().map(|(v,i)| (v.into(), i))".eol
+          } ++ "true".eol
         }
       }
 
@@ -138,8 +156,10 @@ object RangedVariationModule extends Module {
             "false".eol
           } ++
           bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
-            "handler.handle_octet_string(&mut seq.iter());".eol ++
-              "true".eol
+            parenSemi("handler.handle_octet_string") {
+              "HeaderInfo::new(self.variation(), qualifier),".eol ++
+              "&mut seq.iter()".eol
+            } ++ "true".eol
           }
         }
       }
@@ -161,9 +181,14 @@ object RangedVariationModule extends Module {
             variations.flatMap(getFmtMatcher).iterator
           }
         } ++ space ++
-        bracket("pub(crate) fn extract_measurements_to(&self, handler: &mut dyn ReadHandler) -> bool") {
+        bracket("pub(crate) fn extract_measurements_to(&self, qualifier: QualifierCode, handler: &mut dyn ReadHandler) -> bool") {
           bracket("match self") {
             variations.flatMap(getExtractMatcher).iterator
+          }
+        } ++ space ++
+        bracket("pub(crate) fn variation(&self) -> Variation") {
+          bracket("match self") {
+            variations.flatMap(getVariationMatcher).iterator
           }
         }
     }

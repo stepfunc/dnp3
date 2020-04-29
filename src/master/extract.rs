@@ -36,8 +36,12 @@ pub(crate) fn extract_measurements(
                 return extract_cto_g51v2(cto, seq.single())
             }
             // everything else
-            HeaderDetails::OneByteStartStop(_, _, var) => var.extract_measurements_to(handler),
-            HeaderDetails::TwoByteStartStop(_, _, var) => var.extract_measurements_to(handler),
+            HeaderDetails::OneByteStartStop(_, _, var) => {
+                var.extract_measurements_to(header.details.qualifier(), handler)
+            }
+            HeaderDetails::TwoByteStartStop(_, _, var) => {
+                var.extract_measurements_to(header.details.qualifier(), handler)
+            }
             HeaderDetails::OneByteCountAndPrefix(_, var) => {
                 var.extract_measurements_to(cto, handler)
             }
@@ -75,7 +79,7 @@ mod test {
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::types::Timestamp;
-    use crate::master::handle::ReadHandler;
+    use crate::master::handle::{HeaderInfo, ReadHandler};
 
     fn header() -> ResponseHeader {
         ResponseHeader::new(
@@ -112,7 +116,7 @@ mod test {
         fn begin_fragment(&mut self, _header: ResponseHeader) {}
         fn end_fragment(&mut self, _header: ResponseHeader) {}
 
-        fn handle_binary(&mut self, x: &mut dyn Iterator<Item = (Binary, u16)>) {
+        fn handle_binary(&mut self, _info: HeaderInfo, x: &mut dyn Iterator<Item = (Binary, u16)>) {
             let next_header = match self.expected.pop() {
                 Some(y) => y,
                 None => {
@@ -130,6 +134,7 @@ mod test {
 
         fn handle_double_bit_binary(
             &mut self,
+            _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
         ) {
             unimplemented!()
@@ -137,31 +142,49 @@ mod test {
 
         fn handle_binary_output_status(
             &mut self,
+            _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
         ) {
             unimplemented!()
         }
 
-        fn handle_counter(&mut self, _x: &mut dyn Iterator<Item = (Counter, u16)>) {
+        fn handle_counter(
+            &mut self,
+            _info: HeaderInfo,
+            _x: &mut dyn Iterator<Item = (Counter, u16)>,
+        ) {
             unimplemented!()
         }
 
-        fn handle_frozen_counter(&mut self, _x: &mut dyn Iterator<Item = (FrozenCounter, u16)>) {
+        fn handle_frozen_counter(
+            &mut self,
+            _info: HeaderInfo,
+            _x: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
+        ) {
             unimplemented!()
         }
 
-        fn handle_analog(&mut self, _x: &mut dyn Iterator<Item = (Analog, u16)>) {
+        fn handle_analog(
+            &mut self,
+            _info: HeaderInfo,
+            _x: &mut dyn Iterator<Item = (Analog, u16)>,
+        ) {
             unimplemented!()
         }
 
         fn handle_analog_output_status(
             &mut self,
+            _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
         ) {
             unimplemented!()
         }
 
-        fn handle_octet_string<'a>(&mut self, _x: &mut dyn Iterator<Item = (Bytes<'a>, u16)>) {
+        fn handle_octet_string<'a>(
+            &mut self,
+            _info: HeaderInfo,
+            _x: &mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+        ) {
             unimplemented!()
         }
     }
