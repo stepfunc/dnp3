@@ -14,13 +14,6 @@ object FixedSizeVariationModule extends Module {
       }
     }
 
-    "use crate::app::parse::traits::{FixedSize, FixedSizeVariation};".eol ++
-    "use crate::util::cursor::*;".eol ++
-    "use crate::app::gen::enums::CommandStatus;".eol ++
-    "use crate::app::types::{ControlCode, Timestamp};".eol ++
-    "use crate::app::flags::format::*;".eol ++
-    "use crate::app::gen::variations::variation::Variation;".eol ++
-    space ++
     spaced(variations.map(v => structDefinition(v)).iterator) ++
     space ++
     spaced(variations.map(v => implFixedSizedVariation(v)).iterator) ++

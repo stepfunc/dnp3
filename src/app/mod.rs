@@ -1,3 +1,6 @@
+/// publicly exported enumerations defined by the standard
+#[rustfmt::skip]
+pub mod enums;
 /// extension impls for generated types
 mod extensions;
 /// measurement flags (aka quality) and display implementations
@@ -14,24 +17,17 @@ pub mod sequence;
 pub mod timeout;
 /// types used in various other application layer objects
 pub mod types;
-
-/// generated implementations of enums and variations
+/// public variations
 #[rustfmt::skip]
-pub mod gen {
-    /// generated protocol-defined enumerations
-    pub mod enums;
-    pub mod variations {
-        /// publicly exported fixed-size variations
-        pub mod fixed;
-        /// enumeration of all variations
-        pub mod variation;
-
-        pub(crate) mod all;
-        pub(crate) mod count;
-        pub(crate) mod prefixed;
-        pub(crate) mod ranged;
-    }
-    pub(crate) mod conversion;
-}
+pub mod variations;
 
 pub(crate) mod format;
+
+#[rustfmt::skip]
+pub(crate) mod gen {
+    pub(crate) mod all;
+    pub(crate) mod conversion;
+    pub(crate) mod count;
+    pub(crate) mod prefixed;
+    pub(crate) mod ranged;
+}

@@ -1,12 +1,11 @@
+use crate::app::enums::CommandStatus;
 use crate::app::format::write::HeaderWriter;
-use crate::app::gen::enums::CommandStatus;
-use crate::app::gen::variations::fixed::*;
-use crate::app::gen::variations::prefixed::PrefixedVariation;
-use crate::app::gen::variations::variation::Variation;
+use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::variations::*;
 use crate::master::error::CommandResponseError;
 use crate::util::cursor::WriteError;
 

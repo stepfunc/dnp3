@@ -7,7 +7,7 @@ import dev.gridio.dnp3.codegen.render._
 object AllObjectsVariationModule extends Module {
 
   override def lines(implicit indent: Indentation) : Iterator[String] = {
-      "use crate::app::gen::variations::variation::Variation;".eol ++
+      "use crate::app::variations::Variation;".eol ++
       space ++
       variationEnumDefinition ++
       space ++

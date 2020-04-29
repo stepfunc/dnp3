@@ -24,10 +24,12 @@ object ProtocolEnums extends Module {
 
   private def lines(model : EnumModel)(implicit indentation: Indentation) : Iterator[String] = {
     def values: Iterator[String] = {
-      model.values.flatMap(v => v.comment.iterator.map(commented) ++ s"${v.name},".eol).iterator
+      model.values.flatMap(v => s"///  ${v.comment} (value == ${model.render(v.value)})".eol ++ s"${v.name},".eol).iterator
     }
 
     def fromValueToOption: Iterator[String] = {
+      "/// try to create the enum from the underlying value, returning None".eol ++
+      "/// if the specified value is undefined".eol ++
       bracket("pub fn from(x: u8) -> Option<Self>") {
         bracket("match x") {
           model.values.iterator.map(v => s"${model.render(v.value)} => Some(${model.name}::${v.name}),") ++ "_ => None,".eol
@@ -36,6 +38,7 @@ object ProtocolEnums extends Module {
     }
 
     def fromValue: Iterator[String] = {
+      "/// create the enum from the underlying value".eol ++
       bracket("pub fn from(x: u8) -> Self") {
         bracket("match x") {
           model.values.iterator.map(v => s"${model.render(v.value)} => ${model.name}::${v.name},") ++ s"_ => ${model.name}::Unknown(x),".eol
@@ -52,6 +55,7 @@ object ProtocolEnums extends Module {
         }
       }
 
+      "/// convert the enum to its underlying value".eol ++
       bracket("pub fn as_u8(self) -> u8") {
         bracket("match self") {
           model.values.iterator.map(v => s"${model.name}::${v.name} => ${model.render(v.value)},") ++ last

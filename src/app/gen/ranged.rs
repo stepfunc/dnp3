@@ -10,15 +10,14 @@
 // This file is auto-generated. Do not edit manually
 //
 
+use crate::app::variations::*;
+use crate::app::enums::QualifierCode;
 use crate::app::parse::range::{RangedSequence, Range};
-use crate::app::gen::variations::fixed::*;
-use crate::app::gen::variations::variation::Variation;
 use crate::util::cursor::ReadCursor;
 use crate::app::parse::parser::*;
 use crate::app::parse::bytes::RangedBytesSequence;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
 use crate::master::handle::{ReadHandler, HeaderInfo};
-use crate::app::gen::enums::QualifierCode;
 use crate::app::parse::error::ObjectParseError;
 
 #[derive(Debug, PartialEq)]

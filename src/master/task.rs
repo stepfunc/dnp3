@@ -1,5 +1,5 @@
+use crate::app::enums::FunctionCode;
 use crate::app::format::write::HeaderWriter;
-use crate::app::gen::enums::FunctionCode;
 use crate::app::parse::parser::Response;
 use crate::master::association::Association;
 use crate::master::error::TaskError;

@@ -12,10 +12,626 @@
 
 use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
 use crate::util::cursor::*;
-use crate::app::gen::enums::CommandStatus;
+use crate::app::enums::CommandStatus;
 use crate::app::types::{ControlCode, Timestamp};
 use crate::app::flags::format::*;
-use crate::app::gen::variations::variation::Variation;
+
+/// all variations supported by the library
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Variation {
+    /// Binary Input - Any Variation
+    Group1Var0,
+    /// Binary Input - Packed Format
+    Group1Var1,
+    /// Binary Input - With Flags
+    Group1Var2,
+    /// Binary Input Event - Any Variation
+    Group2Var0,
+    /// Binary Input Event - Without Time
+    Group2Var1,
+    /// Binary Input Event - With Absolute Time
+    Group2Var2,
+    /// Binary Input Event - With Relative Time
+    Group2Var3,
+    /// Double-bit Binary Input - Any Variation
+    Group3Var0,
+    /// Double-bit Binary Input - Packed Format
+    Group3Var1,
+    /// Double-bit Binary Input - With Flags
+    Group3Var2,
+    /// Double-bit Binary Input Event - Any Variation
+    Group4Var0,
+    /// Double-bit Binary Input Event - Without Time
+    Group4Var1,
+    /// Double-bit Binary Input Event - With Absolute Time
+    Group4Var2,
+    /// Double-bit Binary Input Event - With Relative Time
+    Group4Var3,
+    /// Binary Output - Any Variation
+    Group10Var0,
+    /// Binary Output - Packed Format
+    Group10Var1,
+    /// Binary Output - Output Status With Flags
+    Group10Var2,
+    /// Binary Output Event - Any Variation
+    Group11Var0,
+    /// Binary Output Event - Output Status Without Time
+    Group11Var1,
+    /// Binary Output Event - Output Status With Time
+    Group11Var2,
+    /// Binary Command - Any Variation
+    Group12Var0,
+    /// Binary Command - Control Relay Output Block
+    Group12Var1,
+    /// Binary Command Event - Without Time
+    Group13Var1,
+    /// Binary Command Event - With Time
+    Group13Var2,
+    /// Counter - Any Variation
+    Group20Var0,
+    /// Counter - 32-bit With Flag
+    Group20Var1,
+    /// Counter - 16-bit With Flag
+    Group20Var2,
+    /// Counter - 32-bit Without Flag
+    Group20Var5,
+    /// Counter - 16-bit Without Flag
+    Group20Var6,
+    /// Frozen Counter - Any Variation
+    Group21Var0,
+    /// Frozen Counter - 32-bit With Flag
+    Group21Var1,
+    /// Frozen Counter - 16-bit With Flag
+    Group21Var2,
+    /// Frozen Counter - 32-bit With Flag and Time
+    Group21Var5,
+    /// Frozen Counter - 16-bit With Flag and Time
+    Group21Var6,
+    /// Frozen Counter - 32-bit Without Flag
+    Group21Var9,
+    /// Frozen Counter - 16-bit Without Flag
+    Group21Var10,
+    /// Counter Event - Any Variation
+    Group22Var0,
+    /// Counter Event - 32-bit With Flag
+    Group22Var1,
+    /// Counter Event - 16-bit With Flag
+    Group22Var2,
+    /// Counter Event - 32-bit With Flag and Time
+    Group22Var5,
+    /// Counter Event - 16-bit With Flag and Time
+    Group22Var6,
+    /// Frozen Counter Event - Any Variation
+    Group23Var0,
+    /// Frozen Counter Event - 32-bit With Flag
+    Group23Var1,
+    /// Frozen Counter Event - 16-bit With Flag
+    Group23Var2,
+    /// Frozen Counter Event - 32-bit With Flag and Time
+    Group23Var5,
+    /// Frozen Counter Event - 16-bit With Flag and Time
+    Group23Var6,
+    /// Analog Input - Any Variation
+    Group30Var0,
+    /// Analog Input - 32-bit With Flag
+    Group30Var1,
+    /// Analog Input - 16-bit With Flag
+    Group30Var2,
+    /// Analog Input - 32-bit Without Flag
+    Group30Var3,
+    /// Analog Input - 16-bit Without Flag
+    Group30Var4,
+    /// Analog Input - Single-precision With Flag
+    Group30Var5,
+    /// Analog Input - Double-precision With Flag
+    Group30Var6,
+    /// Analog Input Event - Any Variation
+    Group32Var0,
+    /// Analog Input Event - 32-bit With Flag
+    Group32Var1,
+    /// Analog Input Event - 16-bit With Flag
+    Group32Var2,
+    /// Analog Input Event - 32-bit With Flag and Time
+    Group32Var3,
+    /// Analog Input Event - 16-bit With Flag and Time
+    Group32Var4,
+    /// Analog Input Event - Single-precision With Flag
+    Group32Var5,
+    /// Analog Input Event - Double-precision With Flag
+    Group32Var6,
+    /// Analog Input Event - Single-precision With Flag and Time
+    Group32Var7,
+    /// Analog Input Event - Double-precision With Flag and Time
+    Group32Var8,
+    /// Analog Output Status - Any Variation
+    Group40Var0,
+    /// Analog Output Status - 32-bit With Flag
+    Group40Var1,
+    /// Analog Output Status - 16-bit With Flag
+    Group40Var2,
+    /// Analog Output Status - Single-precision With Flag
+    Group40Var3,
+    /// Analog Output Status - Double-precision With Flag
+    Group40Var4,
+    /// Analog Output - Any Variation
+    Group41Var0,
+    /// Analog Output - 32-bit With Flag
+    Group41Var1,
+    /// Analog Output - 16-bit With Flag
+    Group41Var2,
+    /// Analog Output - Single-precision
+    Group41Var3,
+    /// Analog Output - Double-precision
+    Group41Var4,
+    /// Analog Output Event - Any Variation
+    Group42Var0,
+    /// Analog Output Event - 32-bit With Flag
+    Group42Var1,
+    /// Analog Output Event - 16-bit With Flag
+    Group42Var2,
+    /// Analog Output Event - 32-bit With Flag and Time
+    Group42Var3,
+    /// Analog Output Event - 16-bit With Flag and Time
+    Group42Var4,
+    /// Analog Output Event - Single-precision With Flag
+    Group42Var5,
+    /// Analog Output Event - Double-precision With Flag
+    Group42Var6,
+    /// Analog Output Event - Single-precision With Flag and Time
+    Group42Var7,
+    /// Analog Output Event - Double-precision With Flag and Time
+    Group42Var8,
+    /// Analog Command Event - 32-bit
+    Group43Var1,
+    /// Analog Command Event - 16-bit
+    Group43Var2,
+    /// Analog Command Event - 32-bit With Time
+    Group43Var3,
+    /// Analog Command Event - 16-bit With Time
+    Group43Var4,
+    /// Analog Command Event - Single-precision
+    Group43Var5,
+    /// Analog Command Event - Double-precision
+    Group43Var6,
+    /// Analog Command Event - Single-precision With Time
+    Group43Var7,
+    /// Analog Command Event - Double-precision With Time
+    Group43Var8,
+    /// Time and Date - Absolute Time
+    Group50Var1,
+    /// Time and Date - Absolute Time at last recorded time
+    Group50Var3,
+    /// Time and Date - Indexed absolute time and long interval
+    Group50Var4,
+    /// Time and Date CTO - Absolute time, synchronized
+    Group51Var1,
+    /// Time and Date CTO - Absolute time, unsynchronized
+    Group51Var2,
+    /// Time Delay - Coarse
+    Group52Var1,
+    /// Time Delay - Fine
+    Group52Var2,
+    /// Class Data - Class 0
+    Group60Var1,
+    /// Class Data - Class 1
+    Group60Var2,
+    /// Class Data - Class 2
+    Group60Var3,
+    /// Class Data - Class 3
+    Group60Var4,
+    /// Internal Indications - Packed Format
+    Group80Var1,
+    /// Octet String - Sized by variation
+    Group110(u8),
+    /// Octet String Event - Sized by variation
+    Group111(u8),
+    /// Virtual Terminal Output Block - Sized by variation
+    Group112(u8),
+    /// Virtual Terminal Event Data - Sized by variation
+    Group113(u8),
+}
+
+impl Variation {
+    pub(crate) fn lookup(group: u8, var: u8) -> Option<Variation> {
+        match group {
+            1 => match var {
+                0 => Some(Variation::Group1Var0),
+                1 => Some(Variation::Group1Var1),
+                2 => Some(Variation::Group1Var2),
+                _ => None,
+            },
+            2 => match var {
+                0 => Some(Variation::Group2Var0),
+                1 => Some(Variation::Group2Var1),
+                2 => Some(Variation::Group2Var2),
+                3 => Some(Variation::Group2Var3),
+                _ => None,
+            },
+            3 => match var {
+                0 => Some(Variation::Group3Var0),
+                1 => Some(Variation::Group3Var1),
+                2 => Some(Variation::Group3Var2),
+                _ => None,
+            },
+            4 => match var {
+                0 => Some(Variation::Group4Var0),
+                1 => Some(Variation::Group4Var1),
+                2 => Some(Variation::Group4Var2),
+                3 => Some(Variation::Group4Var3),
+                _ => None,
+            },
+            10 => match var {
+                0 => Some(Variation::Group10Var0),
+                1 => Some(Variation::Group10Var1),
+                2 => Some(Variation::Group10Var2),
+                _ => None,
+            },
+            11 => match var {
+                0 => Some(Variation::Group11Var0),
+                1 => Some(Variation::Group11Var1),
+                2 => Some(Variation::Group11Var2),
+                _ => None,
+            },
+            12 => match var {
+                0 => Some(Variation::Group12Var0),
+                1 => Some(Variation::Group12Var1),
+                _ => None,
+            },
+            13 => match var {
+                1 => Some(Variation::Group13Var1),
+                2 => Some(Variation::Group13Var2),
+                _ => None,
+            },
+            20 => match var {
+                0 => Some(Variation::Group20Var0),
+                1 => Some(Variation::Group20Var1),
+                2 => Some(Variation::Group20Var2),
+                5 => Some(Variation::Group20Var5),
+                6 => Some(Variation::Group20Var6),
+                _ => None,
+            },
+            21 => match var {
+                0 => Some(Variation::Group21Var0),
+                1 => Some(Variation::Group21Var1),
+                2 => Some(Variation::Group21Var2),
+                5 => Some(Variation::Group21Var5),
+                6 => Some(Variation::Group21Var6),
+                9 => Some(Variation::Group21Var9),
+                10 => Some(Variation::Group21Var10),
+                _ => None,
+            },
+            22 => match var {
+                0 => Some(Variation::Group22Var0),
+                1 => Some(Variation::Group22Var1),
+                2 => Some(Variation::Group22Var2),
+                5 => Some(Variation::Group22Var5),
+                6 => Some(Variation::Group22Var6),
+                _ => None,
+            },
+            23 => match var {
+                0 => Some(Variation::Group23Var0),
+                1 => Some(Variation::Group23Var1),
+                2 => Some(Variation::Group23Var2),
+                5 => Some(Variation::Group23Var5),
+                6 => Some(Variation::Group23Var6),
+                _ => None,
+            },
+            30 => match var {
+                0 => Some(Variation::Group30Var0),
+                1 => Some(Variation::Group30Var1),
+                2 => Some(Variation::Group30Var2),
+                3 => Some(Variation::Group30Var3),
+                4 => Some(Variation::Group30Var4),
+                5 => Some(Variation::Group30Var5),
+                6 => Some(Variation::Group30Var6),
+                _ => None,
+            },
+            32 => match var {
+                0 => Some(Variation::Group32Var0),
+                1 => Some(Variation::Group32Var1),
+                2 => Some(Variation::Group32Var2),
+                3 => Some(Variation::Group32Var3),
+                4 => Some(Variation::Group32Var4),
+                5 => Some(Variation::Group32Var5),
+                6 => Some(Variation::Group32Var6),
+                7 => Some(Variation::Group32Var7),
+                8 => Some(Variation::Group32Var8),
+                _ => None,
+            },
+            40 => match var {
+                0 => Some(Variation::Group40Var0),
+                1 => Some(Variation::Group40Var1),
+                2 => Some(Variation::Group40Var2),
+                3 => Some(Variation::Group40Var3),
+                4 => Some(Variation::Group40Var4),
+                _ => None,
+            },
+            41 => match var {
+                0 => Some(Variation::Group41Var0),
+                1 => Some(Variation::Group41Var1),
+                2 => Some(Variation::Group41Var2),
+                3 => Some(Variation::Group41Var3),
+                4 => Some(Variation::Group41Var4),
+                _ => None,
+            },
+            42 => match var {
+                0 => Some(Variation::Group42Var0),
+                1 => Some(Variation::Group42Var1),
+                2 => Some(Variation::Group42Var2),
+                3 => Some(Variation::Group42Var3),
+                4 => Some(Variation::Group42Var4),
+                5 => Some(Variation::Group42Var5),
+                6 => Some(Variation::Group42Var6),
+                7 => Some(Variation::Group42Var7),
+                8 => Some(Variation::Group42Var8),
+                _ => None,
+            },
+            43 => match var {
+                1 => Some(Variation::Group43Var1),
+                2 => Some(Variation::Group43Var2),
+                3 => Some(Variation::Group43Var3),
+                4 => Some(Variation::Group43Var4),
+                5 => Some(Variation::Group43Var5),
+                6 => Some(Variation::Group43Var6),
+                7 => Some(Variation::Group43Var7),
+                8 => Some(Variation::Group43Var8),
+                _ => None,
+            },
+            50 => match var {
+                1 => Some(Variation::Group50Var1),
+                3 => Some(Variation::Group50Var3),
+                4 => Some(Variation::Group50Var4),
+                _ => None,
+            },
+            51 => match var {
+                1 => Some(Variation::Group51Var1),
+                2 => Some(Variation::Group51Var2),
+                _ => None,
+            },
+            52 => match var {
+                1 => Some(Variation::Group52Var1),
+                2 => Some(Variation::Group52Var2),
+                _ => None,
+            },
+            60 => match var {
+                1 => Some(Variation::Group60Var1),
+                2 => Some(Variation::Group60Var2),
+                3 => Some(Variation::Group60Var3),
+                4 => Some(Variation::Group60Var4),
+                _ => None,
+            },
+            80 => match var {
+                1 => Some(Variation::Group80Var1),
+                _ => None,
+            },
+            110 => Some(Variation::Group110(var)),
+            111 => Some(Variation::Group111(var)),
+            112 => Some(Variation::Group112(var)),
+            113 => Some(Variation::Group113(var)),
+            _ => None,
+        }
+    }
+    
+    pub(crate) fn to_group_and_var(self) -> (u8, u8) {
+        match self {
+            Variation::Group1Var0 => (1, 0),
+            Variation::Group1Var1 => (1, 1),
+            Variation::Group1Var2 => (1, 2),
+            Variation::Group2Var0 => (2, 0),
+            Variation::Group2Var1 => (2, 1),
+            Variation::Group2Var2 => (2, 2),
+            Variation::Group2Var3 => (2, 3),
+            Variation::Group3Var0 => (3, 0),
+            Variation::Group3Var1 => (3, 1),
+            Variation::Group3Var2 => (3, 2),
+            Variation::Group4Var0 => (4, 0),
+            Variation::Group4Var1 => (4, 1),
+            Variation::Group4Var2 => (4, 2),
+            Variation::Group4Var3 => (4, 3),
+            Variation::Group10Var0 => (10, 0),
+            Variation::Group10Var1 => (10, 1),
+            Variation::Group10Var2 => (10, 2),
+            Variation::Group11Var0 => (11, 0),
+            Variation::Group11Var1 => (11, 1),
+            Variation::Group11Var2 => (11, 2),
+            Variation::Group12Var0 => (12, 0),
+            Variation::Group12Var1 => (12, 1),
+            Variation::Group13Var1 => (13, 1),
+            Variation::Group13Var2 => (13, 2),
+            Variation::Group20Var0 => (20, 0),
+            Variation::Group20Var1 => (20, 1),
+            Variation::Group20Var2 => (20, 2),
+            Variation::Group20Var5 => (20, 5),
+            Variation::Group20Var6 => (20, 6),
+            Variation::Group21Var0 => (21, 0),
+            Variation::Group21Var1 => (21, 1),
+            Variation::Group21Var2 => (21, 2),
+            Variation::Group21Var5 => (21, 5),
+            Variation::Group21Var6 => (21, 6),
+            Variation::Group21Var9 => (21, 9),
+            Variation::Group21Var10 => (21, 10),
+            Variation::Group22Var0 => (22, 0),
+            Variation::Group22Var1 => (22, 1),
+            Variation::Group22Var2 => (22, 2),
+            Variation::Group22Var5 => (22, 5),
+            Variation::Group22Var6 => (22, 6),
+            Variation::Group23Var0 => (23, 0),
+            Variation::Group23Var1 => (23, 1),
+            Variation::Group23Var2 => (23, 2),
+            Variation::Group23Var5 => (23, 5),
+            Variation::Group23Var6 => (23, 6),
+            Variation::Group30Var0 => (30, 0),
+            Variation::Group30Var1 => (30, 1),
+            Variation::Group30Var2 => (30, 2),
+            Variation::Group30Var3 => (30, 3),
+            Variation::Group30Var4 => (30, 4),
+            Variation::Group30Var5 => (30, 5),
+            Variation::Group30Var6 => (30, 6),
+            Variation::Group32Var0 => (32, 0),
+            Variation::Group32Var1 => (32, 1),
+            Variation::Group32Var2 => (32, 2),
+            Variation::Group32Var3 => (32, 3),
+            Variation::Group32Var4 => (32, 4),
+            Variation::Group32Var5 => (32, 5),
+            Variation::Group32Var6 => (32, 6),
+            Variation::Group32Var7 => (32, 7),
+            Variation::Group32Var8 => (32, 8),
+            Variation::Group40Var0 => (40, 0),
+            Variation::Group40Var1 => (40, 1),
+            Variation::Group40Var2 => (40, 2),
+            Variation::Group40Var3 => (40, 3),
+            Variation::Group40Var4 => (40, 4),
+            Variation::Group41Var0 => (41, 0),
+            Variation::Group41Var1 => (41, 1),
+            Variation::Group41Var2 => (41, 2),
+            Variation::Group41Var3 => (41, 3),
+            Variation::Group41Var4 => (41, 4),
+            Variation::Group42Var0 => (42, 0),
+            Variation::Group42Var1 => (42, 1),
+            Variation::Group42Var2 => (42, 2),
+            Variation::Group42Var3 => (42, 3),
+            Variation::Group42Var4 => (42, 4),
+            Variation::Group42Var5 => (42, 5),
+            Variation::Group42Var6 => (42, 6),
+            Variation::Group42Var7 => (42, 7),
+            Variation::Group42Var8 => (42, 8),
+            Variation::Group43Var1 => (43, 1),
+            Variation::Group43Var2 => (43, 2),
+            Variation::Group43Var3 => (43, 3),
+            Variation::Group43Var4 => (43, 4),
+            Variation::Group43Var5 => (43, 5),
+            Variation::Group43Var6 => (43, 6),
+            Variation::Group43Var7 => (43, 7),
+            Variation::Group43Var8 => (43, 8),
+            Variation::Group50Var1 => (50, 1),
+            Variation::Group50Var3 => (50, 3),
+            Variation::Group50Var4 => (50, 4),
+            Variation::Group51Var1 => (51, 1),
+            Variation::Group51Var2 => (51, 2),
+            Variation::Group52Var1 => (52, 1),
+            Variation::Group52Var2 => (52, 2),
+            Variation::Group60Var1 => (60, 1),
+            Variation::Group60Var2 => (60, 2),
+            Variation::Group60Var3 => (60, 3),
+            Variation::Group60Var4 => (60, 4),
+            Variation::Group80Var1 => (80, 1),
+            Variation::Group110(x) => (110, x),
+            Variation::Group111(x) => (111, x),
+            Variation::Group112(x) => (112, x),
+            Variation::Group113(x) => (113, x),
+        }
+    }
+    
+    pub(crate) fn description(self) -> &'static str {
+        match self {
+            Variation::Group1Var0 => "Binary Input - Any Variation",
+            Variation::Group1Var1 => "Binary Input - Packed Format",
+            Variation::Group1Var2 => "Binary Input - With Flags",
+            Variation::Group2Var0 => "Binary Input Event - Any Variation",
+            Variation::Group2Var1 => "Binary Input Event - Without Time",
+            Variation::Group2Var2 => "Binary Input Event - With Absolute Time",
+            Variation::Group2Var3 => "Binary Input Event - With Relative Time",
+            Variation::Group3Var0 => "Double-bit Binary Input - Any Variation",
+            Variation::Group3Var1 => "Double-bit Binary Input - Packed Format",
+            Variation::Group3Var2 => "Double-bit Binary Input - With Flags",
+            Variation::Group4Var0 => "Double-bit Binary Input Event - Any Variation",
+            Variation::Group4Var1 => "Double-bit Binary Input Event - Without Time",
+            Variation::Group4Var2 => "Double-bit Binary Input Event - With Absolute Time",
+            Variation::Group4Var3 => "Double-bit Binary Input Event - With Relative Time",
+            Variation::Group10Var0 => "Binary Output - Any Variation",
+            Variation::Group10Var1 => "Binary Output - Packed Format",
+            Variation::Group10Var2 => "Binary Output - Output Status With Flags",
+            Variation::Group11Var0 => "Binary Output Event - Any Variation",
+            Variation::Group11Var1 => "Binary Output Event - Output Status Without Time",
+            Variation::Group11Var2 => "Binary Output Event - Output Status With Time",
+            Variation::Group12Var0 => "Binary Command - Any Variation",
+            Variation::Group12Var1 => "Binary Command - Control Relay Output Block",
+            Variation::Group13Var1 => "Binary Command Event - Without Time",
+            Variation::Group13Var2 => "Binary Command Event - With Time",
+            Variation::Group20Var0 => "Counter - Any Variation",
+            Variation::Group20Var1 => "Counter - 32-bit With Flag",
+            Variation::Group20Var2 => "Counter - 16-bit With Flag",
+            Variation::Group20Var5 => "Counter - 32-bit Without Flag",
+            Variation::Group20Var6 => "Counter - 16-bit Without Flag",
+            Variation::Group21Var0 => "Frozen Counter - Any Variation",
+            Variation::Group21Var1 => "Frozen Counter - 32-bit With Flag",
+            Variation::Group21Var2 => "Frozen Counter - 16-bit With Flag",
+            Variation::Group21Var5 => "Frozen Counter - 32-bit With Flag and Time",
+            Variation::Group21Var6 => "Frozen Counter - 16-bit With Flag and Time",
+            Variation::Group21Var9 => "Frozen Counter - 32-bit Without Flag",
+            Variation::Group21Var10 => "Frozen Counter - 16-bit Without Flag",
+            Variation::Group22Var0 => "Counter Event - Any Variation",
+            Variation::Group22Var1 => "Counter Event - 32-bit With Flag",
+            Variation::Group22Var2 => "Counter Event - 16-bit With Flag",
+            Variation::Group22Var5 => "Counter Event - 32-bit With Flag and Time",
+            Variation::Group22Var6 => "Counter Event - 16-bit With Flag and Time",
+            Variation::Group23Var0 => "Frozen Counter Event - Any Variation",
+            Variation::Group23Var1 => "Frozen Counter Event - 32-bit With Flag",
+            Variation::Group23Var2 => "Frozen Counter Event - 16-bit With Flag",
+            Variation::Group23Var5 => "Frozen Counter Event - 32-bit With Flag and Time",
+            Variation::Group23Var6 => "Frozen Counter Event - 16-bit With Flag and Time",
+            Variation::Group30Var0 => "Analog Input - Any Variation",
+            Variation::Group30Var1 => "Analog Input - 32-bit With Flag",
+            Variation::Group30Var2 => "Analog Input - 16-bit With Flag",
+            Variation::Group30Var3 => "Analog Input - 32-bit Without Flag",
+            Variation::Group30Var4 => "Analog Input - 16-bit Without Flag",
+            Variation::Group30Var5 => "Analog Input - Single-precision With Flag",
+            Variation::Group30Var6 => "Analog Input - Double-precision With Flag",
+            Variation::Group32Var0 => "Analog Input Event - Any Variation",
+            Variation::Group32Var1 => "Analog Input Event - 32-bit With Flag",
+            Variation::Group32Var2 => "Analog Input Event - 16-bit With Flag",
+            Variation::Group32Var3 => "Analog Input Event - 32-bit With Flag and Time",
+            Variation::Group32Var4 => "Analog Input Event - 16-bit With Flag and Time",
+            Variation::Group32Var5 => "Analog Input Event - Single-precision With Flag",
+            Variation::Group32Var6 => "Analog Input Event - Double-precision With Flag",
+            Variation::Group32Var7 => "Analog Input Event - Single-precision With Flag and Time",
+            Variation::Group32Var8 => "Analog Input Event - Double-precision With Flag and Time",
+            Variation::Group40Var0 => "Analog Output Status - Any Variation",
+            Variation::Group40Var1 => "Analog Output Status - 32-bit With Flag",
+            Variation::Group40Var2 => "Analog Output Status - 16-bit With Flag",
+            Variation::Group40Var3 => "Analog Output Status - Single-precision With Flag",
+            Variation::Group40Var4 => "Analog Output Status - Double-precision With Flag",
+            Variation::Group41Var0 => "Analog Output - Any Variation",
+            Variation::Group41Var1 => "Analog Output - 32-bit With Flag",
+            Variation::Group41Var2 => "Analog Output - 16-bit With Flag",
+            Variation::Group41Var3 => "Analog Output - Single-precision",
+            Variation::Group41Var4 => "Analog Output - Double-precision",
+            Variation::Group42Var0 => "Analog Output Event - Any Variation",
+            Variation::Group42Var1 => "Analog Output Event - 32-bit With Flag",
+            Variation::Group42Var2 => "Analog Output Event - 16-bit With Flag",
+            Variation::Group42Var3 => "Analog Output Event - 32-bit With Flag and Time",
+            Variation::Group42Var4 => "Analog Output Event - 16-bit With Flag and Time",
+            Variation::Group42Var5 => "Analog Output Event - Single-precision With Flag",
+            Variation::Group42Var6 => "Analog Output Event - Double-precision With Flag",
+            Variation::Group42Var7 => "Analog Output Event - Single-precision With Flag and Time",
+            Variation::Group42Var8 => "Analog Output Event - Double-precision With Flag and Time",
+            Variation::Group43Var1 => "Analog Command Event - 32-bit",
+            Variation::Group43Var2 => "Analog Command Event - 16-bit",
+            Variation::Group43Var3 => "Analog Command Event - 32-bit With Time",
+            Variation::Group43Var4 => "Analog Command Event - 16-bit With Time",
+            Variation::Group43Var5 => "Analog Command Event - Single-precision",
+            Variation::Group43Var6 => "Analog Command Event - Double-precision",
+            Variation::Group43Var7 => "Analog Command Event - Single-precision With Time",
+            Variation::Group43Var8 => "Analog Command Event - Double-precision With Time",
+            Variation::Group50Var1 => "Time and Date - Absolute Time",
+            Variation::Group50Var3 => "Time and Date - Absolute Time at last recorded time",
+            Variation::Group50Var4 => "Time and Date - Indexed absolute time and long interval",
+            Variation::Group51Var1 => "Time and Date CTO - Absolute time, synchronized",
+            Variation::Group51Var2 => "Time and Date CTO - Absolute time, unsynchronized",
+            Variation::Group52Var1 => "Time Delay - Coarse",
+            Variation::Group52Var2 => "Time Delay - Fine",
+            Variation::Group60Var1 => "Class Data - Class 0",
+            Variation::Group60Var2 => "Class Data - Class 1",
+            Variation::Group60Var3 => "Class Data - Class 2",
+            Variation::Group60Var4 => "Class Data - Class 3",
+            Variation::Group80Var1 => "Internal Indications - Packed Format",
+            Variation::Group110(_) => "Octet String - Sized by variation",
+            Variation::Group111(_) => "Octet String Event - Sized by variation",
+            Variation::Group112(_) => "Virtual Terminal Output Block - Sized by variation",
+            Variation::Group113(_) => "Virtual Terminal Event Data - Sized by variation",
+        }
+    }
+}
 
 /// Time Delay - Fine
 #[derive(Copy, Clone, Debug, PartialEq)]

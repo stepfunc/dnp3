@@ -10,9 +10,8 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::variations::variation::Variation;
+use crate::app::variations::*;
 use crate::app::parse::count::CountSequence;
-use crate::app::gen::variations::fixed::*;
 use crate::util::cursor::ReadCursor;
 use crate::app::parse::parser::*;
 use crate::app::parse::traits::{FixedSize, Index};

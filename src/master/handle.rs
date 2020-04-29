@@ -1,9 +1,9 @@
-use crate::app::gen::enums::QualifierCode;
-use crate::app::gen::variations::variation::Variation;
+use crate::app::enums::QualifierCode;
 use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::DecodeLogLevel;
+use crate::app::variations::Variation;
 use crate::master::association::Association;
 use crate::master::error::{AssociationError, CommandError, TaskError, TimeSyncError};
 use crate::master::request::{CommandHeaders, CommandMode, TimeSyncProcedure};

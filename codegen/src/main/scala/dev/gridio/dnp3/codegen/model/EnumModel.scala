@@ -1,14 +1,6 @@
 package dev.gridio.dnp3.codegen.model
 
-object EnumValue {
-  def apply(name: String, value: Int, comment: String): EnumValue = EnumValue(name, value, Some(comment))
-}
-
-case class EnumValue(name: String, value: Int, comment: Option[String] = None, strName: Option[String] = None) {
-
-  def displayName: String = strName.getOrElse(name)
-
-}
+case class EnumValue(name: String, value: Int, comment: String)
 
 object EnumModel {
 
@@ -35,7 +27,7 @@ sealed trait IntRender {
 
 object IntRender {
   case object Hex extends IntRender {
-    def apply(i: Int): String = "0x" + Integer.toHexString(i).toUpperCase
+    def apply(i: Int): String = String.format("0x%02X", i)
   }
 
   case object Base10 extends IntRender {

@@ -1,15 +1,15 @@
-use crate::app::gen::enums::{FunctionCode, QualifierCode};
-use crate::app::gen::variations::all::AllObjectsVariation;
-use crate::app::gen::variations::count::CountVariation;
-use crate::app::gen::variations::prefixed::PrefixedVariation;
-use crate::app::gen::variations::ranged::RangedVariation;
-use crate::app::gen::variations::variation::Variation;
+use crate::app::enums::{FunctionCode, QualifierCode};
+use crate::app::gen::all::AllObjectsVariation;
+use crate::app::gen::count::CountVariation;
+use crate::app::gen::prefixed::PrefixedVariation;
+use crate::app::gen::ranged::RangedVariation;
 use crate::app::header::{Control, RequestHeader, ResponseFunction, ResponseHeader, IIN};
 use crate::app::parse::error::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::parse::DecodeLogLevel;
+use crate::app::variations::Variation;
 use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
 
@@ -667,15 +667,14 @@ impl QualifierCode {
 mod test {
 
     use super::*;
-    use crate::app::gen::enums::CommandStatus;
-    use crate::app::gen::variations::fixed::*;
-    use crate::app::gen::variations::variation::Variation::Group110;
+    use crate::app::enums::CommandStatus;
     use crate::app::header::{Control, IIN, IIN1, IIN2};
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::error::ResponseValidationError;
     use crate::app::parse::prefix::Prefix;
     use crate::app::sequence::Sequence;
     use crate::app::types::{DoubleBit, Timestamp};
+    use crate::app::variations::*;
 
     fn test_parse_error(input: &[u8], func: FunctionCode, err: ObjectParseError) {
         assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);
@@ -1014,7 +1013,10 @@ mod test {
         test_parse_error(
             &[0x6E, 0x01, 0x00, 0x01, 0x02],
             FunctionCode::Read,
-            ObjectParseError::InvalidQualifierForVariation(Group110(1), QualifierCode::Range8),
+            ObjectParseError::InvalidQualifierForVariation(
+                Variation::Group110(1),
+                QualifierCode::Range8,
+            ),
         );
     }
 

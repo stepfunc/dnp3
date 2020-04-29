@@ -1,9 +1,8 @@
-use crate::app::gen::enums::{FunctionCode, QualifierCode};
-use crate::app::gen::variations::variation::Variation;
-use crate::app::gen::variations::variation::Variation::Group80Var1;
+use crate::app::enums::{FunctionCode, QualifierCode};
 use crate::app::header::{Control, RequestHeader};
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::sequence::Sequence;
+use crate::app::variations::Variation;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 pub(crate) struct HeaderWriter<'a, 'b> {
@@ -55,7 +54,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
     }
 
     pub(crate) fn write_clear_restart(&mut self) -> Result<(), WriteError> {
-        self.write_range_only(Group80Var1, 7u8, 7u8)?;
+        self.write_range_only(Variation::Group80Var1, 7u8, 7u8)?;
         self.cursor.write_u8(0)?;
         Ok(())
     }

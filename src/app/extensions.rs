@@ -1,6 +1,6 @@
-use crate::app::gen::enums::{CommandStatus, OpType};
-use crate::app::gen::variations::fixed::Group12Var1;
+use crate::app::enums::{CommandStatus, OpType};
 use crate::app::types::ControlCode;
+use crate::app::variations::Group12Var1;
 
 impl Group12Var1 {
     /// construct a `Group12Var1` instance. The status field is automatically set to `CommandStatus::Success`

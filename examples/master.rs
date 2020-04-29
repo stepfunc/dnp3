@@ -1,7 +1,7 @@
-use dnp3::app::gen::enums::OpType;
-use dnp3::app::gen::variations::fixed::Group12Var1;
+use dnp3::app::enums::OpType;
 use dnp3::app::parse::DecodeLogLevel;
 use dnp3::app::timeout::Timeout;
+use dnp3::app::variations::Group12Var1;
 use dnp3::master::association::{Association, Configuration};
 use dnp3::master::handle::NullHandler;
 use dnp3::master::request::{

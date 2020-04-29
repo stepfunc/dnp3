@@ -12,18 +12,23 @@
 
 use crate::util::cursor::{WriteCursor, WriteError};
 
-/// This field is used in conjunction with the Op Type field to specify a control operation
+/// Field is used in conjunction with the `OpType` field to specify a control operation
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TripCloseCode {
+    ///  not specified (value == 0)
     Nul,
+    ///  close output (value == 1)
     Close,
+    ///  trip output (value == 2)
     Trip,
+    ///  reserved for future use (value == 3)
     Reserved,
     /// captures any value not defined in the enumeration
     Unknown(u8),
 }
 
 impl TripCloseCode {
+    /// create the enum from the underlying value
     pub fn from(x: u8) -> Self {
         match x {
             0 => TripCloseCode::Nul,
@@ -34,6 +39,7 @@ impl TripCloseCode {
         }
     }
     
+    /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
             TripCloseCode::Nul => 0,
@@ -45,19 +51,25 @@ impl TripCloseCode {
     }
 }
 
-/// Used in conjunction with the TCC field to specify a control operation
+/// Field used in conjunction with the `TCC` field to specify a control operation
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum OpType {
+    ///  not specified (value == 0)
     Nul,
+    ///  pulse the output on (value == 1)
     PulseOn,
+    ///  pulse the output off (value == 2)
     PulseOff,
+    ///  latch the output on (value == 3)
     LatchOn,
+    ///  latch the output off (value == 4)
     LatchOff,
     /// captures any value not defined in the enumeration
     Unknown(u8),
 }
 
 impl OpType {
+    /// create the enum from the underlying value
     pub fn from(x: u8) -> Self {
         match x {
             0 => OpType::Nul,
@@ -69,6 +81,7 @@ impl OpType {
         }
     }
     
+    /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
             OpType::Nul => 0,
@@ -81,55 +94,55 @@ impl OpType {
     }
 }
 
-/// An enumeration of result codes received from an outstation in response to command request.
-/// These correspond to those defined in the DNP3 standard
+/// Enumeration received from an outstation in response to command request
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandStatus {
-    /// command was accepted, initiated, or queued
+    ///  command was accepted, initiated, or queued (value == 0)
     Success,
-    /// command timed out before completing
+    ///  command timed out before completing (value == 1)
     Timeout,
-    /// command requires being selected before operate, configuration issue
+    ///  command requires being selected before operate, configuration issue (value == 2)
     NoSelect,
-    /// bad control code or timing values
+    ///  bad control code or timing values (value == 3)
     FormatError,
-    /// command is not implemented
+    ///  command is not implemented (value == 4)
     NotSupported,
-    /// command is all ready in progress or its all ready in that mode
+    ///  command is all ready in progress or its all ready in that mode (value == 5)
     AlreadyActive,
-    /// something is stopping the command, often a local/remote interlock
+    ///  something is stopping the command, often a local/remote interlock (value == 6)
     HardwareError,
-    /// the function governed by the control is in local only control
+    ///  the function governed by the control is in local only control (value == 7)
     Local,
-    /// the command has been done too often and has been throttled
+    ///  the command has been done too often and has been throttled (value == 8)
     TooManyOps,
-    /// the command was rejected because the device denied it or an RTU intercepted it
+    ///  the command was rejected because the device denied it or an RTU intercepted it (value == 9)
     NotAuthorized,
-    /// command not accepted because it was prevented or inhibited by a local automation process, such as interlocking logic or synchrocheck
+    ///  command not accepted because it was prevented or inhibited by a local automation process, such as interlocking logic or synchrocheck (value == 10)
     AutomationInhibit,
-    /// command not accepted because the device cannot process any more activities than are presently in progress
+    ///  command not accepted because the device cannot process any more activities than are presently in progress (value == 11)
     ProcessingLimited,
-    /// command not accepted because the value is outside the acceptable range permitted for this point
+    ///  command not accepted because the value is outside the acceptable range permitted for this point (value == 12)
     OutOfRange,
-    /// command not accepted because the outstation is forwarding the request to another downstream device which reported LOCAL
+    ///  command not accepted because the outstation is forwarding the request to another downstream device which reported LOCAL (value == 13)
     DownstreamLocal,
-    /// command not accepted because the outstation has already completed the requested operation
+    ///  command not accepted because the outstation has already completed the requested operation (value == 14)
     AlreadyComplete,
-    /// command not accepted because the requested function is specifically blocked at the outstation
+    ///  command not accepted because the requested function is specifically blocked at the outstation (value == 15)
     Blocked,
-    /// command not accepted because the operation was cancelled
+    ///  command not accepted because the operation was cancelled (value == 16)
     Canceled,
-    /// command not accepted because another master is communicating with the outstation and has exclusive rights to operate this control point
+    ///  command not accepted because another master is communicating with the outstation and has exclusive rights to operate this control point (value == 17)
     BlockedOtherMaster,
-    /// command not accepted because the outstation is forwarding the request to another downstream device which cannot be reached or is otherwise incapable of performing the request
+    ///  command not accepted because the outstation is forwarding the request to another downstream device which cannot be reached or is otherwise incapable of performing the request (value == 18)
     DownstreamFail,
-    /// (deprecated) indicates the outstation shall not issue or perform the control operation
+    ///  (deprecated) indicates the outstation shall not issue or perform the control operation (value == 126)
     NonParticipating,
     /// captures any value not defined in the enumeration
     Unknown(u8),
 }
 
 impl CommandStatus {
+    /// create the enum from the underlying value
     pub fn from(x: u8) -> Self {
         match x {
             0 => CommandStatus::Success,
@@ -156,6 +169,7 @@ impl CommandStatus {
         }
     }
     
+    /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
             CommandStatus::Success => 0,
@@ -187,27 +201,37 @@ impl CommandStatus {
     }
 }
 
-/// application object header types
+/// Application object header types
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum QualifierCode {
+    ///  8-bit start stop (value == 0x00)
     Range8,
+    ///  16-bit start stop (value == 0x01)
     Range16,
+    ///  all objects (value == 0x06)
     AllObjects,
+    ///  8-bit count (value == 0x07)
     Count8,
+    ///  16-bit count (value == 0x08)
     Count16,
+    ///  8-bit count and prefix (value == 0x17)
     CountAndPrefix8,
+    ///  16-bit count and prefix (value == 0x28)
     CountAndPrefix16,
+    ///  16-bit free format (value == 0x5B)
     FreeFormat16,
 }
 
 impl QualifierCode {
+    /// try to create the enum from the underlying value, returning None
+    /// if the specified value is undefined
     pub fn from(x: u8) -> Option<Self> {
         match x {
-            0x0 => Some(QualifierCode::Range8),
-            0x1 => Some(QualifierCode::Range16),
-            0x6 => Some(QualifierCode::AllObjects),
-            0x7 => Some(QualifierCode::Count8),
-            0x8 => Some(QualifierCode::Count16),
+            0x00 => Some(QualifierCode::Range8),
+            0x01 => Some(QualifierCode::Range16),
+            0x06 => Some(QualifierCode::AllObjects),
+            0x07 => Some(QualifierCode::Count8),
+            0x08 => Some(QualifierCode::Count16),
             0x17 => Some(QualifierCode::CountAndPrefix8),
             0x28 => Some(QualifierCode::CountAndPrefix16),
             0x5B => Some(QualifierCode::FreeFormat16),
@@ -215,13 +239,14 @@ impl QualifierCode {
         }
     }
     
+    /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
-            QualifierCode::Range8 => 0x0,
-            QualifierCode::Range16 => 0x1,
-            QualifierCode::AllObjects => 0x6,
-            QualifierCode::Count8 => 0x7,
-            QualifierCode::Count16 => 0x8,
+            QualifierCode::Range8 => 0x00,
+            QualifierCode::Range16 => 0x01,
+            QualifierCode::AllObjects => 0x06,
+            QualifierCode::Count8 => 0x07,
+            QualifierCode::Count16 => 0x08,
             QualifierCode::CountAndPrefix8 => 0x17,
             QualifierCode::CountAndPrefix16 => 0x28,
             QualifierCode::FreeFormat16 => 0x5B,
@@ -236,75 +261,77 @@ impl QualifierCode {
 /// Application layer function code enumeration
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FunctionCode {
-    /// Master sends this to an outstation to confirm the receipt of an Application Layer fragment
+    ///  Master sends this to an outstation to confirm the receipt of an Application Layer fragment (value == 0)
     Confirm,
-    /// Outstation shall return the data specified by the objects in the request
+    ///  Outstation shall return the data specified by the objects in the request (value == 1)
     Read,
-    /// Outstation shall store the data specified by the objects in the request
+    ///  Outstation shall store the data specified by the objects in the request (value == 2)
     Write,
-    /// Outstation shall select (or arm) the output points specified by the objects in the request in preparation for a subsequent operate command
+    ///  Outstation shall select (or arm) the output points specified by the objects in the request in preparation for a subsequent operate command (value == 3)
     Select,
-    /// Outstation shall activate the output points selected (or armed) by a previous select function code command
+    ///  Outstation shall activate the output points selected (or armed) by a previous select function code command (value == 4)
     Operate,
-    /// Outstation shall immediately actuate the output points specified by the objects in the request
+    ///  Outstation shall immediately actuate the output points specified by the objects in the request (value == 5)
     DirectOperate,
-    /// Same as DirectOperate but outstation shall not send a response
+    ///  Same as DirectOperate but outstation shall not send a response (value == 6)
     DirectOperateNoResponse,
-    /// Outstation shall copy the point data values specified by the objects in the request to a separate freeze buffer
+    ///  Outstation shall copy the point data values specified by the objects in the request to a separate freeze buffer (value == 7)
     ImmediateFreeze,
-    /// Same as ImmediateFreeze but outstation shall not send a response
+    ///  Same as ImmediateFreeze but outstation shall not send a response (value == 8)
     ImmediateFreezeNoResponse,
-    /// Outstation shall copy the point data values specified by the objects in the request into a separate freeze buffer and then clear the values
+    ///  Outstation shall copy the point data values specified by the objects in the request into a separate freeze buffer and then clear the values (value == 9)
     FreezeClear,
-    /// Same as FreezeClear but outstation shall not send a response
+    ///  Same as FreezeClear but outstation shall not send a response (value == 10)
     FreezeClearNoResponse,
-    /// Outstation shall copy the point data values specified by the objects in the request to a separate freeze buffer at the time and/or time intervals specified in a special time data information object
+    ///  Outstation shall copy the point data values specified by the objects in the request to a separate freeze buffer at the time and/or time intervals specified in a special time data information object (value == 11)
     FreezeAtTime,
-    /// Same as FreezeAtTime but outstation shall not send a response
+    ///  Same as FreezeAtTime but outstation shall not send a response (value == 12)
     FreezeAtTimeNoResponse,
-    /// Outstation shall perform a complete reset of all hardware and software in the device
+    ///  Outstation shall perform a complete reset of all hardware and software in the device (value == 13)
     ColdRestart,
-    /// Outstation shall reset only portions of the device
+    ///  Outstation shall reset only portions of the device (value == 14)
     WarmRestart,
-    /// Obsolete-Do not use for new designs
+    ///  Obsolete-Do not use for new designs (value == 15)
     InitializeData,
-    /// Outstation shall place the applications specified by the objects in the request into the ready to run state
+    ///  Outstation shall place the applications specified by the objects in the request into the ready to run state (value == 16)
     InitializeApplication,
-    /// Outstation shall start running the applications specified by the objects in the request
+    ///  Outstation shall start running the applications specified by the objects in the request (value == 17)
     StartApplication,
-    /// Outstation shall stop running the applications specified by the objects in the request
+    ///  Outstation shall stop running the applications specified by the objects in the request (value == 18)
     StopApplication,
-    /// This code is deprecated-Do not use for new designs
+    ///  This code is deprecated-Do not use for new designs (value == 19)
     SaveConfiguration,
-    /// Enables outstation to initiate unsolicited responses from points specified by the objects in the request
+    ///  Enables outstation to initiate unsolicited responses from points specified by the objects in the request (value == 20)
     EnabledUnsolicited,
-    /// Prevents outstation from initiating unsolicited responses from points specified by the objects in the request
+    ///  Prevents outstation from initiating unsolicited responses from points specified by the objects in the request (value == 21)
     DisableUnsolicited,
-    /// Outstation shall assign the events generated by the points specified by the objects in the request to one of the classes
+    ///  Outstation shall assign the events generated by the points specified by the objects in the request to one of the classes (value == 22)
     AssignClass,
-    /// Outstation shall report the time it takes to process and initiate the transmission of its response
+    ///  Outstation shall report the time it takes to process and initiate the transmission of its response (value == 23)
     DelayMeasure,
-    /// Outstation shall save the time when the last octet of this message is received
+    ///  Outstation shall save the time when the last octet of this message is received (value == 24)
     RecordCurrentTime,
-    /// Outstation shall open a file
+    ///  Outstation shall open a file (value == 25)
     OpenFile,
-    /// Outstation shall close a file
+    ///  Outstation shall close a file (value == 26)
     CloseFile,
-    /// Outstation shall delete a file
+    ///  Outstation shall delete a file (value == 27)
     DeleteFile,
-    /// Outstation shall retrieve information about a file
+    ///  Outstation shall retrieve information about a file (value == 28)
     GetFileInfo,
-    /// Outstation shall return a file authentication key
+    ///  Outstation shall return a file authentication key (value == 29)
     AuthenticateFile,
-    /// Outstation shall abort a file transfer operation
+    ///  Outstation shall abort a file transfer operation (value == 30)
     AbortFile,
-    /// Master shall interpret this fragment as an Application Layer response to an ApplicationLayer request
+    ///  Master shall interpret this fragment as an Application Layer response to an ApplicationLayer request (value == 129)
     Response,
-    /// Master shall interpret this fragment as an unsolicited response that was not prompted by an explicit request
+    ///  Master shall interpret this fragment as an unsolicited response that was not prompted by an explicit request (value == 130)
     UnsolicitedResponse,
 }
 
 impl FunctionCode {
+    /// try to create the enum from the underlying value, returning None
+    /// if the specified value is undefined
     pub fn from(x: u8) -> Option<Self> {
         match x {
             0 => Some(FunctionCode::Confirm),
@@ -344,6 +371,7 @@ impl FunctionCode {
         }
     }
     
+    /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
             FunctionCode::Confirm => 0,

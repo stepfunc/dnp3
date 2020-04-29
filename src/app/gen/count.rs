@@ -10,13 +10,12 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::app::gen::variations::variation::Variation;
-use crate::app::gen::variations::fixed::*;
+use crate::app::variations::*;
+use crate::app::enums::QualifierCode;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::*;
 use crate::util::cursor::ReadCursor;
 use crate::app::parse::error::ObjectParseError;
-use crate::app::gen::enums::QualifierCode;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum CountVariation<'a> {

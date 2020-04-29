@@ -1,6 +1,6 @@
-use crate::app::gen::enums::{FunctionCode, QualifierCode};
-use crate::app::gen::variations::variation::Variation;
+use crate::app::enums::{FunctionCode, QualifierCode};
 use crate::app::parse::range::InvalidRange;
+use crate::app::variations::Variation;
 use crate::util::cursor::ReadError;
 use std::fmt::Formatter;
 

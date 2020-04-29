@@ -12,7 +12,7 @@
 
 use crate::app::measurement::*;
 use crate::app::flags::*;
-use crate::app::gen::variations::fixed::*;
+use crate::app::variations::*;
 
 impl From<Group2Var2> for Binary {
     fn from(v: Group2Var2) -> Self {

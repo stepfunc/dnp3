@@ -9,8 +9,7 @@ object CommandStatus extends EnumModel {
   override def captureUnknownValues: Boolean = true
 
   override def comments : List[String] = List(
-    "An enumeration of result codes received from an outstation in response to command request.",
-    "These correspond to those defined in the DNP3 standard"
+    "Enumeration received from an outstation in response to command request"
   )
 
   override def name: String = "CommandStatus"

@@ -1,4 +1,4 @@
-use crate::app::gen::enums::CommandStatus;
+use crate::app::enums::CommandStatus;
 use crate::app::header::{IIN, IIN2};
 use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;

@@ -1,9 +1,9 @@
+use crate::app::enums::FunctionCode;
 use crate::app::format::write::HeaderWriter;
-use crate::app::gen::enums::FunctionCode;
-use crate::app::gen::variations::count::CountVariation;
-use crate::app::gen::variations::fixed::{Group50Var1, Group50Var3};
+use crate::app::gen::count::CountVariation;
 use crate::app::parse::parser::{HeaderDetails, Response};
 use crate::app::types::Timestamp;
+use crate::app::variations::{Group50Var1, Group50Var3};
 use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::handle::Promise;
