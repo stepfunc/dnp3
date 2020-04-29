@@ -4,10 +4,9 @@
 //!
 //! * Panic-free, zero-copy, zero-allocation parsing
 //! * Focus on maximal correctness and compliance to the specification
-//! * Automatic connection management with configurable reconnect strategy
+//! * Automatic TCP connection management with configurable reconnect strategy
 //! * Scalable performance using Tokio's multi-threaded executor
-//! * async (futures), callbacks, and synchronous API modes
-//! * Idiomatic C API for integration with legacy code
+//! * Future and callback-based API modes
 
 #![deny(
 dead_code,

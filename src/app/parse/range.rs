@@ -2,20 +2,20 @@ use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct InvalidRange {
-    pub start: u16,
-    pub stop: u16,
+pub(crate) struct InvalidRange {
+    pub(crate) start: u16,
+    pub(crate) stop: u16,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Range {
+pub(crate) struct Range {
     start: u16,
     count: usize,
 }
 
 impl Range {
     /// construct a range in a way that ensures only a valid range can be obtained
-    pub fn from(start: u16, stop: u16) -> Result<Self, InvalidRange> {
+    pub(crate) fn from(start: u16, stop: u16) -> Result<Self, InvalidRange> {
         if stop < start {
             return Err(InvalidRange { start, stop });
         }
@@ -26,15 +26,15 @@ impl Range {
         })
     }
 
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self { start: 0, count: 0 }
     }
 
-    pub fn get_start(&self) -> u16 {
+    pub(crate) fn get_start(&self) -> u16 {
         self.start
     }
 
-    pub fn get_count(&self) -> usize {
+    pub(crate) fn get_count(&self) -> usize {
         self.count
     }
 }

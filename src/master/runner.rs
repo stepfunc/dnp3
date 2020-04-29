@@ -1,5 +1,6 @@
 use crate::app::format::write;
-use crate::app::parse::parser::{DecodeLogLevel, ParsedFragment, Response};
+use crate::app::parse::parser::{ParsedFragment, Response};
+use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::master::task::{NonReadTask, ReadTask, RequestWriter, Task, TaskType};
 use crate::transport::{ReaderType, WriterType};
@@ -655,8 +656,7 @@ impl Runner {
 mod test {
     use super::*;
     use crate::master::association::{Association, Configuration};
-    use crate::master::handle::MasterHandle;
-    use crate::master::null::NullHandler;
+    use crate::master::handle::{MasterHandle, NullHandler};
     use crate::transport::create_transport_layer;
     use tokio_test::io::Builder;
 

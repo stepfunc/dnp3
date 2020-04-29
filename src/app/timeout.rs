@@ -7,7 +7,7 @@ pub struct Timeout {
     value: Duration,
 }
 
-/// Error type returned when constructed with an out-of-range value
+/// Error type returned when a Timeout is constructed with an out-of-range value
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum RangeError {
     TooSmall(Duration), // the applied value and the minimum value

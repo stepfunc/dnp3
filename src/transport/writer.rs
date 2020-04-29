@@ -1,4 +1,5 @@
-use crate::app::parse::parser::{DecodeLogLevel, ParsedFragment};
+use crate::app::parse::parser::ParsedFragment;
+use crate::app::parse::DecodeLogLevel;
 use crate::link::error::LinkError;
 use crate::link::formatter::{LinkFormatter, Payload};
 use crate::transport::sequence::Sequence;

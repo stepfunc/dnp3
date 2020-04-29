@@ -1,13 +1,13 @@
 use dnp3::app::gen::enums::OpType;
 use dnp3::app::gen::variations::fixed::Group12Var1;
-use dnp3::app::parse::parser::DecodeLogLevel;
+use dnp3::app::parse::DecodeLogLevel;
 use dnp3::app::timeout::Timeout;
 use dnp3::master::association::{Association, Configuration};
-use dnp3::master::null::NullHandler;
-use dnp3::master::tcp::{MasterTask, ReconnectStrategy};
-use dnp3::master::types::{
+use dnp3::master::handle::NullHandler;
+use dnp3::master::request::{
     Classes, CommandBuilder, CommandMode, EventClasses, ReadRequest, TimeSyncProcedure,
 };
+use dnp3::master::tcp::{MasterTask, ReconnectStrategy};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;

@@ -9,21 +9,9 @@ use crate::app::parse::error::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::parse::DecodeLogLevel;
 use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
-
-/// Controls how transmitted and received ASDUs are logged
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum DecodeLogLevel {
-    /// Log nothing
-    Nothing,
-    /// Log the header-only
-    Header,
-    /// Log the header and the object headers
-    ObjectHeaders,
-    /// Log the header, the object headers, and the object values
-    ObjectValues,
-}
 
 #[derive(Copy, Clone)]
 pub(crate) struct DecodeSettings {
