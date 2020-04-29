@@ -1,8 +1,8 @@
 use crate::app::enums::FunctionCode;
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::{HeaderCollection, Response};
-use crate::master::error::{CommandResponseError, TaskError};
-use crate::master::handle::{CommandResult, Promise};
+use crate::master::error::{CommandError, CommandResponseError, TaskError};
+use crate::master::handle::Promise;
 use crate::master::request::*;
 use crate::master::task::NonReadTask;
 use crate::util::cursor::WriteError;
@@ -16,7 +16,7 @@ enum State {
 pub(crate) struct CommandTask {
     state: State,
     headers: CommandHeaders,
-    promise: Promise<CommandResult>,
+    promise: Promise<Result<(), CommandError>>,
 }
 
 impl CommandMode {
@@ -32,7 +32,7 @@ impl CommandTask {
     pub(crate) fn from_mode(
         mode: CommandMode,
         headers: CommandHeaders,
-        promise: Promise<CommandResult>,
+        promise: Promise<Result<(), CommandError>>,
     ) -> Self {
         Self {
             state: mode.to_state(),
@@ -41,7 +41,11 @@ impl CommandTask {
         }
     }
 
-    fn new(state: State, headers: CommandHeaders, promise: Promise<CommandResult>) -> Self {
+    fn new(
+        state: State,
+        headers: CommandHeaders,
+        promise: Promise<Result<(), CommandError>>,
+    ) -> Self {
         Self {
             state,
             headers,

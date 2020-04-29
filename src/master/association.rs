@@ -200,8 +200,28 @@ impl Association {
         self.tasks.disable_unsolicited = AutoTaskState::Idle;
     }
 
-    pub(crate) fn handle_response(&mut self, header: ResponseHeader, objects: HeaderCollection) {
-        extract_measurements(header, objects, self.handler.get_read_handler());
+    pub(crate) fn handle_unsolicited_response(
+        &mut self,
+        header: ResponseHeader,
+        objects: HeaderCollection,
+    ) {
+        extract_measurements(header, objects, self.handler.get_unsolicited_handler());
+    }
+
+    pub(crate) fn handle_integrity_response(
+        &mut self,
+        header: ResponseHeader,
+        objects: HeaderCollection,
+    ) {
+        extract_measurements(header, objects, self.handler.get_integrity_handler());
+    }
+
+    pub(crate) fn handle_poll_response(
+        &mut self,
+        header: ResponseHeader,
+        objects: HeaderCollection,
+    ) {
+        extract_measurements(header, objects, self.handler.get_default_poll_handler());
     }
 
     pub(crate) fn next_request(&self, now: Instant) -> Next<Task> {

@@ -1,6 +1,7 @@
 use crate::app::enums::FunctionCode;
 use crate::app::format::write::HeaderWriter;
-use crate::app::parse::parser::Response;
+use crate::app::header::ResponseHeader;
+use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::poll::Poll;
@@ -76,6 +77,18 @@ impl RequestWriter for NonReadTask {
 }
 
 impl ReadTask {
+    pub(crate) fn process_response(
+        &self,
+        association: &mut Association,
+        header: ResponseHeader,
+        objects: HeaderCollection,
+    ) {
+        match self {
+            ReadTask::StartupIntegrity => association.handle_integrity_response(header, objects),
+            ReadTask::PeriodicPoll(_) => association.handle_poll_response(header, objects),
+        }
+    }
+
     pub(crate) fn complete(self, association: &mut Association) {
         match self {
             ReadTask::StartupIntegrity => association.on_integrity_scan_complete(),

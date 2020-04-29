@@ -98,8 +98,12 @@ impl AssociationHandle {
             .ok();
     }
 
-    pub async fn operate(&mut self, mode: CommandMode, headers: CommandHeaders) -> CommandResult {
-        let (tx, rx) = tokio::sync::oneshot::channel::<CommandResult>();
+    pub async fn operate(
+        &mut self,
+        mode: CommandMode,
+        headers: CommandHeaders,
+    ) -> Result<(), CommandError> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), CommandError>>();
         let task = CommandTask::from_mode(mode, headers, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await;
         rx.await?
@@ -141,7 +145,7 @@ impl CallbackAssociationHandle {
 
     pub async fn operate<F>(&mut self, mode: CommandMode, headers: CommandHeaders, callback: F)
     where
-        F: FnOnce(CommandResult) -> () + Send + Sync + 'static,
+        F: FnOnce(Result<(), CommandError>) -> () + Send + Sync + 'static,
     {
         let task = CommandTask::from_mode(mode, headers, Promise::BoxedFn(Box::new(callback)));
         self.inner.send_task(task.wrap().wrap()).await;
@@ -204,13 +208,19 @@ impl<T> Listener<T> {
     }
 }
 
-pub type CommandResult = Result<(), CommandError>;
-
+/// callbacks associated with a single master to outstation association
 pub trait AssociationHandler: Send {
-    fn get_read_handler(&mut self) -> &mut dyn ReadHandler;
+    /// Retrieve the system time used for time synchronization
     fn get_system_time(&self) -> SystemTime {
         SystemTime::now()
     }
+
+    /// retrieve a handler used to process integrity polls
+    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler;
+    /// retrieve a handler used to process unsolicited responses
+    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler;
+    /// retrieve a default handler used to process user-defined polls
+    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler;
 }
 
 /// Information about the object header from which the measurement values were mapped
@@ -331,7 +341,15 @@ impl ReadHandler for NullHandler {
 }
 
 impl AssociationHandler for NullHandler {
-    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
+    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
+        self
+    }
+
+    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
+        self
+    }
+
+    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
         self
     }
 }

@@ -248,8 +248,8 @@ impl Runner {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let session = match self.associations.get_mut(source).ok() {
-            Some(session) => session,
+        let association = match self.associations.get_mut(source).ok() {
+            Some(x) => x,
             None => {
                 log::warn!(
                     "received unsolicited response from unknown address: {}",
@@ -259,10 +259,10 @@ impl Runner {
             }
         };
 
-        session.process_iin(response.header.iin);
+        association.process_iin(response.header.iin);
 
         if let Ok(objects) = response.objects {
-            session.handle_response(response.header, objects);
+            association.handle_unsolicited_response(response.header, objects);
         }
 
         if response.header.control.con {
@@ -521,7 +521,7 @@ impl Runner {
             loop {
                 self.read_next_response(io, deadline, reader).await?;
                 match self
-                    .process_read_response(address, is_first, seq, io, writer, reader)
+                    .process_read_response(address, is_first, seq, &task, io, writer, reader)
                     .await?
                 {
                     // continue reading responses on the inner loop
@@ -542,11 +542,13 @@ impl Runner {
         }
     }
 
+    #[allow(clippy::too_many_arguments)] // TODO
     async fn process_read_response<T>(
         &mut self,
         address: u16,
         is_first: bool,
         seq: Sequence,
+        task: &ReadTask,
         io: &mut T,
         writer: &mut WriterType,
         reader: &mut ReaderType,
@@ -611,9 +613,7 @@ impl Runner {
         }
 
         let association = self.associations.get_mut(address)?;
-        association.process_iin(response.header.iin);
-        // TODO - invoke task specific handler if present
-        association.handle_response(response.header, response.objects?);
+        task.process_response(association, response.header, response.objects?);
 
         if response.header.control.con {
             self.confirm_solicited(io, address, seq, writer).await?;
