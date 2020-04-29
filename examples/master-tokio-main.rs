@@ -7,7 +7,7 @@ use dnp3::master::handle::{Listener, NullHandler};
 use dnp3::master::request::{
     Classes, CommandBuilder, CommandMode, EventClasses, ReadRequest, TimeSyncProcedure,
 };
-use dnp3::master::tcp::{MasterTask, ReconnectStrategy};
+use dnp3::master::tcp::ReconnectStrategy;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
@@ -25,12 +25,13 @@ fn get_association() -> Association {
     association
 }
 
+/// example of using the master API asynchronously from within the Tokio runtime
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
 
     // spawn the master onto another task
-    let mut master = MasterTask::spawn(
+    let mut master = dnp3::master::tcp::spawn(
         1,
         DecodeLogLevel::ObjectValues,
         ReconnectStrategy::default(),

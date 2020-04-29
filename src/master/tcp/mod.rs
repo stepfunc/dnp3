@@ -6,6 +6,7 @@ use crate::master::runner::{RunError, Runner};
 use crate::transport::{ReaderType, WriterType};
 use std::net::SocketAddr;
 use std::time::Duration;
+use tokio::macros::support::Future;
 use tokio::net::TcpStream;
 
 #[derive(Copy, Clone)]
@@ -78,7 +79,7 @@ impl Default for ReconnectStrategy {
     }
 }
 
-pub struct MasterTask {
+pub(crate) struct MasterTask {
     endpoint: SocketAddr,
     back_off: ExponentialBackOff,
     runner: Runner,
@@ -87,35 +88,53 @@ pub struct MasterTask {
     listener: Listener<ClientState>,
 }
 
-impl MasterTask {
-    /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
-    /// `AssociationHandle` created from it are dropped.
-    ///
-    /// Note: This function may only be called from within the runtime itself, and panics otherwise.
-    /// It is preferable to use this method instead of `new()/run()` when using `[tokio::main]`.
-    pub fn spawn(
-        address: u16,
-        level: DecodeLogLevel,
-        strategy: ReconnectStrategy,
-        timeout: Timeout,
-        endpoint: SocketAddr,
-        listener: Listener<ClientState>,
-    ) -> MasterHandle {
-        let (mut task, handle) =
-            MasterTask::new(address, level, strategy, timeout, endpoint, listener);
-        tokio::spawn(async move { task.run().await });
-        handle
-    }
+/// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
+/// `AssociationHandle` created from it, are dropped.
+///
+/// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
+/// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
+pub fn spawn(
+    address: u16,
+    level: DecodeLogLevel,
+    strategy: ReconnectStrategy,
+    timeout: Timeout,
+    endpoint: SocketAddr,
+    listener: Listener<ClientState>,
+) -> MasterHandle {
+    let (mut task, handle) = MasterTask::new(address, level, strategy, timeout, endpoint, listener);
+    tokio::spawn(async move { task.run().await });
+    handle
+}
 
-    /// Create a `MasterTask` which can be spawned onto a runtime, along with a controlling handle.
-    ///
-    /// Once spawned or otherwise executed using the `run` method, the task runs until the handle
-    /// and any `AssociationHandle` created from it are dropped.
-    ///
-    /// Note: This function is required instead of `spawn` when using a runtime to directly spawn
-    /// tasks instead of within the context of a runtime, e.g. in applications that cannot use
-    /// `[tokio::main]` such as C language bindings.
-    pub fn new(
+/// Create a Future, which can be spawned onto a runtime, along with a controlling handle.
+///
+/// Once spawned or otherwise executed using the `run` method, the task runs until the handle
+/// and any `AssociationHandle` created from it are dropped.
+///
+/// **Note**: This function is required instead of `spawn` when using a runtime to directly spawn
+/// tasks instead of within the context of a runtime, e.g. in applications that cannot use
+/// `[tokio::main]` such as C language bindings.
+pub fn create(
+    address: u16,
+    level: DecodeLogLevel,
+    strategy: ReconnectStrategy,
+    response_timeout: Timeout,
+    endpoint: SocketAddr,
+    listener: Listener<ClientState>,
+) -> (impl Future<Output = ()> + 'static, MasterHandle) {
+    let (mut task, handle) = MasterTask::new(
+        address,
+        level,
+        strategy,
+        response_timeout,
+        endpoint,
+        listener,
+    );
+    (async move { task.run().await }, handle)
+}
+
+impl MasterTask {
+    fn new(
         address: u16,
         level: DecodeLogLevel,
         strategy: ReconnectStrategy,
@@ -137,9 +156,7 @@ impl MasterTask {
         (task, MasterHandle::new(tx))
     }
 
-    /// Create a future from the `MasterTask` which can be spawned
-    /// onto a Runtime.
-    pub async fn run(&mut self) {
+    async fn run(&mut self) {
         self.run_impl().await.ok();
     }
 
