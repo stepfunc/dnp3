@@ -14,6 +14,14 @@ object ProtocolEnums extends Module {
     TripCloseCode
   )
 
+  private def excludeWriteImpl(model : EnumModel) : Boolean = {
+    model match  {
+      case OpType => true
+      case TripCloseCode => true
+      case _ => false
+    }
+  }
+
   private def lines(model : EnumModel)(implicit indentation: Indentation) : Iterator[String] = {
     def values: Iterator[String] = {
       model.values.flatMap(v => v.comment.iterator.map(commented) ++ s"${v.name},".eol).iterator
@@ -64,8 +72,14 @@ object ProtocolEnums extends Module {
     }
 
     def write : Iterator[String] = {
-      bracket("pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError>") {
-        s"cursor.write_u8(self.as_u8())".eol
+      if(excludeWriteImpl(model)) {
+        Iterator.empty
+      }
+      else {
+        space ++
+          bracket("pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError>") {
+            s"cursor.write_u8(self.as_u8())".eol
+          }
       }
     }
 
@@ -74,7 +88,6 @@ object ProtocolEnums extends Module {
         (if(model.captureUnknownValues) fromValue else fromValueToOption) ++
           space ++
           asValue ++
-          space ++
           write
       }
     }

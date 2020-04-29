@@ -16,7 +16,7 @@ object PrefixedVariationModule extends Module {
       "use crate::app::parse::prefix::Prefix;".eol ++
       "use crate::app::parse::bytes::PrefixedBytesSequence;".eol ++
       "use crate::app::measurement::Time;".eol ++
-      "use crate::master::handlers::MeasurementHandler;".eol ++
+      "use crate::master::handle::ReadHandler;".eol ++
       "use crate::app::parse::error::ObjectParseError;".eol ++
       space ++
       enumDefinition ++
@@ -36,7 +36,7 @@ object PrefixedVariationModule extends Module {
     }
 
     "#[derive(Debug, PartialEq)]".eol ++
-      bracket("pub enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display") {
+      bracket("pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display") {
         variations.iterator.flatMap(v =>  commented(v.fullDesc).eol ++ definition(v))
       }
 
@@ -53,16 +53,6 @@ object PrefixedVariationModule extends Module {
         s"Variation::${v.name} => Ok(PrefixedVariation::${v.name}(CountSequence::parse(count, cursor)?)),".eol
       }
     }
-
-    def logMatcher(v: Variation): Iterator[String] = v match {
-      case _ : SizedByVariation => {
-          s"PrefixedVariation::${v.parent.name}VarX(_,seq) =>  log_indexed_items(level, seq.iter()),".eol
-      }
-      case _ : FixedSize => {
-        s"PrefixedVariation::${v.name}(seq) => log_prefixed_items(level, seq.iter()),".eol
-      }
-    }
-
     def fmtMatcher(v: Variation): Iterator[String] = v match {
       case _ : SizedByVariation => {
         s"PrefixedVariation::${v.parent.name}VarX(_,seq) =>  format_indexed_items(f, seq.iter()),".eol
@@ -92,25 +82,25 @@ object PrefixedVariationModule extends Module {
         }
         case Group111AnyVar => {
           bracket(s"PrefixedVariation::Group111VarX(_, seq) =>") {
-            "handler.handle_octet_string(seq.iter().map(|x| (x.0, x.1.widen_to_u16())));".eol ++
+            "handler.handle_octet_string(&mut seq.iter().map(|x| (x.0, x.1.widen_to_u16())));".eol ++
             "true".eol
           }
         }
         case Group2Var3 => {
           bracket(s"PrefixedVariation::${v.name}(seq) =>") {
-            "handler.handle_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())));".eol ++
+            "handler.handle_binary(&mut seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())));".eol ++
             "true".eol
           }
         }
         case Group4Var3 => {
           bracket(s"PrefixedVariation::${v.name}(seq) =>") {
-            "handler.handle_double_bit_binary(seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())));".eol ++
+            "handler.handle_double_bit_binary(&mut seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16())));".eol ++
             "true".eol
           }
         }
         case _ => {
           bracket(s"PrefixedVariation::${v.name}(seq) =>") {
-            s"handler.handle_${getName}(seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));".eol ++
+            s"handler.handle_${getName}(&mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16())));".eol ++
             "true".eol
           }
         }
@@ -128,20 +118,12 @@ object PrefixedVariationModule extends Module {
             variations.flatMap(fmtMatcher).iterator
           }
         } ++ space ++
-      bracket("pub(crate) fn extract_measurements_to<T>(&self, cto: Time, handler: &mut T) -> bool where T: MeasurementHandler") {
+      bracket("pub(crate) fn extract_measurements_to(&self, cto: Time, handler: &mut dyn ReadHandler) -> bool") {
         bracket("match self") {
           variations.flatMap(extractMatcher).iterator
         }
       }
     }
-    /*
-     ++ space ++
-      bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
-        bracket("match self") {
-          variations.flatMap(logMatcher).iterator
-        }
-      }
-    */
   }
 
   def variations : Iterator[Variation] = {

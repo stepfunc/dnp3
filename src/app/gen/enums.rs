@@ -43,10 +43,6 @@ impl TripCloseCode {
             TripCloseCode::Unknown(x) => x,
         }
     }
-    
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.as_u8())
-    }
 }
 
 /// Used in conjunction with the TCC field to specify a control operation
@@ -82,10 +78,6 @@ impl OpType {
             OpType::LatchOff => 4,
             OpType::Unknown(x) => x,
         }
-    }
-    
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.as_u8())
     }
 }
 
@@ -190,7 +182,7 @@ impl CommandStatus {
         }
     }
     
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }
@@ -236,7 +228,7 @@ impl QualifierCode {
         }
     }
     
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }
@@ -390,7 +382,7 @@ impl FunctionCode {
         }
     }
     
-    pub fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }

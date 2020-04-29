@@ -3,8 +3,8 @@ use crate::app::gen::enums::FunctionCode;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::master::error::{CommandResponseError, TaskError};
 use crate::master::handle::{CommandResult, Promise};
+use crate::master::request::*;
 use crate::master::task::NonReadTask;
-use crate::master::types::*;
 use crate::util::cursor::WriteError;
 
 enum State {

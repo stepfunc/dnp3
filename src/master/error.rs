@@ -49,24 +49,24 @@ pub enum TaskError {
     Shutdown,
 }
 
-/// errors that can occur when verifying the respond to a command request
+/// Errors that can occur when verifying the respond to a command request
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandResponseError {
-    /// the command failed before receiving a response
+    /// Command failed before receiving a response
     Request(TaskError),
-    /// the outstation indicated that a command was not SUCCESS for the specified reason
+    /// Outstation indicated that a command was not SUCCESS for the specified reason
     BadStatus(CommandStatus),
-    /// the number of headers in the response doesn't match the number in the request
+    /// Number of headers in the response doesn't match the number in the request
     HeaderCountMismatch,
-    /// a header in the response doesn't match the request
+    /// Header in the response doesn't match the request
     HeaderTypeMismatch,
-    /// the number of objects in one of the headers doesn't match the request
+    /// Number of objects in one of the headers doesn't match the request
     ObjectCountMismatch,
-    /// a value in one of the objects in the response doesn't match the request
+    /// Value in one of the objects in the response doesn't match the request
     ObjectValueMismatch,
 }
 
-/// parent error type for time sync tasks
+/// Parent error type for time sync tasks
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TimeSyncError {
     Task(TaskError),
@@ -90,12 +90,12 @@ impl TimeSyncError {
     }
 }
 
-/// parent error type for command tasks
+/// Parent error type for command tasks
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandError {
-    /// failed b/c of a generic task execution error
+    /// Failed b/c of a generic task execution error
     Task(TaskError),
-    /// task failed b/c of an unexpected response
+    /// Failed b/c of an unexpected response to Select, Operate, or DirectOperate
     Response(CommandResponseError),
 }
 

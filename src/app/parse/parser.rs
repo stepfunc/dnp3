@@ -4,42 +4,30 @@ use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::prefixed::PrefixedVariation;
 use crate::app::gen::variations::ranged::RangedVariation;
 use crate::app::gen::variations::variation::Variation;
-use crate::app::header::{Control, RequestHeader, ResponseHeader, IIN};
+use crate::app::header::{Control, RequestHeader, ResponseFunction, ResponseHeader, IIN};
 use crate::app::parse::error::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::parse::DecodeLogLevel;
 use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
 
-/// Controls how transmitted and received ASDUs are logged
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum DecodeLogLevel {
-    /// Log nothing
-    Nothing,
-    /// Log the header-only
-    Header,
-    /// Log the header and the object headers
-    ObjectHeaders,
-    /// Log the header, the object headers, and the object values
-    ObjectValues,
-}
-
 #[derive(Copy, Clone)]
-pub struct DecodeSettings {
+pub(crate) struct DecodeSettings {
     is_transmit: bool,
     level: DecodeLogLevel,
 }
 
 impl DecodeLogLevel {
-    pub fn transmit(self) -> DecodeSettings {
+    pub(crate) fn transmit(self) -> DecodeSettings {
         DecodeSettings {
             is_transmit: true,
             level: self,
         }
     }
 
-    pub fn receive(self) -> DecodeSettings {
+    pub(crate) fn receive(self) -> DecodeSettings {
         DecodeSettings {
             is_transmit: false,
             level: self,
@@ -82,12 +70,12 @@ where
     Ok(())
 }
 
-pub struct ParsedFragment<'a> {
-    pub control: Control,
-    pub function: FunctionCode,
-    pub iin: Option<IIN>,
-    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
-    pub raw_objects: &'a [u8],
+pub(crate) struct ParsedFragment<'a> {
+    pub(crate) control: Control,
+    pub(crate) function: FunctionCode,
+    pub(crate) iin: Option<IIN>,
+    pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
+    pub(crate) raw_objects: &'a [u8],
 }
 
 impl<'a> ParsedFragment<'a> {
@@ -139,7 +127,8 @@ impl<'a> ParsedFragment<'a> {
         }
     }
 
-    pub fn to_request(&self) -> Result<Request<'a>, RequestValidationError> {
+    /*
+    pub(crate) fn to_request(&self) -> Result<Request<'a>, RequestValidationError> {
         if self.iin.is_some() {
             return Err(RequestValidationError::UnexpectedFunction(self.function));
         }
@@ -158,28 +147,31 @@ impl<'a> ParsedFragment<'a> {
             objects: self.objects,
         })
     }
+    */
 
     pub(crate) fn to_response(&self) -> Result<Response<'a>, ResponseValidationError> {
-        let (unsolicited, iin) = match (self.function, self.iin) {
-            (FunctionCode::Response, Some(x)) => (false, x),
-            (FunctionCode::UnsolicitedResponse, Some(x)) => (true, x),
+        let (function, iin) = match (self.function, self.iin) {
+            (FunctionCode::Response, Some(x)) => (ResponseFunction::Response, x),
+            (FunctionCode::UnsolicitedResponse, Some(x)) => {
+                (ResponseFunction::UnsolicitedResponse, x)
+            }
             _ => return Err(ResponseValidationError::UnexpectedFunction(self.function)),
         };
 
-        if !unsolicited && self.control.uns {
+        if !function.is_unsolicited() && self.control.uns {
             return Err(ResponseValidationError::SolicitedResponseWithUnsBit);
         }
 
-        if unsolicited && !self.control.uns {
+        if function.is_unsolicited() && !self.control.uns {
             return Err(ResponseValidationError::UnsolicitedResponseWithoutUnsBit);
         }
 
-        if unsolicited && !self.control.is_fir_and_fin() {
+        if function.is_unsolicited() && !self.control.is_fir_and_fin() {
             return Err(ResponseValidationError::UnsolicitedResponseWithoutFirAndFin);
         }
 
         Ok(Response {
-            header: ResponseHeader::new(self.control, unsolicited, iin),
+            header: ResponseHeader::new(self.control, function, iin),
             raw_objects: self.raw_objects,
             objects: self.objects,
         })
@@ -212,7 +204,10 @@ impl<'a> ParsedFragment<'a> {
         Ok(fragment)
     }
 
-    pub fn parse(settings: DecodeSettings, fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
+    pub(crate) fn parse(
+        settings: DecodeSettings,
+        fragment: &'a [u8],
+    ) -> Result<Self, HeaderParseError> {
         let result = Self::parse_no_logging(fragment);
         match &result {
             Ok(fragment) => {
@@ -229,9 +224,9 @@ impl<'a> ParsedFragment<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ObjectHeader<'a> {
-    pub variation: Variation,
-    pub details: HeaderDetails<'a>,
+pub(crate) struct ObjectHeader<'a> {
+    pub(crate) variation: Variation,
+    pub(crate) details: HeaderDetails<'a>,
 }
 
 impl<'a> ObjectHeader<'a> {
@@ -385,7 +380,7 @@ impl std::fmt::Display for ParsedFragmentDisplay<'_> {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum HeaderDetails<'a> {
+pub(crate) enum HeaderDetails<'a> {
     AllObjects(AllObjectsVariation),
     OneByteStartStop(u8, u8, RangedVariation<'a>),
     TwoByteStartStop(u16, u16, RangedVariation<'a>),
@@ -396,7 +391,7 @@ pub enum HeaderDetails<'a> {
 }
 
 impl HeaderDetails<'_> {
-    pub fn qualifier(&self) -> QualifierCode {
+    pub(crate) fn qualifier(&self) -> QualifierCode {
         match self {
             HeaderDetails::AllObjects(_) => QualifierCode::AllObjects,
             HeaderDetails::OneByteStartStop(_, _, _) => QualifierCode::Range8,
@@ -410,17 +405,17 @@ impl HeaderDetails<'_> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Request<'a> {
-    pub header: RequestHeader,
-    pub raw_objects: &'a [u8],
-    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
+pub(crate) struct Request<'a> {
+    pub(crate) header: RequestHeader,
+    pub(crate) raw_objects: &'a [u8],
+    pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Response<'a> {
-    pub header: ResponseHeader,
-    pub raw_objects: &'a [u8],
-    pub objects: Result<HeaderCollection<'a>, ObjectParseError>,
+pub(crate) struct Response<'a> {
+    pub(crate) header: ResponseHeader,
+    pub(crate) raw_objects: &'a [u8],
+    pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
 struct ObjectParser<'a> {
@@ -432,29 +427,29 @@ struct ObjectParser<'a> {
 /// An abstract collection of pre-validated object headers
 /// that can provide an iterator of the headers.
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct HeaderCollection<'a> {
+pub(crate) struct HeaderCollection<'a> {
     function: FunctionCode,
     data: &'a [u8],
 }
 
 impl<'a> HeaderCollection<'a> {
     /// parse the the raw header data in accordance with the provided function code
-    pub fn parse(function: FunctionCode, data: &'a [u8]) -> Result<Self, ObjectParseError> {
+    pub(crate) fn parse(function: FunctionCode, data: &'a [u8]) -> Result<Self, ObjectParseError> {
         ObjectParser::parse(function, data)
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
     /// return and iterator of the headers that lazily parses them
-    pub fn iter(&self) -> HeaderIterator<'a> {
+    pub(crate) fn iter(&self) -> HeaderIterator<'a> {
         HeaderIterator {
             parser: ObjectParser::one_pass(self.function, self.data),
         }
     }
 
-    pub fn get_only_header(&self) -> Option<ObjectHeader<'a>> {
+    pub(crate) fn get_only_header(&self) -> Option<ObjectHeader<'a>> {
         let mut iter = self.iter();
         match iter.next() {
             None => None,
@@ -466,7 +461,7 @@ impl<'a> HeaderCollection<'a> {
     }
 }
 
-pub struct HeaderIterator<'a> {
+pub(crate) struct HeaderIterator<'a> {
     parser: ObjectParser<'a>,
 }
 
@@ -677,7 +672,7 @@ mod test {
     use crate::app::gen::variations::variation::Variation::Group110;
     use crate::app::header::{Control, IIN, IIN1, IIN2};
     use crate::app::parse::bytes::Bytes;
-    use crate::app::parse::error::{RequestValidationError, ResponseValidationError};
+    use crate::app::parse::error::ResponseValidationError;
     use crate::app::parse::prefix::Prefix;
     use crate::app::sequence::Sequence;
     use crate::app::types::{DoubleBit, Timestamp};
@@ -686,6 +681,7 @@ mod test {
         assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);
     }
 
+    /*
     fn test_request_validation_error(input: &[u8], err: RequestValidationError) {
         assert_eq!(
             ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), input)
@@ -696,6 +692,7 @@ mod test {
             err
         );
     }
+    */
 
     fn test_response_validation_error(input: &[u8], err: ResponseValidationError) {
         assert_eq!(
@@ -729,6 +726,7 @@ mod test {
         }
     }
 
+    /*
     #[test]
     fn parses_valid_request() {
         let fragment = &[0xC2, 0x02, 0xAA];
@@ -754,6 +752,7 @@ mod test {
             ObjectParseError::InsufficientBytes
         )
     }
+    */
 
     #[test]
     fn parses_valid_unsolicited_response() {
@@ -770,7 +769,7 @@ mod test {
                 uns: true,
                 seq: Sequence::new(0x02),
             },
-            unsolicited: true,
+            function: ResponseFunction::UnsolicitedResponse,
             iin: IIN {
                 iin1: IIN1::new(0xFF),
                 iin2: IIN2::new(0xAA),
@@ -801,6 +800,7 @@ mod test {
         );
     }
 
+    /*
     #[test]
     fn fails_bad_request_function_with_uns_bit() {
         test_request_validation_error(
@@ -808,7 +808,9 @@ mod test {
             RequestValidationError::UnexpectedUnsBit(FunctionCode::Write),
         );
     }
+    */
 
+    /*
     #[test]
     fn confirms_may_or_may_not_have_uns_set() {
         {
@@ -830,6 +832,7 @@ mod test {
             assert!(!request.header.control.uns);
         }
     }
+    */
 
     #[test]
     fn parses_integrity_scan() {
@@ -960,14 +963,14 @@ mod test {
         assert_matches!(
             headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
-                assert!(seq.is_empty())
+                assert!(seq.iter().next().is_none())
             }
         );
 
         assert_matches!(
             headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(07, 09, RangedVariation::Group1Var2(seq)) => {
-                assert!(seq.is_empty())
+                assert!(seq.iter().next().is_none())
             }
         );
 

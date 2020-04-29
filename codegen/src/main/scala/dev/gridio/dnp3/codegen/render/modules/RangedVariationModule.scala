@@ -14,7 +14,7 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::parser::*;".eol ++
       "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
-      "use crate::master::handlers::MeasurementHandler;".eol ++
+      "use crate::master::handle::ReadHandler;".eol ++
       "use crate::app::gen::enums::QualifierCode;".eol ++
       "use crate::app::parse::error::ObjectParseError;".eol ++
       space ++
@@ -37,7 +37,7 @@ object RangedVariationModule extends Module {
     }
 
     "#[derive(Debug, PartialEq)]".eol ++
-      bracket("pub enum RangedVariation<'a>") {
+      bracket("pub(crate) enum RangedVariation<'a>") {
         variations.iterator.flatMap(v =>  commented(v.fullDesc).eol ++ getVarDefinition(v))
       }
 
@@ -87,15 +87,6 @@ object RangedVariationModule extends Module {
       case _ => s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getReadVarDefinition(v)}),".eol
     }
 
-    def getLogMatcher(v: Variation): Iterator[String] = v match {
-      case _ : AnyVariation => s"RangedVariation::${v.name} => {}".eol
-      case _ : SizedByVariation => {
-        s"RangedVariation::${v.parent.name}Var0 => {}".eol ++
-          s"RangedVariation::${v.parent.name}VarX(_,seq) =>  log_indexed_items(level, seq.iter()),".eol
-      }
-      case _ => s"RangedVariation::${v.name}(seq) => log_indexed_items(level, seq.iter()),".eol
-    }
-
     def getFmtMatcher(v: Variation): Iterator[String] = v match {
       case _ : AnyVariation => s"RangedVariation::${v.name} => Ok(()),".eol
       case _ : SizedByVariation => {
@@ -122,7 +113,7 @@ object RangedVariationModule extends Module {
 
       def simpleExtract(v: Variation): Iterator[String] = {
         bracket(s"RangedVariation::${v.name}(seq) =>") {
-          s"handler.handle_${getMeasName(v)}(seq.iter().map(|(v,i)| (v.into(), i)));".eol ++
+          s"handler.handle_${getMeasName(v)}(&mut seq.iter().map(|(v,i)| (v.into(), i)));".eol ++
           "true".eol
         }
       }
@@ -147,11 +138,10 @@ object RangedVariationModule extends Module {
             "false".eol
           } ++
           bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
-            "handler.handle_octet_string(seq.iter());".eol ++
+            "handler.handle_octet_string(&mut seq.iter());".eol ++
               "true".eol
           }
         }
-        //case _ => Iterator.empty
       }
     }
     
@@ -171,23 +161,12 @@ object RangedVariationModule extends Module {
             variations.flatMap(getFmtMatcher).iterator
           }
         } ++ space ++
-        bracket("pub(crate) fn extract_measurements_to<T>(&self, handler: &mut T) -> bool where T: MeasurementHandler") {
+        bracket("pub(crate) fn extract_measurements_to(&self, handler: &mut dyn ReadHandler) -> bool") {
           bracket("match self") {
             variations.flatMap(getExtractMatcher).iterator
           }
         }
-
-      /*
-         ++ space ++
-        bracket("pub(crate) fn log_objects(&self, level : log::Level)") {
-          bracket("match self") {
-            variations.flatMap(getLogMatcher).iterator
-          }
-        }
-       */
     }
-
-
   }
 
   def variations : List[Variation] = {

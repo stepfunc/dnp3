@@ -1,11 +1,6 @@
 use crate::link::header::Address;
 use crate::transport::header::Header;
-
-#[derive(Debug)]
-pub struct Fragment<'a> {
-    pub address: Address,
-    pub data: &'a [u8],
-}
+use crate::transport::Fragment;
 
 #[derive(Copy, Clone)]
 enum InternalState {

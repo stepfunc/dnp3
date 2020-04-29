@@ -1,13 +1,14 @@
 use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
-use crate::app::parse::parser::{DecodeLogLevel, HeaderCollection};
+use crate::app::parse::DecodeLogLevel;
 use crate::master::association::Association;
 use crate::master::error::{AssociationError, CommandError, TaskError, TimeSyncError};
+use crate::master::request::{CommandHeaders, CommandMode, TimeSyncProcedure};
 use crate::master::task::{Task, TaskType};
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::time::TimeSyncTask;
-use crate::master::types::{CommandHeaders, CommandMode, TimeSyncProcedure};
+use std::time::SystemTime;
 
 // messages sent from the handles to the master task via an mpsc
 pub(crate) enum Message {
@@ -37,7 +38,7 @@ pub struct MasterHandle {
     sender: tokio::sync::mpsc::Sender<Message>,
 }
 
-/// A handle used to make requests against
+/// handle used to make requests against
 #[derive(Debug)]
 pub struct AssociationHandle {
     address: u16,
@@ -177,21 +178,80 @@ impl<T> Promise<T> {
 
 pub type CommandResult = Result<(), CommandError>;
 
-pub trait ResponseHandler: Send {
-    fn handle(&mut self, source: u16, header: ResponseHeader, headers: HeaderCollection);
+pub trait AssociationHandler: Send {
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler;
+    fn get_system_time(&self) -> SystemTime {
+        SystemTime::now()
+    }
 }
 
-pub trait AssociationHandler: ResponseHandler {
-    fn get_system_time(&self) -> std::time::SystemTime;
+pub trait ReadHandler {
+    fn begin_fragment(&mut self, header: ResponseHeader);
+    fn end_fragment(&mut self, header: ResponseHeader);
+
+    fn handle_binary(&mut self, iter: &mut dyn Iterator<Item = (Binary, u16)>);
+    fn handle_double_bit_binary(&mut self, iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>);
+    fn handle_binary_output_status(
+        &mut self,
+        iter: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
+    );
+    fn handle_counter(&mut self, iter: &mut dyn Iterator<Item = (Counter, u16)>);
+    fn handle_frozen_counter(&mut self, iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>);
+    fn handle_analog(&mut self, iter: &mut dyn Iterator<Item = (Analog, u16)>);
+    fn handle_analog_output_status(
+        &mut self,
+        iter: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
+    );
+    fn handle_octet_string<'a>(&mut self, iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>);
 }
 
-pub trait MeasurementHandler {
-    fn handle_binary(&mut self, x: impl Iterator<Item = (Binary, u16)>);
-    fn handle_double_bit_binary(&mut self, x: impl Iterator<Item = (DoubleBitBinary, u16)>);
-    fn handle_binary_output_status(&mut self, x: impl Iterator<Item = (BinaryOutputStatus, u16)>);
-    fn handle_counter(&mut self, x: impl Iterator<Item = (Counter, u16)>);
-    fn handle_frozen_counter(&mut self, x: impl Iterator<Item = (FrozenCounter, u16)>);
-    fn handle_analog(&mut self, x: impl Iterator<Item = (Analog, u16)>);
-    fn handle_analog_output_status(&mut self, x: impl Iterator<Item = (AnalogOutputStatus, u16)>);
-    fn handle_octet_string<'a>(&mut self, x: impl Iterator<Item = (Bytes<'a>, u16)>);
+/// no-op default association handler type
+#[derive(Copy, Clone)]
+pub struct NullHandler;
+
+impl NullHandler {
+    /// create a default boxed instance of the NullHandler
+    pub fn boxed() -> Box<NullHandler> {
+        Box::new(Self {})
+    }
+}
+
+impl ReadHandler for NullHandler {
+    fn begin_fragment(&mut self, _header: ResponseHeader) {}
+
+    fn end_fragment(&mut self, _header: ResponseHeader) {}
+
+    fn handle_binary(&mut self, _iter: &mut dyn Iterator<Item = (Binary, u16)>) {}
+
+    fn handle_double_bit_binary(
+        &mut self,
+        _iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
+    ) {
+    }
+
+    fn handle_binary_output_status(
+        &mut self,
+        _iter: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
+    ) {
+    }
+
+    fn handle_counter(&mut self, _iter: &mut dyn Iterator<Item = (Counter, u16)>) {}
+
+    fn handle_frozen_counter(&mut self, _iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>) {}
+
+    fn handle_analog(&mut self, _iter: &mut dyn Iterator<Item = (Analog, u16)>) {}
+
+    fn handle_analog_output_status(
+        &mut self,
+        _iter: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
+    ) {
+    }
+
+    fn handle_octet_string<'a>(&mut self, _iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>) {}
+}
+
+impl AssociationHandler for NullHandler {
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
+        self
+    }
 }

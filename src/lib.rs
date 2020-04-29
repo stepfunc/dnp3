@@ -1,5 +1,15 @@
+//! [DNP3](http://www.dnp.org/) protocol using [Tokio](https://docs.rs/tokio) and `async/await`.
+//!
+//! # Features
+//!
+//! * Panic-free, zero-copy, zero-allocation parsing
+//! * Focus on maximal correctness and compliance to the specification
+//! * Automatic TCP connection management with configurable reconnect strategy
+//! * Scalable performance using Tokio's multi-threaded executor
+//! * Future and callback-based API modes
+
 #![deny(
-//dead_code,
+dead_code,
 arithmetic_overflow,
 invalid_type_param_default,
 missing_fragment_specifier,
@@ -51,8 +61,12 @@ extern crate tokio_test;
 #[macro_use]
 extern crate assert_matches;
 
+/// application layer
 pub mod app;
-pub(crate) mod link;
+/// master API
 pub mod master;
-pub mod transport;
-pub mod util;
+
+pub(crate) mod link;
+#[cfg_attr(test, allow(dead_code))]
+pub(crate) mod transport;
+pub(crate) mod util;

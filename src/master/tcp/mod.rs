@@ -1,9 +1,9 @@
-use crate::app::parse::parser::DecodeLogLevel;
+use crate::app::parse::DecodeLogLevel;
+use crate::app::timeout::Timeout;
 use crate::master::error::Shutdown;
 use crate::master::handle::MasterHandle;
 use crate::master::runner::{RunError, Runner};
 use crate::transport::{ReaderType, WriterType};
-use crate::util::timeout::Timeout;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::TcpStream;
@@ -77,6 +77,11 @@ pub struct MasterTask {
 }
 
 impl MasterTask {
+    /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
+    /// `AssociationHandle` created from it are dropped.
+    ///
+    /// Note: This function may only be called from within the runtime itself, and panics otherwise.
+    /// It is preferable to use this method instead of `new()/run()` when using `[tokio::main]`.
     pub fn spawn(
         address: u16,
         level: DecodeLogLevel,
@@ -89,6 +94,14 @@ impl MasterTask {
         handle
     }
 
+    /// Create a `MasterTask` which can be spawned onto a runtime, along with a controlling handle.
+    ///
+    /// Once spawned or otherwise executed using the `run` method, the task runs until the handle
+    /// and any `AssociationHandle` created from it are dropped.
+    ///
+    /// Note: This function is required instead of `spawn` when using a runtime to directly spawn
+    /// tasks instead of within the context of a runtime, e.g. in applications that cannot use
+    /// `[tokio::main]` such as C language bindings.
     pub fn new(
         address: u16,
         level: DecodeLogLevel,
@@ -109,7 +122,9 @@ impl MasterTask {
         (task, MasterHandle::new(tx))
     }
 
-    async fn run(&mut self) {
+    /// Create a future from the `MasterTask` which can be spawned
+    /// onto a Runtime.
+    pub async fn run(&mut self) {
         self.run_impl().await.ok();
     }
 

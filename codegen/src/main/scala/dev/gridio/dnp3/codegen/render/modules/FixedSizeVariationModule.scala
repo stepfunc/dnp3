@@ -1,6 +1,7 @@
 package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
+import dev.gridio.dnp3.codegen.model.groups.{Group12Var1, Group1Var2, Group41Var1, Group41Var2, Group41Var3, Group41Var4}
 import dev.gridio.dnp3.codegen.render._
 
 object FixedSizeVariationModule extends Module {
@@ -62,11 +63,23 @@ object FixedSizeVariationModule extends Module {
     }
   }
 
+  private def visibility(gv : FixedSize): String = {
+    val public = gv match {
+      case Group12Var1 => true
+      case Group41Var1 => true
+      case Group41Var2 => true
+      case Group41Var3 => true
+      case Group41Var4 => true
+      case _ => false
+    }
+    if(public) "" else "(crate)"
+  }
+
   private def structDefinition(gv : FixedSize)(implicit indent: Indentation): Iterator[String] = {
     commented(gv.fullDesc).eol ++
     "#[derive(Copy, Clone, Debug, PartialEq)]".eol ++
-    bracket(s"pub struct ${gv.name}") {
-      gv.fields.map(f => s"pub ${f.name}: ${getFieldType(f.typ)},").iterator
+    bracket(s"pub${visibility(gv)} struct ${gv.name}") {
+      gv.fields.map(f => s"pub${visibility(gv)} ${f.name}: ${getFieldType(f.typ)},").iterator
     }
   }
 
@@ -150,7 +163,7 @@ object FixedSizeVariationModule extends Module {
     def writeField(f : FixedSizeField) : String = {
       def write(suffix: String) = s"cursor.write_${getCursorSuffix(f.typ)}(self.${f.name}${suffix})?;"
       f.typ match {
-        case _ : EnumFieldType => write(".as_u8()")
+        case _ : EnumFieldType => s"self.${f.name}.write(cursor)?;"
         case CustomFieldTypeU8(name) => write(".as_u8()")
         case TimestampField => s"self.${f.name}.write(cursor)?;"
         case _ => write("")

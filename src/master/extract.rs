@@ -1,15 +1,17 @@
 use crate::app::gen::variations::count::CountVariation;
 use crate::app::gen::variations::fixed::*;
+use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
-use crate::master::handle::MeasurementHandler;
+use crate::master::handle::ReadHandler;
 
 /// Extract measurements from a HeaderCollection, sinking them into
 /// something that implements `MeasurementHandler`
-pub fn extract_measurements<T>(headers: HeaderCollection, handler: &mut T)
-where
-    T: MeasurementHandler,
-{
+pub(crate) fn extract_measurements(
+    header: ResponseHeader,
+    objects: HeaderCollection,
+    handler: &mut dyn ReadHandler,
+) {
     fn extract_cto_g51v1(prev: Time, item: Option<Group51Var1>) -> Time {
         item.map_or(prev, |x| Time::Synchronized(x.time))
     }
@@ -18,10 +20,7 @@ where
         item.map_or(prev, |x| Time::NotSynchronized(x.time))
     }
 
-    fn handle<T>(cto: Time, header: ObjectHeader, handler: &mut T) -> Time
-    where
-        T: MeasurementHandler,
-    {
+    fn handle(cto: Time, header: ObjectHeader, handler: &mut dyn ReadHandler) -> Time {
         let handled = match &header.details {
             // these are common-time-of-occurrence headers
             HeaderDetails::OneByteCount(1, CountVariation::Group51Var1(seq)) => {
@@ -60,9 +59,11 @@ where
         cto
     }
 
-    headers
+    handler.begin_fragment(header);
+    objects
         .iter()
         .fold(Time::Invalid, |cto, header| handle(cto, header, handler));
+    handler.end_fragment(header);
 }
 
 #[cfg(test)]
@@ -70,10 +71,19 @@ mod test {
     use super::*;
     use crate::app::flags::Flags;
     use crate::app::gen::enums::FunctionCode;
+    use crate::app::header::{Control, ResponseFunction, ResponseHeader, IIN};
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::types::Timestamp;
-    use crate::master::handle::MeasurementHandler;
+    use crate::master::handle::ReadHandler;
+
+    fn header() -> ResponseHeader {
+        ResponseHeader::new(
+            Control::from(0xC0),
+            ResponseFunction::Response,
+            IIN::default(),
+        )
+    }
 
     #[derive(Debug)]
     enum Header {
@@ -98,8 +108,11 @@ mod test {
         }
     }
 
-    impl MeasurementHandler for MockHandler {
-        fn handle_binary(&mut self, x: impl Iterator<Item = (Binary, u16)>) {
+    impl ReadHandler for MockHandler {
+        fn begin_fragment(&mut self, _header: ResponseHeader) {}
+        fn end_fragment(&mut self, _header: ResponseHeader) {}
+
+        fn handle_binary(&mut self, x: &mut dyn Iterator<Item = (Binary, u16)>) {
             let next_header = match self.expected.pop() {
                 Some(y) => y,
                 None => {
@@ -115,37 +128,40 @@ mod test {
             }
         }
 
-        fn handle_double_bit_binary(&mut self, _x: impl Iterator<Item = (DoubleBitBinary, u16)>) {
+        fn handle_double_bit_binary(
+            &mut self,
+            _x: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
+        ) {
             unimplemented!()
         }
 
         fn handle_binary_output_status(
             &mut self,
-            _x: impl Iterator<Item = (BinaryOutputStatus, u16)>,
+            _x: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
         ) {
             unimplemented!()
         }
 
-        fn handle_counter(&mut self, _x: impl Iterator<Item = (Counter, u16)>) {
+        fn handle_counter(&mut self, _x: &mut dyn Iterator<Item = (Counter, u16)>) {
             unimplemented!()
         }
 
-        fn handle_frozen_counter(&mut self, _x: impl Iterator<Item = (FrozenCounter, u16)>) {
+        fn handle_frozen_counter(&mut self, _x: &mut dyn Iterator<Item = (FrozenCounter, u16)>) {
             unimplemented!()
         }
 
-        fn handle_analog(&mut self, _x: impl Iterator<Item = (Analog, u16)>) {
+        fn handle_analog(&mut self, _x: &mut dyn Iterator<Item = (Analog, u16)>) {
             unimplemented!()
         }
 
         fn handle_analog_output_status(
             &mut self,
-            _x: impl Iterator<Item = (AnalogOutputStatus, u16)>,
+            _x: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
         ) {
             unimplemented!()
         }
 
-        fn handle_octet_string<'a>(&mut self, _x: impl Iterator<Item = (Bytes<'a>, u16)>) {
+        fn handle_octet_string<'a>(&mut self, _x: &mut dyn Iterator<Item = (Bytes<'a>, u16)>) {
             unimplemented!()
         }
     }
@@ -153,7 +169,7 @@ mod test {
     #[test]
     fn g2v3_without_cto_yields_invalid_time() {
         let mut handler = MockHandler::new();
-        let headers = HeaderCollection::parse(
+        let objects = HeaderCollection::parse(
             FunctionCode::Response,
             &[0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF],
         )
@@ -169,14 +185,14 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(headers, &mut handler);
+        extract_measurements(header(), objects, &mut handler);
         assert!(handler.is_empty());
     }
 
     #[test]
     fn g2v3_with_synchronized_cto_yields_synchronized_time() {
         let mut handler = MockHandler::new();
-        let headers = HeaderCollection::parse(
+        let objects = HeaderCollection::parse(
             FunctionCode::Response,
             // g50v1       count: 1   -------- time: 1 ------------------
             &[
@@ -196,14 +212,14 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(headers, &mut handler);
+        extract_measurements(header(), objects, &mut handler);
         assert!(handler.is_empty());
     }
 
     #[test]
     fn g2v3_with_unsynchronized_cto_yields_unsynchronized_time() {
         let mut handler = MockHandler::new();
-        let headers = HeaderCollection::parse(
+        let objects = HeaderCollection::parse(
             FunctionCode::Response,
             // g50v2   count: 1    --------- time: 2 -----------------
             &[
@@ -223,14 +239,14 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(headers, &mut handler);
+        extract_measurements(header(), objects, &mut handler);
         assert!(handler.is_empty());
     }
 
     #[test]
     fn can_calculate_maximum_timestamp() {
         let mut handler = MockHandler::new();
-        let headers = HeaderCollection::parse(
+        let objects = HeaderCollection::parse(
             FunctionCode::Response,
             // g50v1      count: 1  --------- time: 0xFFFFFE ----------
             &[
@@ -250,14 +266,14 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(headers, &mut handler);
+        extract_measurements(header(), objects, &mut handler);
         assert!(handler.is_empty());
     }
 
     #[test]
     fn cto_overflow_of_u48_yields_invalid_time() {
         let mut handler = MockHandler::new();
-        let headers = HeaderCollection::parse(
+        let objects = HeaderCollection::parse(
             FunctionCode::Response,
             // g50v1      count: 1  --------- time: 0xFFFFFE ----------
             &[
@@ -277,7 +293,7 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(headers, &mut handler);
+        extract_measurements(header(), objects, &mut handler);
         assert!(handler.is_empty());
     }
 }

@@ -48,13 +48,13 @@ impl ControlField {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Address {
-    pub destination: u16,
-    pub source: u16,
+pub(crate) struct Address {
+    pub(crate) destination: u16,
+    pub(crate) source: u16,
 }
 
 impl Address {
-    pub fn new(destination: u16, source: u16) -> Self {
+    pub(crate) fn new(destination: u16, source: u16) -> Self {
         Self {
             destination,
             source,

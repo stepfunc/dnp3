@@ -4,35 +4,57 @@ use crate::app::parse::range::InvalidRange;
 use crate::util::cursor::ReadError;
 use std::fmt::Formatter;
 
+/// errors that occur when parsing an application layer header
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum HeaderParseError {
+    /// unknown function code
     UnknownFunction(u8),
+    /// insufficient bytes for a header
     InsufficientBytes,
 }
 
+/// errors that occur when parsing object headers
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ObjectParseError {
+    /// unknown group and variation
     UnknownGroupVariation(u8, u8),
+    /// unknown qualifier code
     UnknownQualifier(u8),
+    /// insufficient bytes for object header or specified object values
     InsufficientBytes,
+    /// range where stop < start
     InvalidRange(u16, u16),
+    /// specified variation and qualifier code are invalid or not supported
     InvalidQualifierForVariation(Variation, QualifierCode),
+    /// specified qualifier code is not supported
     UnsupportedQualifierCode(QualifierCode),
+    /// response containing zero-length octet data disallowed by the specification
     ZeroLengthOctetData,
 }
 
+/*
+/// errors that occur when interpreting a header as a request header
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum RequestValidationError {
+pub(crate) enum RequestValidationError {
+    /// function code not allowed in requests
     UnexpectedFunction(FunctionCode),
+    /// request with either FIR or FIN == 0
     NonFirFin,
+    /// request with an UNS bit that doesn't match the function code (only allowed in Confirm)
     UnexpectedUnsBit(FunctionCode),
 }
+*/
 
+/// errors that occur when interpreting a header as a response header
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ResponseValidationError {
+    /// function code not allowed in responses
     UnexpectedFunction(FunctionCode),
+    /// solicited response with UNS == 1
     SolicitedResponseWithUnsBit,
+    /// unsolicited response without UNS == 0
     UnsolicitedResponseWithoutUnsBit,
+    /// unsolicited response with either FIR or FIN == 0
     UnsolicitedResponseWithoutFirAndFin,
 }
 
@@ -80,6 +102,7 @@ impl std::fmt::Display for ObjectParseError {
     }
 }
 
+/*
 impl std::fmt::Display for RequestValidationError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
@@ -95,6 +118,7 @@ impl std::fmt::Display for RequestValidationError {
         }
     }
 }
+*/
 
 impl std::fmt::Display for ResponseValidationError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {

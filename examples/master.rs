@@ -1,13 +1,13 @@
-use dnp3rs::app::gen::enums::OpType;
-use dnp3rs::app::gen::variations::fixed::Group12Var1;
-use dnp3rs::app::parse::parser::DecodeLogLevel;
-use dnp3rs::master::association::{Association, Configuration};
-use dnp3rs::master::null::NullHandler;
-use dnp3rs::master::tcp::{MasterTask, ReconnectStrategy};
-use dnp3rs::master::types::{
+use dnp3::app::gen::enums::OpType;
+use dnp3::app::gen::variations::fixed::Group12Var1;
+use dnp3::app::parse::DecodeLogLevel;
+use dnp3::app::timeout::Timeout;
+use dnp3::master::association::{Association, Configuration};
+use dnp3::master::handle::NullHandler;
+use dnp3::master::request::{
     Classes, CommandBuilder, CommandMode, EventClasses, ReadRequest, TimeSyncProcedure,
 };
-use dnp3rs::util::timeout::Timeout;
+use dnp3::master::tcp::{MasterTask, ReconnectStrategy};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
@@ -55,7 +55,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Err(err) = association
                     .operate(
                         CommandMode::SelectBeforeOperate,
-                        CommandBuilder::single(Group12Var1::from_op_type(OpType::LatchOn), 3u16),
+                        CommandBuilder::single_u16_header(
+                            Group12Var1::from_op_type(OpType::LatchOn),
+                            3u16,
+                        ),
                     )
                     .await
                 {

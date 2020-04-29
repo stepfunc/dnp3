@@ -1,15 +1,14 @@
-use crate::app::parse::parser::DecodeLogLevel;
+use crate::app::parse::DecodeLogLevel;
 use crate::link::error::LinkError;
 use crate::link::header::Address;
-use crate::transport::assembler::Fragment;
+use crate::transport::Fragment;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-#[derive(Copy, Clone)]
-pub struct MockWriter {
+pub(crate) struct MockWriter {
     num_writes: usize,
 }
-#[derive(Copy, Clone)]
-pub struct MockReader {
+
+pub(crate) struct MockReader {
     num_reads: usize,
     count: usize,
     address: Address,
@@ -19,21 +18,17 @@ pub struct MockReader {
 // same signature as the real transport writer
 impl MockWriter {
     pub(crate) fn new(_master: bool, _address: u16) -> Self {
-        Self::mock()
+        Self { num_writes: 0 }
     }
 
     pub(crate) fn reset(&mut self) {}
-
-    pub fn mock() -> Self {
-        Self { num_writes: 0 }
-    }
 
     pub(crate) fn num_writes(&self) -> usize {
         self.num_writes
     }
 
     // just write the fragment directly to the I/O
-    pub async fn write<W>(
+    pub(crate) async fn write<W>(
         &mut self,
         _level: DecodeLogLevel,
         io: &mut W,
@@ -51,8 +46,13 @@ impl MockWriter {
 }
 
 impl MockReader {
-    pub(crate) fn new(_master: bool, _address: u16) -> Self {
-        Self::mock(Address::new(0, 0))
+    pub(crate) fn new(_master: bool, address: u16) -> Self {
+        Self {
+            num_reads: 0,
+            count: 0,
+            address: Address::new(address, 1024),
+            buffer: [0; 2048],
+        }
     }
 
     pub(crate) fn num_reads(&self) -> usize {
@@ -60,15 +60,6 @@ impl MockReader {
     }
 
     pub(crate) fn reset(&mut self) {}
-
-    pub(crate) fn mock(address: Address) -> Self {
-        Self {
-            num_reads: 0,
-            count: 0,
-            address,
-            buffer: [0; 2048],
-        }
-    }
 
     pub(crate) fn peek(&self) -> Option<Fragment> {
         match self.count {

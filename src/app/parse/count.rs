@@ -2,7 +2,7 @@ use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::{ReadCursor, ReadError};
 
 #[derive(Debug, PartialEq)]
-pub struct CountSequence<'a, T>
+pub(crate) struct CountSequence<'a, T>
 where
     T: FixedSize,
 {
@@ -24,16 +24,12 @@ where
         Ok(Self::new(count as usize, cursor.read_bytes(num_bytes)?))
     }
 
-    pub fn single(&self) -> Option<T> {
+    pub(crate) fn single(&self) -> Option<T> {
         if self.count != 1 {
             return None;
         }
 
         self.iter().next()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.data.is_empty()
     }
 
     pub(crate) fn new(count: usize, data: &'a [u8]) -> Self {
@@ -44,7 +40,7 @@ where
         }
     }
 
-    pub fn iter(&self) -> CountIterator<'a, T> {
+    pub(crate) fn iter(&self) -> CountIterator<'a, T> {
         CountIterator {
             remaining: self.count,
             cursor: ReadCursor::new(self.data),
@@ -53,7 +49,7 @@ where
     }
 }
 
-pub struct CountIterator<'a, T> {
+pub(crate) struct CountIterator<'a, T> {
     cursor: ReadCursor<'a>,
     remaining: usize,
     phantom: std::marker::PhantomData<T>,

@@ -1,5 +1,6 @@
 use crate::app::format::write;
-use crate::app::parse::parser::{DecodeLogLevel, ParsedFragment, Response};
+use crate::app::parse::parser::{ParsedFragment, Response};
+use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::master::task::{NonReadTask, ReadTask, RequestWriter, Task, TaskType};
 use crate::transport::{ReaderType, WriterType};
@@ -9,9 +10,9 @@ use crate::link::error::LinkError;
 use crate::util::cursor::WriteCursor;
 
 use crate::app::format::write::start_request;
+use crate::app::timeout::Timeout;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::handle::Message;
-use crate::util::timeout::Timeout;
 
 use crate::master::error::{Shutdown, TaskError};
 use std::collections::VecDeque;
@@ -147,7 +148,7 @@ impl Runner {
             Ok(x) => x,
         };
 
-        if response.header.unsolicited {
+        if response.header.function.is_unsolicited() {
             self.handle_unsolicited(fragment.address.source, &response, io, writer)
                 .await?;
         } else {
@@ -469,7 +470,7 @@ impl Runner {
             Ok(x) => x,
         };
 
-        if response.header.unsolicited {
+        if response.header.function.is_unsolicited() {
             self.handle_unsolicited(fragment.address.source, &response, io, writer)
                 .await?;
             return Ok(None);
@@ -571,7 +572,7 @@ impl Runner {
             }
         };
 
-        if response.header.unsolicited {
+        if response.header.function.is_unsolicited() {
             self.handle_unsolicited(fragment.address.source, &response, io, writer)
                 .await?;
             return Ok(ReadResponseAction::Ignore);
@@ -654,11 +655,9 @@ impl Runner {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::link::header::Address;
     use crate::master::association::{Association, Configuration};
-    use crate::master::handle::MasterHandle;
-    use crate::master::null::NullHandler;
-    use crate::transport::mocks::{MockReader, MockWriter};
+    use crate::master::handle::{MasterHandle, NullHandler};
+    use crate::transport::create_transport_layer;
     use tokio_test::io::Builder;
 
     #[tokio::test]
@@ -692,8 +691,7 @@ mod test {
             .read(&[0xC3, 0x81, 0x00, 0x00])
             .build_with_handle();
 
-        let mut writer = MockWriter::mock();
-        let mut reader = MockReader::mock(Address::new(1, 1024));
+        let (mut reader, mut writer) = create_transport_layer(true, 1);
 
         let mut master_task =
             tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));

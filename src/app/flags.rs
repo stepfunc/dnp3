@@ -2,54 +2,71 @@ use crate::app::types::DoubleBit;
 use crate::util::bit::Bitfield;
 use std::fmt::Formatter;
 
+/// Flags as defined in the specification where each bit has meaning.
+///
+/// Not every bit is used for every type (Binary, Analog, etc). Users
+/// should refer to the standard to determine what flag values
+/// correspond to each type.
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Flags {
+    /// underlying value
     pub value: u8,
 }
 
 impl Flags {
-    pub const ONLINE: Flags = Flags::new(0x01);
+    pub(crate) const ONLINE: Flags = Flags::new(0x01);
 
+    /// create a `Flags` struct from a `u8`
     pub const fn new(value: u8) -> Self {
         Self { value }
     }
 
+    /// test a `Flags` struct to see if the `ONLINE` bit is set
     pub fn online(self) -> bool {
         self.value.bit_0()
     }
 
+    /// test a `Flags` struct to see if the `RESTART` bit is set
     pub fn restart(self) -> bool {
         self.value.bit_1()
     }
 
+    /// test a `Flags` struct to see if the `COMM_LOST` bit is set
     pub fn comm_lost(self) -> bool {
         self.value.bit_2()
     }
 
+    /// test a `Flags` struct to see if the `REMOTE_FORCED` bit is set
     pub fn remote_forced(self) -> bool {
         self.value.bit_3()
     }
 
+    /// test a `Flags` struct to see if the `LOCAL_FORCED` bit is set
     pub fn local_forced(self) -> bool {
         self.value.bit_4()
     }
 
+    /// test a `Flags` struct to see if the `CHATTER_FILTER` bit is set
     pub fn chatter_filter(self) -> bool {
         self.value.bit_5()
     }
 
+    /// test a `Flags` struct to see if the `ROLLOVER` bit is set
     pub fn rollover(self) -> bool {
         self.value.bit_5()
     }
 
+    /// test a `Flags` struct to see if the `DISCONTINUITY` bit is set
     pub fn discontinuity(self) -> bool {
         self.value.bit_6()
     }
 
+    /// test a `Flags` struct to see if the `OVER_RANGE` bit is set
     pub fn over_range(self) -> bool {
         self.value.bit_5()
     }
 
+    /// test a `Flags` struct to see if the `REFERENCE_ERR` bit is set
     pub fn reference_err(self) -> bool {
         self.value.bit_6()
     }
@@ -66,10 +83,12 @@ impl Flags {
         self.value.bit_7()
     }
 
+    /// test a `Flags` struct to see if the `STATE` bit is set
     pub fn state(self) -> bool {
         self.value.bit_7()
     }
 
+    /// extract the `DoubleBit` value from a flags struct
     pub fn double_bit_state(self) -> DoubleBit {
         DoubleBit::from(self.value.bit_7(), self.value.bit_6())
     }

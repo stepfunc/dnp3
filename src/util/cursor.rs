@@ -1,11 +1,11 @@
 /// custom read-only cursor
 #[derive(Debug, PartialEq)]
-pub struct ReadCursor<'a> {
+pub(crate) struct ReadCursor<'a> {
     src: &'a [u8],
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct ReadError;
+pub(crate) struct ReadError;
 
 impl<'a> ReadCursor<'a> {
     pub(crate) fn new(src: &'a [u8]) -> ReadCursor {
@@ -102,13 +102,13 @@ impl<'a> ReadCursor<'a> {
     }
 }
 
-pub struct WriteCursor<'a> {
+pub(crate) struct WriteCursor<'a> {
     dest: &'a mut [u8],
     pos: usize,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct WriteError;
+pub(crate) struct WriteError;
 
 impl<'a> WriteCursor<'a> {
     pub(crate) fn new(dest: &'a mut [u8]) -> WriteCursor<'a> {

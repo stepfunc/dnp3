@@ -1,10 +1,9 @@
 use crate::app::gen::enums::QualifierCode;
 use crate::app::gen::variations::variation::Variation;
-use crate::master::types::{CommandHeader, PrefixedCommandHeader};
 use crate::util::cursor::*;
 use std::fmt::Display;
 
-pub trait FixedSize
+pub(crate) trait FixedSize
 where
     Self: Sized,
 {
@@ -14,18 +13,17 @@ where
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError>;
 }
 
-pub trait Index: FixedSize + PartialEq + Display {
+pub(crate) trait Index: FixedSize + PartialEq + Display {
     fn zero() -> Self;
     fn increment(&mut self);
     fn widen_to_u16(self) -> u16;
     fn write_at(self, pos: usize, cursor: &mut WriteCursor) -> Result<(), WriteError>;
-    fn get_command_header(header: PrefixedCommandHeader<Self>) -> CommandHeader;
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode;
     const RANGE_QUALIFIER: QualifierCode;
 }
 
-pub trait FixedSizeVariation: FixedSize + PartialEq + Display {
+pub(crate) trait FixedSizeVariation: FixedSize + PartialEq + Display {
     const VARIATION: Variation;
 }
 
@@ -63,9 +61,6 @@ impl Index for u8 {
     fn write_at(self, pos: usize, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8_at(self, pos)
     }
-    fn get_command_header(header: PrefixedCommandHeader<Self>) -> CommandHeader {
-        CommandHeader::U8(header)
-    }
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode = QualifierCode::CountAndPrefix8;
     const RANGE_QUALIFIER: QualifierCode = QualifierCode::Range8;
@@ -83,9 +78,6 @@ impl Index for u16 {
     }
     fn write_at(self, pos: usize, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u16_le_at(self, pos)
-    }
-    fn get_command_header(header: PrefixedCommandHeader<Self>) -> CommandHeader {
-        CommandHeader::U16(header)
     }
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode = QualifierCode::CountAndPrefix16;
