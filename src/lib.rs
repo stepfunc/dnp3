@@ -33,7 +33,6 @@
 //! // example of using the master API asynchronously from within the Tokio runtime
 //! #[tokio::main(threaded_scheduler)]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     colog::init();
 //!
 //!     // spawn the master onto another task
 //!     let mut master = spawn_master_tcp_client(
