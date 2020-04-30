@@ -93,7 +93,7 @@ pub(crate) struct MasterTask {
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
-pub fn spawn(
+pub fn spawn_master_tcp_client(
     address: u16,
     level: DecodeLogLevel,
     strategy: ReconnectStrategy,
@@ -114,7 +114,7 @@ pub fn spawn(
 /// **Note**: This function is required instead of `spawn` when using a runtime to directly spawn
 /// tasks instead of within the context of a runtime, e.g. in applications that cannot use
 /// `[tokio::main]` such as C language bindings.
-pub fn create(
+pub fn create_master_tcp_client(
     address: u16,
     level: DecodeLogLevel,
     strategy: ReconnectStrategy,

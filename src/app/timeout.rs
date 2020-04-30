@@ -10,13 +10,15 @@ pub struct Timeout {
 /// Error type returned when a Timeout is constructed with an out-of-range value
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum RangeError {
-    TooSmall(Duration), // the applied value and the minimum value
-    TooLarge(Duration), // the maximum value, and the maximum value
+    /// value smaller than library allowed minimum
+    TooSmall(Duration),
+    /// value larger than library allowed maximum
+    TooLarge(Duration),
 }
 
 impl Timeout {
-    const MIN: Duration = Duration::from_millis(1);
-    const MAX: Duration = Duration::from_secs(60 * 60); // one hour
+    pub const MIN: Duration = Duration::from_millis(1);
+    pub const MAX: Duration = Duration::from_secs(60 * 60); // one hour
 
     pub fn from_secs(x: u64) -> Result<Self, RangeError> {
         Self::from_duration(Duration::from_secs(x))
@@ -38,7 +40,7 @@ impl Timeout {
         Ok(Self { value })
     }
 
-    pub(crate) fn from_now(&self) -> tokio::time::Instant {
+    pub(crate) fn deadline_from_now(self) -> tokio::time::Instant {
         // if this panics due to overflow we have bigger problems than the panic
         // it means the tim value being returned by now() is WAAAY too big
         tokio::time::Instant::now() + self.value
@@ -50,3 +52,24 @@ impl std::fmt::Display for Timeout {
         write!(f, "{} ms", self.value.as_millis())
     }
 }
+
+impl std::fmt::Display for RangeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            RangeError::TooSmall(x) => write!(
+                f,
+                "specified duration ({} ms) smaller than allowed library minimum ({} ms)",
+                x.as_millis(),
+                Timeout::MIN.as_millis()
+            ),
+            RangeError::TooLarge(x) => write!(
+                f,
+                "specified duration ({} ms) larger than allowed library maximum ({} ms)",
+                x.as_millis(),
+                Timeout::MAX.as_millis()
+            ),
+        }
+    }
+}
+
+impl std::error::Error for RangeError {}

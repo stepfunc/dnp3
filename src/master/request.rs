@@ -21,27 +21,27 @@ pub enum TimeSyncProcedure {
     NonLAN,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct EventClasses {
     pub class1: bool,
     pub class2: bool,
     pub class3: bool,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Classes {
     pub class0: bool,
     pub events: EventClasses,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OneByteRangeScan {
     pub variation: Variation,
     pub start: u8,
     pub stop: u8,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct TwoByteRangeScan {
     pub variation: Variation,
     pub start: u16,
@@ -55,6 +55,10 @@ impl EventClasses {
             class2,
             class3,
         }
+    }
+
+    pub fn to_request(self) -> ReadRequest {
+        ReadRequest::ClassScan(Classes::new(false, self))
     }
 
     pub fn any(self) -> bool {
@@ -94,6 +98,10 @@ impl EventClasses {
 impl Classes {
     pub fn new(class0: bool, events: EventClasses) -> Self {
         Self { events, class0 }
+    }
+
+    pub fn to_request(self) -> ReadRequest {
+        ReadRequest::ClassScan(self)
     }
 
     pub fn events(events: EventClasses) -> Self {
@@ -141,7 +149,7 @@ impl TwoByteRangeScan {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ReadRequest {
     ClassScan(Classes),
     Range8(OneByteRangeScan),

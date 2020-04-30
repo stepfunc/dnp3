@@ -397,7 +397,7 @@ impl Runner {
 
             let request_tx = std::time::SystemTime::now();
 
-            let deadline = self.timeout.from_now();
+            let deadline = self.timeout.deadline_from_now();
 
             loop {
                 if let Err(err) = self.read_next_response(io, deadline, reader).await {
@@ -516,7 +516,7 @@ impl Runner {
 
         // read responses until we get a FIN or an error occurs
         loop {
-            let deadline = self.timeout.from_now();
+            let deadline = self.timeout.deadline_from_now();
 
             loop {
                 self.read_next_response(io, deadline, reader).await?;

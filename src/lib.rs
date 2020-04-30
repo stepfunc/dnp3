@@ -7,6 +7,53 @@
 //! * Automatic TCP connection management with configurable reconnect strategy
 //! * Scalable performance using Tokio's multi-threaded executor
 //! * Future and callback-based API modes
+//!
+//! # Master example
+//!
+//! ```no_run
+//! use dnp3::prelude::master::*;
+//!
+//! use std::net::SocketAddr;
+//! use std::str::FromStr;
+//! use std::time::Duration;
+//!
+//! fn get_association() -> Association {
+//!     let mut association = Association::new(
+//!         1024,
+//!         Configuration::default(),
+//!         NullHandler::boxed()
+//!     );
+//!     association.add_poll(
+//!         EventClasses::all().to_request(),
+//!         Duration::from_secs(5),
+//!     );
+//!     association
+//! }
+//!
+//! // example of using the master API asynchronously from within the Tokio runtime
+//! #[tokio::main(threaded_scheduler)]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     colog::init();
+//!
+//!     // spawn the master onto another task
+//!     let mut master = spawn_master_tcp_client(
+//!         1,
+//!         DecodeLogLevel::ObjectValues,
+//!         ReconnectStrategy::default(),
+//!         Timeout::from_secs(1)?,
+//!         SocketAddr::from_str("127.0.0.1:20000")?,
+//!         Listener::None,
+//!     );
+//!
+//!     let mut _association = master.add_association(get_association()).await?;
+//!
+//!     // In a real application, use the handle to make requests measurement data comes back via the
+//!     // handler specified when creating the association. See the provided examples for more details.
+//!     tokio::time::delay_for(Duration::from_secs(60)).await;
+//!     Ok(())
+//! }
+//! ```
+//!
 
 #![deny(
 dead_code,
@@ -61,10 +108,20 @@ extern crate tokio_test;
 #[macro_use]
 extern crate assert_matches;
 
-/// application layer
+/// application layer types shared by both the master and outstation APIs
 pub mod app;
-/// master API
+/// types, enums, and traits specific to masters
 pub mod master;
+/// entry points for creating and spawning async tasks
+pub mod entry {
+    /// entry points for creating and spawning master tasks
+    pub mod master {
+        /// entry points for creating and spawning TCP-based master tasks
+        pub mod tcp;
+    }
+}
+/// preludes for master and outstation
+pub mod prelude;
 
 pub(crate) mod link;
 #[cfg_attr(test, allow(dead_code))]
