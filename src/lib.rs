@@ -46,8 +46,9 @@
 //!
 //!     let mut _association = master.add_association(get_association()).await?;
 //!
-//!     // In a real application, use the handle to make requests measurement data comes back via the
-//!     // handler specified when creating the association. See the provided examples for more details.
+//!     // In a real application, use the handle to make requests. Measurement data
+//!     // comes back via the handler specified when creating the association. See
+//!     // the provided examples for more details.
 //!     tokio::time::delay_for(Duration::from_secs(60)).await;
 //!     Ok(())
 //! }
