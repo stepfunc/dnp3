@@ -49,6 +49,15 @@ pub enum TaskError {
     Shutdown,
 }
 
+// Errors that can occur when adding/modifying polls
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum PollError {
+    /// the master task has shutdown
+    Shutdown,
+    /// no association with the specified address exists
+    NoSuchAssociation(u16),
+}
+
 /// Errors that can occur when verifying the respond to a command request
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandResponseError {
@@ -110,6 +119,17 @@ impl std::fmt::Display for AssociationError {
                 "master already contains association with outstation address: {}",
                 address
             ),
+        }
+    }
+}
+
+impl std::fmt::Display for PollError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PollError::Shutdown => f.write_str("operation failed b/c the master has been shutdown"),
+            PollError::NoSuchAssociation(address) => {
+                write!(f, "no association with address: {}", address)
+            }
         }
     }
 }
@@ -247,6 +267,24 @@ impl From<NoAssociation> for TaskError {
     }
 }
 
+impl From<Shutdown> for PollError {
+    fn from(_: Shutdown) -> Self {
+        PollError::Shutdown
+    }
+}
+
+impl From<NoAssociation> for PollError {
+    fn from(x: NoAssociation) -> Self {
+        PollError::NoSuchAssociation(x.address)
+    }
+}
+
+impl From<RecvError> for PollError {
+    fn from(_: RecvError) -> Self {
+        PollError::Shutdown
+    }
+}
+
 impl From<CommandResponseError> for CommandError {
     fn from(err: CommandResponseError) -> Self {
         CommandError::Response(err)
@@ -285,6 +323,7 @@ impl From<RecvError> for TimeSyncError {
 
 impl Error for AssociationError {}
 impl Error for TaskError {}
+impl Error for PollError {}
 impl Error for CommandError {}
 impl Error for CommandResponseError {}
 impl Error for TimeSyncError {}

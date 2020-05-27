@@ -4,15 +4,14 @@ use crate::app::sequence::Sequence;
 use crate::master::error::AssociationError;
 use crate::master::extract::extract_measurements;
 use crate::master::handle::{AssociationHandler, Promise};
-use crate::master::poll::{Poll, PollMap};
-use crate::master::request::{EventClasses, ReadRequest, TimeSyncProcedure};
+use crate::master::poll::{Poll, PollHandle, PollMap, PollTask};
+use crate::master::request::{EventClasses, TimeSyncProcedure};
 use crate::master::task::NonReadTask::TimeSync;
 use crate::master::task::{ReadTask, Task, TaskType};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
-use std::time::Duration;
 use tokio::time::Instant;
 
 #[derive(Copy, Clone)]
@@ -102,7 +101,7 @@ impl TaskStates {
 /// A logical connection between a master and an outstation
 /// as defined by the DNP3 standard. A master manages requests
 /// and responses for multiple associations (i.e. multi-drop).
-pub struct Association {
+pub(crate) struct Association {
     address: u16,
     seq: Sequence,
     tasks: TaskStates,
@@ -112,11 +111,11 @@ pub struct Association {
 }
 
 impl Association {
-    /// Create a new association:
-    /// * `address` is the DNP3 link-layer address of the outstation
-    /// * `config` controls the behavior of the master for this outstation
-    /// * `handler` is a callback trait invoked when events occur for this outstation
-    pub fn new(address: u16, config: Configuration, handler: Box<dyn AssociationHandler>) -> Self {
+    pub(crate) fn new(
+        address: u16,
+        config: Configuration,
+        handler: Box<dyn AssociationHandler>,
+    ) -> Self {
         Self {
             address,
             seq: Sequence::default(),
@@ -127,19 +126,24 @@ impl Association {
         }
     }
 
-    /// Add a poll to the association
-    /// * `request` defines what data is being requested
-    /// * `period` defines how often the READ operation is performed
-    pub fn add_poll(&mut self, request: ReadRequest, period: Duration) {
-        self.polls.add(request, period)
+    pub(crate) fn execute_poll_task(&mut self, task: PollTask) {
+        match task {
+            PollTask::AddPoll(request, period, channel, callback) => {
+                let id = self.polls.add(request, period);
+                let handle = PollHandle::new(channel, self.address, id);
+                callback.complete(Ok(handle))
+            }
+            PollTask::RemovePoll(id) => {
+                self.polls.remove(id);
+            }
+            PollTask::Demand(id) => {
+                self.polls.demand(id);
+            }
+        }
     }
 
     pub(crate) fn get_system_time(&self) -> std::time::SystemTime {
         self.handler.get_system_time()
-    }
-
-    pub(crate) fn get_address(&self) -> u16 {
-        self.address
     }
 
     pub(crate) fn complete_poll(&mut self, id: u64) {

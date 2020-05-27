@@ -4,14 +4,6 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 
-fn get_association() -> Association {
-    let mut config = Configuration::default();
-    config.auto_time_sync = Some(TimeSyncProcedure::LAN);
-    let mut association = Association::new(1024, config, NullHandler::boxed());
-    association.add_poll(EventClasses::all().to_request(), Duration::from_secs(5));
-    association
-}
-
 /// example of using the master API synchronously from outside the Tokio runtime
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
@@ -30,7 +22,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     runtime.spawn(future);
 
-    let mut association = runtime.block_on(master.add_association(get_association()))?;
+    // Create the association
+    let mut config = Configuration::default();
+    config.auto_time_sync = Some(TimeSyncProcedure::LAN);
+    let mut association =
+        runtime.block_on(master.add_association(1024, config, NullHandler::boxed()))?;
+
+    // Add an event poll
+    let mut poll = runtime
+        .block_on(association.add_poll(EventClasses::all().to_request(), Duration::from_secs(5)))?;
 
     loop {
         match std::io::stdin()
@@ -54,6 +54,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )) {
                     log::warn!("error: {}", err);
                 }
+            }
+            "evt" => {
+                runtime.block_on(poll.demand());
             }
             "lts" => {
                 if let Err(err) =

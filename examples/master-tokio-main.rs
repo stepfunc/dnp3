@@ -5,14 +5,6 @@ use std::time::Duration;
 use tokio::stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
-fn get_association() -> Association {
-    let mut config = Configuration::default();
-    config.auto_time_sync = Some(TimeSyncProcedure::LAN);
-    let mut association = Association::new(1024, config, NullHandler::boxed());
-    association.add_poll(EventClasses::all().to_request(), Duration::from_secs(5));
-    association
-}
-
 /// example of using the master API asynchronously from within the Tokio runtime
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,7 +20,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Listener::None,
     );
 
-    let mut association = master.add_association(get_association()).await?;
+    // Create the association
+    let mut config = Configuration::default();
+    config.auto_time_sync = Some(TimeSyncProcedure::LAN);
+    let mut association = master
+        .add_association(1024, config, NullHandler::boxed())
+        .await?;
+
+    // Create event poll
+    let mut poll = association
+        .add_poll(EventClasses::all().to_request(), Duration::from_secs(5))
+        .await?;
 
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
@@ -55,6 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     log::warn!("error: {}", err);
                 }
             }
+            "evt" => poll.demand().await,
             "lts" => {
                 if let Err(err) = association.perform_time_sync(TimeSyncProcedure::LAN).await {
                     log::warn!("error: {}", err);

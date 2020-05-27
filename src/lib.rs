@@ -17,19 +17,6 @@
 //! use std::str::FromStr;
 //! use std::time::Duration;
 //!
-//! fn get_association() -> Association {
-//!     let mut association = Association::new(
-//!         1024,
-//!         Configuration::default(),
-//!         NullHandler::boxed()
-//!     );
-//!     association.add_poll(
-//!         EventClasses::all().to_request(),
-//!         Duration::from_secs(5),
-//!     );
-//!     association
-//! }
-//!
 //! // example of using the master API asynchronously from within the Tokio runtime
 //! #[tokio::main(threaded_scheduler)]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,7 +31,11 @@
 //!         Listener::None,
 //!     );
 //!
-//!     let mut _association = master.add_association(get_association()).await?;
+//!     let mut association = master.add_association(1024, Configuration::default(), NullHandler::boxed()).await?;
+//!     association.add_poll(
+//!         EventClasses::all().to_request(),
+//!         Duration::from_secs(5),
+//!     ).await;
 //!
 //!     // In a real application, use the handle to make requests. Measurement data
 //!     // comes back via the handler specified when creating the association. See

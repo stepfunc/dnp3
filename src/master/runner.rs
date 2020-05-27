@@ -14,7 +14,7 @@ use crate::app::timeout::Timeout;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::handle::Message;
 
-use crate::master::error::{Shutdown, TaskError};
+use crate::master::error::{PollError, Shutdown, TaskError};
 use std::collections::VecDeque;
 use std::ops::Add;
 use std::time::Duration;
@@ -170,6 +170,13 @@ impl Runner {
                             self.queue_task(task);
                         } else {
                             task.details.on_task_error(TaskError::NoConnection);
+                        }
+                    }
+                    Message::PollTask(msg) => {
+                        if let Ok(association) = self.associations.get_mut(msg.address) {
+                            association.execute_poll_task(msg.task);
+                        } else {
+                            msg.task.on_error(PollError::NoSuchAssociation(msg.address))
                         }
                     }
                     Message::AddAssociation(association, callback) => {
@@ -655,7 +662,7 @@ impl Runner {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::master::association::{Association, Configuration};
+    use crate::master::association::Configuration;
     use crate::master::handle::{MasterHandle, NullHandler};
     use crate::transport::create_transport_layer;
     use tokio_test::io::Builder;
@@ -695,15 +702,16 @@ mod test {
 
         let mut master_task =
             tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));
-        let association =
-            {
-                let mut add_task = tokio_test::task::spawn(master.add_association(
-                    Association::new(1024, Configuration::default(), NullHandler::boxed()),
-                ));
-                tokio_test::assert_pending!(add_task.poll());
-                tokio_test::assert_pending!(master_task.poll());
-                tokio_test::assert_ready_ok!(add_task.poll())
-            };
+        let association = {
+            let mut add_task = tokio_test::task::spawn(master.add_association(
+                1024,
+                Configuration::default(),
+                NullHandler::boxed(),
+            ));
+            tokio_test::assert_pending!(add_task.poll());
+            tokio_test::assert_pending!(master_task.poll());
+            tokio_test::assert_ready_ok!(add_task.poll())
+        };
 
         tokio_test::assert_pending!(master_task.poll());
 

@@ -4,17 +4,19 @@ use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::DecodeLogLevel;
 use crate::app::variations::Variation;
-use crate::master::association::Association;
-use crate::master::error::{AssociationError, CommandError, TaskError, TimeSyncError};
-use crate::master::request::{CommandHeaders, CommandMode, TimeSyncProcedure};
+use crate::master::association::{Association, Configuration};
+use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
+use crate::master::poll::{PollHandle, PollTask, PollTaskMsg};
+use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
 use crate::master::task::{Task, TaskType};
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::time::TimeSyncTask;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 // messages sent from the handles to the master task via an mpsc
 pub(crate) enum Message {
     QueueTask(Task),
+    PollTask(PollTaskMsg),
     AddAssociation(Association, Promise<Result<(), AssociationError>>),
     RemoveAssociation(u16),
     SetDecodeLogLevel(DecodeLogLevel),
@@ -25,6 +27,9 @@ impl Message {
         match self {
             Message::QueueTask(task) => {
                 task.details.on_task_error(TaskError::Shutdown);
+            }
+            Message::PollTask(msg) => {
+                msg.task.on_error(PollError::Shutdown);
             }
             Message::AddAssociation(_, promise) => {
                 promise.complete(Err(AssociationError::Shutdown))
@@ -59,11 +64,17 @@ impl MasterHandle {
             .ok();
     }
 
+    /// Create a new association:
+    /// * `address` is the DNP3 link-layer address of the outstation
+    /// * `config` controls the behavior of the master for this outstation
+    /// * `handler` is a callback trait invoked when events occur for this outstation
     pub async fn add_association(
         &mut self,
-        association: Association,
+        address: u16,
+        config: Configuration,
+        handler: Box<dyn AssociationHandler>,
     ) -> Result<AssociationHandle, AssociationError> {
-        let address = association.get_address();
+        let association = Association::new(address, config, handler);
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
         if self
             .sender
@@ -89,6 +100,28 @@ impl AssociationHandle {
 
     pub fn callbacks(self) -> CallbackAssociationHandle {
         CallbackAssociationHandle { inner: self }
+    }
+
+    /// Add a poll to the association
+    /// * `request` defines what data is being requested
+    /// * `period` defines how often the READ operation is performed
+    pub async fn add_poll(
+        &mut self,
+        request: ReadRequest,
+        period: Duration,
+    ) -> Result<PollHandle, PollError> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<PollHandle, PollError>>();
+        self.sender
+            .send(
+                PollTaskMsg::new(
+                    self.address,
+                    PollTask::AddPoll(request, period, self.sender.clone(), Promise::OneShot(tx)),
+                )
+                .into(),
+            )
+            .await
+            .ok();
+        rx.await?
     }
 
     pub async fn remove(mut self) {
