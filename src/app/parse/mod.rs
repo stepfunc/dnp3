@@ -1,6 +1,9 @@
 /// errors associated with parsing the application layer
 pub mod error;
 
+/// bytes handling helpers
+pub mod bytes;
+
 /// Controls how transmitted and received ASDUs are logged
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DecodeLogLevel {
@@ -15,7 +18,6 @@ pub enum DecodeLogLevel {
 }
 
 pub(crate) mod bit;
-pub(crate) mod bytes;
 pub(crate) mod count;
 pub(crate) mod parser;
 pub(crate) mod prefix;
