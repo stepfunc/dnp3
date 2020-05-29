@@ -30,6 +30,10 @@ impl Timestamp {
         Utc.timestamp_millis_opt(self.value as i64).single()
     }
 
+    pub fn raw_value(&self) -> u64 {
+        self.value
+    }
+
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u48_le(self.value)
     }
