@@ -43,6 +43,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .set_decode_log_level(DecodeLogLevel::ObjectValues)
                     .await
             }
+            "rao" => {
+                if let Err(err) = association
+                    .read(AllObjectsScan::new(Variation::Group40Var0).to_request())
+                    .await
+                {
+                    log::warn!("error: {}", err);
+                }
+            }
             "cmd" => {
                 if let Err(err) = association
                     .operate(

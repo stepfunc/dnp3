@@ -10,6 +10,7 @@ use crate::master::poll::{PollHandle, PollTask, PollTaskMsg};
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
 use crate::master::task::{Task, TaskType};
 use crate::master::tasks::command::CommandTask;
+use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::time::TimeSyncTask;
 use std::time::{Duration, SystemTime};
 
@@ -129,6 +130,13 @@ impl AssociationHandle {
             .send(Message::RemoveAssociation(self.address))
             .await
             .ok();
+    }
+
+    pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
+        let task = SingleReadTask::new(request, Promise::OneShot(tx));
+        self.send_task(task.wrap().wrap()).await;
+        rx.await?
     }
 
     pub async fn operate(

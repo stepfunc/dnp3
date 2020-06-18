@@ -48,6 +48,11 @@ pub struct TwoByteRangeScan {
     pub stop: u16,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct AllObjectsScan {
+    pub variation: Variation,
+}
+
 impl EventClasses {
     pub fn new(class1: bool, class2: bool, class3: bool) -> Self {
         Self {
@@ -130,6 +135,10 @@ impl OneByteRangeScan {
         }
     }
 
+    pub fn to_request(self) -> ReadRequest {
+        ReadRequest::Range8(self)
+    }
+
     pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         writer.write_range_only(self.variation, self.start, self.stop)
     }
@@ -144,8 +153,26 @@ impl TwoByteRangeScan {
         }
     }
 
+    pub fn to_request(self) -> ReadRequest {
+        ReadRequest::Range16(self)
+    }
+
     pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         writer.write_range_only(self.variation, self.start, self.stop)
+    }
+}
+
+impl AllObjectsScan {
+    pub fn new(variation: Variation) -> Self {
+        Self { variation }
+    }
+
+    pub fn to_request(self) -> ReadRequest {
+        ReadRequest::AllObjects(self)
+    }
+
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        writer.write_all_objects_header(self.variation)
     }
 }
 
@@ -154,6 +181,7 @@ pub enum ReadRequest {
     ClassScan(Classes),
     Range8(OneByteRangeScan),
     Range16(TwoByteRangeScan),
+    AllObjects(AllObjectsScan),
 }
 
 impl ReadRequest {
@@ -174,6 +202,7 @@ impl ReadRequest {
             ReadRequest::ClassScan(classes) => classes.write(writer),
             ReadRequest::Range8(scan) => scan.write(writer),
             ReadRequest::Range16(scan) => scan.write(writer),
+            ReadRequest::AllObjects(scan) => scan.write(writer),
         }
     }
 }

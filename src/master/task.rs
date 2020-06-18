@@ -7,6 +7,7 @@ use crate::master::error::TaskError;
 use crate::master::poll::Poll;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
+use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::util::cursor::WriteError;
 
@@ -38,6 +39,8 @@ pub(crate) enum ReadTask {
     PeriodicPoll(Poll),
     /// Integrity poll that occurs during startup, or after outstation restarts
     StartupIntegrity,
+    /// One-time read request
+    SingleRead(SingleReadTask),
 }
 
 pub(crate) enum NonReadTask {
@@ -58,6 +61,7 @@ impl RequestWriter for ReadTask {
         match self {
             ReadTask::PeriodicPoll(poll) => poll.format(writer),
             ReadTask::StartupIntegrity => writer.write_class1230(),
+            ReadTask::SingleRead(req) => req.format(writer),
         }
     }
 }
@@ -77,6 +81,10 @@ impl RequestWriter for NonReadTask {
 }
 
 impl ReadTask {
+    pub(crate) fn wrap(self) -> TaskType {
+        TaskType::Read(self)
+    }
+
     pub(crate) fn process_response(
         &self,
         association: &mut Association,
@@ -86,6 +94,7 @@ impl ReadTask {
         match self {
             ReadTask::StartupIntegrity => association.handle_integrity_response(header, objects),
             ReadTask::PeriodicPoll(_) => association.handle_poll_response(header, objects),
+            ReadTask::SingleRead(_) => association.handle_read_response(header, objects),
         }
     }
 
@@ -93,13 +102,15 @@ impl ReadTask {
         match self {
             ReadTask::StartupIntegrity => association.on_integrity_scan_complete(),
             ReadTask::PeriodicPoll(poll) => association.complete_poll(poll.id),
+            ReadTask::SingleRead(task) => task.on_complete(),
         }
     }
 
-    pub(crate) fn on_task_error(self, _err: TaskError) {
+    pub(crate) fn on_task_error(self, err: TaskError) {
         match self {
             ReadTask::StartupIntegrity => {}
             ReadTask::PeriodicPoll(_) => {}
+            ReadTask::SingleRead(task) => task.on_task_error(err),
         }
     }
 }

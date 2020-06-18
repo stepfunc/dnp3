@@ -309,6 +309,12 @@ impl From<RecvError> for AssociationError {
     }
 }
 
+impl From<RecvError> for TaskError {
+    fn from(_: RecvError) -> Self {
+        TaskError::Shutdown
+    }
+}
+
 impl From<RecvError> for CommandError {
     fn from(_: RecvError) -> Self {
         CommandError::Task(TaskError::Shutdown)

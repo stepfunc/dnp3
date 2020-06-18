@@ -228,6 +228,15 @@ impl Association {
         extract_measurements(header, objects, self.handler.get_default_poll_handler());
     }
 
+    pub(crate) fn handle_read_response(
+        &mut self,
+        header: ResponseHeader,
+        objects: HeaderCollection,
+    ) {
+        // TODO: Get another poll handler?
+        extract_measurements(header, objects, self.handler.get_default_poll_handler());
+    }
+
     pub(crate) fn next_request(&self, now: Instant) -> Next<Task> {
         if self.tasks.clear_restart_iin.is_pending() {
             return Next::Now(self.clear_restart_iin());
