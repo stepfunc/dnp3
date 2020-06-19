@@ -29,7 +29,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create event poll
     let mut poll = association
-        .add_poll(EventClasses::all().to_request(), Duration::from_secs(5))
+        .add_poll(
+            EventClasses::all().to_classes().to_request(),
+            Duration::from_secs(5),
+        )
         .await?;
 
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
@@ -45,7 +48,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "rao" => {
                 if let Err(err) = association
-                    .read(AllObjectsScan::new(Variation::Group40Var0).to_request())
+                    .read(ReadRequest::all_objects(Variation::Group40Var0))
+                    .await
+                {
+                    log::warn!("error: {}", err);
+                }
+            }
+            "rmo" => {
+                if let Err(err) = association
+                    .read(ReadRequest::multiple_headers(&[
+                        ReadHeader::all_objects(Variation::Group10Var0),
+                        ReadHeader::all_objects(Variation::Group40Var0),
+                    ]))
                     .await
                 {
                     log::warn!("error: {}", err);

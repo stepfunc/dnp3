@@ -29,8 +29,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         runtime.block_on(master.add_association(1024, config, NullHandler::boxed()))?;
 
     // Add an event poll
-    let mut poll = runtime
-        .block_on(association.add_poll(EventClasses::all().to_request(), Duration::from_secs(5)))?;
+    let mut poll = runtime.block_on(association.add_poll(
+        EventClasses::all().to_classes().to_request(),
+        Duration::from_secs(5),
+    ))?;
 
     loop {
         match std::io::stdin()

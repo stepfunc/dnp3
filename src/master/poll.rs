@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 use tokio::time::Instant;
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub(crate) struct Poll {
     pub(crate) id: u64,
     request: ReadRequest,
@@ -61,7 +61,7 @@ impl PollMap {
 
         for poll in self.polls.values() {
             if poll.is_ready(now) {
-                return Next::Now(*poll);
+                return Next::Now(poll.clone());
             }
 
             if let Some(x) = poll.next() {

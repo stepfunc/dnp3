@@ -62,8 +62,8 @@ impl EventClasses {
         }
     }
 
-    pub fn to_request(self) -> ReadRequest {
-        ReadRequest::ClassScan(Classes::new(false, self))
+    pub fn to_classes(self) -> Classes {
+        Classes::new(false, self)
     }
 
     pub fn any(self) -> bool {
@@ -106,7 +106,7 @@ impl Classes {
     }
 
     pub fn to_request(self) -> ReadRequest {
-        ReadRequest::ClassScan(self)
+        ReadRequest::class_scan(self)
     }
 
     pub fn events(events: EventClasses) -> Self {
@@ -135,10 +135,6 @@ impl OneByteRangeScan {
         }
     }
 
-    pub fn to_request(self) -> ReadRequest {
-        ReadRequest::Range8(self)
-    }
-
     pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         writer.write_range_only(self.variation, self.start, self.stop)
     }
@@ -153,10 +149,6 @@ impl TwoByteRangeScan {
         }
     }
 
-    pub fn to_request(self) -> ReadRequest {
-        ReadRequest::Range16(self)
-    }
-
     pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         writer.write_range_only(self.variation, self.start, self.stop)
     }
@@ -167,42 +159,78 @@ impl AllObjectsScan {
         Self { variation }
     }
 
-    pub fn to_request(self) -> ReadRequest {
-        ReadRequest::AllObjects(self)
-    }
-
     pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         writer.write_all_objects_header(self.variation)
     }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ReadRequest {
-    ClassScan(Classes),
+pub enum ReadHeader {
     Range8(OneByteRangeScan),
     Range16(TwoByteRangeScan),
     AllObjects(AllObjectsScan),
 }
 
-impl ReadRequest {
-    pub fn class_scan(scan: Classes) -> Self {
-        ReadRequest::ClassScan(scan)
-    }
-
+impl ReadHeader {
     pub fn one_byte_range(variation: Variation, start: u8, stop: u8) -> Self {
-        ReadRequest::Range8(OneByteRangeScan::new(variation, start, stop))
+        ReadHeader::Range8(OneByteRangeScan::new(variation, start, stop))
     }
 
     pub fn two_byte_range(variation: Variation, start: u16, stop: u16) -> Self {
-        ReadRequest::Range16(TwoByteRangeScan::new(variation, start, stop))
+        ReadHeader::Range16(TwoByteRangeScan::new(variation, start, stop))
+    }
+
+    pub fn all_objects(variation: Variation) -> Self {
+        ReadHeader::AllObjects(AllObjectsScan::new(variation))
     }
 
     pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
-            ReadRequest::ClassScan(classes) => classes.write(writer),
-            ReadRequest::Range8(scan) => scan.write(writer),
-            ReadRequest::Range16(scan) => scan.write(writer),
-            ReadRequest::AllObjects(scan) => scan.write(writer),
+            ReadHeader::Range8(scan) => scan.write(writer),
+            ReadHeader::Range16(scan) => scan.write(writer),
+            ReadHeader::AllObjects(scan) => scan.write(writer),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ReadRequest {
+    SingleHeader(ReadHeader),
+    ClassScan(Classes),
+    MultipleHeader(Vec<ReadHeader>),
+}
+
+impl ReadRequest {
+    pub fn class_scan(scan: Classes) -> Self {
+        Self::ClassScan(scan)
+    }
+
+    pub fn one_byte_range(variation: Variation, start: u8, stop: u8) -> Self {
+        Self::SingleHeader(ReadHeader::one_byte_range(variation, start, stop))
+    }
+
+    pub fn two_byte_range(variation: Variation, start: u16, stop: u16) -> Self {
+        Self::SingleHeader(ReadHeader::two_byte_range(variation, start, stop))
+    }
+
+    pub fn all_objects(variation: Variation) -> Self {
+        Self::SingleHeader(ReadHeader::all_objects(variation))
+    }
+
+    pub fn multiple_headers(headers: &[ReadHeader]) -> Self {
+        Self::MultipleHeader(headers.to_vec())
+    }
+
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        match self {
+            ReadRequest::SingleHeader(req) => req.format(writer),
+            ReadRequest::ClassScan(req) => req.write(writer),
+            ReadRequest::MultipleHeader(reqs) => {
+                for req in reqs {
+                    req.format(writer)?;
+                }
+                Ok(())
+            }
         }
     }
 }
