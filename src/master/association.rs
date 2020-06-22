@@ -4,7 +4,7 @@ use crate::app::sequence::Sequence;
 use crate::master::error::AssociationError;
 use crate::master::extract::extract_measurements;
 use crate::master::handle::{AssociationHandler, Promise};
-use crate::master::poll::{Poll, PollHandle, PollMap, PollTask};
+use crate::master::poll::{Poll, PollMap, PollTask};
 use crate::master::request::{EventClasses, TimeSyncProcedure};
 use crate::master::task::NonReadTask::TimeSync;
 use crate::master::task::{ReadTask, Task, TaskType};
@@ -13,6 +13,8 @@ use crate::master::tasks::time::TimeSyncTask;
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use tokio::time::Instant;
+
+pub use crate::master::poll::PollHandle;
 
 #[derive(Copy, Clone)]
 pub struct Configuration {
