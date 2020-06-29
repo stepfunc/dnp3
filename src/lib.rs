@@ -33,7 +33,7 @@
 //!
 //!     let mut association = master.add_association(1024, Configuration::default(), NullHandler::boxed()).await?;
 //!     association.add_poll(
-//!         EventClasses::all().to_request(),
+//!         EventClasses::all().to_classes().to_request(),
 //!         Duration::from_secs(5),
 //!     ).await;
 //!
