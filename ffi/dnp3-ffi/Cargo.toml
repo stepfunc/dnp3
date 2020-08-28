@@ -1,0 +1,17 @@
+[package]
+name = "dnp3-ffi"
+version = "0.1.0"
+authors = ["Émile Grégoire <emile@automatak.com>"]
+edition = "2018"
+
+[lib]
+crate-type=["cdylib"]
+
+[dependencies]
+log = "0.4"
+dnp3 = { path = "../../dnp3" }
+tokio = { version = "^0.2.11", git = "https://github.com/tokio-rs/tokio", branch = "v0.2.x", features = ["rt-threaded"] }
+
+[build-dependencies]
+dnp3-schema = { path = "../dnp3-schema" }
+rust-oo-bindgen = { git = "https://git@github.com/grid-io/oo_bindgen.git" }

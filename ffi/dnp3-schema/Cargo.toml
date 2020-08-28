@@ -1,0 +1,8 @@
+[package]
+name = "dnp3-schema"
+version = "0.1.0"
+authors = ["Émile Grégoire <emile@automatak.com>"]
+edition = "2018"
+
+[dependencies]
+oo-bindgen = { git = "https://git@github.com/grid-io/oo_bindgen.git" }

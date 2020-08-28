@@ -1,0 +1,523 @@
+use oo_bindgen::class::*;
+use oo_bindgen::doc::DocBuilder;
+use oo_bindgen::native_function::*;
+use oo_bindgen::*;
+
+pub fn define(
+    lib: &mut LibraryBuilder,
+    association_class: ClassDeclarationHandle,
+    request_class: ClassHandle,
+) -> Result<(), BindingError> {
+    let destroy_fn = lib
+        .declare_native_function("association_destroy")?
+        .param(
+            "association",
+            Type::ClassRef(association_class.clone()),
+            "Association to destroy",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Remove an association")?
+        .build()?;
+
+    // Poll stuff
+    let poll = lib.declare_class("Poll")?;
+
+    let poll_demand_fn = lib
+        .declare_native_function("poll_demand")?
+        .param(
+            "poll",
+            Type::ClassRef(poll.clone()),
+            "Poll handle to demand",
+        )?
+        .return_type(ReturnType::void())?
+        .doc(
+            DocBuilder::new()
+                .text("Demand the execution of a poll previously created with ")
+                .reference("association_add_poll")
+                .text(". ")
+                .text("The result will be sent to the registered ")
+                .reference("ReadHandler")
+                .text("."),
+        )?
+        .build()?;
+
+    let poll_destroy_fn = lib
+        .declare_native_function("poll_destroy")?
+        .param(
+            "poll",
+            Type::ClassRef(poll.clone()),
+            "Poll handle to destroy",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Remove a poll. The poll won't be performed again.")?
+        .build()?;
+
+    let poll = lib
+        .define_class(&poll)?
+        .destructor(&poll_destroy_fn)?
+        .method("Demand", &poll_demand_fn)?
+        .doc("Poll handle to demand executions of polls")?
+        .build()?;
+
+    let add_poll_fn = lib.declare_native_function("association_add_poll")?
+        .param("association", Type::ClassRef(association_class.clone()), "Association to add the poll to ")?
+        .param("request", Type::ClassRef(request_class.declaration()), "Request to perform")?
+        .param("period", Type::Duration(DurationMapping::Milliseconds), "Period to wait between each poll (in ms)")?
+        .return_type(ReturnType::new(Type::ClassRef(poll.declaration()), "Handle to the created poll."))?
+        .doc(DocBuilder::new().text("Add a periodic poll to the association. Each result of the poll will be sent to the ").reference("ReadHandler").text(" of the association."))?
+        .build()?;
+
+    // Read stuff
+    let read_result = lib
+        .define_native_enum("ReadResult")?
+        .push("Success", "Read was perform successfully")?
+        .push("TaskError", "The read was not performed properly")?
+        .doc("Result of a read operation")?
+        .build()?;
+
+    let read_cb = lib
+        .define_one_time_callback("ReadTaskCallback", "Handler for read tasks")?
+        .callback(
+            "on_complete",
+            "Called when the read task reached completion or failed",
+        )?
+        .param("result", Type::Enum(read_result), "Result of the read task")?
+        .return_type(ReturnType::void())?
+        .build()?
+        .build()?;
+
+    let read_fn = lib
+        .declare_native_function("association_read")?
+        .param("association", Type::ClassRef(association_class.clone()), "Association to read")?
+        .param("request", Type::ClassRef(request_class.declaration()), "Request to send")?
+        .param("callback", Type::OneTimeCallback(read_cb), "Callback that will be called once the read is complete")?
+        .return_type(ReturnType::void())?
+        .doc(DocBuilder::new().text("Perform a read on the association.")
+            .text("The callback will be called once the read is completely received, but the actual values will be sent to the ")
+            .reference("ReadHandler").text(" of the association.").build())?
+        .build()?;
+
+    // Command stuff
+    let command_mode = lib
+        .define_native_enum("CommandMode")?
+        .push("DirectOperate", "Perform a Direct Operate (0x05)")?
+        .push(
+            "SelectBeforeOperate",
+            "Perform a Select & Operate (0x03 then 0x04)",
+        )?
+        .doc("Command operation mode")?
+        .build()?;
+
+    let trip_close_code = lib
+        .define_native_enum("TripCloseCode")?
+        .variant("Nul", 0, "NUL (0)")?
+        .variant("Close", 1, "CLOSE (1)")?
+        .variant("Trip", 2, "TRIP (2)")?
+        .variant("Reserved", 3, "RESERVED (3)")?
+        .doc(
+            DocBuilder::new()
+                .text("Trip-Close Code field, used in conjunction with ")
+                .reference("OpType")
+                .text(" to specify a control operation"),
+        )?
+        .build()?;
+
+    let op_type = lib
+        .define_native_enum("OpType")?
+        .variant("Nul", 0, "NUL (0)")?
+        .variant("PulseOn", 1, "PULSE_ON (1)")?
+        .variant("PulseOff", 2, "PULSE_OFF (2)")?
+        .variant("LatchOn", 3, "LATCH_ON (3)")?
+        .variant("LatchOff", 4, "LATCH_OFF(4)")?
+        .doc(
+            DocBuilder::new()
+                .text("Operation Type field, used in conjunction with ")
+                .reference("TripCloseCode")
+                .text(" to specify a control operation"),
+        )?
+        .build()?;
+
+    let control_code = lib.declare_native_struct("ControlCode")?;
+    let control_code = lib
+        .define_native_struct(&control_code)?
+        .add("tcc", Type::Enum(trip_close_code), "This field is used in conjunction with the `op_type` field to specify a control operation")?
+        .add("clear", Type::Bool, DocBuilder::new()
+            .text("Support for this field is optional. ")
+            .text("When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. ")
+            .text("The indexed point shall go to the state that it would have if the command were allowed to complete normally.")
+        )?
+        .add("queue", Type::Bool, "This field is obsolete and should always be 0")?
+        .add("op_type", Type::Enum(op_type), "This field is used in conjunction with the `tcc` field to specify a control operation")?
+        .doc(DocBuilder::new().text("CROB (").reference("G12V1").text(") control code"))?
+        .build()?;
+
+    let g12v1_struct = lib.declare_native_struct("G12V1")?;
+    let g12v1_struct = lib
+        .define_native_struct(&g12v1_struct)?
+        .add("code", Type::Struct(control_code), "Control code")?
+        .add("count", Type::Uint8, "Count")?
+        .add(
+            "on_time",
+            Type::Uint32,
+            "Duration the output drive remains active (in milliseconds)",
+        )?
+        .add(
+            "off_time",
+            Type::Uint32,
+            "Duration the output drive remains non-active (in milliseconds)",
+        )?
+        .doc("Control Relay Output Block")?
+        .build()?;
+
+    let command = lib.declare_class("Command")?;
+
+    let command_new_fn = lib
+        .declare_native_function("command_new")?
+        .return_type(ReturnType::new(
+            Type::ClassRef(command.clone()),
+            "Handle to the created command",
+        ))?
+        .doc("Create a new command")?
+        .build()?;
+
+    let command_destroy_fn = lib
+        .declare_native_function("command_destroy")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to destroy",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Destroy command")?
+        .build()?;
+
+    let command_add_u8_g12v1_fn = lib
+        .declare_native_function("command_add_u8_g12v1")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint8,
+            "Index of the point to send the command to",
+        )?
+        .param("header", Type::Struct(g12v1_struct.clone()), "CROB data")?
+        .return_type(ReturnType::void())?
+        .doc("Add a CROB with 1-byte prefix index")?
+        .build()?;
+
+    let command_add_u16_g12v1_fn = lib
+        .declare_native_function("command_add_u16_g12v1")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint16,
+            "Index of the point to send the command to",
+        )?
+        .param("header", Type::Struct(g12v1_struct), "CROB data")?
+        .return_type(ReturnType::void())?
+        .doc("Add a CROB with 2-byte prefix index")?
+        .build()?;
+
+    let command_add_u8_g41v1_fn = lib
+        .declare_native_function("command_add_u8_g41v1")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint8,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Sint32, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (signed 32-bit integer) with 1-byte prefix index")?
+        .build()?;
+
+    let command_add_u16_g41v1_fn = lib
+        .declare_native_function("command_add_u16_g41v1")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint16,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Sint32, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (signed 32-bit integer) with 2-byte prefix index")?
+        .build()?;
+
+    let command_add_u8_g41v2_fn = lib
+        .declare_native_function("command_add_u8_g41v2")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint8,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Sint16, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (signed 16-bit integer) with 1-byte prefix index")?
+        .build()?;
+
+    let command_add_u16_g41v2_fn = lib
+        .declare_native_function("command_add_u16_g41v2")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint16,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Sint16, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (signed 16-bit integer) with 2-byte prefix index")?
+        .build()?;
+
+    let command_add_u8_g41v3_fn = lib
+        .declare_native_function("command_add_u8_g41v3")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint8,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Float, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (single-precision float) with 1-byte prefix index")?
+        .build()?;
+
+    let command_add_u16_g41v3_fn = lib
+        .declare_native_function("command_add_u16_g41v3")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint16,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Float, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (single-precision float) with 2-byte prefix index")?
+        .build()?;
+
+    let command_add_u8_g41v4_fn = lib
+        .declare_native_function("command_add_u8_g41v4")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint8,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Double, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (double-precision float) with 1-byte prefix index")?
+        .build()?;
+
+    let command_add_u16_g41v4_fn = lib
+        .declare_native_function("command_add_u16_g41v4")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint16,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Double, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (double-precision float) with 2-byte prefix index")?
+        .build()?;
+
+    let command = lib
+        .define_class(&command)?
+        .constructor(&command_new_fn)?
+        .destructor(&command_destroy_fn)?
+        .method("AddU8G12V1", &command_add_u8_g12v1_fn)?
+        .method("AddU16G12V1", &command_add_u16_g12v1_fn)?
+        .method("AddU8G41V1", &command_add_u8_g41v1_fn)?
+        .method("AddU16G41V1", &command_add_u16_g41v1_fn)?
+        .method("AddU8G41V2", &command_add_u8_g41v2_fn)?
+        .method("AddU16G41V2", &command_add_u16_g41v2_fn)?
+        .method("AddU8G41V3", &command_add_u8_g41v3_fn)?
+        .method("AddU16G41V3", &command_add_u16_g41v3_fn)?
+        .method("AddU8G41V4", &command_add_u8_g41v4_fn)?
+        .method("AddU16G41V4", &command_add_u16_g41v4_fn)?
+        .doc("Command handle used to send SBO or DO commands")?
+        .build()?;
+
+    let command_result = lib
+        .define_native_enum("CommandResult")?
+        .push("Success", "Command was a success")?
+        .push("TaskError", "Failed b/c of a generic task execution error")?
+        .push(
+            "BadStatus",
+            "Outstation indicated that a command was not SUCCESS",
+        )?
+        .push(
+            "HeaderCountMismatch",
+            "Number of headers in the response doesn't match the number in the request",
+        )?
+        .push(
+            "HeaderTypeMismatch",
+            "Header in the response doesn't match the request",
+        )?
+        .push(
+            "ObjectCountMismatch",
+            "Number of objects in one of the headers doesn't match the request",
+        )?
+        .push(
+            "ObjectValueMismatch",
+            "Value in one of the objects in the response doesn't match the request",
+        )?
+        .doc("Result of a command")?
+        .build()?;
+
+    let command_cb = lib
+        .define_one_time_callback("CommandTaskCallback", "Handler for command tasks")?
+        .callback(
+            "on_complete",
+            "Called when the command task reached completion or failed",
+        )?
+        .param(
+            "result",
+            Type::Enum(command_result),
+            "Result of the command task",
+        )?
+        .return_type(ReturnType::void())?
+        .build()?
+        .build()?;
+
+    let operate_fn = lib
+        .declare_native_function("association_operate")?
+        .param(
+            "association",
+            Type::ClassRef(association_class.clone()),
+            "Association to send the command to",
+        )?
+        .param("mode", Type::Enum(command_mode), "Operation mode")?
+        .param(
+            "command",
+            Type::ClassRef(command.declaration()),
+            "Command to send",
+        )?
+        .param(
+            "callback",
+            Type::OneTimeCallback(command_cb),
+            "Callback that will receive the result of the command",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Asynchronously send a command to the association")?
+        .build()?;
+
+    // Time sync stuff
+    let timesync_mode = lib
+        .define_native_enum("TimeSyncMode")?
+        .push(
+            "LAN",
+            "Perform a LAN timesync with Record Current Time (0x18) function code",
+        )?
+        .push(
+            "NonLAN",
+            "Perform a non-LAN timesync with Delay Measurement (0x17) function code",
+        )?
+        .doc("Time synchronization mode")?
+        .build()?;
+
+    let timesync_result = lib
+        .define_native_enum("TimeSyncResult")?
+        .push("Success", "Time synchronization operation was a success")?
+        .push("TaskError", "Failed b/c of a generic task execution error")?
+        .push("ClockRollback", "Detected a clock rollback")?
+        .push(
+            "SystemTimeNotUnix",
+            "The system time cannot be converted to a Unix timestamp",
+        )?
+        .push(
+            "BadOutstationTimeDelay",
+            "Outstation time delay exceeded the response delay",
+        )?
+        .push("Overflow", "Overflow in calculation")?
+        .push(
+            "StillNeedsTime",
+            "Outstation did not clear the NEED_TIME IIN bit",
+        )?
+        .push("IINError", "Outstation indicated an error")?
+        .doc("Result of a timesync operation")?
+        .build()?;
+
+    let timesync_cb = lib
+        .define_one_time_callback("TimeSyncTaskCallback", "Handler for command tasks")?
+        .callback(
+            "on_complete",
+            "Called when the timesync task reached completion or failed",
+        )?
+        .param(
+            "result",
+            Type::Enum(timesync_result),
+            "Result of the command task",
+        )?
+        .return_type(ReturnType::void())?
+        .build()?
+        .build()?;
+
+    let perform_time_sync_fn = lib
+        .declare_native_function("association_perform_time_sync")?
+        .param(
+            "association",
+            Type::ClassRef(association_class.clone()),
+            "Association to perform the timesync to",
+        )?
+        .param("mode", Type::Enum(timesync_mode), "Timesync mode")?
+        .param(
+            "callback",
+            Type::OneTimeCallback(timesync_cb),
+            "Callback that will receive the result of the timesync",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Asynchronously perform a timesync operation to the association")?
+        .build()?;
+
+    lib.define_class(&association_class)?
+        .destructor(&destroy_fn)?
+        .method("AddPoll", &add_poll_fn)?
+        .async_method("Read", &read_fn)?
+        .async_method("Operate", &operate_fn)?
+        .async_method("PerformTimeSync", &perform_time_sync_fn)?
+        .doc("Master-outstation association to interact with")?
+        .build()?;
+
+    Ok(())
+}
