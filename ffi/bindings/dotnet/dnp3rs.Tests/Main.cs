@@ -1,11 +1,11 @@
 using System;
 using System.Threading.Tasks;
-using System.Collections.Immutable;
+using System.Collections.Generic;
 using dnp3rs;
 
 class MainClass
 {
-    class TestLogger : Logger
+    class TestLogger : ILogger
     {
         public void OnMessage(LogLevel level, string message)
         {
@@ -13,7 +13,7 @@ class MainClass
         }
     }
 
-    class TestListener : ClientStateListener
+    class TestListener : IClientStateListener
     {
         public void OnChange(ClientState state)
         {
@@ -21,7 +21,7 @@ class MainClass
         }
     }
 
-    class TestReadHandler : ReadHandler
+    class TestReadHandler : IReadHandler
     {
         public void BeginFragment(ResponseHeader header)
         {
@@ -33,7 +33,7 @@ class MainClass
             Console.WriteLine("End fragment");
         }
 
-        public void HandleBinary(HeaderInfo info, ImmutableArray<Binary> values)
+        public void HandleBinary(HeaderInfo info, ICollection<Binary> values)
         {
             Console.WriteLine("Binaries:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
@@ -45,7 +45,7 @@ class MainClass
             }
         }
 
-        public void HandleDoubleBitBinary(HeaderInfo info, ImmutableArray<DoubleBitBinary> values)
+        public void HandleDoubleBitBinary(HeaderInfo info, ICollection<DoubleBitBinary> values)
         {
             Console.WriteLine("Double Bit Binaries:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
@@ -57,7 +57,7 @@ class MainClass
             }
         }
 
-        public void HandleBinaryOutputStatus(HeaderInfo info, ImmutableArray<BinaryOutputStatus> values)
+        public void HandleBinaryOutputStatus(HeaderInfo info, ICollection<BinaryOutputStatus> values)
         {
             Console.WriteLine("Binary Output Statuses:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
@@ -69,7 +69,7 @@ class MainClass
             }
         }
 
-        public void HandleCounter(HeaderInfo info, ImmutableArray<Counter> values)
+        public void HandleCounter(HeaderInfo info, ICollection<Counter> values)
         {
             Console.WriteLine("Counters:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
@@ -81,7 +81,7 @@ class MainClass
             }
         }
 
-        public void HandleFrozenCounter(HeaderInfo info, ImmutableArray<FrozenCounter> values)
+        public void HandleFrozenCounter(HeaderInfo info, ICollection<FrozenCounter> values)
         {
             Console.WriteLine("Frozen Counters:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
@@ -93,7 +93,7 @@ class MainClass
             }
         }
 
-        public void HandleAnalog(HeaderInfo info, ImmutableArray<Analog> values)
+        public void HandleAnalog(HeaderInfo info, ICollection<Analog> values)
         {
             Console.WriteLine("Analogs:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
@@ -105,7 +105,7 @@ class MainClass
             }
         }
 
-        public void HandleAnalogOutputStatus(HeaderInfo info, ImmutableArray<AnalogOutputStatus> values)
+        public void HandleAnalogOutputStatus(HeaderInfo info, ICollection<AnalogOutputStatus> values)
         {
             Console.WriteLine("Analog Output Statuses:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
