@@ -3,6 +3,7 @@ use dnp3::app::enums::QualifierCode;
 use dnp3::app::flags::Flags;
 use dnp3::app::header::{ResponseFunction, ResponseHeader, IIN1, IIN2};
 use dnp3::app::measurement::*;
+use dnp3::app::parse::bytes::Bytes;
 use dnp3::app::types::DoubleBit;
 use dnp3::master::handle::{HeaderInfo, ReadHandler};
 
@@ -75,10 +76,12 @@ impl ReadHandler for ffi::ReadHandler {
 
     fn handle_octet_string<'a>(
         &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (dnp3::app::parse::bytes::Bytes<'a>, u16)>,
+        info: HeaderInfo,
+        iter: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>,
     ) {
-        // TODO: implement this
+        let info = info.into();
+        let mut iterator = OctetStringIterator::new(iter);
+        ffi::ReadHandler::handle_octet_string(self, info, &mut iterator as *mut _);
     }
 }
 
@@ -269,6 +272,94 @@ impl ffi::AnalogOutputStatus {
             flags: value.flags.into(),
             time: value.time.into(),
         }
+    }
+}
+
+pub struct OctetStringIterator<'a> {
+    inner: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+    next: Option<ffi::OctetString<'a>>,
+    current_byte_it: Option<ByteIterator<'a>>,
+}
+
+impl<'a> OctetStringIterator<'a> {
+    fn new(inner: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>) -> Self {
+        Self {
+            inner,
+            next: None,
+            current_byte_it: None,
+        }
+    }
+
+    fn next(&mut self) {
+        if let Some((bytes, idx)) = self.inner.next() {
+            self.current_byte_it = None;
+            let byte_it_ref = self.current_byte_it.get_or_insert(ByteIterator::new(bytes));
+            self.next = Some(ffi::OctetString::new(idx, byte_it_ref));
+        } else {
+            self.next = None;
+            self.current_byte_it = None;
+        }
+    }
+}
+
+pub unsafe fn octetstring_next(it: *mut OctetStringIterator) -> *const ffi::OctetString {
+    let it = it.as_mut();
+    match it {
+        Some(it) => {
+            it.next();
+            match &it.next {
+                Some(value) => value as *const _,
+                None => std::ptr::null(),
+            }
+        }
+        None => std::ptr::null(),
+    }
+}
+
+impl<'a> ffi::OctetString<'a> {
+    fn new(idx: u16, it: &mut ByteIterator<'a>) -> Self {
+        Self {
+            index: idx,
+            value: it as *mut _,
+        }
+    }
+}
+
+pub struct ByteIterator<'a> {
+    inner: std::slice::Iter<'a, u8>,
+    next: Option<ffi::Byte>,
+}
+
+impl<'a> ByteIterator<'a> {
+    fn new(bytes: Bytes<'a>) -> Self {
+        Self {
+            inner: bytes.value.into_iter(),
+            next: None,
+        }
+    }
+
+    fn next(&mut self) {
+        self.next = self.inner.next().map(|value| ffi::Byte::new(*value))
+    }
+}
+
+pub unsafe fn byte_next(it: *mut ByteIterator) -> *const ffi::Byte {
+    let it = it.as_mut();
+    match it {
+        Some(it) => {
+            it.next();
+            match &it.next {
+                Some(value) => value as *const _,
+                None => std::ptr::null(),
+            }
+        }
+        None => std::ptr::null(),
+    }
+}
+
+impl ffi::Byte {
+    fn new(value: u8) -> Self {
+        Self { value }
     }
 }
 

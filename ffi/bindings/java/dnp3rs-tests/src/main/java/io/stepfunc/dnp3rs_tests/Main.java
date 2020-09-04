@@ -6,7 +6,7 @@ import io.stepfunc.dnp3rs.Runtime;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.Duration;
-import java.util.List;
+import java.util.Collection;
 
 import static org.joou.Unsigned.*;
 
@@ -39,7 +39,7 @@ class TestReadHandler implements ReadHandler {
     }
 
     @Override
-    public void handleBinary(HeaderInfo info, List<Binary> it) {
+    public void handleBinary(HeaderInfo info, Collection<Binary> it) {
         System.out.println("Binaries:");
         System.out.println("Qualifier: " + info.qualifier);
         System.out.println("Variation: " + info.variation);
@@ -50,7 +50,7 @@ class TestReadHandler implements ReadHandler {
     }
 
     @Override
-    public void handleDoubleBitBinary(HeaderInfo info, List<DoubleBitBinary> it) {
+    public void handleDoubleBitBinary(HeaderInfo info, Collection<DoubleBitBinary> it) {
         System.out.println("Double Bit Binaries:");
         System.out.println("Qualifier: " + info.qualifier);
         System.out.println("Variation: " + info.variation);
@@ -61,7 +61,7 @@ class TestReadHandler implements ReadHandler {
     }
 
     @Override
-    public void handleBinaryOutputStatus(HeaderInfo info, List<BinaryOutputStatus> it) {
+    public void handleBinaryOutputStatus(HeaderInfo info, Collection<BinaryOutputStatus> it) {
         System.out.println("Binary Output Statuses:");
         System.out.println("Qualifier: " + info.qualifier);
         System.out.println("Variation: " + info.variation);
@@ -72,7 +72,7 @@ class TestReadHandler implements ReadHandler {
     }
 
     @Override
-    public void handleCounter(HeaderInfo info, List<Counter> it) {
+    public void handleCounter(HeaderInfo info, Collection<Counter> it) {
         System.out.println("Counters:");
         System.out.println("Qualifier: " + info.qualifier);
         System.out.println("Variation: " + info.variation);
@@ -83,7 +83,7 @@ class TestReadHandler implements ReadHandler {
     }
 
     @Override
-    public void handleFrozenCounter(HeaderInfo info, List<FrozenCounter> it) {
+    public void handleFrozenCounter(HeaderInfo info, Collection<FrozenCounter> it) {
         System.out.println("Frozen Counters:");
         System.out.println("Qualifier: " + info.qualifier);
         System.out.println("Variation: " + info.variation);
@@ -94,7 +94,7 @@ class TestReadHandler implements ReadHandler {
     }
 
     @Override
-    public void handleAnalog(HeaderInfo info, List<Analog> it) {
+    public void handleAnalog(HeaderInfo info, Collection<Analog> it) {
         System.out.println("Analogs:");
         System.out.println("Qualifier: " + info.qualifier);
         System.out.println("Variation: " + info.variation);
@@ -105,13 +105,26 @@ class TestReadHandler implements ReadHandler {
     }
 
     @Override
-    public void handleAnalogOutputStatus(HeaderInfo info, List<AnalogOutputStatus> it) {
+    public void handleAnalogOutputStatus(HeaderInfo info, Collection<AnalogOutputStatus> it) {
         System.out.println("Analog Output Statuses:");
         System.out.println("Qualifier: " + info.qualifier);
         System.out.println("Variation: " + info.variation);
 
         it.forEach(val -> {
             System.out.println("AOS " + val.index + ": Value=" + val.value + " Flags=" + val.flags.value + " Time=" + val.time.value + " (" + val.time.quality + ")");
+        });
+    }
+
+    @Override
+    public void handleOctetString(HeaderInfo info, Collection<OctetString> it) {
+        System.out.println("Octet String:");
+        System.out.println("Qualifier: " + info.qualifier);
+        System.out.println("Variation: " + info.variation);
+
+        it.forEach(val -> {
+            System.out.print("Octet String " + val.index + ": Value=");
+            val.value.forEach(b -> System.out.print(String.format("%02X", b.value.byteValue()) + " "));
+            System.out.println();
         });
     }
 }

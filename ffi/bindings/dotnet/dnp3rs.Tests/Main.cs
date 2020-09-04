@@ -116,6 +116,23 @@ class MainClass
                 Console.WriteLine($"AOS {val.Index}: Value={val.Value} Flags={val.Flags.Value} Time={val.Time.Value} ({val.Time.Quality})");
             }
         }
+
+        public void HandleOctetString(HeaderInfo info, ICollection<OctetString> values)
+        {
+            Console.WriteLine("Octet String:");
+            Console.WriteLine("Qualifier: " + info.Qualifier);
+            Console.WriteLine("Variation: " + info.Variation);
+
+            foreach (var val in values)
+            {
+                Console.Write($"Octet String {val.Index}: Value=");
+                foreach (var b in val.Value)
+                {
+                    Console.Write($"{b.Value:X2} ");
+                }
+                Console.WriteLine();
+            }
+        }
     }
 
     public static void Main(string[] args)

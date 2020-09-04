@@ -194,7 +194,7 @@ impl CallbackAssociationHandle {
 
     pub async fn perform_time_sync<F>(&mut self, procedure: TimeSyncProcedure, callback: F)
     where
-        F: FnOnce(Result<(), TimeSyncError>) -> () + Send + Sync + 'static,
+        F: FnOnce(Result<(), TimeSyncError>) + Send + Sync + 'static,
     {
         let task =
             TimeSyncTask::get_procedure(procedure, false, Promise::BoxedFn(Box::new(callback)));
@@ -208,7 +208,7 @@ pub enum Listener<T> {
     /// nothing is listening
     None,
     /// listener is a boxed FnMut
-    BoxedFn(Box<dyn FnMut(T) -> () + Send + Sync>),
+    BoxedFn(Box<dyn FnMut(T) + Send + Sync>),
     /// listener is a broadcast channel
     Watch(tokio::sync::broadcast::Sender<T>),
 }
@@ -220,7 +220,7 @@ pub enum Promise<T> {
     /// nothing happens when the promise is completed
     None,
     /// Box<FnOnce> is consumed when the promise is completed
-    BoxedFn(Box<dyn FnOnce(T) -> () + Send + Sync>),
+    BoxedFn(Box<dyn FnOnce(T) + Send + Sync>),
     /// one-shot reply channel is consumed when the promise is completed
     OneShot(tokio::sync::oneshot::Sender<T>),
 }
@@ -312,7 +312,7 @@ pub trait ReadHandler {
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+        iter: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>,
     );
 }
 

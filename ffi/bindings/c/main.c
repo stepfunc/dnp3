@@ -162,6 +162,32 @@ void handle_analog_output_status(header_info_t info, analog_output_status_iterat
     }
 }
 
+void handle_octet_strings(header_info_t info, octet_string_iterator_t* it, void* arg)
+{
+    printf("Octet Strings:\n");
+    printf("Qualifier: ");
+    print_qualifier(info.qualifier);
+    printf("\n");
+    printf("Variation: ");
+    print_variation(info.variation);
+    printf("\n");
+
+    octet_string_t* value = octetstring_next(it);
+    while(value != NULL)
+    {
+        printf("Octet String: %u: Value=", value->index);
+        byte_t* single_byte = byte_next(value->value);
+        while(single_byte != NULL)
+        {
+            printf("%02X", single_byte->value);
+            single_byte = byte_next(value->value);
+        }
+
+        printf("\n");
+        value = octetstring_next(it);
+    }
+}
+
 // Single read callback
 void on_read_complete(read_result_t result, void* arg)
 {
@@ -231,6 +257,7 @@ int main()
         .handle_frozen_counter = &handle_frozen_counter,
         .handle_analog = &handle_analog,
         .handle_analog_output_status = &handle_analog_output_status,
+        .handle_octet_string = &handle_octet_strings,
         .ctx = NULL,
     };
     association_configuration_t association_config =

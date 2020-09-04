@@ -150,11 +150,11 @@ where
     type Item = (Bytes<'a>, T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let bytes = match self.cursor.read_bytes(self.size) {
+        let index = match T::read(&mut self.cursor) {
             Ok(x) => x,
             _ => return None,
         };
-        let index = match T::read(&mut self.cursor) {
+        let bytes = match self.cursor.read_bytes(self.size) {
             Ok(x) => x,
             _ => return None,
         };

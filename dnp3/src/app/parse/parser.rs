@@ -1042,6 +1042,29 @@ mod test {
     }
 
     #[test]
+    fn parses_group111var1_as_non_read() {
+        let input = [
+            0x6F, 0x01, 0x28, 0x02, 0x00, 0x01, 0x00, 0xAA, 0x02, 0x00, 0xBB,
+        ];
+        let mut headers = ObjectParser::parse(FunctionCode::Response, &input)
+            .unwrap()
+            .iter();
+
+        let bytes: Vec<(Bytes, u16)> = assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::TwoByteCountAndPrefix(0x02, PrefixedVariation::Group111VarX(0x01, seq)) => {
+                seq.iter().collect()
+            }
+        );
+
+        assert_eq!(
+            bytes,
+            vec![(Bytes { value: &[0xAA] }, 1), (Bytes { value: &[0xBB] }, 2)]
+        );
+        assert_eq!(headers.next(), None);
+    }
+
+    #[test]
     fn g110v0_cannot_be_used_in_non_read() {
         test_parse_error(
             &[0x6E, 0x00, 0x00, 0x01, 0x02],
