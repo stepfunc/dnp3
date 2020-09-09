@@ -67,7 +67,7 @@ impl Runner {
                 RunError::Shutdown => TaskError::Shutdown,
                 RunError::Link(_) => TaskError::NoConnection,
             };
-            task.details.on_task_error(task_err);
+            task.details.on_task_error(self.associations.get_mut(task.address).ok(), task_err);
         }
     }
 
@@ -169,7 +169,7 @@ impl Runner {
                         if is_connected {
                             self.queue_task(task);
                         } else {
-                            task.details.on_task_error(TaskError::NoConnection);
+                            task.details.on_task_error(self.associations.get_mut(task.address).ok(), TaskError::NoConnection);
                         }
                     }
                     Message::PollTask(msg) => {
@@ -203,7 +203,7 @@ impl Runner {
             None => {
                 log::warn!("no association for task with address: {}", task.address);
                 task.details
-                    .on_task_error(TaskError::NoSuchAssociation(task.address));
+                    .on_task_error(None, TaskError::NoSuchAssociation(task.address));
             }
         }
     }
@@ -397,7 +397,7 @@ impl Runner {
             let seq = match self.send_request(io, address, &task, writer).await {
                 Ok(seq) => seq,
                 Err(err) => {
-                    task.on_task_error(err);
+                    task.on_task_error(self.associations.get_mut(address).ok(), err);
                     return Err(err);
                 }
             };
@@ -408,7 +408,7 @@ impl Runner {
 
             loop {
                 if let Err(err) = self.read_next_response(io, deadline, reader).await {
-                    task.on_task_error(err);
+                    task.on_task_error(self.associations.get_mut(address).ok(), err);
                     return Err(err);
                 }
 
@@ -421,7 +421,7 @@ impl Runner {
                     Ok(Some(response)) => {
                         match self.associations.get_mut(address) {
                             Err(x) => {
-                                task.on_task_error(x.into());
+                                task.on_task_error(None, x.into());
                                 return Err(x.into());
                             }
                             Ok(association) => {
@@ -438,7 +438,7 @@ impl Runner {
                         }
                     }
                     Err(err) => {
-                        task.on_task_error(err);
+                        task.on_task_error(self.associations.get_mut(address).ok(), err);
                         return Err(err);
                     }
                 }
@@ -518,7 +518,36 @@ impl Runner {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let mut seq = self.send_request(io, address, &task, writer).await?;
+        let result = self.execute_read_task(io, address, &task, writer, reader).await;
+        
+        let association = self.associations.get_mut(address).ok();
+
+        match result {
+            Ok(_) => {
+                if let Some(association) = association {
+                    task.complete(association);
+                } else {
+                    task.on_task_error(None, TaskError::NoSuchAssociation(address));
+                }
+            }
+            Err(err) => task.on_task_error(association, err),
+        }
+
+        result
+    }
+
+    async fn execute_read_task<T>(
+        &mut self,
+        io: &mut T,
+        address: u16,
+        task: &ReadTask,
+        writer: &mut WriterType,
+        reader: &mut ReaderType,
+    ) -> Result<(), TaskError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        let mut seq = self.send_request(io, address, task, writer).await?;
         let mut is_first = true;
 
         // read responses until we get a FIN or an error occurs
@@ -527,6 +556,7 @@ impl Runner {
 
             loop {
                 self.read_next_response(io, deadline, reader).await?;
+
                 match self
                     .process_read_response(address, is_first, seq, &task, io, writer, reader)
                     .await?
@@ -535,7 +565,6 @@ impl Runner {
                     ReadResponseAction::Ignore => continue,
                     // read task complete
                     ReadResponseAction::Complete => {
-                        task.complete(self.associations.get_mut(address)?);
                         return Ok(());
                     }
                     // break to the outer loop and read another response

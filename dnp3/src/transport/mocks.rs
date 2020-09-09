@@ -39,7 +39,7 @@ impl MockWriter {
         W: AsyncWrite + Unpin,
     {
         self.num_writes += 1;
-        println!("mock tx: {:?}", fragment);
+        println!("mock tx: {:02X?}", fragment);
         io.write(fragment).await?;
         Ok(())
     }
@@ -77,7 +77,7 @@ impl MockReader {
     {
         self.count = io.read(&mut self.buffer).await?;
         self.num_reads += 1;
-        println!("mock rx: {:?}", &self.buffer[0..self.count]);
+        println!("mock rx: {:02X?}", &self.buffer[0..self.count]);
         Ok(())
     }
 }

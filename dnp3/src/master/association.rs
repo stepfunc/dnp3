@@ -61,6 +61,13 @@ pub(crate) enum AutoTaskState {
 }
 
 impl AutoTaskState {
+    pub(crate) fn is_idle(self) -> bool {
+        match self {
+            AutoTaskState::Idle => true,
+            _ => false,
+        }
+    }
+
     pub(crate) fn is_pending(self) -> bool {
         match self {
             AutoTaskState::Pending => true,
@@ -69,7 +76,7 @@ impl AutoTaskState {
     }
 
     pub(crate) fn set_pending_if_idle(&mut self) {
-        if let AutoTaskState::Idle = self {
+        if self.is_idle() {
             *self = AutoTaskState::Pending;
         }
     }
@@ -166,18 +173,23 @@ impl Association {
     }
 
     pub(crate) fn on_restart_iin_observed(&mut self) {
-        if let AutoTaskState::Idle = self.tasks.clear_restart_iin {
+        if self.tasks.clear_restart_iin.is_idle() {
             log::warn!("device restart detected (address == {})", self.address);
-            self.tasks.clear_restart_iin = AutoTaskState::Pending;
+            self.tasks.clear_restart_iin.set_pending_if_idle();
             // also redo the startup sequence
-            self.tasks.disable_unsolicited = AutoTaskState::Pending;
-            self.tasks.enabled_unsolicited = AutoTaskState::Pending;
-            self.tasks.integrity_scan = AutoTaskState::Pending;
+            self.tasks.disable_unsolicited.set_pending_if_idle();
+            self.tasks.enabled_unsolicited.set_pending_if_idle();
+            self.tasks.integrity_scan.set_pending_if_idle();
         }
     }
 
     pub(crate) fn on_integrity_scan_complete(&mut self) {
         self.tasks.integrity_scan = AutoTaskState::Idle;
+    }
+
+    pub(crate) fn on_integrity_scan_failure(&mut self) {
+        log::warn!("startup integrity scan failed");
+        self.tasks.integrity_scan = AutoTaskState::Failed;
     }
 
     pub(crate) fn on_clear_restart_iin_response(&mut self, iin: IIN) {
@@ -189,6 +201,11 @@ impl Association {
         }
     }
 
+    pub(crate) fn on_clear_restart_iin_failure(&mut self) {
+        log::warn!("device failed to clear restart IIN bit");
+        self.tasks.clear_restart_iin = AutoTaskState::Failed;
+    }
+
     pub(crate) fn on_time_sync_iin_response(&mut self, iin: IIN) {
         self.tasks.time_sync = if iin.iin1.get_need_time() {
             log::warn!("device failed to clear NEED_TIME IIN bit");
@@ -198,12 +215,27 @@ impl Association {
         }
     }
 
+    pub(crate) fn on_time_sync_iin_failure(&mut self) {
+        log::warn!("auto time sync failed");
+        self.tasks.time_sync = AutoTaskState::Failed;
+    }
+
     pub(crate) fn on_enable_unsolicited_response(&mut self, _iin: IIN) {
         self.tasks.enabled_unsolicited = AutoTaskState::Idle;
     }
 
+    pub(crate) fn on_enable_unsolicited_failure(&mut self) {
+        log::warn!("device failed to enable unsolicited responses");
+        self.tasks.enabled_unsolicited = AutoTaskState::Failed;
+    }
+
     pub(crate) fn on_disable_unsolicited_response(&mut self, _iin: IIN) {
         self.tasks.disable_unsolicited = AutoTaskState::Idle;
+    }
+
+    pub(crate) fn on_disable_unsolicited_failure(&mut self) {
+        log::warn!("device failed to disable unsolicited responses");
+        self.tasks.disable_unsolicited = AutoTaskState::Failed;
     }
 
     pub(crate) fn handle_unsolicited_response(

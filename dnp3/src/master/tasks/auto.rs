@@ -3,6 +3,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::HeaderCollection;
 use crate::master::association::Association;
+use crate::master::error::TaskError;
 use crate::master::request::EventClasses;
 use crate::master::task::{NonReadTask, TaskType};
 use crate::util::cursor::WriteError;
@@ -66,5 +67,19 @@ impl AutoTask {
         };
 
         None
+    }
+
+    pub(crate) fn on_task_error(self, association: &mut Association, _err: TaskError) {
+        match &self {
+            AutoTask::DisableUnsolicited(_) => {
+                association.on_disable_unsolicited_failure();
+            }
+            AutoTask::EnableUnsolicited(_) => {
+                association.on_enable_unsolicited_failure();
+            }
+            AutoTask::ClearRestartBit => {
+                association.on_clear_restart_iin_failure();
+            }
+        }
     }
 }

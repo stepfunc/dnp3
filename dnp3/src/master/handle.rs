@@ -27,7 +27,7 @@ impl Message {
     pub(crate) fn on_send_failure(self) {
         match self {
             Message::QueueTask(task) => {
-                task.details.on_task_error(TaskError::Shutdown);
+                task.details.on_task_error(None, TaskError::Shutdown);
             }
             Message::PollTask(msg) => {
                 msg.task.on_error(PollError::Shutdown);

@@ -78,7 +78,12 @@ impl TimeSyncTask {
         }
     }
 
-    pub(crate) fn on_task_error(self, err: TaskError) {
+    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+        if self.is_auto_task {
+            if let Some(association) = association {
+                association.on_time_sync_iin_failure();
+            }
+        }
         self.promise.complete(Err(err.into()))
     }
 
