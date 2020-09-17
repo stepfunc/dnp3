@@ -24,7 +24,7 @@ impl SingleReadTask {
     }
 
     pub(crate) fn on_task_error(self, err: TaskError) {
-        self.promise.complete(Err(err.into()))
+        self.promise.complete(Err(err))
     }
 
     pub(crate) fn on_complete(self) {

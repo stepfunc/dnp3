@@ -50,7 +50,7 @@
 dead_code,
 arithmetic_overflow,
 invalid_type_param_default,
-missing_fragment_specifier,
+//missing_fragment_specifier,
 mutable_transmutes,
 no_mangle_const_items,
 overflowing_literals,
@@ -86,7 +86,7 @@ clippy::all
 )]
 #![forbid(
     unsafe_code,
-    intra_doc_link_resolution_failure,
+    // intra_doc_link_resolution_failure, broken_intra_doc_links
     safe_packed_borrows,
     while_true,
     bare_trait_objects

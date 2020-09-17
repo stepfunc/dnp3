@@ -108,10 +108,12 @@ impl ReadTask {
 
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
         match self {
-            ReadTask::StartupIntegrity => if let Some(association) = association{
-                association.on_integrity_scan_failure();
-            },
-            ReadTask::PeriodicPoll(_) => {},
+            ReadTask::StartupIntegrity => {
+                if let Some(association) = association {
+                    association.on_integrity_scan_failure();
+                }
+            }
+            ReadTask::PeriodicPoll(_) => {}
             ReadTask::SingleRead(task) => task.on_task_error(err),
         }
     }
@@ -134,9 +136,11 @@ impl NonReadTask {
         match self {
             NonReadTask::Command(task) => task.on_task_error(err),
             NonReadTask::TimeSync(task) => task.on_task_error(association, err),
-            NonReadTask::Auto(task) => if let Some(association) = association {
-                task.on_task_error(association, err);
-            },
+            NonReadTask::Auto(task) => {
+                if let Some(association) = association {
+                    task.on_task_error(association, err);
+                }
+            }
         }
     }
 

@@ -1,0 +1,123 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+        rust:
+          - stable
+          - beta
+          - nightly
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install Rust ${{ matrix.rust }}
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+      - name: Copy Windows config
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: Copy-Item -Path .cargo/config-windows.toml -Destination .cargo/config.toml
+      - name: Copy Linux config
+        if: ${{ runner.os == 'Linux' }}
+        shell: pwsh
+        run: Copy-Item -Path .cargo/config-linux.toml -Destination .cargo/config.toml
+      - name: Run Rust unit tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+      - name: C bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --c
+      - name: .NET bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --dotnet
+      - name: Java bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --java
+      - name: Upload compiled
+        if: ${{ matrix.rust == 'stable' }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/c/generated/lib
+  packaging:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Download compiled FFI
+        uses: actions/download-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi-modules
+      - name: Package all bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --package ./ffi-modules
+      - name: Upload C bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: c-bindings
+          path: ffi/bindings/c/generated
+      - name: Upload .NET bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: dotnet-bindings
+          path: ffi/bindings/dotnet/nupkg/*.nupkg
+      - name: Upload Java bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: java-bindings
+          path: ffi/bindings/java/dnp3rs/target/*.jar
+  linting:
+    strategy:
+      fail-fast: false
+      matrix:
+        rust:
+          - stable
+          - beta
+          - nightly
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install Rust ${{ matrix.rust }}
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: rustfmt, clippy
+      - name: Format
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+      - name: Clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings

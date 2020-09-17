@@ -62,17 +62,11 @@ pub(crate) enum AutoTaskState {
 
 impl AutoTaskState {
     pub(crate) fn is_idle(self) -> bool {
-        match self {
-            AutoTaskState::Idle => true,
-            _ => false,
-        }
+        matches!(self, AutoTaskState::Idle)
     }
 
     pub(crate) fn is_pending(self) -> bool {
-        match self {
-            AutoTaskState::Pending => true,
-            _ => false,
-        }
+        matches!(self, AutoTaskState::Pending)
     }
 
     pub(crate) fn set_pending_if_idle(&mut self) {

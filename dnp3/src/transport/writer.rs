@@ -60,9 +60,7 @@ impl Writer {
             chunks.len() - 1
         };
 
-        let mut count = 0;
-
-        for chunk in chunks {
+        for (count, chunk) in chunks.enumerate() {
             let mut cursor = WriteCursor::new(&mut self.buffer);
             let transport_byte = Self::get_header(count == last, count == 0, self.seq.increment());
             let mark = cursor.position();
@@ -73,8 +71,6 @@ impl Writer {
             )?;
             let written = cursor.written_since(mark)?;
             io.write_all(written).await?;
-
-            count += 1;
         }
 
         Ok(())

@@ -186,7 +186,7 @@ impl CallbackAssociationHandle {
 
     pub async fn operate<F>(&mut self, mode: CommandMode, headers: CommandHeaders, callback: F)
     where
-        F: FnOnce(Result<(), CommandError>) -> () + Send + Sync + 'static,
+        F: FnOnce(Result<(), CommandError>) + Send + Sync + 'static,
     {
         let task = CommandTask::from_mode(mode, headers, Promise::BoxedFn(Box::new(callback)));
         self.inner.send_task(task.wrap().wrap()).await;

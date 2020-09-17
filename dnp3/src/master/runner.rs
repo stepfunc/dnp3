@@ -67,7 +67,8 @@ impl Runner {
                 RunError::Shutdown => TaskError::Shutdown,
                 RunError::Link(_) => TaskError::NoConnection,
             };
-            task.details.on_task_error(self.associations.get_mut(task.address).ok(), task_err);
+            task.details
+                .on_task_error(self.associations.get_mut(task.address).ok(), task_err);
         }
     }
 
@@ -169,7 +170,10 @@ impl Runner {
                         if is_connected {
                             self.queue_task(task);
                         } else {
-                            task.details.on_task_error(self.associations.get_mut(task.address).ok(), TaskError::NoConnection);
+                            task.details.on_task_error(
+                                self.associations.get_mut(task.address).ok(),
+                                TaskError::NoConnection,
+                            );
                         }
                     }
                     Message::PollTask(msg) => {
@@ -518,8 +522,10 @@ impl Runner {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let result = self.execute_read_task(io, address, &task, writer, reader).await;
-        
+        let result = self
+            .execute_read_task(io, address, &task, writer, reader)
+            .await;
+
         let association = self.associations.get_mut(address).ok();
 
         match result {

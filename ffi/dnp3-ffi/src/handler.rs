@@ -333,7 +333,7 @@ pub struct ByteIterator<'a> {
 impl<'a> ByteIterator<'a> {
     fn new(bytes: Bytes<'a>) -> Self {
         Self {
-            inner: bytes.value.into_iter(),
+            inner: bytes.value.iter(),
             next: None,
         }
     }
