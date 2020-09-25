@@ -55,13 +55,13 @@ impl ReadHandler for ffi::ReadHandler {
     ) {
         let info = info.into();
         let mut iterator = FrozenCounterIterator::new(iter);
-        ffi::ReadHandler::handle_frozen_counter(self, info, &mut iterator as *mut _);
+        ffi::ReadHandler::handle_frozen_counter(self, info, &mut iterator);
     }
 
     fn handle_analog(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Analog, u16)>) {
         let info = info.into();
         let mut iterator = AnalogIterator::new(iter);
-        ffi::ReadHandler::handle_analog(self, info, &mut iterator as *mut _);
+        ffi::ReadHandler::handle_analog(self, info, &mut iterator);
     }
 
     fn handle_analog_output_status(
@@ -71,7 +71,7 @@ impl ReadHandler for ffi::ReadHandler {
     ) {
         let info = info.into();
         let mut iterator = AnalogOutputStatusIterator::new(iter);
-        ffi::ReadHandler::handle_analog_output_status(self, info, &mut iterator as *mut _);
+        ffi::ReadHandler::handle_analog_output_status(self, info, &mut iterator);
     }
 
     fn handle_octet_string<'a>(
@@ -81,13 +81,13 @@ impl ReadHandler for ffi::ReadHandler {
     ) {
         let info = info.into();
         let mut iterator = OctetStringIterator::new(iter);
-        ffi::ReadHandler::handle_octet_string(self, info, &mut iterator as *mut _);
+        ffi::ReadHandler::handle_octet_string(self, info, &mut iterator);
     }
 }
 
 impl From<ResponseHeader> for ffi::ResponseHeader {
     fn from(header: ResponseHeader) -> ffi::ResponseHeader {
-        ffi::ResponseHeader {
+        ffi::ResponseHeaderFields {
             control: ffi::Control {
                 fir: header.control.fir,
                 fin: header.control.fin,
@@ -108,12 +108,13 @@ impl From<ResponseHeader> for ffi::ResponseHeader {
                 },
             },
         }
+        .into()
     }
 }
 
 impl From<HeaderInfo> for ffi::HeaderInfo {
     fn from(info: HeaderInfo) -> ffi::HeaderInfo {
-        ffi::HeaderInfo {
+        ffi::HeaderInfoFields {
             variation: info.variation.into(),
             qualifier: match info.qualifier {
                 QualifierCode::Range8 => ffi::QualifierCode::Range8,
@@ -126,6 +127,7 @@ impl From<HeaderInfo> for ffi::HeaderInfo {
                 QualifierCode::FreeFormat16 => ffi::QualifierCode::FreeFormat16,
             },
         }
+        .into()
     }
 }
 
@@ -149,18 +151,13 @@ macro_rules! implement_iterator {
             }
         }
 
-        pub unsafe fn $ffi_func_name(it: *mut $it_name) -> *const $ffi_type {
+        pub unsafe fn $ffi_func_name(it: *mut $it_name) -> Option<&$ffi_type> {
             let it = it.as_mut();
-            match it {
-                Some(it) => {
-                    it.next();
-                    match &it.next {
-                        Some(value) => value as *const _,
-                        None => std::ptr::null(),
-                    }
-                }
-                None => std::ptr::null(),
-            }
+            it.map(|it| {
+                it.next();
+                it.next.as_ref()
+            })
+            .flatten()
         }
     };
 }
@@ -206,7 +203,7 @@ impl ffi::Binary {
 
 impl ffi::DoubleBitBinary {
     fn new(idx: u16, value: DoubleBitBinary) -> Self {
-        Self {
+        ffi::DoubleBitBinaryFields {
             index: idx,
             value: match value.value {
                 DoubleBit::Intermediate => ffi::DoubleBit::Intermediate,
@@ -217,6 +214,7 @@ impl ffi::DoubleBitBinary {
             flags: value.flags.into(),
             time: value.time.into(),
         }
+        .into()
     }
 }
 
@@ -302,18 +300,13 @@ impl<'a> OctetStringIterator<'a> {
     }
 }
 
-pub unsafe fn octetstring_next(it: *mut OctetStringIterator) -> *const ffi::OctetString {
+pub unsafe fn octetstring_next(it: *mut OctetStringIterator) -> Option<&ffi::OctetString> {
     let it = it.as_mut();
-    match it {
-        Some(it) => {
-            it.next();
-            match &it.next {
-                Some(value) => value as *const _,
-                None => std::ptr::null(),
-            }
-        }
-        None => std::ptr::null(),
-    }
+    it.map(|it| {
+        it.next();
+        it.next.as_ref()
+    })
+    .flatten()
 }
 
 impl<'a> ffi::OctetString<'a> {
@@ -343,18 +336,13 @@ impl<'a> ByteIterator<'a> {
     }
 }
 
-pub unsafe fn byte_next(it: *mut ByteIterator) -> *const ffi::Byte {
+pub unsafe fn byte_next(it: *mut ByteIterator) -> Option<&ffi::Byte> {
     let it = it.as_mut();
-    match it {
-        Some(it) => {
-            it.next();
-            match &it.next {
-                Some(value) => value as *const _,
-                None => std::ptr::null(),
-            }
-        }
-        None => std::ptr::null(),
-    }
+    it.map(|it| {
+        it.next();
+        it.next.as_ref()
+    })
+    .flatten()
 }
 
 impl ffi::Byte {
@@ -369,8 +357,8 @@ impl From<Flags> for ffi::Flags {
     }
 }
 
-pub unsafe fn iin1_is_set(iin1: *const ffi::IIN1, flag: ffi::IIN1Flag) -> bool {
-    if let Some(iin1) = iin1.as_ref() {
+pub unsafe fn iin1_is_set(iin1: Option<&ffi::IIN1>, flag: ffi::IIN1Flag) -> bool {
+    if let Some(iin1) = iin1 {
         let iin1 = IIN1::new(iin1.value);
         match flag {
             ffi::IIN1Flag::Broadcast => iin1.get_broadcast(),
@@ -387,8 +375,8 @@ pub unsafe fn iin1_is_set(iin1: *const ffi::IIN1, flag: ffi::IIN1Flag) -> bool {
     }
 }
 
-pub unsafe fn iin2_is_set(iin2: *const ffi::IIN2, flag: ffi::IIN2Flag) -> bool {
-    if let Some(iin1) = iin2.as_ref() {
+pub unsafe fn iin2_is_set(iin2: Option<&ffi::IIN2>, flag: ffi::IIN2Flag) -> bool {
+    if let Some(iin1) = iin2 {
         let iin1 = IIN2::new(iin1.value);
         match flag {
             ffi::IIN2Flag::NoFuncCodeSupport => iin1.get_no_func_code_support(),
@@ -403,8 +391,8 @@ pub unsafe fn iin2_is_set(iin2: *const ffi::IIN2, flag: ffi::IIN2Flag) -> bool {
     }
 }
 
-pub unsafe fn flags_is_set(flags: *const ffi::Flags, flag: ffi::Flag) -> bool {
-    if let Some(flags) = flags.as_ref() {
+pub unsafe fn flags_is_set(flags: Option<&ffi::Flags>, flag: ffi::Flag) -> bool {
+    if let Some(flags) = flags {
         let flags = Flags::new(flags.value);
         match flag {
             ffi::Flag::Online => flags.online(),
@@ -425,7 +413,7 @@ pub unsafe fn flags_is_set(flags: *const ffi::Flags, flag: ffi::Flag) -> bool {
 
 impl From<Time> for ffi::Timestamp {
     fn from(time: Time) -> ffi::Timestamp {
-        ffi::Timestamp {
+        ffi::TimestampFields {
             value: match time {
                 Time::Synchronized(value) => value.raw_value(),
                 Time::NotSynchronized(value) => value.raw_value(),
@@ -437,5 +425,6 @@ impl From<Time> for ffi::Timestamp {
                 Time::Invalid => ffi::TimeQuality::Invalid,
             },
         }
+        .into()
     }
 }

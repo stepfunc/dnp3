@@ -3,7 +3,6 @@ use crate::*;
 use dnp3::prelude::master::*;
 use std::ffi::CStr;
 use std::net::SocketAddr;
-use std::os::raw::c_char;
 use std::ptr::null_mut;
 use std::str::FromStr;
 use std::time::Duration;
@@ -21,9 +20,9 @@ where
 }
 
 pub(crate) unsafe fn runtime_new(
-    config: *const ffi::RuntimeConfig,
+    config: Option<&ffi::RuntimeConfig>,
 ) -> *mut tokio::runtime::Runtime {
-    let result = match config.as_ref() {
+    let result = match config {
         None => build_runtime(|r| r),
         Some(x) => build_runtime(|r| r.core_threads(x.num_core_threads as usize)),
     };
@@ -48,21 +47,17 @@ pub(crate) unsafe fn runtime_add_master_tcp(
     address: u16,
     level: ffi::DecodeLogLevel,
     strategy: ffi::ReconnectStrategy,
-    response_timeout: u64,
-    endpoint: *const c_char,
+    response_timeout: Duration,
+    endpoint: &CStr,
     listener: ffi::ClientStateListener,
 ) -> *mut Master {
-    let strategy = ReconnectStrategy::new(
-        Duration::from_millis(strategy.min_delay),
-        Duration::from_millis(strategy.max_delay),
-    );
-    let response_timeout = Duration::from_millis(response_timeout);
-    let endpoint =
-        if let Ok(endpoint) = SocketAddr::from_str(&CStr::from_ptr(endpoint).to_string_lossy()) {
-            endpoint
-        } else {
-            return std::ptr::null_mut();
-        };
+    let strategy = ReconnectStrategy::new(strategy.min_delay(), strategy.max_delay());
+    let response_timeout = response_timeout;
+    let endpoint = if let Ok(endpoint) = SocketAddr::from_str(&endpoint.to_string_lossy()) {
+        endpoint
+    } else {
+        return std::ptr::null_mut();
+    };
     let listener = ClientStateListenerAdapter::new(listener);
 
     let (future, handle) = create_master_tcp_client(

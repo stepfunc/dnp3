@@ -15,15 +15,15 @@ enum CommandHeaderElement {
 impl From<&ffi::ControlCode> for ControlCode {
     fn from(from: &ffi::ControlCode) -> Self {
         Self {
-            tcc: match from.tcc {
+            tcc: match from.tcc() {
                 ffi::TripCloseCode::Nul => TripCloseCode::Nul,
                 ffi::TripCloseCode::Close => TripCloseCode::Close,
                 ffi::TripCloseCode::Trip => TripCloseCode::Trip,
                 ffi::TripCloseCode::Reserved => TripCloseCode::Reserved,
             },
-            clear: from.clear,
-            queue: from.queue,
-            op_type: match from.op_type {
+            clear: from.clear(),
+            queue: from.queue(),
+            op_type: match from.op_type() {
                 ffi::OpType::Nul => OpType::Nul,
                 ffi::OpType::PulseOn => OpType::PulseOn,
                 ffi::OpType::PulseOff => OpType::PulseOff,

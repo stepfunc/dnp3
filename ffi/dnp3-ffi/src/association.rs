@@ -57,8 +57,8 @@ pub unsafe fn poll_destroy(poll: *mut Poll) {
 
 pub unsafe fn association_add_poll(
     association: *mut Association,
-    request: *const Request,
-    period: u64,
+    request: *mut Request,
+    period: Duration,
 ) -> *mut Poll {
     let association = match association.as_mut() {
         Some(association) => association,
@@ -69,8 +69,6 @@ pub unsafe fn association_add_poll(
         Some(request) => request,
         None => return std::ptr::null_mut(),
     };
-
-    let period = Duration::from_millis(period);
 
     if tokio::runtime::Handle::try_current().is_err() {
         if let Ok(handle) = association

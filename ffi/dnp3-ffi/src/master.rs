@@ -28,9 +28,9 @@ pub unsafe fn master_add_association(
     };
 
     let config = Configuration::new(
-        convert_event_classes(&config.disable_unsol_classes),
-        convert_event_classes(&config.enable_unsol_classes),
-        convert_auto_time_sync(&config.auto_time_sync),
+        convert_event_classes(&config.disable_unsol_classes()),
+        convert_event_classes(&config.enable_unsol_classes()),
+        convert_auto_time_sync(&config.auto_time_sync()),
     );
 
     let handler = AssociationHandlerAdapter {
