@@ -1,5 +1,4 @@
 use oo_bindgen::class::ClassHandle;
-use oo_bindgen::doc::DocBuilder;
 use oo_bindgen::native_enum::NativeEnumHandle;
 use oo_bindgen::native_function::*;
 use oo_bindgen::*;
@@ -235,7 +234,10 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<(ClassHandle, NativeEnumHandle
             Type::ClassRef(request.clone()),
             "Handle to the created request",
         ))?
-        .doc("Create a new request asking for classes")?
+        .doc(
+            doc("Create a new request asking for classes")
+            .details("An identical request can be created manually with {class:Request.AddAllObjectsHeader()} and variations {enum:Variation.Group60Var1}, {enum:Variation.Group60Var2}, {enum:Variation.Group60Var3} and {enum:Variation.Group60Var4}.")
+        )?
         .build()?;
 
     let request_destroy_fn = lib
@@ -246,13 +248,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<(ClassHandle, NativeEnumHandle
             "Request to destroy",
         )?
         .return_type(ReturnType::void())?
-        .doc(
-            DocBuilder::new()
-                .text("Destroy a request created with ")
-                .reference("request_new")
-                .text(" or ")
-                .reference("request_new_class"),
-        )?
+        .doc("Destroy a request created with {class:Request.[constructor]} or {class:Request.ClassRequest()}.")?
         .build()?;
 
     let request_add_one_byte_header_fn = lib
@@ -304,7 +300,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<(ClassHandle, NativeEnumHandle
             "Variation to ask for",
         )?
         .return_type(ReturnType::void())?
-        .doc("Add a all objects variation interrogation")?
+        .doc("Add an all objects variation interrogation")?
         .build()?;
 
     let request = lib
@@ -315,7 +311,10 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<(ClassHandle, NativeEnumHandle
         .method("AddOneByteHeader", &request_add_one_byte_header_fn)?
         .method("AddTwoByteHeader", &request_add_two_byte_header_fn)?
         .method("AddAllObjectsHeader", &request_add_all_objects_header_fn)?
-        .doc("Custom request")?
+        .doc(
+            doc("Custom request")
+            .details("Whenever a method takes a request as a parameter, the request is internally copied. Therefore, it is possible to reuse the same requests over and over.")
+        )?
         .build()?;
 
     Ok((request, variation_enum))

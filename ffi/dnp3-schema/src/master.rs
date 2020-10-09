@@ -1,6 +1,5 @@
 use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
-use oo_bindgen::doc::DocBuilder;
 use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
 use oo_bindgen::*;
@@ -20,9 +19,8 @@ pub fn define(
         )?
         .return_type(ReturnType::void())?
         .doc(
-            DocBuilder::new()
-                .text("Remove and destroy a master.")
-                .warn("This method must NOT be called from within the tokio runtime"),
+            doc("Remove and destroy a master.")
+                .warning("This method must NOT be called from within the {class:Runtime} thread."),
         )?
         .build()?;
 
@@ -79,7 +77,10 @@ pub fn define(
         .add("integrity_handler", Type::Interface(read_handler.clone()), "Handler for the initial integrity scan")?
         .add("unsolicited_handler", Type::Interface(read_handler.clone()), "Handler for unsolicited responses")?
         .add("default_poll_handler", Type::Interface(read_handler), "Handler for all other responses")?
-        .doc("Handlers that will receive readings. You can set all handlers to the same handler if knowing what type of event generated the value is not required.")?
+        .doc(
+            doc("Handlers that will receive readings.")
+            .details("You can set all handlers to the same handler if knowing what type of event generated the value is not required.")
+        )?
         .build()?;
 
     let add_association_fn = lib
@@ -131,7 +132,10 @@ pub fn define(
         .destructor(&destroy_fn)?
         .method("AddAssociation", &add_association_fn)?
         .method("SetDecodeLogLevel", &set_decode_log_level_fn)?
-        .doc("Master channel of communication")?
+        .doc(
+            doc("Master channel of communication")
+            .details("To communicate with a particular outstation, you need to add an association with {class:Master.AddAssociation()}.")
+        )?
         .build()?;
 
     Ok(association_class)

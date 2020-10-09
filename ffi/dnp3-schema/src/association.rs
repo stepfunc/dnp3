@@ -1,5 +1,4 @@
 use oo_bindgen::class::*;
-use oo_bindgen::doc::DocBuilder;
 use oo_bindgen::native_function::*;
 use oo_bindgen::*;
 
@@ -16,7 +15,9 @@ pub fn define(
             "Association to destroy",
         )?
         .return_type(ReturnType::void())?
-        .doc("Remove an association")?
+        .doc(doc("Remove an association").details(
+            "This method will gracefully end all communications with this particular outstation.",
+        ))?
         .build()?;
 
     // Poll stuff
@@ -31,13 +32,9 @@ pub fn define(
         )?
         .return_type(ReturnType::void())?
         .doc(
-            DocBuilder::new()
-                .text("Demand the execution of a poll previously created with ")
-                .reference("association_add_poll")
-                .text(". ")
-                .text("The result will be sent to the registered ")
-                .reference("ReadHandler")
-                .text("."),
+                doc("Demand the immediate execution of a poll previously created with {class:Association.AddPoll()}.")
+                .details("This method returns immediatly. The result will be sent to the registered {interface:ReadHandler}.")
+                .details("This method resets the internal timer of the poll.")
         )?
         .build()?;
 
@@ -56,15 +53,18 @@ pub fn define(
         .define_class(&poll)?
         .destructor(&poll_destroy_fn)?
         .method("Demand", &poll_demand_fn)?
-        .doc("Poll handle to demand executions of polls")?
+        .doc("Poll handle to demand executions of polls with {class:Poll.Demand()}.")?
         .build()?;
 
     let add_poll_fn = lib.declare_native_function("association_add_poll")?
-        .param("association", Type::ClassRef(association_class.clone()), "Association to add the poll to ")?
+        .param("association", Type::ClassRef(association_class.clone()), "Association to add the poll to")?
         .param("request", Type::ClassRef(request_class.declaration()), "Request to perform")?
         .param("period", Type::Duration(DurationMapping::Milliseconds), "Period to wait between each poll (in ms)")?
         .return_type(ReturnType::new(Type::ClassRef(poll.declaration()), "Handle to the created poll."))?
-        .doc(DocBuilder::new().text("Add a periodic poll to the association. Each result of the poll will be sent to the ").reference("ReadHandler").text(" of the association."))?
+        .doc(
+            doc("Add a periodic poll to the association.")
+            .details("Each result of the poll will be sent to the {interface:ReadHandler} of the association.")
+        )?
         .build()?;
 
     // Read stuff
@@ -92,9 +92,10 @@ pub fn define(
         .param("request", Type::ClassRef(request_class.declaration()), "Request to send")?
         .param("callback", Type::OneTimeCallback(read_cb), "Callback that will be called once the read is complete")?
         .return_type(ReturnType::void())?
-        .doc(DocBuilder::new().text("Perform a read on the association.")
-            .text("The callback will be called once the read is completely received, but the actual values will be sent to the ")
-            .reference("ReadHandler").text(" of the association.").build())?
+        .doc(
+            doc("Perform a read on the association.")
+            .details("The callback will be called once the read is completely received, but the actual values will be sent to the {interface:ReadHandler} of the association.")
+        )?
         .build()?;
 
     // Command stuff
@@ -115,11 +116,7 @@ pub fn define(
         .variant("Trip", 2, "TRIP (2)")?
         .variant("Reserved", 3, "RESERVED (3)")?
         .doc(
-            DocBuilder::new()
-                .text("Trip-Close Code field, used in conjunction with ")
-                .reference("OpType")
-                .text(" to specify a control operation"),
-        )?
+            "Trip-Close Code field, used in conjunction with {enum:OpType} to specify a control operation")?
         .build()?;
 
     let op_type = lib
@@ -129,26 +126,17 @@ pub fn define(
         .variant("PulseOff", 2, "PULSE_OFF (2)")?
         .variant("LatchOn", 3, "LATCH_ON (3)")?
         .variant("LatchOff", 4, "LATCH_OFF(4)")?
-        .doc(
-            DocBuilder::new()
-                .text("Operation Type field, used in conjunction with ")
-                .reference("TripCloseCode")
-                .text(" to specify a control operation"),
-        )?
+        .doc("Operation Type field, used in conjunction with {enum:TripCloseCode} to specify a control operation")?
         .build()?;
 
     let control_code = lib.declare_native_struct("ControlCode")?;
     let control_code = lib
         .define_native_struct(&control_code)?
         .add("tcc", Type::Enum(trip_close_code), "This field is used in conjunction with the `op_type` field to specify a control operation")?
-        .add("clear", Type::Bool, DocBuilder::new()
-            .text("Support for this field is optional. ")
-            .text("When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. ")
-            .text("The indexed point shall go to the state that it would have if the command were allowed to complete normally.")
-        )?
+        .add("clear", Type::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
         .add("queue", Type::Bool, "This field is obsolete and should always be 0")?
         .add("op_type", Type::Enum(op_type), "This field is used in conjunction with the `tcc` field to specify a control operation")?
-        .doc(DocBuilder::new().text("CROB (").reference("G12V1").text(") control code"))?
+        .doc("CROB ({struct:G12V1}) control code")?
         .build()?;
 
     let g12v1_struct = lib.declare_native_struct("G12V1")?;

@@ -28,7 +28,7 @@ void client_state_on_change(client_state_t state, void* arg)
 // ReadHandler callbacks
 void begin_fragment(response_header_t header, void* arg)
 {
-    printf("Beginning fragment (broadcast: %u)\n", iin1_is_set(&header.iin.iin1, IIN1Flag_Broadcast));
+    printf("Beginning fragment (broadcast: %u)\n", iin1_is_set(&header.iin.iin1, Iin1Flag_Broadcast));
 }
 
 void end_fragment(response_header_t header, void* arg)
@@ -274,7 +274,7 @@ int main()
             .class2 = true,
             .class3 = true,
         },
-        .auto_time_sync = AutoTimeSync_LAN,
+        .auto_time_sync = AutoTimeSync_Lan,
     };
     association_handlers_t association_handlers =
     {
@@ -384,7 +384,7 @@ int main()
                 .on_complete = &on_timesync_complete,
                 .ctx = NULL,
             };
-            association_perform_time_sync(association, TimeSyncMode_LAN, cb);
+            association_perform_time_sync(association, TimeSyncMode_Lan, cb);
         }
         else if(strcmp(cbuf, "nts\n") == 0)
         {
@@ -393,7 +393,7 @@ int main()
                 .on_complete = &on_timesync_complete,
                 .ctx = NULL,
             };
-            association_perform_time_sync(association, TimeSyncMode_NonLAN, cb);
+            association_perform_time_sync(association, TimeSyncMode_NonLan, cb);
         }
         else
         {

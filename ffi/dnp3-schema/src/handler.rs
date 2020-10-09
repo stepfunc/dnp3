@@ -1,5 +1,4 @@
 use oo_bindgen::callback::InterfaceHandle;
-use oo_bindgen::doc::DocBuilder;
 use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
@@ -188,9 +187,7 @@ pub fn define(
         .param(
             "it",
             Type::Iterator(binary_it),
-            DocBuilder::new()
-                .text("Iterator of point values in the response.")
-                .warn("This iterator is valid only within this call. Do not copy it."),
+                "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .return_type(ReturnType::void())?
         .build()?
@@ -206,9 +203,7 @@ pub fn define(
         .param(
             "it",
             Type::Iterator(double_bit_binary_it),
-            DocBuilder::new()
-                .text("Iterator of point values in the response.")
-                .warn("This iterator is valid only within this call. Do not copy it."),
+            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .return_type(ReturnType::void())?
         .build()?
@@ -224,9 +219,7 @@ pub fn define(
         .param(
             "it",
             Type::Iterator(bos_it),
-            DocBuilder::new()
-                .text("Iterator of point values in the response.")
-                .warn("This iterator is valid only within this call. Do not copy it."),
+            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .return_type(ReturnType::void())?
         .build()?
@@ -239,9 +232,7 @@ pub fn define(
         .param(
             "it",
             Type::Iterator(counter_it),
-            DocBuilder::new()
-                .text("Iterator of point values in the response.")
-                .warn("This iterator is valid only within this call. Do not copy it."),
+            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .return_type(ReturnType::void())?
         .build()?
@@ -254,9 +245,7 @@ pub fn define(
         .param(
             "it",
             Type::Iterator(frozen_counter_it),
-            DocBuilder::new()
-                .text("Iterator of point values in the response.")
-                .warn("This iterator is valid only within this call. Do not copy it."),
+            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .return_type(ReturnType::void())?
         .build()?
@@ -269,9 +258,7 @@ pub fn define(
         .param(
             "it",
             Type::Iterator(analog_it),
-            DocBuilder::new()
-                .text("Iterator of point values in the response.")
-                .warn("This iterator is valid only within this call. Do not copy it."),
+            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .return_type(ReturnType::void())?
         .build()?
@@ -287,9 +274,7 @@ pub fn define(
         .param(
             "it",
             Type::Iterator(aos_it),
-            DocBuilder::new()
-                .text("Iterator of point values in the response.")
-                .warn("This iterator is valid only within this call. Do not copy it."),
+            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .return_type(ReturnType::void())?
         .build()?
@@ -302,9 +287,7 @@ pub fn define(
         .param(
             "it",
             Type::Iterator(octet_string_it),
-            DocBuilder::new()
-                .text("Iterator of point values in the response.")
-                .warn("This iterator is valid only within this call. Do not copy it."),
+            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .return_type(ReturnType::void())?
         .build()?
@@ -496,7 +479,7 @@ fn build_iterator(
         .param("it", Type::ClassRef(value_iterator), "Iterator")?
         .return_type(ReturnType::new(
             Type::StructRef(value_struct.declaration()),
-            "Next value of the iterator or NULL if the iterator reached the end",
+            "Next value of the iterator or {null} if the iterator reached the end",
         ))?
         .doc("Get the next value of the iterator")?
         .build()?;
@@ -521,7 +504,7 @@ fn build_octet_string(lib: &mut LibraryBuilder) -> Result<IteratorHandle, Bindin
         .param("it", Type::ClassRef(byte_it), "Iterator")?
         .return_type(ReturnType::new(
             Type::StructRef(byte_struct.declaration()),
-            "Next value of the iterator or NULL if the iterator reached the end",
+            "Next value of the iterator or {null} if the iterator reached the end",
         ))?
         .doc("Get the next value of the iterator")?
         .build()?;
@@ -541,7 +524,7 @@ fn build_octet_string(lib: &mut LibraryBuilder) -> Result<IteratorHandle, Bindin
         .param("it", Type::ClassRef(octet_string_iterator), "Iterator")?
         .return_type(ReturnType::new(
             Type::StructRef(octet_string_struct.declaration()),
-            "Next value of the iterator or NULL if the iterator reached the end",
+            "Next value of the iterator or {null} if the iterator reached the end",
         ))?
         .doc("Get the next value of the iterator")?
         .build()?;
