@@ -99,11 +99,11 @@ impl From<ResponseHeader> for ffi::ResponseHeader {
                 ResponseFunction::Response => ffi::ResponseFunction::Response,
                 ResponseFunction::UnsolicitedResponse => ffi::ResponseFunction::UnsolicitedResponse,
             },
-            iin: ffi::IIN {
-                iin1: ffi::IIN1 {
+            iin: ffi::Iin {
+                iin1: ffi::Iin1 {
                     value: header.iin.iin1.value,
                 },
-                iin2: ffi::IIN2 {
+                iin2: ffi::Iin2 {
                     value: header.iin.iin2.value,
                 },
             },
@@ -357,34 +357,34 @@ impl From<Flags> for ffi::Flags {
     }
 }
 
-pub unsafe fn iin1_is_set(iin1: Option<&ffi::IIN1>, flag: ffi::IIN1Flag) -> bool {
+pub unsafe fn iin1_is_set(iin1: Option<&ffi::Iin1>, flag: ffi::Iin1Flag) -> bool {
     if let Some(iin1) = iin1 {
         let iin1 = IIN1::new(iin1.value);
         match flag {
-            ffi::IIN1Flag::Broadcast => iin1.get_broadcast(),
-            ffi::IIN1Flag::Class1Events => iin1.get_class_1_events(),
-            ffi::IIN1Flag::Class2Events => iin1.get_class_2_events(),
-            ffi::IIN1Flag::Class3Events => iin1.get_class_3_events(),
-            ffi::IIN1Flag::NeedTime => iin1.get_need_time(),
-            ffi::IIN1Flag::LocalControl => iin1.get_local_control(),
-            ffi::IIN1Flag::DeviceTrouble => iin1.get_device_trouble(),
-            ffi::IIN1Flag::DeviceRestart => iin1.get_device_restart(),
+            ffi::Iin1Flag::Broadcast => iin1.get_broadcast(),
+            ffi::Iin1Flag::Class1Events => iin1.get_class_1_events(),
+            ffi::Iin1Flag::Class2Events => iin1.get_class_2_events(),
+            ffi::Iin1Flag::Class3Events => iin1.get_class_3_events(),
+            ffi::Iin1Flag::NeedTime => iin1.get_need_time(),
+            ffi::Iin1Flag::LocalControl => iin1.get_local_control(),
+            ffi::Iin1Flag::DeviceTrouble => iin1.get_device_trouble(),
+            ffi::Iin1Flag::DeviceRestart => iin1.get_device_restart(),
         }
     } else {
         false
     }
 }
 
-pub unsafe fn iin2_is_set(iin2: Option<&ffi::IIN2>, flag: ffi::IIN2Flag) -> bool {
+pub unsafe fn iin2_is_set(iin2: Option<&ffi::Iin2>, flag: ffi::Iin2Flag) -> bool {
     if let Some(iin1) = iin2 {
         let iin1 = IIN2::new(iin1.value);
         match flag {
-            ffi::IIN2Flag::NoFuncCodeSupport => iin1.get_no_func_code_support(),
-            ffi::IIN2Flag::ObjectUnknown => iin1.get_object_unknown(),
-            ffi::IIN2Flag::ParameterError => iin1.get_parameter_error(),
-            ffi::IIN2Flag::EventBufferOverflow => iin1.get_event_buffer_overflow(),
-            ffi::IIN2Flag::AlreadyExecuting => iin1.get_already_executing(),
-            ffi::IIN2Flag::ConfigCorrupt => iin1.get_config_corrupt(),
+            ffi::Iin2Flag::NoFuncCodeSupport => iin1.get_no_func_code_support(),
+            ffi::Iin2Flag::ObjectUnknown => iin1.get_object_unknown(),
+            ffi::Iin2Flag::ParameterError => iin1.get_parameter_error(),
+            ffi::Iin2Flag::EventBufferOverflow => iin1.get_event_buffer_overflow(),
+            ffi::Iin2Flag::AlreadyExecuting => iin1.get_already_executing(),
+            ffi::Iin2Flag::ConfigCorrupt => iin1.get_config_corrupt(),
         }
     } else {
         false

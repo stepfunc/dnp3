@@ -27,5 +27,6 @@ ffi/bindings/dotnet/nupkg
 # Generated Java lib
 ffi/bindings/java/.idea
 ffi/bindings/java/dnp3rs
+ffi/bindings/java/dnp3rs-jni
 ffi/bindings/java/*/target
 ffi/bindings/java/**/*.iml

@@ -1,5 +1,9 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 jobs:
   test:
     strategy:
@@ -49,12 +53,18 @@ jobs:
         with:
           command: run
           args: --release --bin dnp3-bindings -- --java
-      - name: Upload compiled
+      - name: Upload compiled bindings
         if: ${{ matrix.rust == 'stable' }}
         uses: actions/upload-artifact@v2
         with:
           name: ffi-modules
           path: ffi/bindings/c/generated/lib
+      - name: Upload compiled Java bindings
+        if: ${{ matrix.rust == 'stable' }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/java/dnp3rs/src/main/resources
   packaging:
     needs: test
     runs-on: ubuntu-latest
