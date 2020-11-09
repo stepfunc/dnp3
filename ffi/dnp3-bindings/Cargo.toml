@@ -5,6 +5,6 @@ authors = ["Émile Grégoire <emile@automatak.com>"]
 edition = "2018"
 
 [dependencies]
-ci-script = { git = "https://git@github.com/grid-io/oo_bindgen.git", branch="java-jni" }
+ci-script = { git = "https://git@github.com/grid-io/oo_bindgen.git" }
 dnp3-schema = { path = "../dnp3-schema" }
 dnp3-ffi = { path = "../dnp3-ffi" }

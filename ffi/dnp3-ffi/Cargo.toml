@@ -14,4 +14,4 @@ tokio = { version = "^0.2.11", git = "https://github.com/tokio-rs/tokio", branch
 
 [build-dependencies]
 dnp3-schema = { path = "../dnp3-schema" }
-rust-oo-bindgen = { git = "https://git@github.com/grid-io/oo_bindgen.git", branch="java-jni" }
+rust-oo-bindgen = { git = "https://git@github.com/grid-io/oo_bindgen.git" }
