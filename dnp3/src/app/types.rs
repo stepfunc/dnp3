@@ -65,14 +65,33 @@ pub enum DoubleBit {
     Indeterminate,
 }
 
+pub(crate) struct BitPair {
+    pub(crate) high: bool,
+    pub(crate) low: bool,
+}
+
+impl BitPair {
+    pub(crate) fn new(high: bool, low: bool) -> Self {
+        Self { high, low }
+    }
+}
+
 impl DoubleBit {
-    // the lowest two bits of this number
-    pub fn from(high: bool, low: bool) -> Self {
+    pub(crate) fn from(high: bool, low: bool) -> Self {
         match (high, low) {
             (false, false) => DoubleBit::Intermediate,
             (false, true) => DoubleBit::DeterminedOff,
             (true, false) => DoubleBit::DeterminedOn,
             (true, true) => DoubleBit::Indeterminate,
+        }
+    }
+
+    pub(crate) fn to_bit_pair(&self) -> BitPair {
+        match self {
+            DoubleBit::Intermediate => BitPair::new(false, false),
+            DoubleBit::DeterminedOff => BitPair::new(false, true),
+            DoubleBit::DeterminedOn => BitPair::new(true, false),
+            DoubleBit::Indeterminate => BitPair::new(true, true),
         }
     }
 }

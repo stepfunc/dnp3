@@ -110,8 +110,8 @@ impl From<ffi::Variation> for Variation {
             ffi::Variation::Group11Var2 => Variation::Group11Var2,
             ffi::Variation::Group12Var0 => Variation::Group12Var0,
             ffi::Variation::Group12Var1 => Variation::Group12Var1,
-            ffi::Variation::Group13Var1 => Variation::Group13Var1,
-            ffi::Variation::Group13Var2 => Variation::Group13Var2,
+            //ffi::Variation::Group13Var1 => Variation::Group13Var1 - TODO
+            //ffi::Variation::Group13Var2 => Variation::Group13Var2 - TODO
             ffi::Variation::Group20Var0 => Variation::Group20Var0,
             ffi::Variation::Group20Var1 => Variation::Group20Var1,
             ffi::Variation::Group20Var2 => Variation::Group20Var2,
@@ -169,6 +169,7 @@ impl From<ffi::Variation> for Variation {
             ffi::Variation::Group42Var6 => Variation::Group42Var6,
             ffi::Variation::Group42Var7 => Variation::Group42Var7,
             ffi::Variation::Group42Var8 => Variation::Group42Var8,
+            /* TODO
             ffi::Variation::Group43Var1 => Variation::Group43Var1,
             ffi::Variation::Group43Var2 => Variation::Group43Var2,
             ffi::Variation::Group43Var3 => Variation::Group43Var3,
@@ -177,6 +178,7 @@ impl From<ffi::Variation> for Variation {
             ffi::Variation::Group43Var6 => Variation::Group43Var6,
             ffi::Variation::Group43Var7 => Variation::Group43Var7,
             ffi::Variation::Group43Var8 => Variation::Group43Var8,
+             */
             ffi::Variation::Group50Var1 => Variation::Group50Var1,
             ffi::Variation::Group50Var3 => Variation::Group50Var3,
             ffi::Variation::Group50Var4 => Variation::Group50Var4,
@@ -222,8 +224,10 @@ impl From<Variation> for ffi::Variation {
             Variation::Group11Var2 => ffi::Variation::Group11Var2,
             Variation::Group12Var0 => ffi::Variation::Group12Var0,
             Variation::Group12Var1 => ffi::Variation::Group12Var1,
+            /*
             Variation::Group13Var1 => ffi::Variation::Group13Var1,
             Variation::Group13Var2 => ffi::Variation::Group13Var2,
+             */
             Variation::Group20Var0 => ffi::Variation::Group20Var0,
             Variation::Group20Var1 => ffi::Variation::Group20Var1,
             Variation::Group20Var2 => ffi::Variation::Group20Var2,
@@ -281,6 +285,7 @@ impl From<Variation> for ffi::Variation {
             Variation::Group42Var6 => ffi::Variation::Group42Var6,
             Variation::Group42Var7 => ffi::Variation::Group42Var7,
             Variation::Group42Var8 => ffi::Variation::Group42Var8,
+            /* TODO
             Variation::Group43Var1 => ffi::Variation::Group43Var1,
             Variation::Group43Var2 => ffi::Variation::Group43Var2,
             Variation::Group43Var3 => ffi::Variation::Group43Var3,
@@ -289,6 +294,7 @@ impl From<Variation> for ffi::Variation {
             Variation::Group43Var6 => ffi::Variation::Group43Var6,
             Variation::Group43Var7 => ffi::Variation::Group43Var7,
             Variation::Group43Var8 => ffi::Variation::Group43Var8,
+             */
             Variation::Group50Var1 => ffi::Variation::Group50Var1,
             Variation::Group50Var3 => ffi::Variation::Group50Var3,
             Variation::Group50Var4 => ffi::Variation::Group50Var4,

@@ -107,7 +107,7 @@ pub(crate) struct WriteCursor<'a> {
     pos: usize,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct WriteError;
 
 impl<'a> WriteCursor<'a> {
@@ -117,6 +117,31 @@ impl<'a> WriteCursor<'a> {
 
     pub(crate) fn position(&self) -> usize {
         self.pos
+    }
+
+    pub(crate) fn transaction<T, R>(&mut self, write: T) -> Result<R, WriteError>
+    where
+        T: Fn(&mut WriteCursor) -> Result<R, WriteError>,
+    {
+        let start = self.pos;
+        let result = write(self);
+        // if an error occurs, rollback to the starting position
+        if result.is_err() {
+            self.pos = start;
+        }
+        result
+    }
+
+    pub(crate) fn at_pos<T, R>(&mut self, pos: usize, write: T) -> Result<R, WriteError>
+    where
+        T: Fn(&mut WriteCursor) -> Result<R, WriteError>,
+    {
+        let start = self.pos;
+        self.pos = pos;
+        let result = write(self);
+        // no matter what happens, go back to the starting position
+        self.pos = start;
+        result
     }
 
     pub(crate) fn written(&self) -> &[u8] {
@@ -130,7 +155,7 @@ impl<'a> WriteCursor<'a> {
         }
     }
 
-    pub(crate) fn remaining(&self) -> usize {
+    fn remaining(&self) -> usize {
         self.dest.len() - self.pos
     }
 
@@ -171,25 +196,6 @@ impl<'a> WriteCursor<'a> {
             }
             None => Err(WriteError),
         }
-    }
-
-    pub(crate) fn write_u8_at(&mut self, value: u8, pos: usize) -> Result<(), WriteError> {
-        match self.dest.get_mut(pos) {
-            Some(x) => {
-                *x = value;
-                Ok(())
-            }
-            None => Err(WriteError),
-        }
-    }
-
-    pub(crate) fn write_u16_le_at(&mut self, value: u16, mut pos: usize) -> Result<(), WriteError> {
-        for s in [0, 8].iter() {
-            let b = ((value >> *s) & 0xFF) as u8;
-            self.write_u8_at(b, pos)?;
-            pos += 1;
-        }
-        Ok(())
     }
 
     pub(crate) fn write_u16_le(&mut self, value: u16) -> Result<(), WriteError> {
@@ -250,18 +256,44 @@ mod test {
     use super::*;
 
     #[test]
-    fn can_write_at_arbitrary_positions() {
+    fn transaction_rolls_back_position_on_failure() {
+        let mut buffer = [0u8; 5];
+        let mut cursor = WriteCursor::new(&mut buffer);
+
+        cursor.transaction(|cur| cur.write_u16_le(0xCAFE)).unwrap();
+
+        let result = cursor.transaction(|cur| {
+            cur.write_u16_le(0xDEAD)?;
+            cur.write_u16_le(0xBEEF) // no room for this
+        });
+
+        assert_eq!(result, Err(WriteError));
+        assert_eq!(cursor.written(), &[0xFE, 0xCA]);
+    }
+
+    #[test]
+    fn from_pos_seeks_back_to_original_position_on_success() {
         let mut buffer = [0u8; 3];
         let mut cursor = WriteCursor::new(&mut buffer);
 
-        let pos1 = cursor.position();
-        cursor.skip(1).unwrap();
-        cursor.write_u8(42).unwrap();
-        let pos2 = cursor.position();
-        cursor.skip(1).unwrap();
-        assert_eq!(cursor.remaining(), 0);
-        cursor.write_u8_at(0x01, pos1).unwrap();
-        cursor.write_u8_at(0x03, pos2).unwrap();
-        assert_eq!(buffer, [1, 42, 3]);
+        cursor.skip(2).unwrap();
+        cursor.write_u8(0xFF).unwrap();
+
+        cursor.at_pos(0, |cur| cur.write_u16_le(0xCAFE)).unwrap();
+
+        assert_eq!(cursor.written(), &[0xFE, 0xCA, 0xFF]);
+    }
+
+    #[test]
+    fn write_at_seeks_back_to_original_position_on_failure() {
+        let mut buffer = [0u8; 3];
+        let mut cursor = WriteCursor::new(&mut buffer);
+
+        cursor.skip(2).unwrap();
+        cursor.write_u8(0xFF).unwrap();
+
+        assert_eq!(cursor.at_pos(5, |cur| cur.write_u8(0xAA)), Err(WriteError));
+
+        assert_eq!(cursor.written(), &[0x00, 0x00, 0xFF]);
     }
 }

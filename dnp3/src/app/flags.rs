@@ -1,5 +1,5 @@
 use crate::app::types::DoubleBit;
-use crate::util::bit::Bitfield;
+use crate::util::bit::{BitMask, Bitfield};
 use std::fmt::Formatter;
 
 /// Flags as defined in the specification where each bit has meaning.
@@ -91,6 +91,22 @@ impl Flags {
     /// extract the `DoubleBit` value from a flags struct
     pub fn double_bit_state(self) -> DoubleBit {
         DoubleBit::from(self.value.bit_7(), self.value.bit_6())
+    }
+
+    pub(crate) fn with_bits_set_to(&self, mask: BitMask, value: bool) -> Flags {
+        if value {
+            self.with_bits_set(mask)
+        } else {
+            self.with_bits_cleared(mask)
+        }
+    }
+
+    pub(crate) fn with_bits_cleared(&self, mask: BitMask) -> Flags {
+        Flags::new(self.value & !mask.value)
+    }
+
+    pub(crate) fn with_bits_set(&self, mask: BitMask) -> Flags {
+        Flags::new(self.value | mask.value)
     }
 }
 

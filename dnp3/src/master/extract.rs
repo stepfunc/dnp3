@@ -12,15 +12,19 @@ pub(crate) fn extract_measurements(
     objects: HeaderCollection,
     handler: &mut dyn ReadHandler,
 ) {
-    fn extract_cto_g51v1(prev: Time, item: Option<Group51Var1>) -> Time {
-        item.map_or(prev, |x| Time::Synchronized(x.time))
+    fn extract_cto_g51v1(prev: Option<Time>, item: Option<Group51Var1>) -> Option<Time> {
+        item.map_or(prev, |x| Some(Time::Synchronized(x.time)))
     }
 
-    fn extract_cto_g51v2(prev: Time, item: Option<Group51Var2>) -> Time {
-        item.map_or(prev, |x| Time::NotSynchronized(x.time))
+    fn extract_cto_g51v2(prev: Option<Time>, item: Option<Group51Var2>) -> Option<Time> {
+        item.map_or(prev, |x| Some(Time::NotSynchronized(x.time)))
     }
 
-    fn handle(cto: Time, header: ObjectHeader, handler: &mut dyn ReadHandler) -> Time {
+    fn handle(
+        cto: Option<Time>,
+        header: ObjectHeader,
+        handler: &mut dyn ReadHandler,
+    ) -> Option<Time> {
         let handled = match &header.details {
             // these are common-time-of-occurrence headers
             HeaderDetails::OneByteCount(1, CountVariation::Group51Var1(seq)) => {
@@ -66,7 +70,7 @@ pub(crate) fn extract_measurements(
     handler.begin_fragment(header);
     objects
         .iter()
-        .fold(Time::Invalid, |cto, header| handle(cto, header, handler));
+        .fold(None, |cto, header| handle(cto, header, handler));
     handler.end_fragment(header);
 }
 
@@ -202,7 +206,7 @@ mod test {
             Binary {
                 value: false,
                 flags: Flags::ONLINE,
-                time: Time::Invalid,
+                time: None,
             },
             0x07,
         );
@@ -229,7 +233,7 @@ mod test {
             Binary {
                 value: false,
                 flags: Flags::ONLINE,
-                time: Time::Synchronized(Timestamp::new(65537)), // 0xFFFF + 2
+                time: Some(Time::Synchronized(Timestamp::new(65537))), // 0xFFFF + 2
             },
             0x07,
         );
@@ -256,7 +260,7 @@ mod test {
             Binary {
                 value: false,
                 flags: Flags::ONLINE,
-                time: Time::NotSynchronized(Timestamp::new(65536)), // 0xFFFE + 2
+                time: Some(Time::NotSynchronized(Timestamp::new(65536))), // 0xFFFE + 2
             },
             0x07,
         );
@@ -283,7 +287,7 @@ mod test {
             Binary {
                 value: false,
                 flags: Flags::ONLINE,
-                time: Time::Synchronized(Timestamp::max()),
+                time: Some(Time::Synchronized(Timestamp::max())),
             },
             0x07,
         );
@@ -310,7 +314,7 @@ mod test {
             Binary {
                 value: false,
                 flags: Flags::ONLINE,
-                time: Time::Invalid,
+                time: None,
             },
             0x07,
         );

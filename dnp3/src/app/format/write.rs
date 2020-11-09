@@ -79,7 +79,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
             count.increment();
         }
 
-        count.write_at(pos_of_count, self.cursor)
+        self.cursor.at_pos(pos_of_count, |cur| count.write(cur))
     }
 
     pub(crate) fn write_count_of_one<V>(&mut self, item: V) -> Result<(), WriteError>

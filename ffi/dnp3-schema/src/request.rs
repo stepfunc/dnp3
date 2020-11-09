@@ -43,8 +43,10 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<(ClassHandle, NativeEnumHandle
             "Group12Var1",
             "Binary Output Command - Pattern Control Block",
         )?
+        /* TODO
         .push("Group13Var1", "Binary Output Command Event - Without time")?
         .push("Group13Var2", "Binary Output Command Event - With time")?
+         */
         .push("Group20Var0", "Counter - Default variation")?
         .push("Group20Var1", "Counter - 32-bit with flags")?
         .push("Group20Var2", "Counter - 16-bit with flags")?
@@ -150,6 +152,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<(ClassHandle, NativeEnumHandle
             "Group42Var8",
             "Analog Output Event - Double-preicions floating point with time",
         )?
+        /*
         .push(
             "Group43Var1",
             "Analog Output Command Event - 32-bit without time",
@@ -182,6 +185,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<(ClassHandle, NativeEnumHandle
             "Group43Var8",
             "Analog Output Command Event - Double-precision floating point with time",
         )?
+         */
         .push("Group50Var1", "Time and Date - Absolute time")?
         .push(
             "Group50Var3",

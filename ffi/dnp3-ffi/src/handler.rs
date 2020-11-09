@@ -411,18 +411,17 @@ pub unsafe fn flags_is_set(flags: Option<&ffi::Flags>, flag: ffi::Flag) -> bool 
     }
 }
 
-impl From<Time> for ffi::Timestamp {
-    fn from(time: Time) -> ffi::Timestamp {
+impl From<Option<Time>> for ffi::Timestamp {
+    fn from(time: Option<Time>) -> ffi::Timestamp {
         ffi::TimestampFields {
             value: match time {
-                Time::Synchronized(value) => value.raw_value(),
-                Time::NotSynchronized(value) => value.raw_value(),
-                Time::Invalid => 0,
+                Some(t) => t.timestamp().raw_value(),
+                None => 0,
             },
             quality: match time {
-                Time::Synchronized(_) => ffi::TimeQuality::Synchronized,
-                Time::NotSynchronized(_) => ffi::TimeQuality::NotSynchronized,
-                Time::Invalid => ffi::TimeQuality::Invalid,
+                Some(Time::Synchronized(_)) => ffi::TimeQuality::Synchronized,
+                Some(Time::NotSynchronized(_)) => ffi::TimeQuality::NotSynchronized,
+                None => ffi::TimeQuality::Invalid,
             },
         }
         .into()

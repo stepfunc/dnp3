@@ -1,6 +1,9 @@
 use crate::app::enums::{CommandStatus, OpType};
+use crate::app::flags::Flags;
+use crate::app::measurement::*;
 use crate::app::types::ControlCode;
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
+use crate::util::bit::bits::{BIT_6, BIT_7};
 
 impl Group12Var1 {
     /// construct a `Group12Var1` instance. The status field is automatically set to `CommandStatus::Success`
@@ -82,5 +85,71 @@ impl Group41Var4 {
             value,
             status: CommandStatus::Success,
         }
+    }
+}
+
+impl WireFlags for Binary {
+    fn get_wire_flags(&self) -> u8 {
+        self.flags.with_bits_set_to(BIT_7, self.value).value
+    }
+}
+
+impl WireFlags for DoubleBitBinary {
+    fn get_wire_flags(&self) -> u8 {
+        let pair = self.value.to_bit_pair();
+        self.flags
+            .with_bits_set_to(BIT_7, pair.high)
+            .with_bits_set_to(BIT_6, pair.low)
+            .value
+    }
+}
+
+impl WireFlags for BinaryOutputStatus {
+    fn get_wire_flags(&self) -> u8 {
+        self.flags.with_bits_set_to(BIT_7, self.value).value
+    }
+}
+
+impl WireFlags for Counter {
+    fn get_wire_flags(&self) -> u8 {
+        self.flags.value
+    }
+}
+
+impl WireFlags for FrozenCounter {
+    fn get_wire_flags(&self) -> u8 {
+        self.flags.value
+    }
+}
+
+impl WireFlags for Analog {
+    fn get_wire_flags(&self) -> u8 {
+        self.flags.value
+    }
+}
+
+impl WireFlags for AnalogOutputStatus {
+    fn get_wire_flags(&self) -> u8 {
+        self.flags.value
+    }
+}
+
+impl AnalogConversions for Analog {
+    fn get_value(&self) -> f64 {
+        self.value
+    }
+
+    fn get_flags(&self) -> Flags {
+        self.flags
+    }
+}
+
+impl AnalogConversions for AnalogOutputStatus {
+    fn get_value(&self) -> f64 {
+        self.value
+    }
+
+    fn get_flags(&self) -> Flags {
+        self.flags
     }
 }
