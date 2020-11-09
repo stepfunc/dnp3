@@ -19,9 +19,9 @@ object ConversionsModule extends Module {
       fs.fields.exists(f => f.attr.contains(FieldAttribute.Timestamp48))
     }
     if(hasTime48) {
-      "Time::Synchronized(v.time)"
+      "Some(Time::Synchronized(v.time))"
     } else {
-      "Time::Invalid"
+      "None"
     }
   }
 
@@ -55,7 +55,7 @@ object ConversionsModule extends Module {
     }
 
     def single(name: String)(fs: FixedSize) : Iterator[String] = {
-      def conversion : Iterator[String] = {
+      def variationToMeas : Iterator[String] = {
         "let flags = Flags::new(v.flags);".eol ++
           bracket(s"${name}") {
             "value : flags.state(),".eol ++
@@ -64,11 +64,29 @@ object ConversionsModule extends Module {
           }
       }
 
+      def measToVariation : Iterator[String] = {
+          def fieldGetter(field: FixedSizeField): String = {
+            field.typ match {
+              case TimestampField => "self.time.into()"
+              case UInt8Field if field.isFlags => "self.get_wire_flags()"
+            }
+          }
+
+          bracket(s"${fs.name}") {
+            fs.fields.map(f => s"${f.name}: ${fieldGetter(f)},").iterator
+          }
+      }
+
       bracket(s"impl From<${fs.name}> for ${name}") {
         bracket(s"fn from(v: ${fs.name}) -> Self") {
-          conversion
+          variationToMeas
         }
-      }
+      } ++ space ++
+        bracket(s"impl ToVariation<${fs.name}> for ${name}") {
+          bracket(s"fn to_variation(&self) -> ${fs.name}") {
+            measToVariation
+          }
+        }
     }
 
     spaced(binaryVariations.map(single("Binary")).iterator) ++
@@ -87,7 +105,7 @@ object ConversionsModule extends Module {
     }
 
     def single(fs: FixedSize) : Iterator[String] = {
-      def conversion : Iterator[String] = {
+      def variationToMeas : Iterator[String] = {
         "let flags = Flags::new(v.flags);".eol ++
           bracket("DoubleBitBinary") {
             "value : flags.double_bit_state(),".eol ++
@@ -96,11 +114,29 @@ object ConversionsModule extends Module {
           }
       }
 
-      bracket(s"impl From<${fs.name}> for DoubleBitBinary") {
-        bracket(s"fn from(v: ${fs.name}) -> Self") {
-          conversion
+      def measToVariation : Iterator[String] = {
+        def fieldGetter(field: FixedSizeField): String = {
+          field.typ match {
+            case TimestampField => "self.time.into()"
+            case UInt8Field if field.isFlags => "self.get_wire_flags()"
+          }
+        }
+
+        bracket(s"${fs.name}") {
+          fs.fields.map(f => s"${f.name}: ${fieldGetter(f)},").iterator
         }
       }
+
+      bracket(s"impl From<${fs.name}> for DoubleBitBinary") {
+        bracket(s"fn from(v: ${fs.name}) -> Self") {
+          variationToMeas
+        }
+      } ++ space ++
+        bracket(s"impl ToVariation<${fs.name}> for DoubleBitBinary") {
+          bracket(s"fn to_variation(&self) -> ${fs.name}") {
+            measToVariation
+          }
+        }
     }
 
     spaced(variations.map(single).iterator)
@@ -123,7 +159,7 @@ object ConversionsModule extends Module {
     }
 
     def single(name: String)(fs: FixedSize) : Iterator[String] = {
-      def conversion : Iterator[String] = {
+      def variationToMeas : Iterator[String] = {
         def cast : String = {
           val field = fs.fields.find(f => f.attr.contains(FieldAttribute.Value)).get
           field.typ match {
@@ -138,11 +174,33 @@ object ConversionsModule extends Module {
         }
       }
 
-      bracket(s"impl From<${fs.name}> for ${name}") {
-        bracket(s"fn from(v: ${fs.name}) -> Self") {
-          conversion
+      def measToVariation : Iterator[String] = {
+        def fieldGetter(field: FixedSizeField): String = {
+          field.typ match {
+            case TimestampField => "self.time.into()"
+            case UInt16Field if field.isValue => "self.value as u16"
+            case UInt32Field if field.isValue => "self.value"
+            case UInt8Field if field.isFlags => "self.flags.value"
+          }
+        }
+
+        bracket(s"${fs.name}") {
+          fs.fields.map(f => s"${f.name}: ${fieldGetter(f)},").iterator
         }
       }
+
+
+
+      bracket(s"impl From<${fs.name}> for ${name}") {
+        bracket(s"fn from(v: ${fs.name}) -> Self") {
+          variationToMeas
+        }
+      } ++ space ++
+        bracket(s"impl ToVariation<${fs.name}> for ${name}") {
+          bracket(s"fn to_variation(&self) -> ${fs.name}") {
+            measToVariation
+          }
+        }
     }
 
     spaced(counterVariations.map(single("Counter")).iterator) ++
@@ -167,7 +225,7 @@ object ConversionsModule extends Module {
     }
 
     def single(name: String)(fs: FixedSize) : Iterator[String] = {
-      def conversion : Iterator[String] = {
+      def variationToMeas : Iterator[String] = {
         def cast : String = {
           val field = fs.fields.find(f => f.attr.contains(FieldAttribute.Value)).get
           field.typ match {
@@ -182,11 +240,74 @@ object ConversionsModule extends Module {
         }
       }
 
-      bracket(s"impl From<${fs.name}> for ${name}") {
-        bracket(s"fn from(v: ${fs.name}) -> Self") {
-          conversion
+      def hasDoubleValue: Boolean = {
+        fs.fields.exists(f => {
+          f.isValue && {
+            f.typ match {
+              case Float64Field => true
+              case _ => false
+            }
+          }
+        })
+      }
+
+      def measToVariation : Iterator[String] = {
+        def fieldGetter(field: FixedSizeField): String = {
+          field.typ match {
+            case TimestampField => "self.time.into()"
+            case UInt8Field if field.isFlags => "self.flags.value"
+            case EnumFieldType(_) => s"self.${field.name}"
+            case _ if field.isValue => "self.value"
+          }
+        }
+
+        bracket(s"${fs.name}") {
+          fs.fields.map(f => s"${f.name}: ${fieldGetter(f)},").iterator
         }
       }
+
+      def measToVariationWithCast : Iterator[String] = {
+        def getFlagsAndValue: String = {
+           fs.fields.find(_.isValue).get.typ match {
+             case SInt16Field => "self.to_i16()"
+             case SInt32Field => "self.to_i32()"
+             case Float32Field => "self.to_f32()"
+           }
+        }
+
+        def fieldGetter(field: FixedSizeField): String = {
+          field.typ match {
+            case TimestampField => "self.time.into()"
+            case UInt8Field if field.isFlags => "_wire_flags.value"
+            case EnumFieldType(_) => s"self.${field.name}"
+            case _ if field.isValue => "_wire_value"
+          }
+        }
+
+        s"let (_wire_flags, _wire_value) = ${getFlagsAndValue};".eol ++
+        bracket(s"${fs.name}") {
+          fs.fields.map(f => s"${f.name}: ${fieldGetter(f)},").iterator
+        }
+      }
+
+      def toVariation: Iterator[String] = {
+        if(fs.parent.groupType == GroupType.AnalogOutputCommandEvent) {
+          Iterator.empty
+        } else {
+          space ++ bracket(s"impl ToVariation<${fs.name}> for ${name}") {
+            bracket(s"fn to_variation(&self) -> ${fs.name}") {
+              if(hasDoubleValue) measToVariation else measToVariationWithCast
+            }
+          }
+        }
+      }
+
+      bracket(s"impl From<${fs.name}> for ${name}") {
+        bracket(s"fn from(v: ${fs.name}) -> Self") {
+          variationToMeas
+        }
+      } ++ toVariation
+
     }
 
     spaced(analogVariations.map(single("Analog")).iterator) ++

@@ -47,7 +47,7 @@
 //!
 
 #![deny(
-dead_code,
+//dead_code,
 arithmetic_overflow,
 invalid_type_param_default,
 //missing_fragment_specifier,
@@ -91,6 +91,8 @@ clippy::all
     while_true,
     bare_trait_objects
 )]
+// TODO - remove before release
+#![allow(dead_code)]
 
 #[cfg(test)]
 extern crate tokio_test;
@@ -103,6 +105,8 @@ extern crate assert_matches;
 pub mod app;
 /// types, enums, and traits specific to masters
 pub mod master;
+/// types, enums, and traits specific to outstations
+pub mod outstation;
 /// entry points for creating and spawning async tasks
 pub mod entry {
     /// entry points for creating and spawning master tasks

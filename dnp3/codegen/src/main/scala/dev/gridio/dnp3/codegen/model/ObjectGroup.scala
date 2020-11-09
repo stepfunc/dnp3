@@ -14,7 +14,7 @@ object ObjectGroup {
     Group10,
     Group11,
     Group12,
-    Group13,
+    //Group13, TODO
     Group20,
     Group21,
     Group22,
@@ -24,7 +24,7 @@ object ObjectGroup {
     Group40,
     Group41,
     Group42,
-    Group43,
+    //Group43, TODO
     Group50,
     Group51,
     Group52,
@@ -68,11 +68,13 @@ object GroupType {
 
   object BinaryEvent extends Event
   object BinaryOutputEvent extends Event
+  object BinaryOutputCommandEvent extends Event
   object DoubleBinaryEvent extends Event
   object CounterEvent extends Event
   object FrozenCounterEvent extends Event
   object AnalogEvent extends Event
   object AnalogOutputEvent extends Event
+  object AnalogOutputCommandEvent extends Event
   object OctetStringEvent extends Event
   object VirtualTerminalEvent extends Event
 

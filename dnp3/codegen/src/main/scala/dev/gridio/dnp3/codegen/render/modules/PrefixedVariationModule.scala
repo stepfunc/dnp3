@@ -82,6 +82,8 @@ object PrefixedVariationModule extends Module {
         case GroupType.FrozenCounterEvent => "frozen_counter"
         case GroupType.AnalogEvent => "analog"
         case GroupType.AnalogOutputEvent => "analog_output_status"
+        case GroupType.AnalogOutputCommandEvent => "analog_output_command"
+        case GroupType.BinaryOutputCommandEvent => "binary_output_command"
         case _ => throw new Exception("unhandled variation")
       }
 
@@ -137,7 +139,7 @@ object PrefixedVariationModule extends Module {
             variations.flatMap(fmtMatcher).iterator
           }
         } ++ space ++
-      bracket("pub(crate) fn extract_measurements_to(&self, cto: Time, handler: &mut dyn ReadHandler) -> bool") {
+      bracket("pub(crate) fn extract_measurements_to(&self, cto: Option<Time>, handler: &mut dyn ReadHandler) -> bool") {
         bracket("match self") {
           variations.flatMap(extractMatcher).iterator
         }

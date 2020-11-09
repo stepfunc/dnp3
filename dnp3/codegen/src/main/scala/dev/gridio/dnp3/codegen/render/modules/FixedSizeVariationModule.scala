@@ -113,6 +113,8 @@ object FixedSizeVariationModule extends Module {
           case GroupType.StaticBinaryOutputStatus => binaryOutputStatus
           case GroupType.StaticDoubleBinary => doubleBitBinary
           case GroupType.DoubleBinaryEvent => doubleBitBinary
+          case GroupType.AnalogOutputCommandEvent => analog
+          case GroupType.BinaryOutputCommandEvent => binary
           case _ => throw new Exception("unhandled group type")
         }
       }

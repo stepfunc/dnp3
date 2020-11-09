@@ -17,7 +17,6 @@ pub(crate) trait Index: FixedSize + PartialEq + Display {
     fn zero() -> Self;
     fn increment(&mut self);
     fn widen_to_u16(self) -> u16;
-    fn write_at(self, pos: usize, cursor: &mut WriteCursor) -> Result<(), WriteError>;
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode;
     const RANGE_QUALIFIER: QualifierCode;
@@ -58,9 +57,6 @@ impl Index for u8 {
     fn widen_to_u16(self) -> u16 {
         self as u16
     }
-    fn write_at(self, pos: usize, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8_at(self, pos)
-    }
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode = QualifierCode::CountAndPrefix8;
     const RANGE_QUALIFIER: QualifierCode = QualifierCode::Range8;
@@ -75,9 +71,6 @@ impl Index for u16 {
     }
     fn widen_to_u16(self) -> u16 {
         self
-    }
-    fn write_at(self, pos: usize, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u16_le_at(self, pos)
     }
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode = QualifierCode::CountAndPrefix16;

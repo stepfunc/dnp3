@@ -6,6 +6,8 @@ Cargo.lock
 .idea
 .vs
 
+dnp3/codegen/target
+
 # Cargo config
 /.cargo/config.toml
 
