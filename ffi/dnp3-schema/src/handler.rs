@@ -470,7 +470,7 @@ fn build_iterator(
             Type::Struct(timestamp_struct.clone()),
             "Point timestamp",
         )?
-        .doc(format!("{} point", name).as_ref())?
+        .doc(format!("{} point", name))?
         .build()?;
 
     let value_iterator = lib.declare_class(&format!("{}Iterator", name))?;
@@ -495,7 +495,7 @@ fn build_octet_string(lib: &mut LibraryBuilder) -> Result<IteratorHandle, Bindin
     let byte_struct = lib
         .define_native_struct(&byte_struct)?
         .add("value", Type::Uint8, "Byte value")?
-        .doc("Single byte struct".as_ref())?
+        .doc("Single byte struct")?
         .build()?;
 
     let byte_it = lib.declare_class("ByteIterator")?;

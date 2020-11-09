@@ -34,8 +34,8 @@ impl From<&ffi::ControlCode> for ControlCode {
     }
 }
 
-impl From<ffi::G12V1> for CommandHeaderElement {
-    fn from(from: ffi::G12V1) -> Self {
+impl From<ffi::G12v1> for CommandHeaderElement {
+    fn from(from: ffi::G12v1) -> Self {
         Self::G12V1(Group12Var1::new(
             (&from.code).into(),
             from.count,
@@ -138,13 +138,13 @@ pub unsafe fn command_destroy(command: *mut Command) {
     }
 }
 
-pub unsafe fn command_add_u8_g12v1(command: *mut Command, idx: u8, header: ffi::G12V1) {
+pub unsafe fn command_add_u8_g12v1(command: *mut Command, idx: u8, header: ffi::G12v1) {
     if let Some(command) = command.as_mut() {
         command.push(CommandHeader::u8(idx, header.into()));
     }
 }
 
-pub unsafe fn command_add_u16_g12v1(command: *mut Command, idx: u16, header: ffi::G12V1) {
+pub unsafe fn command_add_u16_g12v1(command: *mut Command, idx: u16, header: ffi::G12v1) {
     if let Some(command) = command.as_mut() {
         command.push(CommandHeader::u16(idx, header.into()));
     }
