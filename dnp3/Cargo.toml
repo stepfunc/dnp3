@@ -7,10 +7,10 @@ edition = "2018"
 [dependencies]
 log = "0.4"
 chrono = "0.4"
-tokio = { version = "^0.2.11", git = "https://github.com/tokio-rs/tokio", branch = "v0.2.x", features = ["tcp", "sync", "io-util", "io-std", "time", "rt-core", "rt-threaded", "macros"] }
+tokio = { version = "^0.2.23", features = ["tcp", "sync", "io-util", "io-std", "time", "rt-core", "rt-threaded", "macros"] }
 
 [dev-dependencies]
 assert_matches = "1.2"
 colog = "^1.0"
-tokio-test = { version = "0.2", git = "https://github.com/tokio-rs/tokio", branch = "v0.2.x" }
-tokio-util = { version = "0.3", git = "https://github.com/tokio-rs/tokio", branch = "v0.2.x", features = ["codec"] }
+tokio-test = "0.2"
+tokio-util = { version = "0.3", features = ["codec"] }
