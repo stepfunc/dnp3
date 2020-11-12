@@ -6,6 +6,7 @@ use crate::master::association::NoAssociation;
 use crate::master::runner::RunError;
 use crate::util::cursor::WriteError;
 use std::error::Error;
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
 /// Indicates that a task has shutdown
@@ -324,6 +325,36 @@ impl From<RecvError> for CommandError {
 impl From<RecvError> for TimeSyncError {
     fn from(_: RecvError) -> Self {
         TimeSyncError::Task(TaskError::Shutdown)
+    }
+}
+
+impl<T> From<SendError<T>> for AssociationError {
+    fn from(_: SendError<T>) -> Self {
+        AssociationError::Shutdown
+    }
+}
+
+impl<T> From<SendError<T>> for TaskError {
+    fn from(_: SendError<T>) -> Self {
+        TaskError::Shutdown
+    }
+}
+
+impl<T> From<SendError<T>> for CommandError {
+    fn from(_: SendError<T>) -> Self {
+        CommandError::Task(TaskError::Shutdown)
+    }
+}
+
+impl<T> From<SendError<T>> for TimeSyncError {
+    fn from(_: SendError<T>) -> Self {
+        TimeSyncError::Task(TaskError::Shutdown)
+    }
+}
+
+impl<T> From<SendError<T>> for PollError {
+    fn from(_: SendError<T>) -> Self {
+        PollError::Shutdown
     }
 }
 

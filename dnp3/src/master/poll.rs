@@ -1,7 +1,7 @@
 use crate::app::format::write::HeaderWriter;
 use crate::master::association::Next;
 use crate::master::error::PollError;
-use crate::master::handle::{Message, Promise};
+use crate::master::handle::{AssociationHandle, Promise};
 use crate::master::request::ReadRequest;
 use crate::util::cursor::WriteError;
 use crate::util::Smallest;
@@ -9,14 +9,20 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 use tokio::time::Instant;
 
+/// Periodic poll representation
 #[derive(Clone)]
 pub(crate) struct Poll {
+    /// Unique ID of the poll
     pub(crate) id: u64,
+    /// Read request to perform
     request: ReadRequest,
+    /// Period to wait between two polls
     period: Duration,
+    /// Next instant to send the request (`None` if it was just created)
     next: Option<Instant>,
 }
 
+/// Map of all the polls of an association
 pub(crate) struct PollMap {
     id: u64,
     polls: BTreeMap<u64, Poll>,
@@ -111,70 +117,48 @@ impl Poll {
     }
 }
 
-pub(crate) struct PollTaskMsg {
-    pub(crate) address: u16,
-    pub(crate) task: PollTask,
-}
-
-impl PollTaskMsg {
-    pub(crate) fn new(address: u16, task: PollTask) -> Self {
-        Self { address, task }
-    }
-}
-
-impl From<PollTaskMsg> for Message {
-    fn from(msg: PollTaskMsg) -> Self {
-        Self::PollTask(msg)
-    }
-}
-
-pub(crate) enum PollTask {
+pub(crate) enum PollMsg {
     AddPoll(
+        AssociationHandle,
         ReadRequest,
         Duration,
-        tokio::sync::mpsc::Sender<Message>,
         Promise<Result<PollHandle, PollError>>,
     ),
     RemovePoll(u64),
     Demand(u64),
 }
 
-impl PollTask {
+impl PollMsg {
     pub(crate) fn on_error(self, err: PollError) {
         match self {
-            PollTask::AddPoll(_, _, _, callback) => callback.complete(Err(err)),
-            PollTask::RemovePoll(_) => {}
-            PollTask::Demand(_) => {}
+            PollMsg::AddPoll(_, _, _, callback) => callback.complete(Err(err)),
+            PollMsg::RemovePoll(_) => {}
+            PollMsg::Demand(_) => {}
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PollHandle {
-    channel: tokio::sync::mpsc::Sender<Message>,
-    address: u16,
+    association: AssociationHandle,
     id: u64,
 }
 
 impl PollHandle {
-    pub(crate) fn new(channel: tokio::sync::mpsc::Sender<Message>, address: u16, id: u64) -> Self {
-        Self {
-            channel,
-            address,
-            id,
-        }
+    pub(crate) fn new(association: AssociationHandle, id: u64) -> Self {
+        Self { association, id }
     }
 
     pub async fn demand(&mut self) {
-        self.channel
-            .send(PollTaskMsg::new(self.address, PollTask::Demand(self.id)).into())
+        self.association
+            .send_poll_message(PollMsg::Demand(self.id))
             .await
             .ok();
     }
 
     pub async fn remove(mut self) {
-        self.channel
-            .send(PollTaskMsg::new(self.address, PollTask::RemovePoll(self.id)).into())
+        self.association
+            .send_poll_message(PollMsg::RemovePoll(self.id))
             .await
             .ok();
     }

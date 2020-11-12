@@ -1,15 +1,17 @@
 use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::error::AssociationError;
+use crate::master::error::{AssociationError, TaskError};
 use crate::master::extract::extract_measurements;
 use crate::master::handle::{AssociationHandler, Promise};
-use crate::master::poll::{Poll, PollMap, PollTask};
+use crate::master::messages::AssociationMsgType;
+use crate::master::poll::{PollMap, PollMsg};
 use crate::master::request::{EventClasses, TimeSyncProcedure};
-use crate::master::task::NonReadTask::TimeSync;
-use crate::master::task::{ReadTask, Task, TaskType};
+use crate::master::runner::RunError;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
+use crate::master::tasks::NonReadTask::TimeSync;
+use crate::master::tasks::{AssociationTask, ReadTask, Task};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use tokio::time::Instant;
@@ -107,7 +109,8 @@ impl TaskStates {
 pub(crate) struct Association {
     address: u16,
     seq: Sequence,
-    tasks: TaskStates,
+    request_queue: VecDeque<Task>,
+    auto_tasks: TaskStates,
     handler: Box<dyn AssociationHandler>,
     config: Configuration,
     polls: PollMap,
@@ -122,27 +125,57 @@ impl Association {
         Self {
             address,
             seq: Sequence::default(),
-            tasks: TaskStates::new(),
+            request_queue: VecDeque::new(),
+            auto_tasks: TaskStates::new(),
             handler,
             config,
             polls: PollMap::new(),
         }
     }
 
-    pub(crate) fn execute_poll_task(&mut self, task: PollTask) {
-        match task {
-            PollTask::AddPoll(request, period, channel, callback) => {
+    pub(crate) fn process_message(&mut self, msg: AssociationMsgType, is_connected: bool) {
+        match msg {
+            AssociationMsgType::QueueTask(task) => {
+                if is_connected {
+                    self.request_queue.push_back(task);
+                } else {
+                    task.on_task_error(Some(self), TaskError::NoConnection);
+                }
+            }
+            AssociationMsgType::Poll(msg) => {
+                self.process_poll_message(msg);
+            }
+        }
+    }
+
+    fn process_poll_message(&mut self, msg: PollMsg) {
+        match msg {
+            PollMsg::AddPoll(association, request, period, callback) => {
                 let id = self.polls.add(request, period);
-                let handle = PollHandle::new(channel, self.address, id);
+                let handle = PollHandle::new(association, id);
                 callback.complete(Ok(handle))
             }
-            PollTask::RemovePoll(id) => {
+            PollMsg::RemovePoll(id) => {
                 self.polls.remove(id);
             }
-            PollTask::Demand(id) => {
+            PollMsg::Demand(id) => {
                 self.polls.demand(id);
             }
         }
+    }
+
+    fn reset(&mut self, err: RunError) {
+        // Fail any pending requests
+        while let Some(task) = self.request_queue.pop_front() {
+            let task_err = match err {
+                RunError::Shutdown => TaskError::Shutdown,
+                RunError::Link(_) => TaskError::NoConnection,
+            };
+            task.on_task_error(Some(self), task_err);
+        }
+
+        // Reset the auto tasks
+        self.auto_tasks.reset();
     }
 
     pub(crate) fn get_system_time(&self) -> std::time::SystemTime {
@@ -162,32 +195,32 @@ impl Association {
             self.on_restart_iin_observed()
         }
         if iin.iin1.get_need_time() {
-            self.tasks.time_sync.set_pending_if_idle();
+            self.auto_tasks.time_sync.set_pending_if_idle();
         }
     }
 
     pub(crate) fn on_restart_iin_observed(&mut self) {
-        if self.tasks.clear_restart_iin.is_idle() {
+        if self.auto_tasks.clear_restart_iin.is_idle() {
             log::warn!("device restart detected (address == {})", self.address);
-            self.tasks.clear_restart_iin.set_pending_if_idle();
+            self.auto_tasks.clear_restart_iin.set_pending_if_idle();
             // also redo the startup sequence
-            self.tasks.disable_unsolicited.set_pending_if_idle();
-            self.tasks.enabled_unsolicited.set_pending_if_idle();
-            self.tasks.integrity_scan.set_pending_if_idle();
+            self.auto_tasks.disable_unsolicited.set_pending_if_idle();
+            self.auto_tasks.enabled_unsolicited.set_pending_if_idle();
+            self.auto_tasks.integrity_scan.set_pending_if_idle();
         }
     }
 
     pub(crate) fn on_integrity_scan_complete(&mut self) {
-        self.tasks.integrity_scan = AutoTaskState::Idle;
+        self.auto_tasks.integrity_scan = AutoTaskState::Idle;
     }
 
     pub(crate) fn on_integrity_scan_failure(&mut self) {
         log::warn!("startup integrity scan failed");
-        self.tasks.integrity_scan = AutoTaskState::Failed;
+        self.auto_tasks.integrity_scan = AutoTaskState::Failed;
     }
 
     pub(crate) fn on_clear_restart_iin_response(&mut self, iin: IIN) {
-        self.tasks.clear_restart_iin = if iin.iin1.get_device_restart() {
+        self.auto_tasks.clear_restart_iin = if iin.iin1.get_device_restart() {
             log::warn!("device failed to clear restart IIN bit");
             AutoTaskState::Failed
         } else {
@@ -197,11 +230,11 @@ impl Association {
 
     pub(crate) fn on_clear_restart_iin_failure(&mut self) {
         log::warn!("device failed to clear restart IIN bit");
-        self.tasks.clear_restart_iin = AutoTaskState::Failed;
+        self.auto_tasks.clear_restart_iin = AutoTaskState::Failed;
     }
 
     pub(crate) fn on_time_sync_iin_response(&mut self, iin: IIN) {
-        self.tasks.time_sync = if iin.iin1.get_need_time() {
+        self.auto_tasks.time_sync = if iin.iin1.get_need_time() {
             log::warn!("device failed to clear NEED_TIME IIN bit");
             AutoTaskState::Failed
         } else {
@@ -211,25 +244,25 @@ impl Association {
 
     pub(crate) fn on_time_sync_iin_failure(&mut self) {
         log::warn!("auto time sync failed");
-        self.tasks.time_sync = AutoTaskState::Failed;
+        self.auto_tasks.time_sync = AutoTaskState::Failed;
     }
 
     pub(crate) fn on_enable_unsolicited_response(&mut self, _iin: IIN) {
-        self.tasks.enabled_unsolicited = AutoTaskState::Idle;
+        self.auto_tasks.enabled_unsolicited = AutoTaskState::Idle;
     }
 
     pub(crate) fn on_enable_unsolicited_failure(&mut self) {
         log::warn!("device failed to enable unsolicited responses");
-        self.tasks.enabled_unsolicited = AutoTaskState::Failed;
+        self.auto_tasks.enabled_unsolicited = AutoTaskState::Failed;
     }
 
     pub(crate) fn on_disable_unsolicited_response(&mut self, _iin: IIN) {
-        self.tasks.disable_unsolicited = AutoTaskState::Idle;
+        self.auto_tasks.disable_unsolicited = AutoTaskState::Idle;
     }
 
     pub(crate) fn on_disable_unsolicited_failure(&mut self) {
         log::warn!("device failed to disable unsolicited responses");
-        self.tasks.disable_unsolicited = AutoTaskState::Failed;
+        self.auto_tasks.disable_unsolicited = AutoTaskState::Failed;
     }
 
     pub(crate) fn handle_unsolicited_response(
@@ -265,29 +298,43 @@ impl Association {
         extract_measurements(header, objects, self.handler.get_default_poll_handler());
     }
 
-    pub(crate) fn next_request(&self, now: Instant) -> Next<Task> {
-        if self.tasks.clear_restart_iin.is_pending() {
-            return Next::Now(self.clear_restart_iin());
+    pub(crate) fn priority_task(&mut self) -> Option<Task> {
+        self.request_queue.pop_front()
+    }
+
+    pub(crate) fn next_task(&self, now: Instant) -> Next<Task> {
+        // Check for automatic tasks
+        if self.auto_tasks.clear_restart_iin.is_pending() {
+            return Next::Now(AutoTask::ClearRestartBit.wrap());
         }
-        if self.tasks.time_sync.is_pending() {
-            if let Some(x) = self.config.auto_time_sync {
-                return Next::Now(self.time_sync(x));
+        if self.auto_tasks.time_sync.is_pending() {
+            if let Some(procedure) = self.config.auto_time_sync {
+                return Next::Now(
+                    TimeSync(TimeSyncTask::get_procedure(procedure, true, Promise::None)).wrap(),
+                );
             }
         }
-        if self.config.disable_unsol_classes.any() && self.tasks.disable_unsolicited.is_pending() {
-            return Next::Now(self.disable_unsolicited(self.config.disable_unsol_classes));
+        if self.config.disable_unsol_classes.any()
+            && self.auto_tasks.disable_unsolicited.is_pending()
+        {
+            return Next::Now(
+                AutoTask::DisableUnsolicited(self.config.disable_unsol_classes).wrap(),
+            );
         }
-        if self.tasks.integrity_scan.is_pending() {
-            return Next::Now(self.integrity());
+        if self.auto_tasks.integrity_scan.is_pending() {
+            return Next::Now(Task::Read(ReadTask::StartupIntegrity));
         }
-        if self.config.enable_unsol_classes.any() && self.tasks.enabled_unsolicited.is_pending() {
-            return Next::Now(self.enable_unsolicited(self.config.enable_unsol_classes));
+        if self.config.enable_unsol_classes.any()
+            && self.auto_tasks.enabled_unsolicited.is_pending()
+        {
+            return Next::Now(AutoTask::EnableUnsolicited(self.config.enable_unsol_classes).wrap());
         }
 
+        // Check for polls
         match self.polls.next(now) {
             Next::None => Next::None,
             Next::NotBefore(x) => Next::NotBefore(x),
-            Next::Now(x) => Next::Now(self.poll(x)),
+            Next::Now(poll) => Next::Now(Task::Read(ReadTask::PeriodicPoll(poll))),
         }
     }
 }
@@ -322,9 +369,9 @@ impl AssociationMap {
         }
     }
 
-    pub(crate) fn reset(&mut self) {
-        for session in &mut self.map.values_mut() {
-            session.tasks.reset();
+    pub(crate) fn reset(&mut self, err: RunError) {
+        for association in &mut self.map.values_mut() {
+            association.reset(err);
         }
     }
 
@@ -343,7 +390,7 @@ impl AssociationMap {
         self.priority.retain(|x| *x != address);
     }
 
-    pub(crate) fn get(&mut self, address: u16) -> Result<&Association, NoAssociation> {
+    pub(crate) fn get(&self, address: u16) -> Result<&Association, NoAssociation> {
         match self.map.get(&address) {
             Some(x) => Ok(x),
             None => Err(NoAssociation { address }),
@@ -357,64 +404,51 @@ impl AssociationMap {
         }
     }
 
-    pub(crate) fn next_task(&mut self) -> Next<Task> {
-        let now = Instant::now();
-
-        let mut earliest = Smallest::<Instant>::new();
-
-        // don't try to rotate the tasks more times than the length of the queue
-        for index in 0..self.priority.len() {
-            if let Some(address) = self.priority.get(index) {
-                if let Some(session) = self.map.get(address) {
-                    match session.next_request(now) {
-                        Next::Now(request) => {
-                            // just before returning, move this session to last priority
-                            if let Some(x) = self.priority.remove(index) {
-                                self.priority.push_back(x);
-                            }
-                            return Next::Now(request);
-                        }
-                        Next::NotBefore(x) => earliest.observe(x),
-                        Next::None => {}
+    pub(crate) fn next_task(&mut self) -> Next<AssociationTask> {
+        // Check for priority task
+        for (index, address) in self.priority.iter().enumerate() {
+            if let Some(association) = self.map.get_mut(address) {
+                // Check for priority task
+                if let Some(task) = association.priority_task() {
+                    // just before returning, move this session to last priority
+                    if let Some(x) = self.priority.remove(index) {
+                        self.priority.push_back(x);
                     }
+
+                    let task = AssociationTask::new(association.address, task);
+                    return Next::Now(task);
                 }
             }
         }
 
+        // Check for non-priority tasks
+        let now = Instant::now();
+        let mut earliest = Smallest::<Instant>::new();
+
+        for (index, address) in self.priority.iter().enumerate() {
+            if let Some(association) = self.map.get_mut(address) {
+                match association.next_task(now) {
+                    Next::Now(task) => {
+                        // just before returning, move this session to last priority
+                        if let Some(x) = self.priority.remove(index) {
+                            self.priority.push_back(x);
+                        }
+
+                        let task = AssociationTask::new(association.address, task);
+                        return Next::Now(task);
+                    }
+                    Next::NotBefore(x) => earliest.observe(x),
+                    Next::None => {}
+                }
+            }
+        }
+
+        // Return earliest task
         if let Some(x) = earliest.value() {
             return Next::NotBefore(x);
         }
 
+        // No task found
         Next::None
-    }
-}
-
-// helpers to produce request tasks
-impl Association {
-    fn poll(&self, poll: Poll) -> Task {
-        Task::new(self.address, TaskType::Read(ReadTask::PeriodicPoll(poll)))
-    }
-
-    fn integrity(&self) -> Task {
-        Task::new(self.address, TaskType::Read(ReadTask::StartupIntegrity))
-    }
-
-    fn clear_restart_iin(&self) -> Task {
-        Task::new(self.address, AutoTask::ClearRestartBit.wrap())
-    }
-
-    fn disable_unsolicited(&self, classes: EventClasses) -> Task {
-        Task::new(self.address, AutoTask::DisableUnsolicited(classes).wrap())
-    }
-
-    fn time_sync(&self, procedure: TimeSyncProcedure) -> Task {
-        Task::new(
-            self.address,
-            TimeSync(TimeSyncTask::get_procedure(procedure, true, Promise::None)).wrap(),
-        )
-    }
-
-    fn enable_unsolicited(&self, classes: EventClasses) -> Task {
-        Task::new(self.address, AutoTask::EnableUnsolicited(classes).wrap())
     }
 }

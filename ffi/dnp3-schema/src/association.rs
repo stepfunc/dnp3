@@ -64,6 +64,7 @@ pub fn define(
         .doc(
             doc("Add a periodic poll to the association.")
             .details("Each result of the poll will be sent to the {interface:ReadHandler} of the association.")
+            .warning("This cannot be called from within a callback.")
         )?
         .build()?;
 

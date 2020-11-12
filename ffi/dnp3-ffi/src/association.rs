@@ -15,11 +15,7 @@ pub struct Association {
 pub unsafe fn association_destroy(association: *mut Association) {
     if !association.is_null() {
         let association = Box::from_raw(association);
-        if tokio::runtime::Handle::try_current().is_err() {
-            association.runtime.block_on(association.handle.remove());
-        } else {
-            log::warn!("Tried calling 'association_destroy' from within a tokio thread");
-        }
+        association.runtime.spawn(association.handle.remove());
     }
 }
 
@@ -36,22 +32,14 @@ impl Poll {
 
 pub unsafe fn poll_demand(poll: *mut Poll) {
     if let Some(poll) = poll.as_mut() {
-        if tokio::runtime::Handle::try_current().is_err() {
-            poll.runtime.block_on(poll.handle.demand());
-        } else {
-            log::warn!("Tried calling 'poll_demand' from within a tokio thread");
-        }
+        poll.runtime.spawn(poll.handle.demand());
     }
 }
 
 pub unsafe fn poll_destroy(poll: *mut Poll) {
     if !poll.is_null() {
         let poll = Box::from_raw(poll);
-        if tokio::runtime::Handle::try_current().is_err() {
-            poll.runtime.block_on(poll.handle.remove());
-        } else {
-            log::warn!("Tried calling 'poll_destroy' from within a tokio thread");
-        }
+        poll.runtime.spawn(poll.handle.remove());
     }
 }
 
