@@ -2,7 +2,7 @@ use crate::app::format::write;
 use crate::app::parse::parser::{ParsedFragment, Response};
 use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
-use crate::master::task::{NonReadTask, ReadTask, RequestWriter, Task, TaskType};
+use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::transport::{ReaderType, WriterType};
 
 use crate::app::header::Control;
@@ -12,10 +12,9 @@ use crate::util::cursor::WriteCursor;
 use crate::app::format::write::start_request;
 use crate::app::timeout::Timeout;
 use crate::master::association::{AssociationMap, Next};
-use crate::master::handle::Message;
+use crate::master::messages::{MasterMsg, Message};
 
-use crate::master::error::{PollError, Shutdown, TaskError};
-use std::collections::VecDeque;
+use crate::master::error::{Shutdown, TaskError};
 use std::ops::Add;
 use std::time::Duration;
 use tokio::prelude::{AsyncRead, AsyncWrite};
@@ -32,7 +31,6 @@ pub(crate) struct Runner {
     timeout: Timeout,
     associations: AssociationMap,
     user_queue: tokio::sync::mpsc::Receiver<Message>,
-    request_queue: VecDeque<Task>,
     buffer: [u8; 2048],
 }
 
@@ -53,25 +51,81 @@ impl Runner {
             timeout: response_timeout,
             associations: AssociationMap::new(),
             user_queue,
-            request_queue: VecDeque::new(),
             buffer: [0; 2048],
         }
     }
 
-    fn reset(&mut self, err: RunError) {
-        self.associations.reset();
+    /// Wait for the defined duration, processing messages that are received in the meantime.
+    pub(crate) async fn delay_for(&mut self, duration: Duration) -> Result<(), Shutdown> {
+        let deadline = Instant::now().add(duration);
 
-        // fail any pending requests
-        while let Some(task) = self.request_queue.pop_front() {
-            let task_err = match err {
-                RunError::Shutdown => TaskError::Shutdown,
-                RunError::Link(_) => TaskError::NoConnection,
-            };
-            task.details
-                .on_task_error(self.associations.get_mut(task.address).ok(), task_err);
+        loop {
+            tokio::select! {
+                result = self.process_message(false) => {
+                   result?;
+                }
+                _ = tokio::time::delay_until(deadline) => {
+                   return Ok(());
+                }
+            }
         }
     }
 
+    /// Run the master until an error or shutdown occurs.
+    pub(crate) async fn run<T>(
+        &mut self,
+        io: &mut T,
+        writer: &mut WriterType,
+        reader: &mut ReaderType,
+    ) -> RunError
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        loop {
+            let result = match self.get_next_task() {
+                Next::Now(task) => self.run_task(io, task, writer, reader).await,
+                Next::NotBefore(time) => self.idle_until(time, io, writer, reader).await,
+                Next::None => self.idle_forever(io, writer, reader).await,
+            };
+
+            if let Err(err) = result {
+                self.reset(err);
+                writer.reset();
+                reader.reset();
+                return err;
+            }
+        }
+    }
+
+    /// Wait until a message is received or a response is received.
+    ///
+    /// Returns an error only if shutdown or link layer error occured.
+    async fn idle_forever<T>(
+        &mut self,
+        io: &mut T,
+        writer: &mut WriterType,
+        reader: &mut ReaderType,
+    ) -> Result<(), RunError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        loop {
+            tokio::select! {
+                result = self.process_message(true) => {
+                   // we need to recheck the tasks
+                   return Ok(result?);
+                }
+                result = reader.read(io) => {
+                   result?;
+                   self.handle_fragment_while_idle(io, writer, reader).await?;
+                }
+            }
+        }
+    }
+
+    /// Wait until a message is received, a response is received, or we reach the defined time.
+    ///
+    /// Returns an error only if shutdown or link layer error occured.
     async fn idle_until<T>(
         &mut self,
         instant: Instant,
@@ -99,265 +153,78 @@ impl Runner {
         }
     }
 
-    async fn idle_forever<T>(
-        &mut self,
-        io: &mut T,
-        writer: &mut WriterType,
-        reader: &mut ReaderType,
-    ) -> Result<(), RunError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
-        loop {
-            tokio::select! {
-                result = self.process_message(true) => {
-                   // we need to recheck the tasks
-                   return Ok(result?);
-                }
-                result = reader.read(io) => {
-                   result?;
-                   self.handle_fragment_while_idle(io, writer, reader).await?;
-                }
-            }
-        }
-    }
-
-    async fn handle_fragment_while_idle<T>(
-        &mut self,
-        io: &mut T,
-        writer: &mut WriterType,
-        reader: &mut ReaderType,
-    ) -> Result<(), RunError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
-        let fragment = match reader.peek() {
-            None => return Ok(()),
-            Some(x) => x,
-        };
-
-        let parsed = match ParsedFragment::parse(self.level.receive(), fragment.data).ok() {
-            None => return Ok(()),
-            Some(x) => x,
-        };
-
-        let response = match parsed.to_response() {
-            Err(err) => {
-                log::warn!("{}", err);
-                return Ok(());
-            }
-            Ok(x) => x,
-        };
-
-        if response.header.function.is_unsolicited() {
-            self.handle_unsolicited(fragment.address.source, &response, io, writer)
-                .await?;
-        } else {
-            log::warn!(
-                "unexpected response with sequence: {}",
-                response.header.control.seq.value()
-            )
-        }
-
-        Ok(())
-    }
-
     async fn process_message(&mut self, is_connected: bool) -> Result<(), Shutdown> {
         match self.user_queue.recv().await {
-            Some(x) => {
-                match x {
-                    Message::QueueTask(task) => {
-                        if is_connected {
-                            self.queue_task(task);
-                        } else {
-                            task.details.on_task_error(
-                                self.associations.get_mut(task.address).ok(),
-                                TaskError::NoConnection,
-                            );
-                        }
-                    }
-                    Message::PollTask(msg) => {
+            Some(msg) => {
+                match msg {
+                    Message::Master(msg) => self.process_master_message(msg),
+                    Message::Association(msg) => {
                         if let Ok(association) = self.associations.get_mut(msg.address) {
-                            association.execute_poll_task(msg.task);
+                            association.process_message(msg.details, is_connected);
                         } else {
-                            msg.task.on_error(PollError::NoSuchAssociation(msg.address))
+                            msg.on_association_failure();
                         }
                     }
-                    Message::AddAssociation(association, callback) => {
-                        callback.complete(self.associations.register(association));
-                    }
-                    Message::RemoveAssociation(address) => {
-                        self.associations.remove(address);
-                    }
-                    Message::SetDecodeLogLevel(level) => {
-                        self.level = level;
-                    }
-                };
+                }
                 Ok(())
             }
             None => Err(Shutdown),
         }
     }
 
-    fn queue_task(&mut self, task: Task) {
-        match self.associations.get(task.address).ok() {
-            Some(_association) => {
-                self.request_queue.push_back(task);
+    fn process_master_message(&mut self, msg: MasterMsg) {
+        match msg {
+            MasterMsg::AddAssociation(association, callback) => {
+                callback.complete(self.associations.register(association));
             }
-            None => {
-                log::warn!("no association for task with address: {}", task.address);
-                task.details
-                    .on_task_error(None, TaskError::NoSuchAssociation(task.address));
+            MasterMsg::RemoveAssociation(address) => {
+                self.associations.remove(address);
+            }
+            MasterMsg::SetDecodeLogLevel(level) => {
+                self.level = level;
             }
         }
     }
 
-    async fn confirm_solicited<T>(
+    async fn read_next_response<T>(
         &mut self,
         io: &mut T,
-        destination: u16,
-        seq: Sequence,
-        writer: &mut WriterType,
-    ) -> Result<(), LinkError>
-    where
-        T: AsyncWrite + Unpin,
-    {
-        let mut cursor = WriteCursor::new(&mut self.buffer);
-        write::confirm_solicited(seq, &mut cursor)?;
-        writer
-            .write(self.level, io, destination, cursor.written())
-            .await?;
-        Ok(())
-    }
-
-    async fn confirm_unsolicited<T>(
-        &mut self,
-        io: &mut T,
-        destination: u16,
-        seq: Sequence,
-        writer: &mut WriterType,
-    ) -> Result<(), LinkError>
-    where
-        T: AsyncWrite + Unpin,
-    {
-        let mut cursor = WriteCursor::new(&mut self.buffer);
-        crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
-
-        writer
-            .write(self.level, io, destination, cursor.written())
-            .await?;
-        Ok(())
-    }
-
-    async fn handle_unsolicited<T>(
-        &mut self,
-        source: u16,
-        response: &Response<'_>,
-        io: &mut T,
-        writer: &mut WriterType,
-    ) -> Result<(), LinkError>
+        deadline: Instant,
+        reader: &mut ReaderType,
+    ) -> Result<(), TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let association = match self.associations.get_mut(source).ok() {
-            Some(x) => x,
-            None => {
-                log::warn!(
-                    "received unsolicited response from unknown address: {}",
-                    source
-                );
-                return Ok(());
-            }
-        };
-
-        association.process_iin(response.header.iin);
-
-        if let Ok(objects) = response.objects {
-            association.handle_unsolicited_response(response.header, objects);
-        }
-
-        if response.header.control.con {
-            self.confirm_unsolicited(io, source, response.header.control.seq, writer)
-                .await?;
-        }
-
-        Ok(())
-    }
-
-    async fn send_request<T, U>(
-        &mut self,
-        io: &mut T,
-        address: u16,
-        request: &U,
-        writer: &mut WriterType,
-    ) -> Result<Sequence, TaskError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-        U: RequestWriter,
-    {
-        // format the request
-        let seq = self.associations.get_mut(address)?.increment_seq();
-        let mut cursor = WriteCursor::new(&mut self.buffer);
-        let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
-        request.write(&mut hw)?;
-        writer
-            .write(self.level, io, address, cursor.written())
-            .await?;
-        Ok(seq)
-    }
-
-    pub(crate) async fn delay_for(&mut self, duration: Duration) -> Result<(), Shutdown> {
-        let deadline = Instant::now().add(duration);
-
         loop {
             tokio::select! {
-                result = self.process_message(false) => {
-                   result?;
-                }
-                _ = tokio::time::delay_until(deadline) => {
-                   return Ok(());
-                }
+                    _ = tokio::time::delay_until(deadline) => {
+                         log::warn!("no response within timeout: {}", self.timeout);
+                         return Err(TaskError::ResponseTimeout);
+                    }
+                    x = reader.read(io)  => {
+                        return Ok(x?);
+                    }
+                    y = self.process_message(true) => {
+                        y?; // unless shutdown, proceed to next event
+                    }
             }
         }
     }
 
-    fn get_next_task(&mut self) -> Next<Task> {
-        if let Some(x) = self.request_queue.pop_front() {
-            return Next::Now(x);
-        }
-
-        self.associations.next_task()
+    fn reset(&mut self, err: RunError) {
+        self.associations.reset(err);
     }
+}
 
-    pub(crate) async fn run<T>(
-        &mut self,
-        io: &mut T,
-        writer: &mut WriterType,
-        reader: &mut ReaderType,
-    ) -> RunError
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
-        loop {
-            let result = match self.get_next_task() {
-                Next::Now(task) => self.run_task(io, task, writer, reader).await,
-                Next::NotBefore(time) => self.idle_until(time, io, writer, reader).await,
-                Next::None => self.idle_forever(io, writer, reader).await,
-            };
-
-            if let Err(err) = result {
-                self.reset(err);
-                writer.reset();
-                reader.reset();
-                return err;
-            }
-        }
-    }
-
+// Task processing
+impl Runner {
+    /// Run a specific task.
+    ///
+    /// Returns an error only if shutdown or link layer error occured.
     async fn run_task<T>(
         &mut self,
         io: &mut T,
-        task: Task,
+        task: AssociationTask,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), RunError>
@@ -365,11 +232,11 @@ impl Runner {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         let result = match task.details {
-            TaskType::Read(t) => {
+            Task::Read(t) => {
                 self.run_read_task(io, task.address, t, writer, reader)
                     .await
             }
-            TaskType::NonRead(t) => {
+            Task::NonRead(t) => {
                 self.run_non_read_task(io, task.address, t, writer, reader)
                     .await
             }
@@ -668,29 +535,148 @@ impl Runner {
         }
     }
 
-    async fn read_next_response<T>(
+    fn get_next_task(&mut self) -> Next<AssociationTask> {
+        self.associations.next_task()
+    }
+}
+
+// Unsolicited processing
+impl Runner {
+    async fn handle_fragment_while_idle<T>(
         &mut self,
         io: &mut T,
-        deadline: Instant,
+        writer: &mut WriterType,
         reader: &mut ReaderType,
-    ) -> Result<(), TaskError>
+    ) -> Result<(), RunError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        loop {
-            tokio::select! {
-                    _ = tokio::time::delay_until(deadline) => {
-                         log::warn!("no response within timeout: {}", self.timeout);
-                         return Err(TaskError::ResponseTimeout);
-                    }
-                    x = reader.read(io)  => {
-                        return Ok(x?);
-                    }
-                    y = self.process_message(true) => {
-                        y?; // unless shutdown, proceed to next event
-                    }
+        let fragment = match reader.peek() {
+            None => return Ok(()),
+            Some(x) => x,
+        };
+
+        let parsed = match ParsedFragment::parse(self.level.receive(), fragment.data).ok() {
+            None => return Ok(()),
+            Some(x) => x,
+        };
+
+        let response = match parsed.to_response() {
+            Err(err) => {
+                log::warn!("{}", err);
+                return Ok(());
             }
+            Ok(x) => x,
+        };
+
+        if response.header.function.is_unsolicited() {
+            self.handle_unsolicited(fragment.address.source, &response, io, writer)
+                .await?;
+        } else {
+            log::warn!(
+                "unexpected response with sequence: {}",
+                response.header.control.seq.value()
+            )
         }
+
+        Ok(())
+    }
+
+    async fn handle_unsolicited<T>(
+        &mut self,
+        source: u16,
+        response: &Response<'_>,
+        io: &mut T,
+        writer: &mut WriterType,
+    ) -> Result<(), LinkError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        let association = match self.associations.get_mut(source).ok() {
+            Some(x) => x,
+            None => {
+                log::warn!(
+                    "received unsolicited response from unknown address: {}",
+                    source
+                );
+                return Ok(());
+            }
+        };
+
+        association.process_iin(response.header.iin);
+
+        if let Ok(objects) = response.objects {
+            association.handle_unsolicited_response(response.header, objects);
+        }
+
+        if response.header.control.con {
+            self.confirm_unsolicited(io, source, response.header.control.seq, writer)
+                .await?;
+        }
+
+        Ok(())
+    }
+}
+
+// Sending methods
+impl Runner {
+    async fn confirm_solicited<T>(
+        &mut self,
+        io: &mut T,
+        destination: u16,
+        seq: Sequence,
+        writer: &mut WriterType,
+    ) -> Result<(), LinkError>
+    where
+        T: AsyncWrite + Unpin,
+    {
+        let mut cursor = WriteCursor::new(&mut self.buffer);
+        write::confirm_solicited(seq, &mut cursor)?;
+        writer
+            .write(self.level, io, destination, cursor.written())
+            .await?;
+        Ok(())
+    }
+
+    async fn confirm_unsolicited<T>(
+        &mut self,
+        io: &mut T,
+        destination: u16,
+        seq: Sequence,
+        writer: &mut WriterType,
+    ) -> Result<(), LinkError>
+    where
+        T: AsyncWrite + Unpin,
+    {
+        let mut cursor = WriteCursor::new(&mut self.buffer);
+        crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
+
+        writer
+            .write(self.level, io, destination, cursor.written())
+            .await?;
+        Ok(())
+    }
+
+    async fn send_request<T, U>(
+        &mut self,
+        io: &mut T,
+        address: u16,
+        request: &U,
+        writer: &mut WriterType,
+    ) -> Result<Sequence, TaskError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+        U: RequestWriter,
+    {
+        // format the request
+        let seq = self.associations.get_mut(address)?.increment_seq();
+        let mut cursor = WriteCursor::new(&mut self.buffer);
+        let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
+        request.write(&mut hw)?;
+        writer
+            .write(self.level, io, address, cursor.written())
+            .await?;
+        Ok(seq)
     }
 }
 

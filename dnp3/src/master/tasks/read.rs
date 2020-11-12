@@ -2,7 +2,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::master::error::TaskError;
 use crate::master::handle::Promise;
 use crate::master::request::ReadRequest;
-use crate::master::task::ReadTask;
+use crate::master::tasks::ReadTask;
 use crate::util::cursor::WriteError;
 
 pub(crate) struct SingleReadTask {

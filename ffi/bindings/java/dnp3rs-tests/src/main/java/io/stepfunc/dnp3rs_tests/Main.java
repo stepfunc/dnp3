@@ -182,8 +182,7 @@ public class Main {
             try {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
                 while (true) {
-                    //String line = reader.readLine();
-                    String line = "rmo";
+                    String line = reader.readLine();
                     switch(line) {
                         case "x":
                             return;

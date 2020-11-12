@@ -6,51 +6,26 @@ use crate::app::parse::DecodeLogLevel;
 use crate::app::variations::Variation;
 use crate::master::association::{Association, Configuration};
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
-use crate::master::poll::{PollHandle, PollTask, PollTaskMsg};
+use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
+use crate::master::poll::{PollHandle, PollMsg};
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
-use crate::master::task::{Task, TaskType};
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::time::TimeSyncTask;
+use crate::master::tasks::Task;
 use std::time::{Duration, SystemTime};
+use tokio::sync::mpsc::error::SendError;
 
-// messages sent from the handles to the master task via an mpsc
-pub(crate) enum Message {
-    QueueTask(Task),
-    PollTask(PollTaskMsg),
-    AddAssociation(Association, Promise<Result<(), AssociationError>>),
-    RemoveAssociation(u16),
-    SetDecodeLogLevel(DecodeLogLevel),
-}
-
-impl Message {
-    pub(crate) fn on_send_failure(self) {
-        match self {
-            Message::QueueTask(task) => {
-                task.details.on_task_error(None, TaskError::Shutdown);
-            }
-            Message::PollTask(msg) => {
-                msg.task.on_error(PollError::Shutdown);
-            }
-            Message::AddAssociation(_, promise) => {
-                promise.complete(Err(AssociationError::Shutdown))
-            }
-            Message::RemoveAssociation(_) => {}
-            Message::SetDecodeLogLevel(_) => {}
-        }
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MasterHandle {
     sender: tokio::sync::mpsc::Sender<Message>,
 }
 
 /// handle used to make requests against
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AssociationHandle {
     address: u16,
-    sender: tokio::sync::mpsc::Sender<Message>,
+    master: MasterHandle,
 }
 
 impl MasterHandle {
@@ -59,8 +34,7 @@ impl MasterHandle {
     }
 
     pub async fn set_decode_log_level(&mut self, level: DecodeLogLevel) {
-        self.sender
-            .send(Message::SetDecodeLogLevel(level))
+        self.send_master_message(MasterMsg::SetDecodeLogLevel(level))
             .await
             .ok();
     }
@@ -77,30 +51,37 @@ impl MasterHandle {
     ) -> Result<AssociationHandle, AssociationError> {
         let association = Association::new(address, config, handler);
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
-        if self
-            .sender
-            .send(Message::AddAssociation(association, Promise::OneShot(tx)))
-            .await
-            .is_err()
-        {
-            return Err(AssociationError::Shutdown);
-        }
+        self.send_master_message(MasterMsg::AddAssociation(association, Promise::OneShot(tx)))
+            .await?;
         rx.await?
-            .map(|_| (AssociationHandle::new(address, self.sender.clone())))
+            .map(|_| (AssociationHandle::new(address, self.clone())))
+    }
+
+    async fn send_master_message(&mut self, msg: MasterMsg) -> Result<(), SendError<Message>> {
+        self.sender.send(Message::Master(msg)).await
+    }
+
+    async fn send_association_message(
+        &mut self,
+        address: u16,
+        msg: AssociationMsgType,
+    ) -> Result<(), SendError<Message>> {
+        self.sender
+            .send(Message::Association(AssociationMsg {
+                address,
+                details: msg,
+            }))
+            .await
     }
 }
 
 impl AssociationHandle {
-    pub(crate) fn new(address: u16, sender: tokio::sync::mpsc::Sender<Message>) -> Self {
-        Self { address, sender }
+    pub(crate) fn new(address: u16, master: MasterHandle) -> Self {
+        Self { address, master }
     }
 
     pub fn address(&self) -> u16 {
         self.address
-    }
-
-    pub fn callbacks(self) -> CallbackAssociationHandle {
-        CallbackAssociationHandle { inner: self }
     }
 
     /// Add a poll to the association
@@ -112,22 +93,19 @@ impl AssociationHandle {
         period: Duration,
     ) -> Result<PollHandle, PollError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<PollHandle, PollError>>();
-        self.sender
-            .send(
-                PollTaskMsg::new(
-                    self.address,
-                    PollTask::AddPoll(request, period, self.sender.clone(), Promise::OneShot(tx)),
-                )
-                .into(),
-            )
-            .await
-            .ok();
+        self.send_poll_message(PollMsg::AddPoll(
+            self.clone(),
+            request,
+            period,
+            Promise::OneShot(tx),
+        ))
+        .await?;
         rx.await?
     }
 
     pub async fn remove(mut self) {
-        self.sender
-            .send(Message::RemoveAssociation(self.address))
+        self.master
+            .send_master_message(MasterMsg::RemoveAssociation(self.address))
             .await
             .ok();
     }
@@ -135,7 +113,7 @@ impl AssociationHandle {
     pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         let task = SingleReadTask::new(request, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await;
+        self.send_task(task.wrap().wrap()).await?;
         rx.await?
     }
 
@@ -146,7 +124,7 @@ impl AssociationHandle {
     ) -> Result<(), CommandError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), CommandError>>();
         let task = CommandTask::from_mode(mode, headers, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await;
+        self.send_task(task.wrap().wrap()).await?;
         rx.await?
     }
 
@@ -156,49 +134,23 @@ impl AssociationHandle {
     ) -> Result<(), TimeSyncError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
         let task = TimeSyncTask::get_procedure(procedure, false, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await;
+        self.send_task(task.wrap().wrap()).await?;
         rx.await?
     }
 
-    async fn send_task(&mut self, task: TaskType) {
-        if let Err(tokio::sync::mpsc::error::SendError(msg)) = self
-            .sender
-            .send(Message::QueueTask(Task::new(self.address, task)))
+    async fn send_task(&mut self, task: Task) -> Result<(), SendError<Message>> {
+        self.master
+            .send_association_message(self.address, AssociationMsgType::QueueTask(task))
             .await
-        {
-            msg.on_send_failure();
-        }
-    }
-}
-
-pub struct CallbackAssociationHandle {
-    inner: AssociationHandle,
-}
-
-impl CallbackAssociationHandle {
-    pub fn address(&self) -> u16 {
-        self.inner.address
     }
 
-    pub async fn remove(self) {
-        self.inner.remove().await
-    }
-
-    pub async fn operate<F>(&mut self, mode: CommandMode, headers: CommandHeaders, callback: F)
-    where
-        F: FnOnce(Result<(), CommandError>) + Send + Sync + 'static,
-    {
-        let task = CommandTask::from_mode(mode, headers, Promise::BoxedFn(Box::new(callback)));
-        self.inner.send_task(task.wrap().wrap()).await;
-    }
-
-    pub async fn perform_time_sync<F>(&mut self, procedure: TimeSyncProcedure, callback: F)
-    where
-        F: FnOnce(Result<(), TimeSyncError>) + Send + Sync + 'static,
-    {
-        let task =
-            TimeSyncTask::get_procedure(procedure, false, Promise::BoxedFn(Box::new(callback)));
-        self.inner.send_task(task.wrap().wrap()).await;
+    pub(crate) async fn send_poll_message(
+        &mut self,
+        msg: PollMsg,
+    ) -> Result<(), SendError<Message>> {
+        self.master
+            .send_association_message(self.address, AssociationMsgType::Poll(msg))
+            .await
     }
 }
 

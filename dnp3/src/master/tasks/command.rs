@@ -4,7 +4,7 @@ use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::master::error::{CommandError, CommandResponseError, TaskError};
 use crate::master::handle::Promise;
 use crate::master::request::*;
-use crate::master::task::NonReadTask;
+use crate::master::tasks::NonReadTask;
 use crate::util::cursor::WriteError;
 
 enum State {

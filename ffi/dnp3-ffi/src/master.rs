@@ -61,17 +61,10 @@ pub unsafe fn master_add_association(
 }
 
 pub unsafe fn master_set_decode_log_level(master: *mut Master, level: ffi::DecodeLogLevel) {
-    let master = match master.as_mut() {
-        Some(master) => master,
-        None => return,
-    };
-
-    if tokio::runtime::Handle::try_current().is_err() {
+    if let Some(master) = master.as_mut() {
         master
             .runtime
-            .block_on(master.handle.set_decode_log_level(level.into()));
-    } else {
-        log::warn!("Tried calling 'master_set_decode_log_level' from within a tokio thread");
+            .spawn(master.handle.set_decode_log_level(level.into()));
     }
 }
 

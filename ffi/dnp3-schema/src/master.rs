@@ -135,6 +135,7 @@ pub fn define(
         .doc(
             doc("Master channel of communication")
             .details("To communicate with a particular outstation, you need to add an association with {class:Master.AddAssociation()}.")
+            .warning("This cannot be called from within a callback.")
         )?
         .build()?;
 

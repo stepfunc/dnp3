@@ -8,7 +8,7 @@ use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::handle::Promise;
 use crate::master::request::TimeSyncProcedure;
-use crate::master::task::NonReadTask;
+use crate::master::tasks::NonReadTask;
 use crate::util::cursor::WriteError;
 use std::convert::TryFrom;
 use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};

@@ -10,7 +10,7 @@ crate-type = ["rlib", "cdylib"]
 [dependencies]
 log = { version = "0.4", features = ["std"] }
 dnp3 = { path = "../../dnp3" }
-tokio = { version = "^0.2.11", git = "https://github.com/tokio-rs/tokio", branch = "v0.2.x", features = ["rt-threaded"] }
+tokio = { version = "^0.2.23", features = ["rt-threaded"] }
 
 [build-dependencies]
 dnp3-schema = { path = "../dnp3-schema" }
