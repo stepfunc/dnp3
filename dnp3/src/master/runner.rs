@@ -183,6 +183,9 @@ impl Runner {
             MasterMsg::SetDecodeLogLevel(level) => {
                 self.level = level;
             }
+            MasterMsg::GetDecodeLogLevel(promise) => {
+                promise.complete(Ok(self.level));
+            }
         }
     }
 

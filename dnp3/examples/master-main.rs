@@ -44,8 +44,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .as_str()
         {
             "x" => return Ok(()),
-            "dln" => runtime.block_on(master.set_decode_log_level(DecodeLogLevel::Nothing)),
-            "dlv" => runtime.block_on(master.set_decode_log_level(DecodeLogLevel::ObjectValues)),
+            "dln" => {
+                runtime
+                    .block_on(master.set_decode_log_level(DecodeLogLevel::Nothing))
+                    .ok();
+            }
+            "dlv" => {
+                runtime
+                    .block_on(master.set_decode_log_level(DecodeLogLevel::ObjectValues))
+                    .ok();
+            }
             "cmd" => {
                 if let Err(err) = runtime.block_on(association.operate(
                     CommandMode::SelectBeforeOperate,

@@ -40,11 +40,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
-            "dln" => master.set_decode_log_level(DecodeLogLevel::Nothing).await,
+            "dln" => {
+                master
+                    .set_decode_log_level(DecodeLogLevel::Nothing)
+                    .await
+                    .ok();
+            }
             "dlv" => {
                 master
                     .set_decode_log_level(DecodeLogLevel::ObjectValues)
                     .await
+                    .ok();
             }
             "rao" => {
                 if let Err(err) = association

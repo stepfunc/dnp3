@@ -121,17 +121,35 @@ pub fn define(
         )?
         .param(
             "level",
-            Type::Enum(decode_log_level_enum),
+            Type::Enum(decode_log_level_enum.clone()),
             "Decode log level",
         )?
         .return_type(ReturnType::void())?
         .doc("Set the master decoding level for log messages")?
         .build()?;
 
+    let get_decode_log_level_fn = lib
+        .declare_native_function("master_get_decode_log_level")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "Master to modify",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(decode_log_level_enum),
+            "Decode log level",
+        ))?
+        .doc(
+            doc("Get the master decoding level for log messages")
+                .warning("This cannot be called from within a callback."),
+        )?
+        .build()?;
+
     lib.define_class(&master_class)?
         .destructor(&destroy_fn)?
         .method("AddAssociation", &add_association_fn)?
         .method("SetDecodeLogLevel", &set_decode_log_level_fn)?
+        .method("GetDecodeLogLevel", &get_decode_log_level_fn)?
         .doc(
             doc("Master channel of communication")
             .details("To communicate with a particular outstation, you need to add an association with {class:Master.AddAssociation()}.")
