@@ -3,10 +3,10 @@ use crate::app::measurement::*;
 use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
 use crate::app::types::Timestamp;
 use crate::app::variations::{Group51Var1, Group51Var2};
-use crate::outstation::event::traits::BaseEvent;
-use crate::outstation::event::traits::EventVariation;
-use crate::outstation::event::variations::*;
-use crate::outstation::event::write_fn::Continue;
+use crate::outstation::db::event::traits::BaseEvent;
+use crate::outstation::db::event::traits::EventVariation;
+use crate::outstation::db::event::write_fn::Continue;
+use crate::outstation::variations::*;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone)]
@@ -38,13 +38,13 @@ impl HeaderState {
 
 #[derive(Copy, Clone)]
 pub(crate) enum HeaderType {
-    Binary(BinaryEventVariation),
-    DoubleBitBinary(DoubleBitBinaryEventVariation),
-    BinaryOutputStatus(BinaryOutputStatusEventVariation),
-    Counter(CounterEventVariation),
-    FrozenCounter(FrozenCounterEventVariation),
-    Analog(AnalogEventVariation),
-    AnalogOutputStatus(AnalogOutputStatusEventVariation),
+    Binary(EventBinaryVariation),
+    DoubleBitBinary(EventDoubleBitBinaryVariation),
+    BinaryOutputStatus(EventBinaryOutputStatusVariation),
+    Counter(EventCounterVariation),
+    FrozenCounter(EventFrozenCounterVariation),
+    Analog(EventAnalogVariation),
+    AnalogOutputStatus(EventAnalogOutputStatusVariation),
 }
 
 #[derive(Copy, Clone)]
@@ -59,7 +59,7 @@ pub(crate) struct EventWriter {
 }
 
 pub(crate) trait Writable: Sized + BaseEvent {
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::Variation>;
+    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation>;
 
     fn get_time(&self) -> Option<Time>;
 }
@@ -76,7 +76,7 @@ impl EventWriter {
         cursor: &mut WriteCursor,
         event: &E,
         index: u16,
-        variation: E::Variation,
+        variation: E::EventVariation,
     ) -> Result<(), WriteError>
     where
         E: Writable,
@@ -94,7 +94,7 @@ impl EventWriter {
         cursor: &mut WriteCursor,
         event: &E,
         index: u16,
-        variation: E::Variation,
+        variation: E::EventVariation,
     ) -> Result<(), WriteError>
     where
         E: Writable,
@@ -173,7 +173,7 @@ impl EventWriter {
         cursor: &mut WriteCursor,
         event: &E,
         index: u16,
-        variation: E::Variation,
+        variation: E::EventVariation,
     ) -> Result<(), WriteError>
     where
         E: Writable,
@@ -215,7 +215,7 @@ impl EventWriter {
 }
 
 impl Writable for Binary {
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::Variation> {
+    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::Binary(var) => Some(*var),
             _ => None,
@@ -228,7 +228,7 @@ impl Writable for Binary {
 }
 
 impl Writable for DoubleBitBinary {
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::Variation> {
+    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::DoubleBitBinary(var) => Some(*var),
             _ => None,
@@ -241,7 +241,7 @@ impl Writable for DoubleBitBinary {
 }
 
 impl Writable for BinaryOutputStatus {
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::Variation> {
+    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::BinaryOutputStatus(var) => Some(*var),
             _ => None,
@@ -254,7 +254,7 @@ impl Writable for BinaryOutputStatus {
 }
 
 impl Writable for Counter {
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::Variation> {
+    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::Counter(var) => Some(*var),
             _ => None,
@@ -267,7 +267,7 @@ impl Writable for Counter {
 }
 
 impl Writable for FrozenCounter {
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::Variation> {
+    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::FrozenCounter(var) => Some(*var),
             _ => None,
@@ -280,7 +280,7 @@ impl Writable for FrozenCounter {
 }
 
 impl Writable for Analog {
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::Variation> {
+    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::Analog(var) => Some(*var),
             _ => None,
@@ -293,7 +293,7 @@ impl Writable for Analog {
 }
 
 impl Writable for AnalogOutputStatus {
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::Variation> {
+    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::AnalogOutputStatus(var) => Some(*var),
             _ => None,
@@ -318,7 +318,7 @@ mod tests {
 
         let value = Binary::new(true, Flags::ONLINE, Time::synchronized(0));
         writer
-            .write(&mut cursor, &value, 06, BinaryEventVariation::Group2Var1)
+            .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var1)
             .unwrap();
         assert_eq!(
             cursor.written(),
@@ -329,7 +329,7 @@ mod tests {
         );
 
         writer
-            .write(&mut cursor, &value, 07, BinaryEventVariation::Group2Var1)
+            .write(&mut cursor, &value, 07, EventBinaryVariation::Group2Var1)
             .unwrap();
         assert_eq!(
             cursor.written(),
@@ -355,7 +355,7 @@ mod tests {
         {
             let value = Binary::new(true, Flags::ONLINE, Time::synchronized(0));
             writer
-                .write(&mut cursor, &value, 06, BinaryEventVariation::Group2Var1)
+                .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var1)
                 .unwrap();
             assert_eq!(cursor.written(), &expected);
         }
@@ -364,7 +364,7 @@ mod tests {
             let value = Analog::new(32.0, Flags::ONLINE, Time::synchronized(0));
             // not enough space to write analog header
             assert!(writer
-                .write(&mut cursor, &value, 07, AnalogEventVariation::Group32Var1)
+                .write(&mut cursor, &value, 07, EventAnalogVariation::Group32Var1)
                 .is_err());
             // written data should be the same
             assert_eq!(cursor.written(), &expected);
@@ -381,7 +381,7 @@ mod tests {
         let analog = Analog::new(27.0, Flags::ONLINE, Time::synchronized(27));
 
         writer
-            .write(&mut cursor, &binary, 06, BinaryEventVariation::Group2Var1)
+            .write(&mut cursor, &binary, 06, EventBinaryVariation::Group2Var1)
             .unwrap();
 
         assert_eq!(
@@ -393,7 +393,7 @@ mod tests {
         );
 
         writer
-            .write(&mut cursor, &analog, 07, AnalogEventVariation::Group32Var1)
+            .write(&mut cursor, &analog, 07, EventAnalogVariation::Group32Var1)
             .unwrap();
 
         assert_eq!(
@@ -416,7 +416,7 @@ mod tests {
         {
             let value = Binary::new(true, Flags::ONLINE, Time::synchronized(1));
             writer
-                .write(&mut cursor, &value, 06, BinaryEventVariation::Group2Var3)
+                .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var3)
                 .unwrap();
             assert_eq!(
                 cursor.written(),
@@ -432,7 +432,7 @@ mod tests {
         {
             let value = Binary::new(false, Flags::ONLINE, Time::synchronized(28));
             writer
-                .write(&mut cursor, &value, 07, BinaryEventVariation::Group2Var3)
+                .write(&mut cursor, &value, 07, EventBinaryVariation::Group2Var3)
                 .unwrap();
 
             assert_eq!(
@@ -457,7 +457,7 @@ mod tests {
         {
             let value = Binary::new(true, Flags::ONLINE, Time::synchronized(1));
             writer
-                .write(&mut cursor, &value, 06, BinaryEventVariation::Group2Var3)
+                .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var3)
                 .unwrap();
             assert_eq!(
                 cursor.written(),
@@ -473,7 +473,7 @@ mod tests {
         {
             let value = Binary::new(false, Flags::ONLINE, Time::not_synchronized(2));
             writer
-                .write(&mut cursor, &value, 07, BinaryEventVariation::Group2Var3)
+                .write(&mut cursor, &value, 07, EventBinaryVariation::Group2Var3)
                 .unwrap();
 
             assert_eq!(
@@ -501,7 +501,7 @@ mod tests {
         {
             let value = Binary::new(true, Flags::ONLINE, Time::synchronized(0));
             writer
-                .write(&mut cursor, &value, 06, BinaryEventVariation::Group2Var3)
+                .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var3)
                 .unwrap();
             assert_eq!(
                 cursor.written(),
@@ -517,7 +517,7 @@ mod tests {
         {
             let value = Binary::new(true, Flags::ONLINE, Time::synchronized(65536));
             writer
-                .write(&mut cursor, &value, 06, BinaryEventVariation::Group2Var3)
+                .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var3)
                 .unwrap();
 
             assert_eq!(

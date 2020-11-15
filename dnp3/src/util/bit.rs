@@ -1,7 +1,18 @@
 use std::fmt::Formatter;
+use std::ops::BitOr;
 
 pub(crate) struct BitMask {
     pub(crate) value: u8,
+}
+
+impl BitOr<BitMask> for BitMask {
+    type Output = BitMask;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value | rhs.value,
+        }
+    }
 }
 
 pub(crate) mod bits {

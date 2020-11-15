@@ -11,6 +11,7 @@
 //
 
 use crate::util::cursor::{WriteCursor, WriteError};
+use std::fmt::Formatter;
 
 /// Field is used in conjunction with the `OpType` field to specify a control operation
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -255,6 +256,21 @@ impl QualifierCode {
     
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
+    }
+}
+
+impl std::fmt::Display for QualifierCode {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            QualifierCode::Range8 => f.write_str("8-bit start stop (value == 0x00)"),
+            QualifierCode::Range16 => f.write_str("16-bit start stop (value == 0x01)"),
+            QualifierCode::AllObjects => f.write_str("all objects (value == 0x06)"),
+            QualifierCode::Count8 => f.write_str("8-bit count (value == 0x07)"),
+            QualifierCode::Count16 => f.write_str("16-bit count (value == 0x08)"),
+            QualifierCode::CountAndPrefix8 => f.write_str("8-bit count and prefix (value == 0x17)"),
+            QualifierCode::CountAndPrefix16 => f.write_str("16-bit count and prefix (value == 0x28)"),
+            QualifierCode::FreeFormat16 => f.write_str("16-bit free format (value == 0x5B)"),
+        }
     }
 }
 

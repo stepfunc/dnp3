@@ -32,7 +32,6 @@ pub enum ObjectParseError {
     ZeroLengthOctetData,
 }
 
-/*
 /// errors that occur when interpreting a header as a request header
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum RequestValidationError {
@@ -43,7 +42,6 @@ pub(crate) enum RequestValidationError {
     /// request with an UNS bit that doesn't match the function code (only allowed in Confirm)
     UnexpectedUnsBit(FunctionCode),
 }
-*/
 
 /// errors that occur when interpreting a header as a response header
 #[derive(Copy, Clone, Debug, PartialEq)]
