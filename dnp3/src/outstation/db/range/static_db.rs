@@ -221,8 +221,14 @@ where
         self.inner
             .values_mut()
             .for_each(|x| x.selected = x.current.clone());
-        let start = self.inner.first_key_value().map(|(key, _)| *key)?;
-        let stop = self.inner.last_key_value().map(|(key, _)| *key)?;
+
+        /*
+          TODO - when this feature is stabilized we can use it here
+          TODO - #![feature(map_first_last)]
+          TODO - It'll be more efficient than finding first/last using iterators
+        */
+        let start = self.inner.iter().next().map(|(key, _)| *key)?;
+        let stop = self.inner.iter().next_back().map(|(key, _)| *key)?;
         Some(T::wrap(IndexRange::new(start, stop), None))
     }
 }
@@ -776,7 +782,6 @@ mod tests {
                 ]
             )
         }
-
     }
 
     #[test]
