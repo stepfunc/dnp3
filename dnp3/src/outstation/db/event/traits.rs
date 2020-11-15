@@ -1,71 +1,58 @@
 use crate::app::measurement::*;
 use crate::app::variations::*;
-use crate::outstation::event::traits::EventVariation;
-use crate::outstation::event::write_fn::*;
-use crate::outstation::event::writer::HeaderType;
+use crate::outstation::db::event::write_fn::{write_cto, write_fixed_size, Continue};
+use crate::outstation::db::event::writer::HeaderType;
+use crate::outstation::variations::*;
 use crate::util::cursor::{WriteCursor, WriteError};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum BinaryEventVariation {
-    Group2Var1,
-    Group2Var2,
-    Group2Var3,
+pub(crate) trait EventVariation<T> {
+    fn write(
+        &self,
+        cursor: &mut WriteCursor,
+        event: &T,
+        index: u16,
+        cto: Time,
+    ) -> Result<Continue, WriteError>;
+    fn wrap(&self) -> HeaderType;
+    fn get_group_var(&self) -> (u8, u8);
+    fn uses_cto(&self) -> bool {
+        false
+    }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum BinaryOutputStatusEventVariation {
-    Group11Var1,
-    Group11Var2,
+pub(crate) trait BaseEvent: Sized {
+    type EventVariation: Copy + PartialEq + EventVariation<Self>;
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum DoubleBitBinaryEventVariation {
-    Group4Var1,
-    Group4Var2,
-    Group4Var3,
+impl BaseEvent for Binary {
+    type EventVariation = EventBinaryVariation;
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum CounterEventVariation {
-    Group22Var1,
-    Group22Var2,
-    Group22Var5,
-    Group22Var6,
+impl BaseEvent for DoubleBitBinary {
+    type EventVariation = EventDoubleBitBinaryVariation;
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum FrozenCounterEventVariation {
-    Group23Var1,
-    Group23Var2,
-    Group23Var5,
-    Group23Var6,
+impl BaseEvent for BinaryOutputStatus {
+    type EventVariation = EventBinaryOutputStatusVariation;
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum AnalogEventVariation {
-    Group32Var1,
-    Group32Var2,
-    Group32Var3,
-    Group32Var4,
-    Group32Var5,
-    Group32Var6,
-    Group32Var7,
-    Group32Var8,
+impl BaseEvent for Counter {
+    type EventVariation = EventCounterVariation;
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum AnalogOutputStatusEventVariation {
-    Group42Var1,
-    Group42Var2,
-    Group42Var3,
-    Group42Var4,
-    Group42Var5,
-    Group42Var6,
-    Group42Var7,
-    Group42Var8,
+impl BaseEvent for FrozenCounter {
+    type EventVariation = EventFrozenCounterVariation;
 }
 
-impl EventVariation<Binary> for BinaryEventVariation {
+impl BaseEvent for Analog {
+    type EventVariation = EventAnalogVariation;
+}
+
+impl BaseEvent for AnalogOutputStatus {
+    type EventVariation = EventAnalogOutputStatusVariation;
+}
+
+impl EventVariation<Binary> for EventBinaryVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
@@ -97,7 +84,7 @@ impl EventVariation<Binary> for BinaryEventVariation {
     }
 }
 
-impl EventVariation<BinaryOutputStatus> for BinaryOutputStatusEventVariation {
+impl EventVariation<BinaryOutputStatus> for EventBinaryOutputStatusVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
@@ -127,7 +114,7 @@ impl EventVariation<BinaryOutputStatus> for BinaryOutputStatusEventVariation {
     }
 }
 
-impl EventVariation<DoubleBitBinary> for DoubleBitBinaryEventVariation {
+impl EventVariation<DoubleBitBinary> for EventDoubleBitBinaryVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
@@ -163,7 +150,7 @@ impl EventVariation<DoubleBitBinary> for DoubleBitBinaryEventVariation {
     }
 }
 
-impl EventVariation<Counter> for CounterEventVariation {
+impl EventVariation<Counter> for EventCounterVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
@@ -201,7 +188,7 @@ impl EventVariation<Counter> for CounterEventVariation {
     }
 }
 
-impl EventVariation<FrozenCounter> for FrozenCounterEventVariation {
+impl EventVariation<FrozenCounter> for EventFrozenCounterVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
@@ -239,7 +226,7 @@ impl EventVariation<FrozenCounter> for FrozenCounterEventVariation {
     }
 }
 
-impl EventVariation<Analog> for AnalogEventVariation {
+impl EventVariation<Analog> for EventAnalogVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
@@ -277,7 +264,7 @@ impl EventVariation<Analog> for AnalogEventVariation {
     }
 }
 
-impl EventVariation<AnalogOutputStatus> for AnalogOutputStatusEventVariation {
+impl EventVariation<AnalogOutputStatus> for EventAnalogOutputStatusVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,

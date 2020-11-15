@@ -1,8 +1,10 @@
 use crate::app::enums::FunctionCode;
 use crate::app::sequence::Sequence;
+use crate::util::bit::bits::{BIT_0, BIT_1, BIT_2};
 use crate::util::bit::{format_bitfield, Bitfield};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::Formatter;
+use std::ops::BitOr;
 
 /// Control field in the application-layer header
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -130,7 +132,7 @@ impl IIN1 {
     }
 
     /// test IIN.1 to see if the BROADCAST bit is set
-    pub fn get_broadcast(self) -> bool {
+    pub fn get_broadcast(&self) -> bool {
         self.value.bit_0()
     }
 
@@ -170,9 +172,19 @@ impl IIN1 {
     }
 }
 
+impl Default for IIN1 {
+    fn default() -> Self {
+        Self { value: 0 }
+    }
+}
+
 impl IIN2 {
+    pub(crate) const NO_FUNC_CODE_SUPPORT: IIN2 = IIN2::new(BIT_0.value);
+    pub(crate) const OBJECT_UNKNOWN: IIN2 = IIN2::new(BIT_1.value);
+    pub(crate) const PARAMETER_ERROR: IIN2 = IIN2::new(BIT_2.value);
+
     /// Construct IIN2 from its underlying value
-    pub fn new(value: u8) -> Self {
+    pub const fn new(value: u8) -> Self {
         Self { value }
     }
 
@@ -214,6 +226,33 @@ impl IIN2 {
     /// test IIN.2 to see if the RESERVED_1 bit is set
     pub fn get_reserved_1(self) -> bool {
         self.value.bit_7()
+    }
+}
+
+impl Default for IIN2 {
+    fn default() -> Self {
+        Self { value: 0 }
+    }
+}
+
+impl BitOr for IIN2 {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value | rhs.value,
+        }
+    }
+}
+
+impl BitOr<IIN2> for IIN {
+    type Output = Self;
+
+    fn bitor(self, rhs: IIN2) -> Self::Output {
+        Self {
+            iin1: self.iin1,
+            iin2: self.iin2 | rhs,
+        }
     }
 }
 
@@ -288,6 +327,21 @@ impl IIN {
 impl Default for IIN {
     fn default() -> Self {
         IIN::new(IIN1::new(0), IIN2::new(0))
+    }
+}
+
+impl BitOr for IIN {
+    type Output = IIN;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self {
+            iin1: IIN1 {
+                value: self.iin1.value | rhs.iin1.value,
+            },
+            iin2: IIN2 {
+                value: self.iin2.value | rhs.iin2.value,
+            },
+        }
     }
 }
 

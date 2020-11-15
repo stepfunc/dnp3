@@ -93,6 +93,8 @@ clippy::all
 )]
 // TODO - remove before release
 #![allow(dead_code)]
+// this unstable feature is needed ATM for some BTreeMap functionality in the outstation db
+#![feature(map_first_last)]
 
 #[cfg(test)]
 extern crate tokio_test;

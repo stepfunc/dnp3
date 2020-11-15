@@ -94,6 +94,15 @@ impl DoubleBit {
             DoubleBit::Indeterminate => BitPair::new(true, true),
         }
     }
+
+    pub(crate) fn to_byte(&self) -> u8 {
+        match self {
+            DoubleBit::Intermediate => 0b00,
+            DoubleBit::DeterminedOff => 0b01,
+            DoubleBit::DeterminedOn => 0b10,
+            DoubleBit::Indeterminate => 0b11,
+        }
+    }
 }
 
 impl std::fmt::Display for DoubleBit {
