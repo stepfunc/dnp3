@@ -230,7 +230,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<(ClassHandle, NativeEnumHandle
 
     let request_new_class_fn = lib
         .declare_native_function("request_new_class")?
-        .param("class0", Type::Bool, "Ask for class 0 (static_db data)")?
+        .param("class0", Type::Bool, "Ask for class 0 (static data)")?
         .param("class1", Type::Bool, "Ask for class 1 events")?
         .param("class2", Type::Bool, "Ask for class 2 events")?
         .param("class3", Type::Bool, "Ask for class 3 events")?
