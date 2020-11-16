@@ -55,3 +55,14 @@ impl From<ffi::DecodeLogLevel> for DecodeLogLevel {
         }
     }
 }
+
+impl From<DecodeLogLevel> for ffi::DecodeLogLevel {
+    fn from(from: DecodeLogLevel) -> Self {
+        match from {
+            DecodeLogLevel::Nothing => ffi::DecodeLogLevel::Nothing,
+            DecodeLogLevel::Header => ffi::DecodeLogLevel::Header,
+            DecodeLogLevel::ObjectHeaders => ffi::DecodeLogLevel::ObjectHeaders,
+            DecodeLogLevel::ObjectValues => ffi::DecodeLogLevel::ObjectValues,
+        }
+    }
+}

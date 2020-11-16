@@ -9,8 +9,9 @@ use std::error::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
-/// Indicates that a task has shutdown
-pub(crate) struct Shutdown;
+/// Indicates that the master task has shutdown
+#[derive(Copy, Clone, Debug)]
+pub struct Shutdown;
 
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -304,6 +305,12 @@ impl From<TaskError> for TimeSyncError {
     }
 }
 
+impl From<RecvError> for Shutdown {
+    fn from(_: RecvError) -> Self {
+        Shutdown
+    }
+}
+
 impl From<RecvError> for AssociationError {
     fn from(_: RecvError) -> Self {
         AssociationError::Shutdown
@@ -325,6 +332,12 @@ impl From<RecvError> for CommandError {
 impl From<RecvError> for TimeSyncError {
     fn from(_: RecvError) -> Self {
         TimeSyncError::Task(TaskError::Shutdown)
+    }
+}
+
+impl<T> From<SendError<T>> for Shutdown {
+    fn from(_: SendError<T>) -> Self {
+        Shutdown
     }
 }
 

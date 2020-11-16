@@ -5,7 +5,9 @@ use crate::app::parse::bytes::Bytes;
 use crate::app::parse::DecodeLogLevel;
 use crate::app::variations::Variation;
 use crate::master::association::{Association, Configuration};
-use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
+use crate::master::error::{
+    AssociationError, CommandError, PollError, Shutdown, TaskError, TimeSyncError,
+};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
@@ -33,10 +35,19 @@ impl MasterHandle {
         Self { sender }
     }
 
-    pub async fn set_decode_log_level(&mut self, level: DecodeLogLevel) {
+    /// Set the decoding level used by this master
+    pub async fn set_decode_log_level(&mut self, level: DecodeLogLevel) -> Result<(), Shutdown> {
         self.send_master_message(MasterMsg::SetDecodeLogLevel(level))
-            .await
-            .ok();
+            .await?;
+        Ok(())
+    }
+
+    /// Get the current decoding level used by this master
+    pub async fn get_decode_log_level(&mut self) -> Result<DecodeLogLevel, Shutdown> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<DecodeLogLevel, Shutdown>>();
+        self.send_master_message(MasterMsg::GetDecodeLogLevel(Promise::OneShot(tx)))
+            .await?;
+        rx.await?
     }
 
     /// Create a new association:
@@ -103,11 +114,11 @@ impl AssociationHandle {
         rx.await?
     }
 
-    pub async fn remove(mut self) {
+    pub async fn remove(mut self) -> Result<(), Shutdown> {
         self.master
             .send_master_message(MasterMsg::RemoveAssociation(self.address))
-            .await
-            .ok();
+            .await?;
+        Ok(())
     }
 
     pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
