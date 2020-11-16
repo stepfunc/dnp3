@@ -133,7 +133,7 @@ impl AssociationHandle {
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
-        let task = TimeSyncTask::get_procedure(procedure, false, Promise::OneShot(tx));
+        let task = TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
     }

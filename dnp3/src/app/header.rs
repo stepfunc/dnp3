@@ -51,6 +51,26 @@ impl Control {
         }
     }
 
+    pub(crate) fn response(seq: Sequence) -> Self {
+        Self {
+            fir: true,
+            fin: true,
+            con: false,
+            uns: false,
+            seq,
+        }
+    }
+
+    pub(crate) fn response_with_confirmation(seq: Sequence) -> Self {
+        Self {
+            fir: true,
+            fin: true,
+            con: true,
+            uns: false,
+            seq,
+        }
+    }
+
     pub(crate) fn unsolicited(seq: Sequence) -> Self {
         Self {
             fir: true,
@@ -315,13 +335,11 @@ impl IIN {
             || self.iin2.get_parameter_error()
     }
 
-    /*
-        pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-            cursor.write_u8(self.iin1.value)?;
-            cursor.write_u8(self.iin2.value)?;
-            Ok(())
-        }
-    */
+    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.iin1.value)?;
+        cursor.write_u8(self.iin2.value)?;
+        Ok(())
+    }
 }
 
 impl Default for IIN {
@@ -381,6 +399,15 @@ impl ResponseFunction {
     }
 }
 
+impl From<ResponseFunction> for FunctionCode {
+    fn from(from: ResponseFunction) -> Self {
+        match from {
+            ResponseFunction::Response => FunctionCode::Response,
+            ResponseFunction::UnsolicitedResponse => FunctionCode::UnsolicitedResponse,
+        }
+    }
+}
+
 impl RequestHeader {
     pub(crate) fn new(control: Control, function: FunctionCode) -> Self {
         Self { control, function }
@@ -402,13 +429,8 @@ impl ResponseHeader {
         }
     }
 
-    /*
     pub(crate) fn function(self) -> FunctionCode {
-        if self.unsolicited {
-            FunctionCode::UnsolicitedResponse
-        } else {
-            FunctionCode::Response
-        }
+        self.function.into()
     }
 
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
@@ -417,5 +439,4 @@ impl ResponseHeader {
         self.iin.write(cursor)?;
         Ok(())
     }
-    */
 }

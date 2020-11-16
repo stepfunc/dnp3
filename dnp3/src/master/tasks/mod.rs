@@ -15,6 +15,7 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::util::cursor::WriteError;
+use tokio::time::Instant;
 
 /// Queued task requiring I/O
 pub(crate) struct AssociationTask {
@@ -50,7 +51,11 @@ impl Task {
 
 pub(crate) trait RequestWriter {
     fn function(&self) -> FunctionCode;
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError>;
+    fn write(
+        &mut self,
+        writer: &mut HeaderWriter,
+        association: &Association,
+    ) -> Result<(), WriteError>;
 }
 
 pub(crate) enum ReadTask {
@@ -76,7 +81,11 @@ impl RequestWriter for ReadTask {
         FunctionCode::Read
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    fn write(
+        &mut self,
+        writer: &mut HeaderWriter,
+        _association: &Association,
+    ) -> Result<(), WriteError> {
         match self {
             ReadTask::PeriodicPoll(poll) => poll.format(writer),
             ReadTask::StartupIntegrity => writer.write_class1230(),
@@ -90,11 +99,15 @@ impl RequestWriter for NonReadTask {
         self.function()
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    fn write(
+        &mut self,
+        writer: &mut HeaderWriter,
+        association: &Association,
+    ) -> Result<(), WriteError> {
         match self {
             NonReadTask::Auto(t) => t.write(writer),
             NonReadTask::Command(t) => t.write(writer),
-            NonReadTask::TimeSync(t) => t.write(writer),
+            NonReadTask::TimeSync(t) => t.write(writer, association),
         }
     }
 }
@@ -161,7 +174,7 @@ impl NonReadTask {
 
     pub(crate) fn handle(
         self,
-        request_tx: std::time::SystemTime,
+        request_tx: Instant,
         association: &mut Association,
         response: Response,
     ) -> Option<NonReadTask> {

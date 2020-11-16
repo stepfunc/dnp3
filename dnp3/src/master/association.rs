@@ -1,7 +1,7 @@
 use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::error::{AssociationError, TaskError};
+use crate::master::error::{AssociationError, TaskError, TimeSyncError};
 use crate::master::extract::extract_measurements;
 use crate::master::handle::{AssociationHandler, Promise};
 use crate::master::messages::AssociationMsgType;
@@ -233,17 +233,12 @@ impl Association {
         self.auto_tasks.clear_restart_iin = AutoTaskState::Failed;
     }
 
-    pub(crate) fn on_time_sync_iin_response(&mut self, iin: IIN) {
-        self.auto_tasks.time_sync = if iin.iin1.get_need_time() {
-            log::warn!("device failed to clear NEED_TIME IIN bit");
-            AutoTaskState::Failed
-        } else {
-            AutoTaskState::Idle
-        }
+    pub(crate) fn on_time_sync_success(&mut self) {
+        self.auto_tasks.time_sync = AutoTaskState::Idle;
     }
 
-    pub(crate) fn on_time_sync_iin_failure(&mut self) {
-        log::warn!("auto time sync failed");
+    pub(crate) fn on_time_sync_failure(&mut self, err: TimeSyncError) {
+        log::warn!("auto time sync failed: {}", err);
         self.auto_tasks.time_sync = AutoTaskState::Failed;
     }
 
@@ -310,7 +305,7 @@ impl Association {
         if self.auto_tasks.time_sync.is_pending() {
             if let Some(procedure) = self.config.auto_time_sync {
                 return Next::Now(
-                    TimeSync(TimeSyncTask::get_procedure(procedure, true, Promise::None)).wrap(),
+                    TimeSync(TimeSyncTask::get_procedure(procedure, Promise::None)).wrap(),
                 );
             }
         }

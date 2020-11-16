@@ -265,7 +265,7 @@ impl Runner {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            let seq = match self.send_request(io, address, &task, writer).await {
+            let seq = match self.send_request(io, address, &mut task, writer).await {
                 Ok(seq) => seq,
                 Err(err) => {
                     task.on_task_error(self.associations.get_mut(address).ok(), err);
@@ -273,7 +273,7 @@ impl Runner {
                 }
             };
 
-            let request_tx = std::time::SystemTime::now();
+            let request_tx = Instant::now();
 
             let deadline = self.timeout.deadline_from_now();
 
@@ -382,7 +382,7 @@ impl Runner {
         &mut self,
         io: &mut T,
         address: u16,
-        task: ReadTask,
+        mut task: ReadTask,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), TaskError>
@@ -390,7 +390,7 @@ impl Runner {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         let result = self
-            .execute_read_task(io, address, &task, writer, reader)
+            .execute_read_task(io, address, &mut task, writer, reader)
             .await;
 
         let association = self.associations.get_mut(address).ok();
@@ -413,7 +413,7 @@ impl Runner {
         &mut self,
         io: &mut T,
         address: u16,
-        task: &ReadTask,
+        task: &mut ReadTask,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), TaskError>
@@ -661,7 +661,7 @@ impl Runner {
         &mut self,
         io: &mut T,
         address: u16,
-        request: &U,
+        request: &mut U,
         writer: &mut WriterType,
     ) -> Result<Sequence, TaskError>
     where
@@ -669,10 +669,11 @@ impl Runner {
         U: RequestWriter,
     {
         // format the request
-        let seq = self.associations.get_mut(address)?.increment_seq();
+        let association = self.associations.get_mut(address)?;
+        let seq = association.increment_seq();
         let mut cursor = WriteCursor::new(&mut self.buffer);
         let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
-        request.write(&mut hw)?;
+        request.write(&mut hw, association)?;
         writer
             .write(self.level, io, address, cursor.written())
             .await?;
