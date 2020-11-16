@@ -1,3 +1,4 @@
+use crate::app::header::IIN1;
 use crate::app::measurement;
 use crate::outstation::db::event::list::VecList;
 use crate::outstation::db::event::traits::BaseEvent;
@@ -63,6 +64,20 @@ impl EventClasses {
             EventClass::Class2 => self.class2,
             EventClass::Class3 => self.class3,
         }
+    }
+
+    pub(crate) fn as_iin1(&self) -> IIN1 {
+        let mut iin = IIN1::default();
+        if self.class1 {
+            iin = iin | IIN1::CLASS_1_EVENTS
+        }
+        if self.class2 {
+            iin = iin | IIN1::CLASS_2_EVENTS
+        }
+        if self.class3 {
+            iin = iin | IIN1::CLASS_3_EVENTS
+        }
+        iin
     }
 }
 
@@ -402,7 +417,7 @@ pub(crate) trait Insertable: BaseEvent {
     fn decrement_type(counter: &mut TypeCounter);
     fn increment_type(counter: &mut TypeCounter);
     fn create_event_record(
-        self,
+        &self,
         index: u16,
         class: EventClass,
         default_variation: Self::EventVariation,
@@ -493,7 +508,7 @@ impl EventBuffer {
         &mut self,
         index: u16,
         class: EventClass,
-        event: T,
+        event: &T,
         default_variation: T::EventVariation,
     ) -> Result<(), InsertError>
     where
@@ -653,7 +668,7 @@ impl Insertable for measurement::Binary {
     }
 
     fn create_event_record(
-        self,
+        &self,
         index: u16,
         class: EventClass,
         default_variation: EventBinaryVariation,
@@ -661,7 +676,7 @@ impl Insertable for measurement::Binary {
         EventRecord::new(
             index,
             class,
-            Event::Binary(self, Variation::new(default_variation)),
+            Event::Binary(*self, Variation::new(default_variation)),
         )
     }
 
@@ -697,7 +712,7 @@ impl Insertable for measurement::DoubleBitBinary {
     }
 
     fn create_event_record(
-        self,
+        &self,
         index: u16,
         class: EventClass,
         default_variation: EventDoubleBitBinaryVariation,
@@ -705,7 +720,7 @@ impl Insertable for measurement::DoubleBitBinary {
         EventRecord::new(
             index,
             class,
-            Event::DoubleBitBinary(self, Variation::new(default_variation)),
+            Event::DoubleBitBinary(*self, Variation::new(default_variation)),
         )
     }
 
@@ -741,7 +756,7 @@ impl Insertable for measurement::BinaryOutputStatus {
     }
 
     fn create_event_record(
-        self,
+        &self,
         index: u16,
         class: EventClass,
         default_variation: EventBinaryOutputStatusVariation,
@@ -749,7 +764,7 @@ impl Insertable for measurement::BinaryOutputStatus {
         EventRecord::new(
             index,
             class,
-            Event::BinaryOutputStatus(self, Variation::new(default_variation)),
+            Event::BinaryOutputStatus(*self, Variation::new(default_variation)),
         )
     }
 
@@ -785,7 +800,7 @@ impl Insertable for measurement::Counter {
     }
 
     fn create_event_record(
-        self,
+        &self,
         index: u16,
         class: EventClass,
         default_variation: EventCounterVariation,
@@ -793,7 +808,7 @@ impl Insertable for measurement::Counter {
         EventRecord::new(
             index,
             class,
-            Event::Counter(self, Variation::new(default_variation)),
+            Event::Counter(*self, Variation::new(default_variation)),
         )
     }
 
@@ -829,7 +844,7 @@ impl Insertable for measurement::FrozenCounter {
     }
 
     fn create_event_record(
-        self,
+        &self,
         index: u16,
         class: EventClass,
         default_variation: EventFrozenCounterVariation,
@@ -837,7 +852,7 @@ impl Insertable for measurement::FrozenCounter {
         EventRecord::new(
             index,
             class,
-            Event::FrozenCounter(self, Variation::new(default_variation)),
+            Event::FrozenCounter(*self, Variation::new(default_variation)),
         )
     }
 
@@ -873,7 +888,7 @@ impl Insertable for measurement::Analog {
     }
 
     fn create_event_record(
-        self,
+        &self,
         index: u16,
         class: EventClass,
         default_variation: EventAnalogVariation,
@@ -881,7 +896,7 @@ impl Insertable for measurement::Analog {
         EventRecord::new(
             index,
             class,
-            Event::Analog(self, Variation::new(default_variation)),
+            Event::Analog(*self, Variation::new(default_variation)),
         )
     }
 
@@ -917,7 +932,7 @@ impl Insertable for measurement::AnalogOutputStatus {
     }
 
     fn create_event_record(
-        self,
+        &self,
         index: u16,
         class: EventClass,
         default_variation: EventAnalogOutputStatusVariation,
@@ -925,7 +940,7 @@ impl Insertable for measurement::AnalogOutputStatus {
         EventRecord::new(
             index,
             class,
-            Event::AnalogOutputStatus(self, Variation::new(default_variation)),
+            Event::AnalogOutputStatus(*self, Variation::new(default_variation)),
         )
     }
 
@@ -952,7 +967,7 @@ mod tests {
             .insert(
                 1,
                 EventClass::Class1,
-                Binary::new(true, Flags::ONLINE, Time::synchronized(0)),
+                &Binary::new(true, Flags::ONLINE, Time::synchronized(0)),
                 EventBinaryVariation::Group2Var1,
             )
             .unwrap();
@@ -961,7 +976,7 @@ mod tests {
             .insert(
                 2,
                 EventClass::Class2,
-                Counter::new(23, Flags::ONLINE, Time::synchronized(0)),
+                &Counter::new(23, Flags::ONLINE, Time::synchronized(0)),
                 EventCounterVariation::Group22Var2,
             )
             .unwrap();
@@ -970,7 +985,7 @@ mod tests {
             .insert(
                 3,
                 EventClass::Class3,
-                DoubleBitBinary::new(
+                &DoubleBitBinary::new(
                     DoubleBit::DeterminedOn,
                     Flags::ONLINE,
                     Time::synchronized(0),
@@ -983,7 +998,7 @@ mod tests {
             .insert(
                 4,
                 EventClass::Class2,
-                Binary::new(true, Flags::ONLINE, Time::synchronized(1234)),
+                &Binary::new(true, Flags::ONLINE, Time::synchronized(1234)),
                 EventBinaryVariation::Group2Var1,
             )
             .unwrap();
@@ -992,7 +1007,7 @@ mod tests {
             .insert(
                 5,
                 EventClass::Class1,
-                Analog::new(42.0, Flags::ONLINE, Time::synchronized(0)),
+                &Analog::new(42.0, Flags::ONLINE, Time::synchronized(0)),
                 EventAnalogVariation::Group32Var1,
             )
             .unwrap();
@@ -1006,7 +1021,7 @@ mod tests {
             buffer.insert(
                 1,
                 EventClass::Class1,
-                Binary::new(true, Flags::ONLINE, Time::synchronized(0)),
+                &Binary::new(true, Flags::ONLINE, Time::synchronized(0)),
                 EventBinaryVariation::Group2Var1,
             ),
             Err(InsertError::TypeMaxIsZero)
@@ -1023,7 +1038,7 @@ mod tests {
             .insert(
                 1,
                 EventClass::Class1,
-                binary,
+                &binary,
                 EventBinaryVariation::Group2Var1,
             )
             .unwrap();
@@ -1032,7 +1047,7 @@ mod tests {
             buffer.insert(
                 1,
                 EventClass::Class1,
-                binary,
+                &binary,
                 EventBinaryVariation::Group2Var1
             ),
             Err(InsertError::Overflow)

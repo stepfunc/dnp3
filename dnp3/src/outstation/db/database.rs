@@ -15,11 +15,17 @@ pub(crate) struct Database {
 
 pub(crate) struct ResponseInfo {
     /// true if the written response contains events
-    has_events: bool,
+    pub(crate) has_events: bool,
     /// true if all selected data has been written (FIN == 1)
-    complete: bool,
+    pub(crate) complete: bool,
     /// flags for IIN
-    unwritten: EventClasses,
+    pub(crate) unwritten: EventClasses,
+}
+
+impl ResponseInfo {
+    pub(crate) fn need_confirm(&self) -> bool {
+        self.has_events || !self.complete
+    }
 }
 
 impl Database {
@@ -28,6 +34,15 @@ impl Database {
             static_db: StaticDatabase::new(),
             event_buffer: EventBuffer::new(config),
         }
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.static_db.reset();
+        self.event_buffer.reset();
+    }
+
+    pub(crate) fn clear_written_events(&mut self) {
+        self.event_buffer.clear_written();
     }
 
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> IIN2 {
@@ -107,11 +122,11 @@ impl Database {
         self.static_db.remove::<T>(index)
     }
 
-    pub(crate) fn update<T>(&mut self, value: T, index: u16, options: UpdateOptions) -> bool
+    pub(crate) fn update<T>(&mut self, value: &T, index: u16, options: UpdateOptions) -> bool
     where
         T: Updatable,
     {
-        let event_data = self.static_db.update(&value, index, options);
+        let event_data = self.static_db.update(value, index, options);
 
         // if an event should be produced, insert it into the buffer
         if let Some((variation, class)) = event_data {
