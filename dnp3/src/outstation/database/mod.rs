@@ -9,7 +9,6 @@ use crate::outstation::database::details::event::buffer::EventClasses;
 use crate::outstation::database::details::range::static_db::{
     Deadband, FlagsDetector, PointConfig,
 };
-use crate::outstation::types::EventClass;
 use crate::util::cursor::WriteCursor;
 
 use std::sync::{Arc, Mutex};
@@ -22,6 +21,13 @@ pub enum EventMode {
     Force,
     /// Never produce an event regardless of change
     Suppress,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum EventClass {
+    Class1,
+    Class2,
+    Class3,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -119,12 +125,16 @@ impl ResponseInfo {
     }
 }
 
-pub trait Update<T> {
-    fn update(&mut self, value: &T, index: u16, options: UpdateOptions) -> bool;
-}
-
 pub trait Add<T> {
     fn add(&mut self, index: u16, class: EventClass, config: T) -> bool;
+}
+
+pub trait Remove<T> {
+    fn remove(&mut self, index: u16) -> bool;
+}
+
+pub trait Update<T> {
+    fn update(&mut self, value: &T, index: u16, options: UpdateOptions) -> bool;
 }
 
 pub struct Database {
@@ -299,5 +309,47 @@ impl Add<AnalogOutputStatusConfig> for Database {
             config.e_var,
         );
         self.inner.add(index, config)
+    }
+}
+
+impl Remove<Binary> for Database {
+    fn remove(&mut self, index: u16) -> bool {
+        self.inner.remove::<Binary>(index)
+    }
+}
+
+impl Remove<DoubleBitBinary> for Database {
+    fn remove(&mut self, index: u16) -> bool {
+        self.inner.remove::<DoubleBitBinary>(index)
+    }
+}
+
+impl Remove<BinaryOutputStatus> for Database {
+    fn remove(&mut self, index: u16) -> bool {
+        self.inner.remove::<BinaryOutputStatus>(index)
+    }
+}
+
+impl Remove<Counter> for Database {
+    fn remove(&mut self, index: u16) -> bool {
+        self.inner.remove::<Counter>(index)
+    }
+}
+
+impl Remove<FrozenCounter> for Database {
+    fn remove(&mut self, index: u16) -> bool {
+        self.inner.remove::<FrozenCounter>(index)
+    }
+}
+
+impl Remove<Analog> for Database {
+    fn remove(&mut self, index: u16) -> bool {
+        self.inner.remove::<Analog>(index)
+    }
+}
+
+impl Remove<AnalogOutputStatus> for Database {
+    fn remove(&mut self, index: u16) -> bool {
+        self.inner.remove::<AnalogOutputStatus>(index)
     }
 }

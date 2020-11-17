@@ -288,8 +288,8 @@ mod tests {
     use super::*;
     use crate::app::flags::Flags;
     use crate::app::measurement::{Binary, DoubleBitBinary, Time};
+    use crate::outstation::database::config::*;
     use crate::outstation::database::details::range::traits::StaticVariation;
-    use crate::outstation::variations::{StaticBinaryVariation, StaticDoubleBitBinaryVariation};
 
     fn binary(value: bool) -> Binary {
         Binary::new(value, Flags::ONLINE, Time::synchronized(0))

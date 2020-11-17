@@ -1,11 +1,10 @@
 use dnp3::app::flags::Flags;
-use dnp3::app::measurement::{Binary, Time};
-use dnp3::outstation::database::config::BinaryConfig;
-use dnp3::outstation::database::EventBufferConfig;
+use dnp3::app::measurement::*;
+use dnp3::app::parse::DecodeLogLevel;
+use dnp3::outstation::database::config::*;
 use dnp3::outstation::database::{Add, Update, UpdateOptions};
+use dnp3::outstation::database::{EventBufferConfig, EventClass};
 use dnp3::outstation::task::OutstationTask;
-use dnp3::outstation::types::EventClass;
-use dnp3::outstation::variations::{EventBinaryVariation, StaticBinaryVariation};
 use std::net::Ipv4Addr;
 use std::time::Duration;
 
@@ -14,18 +13,15 @@ use std::time::Duration;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
 
-    let (mut task, mut handle) = OutstationTask::create(10, EventBufferConfig::uniform(10));
+    let (mut task, mut handle) = OutstationTask::create(
+        10,
+        DecodeLogLevel::ObjectValues,
+        EventBufferConfig::uniform(10),
+    );
 
     handle.update(|db| {
-        for i in 0..10 {
-            db.add(
-                i,
-                EventClass::Class1,
-                BinaryConfig::new(
-                    StaticBinaryVariation::Group1Var1,
-                    EventBinaryVariation::Group2Var1,
-                ),
-            );
+        for i in 0..1000 {
+            db.add(i, EventClass::Class1, AnalogConfig::default());
         }
     });
 
@@ -42,17 +38,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::spawn(listen_task);
 
-    let mut value = true;
+    let mut value = 0.0;
 
     loop {
         tokio::time::delay_for(Duration::from_secs(5)).await;
         handle.update(|db| {
             db.update(
-                &Binary::new(value, Flags::new(0x01), Time::synchronized(1)),
+                &Analog::new(value, Flags::new(0x01), Time::synchronized(1)),
                 7,
                 UpdateOptions::default(),
             )
         });
-        value = !value;
+        value += 1.0;
     }
 }

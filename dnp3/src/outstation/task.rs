@@ -13,6 +13,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 pub struct Session {
     buffer: [u8; 2048],
+    log_level: DecodeLogLevel,
     database: DatabaseHandle,
 }
 
@@ -23,11 +24,15 @@ pub struct OutstationTask {
 }
 
 impl OutstationTask {
-    pub fn create(address: u16, config: EventBufferConfig) -> (Self, DatabaseHandle) {
+    pub fn create(
+        address: u16,
+        log_level: DecodeLogLevel,
+        config: EventBufferConfig,
+    ) -> (Self, DatabaseHandle) {
         let handle = DatabaseHandle::new(config);
         let (reader, writer) = crate::transport::create_transport_layer(false, address);
         let task = Self {
-            session: Session::new(handle.clone()),
+            session: Session::new(log_level, handle.clone()),
             reader,
             writer,
         };
@@ -56,10 +61,11 @@ enum Confirm {
 }
 
 impl Session {
-    pub(crate) fn new(database: DatabaseHandle) -> Self {
+    pub(crate) fn new(log_level: DecodeLogLevel, database: DatabaseHandle) -> Self {
         Self {
             buffer: [0; 2048],
             database,
+            log_level,
         }
     }
 
@@ -100,18 +106,17 @@ impl Session {
     }
 
     fn process_request(&mut self, fragment: Fragment) -> Option<ResponseAction> {
-        let request =
-            match ParsedFragment::parse(DecodeLogLevel::ObjectValues.receive(), fragment.data) {
-                // this is logged internally
-                Err(_) => return None,
-                Ok(x) => match x.to_request() {
-                    Ok(request) => request,
-                    Err(err) => {
-                        log::error!("bad request: {}", err);
-                        return None;
-                    }
-                },
-            };
+        let request = match ParsedFragment::parse(self.log_level.receive(), fragment.data) {
+            // this is logged internally
+            Err(_) => return None,
+            Ok(x) => match x.to_request() {
+                Ok(request) => request,
+                Err(err) => {
+                    log::error!("bad request: {}", err);
+                    return None;
+                }
+            },
+        };
 
         if request.header.function == FunctionCode::Read {
             let iin = match request.objects {
@@ -166,7 +171,7 @@ impl Session {
             );
             cursor.at_pos(0, |c| header.write(c))?;
             writer
-                .write(DecodeLogLevel::ObjectValues, io, 1, cursor.written())
+                .write(self.log_level, io, 1, cursor.written())
                 .await?;
 
             match self.wait_sol_confirm(io, reader, seq).await? {
@@ -191,12 +196,15 @@ impl Session {
         }
     }
 
-    fn parse_confirm(fragment: Fragment, seq: Sequence) -> Option<Confirm> {
-        let parsed =
-            match ParsedFragment::parse(DecodeLogLevel::ObjectValues.receive(), fragment.data) {
-                Ok(parsed) => parsed,
-                Err(_) => return None,
-            };
+    fn parse_confirm(
+        log_level: DecodeLogLevel,
+        fragment: Fragment,
+        seq: Sequence,
+    ) -> Option<Confirm> {
+        let parsed = match ParsedFragment::parse(log_level.receive(), fragment.data) {
+            Ok(parsed) => parsed,
+            Err(_) => return None,
+        };
 
         let request = match parsed.to_request() {
             Ok(request) => request,
@@ -239,7 +247,7 @@ impl Session {
                 }
                 _ = reader.read(io) => {
                      if let Some(fragment) =  reader.peek() {
-                        if let Some(result) = Self::parse_confirm(fragment, seq) {
+                        if let Some(result) = Self::parse_confirm(self.log_level, fragment, seq) {
                           return Ok(result);
                         }
                      }

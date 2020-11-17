@@ -5,8 +5,7 @@ use crate::outstation::database::details::event::buffer::EventBuffer;
 use crate::outstation::database::details::range::static_db::{
     PointConfig, StaticDatabase, Updatable,
 };
-use crate::outstation::database::{EventBufferConfig, ResponseInfo, UpdateOptions};
-use crate::outstation::types::EventClass;
+use crate::outstation::database::{EventBufferConfig, EventClass, ResponseInfo, UpdateOptions};
 use crate::util::cursor::WriteCursor;
 
 pub(crate) struct Database {
