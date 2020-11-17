@@ -36,6 +36,54 @@ pub enum EventClass {
     Class3,
 }
 
+/// Controls which types are reported during a class 0 READ
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct ClassZeroConfig {
+    pub binary: bool,
+    pub double_bit_binary: bool,
+    pub binary_output_status: bool,
+    pub counter: bool,
+    pub frozen_counter: bool,
+    pub analog: bool,
+    pub analog_output_status: bool,
+}
+
+impl ClassZeroConfig {
+    pub fn new(
+        binary: bool,
+        double_bit_binary: bool,
+        binary_output_status: bool,
+        counter: bool,
+        frozen_counter: bool,
+        analog: bool,
+        analog_output_status: bool,
+    ) -> Self {
+        ClassZeroConfig {
+            binary,
+            double_bit_binary,
+            binary_output_status,
+            counter,
+            frozen_counter,
+            analog,
+            analog_output_status,
+        }
+    }
+}
+
+impl Default for ClassZeroConfig {
+    fn default() -> Self {
+        Self {
+            binary: true,
+            double_bit_binary: true,
+            binary_output_status: true,
+            counter: true,
+            frozen_counter: true,
+            analog: true,
+            analog_output_status: true,
+        }
+    }
+}
+
 /// Maximum number of events for each type.
 ///
 /// A value of zero means that events will not be buffered for that type.
@@ -107,6 +155,37 @@ pub(crate) struct ResponseInfo {
     pub(crate) complete: bool,
     /// flags for IIN
     pub(crate) unwritten: EventClasses,
+}
+
+/// Configuration of the database
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct DatabaseConfig {
+    /// Maximum number of headers that will be processed
+    /// in a READ request. Internally, this controls the size of a
+    /// pre-allocated buffer used to process requests. A minimum
+    /// value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced.
+    /// Requesting more than this number will result in the PARAMETER_ERROR
+    /// IIN bit being set in the response.
+    pub max_read_request_headers: Option<u16>,
+    /// controls responses to class 0 reads
+    pub class_zero: ClassZeroConfig,
+    /// event buffer parameters
+    pub events: EventBufferConfig,
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            max_read_request_headers: None,
+            class_zero: ClassZeroConfig::default(),
+            events: EventBufferConfig::no_events(),
+        }
+    }
+}
+
+impl DatabaseConfig {
+    /// minimum that may be configured for 'max_read_request_headers', also the default.
+    pub const DEFAULT_READ_REQUEST_HEADERS: u16 = 64;
 }
 
 /// Options that control how the update is performed. 99% of the time
@@ -187,7 +266,7 @@ pub struct Database {
 
 impl Database {
     /// Create a database by specified how it will buffer events
-    pub(crate) fn new(config: EventBufferConfig) -> Self {
+    pub(crate) fn new(config: DatabaseConfig) -> Self {
         Self {
             inner: crate::outstation::database::details::database::Database::new(config),
         }
@@ -210,7 +289,7 @@ impl DatabaseHandle {
         func(&mut *lock)
     }
 
-    pub(crate) fn new(config: EventBufferConfig) -> Self {
+    pub(crate) fn new(config: DatabaseConfig) -> Self {
         Self {
             inner: Arc::new(Mutex::new(Database::new(config))),
         }

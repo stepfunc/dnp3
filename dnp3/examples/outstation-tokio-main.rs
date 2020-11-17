@@ -2,22 +2,25 @@ use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::parse::DecodeLogLevel;
 use dnp3::outstation::database::config::*;
-use dnp3::outstation::database::{Add, Update, UpdateOptions};
-use dnp3::outstation::database::{EventBufferConfig, EventClass};
+use dnp3::outstation::database::EventClass;
+use dnp3::outstation::database::{Add, DatabaseConfig, Update, UpdateOptions};
 use dnp3::outstation::task::OutstationTask;
 use std::net::Ipv4Addr;
 use std::time::Duration;
+
+fn get_database_config() -> DatabaseConfig {
+    let mut config = DatabaseConfig::default();
+    config.events.max_analog = 10;
+    config
+}
 
 /// example of using the outstation API asynchronously from within the Tokio runtime
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
 
-    let (mut task, mut handle) = OutstationTask::create(
-        10,
-        DecodeLogLevel::ObjectValues,
-        EventBufferConfig::all_types(10),
-    );
+    let (mut task, mut handle) =
+        OutstationTask::create(10, DecodeLogLevel::ObjectValues, get_database_config());
 
     handle.transaction(|db| {
         for i in 0..1000 {

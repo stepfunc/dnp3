@@ -5,7 +5,7 @@ use crate::outstation::database::details::event::buffer::EventBuffer;
 use crate::outstation::database::details::range::static_db::{
     PointConfig, StaticDatabase, Updatable,
 };
-use crate::outstation::database::{EventBufferConfig, EventClass, ResponseInfo, UpdateOptions};
+use crate::outstation::database::{DatabaseConfig, EventClass, ResponseInfo, UpdateOptions};
 use crate::util::cursor::WriteCursor;
 
 pub(crate) struct Database {
@@ -14,10 +14,10 @@ pub(crate) struct Database {
 }
 
 impl Database {
-    pub(crate) fn new(config: EventBufferConfig) -> Self {
+    pub(crate) fn new(config: DatabaseConfig) -> Self {
         Self {
-            static_db: StaticDatabase::new(),
-            event_buffer: EventBuffer::new(config),
+            static_db: StaticDatabase::new(config.max_read_request_headers, config.class_zero),
+            event_buffer: EventBuffer::new(config.events),
         }
     }
 
@@ -72,7 +72,7 @@ impl Database {
     fn select_all_objects(&mut self, variation: AllObjectsVariation) -> IIN2 {
         match variation {
             AllObjectsVariation::Group60Var1 => {
-                self.static_db.select_class_0();
+                self.static_db.select_class_zero();
             }
             AllObjectsVariation::Group60Var2 => {
                 self.event_buffer

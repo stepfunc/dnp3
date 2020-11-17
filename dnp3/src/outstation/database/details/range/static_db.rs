@@ -7,7 +7,9 @@ use crate::outstation::database::details::range::traits::StaticVariation;
 use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::util::cursor::{WriteCursor, WriteError};
 
-use crate::outstation::database::{EventClass, EventMode, UpdateOptions};
+use crate::outstation::database::{
+    ClassZeroConfig, DatabaseConfig, EventClass, EventMode, UpdateOptions,
+};
 use std::collections::{BTreeMap, Bound, VecDeque};
 use std::ops::RangeBounds;
 
@@ -23,6 +25,7 @@ pub(crate) trait Updatable: Insertable + Clone + Default {
     type Detector: EventDetector<Self>;
     fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self>;
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange;
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool;
 }
 
 #[derive(Copy, Clone)]
@@ -215,6 +218,7 @@ where
 }
 
 pub(crate) struct StaticDatabase {
+    class_zero: ClassZeroConfig,
     selected: SelectionQueue,
     // maps for the various types
     binary: PointMap<Binary>,
@@ -226,6 +230,12 @@ pub(crate) struct StaticDatabase {
     analog_output_status: PointMap<AnalogOutputStatus>,
 }
 
+impl Default for StaticDatabase {
+    fn default() -> Self {
+        Self::new(None, ClassZeroConfig::default())
+    }
+}
+
 #[derive(Copy, Clone)]
 enum NextWriteAction {
     Complete,
@@ -233,9 +243,15 @@ enum NextWriteAction {
 }
 
 impl StaticDatabase {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(max_selection: Option<u16>, class_zero: ClassZeroConfig) -> Self {
+        // don't allow values smaller than the default
+        let max_selection = max_selection
+            .map(|x| x.max(DatabaseConfig::DEFAULT_READ_REQUEST_HEADERS))
+            .unwrap_or(DatabaseConfig::DEFAULT_READ_REQUEST_HEADERS);
+
         Self {
-            selected: SelectionQueue::new(64), // TODO - How to configure?
+            class_zero,
+            selected: SelectionQueue::new(max_selection),
             binary: PointMap::empty(),
             double_bit_binary: PointMap::empty(),
             binary_output_status: PointMap::empty(),
@@ -413,24 +429,25 @@ impl StaticDatabase {
         T::get_map(self)
     }
 
-    pub(crate) fn select_class_0(&mut self) {
-        self.binary.select_all().map(|x| self.selected.push_back(x));
-        self.double_bit_binary
-            .select_all()
-            .map(|x| self.selected.push_back(x));
-        self.binary_output_status
-            .select_all()
-            .map(|x| self.selected.push_back(x));
-        self.counter
-            .select_all()
-            .map(|x| self.selected.push_back(x));
-        self.frozen_counter
-            .select_all()
-            .map(|x| self.selected.push_back(x));
-        self.analog.select_all().map(|x| self.selected.push_back(x));
-        self.analog_output_status
-            .select_all()
-            .map(|x| self.selected.push_back(x));
+    fn select_class_zero_type<T>(&mut self)
+    where
+        T: Updatable,
+    {
+        if T::enabled_class_zero(&self.class_zero) {
+            T::get_map(self)
+                .select_all()
+                .map(|x| self.selected.push_back(x));
+        }
+    }
+
+    pub(crate) fn select_class_zero(&mut self) {
+        self.select_class_zero_type::<Binary>();
+        self.select_class_zero_type::<DoubleBitBinary>();
+        self.select_class_zero_type::<BinaryOutputStatus>();
+        self.select_class_zero_type::<Counter>();
+        self.select_class_zero_type::<FrozenCounter>();
+        self.select_class_zero_type::<Analog>();
+        self.select_class_zero_type::<AnalogOutputStatus>();
     }
 }
 
@@ -528,6 +545,10 @@ impl Updatable for Binary {
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::Binary(variation).with(range)
     }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.binary
+    }
 }
 
 impl Updatable for DoubleBitBinary {
@@ -540,6 +561,10 @@ impl Updatable for DoubleBitBinary {
 
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::DoubleBitBinary(variation).with(range)
+    }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.double_bit_binary
     }
 }
 
@@ -554,6 +579,10 @@ impl Updatable for BinaryOutputStatus {
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::BinaryOutputStatus(variation).with(range)
     }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.binary_output_status
+    }
 }
 
 impl Updatable for Counter {
@@ -566,6 +595,10 @@ impl Updatable for Counter {
 
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::Counter(variation).with(range)
+    }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.counter
     }
 }
 
@@ -580,6 +613,10 @@ impl Updatable for FrozenCounter {
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::FrozenCounter(variation).with(range)
     }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.frozen_counter
+    }
 }
 
 impl Updatable for Analog {
@@ -593,6 +630,10 @@ impl Updatable for Analog {
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::Analog(variation).with(range)
     }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.analog
+    }
 }
 
 impl Updatable for AnalogOutputStatus {
@@ -605,6 +646,10 @@ impl Updatable for AnalogOutputStatus {
 
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::AnalogOutputStatus(variation).with(range)
+    }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.analog_output_status
     }
 }
 
@@ -687,13 +732,13 @@ mod tests {
 
     #[test]
     fn can_write_integrity() {
-        let mut db = StaticDatabase::new();
+        let mut db = StaticDatabase::default();
 
         assert!(db.add(0, binary_config(StaticBinaryVariation::Group1Var2)));
         assert!(db.add(1, counter_config(StaticCounterVariation::Group20Var1)));
         assert!(db.add(2, analog_config(StaticAnalogVariation::Group30Var1)));
 
-        db.select_class_0();
+        db.select_class_zero();
 
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(buffer.as_mut());
@@ -715,13 +760,13 @@ mod tests {
 
     #[test]
     fn can_write_multiple_cycles() {
-        let mut db = StaticDatabase::new();
+        let mut db = StaticDatabase::default();
 
         assert!(db.add(0, binary_config(StaticBinaryVariation::Group1Var2)));
         assert!(db.add(1, counter_config(StaticCounterVariation::Group20Var1)));
         assert!(db.add(2, analog_config(StaticAnalogVariation::Group30Var1)));
 
-        db.select_class_0();
+        db.select_class_zero();
 
         let mut buffer = [0u8; 12]; // can only fit one header at a time
 
@@ -767,11 +812,11 @@ mod tests {
 
     #[test]
     fn promotes_g1v1_to_g1v2_if_flags_other_than_just_online() {
-        let mut db = StaticDatabase::new();
+        let mut db = StaticDatabase::default();
 
         assert!(db.add(0, binary_config(StaticBinaryVariation::Group1Var1)));
 
-        db.select_class_0();
+        db.select_class_zero();
 
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(buffer.as_mut());

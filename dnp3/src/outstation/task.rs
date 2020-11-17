@@ -5,7 +5,7 @@ use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::link::error::LinkError;
 use crate::link::header::Address;
-use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
+use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
 use crate::transport::{Fragment, ReaderType, WriterType};
 use crate::util::cursor::WriteCursor;
 
@@ -28,7 +28,7 @@ impl OutstationTask {
     pub fn create(
         address: u16,
         log_level: DecodeLogLevel,
-        config: EventBufferConfig,
+        config: DatabaseConfig,
     ) -> (Self, DatabaseHandle) {
         let handle = DatabaseHandle::new(config);
         let (reader, writer) = crate::transport::create_transport_layer(false, address);
