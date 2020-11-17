@@ -16,12 +16,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (mut task, mut handle) = OutstationTask::create(
         10,
         DecodeLogLevel::ObjectValues,
-        EventBufferConfig::uniform(10),
+        EventBufferConfig::all_types(10),
     );
 
-    handle.update(|db| {
+    handle.transaction(|db| {
         for i in 0..1000 {
-            db.add(i, EventClass::Class1, AnalogConfig::default());
+            db.add(i, Some(EventClass::Class1), AnalogConfig::default());
+            db.update(
+                i,
+                &Analog::new(10.0, Flags::ONLINE, Time::synchronized(0)),
+                UpdateOptions::initialize(),
+            );
         }
     });
 
@@ -42,10 +47,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         tokio::time::delay_for(Duration::from_secs(5)).await;
-        handle.update(|db| {
+        handle.transaction(|db| {
             db.update(
-                &Analog::new(value, Flags::new(0x01), Time::synchronized(1)),
                 7,
+                &Analog::new(value, Flags::new(0x01), Time::synchronized(1)),
                 UpdateOptions::default(),
             )
         });

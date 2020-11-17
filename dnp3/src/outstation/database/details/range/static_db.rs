@@ -124,7 +124,7 @@ pub(crate) struct PointConfig<T>
 where
     T: Updatable,
 {
-    class: EventClass,
+    class: Option<EventClass>,
     detector: T::Detector,
     s_var: T::StaticVariation,
     e_var: T::EventVariation,
@@ -135,7 +135,7 @@ where
     T: Updatable,
 {
     pub(crate) fn new(
-        class: EventClass,
+        class: Option<EventClass>,
         detector: T::Detector,
         s_var: T::StaticVariation,
         e_var: T::EventVariation,
@@ -305,12 +305,12 @@ impl StaticDatabase {
                     EventMode::Suppress => None,
                     EventMode::Force => {
                         x.last_event = value.clone();
-                        Some((x.config.e_var, x.config.class))
+                        x.config.class.map(|ec| (x.config.e_var, ec))
                     }
                     EventMode::Detect => {
                         if x.config.detector.is_event(&x.last_event, &value) {
                             x.last_event = value.clone();
-                            Some((x.config.e_var, x.config.class))
+                            x.config.class.map(|ec| (x.config.e_var, ec))
                         } else {
                             None
                         }
@@ -660,7 +660,7 @@ mod tests {
 
     fn binary_config(var: StaticBinaryVariation) -> PointConfig<Binary> {
         PointConfig {
-            class: EventClass::Class1,
+            class: Some(EventClass::Class1),
             s_var: var,
             e_var: EventBinaryVariation::Group2Var1,
             detector: FlagsDetector {},
@@ -669,7 +669,7 @@ mod tests {
 
     fn counter_config(var: StaticCounterVariation) -> PointConfig<Counter> {
         PointConfig {
-            class: EventClass::Class1,
+            class: Some(EventClass::Class1),
             s_var: var,
             e_var: EventCounterVariation::Group22Var1,
             detector: Deadband::new(0),
@@ -678,7 +678,7 @@ mod tests {
 
     fn analog_config(var: StaticAnalogVariation) -> PointConfig<Analog> {
         PointConfig {
-            class: EventClass::Class1,
+            class: Some(EventClass::Class1),
             s_var: var,
             e_var: EventAnalogVariation::Group32Var1,
             detector: Deadband::new(0.0),

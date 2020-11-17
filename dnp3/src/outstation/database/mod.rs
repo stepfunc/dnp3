@@ -1,18 +1,20 @@
+/// types for configuring the database
 pub mod config;
-pub(crate) mod details;
+/// private internal details only needed by the parent module
+mod details;
 
 use crate::app::header::IIN2;
 use crate::app::measurement::*;
 use crate::app::parse::parser::HeaderCollection;
-use crate::outstation::database::config::*;
-use crate::outstation::database::details::event::buffer::EventClasses;
-use crate::outstation::database::details::range::static_db::{
-    Deadband, FlagsDetector, PointConfig,
-};
 use crate::util::cursor::WriteCursor;
+
+use config::*;
+use details::event::buffer::EventClasses;
+use details::range::static_db::{Deadband, FlagsDetector, PointConfig};
 
 use std::sync::{Arc, Mutex};
 
+/// Controls how are events are processed when updating values in the database
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum EventMode {
     /// Detect events in a type dependent fashion. This is the default mode that should be used.
@@ -23,33 +25,50 @@ pub enum EventMode {
     Suppress,
 }
 
+/// Event class (1/2/3) assignment
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum EventClass {
+    /// Class 1 data per the protocol specification
     Class1,
+    /// Class 2 data per the protocol specification
     Class2,
+    /// Class 3 data per the protocol specification
     Class3,
 }
 
+/// Maximum number of events for each type.
+///
+/// A value of zero means that events will not be buffered for that type.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EventBufferConfig {
+    /// maximum number of binary input events (g2)
     pub max_binary: u16,
+    /// maximum number of double bit binary input events (g4)
     pub max_double_binary: u16,
+    /// maximum number of binary output status events (g11)
     pub max_binary_output_status: u16,
+    /// maximum number of counter events (g22)
     pub max_counter: u16,
+    /// maximum number of frozen counter events (g23)
     pub max_frozen_counter: u16,
+    /// maximum number of analog events (g32)
     pub max_analog: u16,
+    /// maximum number of analog output status events (g42)
     pub max_analog_output_status: u16,
 }
 
 impl EventBufferConfig {
-    pub fn uniform(max: u16) -> Self {
+    /// initialize with the same maximum values for all types
+    pub fn all_types(max: u16) -> Self {
         Self::new(max, max, max, max, max, max, max)
     }
 
+    /// initialize the configuration to support no events
     pub fn no_events() -> Self {
-        Self::uniform(0)
+        Self::all_types(0)
     }
 
+    /// create a configuration specifying the max for each type individually
     pub fn new(
         max_binary: u16,
         max_double_binary: u16,
@@ -102,10 +121,20 @@ pub struct UpdateOptions {
 }
 
 impl UpdateOptions {
+    /// fully specify custom UpdateOptions
     pub fn new(update_static: bool, event_mode: EventMode) -> Self {
         Self {
             update_static,
             event_mode,
+        }
+    }
+
+    /// options that will only update the static value in the database, but produce no events
+    /// useful for setting a first value in the outstation during database initialization
+    pub fn initialize() -> Self {
+        Self {
+            update_static: true,
+            event_mode: EventMode::Suppress,
         }
     }
 }
@@ -125,23 +154,39 @@ impl ResponseInfo {
     }
 }
 
+/// trait for adding a type to the database by index/class/configuration
+///
+/// Setting class to None means that the value will not produce events (static only).
+/// The value is initialized to the default of 0.0/false with flags == RESTART.
 pub trait Add<T> {
-    fn add(&mut self, index: u16, class: EventClass, config: T) -> bool;
+    /// add a measurement to the database
+    fn add(&mut self, index: u16, class: Option<EventClass>, config: T) -> bool;
 }
 
+/// trait for removing a type from the database
 pub trait Remove<T> {
+    /// remove a type by index, return true of the value existed, false otherwise
+    ///
+    /// Note: this remove the static value and configuration only. Any previously
+    /// buffered events will be reported normally
     fn remove(&mut self, index: u16) -> bool;
 }
 
+/// trait for updating an existing value in the database
 pub trait Update<T> {
-    fn update(&mut self, value: &T, index: u16, options: UpdateOptions) -> bool;
+    /// Update a value at a particular index. The options control
+    /// how static/event data is modified
+    fn update(&mut self, index: u16, value: &T, options: UpdateOptions) -> bool;
 }
 
+/// Core database implementation shared between an outstation task and the user facing API.
+/// This type is always guarded by a `DatabaseHandle` which provides a transactional API.
 pub struct Database {
     pub(crate) inner: crate::outstation::database::details::database::Database,
 }
 
 impl Database {
+    /// Create a database by specified how it will buffer events
     pub(crate) fn new(config: EventBufferConfig) -> Self {
         Self {
             inner: crate::outstation::database::details::database::Database::new(config),
@@ -149,24 +194,26 @@ impl Database {
     }
 }
 
+/// Handle type that can be used to perform transactions on an underlying database
 #[derive(Clone)]
 pub struct DatabaseHandle {
     inner: Arc<Mutex<Database>>,
 }
 
 impl DatabaseHandle {
-    pub fn new(config: EventBufferConfig) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(Database::new(config))),
-        }
-    }
-
-    pub fn update<F, R>(&mut self, mut func: F) -> R
+    /// Perform a transaction on the underlying database using a closure
+    pub fn transaction<F, R>(&mut self, mut func: F) -> R
     where
         F: FnMut(&mut Database) -> R,
     {
         let mut lock = self.inner.lock().unwrap();
         func(&mut *lock)
+    }
+
+    pub(crate) fn new(config: EventBufferConfig) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(Database::new(config))),
+        }
     }
 
     pub(crate) fn clear_written_events(&mut self) {
@@ -191,49 +238,49 @@ impl DatabaseHandle {
 }
 
 impl Update<Binary> for Database {
-    fn update(&mut self, value: &Binary, index: u16, options: UpdateOptions) -> bool {
+    fn update(&mut self, index: u16, value: &Binary, options: UpdateOptions) -> bool {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<DoubleBitBinary> for Database {
-    fn update(&mut self, value: &DoubleBitBinary, index: u16, options: UpdateOptions) -> bool {
+    fn update(&mut self, index: u16, value: &DoubleBitBinary, options: UpdateOptions) -> bool {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<BinaryOutputStatus> for Database {
-    fn update(&mut self, value: &BinaryOutputStatus, index: u16, options: UpdateOptions) -> bool {
+    fn update(&mut self, index: u16, value: &BinaryOutputStatus, options: UpdateOptions) -> bool {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<Counter> for Database {
-    fn update(&mut self, value: &Counter, index: u16, options: UpdateOptions) -> bool {
+    fn update(&mut self, index: u16, value: &Counter, options: UpdateOptions) -> bool {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<FrozenCounter> for Database {
-    fn update(&mut self, value: &FrozenCounter, index: u16, options: UpdateOptions) -> bool {
+    fn update(&mut self, index: u16, value: &FrozenCounter, options: UpdateOptions) -> bool {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<Analog> for Database {
-    fn update(&mut self, value: &Analog, index: u16, options: UpdateOptions) -> bool {
+    fn update(&mut self, index: u16, value: &Analog, options: UpdateOptions) -> bool {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<AnalogOutputStatus> for Database {
-    fn update(&mut self, value: &AnalogOutputStatus, index: u16, options: UpdateOptions) -> bool {
+    fn update(&mut self, index: u16, value: &AnalogOutputStatus, options: UpdateOptions) -> bool {
         self.inner.update(value, index, options)
     }
 }
 
 impl Add<BinaryConfig> for Database {
-    fn add(&mut self, index: u16, class: EventClass, config: BinaryConfig) -> bool {
+    fn add(&mut self, index: u16, class: Option<EventClass>, config: BinaryConfig) -> bool {
         let config =
             PointConfig::<Binary>::new(class, FlagsDetector {}, config.s_var, config.e_var);
         self.inner.add(index, config)
@@ -241,7 +288,12 @@ impl Add<BinaryConfig> for Database {
 }
 
 impl Add<DoubleBitBinaryConfig> for Database {
-    fn add(&mut self, index: u16, class: EventClass, config: DoubleBitBinaryConfig) -> bool {
+    fn add(
+        &mut self,
+        index: u16,
+        class: Option<EventClass>,
+        config: DoubleBitBinaryConfig,
+    ) -> bool {
         let config = PointConfig::<DoubleBitBinary>::new(
             class,
             FlagsDetector {},
@@ -253,7 +305,12 @@ impl Add<DoubleBitBinaryConfig> for Database {
 }
 
 impl Add<BinaryOutputStatusConfig> for Database {
-    fn add(&mut self, index: u16, class: EventClass, config: BinaryOutputStatusConfig) -> bool {
+    fn add(
+        &mut self,
+        index: u16,
+        class: Option<EventClass>,
+        config: BinaryOutputStatusConfig,
+    ) -> bool {
         let config = PointConfig::<BinaryOutputStatus>::new(
             class,
             FlagsDetector {},
@@ -265,7 +322,7 @@ impl Add<BinaryOutputStatusConfig> for Database {
 }
 
 impl Add<CounterConfig> for Database {
-    fn add(&mut self, index: u16, class: EventClass, config: CounterConfig) -> bool {
+    fn add(&mut self, index: u16, class: Option<EventClass>, config: CounterConfig) -> bool {
         let config = PointConfig::<Counter>::new(
             class,
             Deadband::new(config.deadband),
@@ -277,7 +334,7 @@ impl Add<CounterConfig> for Database {
 }
 
 impl Add<FrozenCounterConfig> for Database {
-    fn add(&mut self, index: u16, class: EventClass, config: FrozenCounterConfig) -> bool {
+    fn add(&mut self, index: u16, class: Option<EventClass>, config: FrozenCounterConfig) -> bool {
         let config = PointConfig::<FrozenCounter>::new(
             class,
             Deadband::new(config.deadband),
@@ -289,7 +346,7 @@ impl Add<FrozenCounterConfig> for Database {
 }
 
 impl Add<AnalogConfig> for Database {
-    fn add(&mut self, index: u16, class: EventClass, config: AnalogConfig) -> bool {
+    fn add(&mut self, index: u16, class: Option<EventClass>, config: AnalogConfig) -> bool {
         let config = PointConfig::<Analog>::new(
             class,
             Deadband::new(config.deadband),
@@ -301,7 +358,12 @@ impl Add<AnalogConfig> for Database {
 }
 
 impl Add<AnalogOutputStatusConfig> for Database {
-    fn add(&mut self, index: u16, class: EventClass, config: AnalogOutputStatusConfig) -> bool {
+    fn add(
+        &mut self,
+        index: u16,
+        class: Option<EventClass>,
+        config: AnalogOutputStatusConfig,
+    ) -> bool {
         let config = PointConfig::<AnalogOutputStatus>::new(
             class,
             Deadband::new(config.deadband),

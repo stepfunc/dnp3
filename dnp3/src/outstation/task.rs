@@ -11,7 +11,7 @@ use crate::util::cursor::WriteCursor;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
-pub struct Session {
+pub(crate) struct Session {
     buffer: [u8; 2048],
     log_level: DecodeLogLevel,
     database: DatabaseHandle,
@@ -24,6 +24,7 @@ pub struct OutstationTask {
 }
 
 impl OutstationTask {
+    /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
     pub fn create(
         address: u16,
         log_level: DecodeLogLevel,
@@ -39,6 +40,7 @@ impl OutstationTask {
         (task, handle)
     }
 
+    /// run the outstation task asynchronously until a `LinkError` occurs
     pub async fn run<T>(&mut self, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
