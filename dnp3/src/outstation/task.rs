@@ -5,24 +5,43 @@ use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::link::error::LinkError;
 use crate::link::header::Address;
+use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
 use crate::transport::{Fragment, ReaderType, WriterType};
 use crate::util::cursor::WriteCursor;
-use std::sync::{Arc, Mutex};
+
 use tokio::io::{AsyncRead, AsyncWrite};
 
-/*
-pub trait Update<T> {
-    fn update(&mut self, value: &T, index: u16, options: UpdateOptions) -> bool;
-}
-*/
-
-pub struct State {
-    pub(crate) database: Arc<Mutex<crate::outstation::db::database::Database>>,
-}
-
-pub(crate) struct Task {
+pub struct Session {
     buffer: [u8; 2048],
-    state: State,
+    database: DatabaseHandle,
+}
+
+pub struct OutstationTask {
+    session: Session,
+    reader: ReaderType,
+    writer: WriterType,
+}
+
+impl OutstationTask {
+    pub fn create(address: u16, config: EventBufferConfig) -> (Self, DatabaseHandle) {
+        let handle = DatabaseHandle::new(config);
+        let (reader, writer) = crate::transport::create_transport_layer(false, address);
+        let task = Self {
+            session: Session::new(handle.clone()),
+            reader,
+            writer,
+        };
+        (task, handle)
+    }
+
+    pub async fn run<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        self.session
+            .run(io, &mut self.reader, &mut self.writer)
+            .await
+    }
 }
 
 enum ResponseAction {
@@ -36,11 +55,11 @@ enum Confirm {
     NewRequest,
 }
 
-impl Task {
-    pub(crate) fn new(database: Arc<Mutex<crate::outstation::db::database::Database>>) -> Self {
+impl Session {
+    pub(crate) fn new(database: DatabaseHandle) -> Self {
         Self {
             buffer: [0; 2048],
-            state: State { database },
+            database,
         }
     }
 
@@ -97,7 +116,7 @@ impl Task {
         if request.header.function == FunctionCode::Read {
             let iin = match request.objects {
                 Err(_) => IIN2::PARAMETER_ERROR,
-                Ok(headers) => self.state.database.lock().unwrap().select(&headers),
+                Ok(headers) => self.database.select(&headers),
             };
             Some(ResponseAction::BeginReadResponse(
                 request.header.control.seq,
@@ -135,12 +154,8 @@ impl Task {
         loop {
             let mut cursor = WriteCursor::new(self.buffer.as_mut());
             cursor.skip(4)?;
-            let info = self
-                .state
-                .database
-                .lock()
-                .unwrap()
-                .write_response_headers(&mut cursor);
+            let info = self.database.write_response_headers(&mut cursor);
+
             let confirm = info.need_confirm();
 
             let iin2 = if fir { iin2 } else { IIN2::default() };
@@ -156,7 +171,7 @@ impl Task {
 
             match self.wait_sol_confirm(io, reader, seq).await? {
                 Confirm::Timeout => {
-                    self.state.database.lock().unwrap().reset();
+                    self.database.reset();
                     return Ok(());
                 }
                 Confirm::NewRequest => {
@@ -165,7 +180,7 @@ impl Task {
                 Confirm::Yes => {}
             }
 
-            self.state.database.lock().unwrap().clear_written_events();
+            self.database.clear_written_events();
 
             if info.complete {
                 return Ok(());
@@ -235,47 +250,3 @@ impl Task {
         Ok(Confirm::Timeout)
     }
 }
-
-/*
-impl Update<Binary> for Database {
-    fn update(&mut self, value: &Binary, index: u16, options: UpdateOptions) -> bool {
-        self.inner.update(value, index, options)
-    }
-}
-
-impl Update<DoubleBitBinary> for Database {
-    fn update(&mut self, value: &DoubleBitBinary, index: u16, options: UpdateOptions) -> bool {
-        self.inner.update(value, index, options)
-    }
-}
-
-impl Update<BinaryOutputStatus> for Database {
-    fn update(&mut self, value: &BinaryOutputStatus, index: u16, options: UpdateOptions) -> bool {
-        self.inner.update(value, index, options)
-    }
-}
-
-impl Update<Counter> for Database {
-    fn update(&mut self, value: &Counter, index: u16, options: UpdateOptions) -> bool {
-        self.inner.update(value, index, options)
-    }
-}
-
-impl Update<FrozenCounter> for Database {
-    fn update(&mut self, value: &FrozenCounter, index: u16, options: UpdateOptions) -> bool {
-        self.inner.update(value, index, options)
-    }
-}
-
-impl Update<Analog> for Database {
-    fn update(&mut self, value: &Analog, index: u16, options: UpdateOptions) -> bool {
-        self.inner.update(value, index, options)
-    }
-}
-
-impl Update<AnalogOutputStatus> for Database {
-    fn update(&mut self, value: &AnalogOutputStatus, index: u16, options: UpdateOptions) -> bool {
-        self.inner.update(value, index, options)
-    }
-}
-*/

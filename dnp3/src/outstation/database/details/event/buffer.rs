@@ -1,8 +1,9 @@
+use super::list::VecList;
+use super::traits::BaseEvent;
+use super::writer::EventWriter;
 use crate::app::header::IIN1;
 use crate::app::measurement;
-use crate::outstation::db::event::list::VecList;
-use crate::outstation::db::event::traits::BaseEvent;
-use crate::outstation::db::event::writer::EventWriter;
+use crate::outstation::database::EventBufferConfig;
 use crate::outstation::types::EventClass;
 use crate::outstation::variations::*;
 use crate::util::cursor::{WriteCursor, WriteError};
@@ -399,17 +400,6 @@ impl EventRecord {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct EventBufferConfig {
-    pub max_binary: u16,
-    pub max_double_binary: u16,
-    pub max_binary_output_status: u16,
-    pub max_counter: u16,
-    pub max_frozen_counter: u16,
-    pub max_analog: u16,
-    pub max_analog_output_status: u16,
-}
-
 pub(crate) trait Insertable: BaseEvent {
     fn get_max(config: &EventBufferConfig) -> u16;
     fn get_type_count(counter: &TypeCounter) -> usize;
@@ -426,47 +416,7 @@ pub(crate) trait Insertable: BaseEvent {
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool;
 }
 
-impl EventBufferConfig {
-    pub fn uniform(max: u16) -> Self {
-        Self::new(max, max, max, max, max, max, max)
-    }
-
-    pub fn no_events() -> Self {
-        Self::uniform(0)
-    }
-
-    pub fn new(
-        max_binary: u16,
-        max_double_binary: u16,
-        max_binary_output_status: u16,
-        max_counter: u16,
-        max_frozen_counter: u16,
-        max_analog: u16,
-        max_analog_output_status: u16,
-    ) -> Self {
-        Self {
-            max_binary,
-            max_double_binary,
-            max_binary_output_status,
-            max_counter,
-            max_frozen_counter,
-            max_analog,
-            max_analog_output_status,
-        }
-    }
-
-    fn max_events(&self) -> usize {
-        self.max_binary as usize
-            + self.max_double_binary as usize
-            + self.max_binary_output_status as usize
-            + self.max_counter as usize
-            + self.max_frozen_counter as usize
-            + self.max_analog as usize
-            + self.max_analog_output_status as usize
-    }
-}
-
-pub struct EventBuffer {
+pub(crate) struct EventBuffer {
     config: EventBufferConfig,
     events: VecList<EventRecord>,
     total: Counters,

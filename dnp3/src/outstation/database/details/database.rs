@@ -1,31 +1,17 @@
 use crate::app::gen::all::AllObjectsVariation;
 use crate::app::header::IIN2;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
-use crate::outstation::db::event::buffer::{EventBuffer, EventBufferConfig, EventClasses};
-use crate::outstation::db::range::static_db::{
-    PointConfig, StaticDatabase, Updatable, UpdateOptions,
+use crate::outstation::database::details::event::buffer::EventBuffer;
+use crate::outstation::database::details::range::static_db::{
+    PointConfig, StaticDatabase, Updatable,
 };
+use crate::outstation::database::{EventBufferConfig, ResponseInfo, UpdateOptions};
 use crate::outstation::types::EventClass;
 use crate::util::cursor::WriteCursor;
 
 pub(crate) struct Database {
     static_db: StaticDatabase,
     event_buffer: EventBuffer,
-}
-
-pub(crate) struct ResponseInfo {
-    /// true if the written response contains events
-    pub(crate) has_events: bool,
-    /// true if all selected data has been written (FIN == 1)
-    pub(crate) complete: bool,
-    /// flags for IIN
-    pub(crate) unwritten: EventClasses,
-}
-
-impl ResponseInfo {
-    pub(crate) fn need_confirm(&self) -> bool {
-        self.has_events || !self.complete
-    }
 }
 
 impl Database {

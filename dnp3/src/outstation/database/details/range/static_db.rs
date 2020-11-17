@@ -1,12 +1,14 @@
 use crate::app::flags::Flags;
 use crate::app::measurement::*;
 use crate::app::types::DoubleBit;
-use crate::outstation::db::event::buffer::Insertable;
-use crate::outstation::db::range::traits::StaticVariation;
-use crate::outstation::db::range::writer::RangeWriter;
+use crate::outstation::database::details::event::buffer::Insertable;
+use crate::outstation::database::details::range::traits::StaticVariation;
+use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::outstation::types::EventClass;
 use crate::outstation::variations::*;
 use crate::util::cursor::{WriteCursor, WriteError};
+
+use crate::outstation::database::{EventMode, UpdateOptions};
 use std::collections::{BTreeMap, Bound, VecDeque};
 use std::ops::RangeBounds;
 
@@ -114,7 +116,7 @@ impl SelectionQueue {
     }
 
     fn reset(&mut self) {
-        self.capacity_exceeded = 1;
+        self.capacity_exceeded = 0;
         self.queue.clear();
     }
 }
@@ -127,6 +129,25 @@ where
     detector: T::Detector,
     s_var: T::StaticVariation,
     e_var: T::EventVariation,
+}
+
+impl<T> PointConfig<T>
+where
+    T: Updatable,
+{
+    pub(crate) fn new(
+        class: EventClass,
+        detector: T::Detector,
+        s_var: T::StaticVariation,
+        e_var: T::EventVariation,
+    ) -> Self {
+        Self {
+            class,
+            detector,
+            s_var,
+            e_var,
+        }
+    }
 }
 
 pub(crate) struct Point<T>
@@ -153,45 +174,6 @@ where
             selected: T::default(),
             last_event: T::default(),
             config,
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum EventMode {
-    /// Detect events in a type dependent fashion. This is the default mode that should be used.
-    Detect,
-    /// Produce an event whether the value has changed or not
-    Force,
-    /// Never produce an event regardless of change
-    Suppress,
-}
-
-/// Options that control how the update is performed. 99% of the time
-/// the default() method should be used to initialize this struct. Very
-/// few applications need to use the other options.
-#[derive(Debug, Copy, Clone)]
-pub struct UpdateOptions {
-    /// optionally bypass updating the static_db (current value)
-    update_static: bool,
-    /// determines how/if an event is produced
-    event_mode: EventMode,
-}
-
-impl UpdateOptions {
-    pub fn new(update_static: bool, event_mode: EventMode) -> Self {
-        Self {
-            update_static,
-            event_mode,
-        }
-    }
-}
-
-impl Default for UpdateOptions {
-    fn default() -> Self {
-        Self {
-            update_static: true,
-            event_mode: EventMode::Detect,
         }
     }
 }

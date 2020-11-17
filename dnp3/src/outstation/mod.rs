@@ -1,5 +1,5 @@
-/// db and event buffer
-pub mod db;
+/// database and event buffer
+pub mod database;
 pub mod task;
 /// public types like enums
 pub mod types;

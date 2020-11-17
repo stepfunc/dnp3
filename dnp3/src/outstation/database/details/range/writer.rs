@@ -1,7 +1,7 @@
 use crate::app::enums::QualifierCode;
 use crate::app::types::DoubleBit;
 use crate::app::variations::Variation;
-use crate::outstation::db::range::traits::{
+use crate::outstation::database::details::range::traits::{
     FixedWriteFn, ToBit, ToDoubleBit, WriteInfo, WriteType,
 };
 use crate::util::cursor::{WriteCursor, WriteError};
@@ -288,7 +288,7 @@ mod tests {
     use super::*;
     use crate::app::flags::Flags;
     use crate::app::measurement::{Binary, DoubleBitBinary, Time};
-    use crate::outstation::db::range::traits::StaticVariation;
+    use crate::outstation::database::details::range::traits::StaticVariation;
     use crate::outstation::variations::{StaticBinaryVariation, StaticDoubleBitBinaryVariation};
 
     fn binary(value: bool) -> Binary {
