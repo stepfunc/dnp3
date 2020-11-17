@@ -1,7 +1,8 @@
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::{Binary, Time};
+use dnp3::outstation::database::config::BinaryConfig;
 use dnp3::outstation::database::EventBufferConfig;
-use dnp3::outstation::database::{Update, UpdateOptions};
+use dnp3::outstation::database::{Add, Update, UpdateOptions};
 use dnp3::outstation::task::OutstationTask;
 use dnp3::outstation::types::EventClass;
 use dnp3::outstation::variations::{EventBinaryVariation, StaticBinaryVariation};
@@ -17,11 +18,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     handle.update(|db| {
         for i in 0..10 {
-            db.add_binary(
+            db.add(
                 i,
                 EventClass::Class1,
-                StaticBinaryVariation::Group1Var1,
-                EventBinaryVariation::Group2Var1,
+                BinaryConfig::new(
+                    StaticBinaryVariation::Group1Var1,
+                    EventBinaryVariation::Group2Var1,
+                ),
             );
         }
     });

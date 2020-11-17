@@ -1,13 +1,17 @@
+pub mod config;
 pub(crate) mod details;
 
 use crate::app::header::IIN2;
 use crate::app::measurement::*;
 use crate::app::parse::parser::HeaderCollection;
+use crate::outstation::database::config::*;
 use crate::outstation::database::details::event::buffer::EventClasses;
-use crate::outstation::database::details::range::static_db::{FlagsDetector, PointConfig};
+use crate::outstation::database::details::range::static_db::{
+    Deadband, FlagsDetector, PointConfig,
+};
 use crate::outstation::types::EventClass;
-use crate::outstation::variations::{EventBinaryVariation, StaticBinaryVariation};
 use crate::util::cursor::WriteCursor;
+
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -119,6 +123,10 @@ pub trait Update<T> {
     fn update(&mut self, value: &T, index: u16, options: UpdateOptions) -> bool;
 }
 
+pub trait Add<T> {
+    fn add(&mut self, index: u16, class: EventClass, config: T) -> bool;
+}
+
 pub struct Database {
     pub(crate) inner: crate::outstation::database::details::database::Database,
 }
@@ -128,17 +136,6 @@ impl Database {
         Self {
             inner: crate::outstation::database::details::database::Database::new(config),
         }
-    }
-
-    pub fn add_binary(
-        &mut self,
-        index: u16,
-        class: EventClass,
-        s_var: StaticBinaryVariation,
-        e_var: EventBinaryVariation,
-    ) -> bool {
-        let config = PointConfig::<Binary>::new(class, FlagsDetector {}, s_var, e_var);
-        self.inner.add(index, config)
     }
 }
 
@@ -222,5 +219,85 @@ impl Update<Analog> for Database {
 impl Update<AnalogOutputStatus> for Database {
     fn update(&mut self, value: &AnalogOutputStatus, index: u16, options: UpdateOptions) -> bool {
         self.inner.update(value, index, options)
+    }
+}
+
+impl Add<BinaryConfig> for Database {
+    fn add(&mut self, index: u16, class: EventClass, config: BinaryConfig) -> bool {
+        let config =
+            PointConfig::<Binary>::new(class, FlagsDetector {}, config.s_var, config.e_var);
+        self.inner.add(index, config)
+    }
+}
+
+impl Add<DoubleBitBinaryConfig> for Database {
+    fn add(&mut self, index: u16, class: EventClass, config: DoubleBitBinaryConfig) -> bool {
+        let config = PointConfig::<DoubleBitBinary>::new(
+            class,
+            FlagsDetector {},
+            config.s_var,
+            config.e_var,
+        );
+        self.inner.add(index, config)
+    }
+}
+
+impl Add<BinaryOutputStatusConfig> for Database {
+    fn add(&mut self, index: u16, class: EventClass, config: BinaryOutputStatusConfig) -> bool {
+        let config = PointConfig::<BinaryOutputStatus>::new(
+            class,
+            FlagsDetector {},
+            config.s_var,
+            config.e_var,
+        );
+        self.inner.add(index, config)
+    }
+}
+
+impl Add<CounterConfig> for Database {
+    fn add(&mut self, index: u16, class: EventClass, config: CounterConfig) -> bool {
+        let config = PointConfig::<Counter>::new(
+            class,
+            Deadband::new(config.deadband),
+            config.s_var,
+            config.e_var,
+        );
+        self.inner.add(index, config)
+    }
+}
+
+impl Add<FrozenCounterConfig> for Database {
+    fn add(&mut self, index: u16, class: EventClass, config: FrozenCounterConfig) -> bool {
+        let config = PointConfig::<FrozenCounter>::new(
+            class,
+            Deadband::new(config.deadband),
+            config.s_var,
+            config.e_var,
+        );
+        self.inner.add(index, config)
+    }
+}
+
+impl Add<AnalogConfig> for Database {
+    fn add(&mut self, index: u16, class: EventClass, config: AnalogConfig) -> bool {
+        let config = PointConfig::<Analog>::new(
+            class,
+            Deadband::new(config.deadband),
+            config.s_var,
+            config.e_var,
+        );
+        self.inner.add(index, config)
+    }
+}
+
+impl Add<AnalogOutputStatusConfig> for Database {
+    fn add(&mut self, index: u16, class: EventClass, config: AnalogOutputStatusConfig) -> bool {
+        let config = PointConfig::<AnalogOutputStatus>::new(
+            class,
+            Deadband::new(config.deadband),
+            config.s_var,
+            config.e_var,
+        );
+        self.inner.add(index, config)
     }
 }
