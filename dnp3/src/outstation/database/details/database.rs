@@ -1,11 +1,11 @@
 use crate::app::gen::all::AllObjectsVariation;
 use crate::app::header::IIN2;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
-use crate::outstation::db::event::buffer::{EventBuffer, EventBufferConfig, EventClasses};
-use crate::outstation::db::range::static_db::{
-    PointConfig, StaticDatabase, Updatable, UpdateOptions,
+use crate::outstation::database::details::event::buffer::EventBuffer;
+use crate::outstation::database::details::range::static_db::{
+    PointConfig, StaticDatabase, Updatable,
 };
-use crate::outstation::types::EventClass;
+use crate::outstation::database::{DatabaseConfig, EventClass, ResponseInfo, UpdateOptions};
 use crate::util::cursor::WriteCursor;
 
 pub(crate) struct Database {
@@ -13,21 +13,21 @@ pub(crate) struct Database {
     event_buffer: EventBuffer,
 }
 
-pub(crate) struct ResponseInfo {
-    /// true if the written response contains events
-    has_events: bool,
-    /// true if all selected data has been written (FIN == 1)
-    complete: bool,
-    /// flags for IIN
-    unwritten: EventClasses,
-}
-
 impl Database {
-    pub(crate) fn new(config: EventBufferConfig) -> Self {
+    pub(crate) fn new(config: DatabaseConfig) -> Self {
         Self {
-            static_db: StaticDatabase::new(),
-            event_buffer: EventBuffer::new(config),
+            static_db: StaticDatabase::new(config.max_read_request_headers, config.class_zero),
+            event_buffer: EventBuffer::new(config.events),
         }
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.static_db.reset();
+        self.event_buffer.reset();
+    }
+
+    pub(crate) fn clear_written_events(&mut self) {
+        self.event_buffer.clear_written();
     }
 
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> IIN2 {
@@ -72,7 +72,7 @@ impl Database {
     fn select_all_objects(&mut self, variation: AllObjectsVariation) -> IIN2 {
         match variation {
             AllObjectsVariation::Group60Var1 => {
-                self.static_db.select_class_0();
+                self.static_db.select_class_zero();
             }
             AllObjectsVariation::Group60Var2 => {
                 self.event_buffer
@@ -107,11 +107,11 @@ impl Database {
         self.static_db.remove::<T>(index)
     }
 
-    pub(crate) fn update<T>(&mut self, value: T, index: u16, options: UpdateOptions) -> bool
+    pub(crate) fn update<T>(&mut self, value: &T, index: u16, options: UpdateOptions) -> bool
     where
         T: Updatable,
     {
-        let event_data = self.static_db.update(&value, index, options);
+        let event_data = self.static_db.update(value, index, options);
 
         // if an event should be produced, insert it into the buffer
         if let Some((variation, class)) = event_data {

@@ -322,6 +322,10 @@ mod tests {
     use std::future::Future;
     use std::time::SystemTime;
 
+    fn response_control_field(seq: Sequence) -> Control {
+        Control::response(seq, true, true, false)
+    }
+
     struct SingleTimestampTestHandler {
         time: Cell<Option<Timestamp>>,
         handler: NullHandler,
@@ -416,7 +420,7 @@ mod tests {
                     let mut buffer = [0; 20];
                     let mut cursor = WriteCursor::new(&mut buffer);
                     let writer = start_response(
-                        Control::response(Sequence::default()),
+                        response_control_field(Sequence::default()),
                         ResponseFunction::Response,
                         IIN::default(),
                         &mut cursor,
@@ -471,7 +475,7 @@ mod tests {
                     let mut buffer = [0; 20];
                     let mut cursor = WriteCursor::new(&mut buffer);
                     let writer = start_response(
-                        Control::response(Sequence::default()),
+                        response_control_field(Sequence::default()),
                         ResponseFunction::Response,
                         IIN::default(),
                         &mut cursor,
@@ -501,7 +505,7 @@ mod tests {
                     let mut buffer = [0; 20];
                     let mut cursor = WriteCursor::new(&mut buffer);
                     let mut writer = start_response(
-                        Control::response(Sequence::default()),
+                        response_control_field(Sequence::default()),
                         ResponseFunction::Response,
                         IIN::default(),
                         &mut cursor,
@@ -532,7 +536,7 @@ mod tests {
                     let mut buffer = [0; 20];
                     let mut cursor = WriteCursor::new(&mut buffer);
                     let writer = start_response(
-                        Control::response(Sequence::default()),
+                        response_control_field(Sequence::default()),
                         ResponseFunction::Response,
                         IIN::new(IIN1::new(0x10), IIN2::new(0x00)),
                         &mut cursor,
@@ -673,7 +677,7 @@ mod tests {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
             let mut writer = start_response(
-                Control::response(Sequence::default()),
+                response_control_field(Sequence::default()),
                 ResponseFunction::Response,
                 IIN::default(),
                 &mut cursor,
@@ -766,7 +770,7 @@ mod tests {
                     let mut buffer = [0; 20];
                     let mut cursor = WriteCursor::new(&mut buffer);
                     let mut writer = start_response(
-                        Control::response(Sequence::default()),
+                        response_control_field(Sequence::default()),
                         ResponseFunction::Response,
                         IIN::default(),
                         &mut cursor,
@@ -797,7 +801,7 @@ mod tests {
                     let mut buffer = [0; 20];
                     let mut cursor = WriteCursor::new(&mut buffer);
                     let mut writer = start_response(
-                        Control::response(Sequence::default()),
+                        response_control_field(Sequence::default()),
                         ResponseFunction::Response,
                         IIN::default(),
                         &mut cursor,
@@ -828,7 +832,7 @@ mod tests {
                     let mut buffer = [0; 20];
                     let mut cursor = WriteCursor::new(&mut buffer);
                     let writer = start_response(
-                        Control::response(Sequence::default()),
+                        response_control_field(Sequence::default()),
                         ResponseFunction::Response,
                         IIN::new(IIN1::new(0x10), IIN2::new(0x00)),
                         &mut cursor,
@@ -927,7 +931,7 @@ mod tests {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
             let writer = start_response(
-                Control::response(Sequence::default()),
+                response_control_field(Sequence::default()),
                 ResponseFunction::Response,
                 IIN::default(),
                 &mut cursor,

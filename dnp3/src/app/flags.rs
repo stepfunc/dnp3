@@ -14,8 +14,8 @@ pub struct Flags {
 }
 
 impl Flags {
-    pub(crate) const ONLINE: Flags = Flags::new(0x01);
-    pub(crate) const RESTART: Flags = Flags::new(0x02);
+    pub const ONLINE: Flags = Flags::new(0x01);
+    pub const RESTART: Flags = Flags::new(0x02);
 
     /// create a `Flags` struct from a `u8`
     pub const fn new(value: u8) -> Self {

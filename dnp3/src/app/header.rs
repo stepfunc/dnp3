@@ -1,6 +1,6 @@
 use crate::app::enums::FunctionCode;
 use crate::app::sequence::Sequence;
-use crate::util::bit::bits::{BIT_0, BIT_1, BIT_2};
+use crate::util::bit::bits::*;
 use crate::util::bit::{format_bitfield, Bitfield};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::Formatter;
@@ -41,17 +41,17 @@ impl Control {
     const CON_MASK: u8 = 0b0010_0000;
     const UNS_MASK: u8 = 0b0001_0000;
 
-    pub(crate) fn request(seq: Sequence) -> Self {
+    pub(crate) fn response(seq: Sequence, fir: bool, fin: bool, con: bool) -> Self {
         Self {
-            fir: true,
-            fin: true,
-            con: false,
+            fir,
+            fin,
+            con,
             uns: false,
             seq,
         }
     }
 
-    pub(crate) fn response(seq: Sequence) -> Self {
+    pub(crate) fn request(seq: Sequence) -> Self {
         Self {
             fir: true,
             fin: true,
@@ -146,8 +146,12 @@ pub struct IIN {
 }
 
 impl IIN1 {
+    pub const CLASS_1_EVENTS: IIN1 = IIN1::new(BIT_1.value);
+    pub const CLASS_2_EVENTS: IIN1 = IIN1::new(BIT_2.value);
+    pub const CLASS_3_EVENTS: IIN1 = IIN1::new(BIT_3.value);
+
     /// Construct IIN1 from its underlying value
-    pub fn new(value: u8) -> Self {
+    pub const fn new(value: u8) -> Self {
         Self { value }
     }
 
@@ -252,6 +256,16 @@ impl IIN2 {
 impl Default for IIN2 {
     fn default() -> Self {
         Self { value: 0 }
+    }
+}
+
+impl BitOr for IIN1 {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value | rhs.value,
+        }
     }
 }
 
@@ -397,6 +411,13 @@ impl ResponseFunction {
             ResponseFunction::UnsolicitedResponse => true,
         }
     }
+
+    pub(crate) fn function(&self) -> FunctionCode {
+        match self {
+            ResponseFunction::Response => FunctionCode::Response,
+            ResponseFunction::UnsolicitedResponse => FunctionCode::UnsolicitedResponse,
+        }
+    }
 }
 
 impl From<ResponseFunction> for FunctionCode {
@@ -435,7 +456,7 @@ impl ResponseHeader {
 
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.control.write(cursor)?;
-        self.function().write(cursor)?;
+        self.function.function().write(cursor)?;
         self.iin.write(cursor)?;
         Ok(())
     }

@@ -100,7 +100,6 @@ impl std::fmt::Display for ObjectParseError {
     }
 }
 
-/*
 impl std::fmt::Display for RequestValidationError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
@@ -116,7 +115,6 @@ impl std::fmt::Display for RequestValidationError {
         }
     }
 }
-*/
 
 impl std::fmt::Display for ResponseValidationError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {

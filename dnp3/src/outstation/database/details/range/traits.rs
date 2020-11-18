@@ -3,7 +3,7 @@ use crate::app::measurement::*;
 use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
 use crate::app::types::DoubleBit;
 use crate::app::variations::*;
-use crate::outstation::variations::*;
+use crate::outstation::database::config::*;
 use crate::util::bit::bits::{BIT_6, BIT_7};
 use crate::util::cursor::{WriteCursor, WriteError};
 
