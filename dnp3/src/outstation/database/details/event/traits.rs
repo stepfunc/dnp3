@@ -1,8 +1,10 @@
 use crate::app::measurement::*;
 use crate::app::variations::*;
-use crate::outstation::db::event::write_fn::{write_cto, write_fixed_size, Continue};
-use crate::outstation::db::event::writer::HeaderType;
-use crate::outstation::variations::*;
+use crate::outstation::database::config::*;
+use crate::outstation::database::details::event::write_fn::{
+    write_cto, write_fixed_size, Continue,
+};
+use crate::outstation::database::details::event::writer::HeaderType;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 pub(crate) trait EventVariation<T> {

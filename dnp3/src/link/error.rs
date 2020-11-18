@@ -2,7 +2,7 @@ use crate::util::cursor::WriteError;
 
 /// these errors should never occur, but they are preferable to using
 /// functions that could panic. If they ever were to happen, they indicate
-/// a buy in the library itself
+/// a bug in the library itself
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum LogicError {
     BadRead,

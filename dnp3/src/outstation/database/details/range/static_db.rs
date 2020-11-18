@@ -1,12 +1,15 @@
 use crate::app::flags::Flags;
 use crate::app::measurement::*;
 use crate::app::types::DoubleBit;
-use crate::outstation::db::event::buffer::Insertable;
-use crate::outstation::db::range::traits::StaticVariation;
-use crate::outstation::db::range::writer::RangeWriter;
-use crate::outstation::types::EventClass;
-use crate::outstation::variations::*;
+use crate::outstation::database::config::*;
+use crate::outstation::database::details::event::buffer::Insertable;
+use crate::outstation::database::details::range::traits::StaticVariation;
+use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::util::cursor::{WriteCursor, WriteError};
+
+use crate::outstation::database::{
+    ClassZeroConfig, DatabaseConfig, EventClass, EventMode, UpdateOptions,
+};
 use std::collections::{BTreeMap, Bound, VecDeque};
 use std::ops::RangeBounds;
 
@@ -22,6 +25,7 @@ pub(crate) trait Updatable: Insertable + Clone + Default {
     type Detector: EventDetector<Self>;
     fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self>;
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange;
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool;
 }
 
 #[derive(Copy, Clone)]
@@ -114,7 +118,7 @@ impl SelectionQueue {
     }
 
     fn reset(&mut self) {
-        self.capacity_exceeded = 1;
+        self.capacity_exceeded = 0;
         self.queue.clear();
     }
 }
@@ -123,10 +127,29 @@ pub(crate) struct PointConfig<T>
 where
     T: Updatable,
 {
-    class: EventClass,
+    class: Option<EventClass>,
     detector: T::Detector,
     s_var: T::StaticVariation,
     e_var: T::EventVariation,
+}
+
+impl<T> PointConfig<T>
+where
+    T: Updatable,
+{
+    pub(crate) fn new(
+        class: Option<EventClass>,
+        detector: T::Detector,
+        s_var: T::StaticVariation,
+        e_var: T::EventVariation,
+    ) -> Self {
+        Self {
+            class,
+            detector,
+            s_var,
+            e_var,
+        }
+    }
 }
 
 pub(crate) struct Point<T>
@@ -153,45 +176,6 @@ where
             selected: T::default(),
             last_event: T::default(),
             config,
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum EventMode {
-    /// Detect events in a type dependent fashion. This is the default mode that should be used.
-    Detect,
-    /// Produce an event whether the value has changed or not
-    Force,
-    /// Never produce an event regardless of change
-    Suppress,
-}
-
-/// Options that control how the update is performed. 99% of the time
-/// the default() method should be used to initialize this struct. Very
-/// few applications need to use the other options.
-#[derive(Debug, Copy, Clone)]
-pub struct UpdateOptions {
-    /// optionally bypass updating the static_db (current value)
-    update_static: bool,
-    /// determines how/if an event is produced
-    event_mode: EventMode,
-}
-
-impl UpdateOptions {
-    pub fn new(update_static: bool, event_mode: EventMode) -> Self {
-        Self {
-            update_static,
-            event_mode,
-        }
-    }
-}
-
-impl Default for UpdateOptions {
-    fn default() -> Self {
-        Self {
-            update_static: true,
-            event_mode: EventMode::Detect,
         }
     }
 }
@@ -234,6 +218,7 @@ where
 }
 
 pub(crate) struct StaticDatabase {
+    class_zero: ClassZeroConfig,
     selected: SelectionQueue,
     // maps for the various types
     binary: PointMap<Binary>,
@@ -245,6 +230,12 @@ pub(crate) struct StaticDatabase {
     analog_output_status: PointMap<AnalogOutputStatus>,
 }
 
+impl Default for StaticDatabase {
+    fn default() -> Self {
+        Self::new(None, ClassZeroConfig::default())
+    }
+}
+
 #[derive(Copy, Clone)]
 enum NextWriteAction {
     Complete,
@@ -252,9 +243,15 @@ enum NextWriteAction {
 }
 
 impl StaticDatabase {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(max_selection: Option<u16>, class_zero: ClassZeroConfig) -> Self {
+        // don't allow values smaller than the default
+        let max_selection = max_selection
+            .map(|x| x.max(DatabaseConfig::DEFAULT_READ_REQUEST_HEADERS))
+            .unwrap_or(DatabaseConfig::DEFAULT_READ_REQUEST_HEADERS);
+
         Self {
-            selected: SelectionQueue::new(64), // TODO - How to configure?
+            class_zero,
+            selected: SelectionQueue::new(max_selection),
             binary: PointMap::empty(),
             double_bit_binary: PointMap::empty(),
             binary_output_status: PointMap::empty(),
@@ -324,12 +321,12 @@ impl StaticDatabase {
                     EventMode::Suppress => None,
                     EventMode::Force => {
                         x.last_event = value.clone();
-                        Some((x.config.e_var, x.config.class))
+                        x.config.class.map(|ec| (x.config.e_var, ec))
                     }
                     EventMode::Detect => {
                         if x.config.detector.is_event(&x.last_event, &value) {
                             x.last_event = value.clone();
-                            Some((x.config.e_var, x.config.class))
+                            x.config.class.map(|ec| (x.config.e_var, ec))
                         } else {
                             None
                         }
@@ -432,24 +429,25 @@ impl StaticDatabase {
         T::get_map(self)
     }
 
-    pub(crate) fn select_class_0(&mut self) {
-        self.binary.select_all().map(|x| self.selected.push_back(x));
-        self.double_bit_binary
-            .select_all()
-            .map(|x| self.selected.push_back(x));
-        self.binary_output_status
-            .select_all()
-            .map(|x| self.selected.push_back(x));
-        self.counter
-            .select_all()
-            .map(|x| self.selected.push_back(x));
-        self.frozen_counter
-            .select_all()
-            .map(|x| self.selected.push_back(x));
-        self.analog.select_all().map(|x| self.selected.push_back(x));
-        self.analog_output_status
-            .select_all()
-            .map(|x| self.selected.push_back(x));
+    fn select_class_zero_type<T>(&mut self)
+    where
+        T: Updatable,
+    {
+        if T::enabled_class_zero(&self.class_zero) {
+            T::get_map(self)
+                .select_all()
+                .map(|x| self.selected.push_back(x));
+        }
+    }
+
+    pub(crate) fn select_class_zero(&mut self) {
+        self.select_class_zero_type::<Binary>();
+        self.select_class_zero_type::<DoubleBitBinary>();
+        self.select_class_zero_type::<BinaryOutputStatus>();
+        self.select_class_zero_type::<Counter>();
+        self.select_class_zero_type::<FrozenCounter>();
+        self.select_class_zero_type::<Analog>();
+        self.select_class_zero_type::<AnalogOutputStatus>();
     }
 }
 
@@ -547,6 +545,10 @@ impl Updatable for Binary {
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::Binary(variation).with(range)
     }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.binary
+    }
 }
 
 impl Updatable for DoubleBitBinary {
@@ -559,6 +561,10 @@ impl Updatable for DoubleBitBinary {
 
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::DoubleBitBinary(variation).with(range)
+    }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.double_bit_binary
     }
 }
 
@@ -573,6 +579,10 @@ impl Updatable for BinaryOutputStatus {
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::BinaryOutputStatus(variation).with(range)
     }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.binary_output_status
+    }
 }
 
 impl Updatable for Counter {
@@ -585,6 +595,10 @@ impl Updatable for Counter {
 
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::Counter(variation).with(range)
+    }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.counter
     }
 }
 
@@ -599,6 +613,10 @@ impl Updatable for FrozenCounter {
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::FrozenCounter(variation).with(range)
     }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.frozen_counter
+    }
 }
 
 impl Updatable for Analog {
@@ -612,6 +630,10 @@ impl Updatable for Analog {
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::Analog(variation).with(range)
     }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.analog
+    }
 }
 
 impl Updatable for AnalogOutputStatus {
@@ -624,6 +646,10 @@ impl Updatable for AnalogOutputStatus {
 
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
         SpecificVariation::AnalogOutputStatus(variation).with(range)
+    }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.analog_output_status
     }
 }
 
@@ -679,7 +705,7 @@ mod tests {
 
     fn binary_config(var: StaticBinaryVariation) -> PointConfig<Binary> {
         PointConfig {
-            class: EventClass::Class1,
+            class: Some(EventClass::Class1),
             s_var: var,
             e_var: EventBinaryVariation::Group2Var1,
             detector: FlagsDetector {},
@@ -688,7 +714,7 @@ mod tests {
 
     fn counter_config(var: StaticCounterVariation) -> PointConfig<Counter> {
         PointConfig {
-            class: EventClass::Class1,
+            class: Some(EventClass::Class1),
             s_var: var,
             e_var: EventCounterVariation::Group22Var1,
             detector: Deadband::new(0),
@@ -697,7 +723,7 @@ mod tests {
 
     fn analog_config(var: StaticAnalogVariation) -> PointConfig<Analog> {
         PointConfig {
-            class: EventClass::Class1,
+            class: Some(EventClass::Class1),
             s_var: var,
             e_var: EventAnalogVariation::Group32Var1,
             detector: Deadband::new(0.0),
@@ -706,13 +732,13 @@ mod tests {
 
     #[test]
     fn can_write_integrity() {
-        let mut db = StaticDatabase::new();
+        let mut db = StaticDatabase::default();
 
         assert!(db.add(0, binary_config(StaticBinaryVariation::Group1Var2)));
         assert!(db.add(1, counter_config(StaticCounterVariation::Group20Var1)));
         assert!(db.add(2, analog_config(StaticAnalogVariation::Group30Var1)));
 
-        db.select_class_0();
+        db.select_class_zero();
 
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(buffer.as_mut());
@@ -734,13 +760,13 @@ mod tests {
 
     #[test]
     fn can_write_multiple_cycles() {
-        let mut db = StaticDatabase::new();
+        let mut db = StaticDatabase::default();
 
         assert!(db.add(0, binary_config(StaticBinaryVariation::Group1Var2)));
         assert!(db.add(1, counter_config(StaticCounterVariation::Group20Var1)));
         assert!(db.add(2, analog_config(StaticAnalogVariation::Group30Var1)));
 
-        db.select_class_0();
+        db.select_class_zero();
 
         let mut buffer = [0u8; 12]; // can only fit one header at a time
 
@@ -786,11 +812,11 @@ mod tests {
 
     #[test]
     fn promotes_g1v1_to_g1v2_if_flags_other_than_just_online() {
-        let mut db = StaticDatabase::new();
+        let mut db = StaticDatabase::default();
 
         assert!(db.add(0, binary_config(StaticBinaryVariation::Group1Var1)));
 
-        db.select_class_0();
+        db.select_class_zero();
 
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(buffer.as_mut());
