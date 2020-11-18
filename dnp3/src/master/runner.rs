@@ -276,8 +276,6 @@ impl Runner {
                 }
             };
 
-            let request_tx = std::time::SystemTime::now();
-
             let deadline = self.timeout.deadline_from_now();
 
             loop {
@@ -300,7 +298,7 @@ impl Runner {
                             }
                             Ok(association) => {
                                 association.process_iin(response.header.iin);
-                                match task.handle(request_tx, association, response) {
+                                match task.handle(association, response) {
                                     None => return Ok(()),
                                     Some(next) => {
                                         task = next;
@@ -672,7 +670,8 @@ impl Runner {
         U: RequestWriter,
     {
         // format the request
-        let seq = self.associations.get_mut(address)?.increment_seq();
+        let association = self.associations.get_mut(address)?;
+        let seq = association.increment_seq();
         let mut cursor = WriteCursor::new(&mut self.buffer);
         let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;

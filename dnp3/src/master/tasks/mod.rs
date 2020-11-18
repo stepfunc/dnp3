@@ -46,6 +46,18 @@ impl Task {
             Task::Read(task) => task.on_task_error(association, err),
         }
     }
+
+    /// Perform operation before sending and check if the request should still be sent
+    ///
+    /// Returning `true` means the task should proceed, returning false means
+    /// the task was cancelled, forget about it.
+    pub(crate) fn start(self, association: &mut Association) -> Option<Task> {
+        if let Task::NonRead(task) = self {
+            return task.start(association).map(|task| task.wrap());
+        }
+
+        Some(self)
+    }
 }
 
 pub(crate) trait RequestWriter {
@@ -143,6 +155,14 @@ impl NonReadTask {
         Task::NonRead(self)
     }
 
+    pub(crate) fn start(self, association: &mut Association) -> Option<NonReadTask> {
+        match self {
+            NonReadTask::Command(_) => Some(self),
+            NonReadTask::Auto(_) => Some(self),
+            NonReadTask::TimeSync(task) => task.start(association).map(|task| task.wrap()),
+        }
+    }
+
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
             NonReadTask::Command(task) => task.function(),
@@ -161,7 +181,6 @@ impl NonReadTask {
 
     pub(crate) fn handle(
         self,
-        request_tx: std::time::SystemTime,
         association: &mut Association,
         response: Response,
     ) -> Option<NonReadTask> {
@@ -171,7 +190,7 @@ impl NonReadTask {
                 Some(headers) => task.handle(association, response.header, headers),
                 None => None,
             },
-            NonReadTask::TimeSync(task) => task.handle(association, request_tx, response),
+            NonReadTask::TimeSync(task) => task.handle(association, response),
         }
     }
 }

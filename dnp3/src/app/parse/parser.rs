@@ -19,6 +19,15 @@ pub(crate) struct DecodeSettings {
     level: DecodeLogLevel,
 }
 
+impl DecodeSettings {
+    pub(crate) fn none() -> Self {
+        DecodeSettings {
+            is_transmit: false,
+            level: DecodeLogLevel::Nothing,
+        }
+    }
+}
+
 impl DecodeLogLevel {
     pub(crate) fn transmit(self) -> DecodeSettings {
         DecodeSettings {
@@ -398,6 +407,14 @@ impl HeaderDetails<'_> {
             HeaderDetails::TwoByteCount(_, _) => QualifierCode::Count16,
             HeaderDetails::OneByteCountAndPrefix(_, _) => QualifierCode::CountAndPrefix8,
             HeaderDetails::TwoByteCountAndPrefix(_, _) => QualifierCode::CountAndPrefix16,
+        }
+    }
+
+    pub(crate) fn count(&self) -> Option<&CountVariation> {
+        match self {
+            HeaderDetails::OneByteCount(_, objects) => Some(objects),
+            HeaderDetails::TwoByteCount(_, objects) => Some(objects),
+            _ => None,
         }
     }
 }

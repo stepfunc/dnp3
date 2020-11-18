@@ -3,6 +3,7 @@ use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::DecodeLogLevel;
+use crate::app::types::Timestamp;
 use crate::app::variations::Variation;
 use crate::master::association::{Association, Configuration};
 use crate::master::error::{
@@ -144,7 +145,7 @@ impl AssociationHandle {
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
-        let task = TimeSyncTask::get_procedure(procedure, false, Promise::OneShot(tx));
+        let task = TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
     }
@@ -215,8 +216,8 @@ impl<T> Listener<T> {
 /// callbacks associated with a single master to outstation association
 pub trait AssociationHandler: Send {
     /// Retrieve the system time used for time synchronization
-    fn get_system_time(&self) -> SystemTime {
-        SystemTime::now()
+    fn get_system_time(&self) -> Option<Timestamp> {
+        Timestamp::try_from_system_time(SystemTime::now())
     }
 
     /// retrieve a handler used to process integrity polls

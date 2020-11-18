@@ -463,6 +463,7 @@ pub fn define(
             "StillNeedsTime",
             "Outstation did not clear the NEED_TIME IIN bit",
         )?
+        .push("SystemTimeNotAvailable", "System time not available")?
         .push("IINError", "Outstation indicated an error")?
         .doc("Result of a timesync operation")?
         .build()?;

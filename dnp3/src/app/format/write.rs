@@ -1,5 +1,7 @@
 use crate::app::enums::{FunctionCode, QualifierCode};
-use crate::app::header::{Control, RequestHeader};
+use crate::app::header::{Control, RequestHeader, ResponseFunction, ResponseHeader, IIN};
+#[cfg(test)]
+use crate::app::parse::parser::{DecodeSettings, ParsedFragment};
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
@@ -19,7 +21,22 @@ pub(crate) fn start_request<'a, 'b>(
     Ok(HeaderWriter { cursor })
 }
 
+pub(crate) fn start_response<'a, 'b>(
+    control: Control,
+    function: ResponseFunction,
+    iin: IIN,
+    cursor: &'b mut WriteCursor<'a>,
+) -> Result<HeaderWriter<'a, 'b>, WriteError> {
+    let header = ResponseHeader::new(control, function, iin);
+    header.write(cursor)?;
+    Ok(HeaderWriter { cursor })
+}
+
 impl<'a, 'b> HeaderWriter<'a, 'b> {
+    pub(crate) fn inner(self) -> &'b mut WriteCursor<'a> {
+        self.cursor
+    }
+
     pub(crate) fn write_class1230(&mut self) -> Result<(), WriteError> {
         self.write_all_objects_header(Variation::Group60Var2)?;
         self.write_all_objects_header(Variation::Group60Var3)?;
@@ -91,6 +108,11 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         self.cursor.write_u8(1)?;
         item.write(self.cursor)?;
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn to_parsed(&'a self) -> ParsedFragment<'a> {
+        ParsedFragment::parse(DecodeSettings::none(), self.cursor.written()).unwrap()
     }
 }
 

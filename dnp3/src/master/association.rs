@@ -1,7 +1,8 @@
 use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
-use crate::master::error::{AssociationError, TaskError};
+use crate::app::types::Timestamp;
+use crate::master::error::{AssociationError, TaskError, TimeSyncError};
 use crate::master::extract::extract_measurements;
 use crate::master::handle::{AssociationHandler, Promise};
 use crate::master::messages::AssociationMsgType;
@@ -178,7 +179,7 @@ impl Association {
         self.auto_tasks.reset();
     }
 
-    pub(crate) fn get_system_time(&self) -> std::time::SystemTime {
+    pub(crate) fn get_system_time(&self) -> Option<Timestamp> {
         self.handler.get_system_time()
     }
 
@@ -233,17 +234,12 @@ impl Association {
         self.auto_tasks.clear_restart_iin = AutoTaskState::Failed;
     }
 
-    pub(crate) fn on_time_sync_iin_response(&mut self, iin: IIN) {
-        self.auto_tasks.time_sync = if iin.iin1.get_need_time() {
-            log::warn!("device failed to clear NEED_TIME IIN bit");
-            AutoTaskState::Failed
-        } else {
-            AutoTaskState::Idle
-        }
+    pub(crate) fn on_time_sync_success(&mut self) {
+        self.auto_tasks.time_sync = AutoTaskState::Idle;
     }
 
-    pub(crate) fn on_time_sync_iin_failure(&mut self) {
-        log::warn!("auto time sync failed");
+    pub(crate) fn on_time_sync_failure(&mut self, err: TimeSyncError) {
+        log::warn!("auto time sync failed: {}", err);
         self.auto_tasks.time_sync = AutoTaskState::Failed;
     }
 
@@ -299,10 +295,31 @@ impl Association {
     }
 
     pub(crate) fn priority_task(&mut self) -> Option<Task> {
-        self.request_queue.pop_front()
+        while let Some(task) = self.request_queue.pop_front() {
+            if let Some(task) = task.start(self) {
+                return Some(task);
+            }
+        }
+
+        None
     }
 
-    pub(crate) fn next_task(&self, now: Instant) -> Next<Task> {
+    fn next_task(&mut self, now: Instant) -> Next<Task> {
+        loop {
+            let next_task = self.get_next_task(now);
+
+            if let Next::Now(task) = next_task {
+                // Check if execution can still happen
+                if let Some(task) = task.start(self) {
+                    return Next::Now(task);
+                }
+            } else {
+                return next_task;
+            }
+        }
+    }
+
+    fn get_next_task(&self, now: Instant) -> Next<Task> {
         // Check for automatic tasks
         if self.auto_tasks.clear_restart_iin.is_pending() {
             return Next::Now(AutoTask::ClearRestartBit.wrap());
@@ -310,7 +327,7 @@ impl Association {
         if self.auto_tasks.time_sync.is_pending() {
             if let Some(procedure) = self.config.auto_time_sync {
                 return Next::Now(
-                    TimeSync(TimeSyncTask::get_procedure(procedure, true, Promise::None)).wrap(),
+                    TimeSync(TimeSyncTask::get_procedure(procedure, Promise::None)).wrap(),
                 );
             }
         }

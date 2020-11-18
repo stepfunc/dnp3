@@ -1,7 +1,10 @@
+use std::time::{Duration, SystemTime};
+
 use crate::app::enums::{OpType, QualifierCode, TripCloseCode};
 use crate::app::variations::Variation;
 use crate::util::cursor::{WriteCursor, WriteError};
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+use std::convert::TryFrom;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Timestamp {
@@ -26,6 +29,18 @@ impl Timestamp {
         Self::new(Self::MAX_VALUE)
     }
 
+    pub fn try_from_system_time(system_time: SystemTime) -> Option<Timestamp> {
+        Some(Timestamp::new(
+            u64::try_from(
+                system_time
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .ok()?
+                    .as_millis(),
+            )
+            .ok()?,
+        ))
+    }
+
     pub fn to_datetime_utc(self) -> Option<DateTime<Utc>> {
         Utc.timestamp_millis_opt(self.value as i64).single()
     }
@@ -38,13 +53,14 @@ impl Timestamp {
         cursor.write_u48_le(self.value)
     }
 
-    pub(crate) fn checked_add(self, x: u16) -> Option<Timestamp> {
+    pub(crate) fn checked_add(self, x: Duration) -> Option<Timestamp> {
         // safe from overflow since self.value cannot possibly be larger than MAX
         let max_add = Self::MAX_VALUE - self.value;
-        if x as u64 > max_add {
+        let millis = x.as_millis();
+        if millis > max_add as u128 {
             return None;
         }
-        Some(Timestamp::new(self.value + x as u64))
+        Some(Timestamp::new(self.value + millis as u64))
     }
 }
 
