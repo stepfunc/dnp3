@@ -10,6 +10,7 @@ use crate::transport::{Fragment, ReaderType, WriterType};
 use crate::util::cursor::WriteCursor;
 
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::time::Duration;
 
 pub(crate) struct Session {
     buffer: [u8; 2048],
@@ -23,17 +24,38 @@ pub struct OutstationTask {
     writer: WriterType,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct OutstationConfig {
+    pub outstation_address: u16,
+    pub master_address: Option<u16>,
+    pub log_level: DecodeLogLevel,
+    pub confirm_timeout: Duration,
+}
+
+impl OutstationConfig {
+    pub fn new(
+        outstation_address: u16,
+        master_address: Option<u16>,
+        log_level: DecodeLogLevel,
+        confirm_timeout: Duration,
+    ) -> Self {
+        OutstationConfig {
+            outstation_address,
+            master_address,
+            log_level,
+            confirm_timeout,
+        }
+    }
+}
+
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
-    pub fn create(
-        address: u16,
-        log_level: DecodeLogLevel,
-        config: DatabaseConfig,
-    ) -> (Self, DatabaseHandle) {
-        let handle = DatabaseHandle::new(config);
-        let (reader, writer) = crate::transport::create_transport_layer(false, address);
+    pub fn create(config: OutstationConfig, database: DatabaseConfig) -> (Self, DatabaseHandle) {
+        let handle = DatabaseHandle::new(database);
+        let (reader, writer) =
+            crate::transport::create_transport_layer(false, config.outstation_address);
         let task = Self {
-            session: Session::new(log_level, handle.clone()),
+            session: Session::new(config.log_level, handle.clone()),
             reader,
             writer,
         };

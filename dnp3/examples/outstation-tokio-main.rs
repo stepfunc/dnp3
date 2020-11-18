@@ -4,9 +4,18 @@ use dnp3::app::parse::DecodeLogLevel;
 use dnp3::outstation::database::config::*;
 use dnp3::outstation::database::EventClass;
 use dnp3::outstation::database::{Add, DatabaseConfig, Update, UpdateOptions};
-use dnp3::outstation::task::OutstationTask;
+use dnp3::outstation::task::{OutstationConfig, OutstationTask};
 use std::net::Ipv4Addr;
 use std::time::Duration;
+
+fn get_outstation_config() -> OutstationConfig {
+    OutstationConfig::new(
+        10,
+        Some(1),
+        DecodeLogLevel::ObjectValues,
+        Duration::from_secs(2),
+    )
+}
 
 fn get_database_config() -> DatabaseConfig {
     let mut config = DatabaseConfig::default();
@@ -20,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
 
     let (mut task, mut handle) =
-        OutstationTask::create(10, DecodeLogLevel::ObjectValues, get_database_config());
+        OutstationTask::create(get_outstation_config(), get_database_config());
 
     handle.transaction(|db| {
         for i in 0..1000 {
