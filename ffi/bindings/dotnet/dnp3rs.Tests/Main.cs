@@ -135,6 +135,14 @@ class MainClass
         }
     }
 
+    class TestTimeProvider : ITimeProvider
+    {
+        public TimeProviderTimestamp GetTime()
+        {
+            return TimeProviderTimestamp.Valid((ulong)DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
+        }
+    }
+
     public static void Main(string[] args)
     {   
             MainAsync().GetAwaiter().GetResult();
@@ -184,7 +192,8 @@ class MainClass
                     IntegrityHandler = readHandler,
                     UnsolicitedHandler = readHandler,
                     DefaultPollHandler = readHandler,
-                }
+                },
+                new TestTimeProvider()
             );
 
             var pollRequest = Request.ClassRequest(false, true, true, true);

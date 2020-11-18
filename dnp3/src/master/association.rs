@@ -1,6 +1,7 @@
 use crate::app::header::{ResponseHeader, IIN};
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
+use crate::app::types::Timestamp;
 use crate::master::error::{AssociationError, TaskError, TimeSyncError};
 use crate::master::extract::extract_measurements;
 use crate::master::handle::{AssociationHandler, Promise};
@@ -178,7 +179,7 @@ impl Association {
         self.auto_tasks.reset();
     }
 
-    pub(crate) fn get_system_time(&self) -> std::time::SystemTime {
+    pub(crate) fn get_system_time(&self) -> Option<Timestamp> {
         self.handler.get_system_time()
     }
 
@@ -294,10 +295,31 @@ impl Association {
     }
 
     pub(crate) fn priority_task(&mut self) -> Option<Task> {
-        self.request_queue.pop_front()
+        while let Some(task) = self.request_queue.pop_front() {
+            if let Some(task) = task.start(self) {
+                return Some(task);
+            }
+        }
+
+        None
     }
 
-    pub(crate) fn next_task(&self, now: Instant) -> Next<Task> {
+    fn next_task(&mut self, now: Instant) -> Next<Task> {
+        loop {
+            let next_task = self.get_next_task(now);
+
+            if let Next::Now(task) = next_task {
+                // Check if execution can still happen
+                if let Some(task) = task.start(self) {
+                    return Next::Now(task);
+                }
+            } else {
+                return next_task;
+            }
+        }
+    }
+
+    fn get_next_task(&self, now: Instant) -> Next<Task> {
         // Check for automatic tasks
         if self.auto_tasks.clear_restart_iin.is_pending() {
             return Next::Now(AutoTask::ClearRestartBit.wrap());

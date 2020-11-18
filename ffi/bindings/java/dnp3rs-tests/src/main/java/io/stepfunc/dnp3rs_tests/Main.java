@@ -129,6 +129,14 @@ class TestReadHandler implements ReadHandler {
     }
 }
 
+class TestTimeProvider implements TimeProvider
+{
+    @Override
+    public TimeProviderTimestamp getTime() {
+        return TimeProviderTimestamp.valid(ulong(System.currentTimeMillis()));
+    }
+}
+
 public class Main {
     public static void main(String[] args) {
         // Setup logging
@@ -171,7 +179,8 @@ public class Main {
             Association association = master.addAssociation(
                     ushort(1024),
                     associationConfiguration,
-                    associationHandlers
+                    associationHandlers,
+                    new TestTimeProvider()
             );
 
             // Create a periodic poll

@@ -85,6 +85,7 @@ pub enum TimeSyncError {
     BadOutstationTimeDelay(u16),
     Overflow,
     StillNeedsTime,
+    SystemTimeNotAvailable,
     IINError(IIN2),
 }
 
@@ -215,6 +216,7 @@ impl std::fmt::Display for TimeSyncError {
             TimeSyncError::Overflow => f.write_str("overflow in calculation"),
             TimeSyncError::ClockRollback => f.write_str("detected a clock rollback"),
             TimeSyncError::StillNeedsTime => f.write_str("outstation did not clear NEED_TIME bit"),
+            TimeSyncError::SystemTimeNotAvailable => f.write_str("system time not available"),
             TimeSyncError::IINError(iin2) => write!(f, "outstation indicated an error: {}", iin2),
         }
     }

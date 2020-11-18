@@ -1,6 +1,7 @@
 use crate::association::Association;
 use crate::ffi;
 
+use dnp3::app::types::Timestamp;
 use dnp3::master::association::Configuration;
 use dnp3::master::handle::{AssociationHandler, MasterHandle, ReadHandler};
 use dnp3::master::request::{EventClasses, TimeSyncProcedure};
@@ -21,6 +22,7 @@ pub unsafe fn master_add_association(
     address: u16,
     config: ffi::AssociationConfiguration,
     handlers: ffi::AssociationHandlers,
+    time_provider: ffi::TimeProvider,
 ) -> *mut Association {
     let master = match master.as_mut() {
         Some(master) => master,
@@ -37,6 +39,7 @@ pub unsafe fn master_add_association(
         integrity_handler: handlers.integrity_handler,
         unsolicited_handler: handlers.unsolicited_handler,
         default_poll_handler: handlers.default_poll_handler,
+        time_provider,
     };
 
     if tokio::runtime::Handle::try_current().is_err() {
@@ -84,9 +87,18 @@ struct AssociationHandlerAdapter {
     integrity_handler: ffi::ReadHandler,
     unsolicited_handler: ffi::ReadHandler,
     default_poll_handler: ffi::ReadHandler,
+    time_provider: ffi::TimeProvider,
 }
 
 impl AssociationHandler for AssociationHandlerAdapter {
+    fn get_system_time(&self) -> Option<Timestamp> {
+        if let Some(time) = self.time_provider.get_time() {
+            time.into()
+        } else {
+            None
+        }
+    }
+
     fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
         &mut self.integrity_handler
     }
@@ -97,5 +109,29 @@ impl AssociationHandler for AssociationHandlerAdapter {
 
     fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
         &mut self.default_poll_handler
+    }
+}
+
+pub fn timeprovidertimestamp_valid(value: u64) -> ffi::TimeProviderTimestamp {
+    ffi::TimeProviderTimestamp {
+        value,
+        is_valid: true,
+    }
+}
+
+pub fn timeprovidertimestamp_invalid() -> ffi::TimeProviderTimestamp {
+    ffi::TimeProviderTimestamp {
+        value: 0,
+        is_valid: false,
+    }
+}
+
+impl From<ffi::TimeProviderTimestamp> for Option<Timestamp> {
+    fn from(from: ffi::TimeProviderTimestamp) -> Self {
+        if from.is_valid {
+            Some(Timestamp::new(from.value))
+        } else {
+            None
+        }
     }
 }

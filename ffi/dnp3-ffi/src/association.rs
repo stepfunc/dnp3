@@ -191,6 +191,9 @@ pub unsafe fn association_perform_time_sync(
             }
             Err(TimeSyncError::Overflow) => ffi::TimeSyncResult::Overflow,
             Err(TimeSyncError::StillNeedsTime) => ffi::TimeSyncResult::StillNeedsTime,
+            Err(TimeSyncError::SystemTimeNotAvailable) => {
+                ffi::TimeSyncResult::SystemTimeNotAvailable
+            }
             Err(TimeSyncError::IINError(_)) => ffi::TimeSyncResult::IINError,
         };
 

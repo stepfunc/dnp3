@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::app::flags::Flags;
 use crate::app::types::{DoubleBit, Timestamp};
 use crate::util::bit::bits::*;
@@ -49,11 +51,11 @@ impl From<Option<Time>> for Timestamp {
 impl Time {
     pub(crate) fn checked_add(self, x: u16) -> Option<Self> {
         match self {
-            Time::Synchronized(ts) => match ts.checked_add(x) {
+            Time::Synchronized(ts) => match ts.checked_add(Duration::from_millis(x as u64)) {
                 Some(x) => Some(Time::Synchronized(x)),
                 None => None,
             },
-            Time::NotSynchronized(ts) => match ts.checked_add(x) {
+            Time::NotSynchronized(ts) => match ts.checked_add(Duration::from_millis(x as u64)) {
                 Some(x) => Some(Time::NotSynchronized(x)),
                 None => None,
             },

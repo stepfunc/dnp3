@@ -265,15 +265,13 @@ impl Runner {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            let seq = match self.send_request(io, address, &mut task, writer).await {
+            let seq = match self.send_request(io, address, &task, writer).await {
                 Ok(seq) => seq,
                 Err(err) => {
                     task.on_task_error(self.associations.get_mut(address).ok(), err);
                     return Err(err);
                 }
             };
-
-            let request_tx = Instant::now();
 
             let deadline = self.timeout.deadline_from_now();
 
@@ -297,7 +295,7 @@ impl Runner {
                             }
                             Ok(association) => {
                                 association.process_iin(response.header.iin);
-                                match task.handle(request_tx, association, response) {
+                                match task.handle(association, response) {
                                     None => return Ok(()),
                                     Some(next) => {
                                         task = next;
@@ -382,7 +380,7 @@ impl Runner {
         &mut self,
         io: &mut T,
         address: u16,
-        mut task: ReadTask,
+        task: ReadTask,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), TaskError>
@@ -390,7 +388,7 @@ impl Runner {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         let result = self
-            .execute_read_task(io, address, &mut task, writer, reader)
+            .execute_read_task(io, address, &task, writer, reader)
             .await;
 
         let association = self.associations.get_mut(address).ok();
@@ -413,7 +411,7 @@ impl Runner {
         &mut self,
         io: &mut T,
         address: u16,
-        task: &mut ReadTask,
+        task: &ReadTask,
         writer: &mut WriterType,
         reader: &mut ReaderType,
     ) -> Result<(), TaskError>
@@ -661,7 +659,7 @@ impl Runner {
         &mut self,
         io: &mut T,
         address: u16,
-        request: &mut U,
+        request: &U,
         writer: &mut WriterType,
     ) -> Result<Sequence, TaskError>
     where
@@ -673,7 +671,7 @@ impl Runner {
         let seq = association.increment_seq();
         let mut cursor = WriteCursor::new(&mut self.buffer);
         let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
-        request.write(&mut hw, association)?;
+        request.write(&mut hw)?;
         writer
             .write(self.level, io, address, cursor.written())
             .await?;

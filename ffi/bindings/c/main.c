@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 void print_qualifier(qualifier_code_t qualifier)
 {
@@ -206,6 +207,14 @@ void on_timesync_complete(time_sync_result_t result, void* arg)
     printf("TimeSyncResult: %s\n", TimeSyncResult_to_string(result));
 }
 
+// Timestamp callback
+time_provider_timestamp_t get_time(void* arg)
+{
+    time_t timer = time(NULL);
+
+    return timeprovidertimestamp_valid(timer * 1000);
+}
+
 int main()
 {
     // Setup logging
@@ -282,11 +291,17 @@ int main()
         .unsolicited_handler = read_handler,
         .default_poll_handler = read_handler,
     };
+    time_provider_t time_provider =
+    {
+        .get_time = get_time,
+        .ctx = NULL,
+    };
     association_t* association = master_add_association(
         master,
         1024,
         association_config,
-        association_handlers
+        association_handlers,
+        time_provider
     );
 
     // Add an event poll

@@ -83,6 +83,8 @@ pub fn define(
         )?
         .build()?;
 
+    let time_provider_interface = define_time_provider(lib)?;
+
     let add_association_fn = lib
         .declare_native_function("master_add_association")?
         .param(
@@ -104,6 +106,11 @@ pub fn define(
             "handlers",
             Type::Struct(association_handlers),
             "Handlers to call when receiving point data",
+        )?
+        .param(
+            "time_provider",
+            Type::Interface(time_provider_interface),
+            "Time provider for the association",
         )?
         .return_type(ReturnType::new(
             Type::ClassRef(association_class.clone()),
@@ -140,4 +147,58 @@ pub fn define(
         .build()?;
 
     Ok(association_class)
+}
+
+fn define_time_provider(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
+    let timestamp_struct = lib.declare_native_struct("TimeProviderTimestamp")?;
+    let timestamp_struct = lib.define_native_struct(&timestamp_struct)?
+        .add("value", Type::Uint64, doc("Value of the timestamp (in milliseconds from UNIX Epoch).").warning("Only 48 bits are available for timestamps."))?
+        .add("is_valid", Type::Bool, "True if the timestamp is valid, false otherwise.")?
+        .doc(doc("Timestamp value returned by {interface:TimeProvider}.").details("{struct:TimeProviderTimestamp.value} is only valid if {struct:TimeProviderTimestamp.is_valid} is true."))?
+        .build()?;
+
+    let valid_constructor = lib
+        .declare_native_function("timeprovidertimestamp_valid")?
+        .param(
+            "value",
+            Type::Uint64,
+            "Timestamp value in milliseconds from UNIX Epoch",
+        )?
+        .return_type(ReturnType::new(
+            Type::Struct(timestamp_struct.clone()),
+            "Timestamp",
+        ))?
+        .doc("Create a valid timestamp value")?
+        .build()?;
+
+    let invalid_constructor = lib
+        .declare_native_function("timeprovidertimestamp_invalid")?
+        .return_type(ReturnType::new(
+            Type::Struct(timestamp_struct.clone()),
+            "Timestamp",
+        ))?
+        .doc("Create an invalid timestamp value")?
+        .build()?;
+
+    lib.define_struct(&timestamp_struct)?
+        .static_method("valid", &valid_constructor)?
+        .static_method("invalid", &invalid_constructor)?
+        .build();
+
+    lib.define_interface("TimeProvider", "Current time provider")?
+        .callback(
+            "get_time",
+            doc("Returns the current time of the system.")
+                .details("This callback is called when time synchronization is performed.")
+                .details(
+                    "This can use external clock synchronization or the system clock for example.",
+                ),
+        )?
+        .return_type(ReturnType::new(
+            Type::Struct(timestamp_struct),
+            "The current time",
+        ))?
+        .build()?
+        .destroy_callback("on_destroy")?
+        .build()
 }

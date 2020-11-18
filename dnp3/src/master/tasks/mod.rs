@@ -15,7 +15,6 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::util::cursor::WriteError;
-use tokio::time::Instant;
 
 /// Queued task requiring I/O
 pub(crate) struct AssociationTask {
@@ -47,15 +46,23 @@ impl Task {
             Task::Read(task) => task.on_task_error(association, err),
         }
     }
+
+    /// Perform operation before sending and check if the request should still be sent
+    ///
+    /// Returning `true` means the task should proceed, returning false means
+    /// the task was cancelled, forget about it.
+    pub(crate) fn start(self, association: &mut Association) -> Option<Task> {
+        if let Task::NonRead(task) = self {
+            return task.start(association).map(|task| task.wrap());
+        }
+
+        Some(self)
+    }
 }
 
 pub(crate) trait RequestWriter {
     fn function(&self) -> FunctionCode;
-    fn write(
-        &mut self,
-        writer: &mut HeaderWriter,
-        association: &Association,
-    ) -> Result<(), WriteError>;
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError>;
 }
 
 pub(crate) enum ReadTask {
@@ -81,11 +88,7 @@ impl RequestWriter for ReadTask {
         FunctionCode::Read
     }
 
-    fn write(
-        &mut self,
-        writer: &mut HeaderWriter,
-        _association: &Association,
-    ) -> Result<(), WriteError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
             ReadTask::PeriodicPoll(poll) => poll.format(writer),
             ReadTask::StartupIntegrity => writer.write_class1230(),
@@ -99,15 +102,11 @@ impl RequestWriter for NonReadTask {
         self.function()
     }
 
-    fn write(
-        &mut self,
-        writer: &mut HeaderWriter,
-        association: &Association,
-    ) -> Result<(), WriteError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
             NonReadTask::Auto(t) => t.write(writer),
             NonReadTask::Command(t) => t.write(writer),
-            NonReadTask::TimeSync(t) => t.write(writer, association),
+            NonReadTask::TimeSync(t) => t.write(writer),
         }
     }
 }
@@ -156,6 +155,14 @@ impl NonReadTask {
         Task::NonRead(self)
     }
 
+    pub(crate) fn start(self, association: &mut Association) -> Option<NonReadTask> {
+        match self {
+            NonReadTask::Command(_) => Some(self),
+            NonReadTask::Auto(_) => Some(self),
+            NonReadTask::TimeSync(task) => task.start(association).map(|task| task.wrap()),
+        }
+    }
+
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
             NonReadTask::Command(task) => task.function(),
@@ -174,7 +181,6 @@ impl NonReadTask {
 
     pub(crate) fn handle(
         self,
-        request_tx: Instant,
         association: &mut Association,
         response: Response,
     ) -> Option<NonReadTask> {
@@ -184,7 +190,7 @@ impl NonReadTask {
                 Some(headers) => task.handle(association, response.header, headers),
                 None => None,
             },
-            NonReadTask::TimeSync(task) => task.handle(association, request_tx, response),
+            NonReadTask::TimeSync(task) => task.handle(association, response),
         }
     }
 }
