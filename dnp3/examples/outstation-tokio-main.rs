@@ -10,6 +10,7 @@ use std::time::Duration;
 
 fn get_outstation_config() -> OutstationConfig {
     OutstationConfig::new(
+        2048,
         10,
         Some(1),
         DecodeLogLevel::ObjectValues,

@@ -7,13 +7,13 @@ use crate::link::error::LinkError;
 use crate::link::header::Address;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
 use crate::transport::{Fragment, ReaderType, WriterType};
-use crate::util::cursor::WriteCursor;
 
+use crate::util::buffer::Buffer;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::Duration;
 
 pub(crate) struct Session {
-    buffer: [u8; 2048],
+    tx_buffer: Buffer,
     log_level: DecodeLogLevel,
     database: DatabaseHandle,
 }
@@ -26,6 +26,7 @@ pub struct OutstationTask {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OutstationConfig {
+    pub tx_buffer_size: usize,
     pub outstation_address: u16,
     pub master_address: Option<u16>,
     pub log_level: DecodeLogLevel,
@@ -34,12 +35,14 @@ pub struct OutstationConfig {
 
 impl OutstationConfig {
     pub fn new(
+        tx_buffer_size: usize,
         outstation_address: u16,
         master_address: Option<u16>,
         log_level: DecodeLogLevel,
         confirm_timeout: Duration,
     ) -> Self {
         OutstationConfig {
+            tx_buffer_size,
             outstation_address,
             master_address,
             log_level,
@@ -55,7 +58,7 @@ impl OutstationTask {
         let (reader, writer) =
             crate::transport::create_transport_layer(false, config.outstation_address);
         let task = Self {
-            session: Session::new(config.log_level, handle.clone()),
+            session: Session::new(config.tx_buffer_size, config.log_level, handle.clone()),
             reader,
             writer,
         };
@@ -85,9 +88,16 @@ enum Confirm {
 }
 
 impl Session {
-    pub(crate) fn new(log_level: DecodeLogLevel, database: DatabaseHandle) -> Self {
+    pub(crate) const DEFAULT_TX_BUFFER_SIZE: usize = 2048;
+    pub(crate) const MIN_TX_BUFFER_SIZE: usize = 249; // 1 link frame
+
+    pub(crate) fn new(
+        tx_buffer_size: usize,
+        log_level: DecodeLogLevel,
+        database: DatabaseHandle,
+    ) -> Self {
         Self {
-            buffer: [0; 2048],
+            tx_buffer: Buffer::new(tx_buffer_size.min(Self::MIN_TX_BUFFER_SIZE)),
             database,
             log_level,
         }
@@ -113,7 +123,7 @@ impl Session {
                                     DecodeLogLevel::ObjectValues,
                                     io,
                                     address.source,
-                                    &self.buffer[0..num],
+                                    self.tx_buffer.get(num).unwrap(),
                                 )
                                 .await?
                         }
@@ -153,7 +163,7 @@ impl Session {
             ))
         } else {
             // here's where we'd call the non-read response processor
-            let mut cursor = WriteCursor::new(self.buffer.as_mut());
+            let mut cursor = self.tx_buffer.write_cursor();
             let header = ResponseHeader::new(
                 request.header.control,
                 ResponseFunction::Response,
@@ -181,7 +191,7 @@ impl Session {
         let mut fir = true;
 
         loop {
-            let mut cursor = WriteCursor::new(self.buffer.as_mut());
+            let mut cursor = self.tx_buffer.write_cursor();
             cursor.skip(4)?;
             let info = self.database.write_response_headers(&mut cursor);
 
