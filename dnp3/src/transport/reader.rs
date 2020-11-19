@@ -1,4 +1,4 @@
-use crate::entry::NormalAddress;
+use crate::entry::LinkAddress;
 use crate::link::error::LinkError;
 use crate::link::parser::FramePayload;
 use crate::transport::assembler::{Assembler, AssemblyState};
@@ -12,7 +12,7 @@ pub(crate) struct Reader {
 }
 
 impl Reader {
-    pub(crate) fn new(tt: TransportType, address: NormalAddress) -> Self {
+    pub(crate) fn new(tt: TransportType, address: LinkAddress) -> Self {
         Self {
             link: crate::link::layer::Layer::new(tt.is_master(), address),
             assembler: Assembler::new(),

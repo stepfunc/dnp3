@@ -5,7 +5,7 @@ pub mod master {
     pub use crate::app::timeout::Timeout;
     pub use crate::app::variations::*;
     pub use crate::entry::master::tcp::*;
-    pub use crate::entry::NormalAddress;
+    pub use crate::entry::LinkAddress;
     pub use crate::master::association::*;
     pub use crate::master::handle::*;
     pub use crate::master::request::*;

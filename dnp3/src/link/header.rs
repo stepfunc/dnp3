@@ -1,5 +1,5 @@
 use super::function::Function;
-use crate::entry::NormalAddress;
+use crate::entry::LinkAddress;
 
 pub(crate) mod constants {
     pub(crate) const MASK_DIR: u8 = 0x80;
@@ -32,13 +32,13 @@ impl BroadcastAddress {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub(crate) enum Address {
-    Normal(NormalAddress),
+pub(crate) enum AnyAddress {
+    Normal(LinkAddress),
     Broadcast(BroadcastAddress),
     SelfAddress,
 }
 
-impl Address {
+impl AnyAddress {
     pub(crate) const fn from(address: u16) -> Self {
         match address {
             constants::BROADCAST_CONFIRM_OPTIONAL => {
@@ -51,13 +51,13 @@ impl Address {
                 Self::Broadcast(BroadcastAddress::ConfirmNotRequired)
             }
             constants::SELF_ADDRESS => Self::SelfAddress,
-            _ => Self::Normal(NormalAddress::raw(address)),
+            _ => Self::Normal(LinkAddress::raw(address)),
         }
     }
 
-    pub(crate) fn get_normal_address(&self) -> Option<NormalAddress> {
+    pub(crate) fn get_normal_address(&self) -> Option<LinkAddress> {
         match self {
-            Address::Normal(x) => Some(*x),
+            AnyAddress::Normal(x) => Some(*x),
             _ => None,
         }
     }
@@ -71,12 +71,12 @@ impl Address {
     }
 }
 
-impl std::fmt::Display for Address {
+impl std::fmt::Display for AnyAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Address::Normal(x) => write!(f, "normal address ({})", x.value()),
-            Address::SelfAddress => write!(f, "self address ({})", constants::SELF_ADDRESS),
-            Address::Broadcast(details) => write!(f, "broadcast address ({})", details.value()),
+            AnyAddress::Normal(x) => write!(f, "normal address ({})", x.value()),
+            AnyAddress::SelfAddress => write!(f, "self address ({})", constants::SELF_ADDRESS),
+            AnyAddress::Broadcast(details) => write!(f, "broadcast address ({})", details.value()),
         }
     }
 }
@@ -121,12 +121,12 @@ impl ControlField {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub(crate) struct AddressPair {
-    pub(crate) destination: Address,
-    pub(crate) source: Address,
+    pub(crate) destination: AnyAddress,
+    pub(crate) source: AnyAddress,
 }
 
 impl AddressPair {
-    pub(crate) fn new(destination: Address, source: Address) -> Self {
+    pub(crate) fn new(destination: AnyAddress, source: AnyAddress) -> Self {
         Self {
             destination,
             source,

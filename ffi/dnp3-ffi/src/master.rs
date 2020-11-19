@@ -2,7 +2,7 @@ use crate::association::Association;
 use crate::ffi;
 
 use dnp3::app::types::Timestamp;
-use dnp3::entry::NormalAddress;
+use dnp3::entry::LinkAddress;
 use dnp3::master::association::Configuration;
 use dnp3::master::handle::{AssociationHandler, MasterHandle, ReadHandler};
 use dnp3::master::request::{EventClasses, TimeSyncProcedure};
@@ -30,7 +30,7 @@ pub unsafe fn master_add_association(
         None => return std::ptr::null_mut(),
     };
 
-    let address = match NormalAddress::from(address) {
+    let address = match LinkAddress::from(address) {
         Ok(x) => x,
         Err(err) => {
             log::warn!(

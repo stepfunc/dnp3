@@ -1,8 +1,8 @@
 use crate::app::parse::parser::{ParsedFragment, Request, Response};
 use crate::app::parse::DecodeLogLevel;
-use crate::entry::NormalAddress;
+use crate::entry::LinkAddress;
 use crate::link::error::LinkError;
-use crate::link::header::{Address, AddressPair};
+use crate::link::header::{AddressPair, AnyAddress};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 #[cfg(not(test))]
@@ -59,7 +59,7 @@ pub(crate) struct TransportReader {
 }
 
 impl TransportReader {
-    fn new(tt: TransportType, address: NormalAddress) -> Self {
+    fn new(tt: TransportType, address: LinkAddress) -> Self {
         Self {
             logged: false,
             inner: ReaderType::new(tt, address),
@@ -86,7 +86,7 @@ impl TransportReader {
     pub(crate) fn get_response(
         &mut self,
         level: DecodeLogLevel,
-    ) -> Option<(NormalAddress, Response)> {
+    ) -> Option<(LinkAddress, Response)> {
         let (log, addresses, parsed) = self.peek(level)?;
 
         let source = match addresses.source.get_normal_address() {
@@ -111,7 +111,7 @@ impl TransportReader {
         }
     }
 
-    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(Address, Request)> {
+    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(AnyAddress, Request)> {
         let (log, address, parsed) = self.peek(level)?;
         match parsed.to_request() {
             Err(err) => {
@@ -153,7 +153,7 @@ impl TransportReader {
 
 pub(crate) fn create_transport_layer(
     tt: TransportType,
-    address: NormalAddress,
+    address: LinkAddress,
 ) -> (TransportReader, TransportWriter) {
     (
         TransportReader::new(tt, address),

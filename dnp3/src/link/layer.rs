@@ -1,8 +1,8 @@
-use crate::entry::NormalAddress;
+use crate::entry::LinkAddress;
 use crate::link::error::LinkError;
 use crate::link::formatter::LinkFormatter;
 use crate::link::function::Function;
-use crate::link::header::{Address, AddressPair, ControlField};
+use crate::link::header::{AddressPair, AnyAddress, ControlField};
 use crate::link::parser::FramePayload;
 use crate::util::cursor::WriteCursor;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
@@ -13,7 +13,7 @@ enum SecondaryState {
 }
 
 pub(crate) struct Layer {
-    local_address: NormalAddress,
+    local_address: LinkAddress,
     secondary_state: SecondaryState,
     formatter: LinkFormatter,
     reader: super::reader::Reader,
@@ -21,7 +21,7 @@ pub(crate) struct Layer {
 }
 
 impl Layer {
-    pub(crate) fn new(is_master: bool, local_address: NormalAddress) -> Self {
+    pub(crate) fn new(is_master: bool, local_address: LinkAddress) -> Self {
         Self {
             local_address,
             secondary_state: SecondaryState::NotReset,
@@ -53,7 +53,7 @@ impl Layer {
 
     async fn reply<T>(
         &mut self,
-        destination: Address,
+        destination: AnyAddress,
         control: ControlField,
         io: &mut T,
     ) -> Result<(), LinkError>
@@ -69,7 +69,7 @@ impl Layer {
         Ok(io.write_all(reply_frame).await?)
     }
 
-    async fn acknowledge<T>(&mut self, destination: Address, io: &mut T) -> Result<(), LinkError>
+    async fn acknowledge<T>(&mut self, destination: AnyAddress, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncWrite + Unpin,
     {

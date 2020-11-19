@@ -1,4 +1,4 @@
-use dnp3::entry::NormalAddress;
+use dnp3::entry::LinkAddress;
 use dnp3::prelude::master::*;
 use std::io::BufRead;
 use std::net::SocketAddr;
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // create
     let (future, mut master) = create_master_tcp_client(
-        NormalAddress::from(1).unwrap(),
+        LinkAddress::from(1)?,
         DecodeLogLevel::ObjectValues,
         ReconnectStrategy::default(),
         Timeout::from_secs(1)?,
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = Configuration::default();
     config.auto_time_sync = Some(TimeSyncProcedure::LAN);
     let mut association = runtime.block_on(master.add_association(
-        NormalAddress::from(1024).unwrap(),
+        LinkAddress::from(1024)?,
         config,
         NullHandler::boxed(),
     ))?;

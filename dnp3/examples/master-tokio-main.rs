@@ -1,4 +1,4 @@
-use dnp3::entry::NormalAddress;
+use dnp3::entry::LinkAddress;
 use dnp3::prelude::master::*;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // spawn the master onto another task
     let mut master = spawn_master_tcp_client(
-        NormalAddress::from(1).unwrap(),
+        LinkAddress::from(1)?,
         DecodeLogLevel::ObjectValues,
         ReconnectStrategy::default(),
         Timeout::from_secs(1)?,
@@ -25,11 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = Configuration::default();
     config.auto_time_sync = Some(TimeSyncProcedure::LAN);
     let mut association = master
-        .add_association(
-            NormalAddress::from(1024).unwrap(),
-            config,
-            NullHandler::boxed(),
-        )
+        .add_association(LinkAddress::from(1024)?, config, NullHandler::boxed())
         .await?;
 
     // Create event poll

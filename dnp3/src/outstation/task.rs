@@ -7,8 +7,8 @@ use crate::link::error::LinkError;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
 use crate::transport::{TransportReader, TransportType, TransportWriter};
 
-use crate::entry::NormalAddress;
-use crate::link::header::Address;
+use crate::entry::LinkAddress;
+use crate::link::header::AnyAddress;
 use crate::util::buffer::Buffer;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::Duration;
@@ -28,7 +28,7 @@ pub struct OutstationTask {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OutstationConfig {
     pub tx_buffer_size: usize,
-    pub outstation_address: NormalAddress,
+    pub outstation_address: LinkAddress,
     pub master_address: Option<u16>,
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: Duration,
@@ -37,7 +37,7 @@ pub struct OutstationConfig {
 impl OutstationConfig {
     pub fn new(
         tx_buffer_size: usize,
-        outstation_address: NormalAddress,
+        outstation_address: LinkAddress,
         master_address: Option<u16>,
         log_level: DecodeLogLevel,
         confirm_timeout: Duration,
@@ -188,7 +188,7 @@ impl Session {
             );
             cursor.at_pos(0, |c| header.write(c))?;
             writer
-                .write(io, self.level, Address::from(1), cursor.written())
+                .write(io, self.level, AnyAddress::from(1), cursor.written())
                 .await?;
 
             match self.wait_sol_confirm(io, reader, seq).await? {

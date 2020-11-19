@@ -23,7 +23,7 @@
 //!
 //!     // spawn the master onto another task
 //!     let mut master = spawn_master_tcp_client(
-//!         NormalAddress::from(1)?,
+//!         LinkAddress::from(1)?,
 //!         DecodeLogLevel::ObjectValues,
 //!         ReconnectStrategy::default(),
 //!         Timeout::from_secs(1)?,
@@ -31,7 +31,7 @@
 //!         Listener::None,
 //!     );
 //!
-//!     let mut association = master.add_association(NormalAddress::from(1024)?, Configuration::default(), NullHandler::boxed()).await?;
+//!     let mut association = master.add_association(LinkAddress::from(1024)?, Configuration::default(), NullHandler::boxed()).await?;
 //!     association.add_poll(
 //!         EventClasses::all().to_classes().to_request(),
 //!         Duration::from_secs(5),

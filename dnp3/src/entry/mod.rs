@@ -1,7 +1,7 @@
-use crate::link::header::Address;
+use crate::link::header::AnyAddress;
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord)]
-pub struct NormalAddress {
+pub struct LinkAddress {
     address: u16,
 }
 
@@ -22,28 +22,28 @@ impl std::fmt::Display for SpecialAddressError {
     }
 }
 
-impl NormalAddress {
+impl LinkAddress {
     pub fn from(value: u16) -> Result<Self, SpecialAddressError> {
-        match Address::from(value) {
-            Address::Normal(x) => Ok(x),
+        match AnyAddress::from(value) {
+            AnyAddress::Normal(x) => Ok(x),
             _ => Err(SpecialAddressError { address: value }),
         }
     }
 
-    pub(crate) const fn raw(address: u16) -> NormalAddress {
-        NormalAddress { address }
+    pub(crate) const fn raw(address: u16) -> LinkAddress {
+        LinkAddress { address }
     }
 
     pub(crate) fn value(&self) -> u16 {
         self.address
     }
 
-    pub(crate) fn wrap(&self) -> Address {
-        Address::Normal(*self)
+    pub(crate) fn wrap(&self) -> AnyAddress {
+        AnyAddress::Normal(*self)
     }
 }
 
-impl std::fmt::Display for NormalAddress {
+impl std::fmt::Display for LinkAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.address)
     }

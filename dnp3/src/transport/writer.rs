@@ -1,16 +1,16 @@
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::DecodeLogLevel;
-use crate::entry::NormalAddress;
+use crate::entry::LinkAddress;
 use crate::link::error::LinkError;
 use crate::link::formatter::{LinkFormatter, Payload};
-use crate::link::header::{Address, AddressPair};
+use crate::link::header::{AddressPair, AnyAddress};
 use crate::transport::sequence::Sequence;
 use crate::transport::TransportType;
 use crate::util::cursor::WriteCursor;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 pub(crate) struct Writer {
-    local_address: NormalAddress,
+    local_address: LinkAddress,
     formatter: LinkFormatter,
     seq: Sequence,
     buffer: [u8; crate::link::constant::MAX_LINK_FRAME_LENGTH],
@@ -30,7 +30,7 @@ impl Writer {
         acc | seq.value()
     }
 
-    pub(crate) fn new(tt: TransportType, local_address: NormalAddress) -> Self {
+    pub(crate) fn new(tt: TransportType, local_address: LinkAddress) -> Self {
         Self {
             local_address,
             formatter: LinkFormatter::new(tt.is_master()),
@@ -47,7 +47,7 @@ impl Writer {
         &mut self,
         io: &mut W,
         level: DecodeLogLevel,
-        destination: Address,
+        destination: AnyAddress,
         fragment: &[u8],
     ) -> Result<(), LinkError>
     where
