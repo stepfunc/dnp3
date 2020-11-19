@@ -8,7 +8,7 @@ use crate::master::handle::{AssociationHandler, Promise};
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollMap, PollMsg};
 use crate::master::request::{EventClasses, TimeSyncProcedure};
-use crate::master::runner::RunError;
+use crate::master::session::RunError;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::NonReadTask::TimeSync;

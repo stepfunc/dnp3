@@ -26,7 +26,7 @@ pub(crate) enum RunError {
     Shutdown,
 }
 
-pub(crate) struct Runner {
+pub(crate) struct MasterSession {
     level: DecodeLogLevel,
     timeout: Timeout,
     associations: AssociationMap,
@@ -40,7 +40,7 @@ enum ReadResponseAction {
     Complete,
 }
 
-impl Runner {
+impl MasterSession {
     pub(crate) fn new(
         level: DecodeLogLevel,
         response_timeout: Timeout,
@@ -220,7 +220,7 @@ impl Runner {
 }
 
 // Task processing
-impl Runner {
+impl MasterSession {
     /// Run a specific task.
     ///
     /// Returns an error only if shutdown or link layer error occured.
@@ -516,7 +516,7 @@ impl Runner {
 }
 
 // Unsolicited processing
-impl Runner {
+impl MasterSession {
     async fn handle_fragment_while_idle<T>(
         &mut self,
         io: &mut T,
@@ -581,7 +581,7 @@ impl Runner {
 }
 
 // Sending methods
-impl Runner {
+impl MasterSession {
     async fn confirm_solicited<T>(
         &mut self,
         io: &mut T,
@@ -655,7 +655,7 @@ mod test {
     #[tokio::test]
     async fn performs_startup_sequence_with_device_restart_asserted() {
         let (tx, rx) = tokio::sync::mpsc::channel(1);
-        let mut runner = Runner::new(
+        let mut runner = MasterSession::new(
             DecodeLogLevel::ObjectValues,
             Timeout::from_secs(1).unwrap(),
             rx,

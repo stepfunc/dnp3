@@ -2,7 +2,7 @@ use crate::app::parse::DecodeLogLevel;
 use crate::app::timeout::Timeout;
 use crate::master::error::Shutdown;
 use crate::master::handle::{Listener, MasterHandle};
-use crate::master::runner::{RunError, Runner};
+use crate::master::session::{MasterSession, RunError};
 use crate::transport::{TransportReader, TransportType, TransportWriter};
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -82,7 +82,7 @@ impl Default for ReconnectStrategy {
 pub(crate) struct MasterTask {
     endpoint: SocketAddr,
     back_off: ExponentialBackOff,
-    runner: Runner,
+    session: MasterSession,
     reader: TransportReader,
     writer: TransportWriter,
     listener: Listener<ClientState>,
@@ -143,13 +143,13 @@ impl MasterTask {
         listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
         let (tx, rx) = tokio::sync::mpsc::channel(100); // TODO
-        let runner = Runner::new(level, response_timeout, rx);
+        let session = MasterSession::new(level, response_timeout, rx);
         let (reader, writer) =
             crate::transport::create_transport_layer(TransportType::Master, address);
         let task = Self {
             endpoint,
             back_off: ExponentialBackOff::new(strategy),
-            runner,
+            session,
             reader,
             writer,
             listener,
@@ -170,14 +170,14 @@ impl MasterTask {
                     log::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
                     self.listener
                         .update(ClientState::WaitAfterFailedConnect(delay));
-                    self.runner.delay_for(delay).await?;
+                    self.session.delay_for(delay).await?;
                 }
                 Ok(mut socket) => {
                     log::info!("connected to: {}", self.endpoint);
                     self.back_off.on_connect_success();
                     self.listener.update(ClientState::Connected);
                     match self
-                        .runner
+                        .session
                         .run(&mut socket, &mut self.writer, &mut self.reader)
                         .await
                     {
@@ -190,7 +190,7 @@ impl MasterTask {
                             log::warn!("{} - waiting {} ms to reconnect", err, delay.as_millis());
                             self.listener
                                 .update(ClientState::WaitAfterDisconnect(delay));
-                            self.runner.delay_for(delay).await?;
+                            self.session.delay_for(delay).await?;
                         }
                     }
                 }

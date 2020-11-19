@@ -3,7 +3,7 @@ use crate::app::header::{IIN, IIN2};
 use crate::app::parse::error::ObjectParseError;
 use crate::link::error::LinkError;
 use crate::master::association::NoAssociation;
-use crate::master::runner::RunError;
+use crate::master::session::RunError;
 use crate::util::cursor::WriteError;
 use std::error::Error;
 use tokio::sync::mpsc::error::SendError;
