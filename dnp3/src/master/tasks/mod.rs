@@ -145,7 +145,12 @@ impl ReadTask {
                     association.on_integrity_scan_failure();
                 }
             }
-            ReadTask::PeriodicPoll(_) => {}
+            ReadTask::PeriodicPoll(poll) => {
+                if let Some(association) = association {
+                    log::warn!("Poll {} failed", poll.id);
+                    association.complete_poll(poll.id);
+                }
+            }
             ReadTask::SingleRead(task) => task.on_task_error(err),
         }
     }

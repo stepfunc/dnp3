@@ -1,4 +1,5 @@
 use crate::app::parse::DecodeLogLevel;
+use crate::app::retry::{ExponentialBackOff, RetryStrategy};
 use crate::app::timeout::Timeout;
 use crate::entry::EndpointAddress;
 use crate::master::error::Shutdown;
@@ -10,21 +11,6 @@ use std::time::Duration;
 use tokio::macros::support::Future;
 use tokio::net::TcpStream;
 
-#[derive(Copy, Clone)]
-pub struct ReconnectStrategy {
-    min_delay: Duration,
-    max_delay: Duration,
-}
-
-impl ReconnectStrategy {
-    pub fn new(min_delay: Duration, max_delay: Duration) -> Self {
-        Self {
-            min_delay,
-            max_delay,
-        }
-    }
-}
-
 /// state of TCP client connection
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ClientState {
@@ -33,51 +19,6 @@ pub enum ClientState {
     WaitAfterFailedConnect(Duration),
     WaitAfterDisconnect(Duration),
     Shutdown,
-}
-
-struct ExponentialBackOff {
-    strategy: ReconnectStrategy,
-    last: Option<Duration>,
-}
-
-impl ExponentialBackOff {
-    fn new(strategy: ReconnectStrategy) -> Self {
-        Self {
-            strategy,
-            last: None,
-        }
-    }
-
-    fn on_connect_success(&mut self) {
-        self.last = None;
-    }
-
-    fn on_connect_failure(&mut self) -> Duration {
-        match self.last {
-            Some(x) => {
-                let next = x
-                    .checked_mul(2)
-                    .unwrap_or(self.strategy.max_delay)
-                    .min(self.strategy.max_delay);
-                self.last = Some(next);
-                next
-            }
-            None => {
-                self.last = Some(self.strategy.min_delay);
-                self.strategy.min_delay
-            }
-        }
-    }
-
-    fn min_delay(&self) -> Duration {
-        self.strategy.min_delay
-    }
-}
-
-impl Default for ReconnectStrategy {
-    fn default() -> Self {
-        Self::new(Duration::from_secs(1), Duration::from_secs(10))
-    }
 }
 
 pub(crate) struct MasterTask {
@@ -97,7 +38,7 @@ pub(crate) struct MasterTask {
 pub fn spawn_master_tcp_client(
     address: EndpointAddress,
     level: DecodeLogLevel,
-    strategy: ReconnectStrategy,
+    strategy: RetryStrategy,
     timeout: Timeout,
     endpoint: SocketAddr,
     listener: Listener<ClientState>,
@@ -118,7 +59,7 @@ pub fn spawn_master_tcp_client(
 pub fn create_master_tcp_client(
     address: EndpointAddress,
     level: DecodeLogLevel,
-    strategy: ReconnectStrategy,
+    strategy: RetryStrategy,
     response_timeout: Timeout,
     endpoint: SocketAddr,
     listener: Listener<ClientState>,
@@ -138,7 +79,7 @@ impl MasterTask {
     fn new(
         address: EndpointAddress,
         level: DecodeLogLevel,
-        strategy: ReconnectStrategy,
+        strategy: RetryStrategy,
         response_timeout: Timeout,
         endpoint: SocketAddr,
         listener: Listener<ClientState>,
@@ -166,7 +107,7 @@ impl MasterTask {
             self.listener.update(ClientState::Connecting);
             match TcpStream::connect(self.endpoint).await {
                 Err(err) => {
-                    let delay = self.back_off.on_connect_failure();
+                    let delay = self.back_off.on_failure();
                     log::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
                     self.listener
                         .update(ClientState::WaitAfterFailedConnect(delay));
@@ -174,7 +115,7 @@ impl MasterTask {
                 }
                 Ok(mut socket) => {
                     log::info!("connected to: {}", self.endpoint);
-                    self.back_off.on_connect_success();
+                    self.back_off.on_success();
                     self.listener.update(ClientState::Connected);
                     match self
                         .session

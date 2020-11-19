@@ -18,6 +18,8 @@ pub mod header;
 pub mod measurement;
 /// application layer parser
 pub mod parse;
+/// retry strategies
+pub mod retry;
 /// application layer sequence number
 pub mod sequence;
 /// types for handling timeouts

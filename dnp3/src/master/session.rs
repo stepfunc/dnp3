@@ -570,15 +570,24 @@ impl MasterSession {
             }
         };
 
+        // Even if we might have to ignore the UNS, we need to detect the restart IIN bit
         association.process_iin(response.header.iin);
 
-        if let Ok(objects) = response.objects {
-            association.handle_unsolicited_response(response.header, objects);
-        }
+        if association.is_integrity_complete()
+            || (response.header.iin.iin1.get_device_restart() && response.raw_objects.is_empty())
+        {
+            if let Ok(objects) = response.objects {
+                association.handle_unsolicited_response(response.header, objects);
+            }
 
-        if response.header.control.con {
-            self.confirm_unsolicited(io, source, response.header.control.seq, writer)
-                .await?;
+            if response.header.control.con {
+                self.confirm_unsolicited(io, source, response.header.control.seq, writer)
+                    .await?;
+            }
+        } else {
+            log::warn!(
+                "ignoring unsolicited response received before the end of the startup procedure"
+            );
         }
 
         Ok(())

@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut master = spawn_master_tcp_client(
         EndpointAddress::from(1)?,
         DecodeLogLevel::ObjectValues,
-        ReconnectStrategy::default(),
+        RetryStrategy::default(),
         Timeout::from_secs(1)?,
         SocketAddr::from_str("127.0.0.1:20000")?,
         Listener::None,
