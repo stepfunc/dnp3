@@ -11,14 +11,14 @@ pub(crate) type ReaderType = crate::transport::reader::Reader;
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport writer during testing.
 /// If Rust eventually allows `async fn` in traits, this can be removed
-pub(crate) type WriterType = crate::transport::writer::Writer;
+pub(crate) type TransportWriter = crate::transport::writer::Writer;
 
 #[cfg(test)]
 pub(crate) mod mocks;
 #[cfg(test)]
 pub(crate) type ReaderType = crate::transport::mocks::MockReader;
 #[cfg(test)]
-pub(crate) type WriterType = crate::transport::mocks::MockWriter;
+pub(crate) type TransportWriter = crate::transport::mocks::MockWriter;
 
 pub(crate) mod assembler;
 pub(crate) mod header;
@@ -138,9 +138,9 @@ impl TransportReader {
 pub(crate) fn create_transport_layer(
     tt: TransportType,
     address: u16,
-) -> (TransportReader, WriterType) {
+) -> (TransportReader, TransportWriter) {
     (
         TransportReader::new(tt, address),
-        WriterType::new(tt, address),
+        TransportWriter::new(tt, address),
     )
 }

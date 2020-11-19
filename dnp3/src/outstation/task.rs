@@ -5,7 +5,7 @@ use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::link::error::LinkError;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
-use crate::transport::{TransportReader, TransportType, WriterType};
+use crate::transport::{TransportReader, TransportType, TransportWriter};
 
 use crate::util::buffer::Buffer;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -20,7 +20,7 @@ pub(crate) struct Session {
 pub struct OutstationTask {
     session: Session,
     reader: TransportReader,
-    writer: WriterType,
+    writer: TransportWriter,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -108,7 +108,7 @@ impl Session {
         &mut self,
         io: &mut T,
         reader: &mut TransportReader,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -167,7 +167,7 @@ impl Session {
         &mut self,
         io: &mut T,
         reader: &mut TransportReader,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
         mut seq: Sequence,
         iin2: IIN2,
     ) -> Result<(), LinkError>

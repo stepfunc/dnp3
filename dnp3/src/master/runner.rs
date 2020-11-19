@@ -2,7 +2,7 @@ use crate::app::format::write;
 use crate::app::parse::parser::Response;
 use crate::app::sequence::Sequence;
 use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
-use crate::transport::{TransportReader, WriterType};
+use crate::transport::{TransportReader, TransportWriter};
 
 use crate::app::header::Control;
 use crate::link::error::LinkError;
@@ -75,7 +75,7 @@ impl Runner {
     pub(crate) async fn run<T>(
         &mut self,
         io: &mut T,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> RunError
     where
@@ -103,7 +103,7 @@ impl Runner {
     async fn idle_forever<T>(
         &mut self,
         io: &mut T,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
@@ -130,7 +130,7 @@ impl Runner {
         &mut self,
         instant: Instant,
         io: &mut T,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
@@ -228,7 +228,7 @@ impl Runner {
         &mut self,
         io: &mut T,
         task: AssociationTask,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
@@ -261,7 +261,7 @@ impl Runner {
         io: &mut T,
         address: u16,
         mut task: NonReadTask,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), TaskError>
     where
@@ -326,7 +326,7 @@ impl Runner {
         seq: Sequence,
         io: &mut T,
         reader: &'a mut TransportReader,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
     ) -> Result<Option<Response<'a>>, TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -371,7 +371,7 @@ impl Runner {
         io: &mut T,
         address: u16,
         task: ReadTask,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), TaskError>
     where
@@ -402,7 +402,7 @@ impl Runner {
         io: &mut T,
         address: u16,
         task: &ReadTask,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), TaskError>
     where
@@ -447,7 +447,7 @@ impl Runner {
         seq: Sequence,
         task: &ReadTask,
         io: &mut T,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<ReadResponseAction, TaskError>
     where
@@ -520,7 +520,7 @@ impl Runner {
     async fn handle_fragment_while_idle<T>(
         &mut self,
         io: &mut T,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
@@ -549,7 +549,7 @@ impl Runner {
         source: u16,
         response: &Response<'_>,
         io: &mut T,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -587,7 +587,7 @@ impl Runner {
         io: &mut T,
         destination: u16,
         seq: Sequence,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
     where
         T: AsyncWrite + Unpin,
@@ -605,7 +605,7 @@ impl Runner {
         io: &mut T,
         destination: u16,
         seq: Sequence,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
     where
         T: AsyncWrite + Unpin,
@@ -624,7 +624,7 @@ impl Runner {
         io: &mut T,
         address: u16,
         request: &U,
-        writer: &mut WriterType,
+        writer: &mut TransportWriter,
     ) -> Result<Sequence, TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
