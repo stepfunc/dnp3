@@ -1,4 +1,8 @@
+use crate::app::parse::parser::{ParsedFragment, Request, Response};
+use crate::app::parse::DecodeLogLevel;
+use crate::link::error::LinkError;
 use crate::link::header::Address;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport reader during testing.
@@ -48,6 +52,95 @@ pub(crate) mod constants {
     pub(crate) const FIR_MASK: u8 = 0b0100_0000;
 }
 
-pub(crate) fn create_transport_layer(typ: TransportType, address: u16) -> (ReaderType, WriterType) {
-    (ReaderType::new(typ, address), WriterType::new(typ, address))
+pub(crate) struct TransportReader {
+    logged: bool,
+    inner: ReaderType,
+}
+
+impl TransportReader {
+    fn new(tt: TransportType, address: u16) -> Self {
+        Self {
+            logged: false,
+            inner: ReaderType::new(tt, address),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_inner(&self) -> &ReaderType {
+        &self.inner
+    }
+
+    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        self.logged = false;
+        self.inner.read(io).await
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.inner.reset()
+    }
+
+    pub(crate) fn get_response(&mut self, level: DecodeLogLevel) -> Option<(u16, Response)> {
+        let (log, address, parsed) = self.peek(level)?;
+        match parsed.to_response() {
+            Err(err) => {
+                if log {
+                    log::error!("response error: {}", err)
+                }
+                None
+            }
+            Ok(response) => Some((address.source, response)),
+        }
+    }
+
+    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(Address, Request)> {
+        let (log, address, parsed) = self.peek(level)?;
+        match parsed.to_request() {
+            Err(err) => {
+                if log {
+                    log::error!("request error: {}", err)
+                }
+                None
+            }
+            Ok(request) => Some((address, request)),
+        }
+    }
+
+    fn peek(&mut self, level: DecodeLogLevel) -> Option<(bool, Address, ParsedFragment)> {
+        let log_this_peek = !self.logged;
+        self.logged = true;
+        let fragment: Fragment = self.inner.peek()?;
+        let level = if log_this_peek {
+            level
+        } else {
+            DecodeLogLevel::Nothing
+        };
+        let parsed = match ParsedFragment::parse(level.receive(), fragment.data) {
+            Err(err) => {
+                if log_this_peek {
+                    log::warn!("error parsing fragment header: {}", err)
+                }
+                return None;
+            }
+            Ok(parsed) => parsed,
+        };
+        if let Err(err) = parsed.objects {
+            if log_this_peek {
+                log::warn!("error parsing object headers: {}", err)
+            }
+        }
+        Some((log_this_peek, fragment.address, parsed))
+    }
+}
+
+pub(crate) fn create_transport_layer(
+    tt: TransportType,
+    address: u16,
+) -> (TransportReader, WriterType) {
+    (
+        TransportReader::new(tt, address),
+        WriterType::new(tt, address),
+    )
 }

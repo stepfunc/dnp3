@@ -3,7 +3,7 @@ use crate::app::timeout::Timeout;
 use crate::master::error::Shutdown;
 use crate::master::handle::{Listener, MasterHandle};
 use crate::master::runner::{RunError, Runner};
-use crate::transport::{ReaderType, TransportType, WriterType};
+use crate::transport::{TransportReader, TransportType, WriterType};
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::macros::support::Future;
@@ -83,7 +83,7 @@ pub(crate) struct MasterTask {
     endpoint: SocketAddr,
     back_off: ExponentialBackOff,
     runner: Runner,
-    reader: ReaderType,
+    reader: TransportReader,
     writer: WriterType,
     listener: Listener<ClientState>,
 }

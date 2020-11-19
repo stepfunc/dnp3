@@ -30,8 +30,8 @@ impl MockWriter {
     // just write the fragment directly to the I/O
     pub(crate) async fn write<W>(
         &mut self,
-        _level: DecodeLogLevel,
         io: &mut W,
+        _: DecodeLogLevel,
         _destination: u16,
         fragment: &[u8],
     ) -> Result<(), LinkError>

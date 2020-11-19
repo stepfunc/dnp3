@@ -41,8 +41,8 @@ impl Writer {
 
     pub(crate) async fn write<W>(
         &mut self,
-        level: DecodeLogLevel,
         io: &mut W,
+        level: DecodeLogLevel,
         destination: u16,
         fragment: &[u8],
     ) -> Result<(), LinkError>
@@ -50,7 +50,7 @@ impl Writer {
         W: AsyncWrite + Unpin,
     {
         if level != DecodeLogLevel::Nothing {
-            ParsedFragment::parse(level.transmit(), fragment).ok();
+            let _ = ParsedFragment::parse(level.transmit(), fragment);
         }
 
         let chunks = fragment.chunks(crate::link::constant::MAX_APP_BYTES_PER_FRAME);

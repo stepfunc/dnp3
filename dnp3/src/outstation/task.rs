@@ -1,26 +1,25 @@
 use crate::app::enums::FunctionCode;
 use crate::app::header::{Control, ResponseFunction, ResponseHeader, IIN, IIN1, IIN2};
-use crate::app::parse::parser::ParsedFragment;
+use crate::app::parse::parser::Request;
 use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::link::error::LinkError;
-use crate::link::header::Address;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
-use crate::transport::{Fragment, ReaderType, TransportType, WriterType};
+use crate::transport::{TransportReader, TransportType, WriterType};
 
 use crate::util::buffer::Buffer;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::Duration;
 
 pub(crate) struct Session {
+    level: DecodeLogLevel,
     tx_buffer: Buffer,
-    log_level: DecodeLogLevel,
     database: DatabaseHandle,
 }
 
 pub struct OutstationTask {
     session: Session,
-    reader: ReaderType,
+    reader: TransportReader,
     writer: WriterType,
 }
 
@@ -60,7 +59,7 @@ impl OutstationTask {
             config.outstation_address,
         );
         let task = Self {
-            session: Session::new(config.tx_buffer_size, config.log_level, handle.clone()),
+            session: Session::new(config.log_level, config.tx_buffer_size, handle.clone()),
             reader,
             writer,
         };
@@ -79,7 +78,7 @@ impl OutstationTask {
 }
 
 enum ResponseAction {
-    Respond(Address, usize),
+    Respond(usize),
     BeginReadResponse(Sequence, IIN2),
 }
 
@@ -94,21 +93,21 @@ impl Session {
     pub(crate) const MIN_TX_BUFFER_SIZE: usize = 249; // 1 link frame
 
     pub(crate) fn new(
+        level: DecodeLogLevel,
         tx_buffer_size: usize,
-        log_level: DecodeLogLevel,
         database: DatabaseHandle,
     ) -> Self {
         Self {
+            level,
             tx_buffer: Buffer::new(tx_buffer_size.min(Self::MIN_TX_BUFFER_SIZE)),
             database,
-            log_level,
         }
     }
 
     pub(crate) async fn run<T>(
         &mut self,
         io: &mut T,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
         writer: &mut WriterType,
     ) -> Result<(), LinkError>
     where
@@ -116,14 +115,14 @@ impl Session {
     {
         loop {
             // process any available request fragments
-            if let Some(request) = reader.peek() {
+            if let Some((address, request)) = reader.get_request(self.level) {
                 if let Some(action) = self.process_request(request) {
                     match action {
-                        ResponseAction::Respond(address, num) => {
+                        ResponseAction::Respond(num) => {
                             writer
                                 .write(
-                                    DecodeLogLevel::ObjectValues,
                                     io,
+                                    self.level,
                                     address.source,
                                     self.tx_buffer.get(num).unwrap(),
                                 )
@@ -141,19 +140,7 @@ impl Session {
         }
     }
 
-    fn process_request(&mut self, fragment: Fragment) -> Option<ResponseAction> {
-        let request = match ParsedFragment::parse(self.log_level.receive(), fragment.data) {
-            // this is logged internally
-            Err(_) => return None,
-            Ok(x) => match x.to_request() {
-                Ok(request) => request,
-                Err(err) => {
-                    log::error!("bad request: {}", err);
-                    return None;
-                }
-            },
-        };
-
+    fn process_request(&mut self, request: Request) -> Option<ResponseAction> {
         if request.header.function == FunctionCode::Read {
             let iin = match request.objects {
                 Err(_) => IIN2::PARAMETER_ERROR,
@@ -172,17 +159,14 @@ impl Session {
                 IIN::new(IIN1::default(), IIN2::NO_FUNC_CODE_SUPPORT),
             );
             let _ = header.write(&mut cursor);
-            Some(ResponseAction::Respond(
-                fragment.address,
-                cursor.written().len(),
-            ))
+            Some(ResponseAction::Respond(cursor.written().len()))
         }
     }
 
     async fn respond_to_read<T>(
         &mut self,
         io: &mut T,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
         writer: &mut WriterType,
         mut seq: Sequence,
         iin2: IIN2,
@@ -206,9 +190,7 @@ impl Session {
                 IIN::new(info.unwritten.as_iin1(), iin2),
             );
             cursor.at_pos(0, |c| header.write(c))?;
-            writer
-                .write(self.log_level, io, 1, cursor.written())
-                .await?;
+            writer.write(io, self.level, 1, cursor.written()).await?;
 
             match self.wait_sol_confirm(io, reader, seq).await? {
                 Confirm::Timeout => {
@@ -232,44 +214,11 @@ impl Session {
         }
     }
 
-    fn parse_confirm(
-        log_level: DecodeLogLevel,
-        fragment: Fragment,
-        seq: Sequence,
-    ) -> Option<Confirm> {
-        let parsed = match ParsedFragment::parse(log_level.receive(), fragment.data) {
-            Ok(parsed) => parsed,
-            Err(_) => return None,
-        };
-
-        let request = match parsed.to_request() {
-            Ok(request) => request,
-            Err(err) => {
-                log::warn!("bad request: {}", err);
-                return None;
-            }
-        };
-
-        if request.header.function != FunctionCode::Confirm {
-            return Some(Confirm::NewRequest);
-        }
-
-        if request.header.control.seq != seq {
-            log::warn!(
-                "unexpected confirm seq: {}",
-                request.header.control.seq.value()
-            );
-            return None;
-        }
-
-        Some(Confirm::Yes)
-    }
-
     async fn wait_sol_confirm<T>(
         &mut self,
         io: &mut T,
-        reader: &mut ReaderType,
-        seq: Sequence,
+        reader: &mut TransportReader,
+        _seq: Sequence,
     ) -> Result<Confirm, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -282,9 +231,12 @@ impl Session {
                     return Ok(Confirm::Timeout);
                 }
                 _ = reader.read(io) => {
-                     if let Some(fragment) =  reader.peek() {
-                        if let Some(result) = Self::parse_confirm(self.log_level, fragment, seq) {
-                          return Ok(result);
+                     if let Some((_address, request)) =  reader.get_request(self.level) {
+                        if request.header.function == FunctionCode::Confirm {
+                            return Ok(Confirm::Yes);
+                        }
+                        else {
+                            return Ok(Confirm::NewRequest);
                         }
                      }
                 }

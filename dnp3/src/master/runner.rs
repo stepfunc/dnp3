@@ -1,9 +1,8 @@
 use crate::app::format::write;
-use crate::app::parse::parser::{ParsedFragment, Response};
-use crate::app::parse::DecodeLogLevel;
+use crate::app::parse::parser::Response;
 use crate::app::sequence::Sequence;
 use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
-use crate::transport::{ReaderType, WriterType};
+use crate::transport::{TransportReader, WriterType};
 
 use crate::app::header::Control;
 use crate::link::error::LinkError;
@@ -14,6 +13,7 @@ use crate::app::timeout::Timeout;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::messages::{MasterMsg, Message};
 
+use crate::app::parse::DecodeLogLevel;
 use crate::master::error::{Shutdown, TaskError};
 use std::ops::Add;
 use std::time::Duration;
@@ -76,7 +76,7 @@ impl Runner {
         &mut self,
         io: &mut T,
         writer: &mut WriterType,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
     ) -> RunError
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -104,7 +104,7 @@ impl Runner {
         &mut self,
         io: &mut T,
         writer: &mut WriterType,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -131,7 +131,7 @@ impl Runner {
         instant: Instant,
         io: &mut T,
         writer: &mut WriterType,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -193,7 +193,7 @@ impl Runner {
         &mut self,
         io: &mut T,
         deadline: Instant,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
     ) -> Result<(), TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -229,7 +229,7 @@ impl Runner {
         io: &mut T,
         task: AssociationTask,
         writer: &mut WriterType,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -262,7 +262,7 @@ impl Runner {
         address: u16,
         mut task: NonReadTask,
         writer: &mut WriterType,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
     ) -> Result<(), TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -325,40 +325,27 @@ impl Runner {
         address: u16,
         seq: Sequence,
         io: &mut T,
-        reader: &'a mut ReaderType,
+        reader: &'a mut TransportReader,
         writer: &mut WriterType,
     ) -> Result<Option<Response<'a>>, TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let fragment = match reader.peek() {
+        let (source, response) = match reader.get_response(self.level) {
             None => return Ok(None),
             Some(x) => x,
-        };
-
-        let parsed = match ParsedFragment::parse(self.level.receive(), fragment.data).ok() {
-            None => return Ok(None),
-            Some(x) => x,
-        };
-
-        let response = match parsed.to_response() {
-            Err(err) => {
-                log::warn!("{}", err);
-                return Ok(None);
-            }
-            Ok(x) => x,
         };
 
         if response.header.function.is_unsolicited() {
-            self.handle_unsolicited(fragment.address.source, &response, io, writer)
+            self.handle_unsolicited(source, &response, io, writer)
                 .await?;
             return Ok(None);
         }
 
-        if fragment.address.source != address {
+        if source != address {
             log::warn!(
                 "Received response from {} while expecting response from {}",
-                fragment.address.source,
+                source,
                 address
             );
             return Ok(None);
@@ -385,7 +372,7 @@ impl Runner {
         address: u16,
         task: ReadTask,
         writer: &mut WriterType,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
     ) -> Result<(), TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -416,7 +403,7 @@ impl Runner {
         address: u16,
         task: &ReadTask,
         writer: &mut WriterType,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
     ) -> Result<(), TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
@@ -461,39 +448,26 @@ impl Runner {
         task: &ReadTask,
         io: &mut T,
         writer: &mut WriterType,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
     ) -> Result<ReadResponseAction, TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let fragment = match reader.peek() {
+        let (source, response) = match reader.get_response(self.level) {
             Some(x) => x,
             None => return Ok(ReadResponseAction::Ignore),
         };
 
-        let parsed = match ParsedFragment::parse(self.level.receive(), fragment.data).ok() {
-            Some(parsed) => parsed,
-            None => return Ok(ReadResponseAction::Ignore),
-        };
-
-        let response = match parsed.to_response() {
-            Ok(response) => response,
-            Err(err) => {
-                log::warn!("{}", err);
-                return Ok(ReadResponseAction::Ignore);
-            }
-        };
-
         if response.header.function.is_unsolicited() {
-            self.handle_unsolicited(fragment.address.source, &response, io, writer)
+            self.handle_unsolicited(source, &response, io, writer)
                 .await?;
             return Ok(ReadResponseAction::Ignore);
         }
 
-        if fragment.address.source != address {
+        if source != address {
             log::warn!(
                 "Received response from {} while expecting response from {}",
-                fragment.address.source,
+                source,
                 address
             );
             return Ok(ReadResponseAction::Ignore);
@@ -547,31 +521,18 @@ impl Runner {
         &mut self,
         io: &mut T,
         writer: &mut WriterType,
-        reader: &mut ReaderType,
+        reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let fragment = match reader.peek() {
+        let (source, response) = match reader.get_response(self.level) {
             None => return Ok(()),
             Some(x) => x,
-        };
-
-        let parsed = match ParsedFragment::parse(self.level.receive(), fragment.data).ok() {
-            None => return Ok(()),
-            Some(x) => x,
-        };
-
-        let response = match parsed.to_response() {
-            Err(err) => {
-                log::warn!("{}", err);
-                return Ok(());
-            }
-            Ok(x) => x,
         };
 
         if response.header.function.is_unsolicited() {
-            self.handle_unsolicited(fragment.address.source, &response, io, writer)
+            self.handle_unsolicited(source, &response, io, writer)
                 .await?;
         } else {
             log::warn!(
@@ -634,7 +595,7 @@ impl Runner {
         let mut cursor = WriteCursor::new(&mut self.buffer);
         write::confirm_solicited(seq, &mut cursor)?;
         writer
-            .write(self.level, io, destination, cursor.written())
+            .write(io, self.level, destination, cursor.written())
             .await?;
         Ok(())
     }
@@ -653,7 +614,7 @@ impl Runner {
         crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
 
         writer
-            .write(self.level, io, destination, cursor.written())
+            .write(io, self.level, destination, cursor.written())
             .await?;
         Ok(())
     }
@@ -676,7 +637,7 @@ impl Runner {
         let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
         writer
-            .write(self.level, io, address, cursor.written())
+            .write(io, self.level, address, cursor.written())
             .await?;
         Ok(seq)
     }
@@ -685,6 +646,7 @@ impl Runner {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::app::parse::DecodeLogLevel;
     use crate::master::association::Configuration;
     use crate::master::handle::{MasterHandle, NullHandler};
     use crate::transport::{create_transport_layer, TransportType};
@@ -693,7 +655,11 @@ mod test {
     #[tokio::test]
     async fn performs_startup_sequence_with_device_restart_asserted() {
         let (tx, rx) = tokio::sync::mpsc::channel(1);
-        let mut runner = Runner::new(DecodeLogLevel::Nothing, Timeout::from_secs(1).unwrap(), rx);
+        let mut runner = Runner::new(
+            DecodeLogLevel::ObjectValues,
+            Timeout::from_secs(1).unwrap(),
+            rx,
+        );
         let mut master = MasterHandle::new(tx);
 
         let (mut io, _handle) = Builder::new()
@@ -745,6 +711,6 @@ mod test {
         tokio_test::assert_ready_eq!(master_task.poll(), RunError::Shutdown);
         drop(master_task);
         assert_eq!(writer.num_writes(), 4);
-        assert_eq!(reader.num_reads(), 4);
+        assert_eq!(reader.get_inner().num_reads(), 4);
     }
 }

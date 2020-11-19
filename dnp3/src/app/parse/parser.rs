@@ -216,16 +216,11 @@ impl<'a> ParsedFragment<'a> {
         fragment: &'a [u8],
     ) -> Result<Self, HeaderParseError> {
         let result = Self::parse_no_logging(fragment);
-        match &result {
-            Ok(fragment) => {
-                if let Some(view) = fragment.display_view(settings) {
-                    log::info!("{}", view);
-                }
+        if let Ok(fragment) = &result {
+            if let Some(view) = fragment.display_view(settings) {
+                log::info!("{}", view);
             }
-            Err(err) => {
-                log::warn!("error parsing fragment header: {}", err);
-            }
-        };
+        }
         result
     }
 }
