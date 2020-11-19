@@ -64,7 +64,7 @@ impl AnyAddress {
 
     pub(crate) fn value(&self) -> u16 {
         match self {
-            Self::Normal(x) => x.value(),
+            Self::Normal(x) => x.raw_value(),
             Self::Broadcast(x) => x.value(),
             Self::SelfAddress => constants::SELF_ADDRESS,
         }
@@ -74,7 +74,7 @@ impl AnyAddress {
 impl std::fmt::Display for AnyAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            AnyAddress::Normal(x) => write!(f, "normal address ({})", x.value()),
+            AnyAddress::Normal(x) => write!(f, "normal address ({})", x),
             AnyAddress::SelfAddress => write!(f, "self address ({})", constants::SELF_ADDRESS),
             AnyAddress::Broadcast(details) => write!(f, "broadcast address ({})", details.value()),
         }

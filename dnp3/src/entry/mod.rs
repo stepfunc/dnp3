@@ -34,7 +34,7 @@ impl LinkAddress {
         LinkAddress { address }
     }
 
-    pub(crate) fn value(&self) -> u16 {
+    pub(crate) fn raw_value(&self) -> u16 {
         self.address
     }
 

@@ -260,7 +260,7 @@ impl MasterSession {
     async fn run_non_read_task<T>(
         &mut self,
         io: &mut T,
-        address: LinkAddress,
+        destination: LinkAddress,
         mut task: NonReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -269,10 +269,10 @@ impl MasterSession {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            let seq = match self.send_request(io, address, &task, writer).await {
+            let seq = match self.send_request(io, destination, &task, writer).await {
                 Ok(seq) => seq,
                 Err(err) => {
-                    task.on_task_error(self.associations.get_mut(address).ok(), err);
+                    task.on_task_error(self.associations.get_mut(destination).ok(), err);
                     return Err(err);
                 }
             };
@@ -281,18 +281,18 @@ impl MasterSession {
 
             loop {
                 if let Err(err) = self.read_next_response(io, deadline, reader).await {
-                    task.on_task_error(self.associations.get_mut(address).ok(), err);
+                    task.on_task_error(self.associations.get_mut(destination).ok(), err);
                     return Err(err);
                 }
 
                 match self
-                    .validate_non_read_response(address, seq, io, reader, writer)
+                    .validate_non_read_response(destination, seq, io, reader, writer)
                     .await
                 {
                     // continue reading responses until timeout
                     Ok(None) => continue,
                     Ok(Some(response)) => {
-                        match self.associations.get_mut(address) {
+                        match self.associations.get_mut(destination) {
                             Err(x) => {
                                 task.on_task_error(None, x.into());
                                 return Err(x.into());
@@ -311,7 +311,7 @@ impl MasterSession {
                         }
                     }
                     Err(err) => {
-                        task.on_task_error(self.associations.get_mut(address).ok(), err);
+                        task.on_task_error(self.associations.get_mut(destination).ok(), err);
                         return Err(err);
                     }
                 }
@@ -346,8 +346,8 @@ impl MasterSession {
         if source != destination {
             log::warn!(
                 "Received response from {} while expecting response from {}",
-                source.value(),
-                destination.value()
+                source,
+                destination
             );
             return Ok(None);
         }
@@ -370,7 +370,7 @@ impl MasterSession {
     async fn run_read_task<T>(
         &mut self,
         io: &mut T,
-        address: LinkAddress,
+        destination: LinkAddress,
         task: ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -379,17 +379,17 @@ impl MasterSession {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         let result = self
-            .execute_read_task(io, address, &task, writer, reader)
+            .execute_read_task(io, destination, &task, writer, reader)
             .await;
 
-        let association = self.associations.get_mut(address).ok();
+        let association = self.associations.get_mut(destination).ok();
 
         match result {
             Ok(_) => {
                 if let Some(association) = association {
                     task.complete(association);
                 } else {
-                    task.on_task_error(None, TaskError::NoSuchAssociation(address));
+                    task.on_task_error(None, TaskError::NoSuchAssociation(destination));
                 }
             }
             Err(err) => task.on_task_error(association, err),
@@ -401,7 +401,7 @@ impl MasterSession {
     async fn execute_read_task<T>(
         &mut self,
         io: &mut T,
-        address: LinkAddress,
+        destination: LinkAddress,
         task: &ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -409,7 +409,7 @@ impl MasterSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let mut seq = self.send_request(io, address, task, writer).await?;
+        let mut seq = self.send_request(io, destination, task, writer).await?;
         let mut is_first = true;
 
         // read responses until we get a FIN or an error occurs
@@ -420,7 +420,7 @@ impl MasterSession {
                 self.read_next_response(io, deadline, reader).await?;
 
                 match self
-                    .process_read_response(address, is_first, seq, &task, io, writer, reader)
+                    .process_read_response(destination, is_first, seq, &task, io, writer, reader)
                     .await?
                 {
                     // continue reading responses on the inner loop
@@ -432,7 +432,7 @@ impl MasterSession {
                     // break to the outer loop and read another response
                     ReadResponseAction::ReadNext => {
                         is_first = false;
-                        seq = self.associations.get_mut(address)?.increment_seq();
+                        seq = self.associations.get_mut(destination)?.increment_seq();
                         break;
                     }
                 }
@@ -443,7 +443,7 @@ impl MasterSession {
     #[allow(clippy::too_many_arguments)] // TODO
     async fn process_read_response<T>(
         &mut self,
-        address: LinkAddress,
+        destination: LinkAddress,
         is_first: bool,
         seq: Sequence,
         task: &ReadTask,
@@ -465,11 +465,11 @@ impl MasterSession {
             return Ok(ReadResponseAction::Ignore);
         }
 
-        if source != address {
+        if source != destination {
             log::warn!(
                 "Received response from {} while expecting response from {}",
-                source.value(),
-                address.value()
+                source,
+                destination
             );
             return Ok(ReadResponseAction::Ignore);
         }
@@ -497,11 +497,11 @@ impl MasterSession {
             return Err(TaskError::NonFinWithoutCon);
         }
 
-        let association = self.associations.get_mut(address)?;
+        let association = self.associations.get_mut(destination)?;
         task.process_response(association, response.header, response.objects?);
 
         if response.header.control.con {
-            self.confirm_solicited(io, address, seq, writer).await?;
+            self.confirm_solicited(io, destination, seq, writer).await?;
         }
 
         if response.header.control.fin {
@@ -560,7 +560,7 @@ impl MasterSession {
             None => {
                 log::warn!(
                     "received unsolicited response from unknown address: {}",
-                    source.value()
+                    source
                 );
                 return Ok(());
             }
