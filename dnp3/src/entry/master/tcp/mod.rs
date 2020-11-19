@@ -3,7 +3,7 @@ use crate::app::timeout::Timeout;
 use crate::master::error::Shutdown;
 use crate::master::handle::{Listener, MasterHandle};
 use crate::master::runner::{RunError, Runner};
-use crate::transport::{ReaderType, WriterType};
+use crate::transport::{ReaderType, TransportType, WriterType};
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::macros::support::Future;
@@ -144,7 +144,8 @@ impl MasterTask {
     ) -> (Self, MasterHandle) {
         let (tx, rx) = tokio::sync::mpsc::channel(100); // TODO
         let runner = Runner::new(level, response_timeout, rx);
-        let (reader, writer) = crate::transport::create_transport_layer(true, address);
+        let (reader, writer) =
+            crate::transport::create_transport_layer(TransportType::Master, address);
         let task = Self {
             endpoint,
             back_off: ExponentialBackOff::new(strategy),

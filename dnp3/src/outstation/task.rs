@@ -6,7 +6,7 @@ use crate::app::sequence::Sequence;
 use crate::link::error::LinkError;
 use crate::link::header::Address;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
-use crate::transport::{Fragment, ReaderType, WriterType};
+use crate::transport::{Fragment, ReaderType, TransportType, WriterType};
 
 use crate::util::buffer::Buffer;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -55,8 +55,10 @@ impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
     pub fn create(config: OutstationConfig, database: DatabaseConfig) -> (Self, DatabaseHandle) {
         let handle = DatabaseHandle::new(database);
-        let (reader, writer) =
-            crate::transport::create_transport_layer(false, config.outstation_address);
+        let (reader, writer) = crate::transport::create_transport_layer(
+            TransportType::Outstation,
+            config.outstation_address,
+        );
         let task = Self {
             session: Session::new(config.tx_buffer_size, config.log_level, handle.clone()),
             reader,

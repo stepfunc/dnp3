@@ -1,7 +1,7 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::link::error::LinkError;
 use crate::link::header::Address;
-use crate::transport::Fragment;
+use crate::transport::{Fragment, TransportType};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub(crate) struct MockWriter {
@@ -17,7 +17,7 @@ pub(crate) struct MockReader {
 
 // same signature as the real transport writer
 impl MockWriter {
-    pub(crate) fn new(_master: bool, _address: u16) -> Self {
+    pub(crate) fn new(_: TransportType, _: u16) -> Self {
         Self { num_writes: 0 }
     }
 
@@ -46,7 +46,7 @@ impl MockWriter {
 }
 
 impl MockReader {
-    pub(crate) fn new(_master: bool, address: u16) -> Self {
+    pub(crate) fn new(_: TransportType, address: u16) -> Self {
         Self {
             num_reads: 0,
             count: 0,

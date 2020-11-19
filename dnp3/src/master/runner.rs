@@ -687,7 +687,7 @@ mod test {
     use super::*;
     use crate::master::association::Configuration;
     use crate::master::handle::{MasterHandle, NullHandler};
-    use crate::transport::create_transport_layer;
+    use crate::transport::{create_transport_layer, TransportType};
     use tokio_test::io::Builder;
 
     #[tokio::test]
@@ -721,7 +721,7 @@ mod test {
             .read(&[0xC3, 0x81, 0x00, 0x00])
             .build_with_handle();
 
-        let (mut reader, mut writer) = create_transport_layer(true, 1);
+        let (mut reader, mut writer) = create_transport_layer(TransportType::Master, 1);
 
         let mut master_task =
             tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));

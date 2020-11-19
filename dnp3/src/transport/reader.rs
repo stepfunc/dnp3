@@ -2,7 +2,7 @@ use crate::link::error::LinkError;
 use crate::link::parser::FramePayload;
 use crate::transport::assembler::{Assembler, AssemblyState};
 use crate::transport::header::Header;
-use crate::transport::Fragment;
+use crate::transport::{Fragment, TransportType};
 use tokio::prelude::{AsyncRead, AsyncWrite};
 
 pub(crate) struct Reader {
@@ -11,9 +11,9 @@ pub(crate) struct Reader {
 }
 
 impl Reader {
-    pub(crate) fn new(is_master: bool, address: u16) -> Self {
+    pub(crate) fn new(tt: TransportType, address: u16) -> Self {
         Self {
-            link: crate::link::layer::Layer::new(is_master, address),
+            link: crate::link::layer::Layer::new(tt.is_master(), address),
             assembler: Assembler::new(),
         }
     }

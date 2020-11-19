@@ -22,6 +22,21 @@ pub(crate) mod reader;
 pub(crate) mod sequence;
 pub(crate) mod writer;
 
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum TransportType {
+    Master,
+    Outstation,
+}
+
+impl TransportType {
+    pub(crate) fn is_master(&self) -> bool {
+        match self {
+            TransportType::Master => true,
+            TransportType::Outstation => false,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Fragment<'a> {
     pub(crate) address: Address,
@@ -33,9 +48,6 @@ pub(crate) mod constants {
     pub(crate) const FIR_MASK: u8 = 0b0100_0000;
 }
 
-pub(crate) fn create_transport_layer(is_master: bool, address: u16) -> (ReaderType, WriterType) {
-    (
-        ReaderType::new(is_master, address),
-        WriterType::new(is_master, address),
-    )
+pub(crate) fn create_transport_layer(typ: TransportType, address: u16) -> (ReaderType, WriterType) {
+    (ReaderType::new(typ, address), WriterType::new(typ, address))
 }

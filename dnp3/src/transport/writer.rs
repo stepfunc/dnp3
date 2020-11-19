@@ -3,6 +3,7 @@ use crate::app::parse::DecodeLogLevel;
 use crate::link::error::LinkError;
 use crate::link::formatter::{LinkFormatter, Payload};
 use crate::transport::sequence::Sequence;
+use crate::transport::TransportType;
 use crate::util::cursor::WriteCursor;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
@@ -26,9 +27,9 @@ impl Writer {
         acc | seq.value()
     }
 
-    pub(crate) fn new(master: bool, address: u16) -> Self {
+    pub(crate) fn new(tt: TransportType, address: u16) -> Self {
         Self {
-            formatter: LinkFormatter::new(master, address),
+            formatter: LinkFormatter::new(tt.is_master(), address),
             seq: Sequence::default(),
             buffer: [0; crate::link::constant::MAX_LINK_FRAME_LENGTH],
         }
