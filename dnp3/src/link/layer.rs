@@ -1,7 +1,7 @@
 use crate::link::error::LinkError;
 use crate::link::formatter::LinkFormatter;
 use crate::link::function::Function;
-use crate::link::header::{Address, ControlField};
+use crate::link::header::{AddressPair, ControlField};
 use crate::link::parser::FramePayload;
 use crate::util::cursor::WriteCursor;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
@@ -37,7 +37,7 @@ impl Layer {
         &mut self,
         io: &mut T,
         payload: &mut FramePayload,
-    ) -> Result<Address, LinkError>
+    ) -> Result<AddressPair, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -81,7 +81,7 @@ impl Layer {
         &mut self,
         io: &mut T,
         payload: &mut FramePayload,
-    ) -> Result<Option<Address>, LinkError>
+    ) -> Result<Option<AddressPair>, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -99,19 +99,19 @@ impl Layer {
         }
 
         // TODO - handle broadcast
-        if header.address.destination != self.formatter.get_address() {
+        if header.addresses.destination != self.formatter.get_address() {
             log::info!(
                 "ignoring frame for destination address: {}",
-                header.address.destination
+                header.addresses.destination
             );
             return Ok(None);
         }
 
         match header.control.func {
-            Function::PriUnconfirmedUserData => Ok(Some(header.address)),
+            Function::PriUnconfirmedUserData => Ok(Some(header.addresses)),
             Function::PriResetLinkStates => {
                 self.secondary_state = SecondaryState::Reset(true); // TODO - does it start true or false?
-                self.acknowledge(header.address.source, io).await?;
+                self.acknowledge(header.addresses.source, io).await?;
                 Ok(None)
             }
             Function::PriConfirmedUserData => match self.secondary_state {
@@ -122,7 +122,7 @@ impl Layer {
                 SecondaryState::Reset(expected) => {
                     if header.control.fcb == expected {
                         self.secondary_state = SecondaryState::Reset(!expected);
-                        Ok(Some(header.address))
+                        Ok(Some(header.addresses))
                     } else {
                         log::info!("ignoring confirmed user data with non-matching fcb");
                         Ok(None)
@@ -131,7 +131,7 @@ impl Layer {
             },
             Function::PriRequestLinkStatus => {
                 self.reply(
-                    header.address.source,
+                    header.addresses.source,
                     ControlField::new(self.formatter.is_master(), Function::SecLinkStatus),
                     io,
                 )

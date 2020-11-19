@@ -1,6 +1,6 @@
 use crate::link::constant;
 use crate::link::error::*;
-use crate::link::header::{Address, ControlField, Header};
+use crate::link::header::{AddressPair, ControlField, Header};
 use crate::util::cursor::{ReadCursor, ReadError};
 use crate::util::slice_ext::*;
 
@@ -163,7 +163,7 @@ impl Parser {
 
         let header = Header::new(
             ControlField::from(cursor.read_u8()?),
-            Address::new(cursor.read_u16_le()?, cursor.read_u16_le()?),
+            AddressPair::new(cursor.read_u16_le()?, cursor.read_u16_le()?),
         );
 
         if len < 5 {

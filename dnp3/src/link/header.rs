@@ -48,12 +48,12 @@ impl ControlField {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub(crate) struct Address {
+pub(crate) struct AddressPair {
     pub(crate) destination: u16,
     pub(crate) source: u16,
 }
 
-impl Address {
+impl AddressPair {
     pub(crate) fn new(destination: u16, source: u16) -> Self {
         Self {
             destination,
@@ -65,11 +65,11 @@ impl Address {
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub(crate) struct Header {
     pub(crate) control: ControlField,
-    pub(crate) address: Address,
+    pub(crate) addresses: AddressPair,
 }
 
 impl Header {
-    pub(crate) fn new(control: ControlField, address: Address) -> Header {
-        Header { control, address }
+    pub(crate) fn new(control: ControlField, addresses: AddressPair) -> Header {
+        Header { control, addresses }
     }
 }

@@ -1,4 +1,4 @@
-use crate::link::header::Address;
+use crate::link::header::AddressPair;
 use crate::transport::header::Header;
 use crate::transport::Fragment;
 
@@ -6,9 +6,9 @@ use crate::transport::Fragment;
 enum InternalState {
     Empty,
     // last address, header, and accumulated length
-    Running(Address, Header, usize),
+    Running(AddressPair, Header, usize),
     // buffer contains an assembled ADU
-    Complete(Address, usize),
+    Complete(AddressPair, usize),
 }
 
 pub(crate) enum AssemblyState {
@@ -45,7 +45,7 @@ impl Assembler {
 
     pub(crate) fn assemble(
         &mut self,
-        address: Address,
+        address: AddressPair,
         header: Header,
         payload: &[u8],
     ) -> AssemblyState {
@@ -98,7 +98,7 @@ impl Assembler {
         }
     }
 
-    fn append(&mut self, address: Address, header: Header, acc_length: usize, data: &[u8]) {
+    fn append(&mut self, address: AddressPair, header: Header, acc_length: usize, data: &[u8]) {
         let new_length = acc_length + data.len();
 
         match self.buffer.get_mut(acc_length..new_length) {

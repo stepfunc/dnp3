@@ -1,6 +1,6 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::link::error::LinkError;
-use crate::link::header::Address;
+use crate::link::header::AddressPair;
 use crate::transport::{Fragment, TransportType};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -11,7 +11,7 @@ pub(crate) struct MockWriter {
 pub(crate) struct MockReader {
     num_reads: usize,
     count: usize,
-    address: Address,
+    address: AddressPair,
     buffer: [u8; 2048],
 }
 
@@ -50,7 +50,7 @@ impl MockReader {
         Self {
             num_reads: 0,
             count: 0,
-            address: Address::new(address, 1024),
+            address: AddressPair::new(address, 1024),
             buffer: [0; 2048],
         }
     }

@@ -23,7 +23,7 @@ pub(crate) mod constant {
 #[cfg(test)]
 pub(crate) mod test_data {
     use crate::link::function::Function;
-    use crate::link::header::{Address, ControlField, Header};
+    use crate::link::header::{AddressPair, ControlField, Header};
 
     pub(crate) struct TestFrame {
         pub(crate) bytes: &'static [u8],
@@ -40,7 +40,7 @@ pub(crate) mod test_data {
                 fcb: false,
                 fcv: false,
             },
-            address: Address {
+            addresses: AddressPair {
                 destination: 1,
                 source: 1024,
             },
@@ -57,7 +57,7 @@ pub(crate) mod test_data {
                 fcb: false,
                 fcv: false,
             },
-            address: Address {
+            addresses: AddressPair {
                 destination: 1024,
                 source: 1,
             },
@@ -79,7 +79,7 @@ pub(crate) mod test_data {
                 fcb: true,
                 fcv: true,
             },
-            address: Address {
+            addresses: AddressPair {
                 destination: 1,
                 source: 1024,
             },
@@ -102,7 +102,7 @@ pub(crate) mod test_data {
                 fcb: false,
                 fcv: false,
             },
-            address: Address {
+            addresses: AddressPair {
                 destination: 1,
                 source: 1024,
             },

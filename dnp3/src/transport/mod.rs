@@ -1,7 +1,7 @@
 use crate::app::parse::parser::{ParsedFragment, Request, Response};
 use crate::app::parse::DecodeLogLevel;
 use crate::link::error::LinkError;
-use crate::link::header::Address;
+use crate::link::header::AddressPair;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 #[cfg(not(test))]
@@ -43,7 +43,7 @@ impl TransportType {
 
 #[derive(Debug)]
 pub(crate) struct Fragment<'a> {
-    pub(crate) address: Address,
+    pub(crate) address: AddressPair,
     pub(crate) data: &'a [u8],
 }
 
@@ -95,7 +95,7 @@ impl TransportReader {
         }
     }
 
-    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(Address, Request)> {
+    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(AddressPair, Request)> {
         let (log, address, parsed) = self.peek(level)?;
         match parsed.to_request() {
             Err(err) => {
@@ -108,7 +108,7 @@ impl TransportReader {
         }
     }
 
-    fn peek(&mut self, level: DecodeLogLevel) -> Option<(bool, Address, ParsedFragment)> {
+    fn peek(&mut self, level: DecodeLogLevel) -> Option<(bool, AddressPair, ParsedFragment)> {
         let log_this_peek = !self.logged;
         self.logged = true;
         let fragment: Fragment = self.inner.peek()?;
