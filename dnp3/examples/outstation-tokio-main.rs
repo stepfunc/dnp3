@@ -1,6 +1,7 @@
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::parse::DecodeLogLevel;
+use dnp3::entry::NormalAddress;
 use dnp3::outstation::database::config::*;
 use dnp3::outstation::database::EventClass;
 use dnp3::outstation::database::{Add, DatabaseConfig, Update, UpdateOptions};
@@ -11,7 +12,7 @@ use std::time::Duration;
 fn get_outstation_config() -> OutstationConfig {
     OutstationConfig::new(
         2048,
-        10,
+        NormalAddress::from(10).unwrap(),
         Some(1),
         DecodeLogLevel::ObjectValues,
         Duration::from_secs(2),

@@ -7,6 +7,7 @@ use std::ptr::null_mut;
 use std::str::FromStr;
 use std::time::Duration;
 
+use dnp3::entry::NormalAddress;
 pub use tokio::runtime::Runtime;
 
 fn build_runtime<F>(f: F) -> std::result::Result<tokio::runtime::Runtime, std::io::Error>
@@ -59,6 +60,17 @@ pub(crate) unsafe fn runtime_add_master_tcp(
         return std::ptr::null_mut();
     };
     let listener = ClientStateListenerAdapter::new(listener);
+
+    let address = match NormalAddress::from(address) {
+        Ok(x) => x,
+        Err(err) => {
+            log::warn!(
+                "special addresses may not be used for the master address: {}",
+                err.address
+            );
+            return std::ptr::null_mut();
+        }
+    };
 
     let (future, handle) = create_master_tcp_client(
         address,

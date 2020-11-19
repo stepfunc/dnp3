@@ -14,6 +14,7 @@ use crate::master::association::{AssociationMap, Next};
 use crate::master::messages::{MasterMsg, Message};
 
 use crate::app::parse::DecodeLogLevel;
+use crate::entry::NormalAddress;
 use crate::master::error::{Shutdown, TaskError};
 use std::ops::Add;
 use std::time::Duration;
@@ -259,7 +260,7 @@ impl MasterSession {
     async fn run_non_read_task<T>(
         &mut self,
         io: &mut T,
-        address: u16,
+        address: NormalAddress,
         mut task: NonReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -322,7 +323,7 @@ impl MasterSession {
     #[allow(clippy::needless_lifetimes)]
     async fn validate_non_read_response<'a, T>(
         &mut self,
-        address: u16,
+        destination: NormalAddress,
         seq: Sequence,
         io: &mut T,
         reader: &'a mut TransportReader,
@@ -342,11 +343,11 @@ impl MasterSession {
             return Ok(None);
         }
 
-        if source != address {
+        if source != destination {
             log::warn!(
                 "Received response from {} while expecting response from {}",
-                source,
-                address
+                source.value(),
+                destination.value()
             );
             return Ok(None);
         }
@@ -369,7 +370,7 @@ impl MasterSession {
     async fn run_read_task<T>(
         &mut self,
         io: &mut T,
-        address: u16,
+        address: NormalAddress,
         task: ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -400,7 +401,7 @@ impl MasterSession {
     async fn execute_read_task<T>(
         &mut self,
         io: &mut T,
-        address: u16,
+        address: NormalAddress,
         task: &ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -442,7 +443,7 @@ impl MasterSession {
     #[allow(clippy::too_many_arguments)] // TODO
     async fn process_read_response<T>(
         &mut self,
-        address: u16,
+        address: NormalAddress,
         is_first: bool,
         seq: Sequence,
         task: &ReadTask,
@@ -467,8 +468,8 @@ impl MasterSession {
         if source != address {
             log::warn!(
                 "Received response from {} while expecting response from {}",
-                source,
-                address
+                source.value(),
+                address.value()
             );
             return Ok(ReadResponseAction::Ignore);
         }
@@ -546,7 +547,7 @@ impl MasterSession {
 
     async fn handle_unsolicited<T>(
         &mut self,
-        source: u16,
+        source: NormalAddress,
         response: &Response<'_>,
         io: &mut T,
         writer: &mut TransportWriter,
@@ -559,7 +560,7 @@ impl MasterSession {
             None => {
                 log::warn!(
                     "received unsolicited response from unknown address: {}",
-                    source
+                    source.value()
                 );
                 return Ok(());
             }
@@ -585,7 +586,7 @@ impl MasterSession {
     async fn confirm_solicited<T>(
         &mut self,
         io: &mut T,
-        destination: u16,
+        destination: NormalAddress,
         seq: Sequence,
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
@@ -595,7 +596,7 @@ impl MasterSession {
         let mut cursor = WriteCursor::new(&mut self.buffer);
         write::confirm_solicited(seq, &mut cursor)?;
         writer
-            .write(io, self.level, destination, cursor.written())
+            .write(io, self.level, destination.wrap(), cursor.written())
             .await?;
         Ok(())
     }
@@ -603,7 +604,7 @@ impl MasterSession {
     async fn confirm_unsolicited<T>(
         &mut self,
         io: &mut T,
-        destination: u16,
+        destination: NormalAddress,
         seq: Sequence,
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
@@ -614,7 +615,7 @@ impl MasterSession {
         crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
 
         writer
-            .write(io, self.level, destination, cursor.written())
+            .write(io, self.level, destination.wrap(), cursor.written())
             .await?;
         Ok(())
     }
@@ -622,7 +623,7 @@ impl MasterSession {
     async fn send_request<T, U>(
         &mut self,
         io: &mut T,
-        address: u16,
+        address: NormalAddress,
         request: &U,
         writer: &mut TransportWriter,
     ) -> Result<Sequence, TaskError>
@@ -637,7 +638,7 @@ impl MasterSession {
         let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
         writer
-            .write(io, self.level, address, cursor.written())
+            .write(io, self.level, address.wrap(), cursor.written())
             .await?;
         Ok(seq)
     }
@@ -687,13 +688,14 @@ mod test {
             .read(&[0xC3, 0x81, 0x00, 0x00])
             .build_with_handle();
 
-        let (mut reader, mut writer) = create_transport_layer(TransportType::Master, 1);
+        let (mut reader, mut writer) =
+            create_transport_layer(TransportType::Master, NormalAddress::from(1).unwrap());
 
         let mut master_task =
             tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));
         let association = {
             let mut add_task = tokio_test::task::spawn(master.add_association(
-                1024,
+                NormalAddress::from(1024).unwrap(),
                 Configuration::default(),
                 NullHandler::boxed(),
             ));

@@ -28,46 +28,36 @@ impl<'a> Payload<'a> {
 }
 
 pub(crate) struct LinkFormatter {
-    master: bool,
-    address: u16,
+    is_master: bool,
 }
 
 impl LinkFormatter {
-    pub(crate) fn new(master: bool, address: u16) -> Self {
-        Self { master, address }
+    pub(crate) fn new(is_master: bool) -> Self {
+        Self { is_master }
     }
 
     pub(crate) fn is_master(&self) -> bool {
-        self.master
-    }
-
-    pub(crate) fn get_address(&self) -> u16 {
-        self.address
+        self.is_master
     }
 
     pub(crate) fn format_header_only(
         &self,
-        destination: u16,
+        addresses: AddressPair,
         control: ControlField,
         cursor: &mut WriteCursor,
     ) -> Result<(), LogicError> {
-        Self::format(
-            control,
-            AddressPair::new(destination, self.address),
-            None,
-            cursor,
-        )
+        Self::format(control, addresses, None, cursor)
     }
 
     pub(crate) fn format_unconfirmed_user_data(
         &self,
-        dest: u16,
+        addresses: AddressPair,
         payload: Payload,
         cursor: &mut WriteCursor,
     ) -> Result<(), LogicError> {
         Self::format(
-            ControlField::new(self.master, Function::PriUnconfirmedUserData),
-            AddressPair::new(dest, self.address),
+            ControlField::new(self.is_master, Function::PriUnconfirmedUserData),
+            addresses,
             Some(payload),
             cursor,
         )
@@ -75,7 +65,7 @@ impl LinkFormatter {
 
     fn format(
         control: ControlField,
-        address: AddressPair,
+        addresses: AddressPair,
         payload: Option<Payload>,
         cursor: &mut WriteCursor,
     ) -> Result<(), LogicError> {
@@ -118,8 +108,8 @@ impl LinkFormatter {
 
         cursor.write_u8(length)?;
         cursor.write_u8(control.to_u8())?;
-        cursor.write_u16_le(address.destination)?;
-        cursor.write_u16_le(address.source)?;
+        cursor.write_u16_le(addresses.destination.value())?;
+        cursor.write_u16_le(addresses.source.value())?;
         cursor.write_u16_le(calc_crc_with_0564(cursor.written_since(header_start)?))?;
 
         match payload {
@@ -142,13 +132,9 @@ mod test {
         let mut buffer: Buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
         let mut cursor = WriteCursor::new(&mut buffer);
         let start = cursor.position();
-        let formatter = LinkFormatter::new(false, ACK.header.addresses.source);
+        let formatter = LinkFormatter::new(false);
         formatter
-            .format_header_only(
-                ACK.header.addresses.destination,
-                ACK.header.control,
-                &mut cursor,
-            )
+            .format_header_only(ACK.header.addresses, ACK.header.control, &mut cursor)
             .unwrap();
         assert_eq!(cursor.written_since(start).unwrap(), ACK.bytes);
     }
@@ -158,10 +144,10 @@ mod test {
         let mut buffer: Buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
         let mut cursor = WriteCursor::new(&mut buffer);
         let start = cursor.position();
-        let formatter = LinkFormatter::new(true, UNCONFIRMED_USER_DATA.header.addresses.source);
+        let formatter = LinkFormatter::new(true);
         formatter
             .format_unconfirmed_user_data(
-                UNCONFIRMED_USER_DATA.header.addresses.destination,
+                UNCONFIRMED_USER_DATA.header.addresses,
                 Payload::new(0xC0, &UNCONFIRMED_USER_DATA.payload[1..]),
                 &mut cursor,
             )

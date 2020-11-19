@@ -1,4 +1,5 @@
 use crate::app::parse::DecodeLogLevel;
+use crate::entry::NormalAddress;
 use crate::master::association::Association;
 use crate::master::error::AssociationError;
 use crate::master::error::{PollError, Shutdown, TaskError};
@@ -18,7 +19,7 @@ pub(crate) enum MasterMsg {
     /// Add an association to the master
     AddAssociation(Association, Promise<Result<(), AssociationError>>),
     /// Remove an association from the master
-    RemoveAssociation(u16),
+    RemoveAssociation(NormalAddress),
     /// Set the decoding level
     SetDecodeLogLevel(DecodeLogLevel),
     /// Get the decoding level
@@ -26,7 +27,7 @@ pub(crate) enum MasterMsg {
 }
 
 pub(crate) struct AssociationMsg {
-    pub(crate) address: u16,
+    pub(crate) address: NormalAddress,
     pub(crate) details: AssociationMsgType,
 }
 
@@ -44,7 +45,7 @@ impl AssociationMsg {
 }
 
 impl AssociationMsgType {
-    pub(crate) fn on_association_failure(self, address: u16) {
+    pub(crate) fn on_association_failure(self, address: NormalAddress) {
         match self {
             AssociationMsgType::QueueTask(task) => {
                 task.on_task_error(None, TaskError::NoSuchAssociation(address));

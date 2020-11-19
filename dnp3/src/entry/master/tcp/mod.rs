@@ -1,5 +1,6 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::app::timeout::Timeout;
+use crate::entry::NormalAddress;
 use crate::master::error::Shutdown;
 use crate::master::handle::{Listener, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
@@ -94,7 +95,7 @@ pub(crate) struct MasterTask {
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
 pub fn spawn_master_tcp_client(
-    address: u16,
+    address: NormalAddress,
     level: DecodeLogLevel,
     strategy: ReconnectStrategy,
     timeout: Timeout,
@@ -115,7 +116,7 @@ pub fn spawn_master_tcp_client(
 /// tasks instead of within the context of a runtime, e.g. in applications that cannot use
 /// `[tokio::main]` such as C language bindings.
 pub fn create_master_tcp_client(
-    address: u16,
+    address: NormalAddress,
     level: DecodeLogLevel,
     strategy: ReconnectStrategy,
     response_timeout: Timeout,
@@ -135,7 +136,7 @@ pub fn create_master_tcp_client(
 
 impl MasterTask {
     fn new(
-        address: u16,
+        address: NormalAddress,
         level: DecodeLogLevel,
         strategy: ReconnectStrategy,
         response_timeout: Timeout,

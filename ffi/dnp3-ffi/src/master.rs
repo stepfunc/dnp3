@@ -2,6 +2,7 @@ use crate::association::Association;
 use crate::ffi;
 
 use dnp3::app::types::Timestamp;
+use dnp3::entry::NormalAddress;
 use dnp3::master::association::Configuration;
 use dnp3::master::handle::{AssociationHandler, MasterHandle, ReadHandler};
 use dnp3::master::request::{EventClasses, TimeSyncProcedure};
@@ -27,6 +28,17 @@ pub unsafe fn master_add_association(
     let master = match master.as_mut() {
         Some(master) => master,
         None => return std::ptr::null_mut(),
+    };
+
+    let address = match NormalAddress::from(address) {
+        Ok(x) => x,
+        Err(err) => {
+            log::warn!(
+                "special addresses may not be used for the master address: {}",
+                err.address
+            );
+            return std::ptr::null_mut();
+        }
     };
 
     let config = Configuration::new(

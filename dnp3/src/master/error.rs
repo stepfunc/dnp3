@@ -1,6 +1,7 @@
 use crate::app::enums::CommandStatus;
 use crate::app::header::{IIN, IIN2};
 use crate::app::parse::error::ObjectParseError;
+use crate::entry::NormalAddress;
 use crate::link::error::LinkError;
 use crate::master::association::NoAssociation;
 use crate::master::session::RunError;
@@ -19,7 +20,7 @@ pub enum AssociationError {
     /// the master task has shutdown
     Shutdown,
     /// the specified address is already in use
-    DuplicateAddress(u16),
+    DuplicateAddress(NormalAddress),
 }
 
 /// Errors that can occur while executing a master task
@@ -44,7 +45,7 @@ pub enum TaskError {
     /// Insufficient buffer space to serialize the request
     WriteError,
     /// The requested association does not exist (not configured)
-    NoSuchAssociation(u16),
+    NoSuchAssociation(NormalAddress),
     /// There is not connection at the transport level
     NoConnection,
     /// The master was shutdown
@@ -57,7 +58,7 @@ pub enum PollError {
     /// the master task has shutdown
     Shutdown,
     /// no association with the specified address exists
-    NoSuchAssociation(u16),
+    NoSuchAssociation(NormalAddress),
 }
 
 /// Errors that can occur when verifying the respond to a command request

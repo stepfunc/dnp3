@@ -5,6 +5,7 @@ use crate::app::parse::bytes::Bytes;
 use crate::app::parse::DecodeLogLevel;
 use crate::app::types::Timestamp;
 use crate::app::variations::Variation;
+use crate::entry::NormalAddress;
 use crate::master::association::{Association, Configuration};
 use crate::master::error::{
     AssociationError, CommandError, PollError, Shutdown, TaskError, TimeSyncError,
@@ -27,7 +28,7 @@ pub struct MasterHandle {
 /// handle used to make requests against
 #[derive(Clone, Debug)]
 pub struct AssociationHandle {
-    address: u16,
+    address: NormalAddress,
     master: MasterHandle,
 }
 
@@ -57,7 +58,7 @@ impl MasterHandle {
     /// * `handler` is a callback trait invoked when events occur for this outstation
     pub async fn add_association(
         &mut self,
-        address: u16,
+        address: NormalAddress,
         config: Configuration,
         handler: Box<dyn AssociationHandler>,
     ) -> Result<AssociationHandle, AssociationError> {
@@ -75,7 +76,7 @@ impl MasterHandle {
 
     async fn send_association_message(
         &mut self,
-        address: u16,
+        address: NormalAddress,
         msg: AssociationMsgType,
     ) -> Result<(), SendError<Message>> {
         self.sender
@@ -88,11 +89,11 @@ impl MasterHandle {
 }
 
 impl AssociationHandle {
-    pub(crate) fn new(address: u16, master: MasterHandle) -> Self {
+    pub(crate) fn new(address: NormalAddress, master: MasterHandle) -> Self {
         Self { address, master }
     }
 
-    pub fn address(&self) -> u16 {
+    pub fn address(&self) -> NormalAddress {
         self.address
     }
 

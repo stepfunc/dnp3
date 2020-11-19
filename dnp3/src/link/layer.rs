@@ -1,7 +1,8 @@
+use crate::entry::NormalAddress;
 use crate::link::error::LinkError;
 use crate::link::formatter::LinkFormatter;
 use crate::link::function::Function;
-use crate::link::header::{AddressPair, ControlField};
+use crate::link::header::{Address, AddressPair, ControlField};
 use crate::link::parser::FramePayload;
 use crate::util::cursor::WriteCursor;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
@@ -12,6 +13,7 @@ enum SecondaryState {
 }
 
 pub(crate) struct Layer {
+    local_address: NormalAddress,
     secondary_state: SecondaryState,
     formatter: LinkFormatter,
     reader: super::reader::Reader,
@@ -19,10 +21,11 @@ pub(crate) struct Layer {
 }
 
 impl Layer {
-    pub(crate) fn new(is_master: bool, address: u16) -> Self {
+    pub(crate) fn new(is_master: bool, local_address: NormalAddress) -> Self {
         Self {
+            local_address,
             secondary_state: SecondaryState::NotReset,
-            formatter: LinkFormatter::new(is_master, address),
+            formatter: LinkFormatter::new(is_master),
             reader: super::reader::Reader::default(),
             tx_buffer: [0; super::constant::MAX_LINK_FRAME_LENGTH],
         }
@@ -50,7 +53,7 @@ impl Layer {
 
     async fn reply<T>(
         &mut self,
-        destination: u16,
+        destination: Address,
         control: ControlField,
         io: &mut T,
     ) -> Result<(), LinkError>
@@ -59,13 +62,14 @@ impl Layer {
     {
         let mut cursor = WriteCursor::new(self.tx_buffer.as_mut());
         let start = cursor.position();
+        let addresses = AddressPair::new(destination, self.local_address.wrap());
         self.formatter
-            .format_header_only(destination, control, &mut cursor)?;
+            .format_header_only(addresses, control, &mut cursor)?;
         let reply_frame = cursor.written_since(start)?;
         Ok(io.write_all(reply_frame).await?)
     }
 
-    async fn acknowledge<T>(&mut self, destination: u16, io: &mut T) -> Result<(), LinkError>
+    async fn acknowledge<T>(&mut self, destination: Address, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncWrite + Unpin,
     {
@@ -99,10 +103,10 @@ impl Layer {
         }
 
         // TODO - handle broadcast
-        if header.addresses.destination != self.formatter.get_address() {
+        if header.addresses.destination != self.local_address.wrap() {
             log::info!(
                 "ignoring frame for destination address: {}",
-                header.addresses.destination
+                header.addresses.destination.value()
             );
             return Ok(None);
         }

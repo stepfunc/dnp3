@@ -361,6 +361,8 @@ mod tests {
     mod non_lan {
 
         use super::*;
+        use crate::entry::NormalAddress;
+
         const OUTSTATION_DELAY_MS: u16 = 100;
         const TOTAL_DELAY_MS: u16 = 200;
         const PROPAGATION_DELAY_MS: u16 = (TOTAL_DELAY_MS - OUTSTATION_DELAY_MS) / 2;
@@ -611,7 +613,7 @@ mod tests {
             tokio::time::pause();
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
-                1,
+                NormalAddress::from(1).unwrap(),
                 Configuration::default(),
                 Box::new(TestHandler::new(system_time)),
             );
@@ -635,7 +637,7 @@ mod tests {
             tokio::time::pause();
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
-                1,
+                NormalAddress::from(1).unwrap(),
                 Configuration::default(),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
             );
@@ -745,6 +747,7 @@ mod tests {
 
     mod lan {
         use super::*;
+        use crate::entry::NormalAddress;
 
         const DELAY_MS: u16 = 200;
 
@@ -889,7 +892,7 @@ mod tests {
             tokio::time::pause();
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
-                1,
+                NormalAddress::from(1).unwrap(),
                 Configuration::default(),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
             );

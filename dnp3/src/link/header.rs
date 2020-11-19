@@ -1,4 +1,5 @@
 use super::function::Function;
+use crate::entry::NormalAddress;
 
 pub(crate) mod constants {
     pub(crate) const MASK_DIR: u8 = 0x80;
@@ -7,6 +8,77 @@ pub(crate) mod constants {
     pub(crate) const MASK_FCV: u8 = 0x10;
     pub(crate) const MASK_FUNC: u8 = 0x0F;
     pub(crate) const MASK_FUNC_OR_PRM: u8 = MASK_PRM | MASK_FUNC;
+    pub(crate) const BROADCAST_CONFIRM_OPTIONAL: u16 = 0xFFFF;
+    pub(crate) const BROADCAST_CONFIRM_MANDATORY: u16 = 0xFFFE;
+    pub(crate) const BROADCAST_CONFIRM_NOT_REQUIRED: u16 = 0xFFFD;
+    pub(crate) const SELF_ADDRESS: u16 = 0xFFFC;
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) enum BroadcastAddress {
+    ConfirmOptional,
+    ConfirmMandatory,
+    ConfirmNotRequired,
+}
+
+impl BroadcastAddress {
+    pub(crate) fn value(&self) -> u16 {
+        match self {
+            BroadcastAddress::ConfirmOptional => constants::BROADCAST_CONFIRM_OPTIONAL,
+            BroadcastAddress::ConfirmMandatory => constants::BROADCAST_CONFIRM_MANDATORY,
+            BroadcastAddress::ConfirmNotRequired => constants::BROADCAST_CONFIRM_NOT_REQUIRED,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) enum Address {
+    Normal(NormalAddress),
+    Broadcast(BroadcastAddress),
+    SelfAddress,
+}
+
+impl Address {
+    pub(crate) const fn from(address: u16) -> Self {
+        match address {
+            constants::BROADCAST_CONFIRM_OPTIONAL => {
+                Self::Broadcast(BroadcastAddress::ConfirmOptional)
+            }
+            constants::BROADCAST_CONFIRM_MANDATORY => {
+                Self::Broadcast(BroadcastAddress::ConfirmMandatory)
+            }
+            constants::BROADCAST_CONFIRM_NOT_REQUIRED => {
+                Self::Broadcast(BroadcastAddress::ConfirmNotRequired)
+            }
+            constants::SELF_ADDRESS => Self::SelfAddress,
+            _ => Self::Normal(NormalAddress::raw(address)),
+        }
+    }
+
+    pub(crate) fn get_normal_address(&self) -> Option<NormalAddress> {
+        match self {
+            Address::Normal(x) => Some(*x),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn value(&self) -> u16 {
+        match self {
+            Self::Normal(x) => x.value(),
+            Self::Broadcast(x) => x.value(),
+            Self::SelfAddress => constants::SELF_ADDRESS,
+        }
+    }
+}
+
+impl std::fmt::Display for Address {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Address::Normal(x) => write!(f, "normal address ({})", x.value()),
+            Address::SelfAddress => write!(f, "self address ({})", constants::SELF_ADDRESS),
+            Address::Broadcast(details) => write!(f, "broadcast address ({})", details.value()),
+        }
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -49,12 +121,12 @@ impl ControlField {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub(crate) struct AddressPair {
-    pub(crate) destination: u16,
-    pub(crate) source: u16,
+    pub(crate) destination: Address,
+    pub(crate) source: Address,
 }
 
 impl AddressPair {
-    pub(crate) fn new(destination: u16, source: u16) -> Self {
+    pub(crate) fn new(destination: Address, source: Address) -> Self {
         Self {
             destination,
             source,
