@@ -15,18 +15,18 @@ pub(crate) mod constants {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub(crate) enum BroadcastAddress {
-    ConfirmOptional,
-    ConfirmMandatory,
-    ConfirmNotRequired,
+pub(crate) enum BroadcastConfirmMode {
+    Optional,
+    Mandatory,
+    NotRequired,
 }
 
-impl BroadcastAddress {
-    pub(crate) fn value(&self) -> u16 {
+impl BroadcastConfirmMode {
+    pub(crate) fn address(&self) -> u16 {
         match self {
-            BroadcastAddress::ConfirmOptional => constants::BROADCAST_CONFIRM_OPTIONAL,
-            BroadcastAddress::ConfirmMandatory => constants::BROADCAST_CONFIRM_MANDATORY,
-            BroadcastAddress::ConfirmNotRequired => constants::BROADCAST_CONFIRM_NOT_REQUIRED,
+            BroadcastConfirmMode::Optional => constants::BROADCAST_CONFIRM_OPTIONAL,
+            BroadcastConfirmMode::Mandatory => constants::BROADCAST_CONFIRM_MANDATORY,
+            BroadcastConfirmMode::NotRequired => constants::BROADCAST_CONFIRM_NOT_REQUIRED,
         }
     }
 }
@@ -34,7 +34,7 @@ impl BroadcastAddress {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) enum AnyAddress {
     Normal(LinkAddress),
-    Broadcast(BroadcastAddress),
+    Broadcast(BroadcastConfirmMode),
     SelfAddress,
 }
 
@@ -42,13 +42,13 @@ impl AnyAddress {
     pub(crate) const fn from(address: u16) -> Self {
         match address {
             constants::BROADCAST_CONFIRM_OPTIONAL => {
-                Self::Broadcast(BroadcastAddress::ConfirmOptional)
+                Self::Broadcast(BroadcastConfirmMode::Optional)
             }
             constants::BROADCAST_CONFIRM_MANDATORY => {
-                Self::Broadcast(BroadcastAddress::ConfirmMandatory)
+                Self::Broadcast(BroadcastConfirmMode::Mandatory)
             }
             constants::BROADCAST_CONFIRM_NOT_REQUIRED => {
-                Self::Broadcast(BroadcastAddress::ConfirmNotRequired)
+                Self::Broadcast(BroadcastConfirmMode::NotRequired)
             }
             constants::SELF_ADDRESS => Self::SelfAddress,
             _ => Self::Normal(LinkAddress::raw(address)),
@@ -65,7 +65,7 @@ impl AnyAddress {
     pub(crate) fn value(&self) -> u16 {
         match self {
             Self::Normal(x) => x.raw_value(),
-            Self::Broadcast(x) => x.value(),
+            Self::Broadcast(x) => x.address(),
             Self::SelfAddress => constants::SELF_ADDRESS,
         }
     }
@@ -76,7 +76,7 @@ impl std::fmt::Display for AnyAddress {
         match self {
             AnyAddress::Normal(x) => write!(f, "normal address ({})", x),
             AnyAddress::SelfAddress => write!(f, "self address ({})", constants::SELF_ADDRESS),
-            AnyAddress::Broadcast(details) => write!(f, "broadcast address ({})", details.value()),
+            AnyAddress::Broadcast(details) => write!(f, "broadcast address ({})", details.address()),
         }
     }
 }
