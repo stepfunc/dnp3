@@ -23,6 +23,17 @@ pub(crate) struct Layer {
     tx_buffer: [u8; super::constant::LINK_HEADER_LENGTH],
 }
 
+struct Reply {
+    address: EndpointAddress,
+    function: Function,
+}
+
+impl Reply {
+    fn new(address: EndpointAddress, function: Function) -> Self {
+        Self { address, function }
+    }
+}
+
 impl Layer {
     pub(crate) fn new(
         endpoint_type: EndpointType,
@@ -59,14 +70,14 @@ impl Layer {
         }
     }
 
-    fn format_reply(&mut self, destination: EndpointAddress, function: Function) {
-        let control = ControlField::new(self.endpoint_type.dir_bit(), function);
+    fn format_reply(&mut self, reply: Reply) -> &[u8] {
         format_header(
-            control,
-            destination.raw_value(),
+            ControlField::new(self.endpoint_type.dir_bit(), reply.function),
+            reply.address.raw_value(),
             self.local_address.raw_value(),
             &mut self.tx_buffer,
         );
+        &self.tx_buffer
     }
 
     async fn read_one<T>(
@@ -79,21 +90,17 @@ impl Layer {
     {
         let header = self.reader.read(io, payload).await?;
         let (info, reply) = self.process_header(&header);
-        if reply {
-            io.write_all(&self.tx_buffer).await?
+        if let Some(reply) = reply {
+            io.write_all(self.format_reply(reply)).await?
         }
         Ok(info)
     }
 
-    fn process_header(&mut self, header: &Header) -> (Option<FrameInfo>, bool) {
+    fn process_header(&mut self, header: &Header) -> (Option<FrameInfo>, Option<Reply>) {
         // ignore frames sent from the same endpoint type
         if header.control.master == self.endpoint_type.dir_bit() {
-            if header.control.master {
-                log::info!("ignoring link frame from master");
-            } else {
-                log::info!("ignoring link frame from outstation");
-            }
-            return (None, false);
+            //  we don't log this
+            return (None, None);
         }
 
         // validate the source address
@@ -104,7 +111,7 @@ impl Layer {
                     "ignoring frame from disallowed source address: {}",
                     header.source
                 );
-                return (None, false);
+                return (None, None);
             }
         };
 
@@ -115,7 +122,7 @@ impl Layer {
                     None
                 } else {
                     log::warn!("ignoring frame sent to address: {}", x);
-                    return (None, false);
+                    return (None, None);
                 }
             }
             AnyAddress::SelfAddress => {
@@ -123,18 +130,18 @@ impl Layer {
                     SelfAddressSupport::Enabled => None, // just pretend like it was sent to us
                     SelfAddressSupport::Disabled => {
                         log::warn!("ignoring frame sent to self address");
-                        return (None, false);
+                        return (None, None);
                     }
                 }
             }
             AnyAddress::Reserved(x) => {
                 log::warn!("ignoring frame sent to reserved address: {}", x);
-                return (None, false);
+                return (None, None);
             }
             AnyAddress::Broadcast(mode) => match self.endpoint_type {
                 EndpointType::Master => {
                     log::warn!("ignoring broadcast frame sent to master");
-                    return (None, false);
+                    return (None, None);
                 }
                 EndpointType::Outstation => Some(mode),
             },
@@ -145,46 +152,44 @@ impl Layer {
         // broadcasts may only use unconfirmed user data
         if broadcast.is_some() {
             return match header.control.func {
-                Function::PriUnconfirmedUserData => (Some(info), false),
+                Function::PriUnconfirmedUserData => (Some(info), None),
                 _ => {
                     log::warn!(
                         "ignoring broadcast frame with function: {:?}",
                         header.control.func
                     );
-                    (None, false)
+                    (None, None)
                 }
             };
         }
 
         match header.control.func {
-            Function::PriUnconfirmedUserData => (Some(info), false),
+            Function::PriUnconfirmedUserData => (Some(info), None),
             Function::PriResetLinkStates => {
                 self.secondary_state = SecondaryState::Reset(true); // TODO - does it start true or false
-                self.format_reply(source, Function::SecAck);
-                (None, true)
+                (None, Some(Reply::new(source, Function::SecAck)))
             }
             Function::PriConfirmedUserData => match self.secondary_state {
                 SecondaryState::NotReset => {
                     log::info!("ignoring confirmed user data while secondary state is not reset");
-                    (None, false)
+                    (None, None)
                 }
                 SecondaryState::Reset(expected) => {
                     if header.control.fcb == expected {
                         self.secondary_state = SecondaryState::Reset(!expected);
-                        (Some(info), false)
+                        (Some(info), None)
                     } else {
                         log::info!("ignoring confirmed user data with non-matching fcb");
-                        (None, false)
+                        (None, None)
                     }
                 }
             },
             Function::PriRequestLinkStatus => {
-                self.format_reply(source, Function::SecLinkStatus);
-                (None, true)
+                (None, Some(Reply::new(source, Function::SecLinkStatus)))
             }
             function => {
                 log::warn!("ignoring frame with function code: {:?}", function);
-                (None, false)
+                (None, None)
             }
         }
     }

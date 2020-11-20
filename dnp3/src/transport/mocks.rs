@@ -14,7 +14,7 @@ pub(crate) struct MockWriter {
 pub(crate) struct MockReader {
     num_reads: usize,
     count: usize,
-    info: FrameInfo,
+    info: Option<FrameInfo>,
     buffer: [u8; 2048],
 }
 
@@ -49,21 +49,25 @@ impl MockWriter {
 }
 
 impl MockReader {
-    pub(crate) fn master(address: EndpointAddress) -> Self {
-        Self::new(address)
+    pub(crate) fn master(_: EndpointAddress) -> Self {
+        Self::new()
     }
 
-    pub(crate) fn outstation(address: EndpointAddress, _: SelfAddressSupport) -> Self {
-        Self::new(address)
+    pub(crate) fn outstation(_: EndpointAddress, _: SelfAddressSupport) -> Self {
+        Self::new()
     }
 
-    fn new(address: EndpointAddress) -> Self {
+    fn new() -> Self {
         Self {
             num_reads: 0,
             count: 0,
-            info: FrameInfo::new(address, None),
+            info: None,
             buffer: [0; 2048],
         }
+    }
+
+    pub(crate) fn set_rx_frame_info(&mut self, info: FrameInfo) {
+        self.info = Some(info)
     }
 
     pub(crate) fn num_reads(&self) -> usize {
@@ -76,7 +80,9 @@ impl MockReader {
         match self.count {
             0 => None,
             x => Some(Fragment {
-                address: self.info,
+                address: self
+                    .info
+                    .expect("call set_rx_frame_info(..) before running test"),
                 data: &self.buffer[0..x],
             }),
         }

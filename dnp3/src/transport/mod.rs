@@ -61,8 +61,8 @@ impl TransportReader {
     }
 
     #[cfg(test)]
-    pub(crate) fn get_inner(&self) -> &ReaderType {
-        &self.inner
+    pub(crate) fn get_inner(&mut self) -> &mut ReaderType {
+        &mut self.inner
     }
 
     pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>

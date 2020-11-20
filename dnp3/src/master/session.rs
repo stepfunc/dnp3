@@ -332,10 +332,14 @@ impl MasterSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
+        println!("sent to {}", destination);
+
         let (source, response) = match reader.get_response(self.level) {
             None => return Ok(None),
             Some(x) => x,
         };
+
+        println!("received from {}", source);
 
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
@@ -648,6 +652,7 @@ impl MasterSession {
 mod test {
     use super::*;
     use crate::app::parse::DecodeLogLevel;
+    use crate::link::header::FrameInfo;
     use crate::master::association::Configuration;
     use crate::master::handle::{MasterHandle, NullHandler};
     use crate::transport::create_master_transport_layer;
@@ -655,6 +660,8 @@ mod test {
 
     #[tokio::test]
     async fn performs_startup_sequence_with_device_restart_asserted() {
+        let outstation_address = EndpointAddress::from(1024).unwrap();
+
         let (tx, rx) = tokio::sync::mpsc::channel(1);
         let mut runner = MasterSession::new(
             DecodeLogLevel::ObjectValues,
@@ -691,11 +698,15 @@ mod test {
         let (mut reader, mut writer) =
             create_master_transport_layer(EndpointAddress::from(1).unwrap());
 
+        reader
+            .get_inner()
+            .set_rx_frame_info(FrameInfo::new(outstation_address, None));
+
         let mut master_task =
             tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));
         let association = {
             let mut add_task = tokio_test::task::spawn(master.add_association(
-                EndpointAddress::from(1024).unwrap(),
+                outstation_address,
                 Configuration::default(),
                 NullHandler::boxed(),
             ));
