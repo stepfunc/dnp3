@@ -66,12 +66,11 @@ impl Reader {
         let mut payload = FramePayload::new();
 
         loop {
-            let address = self.link.read(io, &mut payload).await?;
+            let info = self.link.read(io, &mut payload).await?;
             match payload.get() {
                 [transport, data @ ..] => {
                     let header = Header::new(*transport);
-                    if let AssemblyState::Complete = self.assembler.assemble(address, header, data)
-                    {
+                    if let AssemblyState::Complete = self.assembler.assemble(info, header, data) {
                         return Ok(());
                     }
                 }

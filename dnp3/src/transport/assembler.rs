@@ -5,10 +5,19 @@ use crate::transport::Fragment;
 #[derive(Copy, Clone)]
 enum InternalState {
     Empty,
-    // last address, header, and accumulated length
+    // last info, header, and accumulated length
     Running(FrameInfo, Header, usize),
     // buffer contains an assembled ADU
     Complete(FrameInfo, usize),
+}
+
+impl InternalState {
+    fn to_assembly_state(&self) -> AssemblyState {
+        match self {
+            InternalState::Complete(_, _) => AssemblyState::Complete,
+            _ => AssemblyState::ReadMore,
+        }
+    }
 }
 
 pub(crate) enum AssemblyState {
@@ -45,60 +54,70 @@ impl Assembler {
 
     pub(crate) fn assemble(
         &mut self,
-        address: FrameInfo,
+        info: FrameInfo,
         header: Header,
         payload: &[u8],
     ) -> AssemblyState {
         // FIR always clears the state
         if header.fir {
-            if let InternalState::Running(address, _, size) = self.state {
+            if let InternalState::Running(info, _, size) = self.state {
                 log::warn!(
                     "transport: received FIR - dropping {} assembled bytes from {}",
                     size,
-                    address.source
+                    info.source
                 );
             }
             self.state = InternalState::Empty;
         }
 
+        if info.broadcast.is_some() {
+            if header.fir && header.fin {
+                self.append(info, header, 0, payload);
+            } else {
+                log::warn!(
+                    "ignoring broadcast frame with transport header fir: {} and fin: {}",
+                    header.fir,
+                    header.fin
+                );
+            }
+            return self.state.to_assembly_state();
+        }
+
         match self.state {
             InternalState::Complete(_, _) => {
                 self.state = InternalState::Empty;
-                self.append(address, header, 0, payload);
+                self.append(info, header, 0, payload);
             }
             InternalState::Empty => {
                 // ignore non-FIR segments if there was no previous frame
                 if !header.fir {
                     log::warn!(
                         "transport: ignoring non-FIR segment from {} with no previous FIR",
-                        address.source
+                        info.source
                     );
                     return AssemblyState::ReadMore;
                 }
-                self.append(address, header, 0, payload);
+                self.append(info, header, 0, payload);
             }
-            InternalState::Running(previous_address, previous_header, length) => {
+            InternalState::Running(previous_info, previous_header, length) => {
                 if header.seq.value() != previous_header.seq.next() {
-                    log::warn!("transport: conflicting addresses, previous segment with {:?}, but received {:?}", previous_address, address);
+                    log::warn!("transport: conflicting addresses, previous segment with {:?}, but received {:?}", previous_info, info);
                     self.state = InternalState::Empty;
                     return AssemblyState::ReadMore;
                 }
-                if address != previous_address {
-                    log::warn!("transport: conflicting addresses, previous segment with {:?}, but received {:?}", previous_address, address);
+                if info != previous_info {
+                    log::warn!("transport: conflicting addresses, previous segment with {:?}, but received {:?}", previous_info, info);
                     self.state = InternalState::Empty;
                     return AssemblyState::ReadMore;
                 }
-                self.append(address, header, length, payload);
+                self.append(info, header, length, payload);
             }
         }
 
-        match self.state {
-            InternalState::Complete(_, _) => AssemblyState::Complete,
-            _ => AssemblyState::ReadMore,
-        }
+        self.state.to_assembly_state()
     }
 
-    fn append(&mut self, address: FrameInfo, header: Header, acc_length: usize, data: &[u8]) {
+    fn append(&mut self, info: FrameInfo, header: Header, acc_length: usize, data: &[u8]) {
         let new_length = acc_length + data.len();
 
         match self.buffer.get_mut(acc_length..new_length) {
@@ -112,9 +131,9 @@ impl Assembler {
             Some(dest) => {
                 dest.copy_from_slice(data);
                 if header.fin {
-                    self.state = InternalState::Complete(address, new_length)
+                    self.state = InternalState::Complete(info, new_length)
                 } else {
-                    self.state = InternalState::Running(address, header, new_length)
+                    self.state = InternalState::Running(info, header, new_length)
                 }
             }
         }
