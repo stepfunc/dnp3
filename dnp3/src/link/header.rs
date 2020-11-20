@@ -76,7 +76,9 @@ impl std::fmt::Display for AnyAddress {
         match self {
             AnyAddress::Normal(x) => write!(f, "normal address ({})", x),
             AnyAddress::SelfAddress => write!(f, "self address ({})", constants::SELF_ADDRESS),
-            AnyAddress::Broadcast(details) => write!(f, "broadcast address ({})", details.address()),
+            AnyAddress::Broadcast(details) => {
+                write!(f, "broadcast address ({})", details.address())
+            }
         }
     }
 }
