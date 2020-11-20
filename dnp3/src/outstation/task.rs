@@ -5,10 +5,11 @@ use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::link::error::LinkError;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
-use crate::transport::{TransportReader, TransportType, TransportWriter};
+use crate::transport::{TransportReader, TransportWriter};
 
-use crate::entry::LinkAddress;
+use crate::entry::EndpointAddress;
 use crate::link::header::AnyAddress;
+use crate::outstation::SelfAddressSupport;
 use crate::util::buffer::Buffer;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::Duration;
@@ -28,7 +29,8 @@ pub struct OutstationTask {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OutstationConfig {
     pub tx_buffer_size: usize,
-    pub outstation_address: LinkAddress,
+    pub outstation_address: EndpointAddress,
+    pub self_address_support: SelfAddressSupport,
     pub master_address: Option<u16>,
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: Duration,
@@ -37,7 +39,8 @@ pub struct OutstationConfig {
 impl OutstationConfig {
     pub fn new(
         tx_buffer_size: usize,
-        outstation_address: LinkAddress,
+        outstation_address: EndpointAddress,
+        self_address_support: SelfAddressSupport,
         master_address: Option<u16>,
         log_level: DecodeLogLevel,
         confirm_timeout: Duration,
@@ -45,6 +48,7 @@ impl OutstationConfig {
         OutstationConfig {
             tx_buffer_size,
             outstation_address,
+            self_address_support,
             master_address,
             log_level,
             confirm_timeout,
@@ -56,9 +60,9 @@ impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
     pub fn create(config: OutstationConfig, database: DatabaseConfig) -> (Self, DatabaseHandle) {
         let handle = DatabaseHandle::new(database);
-        let (reader, writer) = crate::transport::create_transport_layer(
-            TransportType::Outstation,
+        let (reader, writer) = crate::transport::create_outstation_transport_layer(
             config.outstation_address,
+            config.self_address_support,
         );
         let task = Self {
             session: Session::new(config.log_level, config.tx_buffer_size, handle.clone()),
@@ -117,12 +121,17 @@ impl Session {
     {
         loop {
             // process any available request fragments
-            if let Some((address, request)) = reader.get_request(self.level) {
+            if let Some((info, request)) = reader.get_request(self.level) {
                 if let Some(action) = self.process_request(request) {
                     match action {
                         ResponseAction::Respond(num) => {
                             writer
-                                .write(io, self.level, address, self.tx_buffer.get(num).unwrap())
+                                .write(
+                                    io,
+                                    self.level,
+                                    info.source.wrap(),
+                                    self.tx_buffer.get(num).unwrap(),
+                                )
                                 .await?
                         }
                         ResponseAction::BeginReadResponse(seq, iin2) => {

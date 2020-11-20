@@ -1,9 +1,11 @@
-use crate::entry::LinkAddress;
+use crate::app::EndpointType;
+use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::parser::FramePayload;
+use crate::outstation::SelfAddressSupport;
 use crate::transport::assembler::{Assembler, AssemblyState};
 use crate::transport::header::Header;
-use crate::transport::{Fragment, TransportType};
+use crate::transport::Fragment;
 use tokio::prelude::{AsyncRead, AsyncWrite};
 
 pub(crate) struct Reader {
@@ -12,9 +14,38 @@ pub(crate) struct Reader {
 }
 
 impl Reader {
-    pub(crate) fn new(tt: TransportType, address: LinkAddress) -> Self {
+    fn new(
+        endpoint_type: EndpointType,
+        self_address: SelfAddressSupport,
+        source: EndpointAddress,
+    ) -> Self {
         Self {
-            link: crate::link::layer::Layer::new(tt.is_master(), address),
+            link: crate::link::layer::Layer::new(endpoint_type, self_address, source),
+            assembler: Assembler::new(),
+        }
+    }
+
+    pub(crate) fn master(source: EndpointAddress) -> Self {
+        Self {
+            link: crate::link::layer::Layer::new(
+                EndpointType::Master,
+                SelfAddressSupport::Disabled,
+                source,
+            ),
+            assembler: Assembler::new(),
+        }
+    }
+
+    pub(crate) fn outstation(
+        source: EndpointAddress,
+        self_address_support: SelfAddressSupport,
+    ) -> Self {
+        Self {
+            link: crate::link::layer::Layer::new(
+                EndpointType::Outstation,
+                self_address_support,
+                source,
+            ),
             assembler: Assembler::new(),
         }
     }

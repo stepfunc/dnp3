@@ -14,7 +14,7 @@ use crate::master::association::{AssociationMap, Next};
 use crate::master::messages::{MasterMsg, Message};
 
 use crate::app::parse::DecodeLogLevel;
-use crate::entry::LinkAddress;
+use crate::entry::EndpointAddress;
 use crate::master::error::{Shutdown, TaskError};
 use std::ops::Add;
 use std::time::Duration;
@@ -260,7 +260,7 @@ impl MasterSession {
     async fn run_non_read_task<T>(
         &mut self,
         io: &mut T,
-        destination: LinkAddress,
+        destination: EndpointAddress,
         mut task: NonReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -323,7 +323,7 @@ impl MasterSession {
     #[allow(clippy::needless_lifetimes)]
     async fn validate_non_read_response<'a, T>(
         &mut self,
-        destination: LinkAddress,
+        destination: EndpointAddress,
         seq: Sequence,
         io: &mut T,
         reader: &'a mut TransportReader,
@@ -370,7 +370,7 @@ impl MasterSession {
     async fn run_read_task<T>(
         &mut self,
         io: &mut T,
-        destination: LinkAddress,
+        destination: EndpointAddress,
         task: ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -401,7 +401,7 @@ impl MasterSession {
     async fn execute_read_task<T>(
         &mut self,
         io: &mut T,
-        destination: LinkAddress,
+        destination: EndpointAddress,
         task: &ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -443,7 +443,7 @@ impl MasterSession {
     #[allow(clippy::too_many_arguments)] // TODO
     async fn process_read_response<T>(
         &mut self,
-        destination: LinkAddress,
+        destination: EndpointAddress,
         is_first: bool,
         seq: Sequence,
         task: &ReadTask,
@@ -547,7 +547,7 @@ impl MasterSession {
 
     async fn handle_unsolicited<T>(
         &mut self,
-        source: LinkAddress,
+        source: EndpointAddress,
         response: &Response<'_>,
         io: &mut T,
         writer: &mut TransportWriter,
@@ -586,7 +586,7 @@ impl MasterSession {
     async fn confirm_solicited<T>(
         &mut self,
         io: &mut T,
-        destination: LinkAddress,
+        destination: EndpointAddress,
         seq: Sequence,
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
@@ -604,7 +604,7 @@ impl MasterSession {
     async fn confirm_unsolicited<T>(
         &mut self,
         io: &mut T,
-        destination: LinkAddress,
+        destination: EndpointAddress,
         seq: Sequence,
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
@@ -623,7 +623,7 @@ impl MasterSession {
     async fn send_request<T, U>(
         &mut self,
         io: &mut T,
-        address: LinkAddress,
+        address: EndpointAddress,
         request: &U,
         writer: &mut TransportWriter,
     ) -> Result<Sequence, TaskError>
@@ -650,7 +650,7 @@ mod test {
     use crate::app::parse::DecodeLogLevel;
     use crate::master::association::Configuration;
     use crate::master::handle::{MasterHandle, NullHandler};
-    use crate::transport::{create_transport_layer, TransportType};
+    use crate::transport::create_master_transport_layer;
     use tokio_test::io::Builder;
 
     #[tokio::test]
@@ -689,13 +689,13 @@ mod test {
             .build_with_handle();
 
         let (mut reader, mut writer) =
-            create_transport_layer(TransportType::Master, LinkAddress::from(1).unwrap());
+            create_master_transport_layer(EndpointAddress::from(1).unwrap());
 
         let mut master_task =
             tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));
         let association = {
             let mut add_task = tokio_test::task::spawn(master.add_association(
-                LinkAddress::from(1024).unwrap(),
+                EndpointAddress::from(1024).unwrap(),
                 Configuration::default(),
                 NullHandler::boxed(),
             ));

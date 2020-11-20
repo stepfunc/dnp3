@@ -3,3 +3,9 @@ pub mod database;
 /// async outstation task API that can be run on arbitrary I/O types
 /// implementing `AsyncRead` + `AsyncWrite` + `Unpin`
 pub mod task;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SelfAddressSupport {
+    Enabled,
+    Disabled,
+}

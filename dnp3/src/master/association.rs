@@ -17,7 +17,7 @@ use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use tokio::time::Instant;
 
-use crate::entry::LinkAddress;
+use crate::entry::EndpointAddress;
 pub use crate::master::poll::PollHandle;
 
 #[derive(Copy, Clone)]
@@ -109,7 +109,7 @@ impl TaskStates {
 /// as defined by the DNP3 standard. A master manages requests
 /// and responses for multiple associations (i.e. multi-drop).
 pub(crate) struct Association {
-    address: LinkAddress,
+    address: EndpointAddress,
     seq: Sequence,
     request_queue: VecDeque<Task>,
     auto_tasks: TaskStates,
@@ -120,7 +120,7 @@ pub(crate) struct Association {
 
 impl Association {
     pub(crate) fn new(
-        address: LinkAddress,
+        address: EndpointAddress,
         config: Configuration,
         handler: Box<dyn AssociationHandler>,
     ) -> Self {
@@ -364,8 +364,8 @@ pub(crate) enum Next<T> {
 }
 
 pub(crate) struct AssociationMap {
-    map: BTreeMap<LinkAddress, Association>,
-    priority: VecDeque<LinkAddress>,
+    map: BTreeMap<EndpointAddress, Association>,
+    priority: VecDeque<EndpointAddress>,
 }
 
 impl Default for AssociationMap {
@@ -376,7 +376,7 @@ impl Default for AssociationMap {
 
 #[derive(Copy, Clone)]
 pub(crate) struct NoAssociation {
-    pub(crate) address: LinkAddress,
+    pub(crate) address: EndpointAddress,
 }
 
 impl AssociationMap {
@@ -403,12 +403,12 @@ impl AssociationMap {
         Ok(())
     }
 
-    pub(crate) fn remove(&mut self, address: LinkAddress) {
+    pub(crate) fn remove(&mut self, address: EndpointAddress) {
         self.map.remove(&address);
         self.priority.retain(|x| *x != address);
     }
 
-    pub(crate) fn get(&self, address: LinkAddress) -> Result<&Association, NoAssociation> {
+    pub(crate) fn get(&self, address: EndpointAddress) -> Result<&Association, NoAssociation> {
         match self.map.get(&address) {
             Some(x) => Ok(x),
             None => Err(NoAssociation { address }),
@@ -417,7 +417,7 @@ impl AssociationMap {
 
     pub(crate) fn get_mut(
         &mut self,
-        address: LinkAddress,
+        address: EndpointAddress,
     ) -> Result<&mut Association, NoAssociation> {
         match self.map.get_mut(&address) {
             Some(x) => Ok(x),

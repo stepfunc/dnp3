@@ -1,17 +1,17 @@
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::DecodeLogLevel;
-use crate::entry::LinkAddress;
+use crate::app::EndpointType;
+use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::link::formatter::{LinkFormatter, Payload};
-use crate::link::header::{AddressPair, AnyAddress};
+use crate::link::format::{format_unconfirmed_user_data, Payload};
+use crate::link::header::AnyAddress;
 use crate::transport::sequence::Sequence;
-use crate::transport::TransportType;
 use crate::util::cursor::WriteCursor;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 pub(crate) struct Writer {
-    local_address: LinkAddress,
-    formatter: LinkFormatter,
+    endpoint_type: EndpointType,
+    local_address: EndpointAddress,
     seq: Sequence,
     buffer: [u8; crate::link::constant::MAX_LINK_FRAME_LENGTH],
 }
@@ -30,10 +30,10 @@ impl Writer {
         acc | seq.value()
     }
 
-    pub(crate) fn new(tt: TransportType, local_address: LinkAddress) -> Self {
+    pub(crate) fn new(endpoint_type: EndpointType, local_address: EndpointAddress) -> Self {
         Self {
+            endpoint_type,
             local_address,
-            formatter: LinkFormatter::new(tt.is_master()),
             seq: Sequence::default(),
             buffer: [0; crate::link::constant::MAX_LINK_FRAME_LENGTH],
         }
@@ -69,9 +69,10 @@ impl Writer {
             let mut cursor = WriteCursor::new(&mut self.buffer);
             let transport_byte = Self::get_header(count == last, count == 0, self.seq.increment());
             let mark = cursor.position();
-            let addresses = AddressPair::new(destination, self.local_address.wrap());
-            self.formatter.format_unconfirmed_user_data(
-                addresses,
+            format_unconfirmed_user_data(
+                self.endpoint_type.dir_bit(),
+                destination.value(),
+                self.local_address.raw_value(),
                 Payload::new(transport_byte, chunk),
                 &mut cursor,
             )?;

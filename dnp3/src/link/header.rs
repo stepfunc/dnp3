@@ -1,5 +1,5 @@
 use super::function::Function;
-use crate::entry::LinkAddress;
+use crate::entry::EndpointAddress;
 
 pub(crate) mod constants {
     pub(crate) const MASK_DIR: u8 = 0x80;
@@ -12,6 +12,7 @@ pub(crate) mod constants {
     pub(crate) const BROADCAST_CONFIRM_MANDATORY: u16 = 0xFFFE;
     pub(crate) const BROADCAST_CONFIRM_NOT_REQUIRED: u16 = 0xFFFD;
     pub(crate) const SELF_ADDRESS: u16 = 0xFFFC;
+    pub(crate) const RESERVED_START: u16 = 0xFFF0;
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -33,10 +34,13 @@ impl BroadcastConfirmMode {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) enum AnyAddress {
-    Normal(LinkAddress),
+    Reserved(u16),
+    Endpoint(EndpointAddress),
     Broadcast(BroadcastConfirmMode),
     SelfAddress,
 }
+
+pub(crate) struct SourceAddressError;
 
 impl AnyAddress {
     pub(crate) const fn from(address: u16) -> Self {
@@ -51,20 +55,17 @@ impl AnyAddress {
                 Self::Broadcast(BroadcastConfirmMode::NotRequired)
             }
             constants::SELF_ADDRESS => Self::SelfAddress,
-            _ => Self::Normal(LinkAddress::raw(address)),
-        }
-    }
-
-    pub(crate) fn get_normal_address(&self) -> Option<LinkAddress> {
-        match self {
-            AnyAddress::Normal(x) => Some(*x),
-            _ => None,
+            // reserved addresses
+            x if x >= constants::RESERVED_START => Self::Reserved(x),
+            // anything else is an allowed link address for a master or outstation
+            _ => Self::Endpoint(EndpointAddress::raw(address)),
         }
     }
 
     pub(crate) fn value(&self) -> u16 {
         match self {
-            Self::Normal(x) => x.raw_value(),
+            Self::Reserved(x) => *x,
+            Self::Endpoint(x) => x.raw_value(),
             Self::Broadcast(x) => x.address(),
             Self::SelfAddress => constants::SELF_ADDRESS,
         }
@@ -74,7 +75,8 @@ impl AnyAddress {
 impl std::fmt::Display for AnyAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            AnyAddress::Normal(x) => write!(f, "normal address ({})", x),
+            AnyAddress::Reserved(x) => write!(f, "reserved address ({})", x),
+            AnyAddress::Endpoint(x) => write!(f, "normal address ({})", x),
             AnyAddress::SelfAddress => write!(f, "self address ({})", constants::SELF_ADDRESS),
             AnyAddress::Broadcast(details) => {
                 write!(f, "broadcast address ({})", details.address())
@@ -122,28 +124,34 @@ impl ControlField {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub(crate) struct AddressPair {
-    pub(crate) destination: AnyAddress,
-    pub(crate) source: AnyAddress,
+pub(crate) struct FrameInfo {
+    pub(crate) source: EndpointAddress,
+    pub(crate) broadcast: Option<BroadcastConfirmMode>,
 }
 
-impl AddressPair {
-    pub(crate) fn new(destination: AnyAddress, source: AnyAddress) -> Self {
-        Self {
-            destination,
-            source,
-        }
+impl FrameInfo {
+    pub(crate) fn new(source: EndpointAddress, broadcast: Option<BroadcastConfirmMode>) -> Self {
+        Self { source, broadcast }
     }
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub(crate) struct Header {
     pub(crate) control: ControlField,
-    pub(crate) addresses: AddressPair,
+    pub(crate) destination: AnyAddress,
+    pub(crate) source: AnyAddress,
 }
 
 impl Header {
-    pub(crate) fn new(control: ControlField, addresses: AddressPair) -> Header {
-        Header { control, addresses }
+    pub(crate) fn new(
+        control: ControlField,
+        destination: AnyAddress,
+        source: AnyAddress,
+    ) -> Header {
+        Header {
+            control,
+            destination,
+            source,
+        }
     }
 }

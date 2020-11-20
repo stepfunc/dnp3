@@ -7,7 +7,7 @@ use std::ptr::null_mut;
 use std::str::FromStr;
 use std::time::Duration;
 
-use dnp3::entry::LinkAddress;
+use dnp3::entry::EndpointAddress;
 pub use tokio::runtime::Runtime;
 
 fn build_runtime<F>(f: F) -> std::result::Result<tokio::runtime::Runtime, std::io::Error>
@@ -61,7 +61,7 @@ pub(crate) unsafe fn runtime_add_master_tcp(
     };
     let listener = ClientStateListenerAdapter::new(listener);
 
-    let address = match LinkAddress::from(address) {
+    let address = match EndpointAddress::from(address) {
         Ok(x) => x,
         Err(err) => {
             log::warn!(

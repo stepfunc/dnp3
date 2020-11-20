@@ -1,33 +1,41 @@
-use crate::entry::LinkAddress;
+use crate::app::EndpointType;
+use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::link::formatter::LinkFormatter;
 use crate::link::function::Function;
-use crate::link::header::{AddressPair, AnyAddress, ControlField};
+use crate::link::header::{AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, Header};
 use crate::link::parser::FramePayload;
-use crate::util::cursor::WriteCursor;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+
+use crate::link::format::format_header;
+use crate::outstation::SelfAddressSupport;
 
 enum SecondaryState {
     NotReset,
-    Reset(bool), // the next expect fcb
+    Reset(bool), // the next expected fcb
 }
 
 pub(crate) struct Layer {
-    local_address: LinkAddress,
+    endpoint_type: EndpointType,
+    self_address_support: SelfAddressSupport,
+    local_address: EndpointAddress,
     secondary_state: SecondaryState,
-    formatter: LinkFormatter,
     reader: super::reader::Reader,
-    tx_buffer: [u8; super::constant::MAX_LINK_FRAME_LENGTH],
+    tx_buffer: [u8; super::constant::LINK_HEADER_LENGTH],
 }
 
 impl Layer {
-    pub(crate) fn new(is_master: bool, local_address: LinkAddress) -> Self {
+    pub(crate) fn new(
+        endpoint_type: EndpointType,
+        self_address_support: SelfAddressSupport,
+        local_address: EndpointAddress,
+    ) -> Self {
         Self {
+            endpoint_type,
+            self_address_support,
             local_address,
             secondary_state: SecondaryState::NotReset,
-            formatter: LinkFormatter::new(is_master),
             reader: super::reader::Reader::default(),
-            tx_buffer: [0; super::constant::MAX_LINK_FRAME_LENGTH],
+            tx_buffer: [0; super::constant::LINK_HEADER_LENGTH],
         }
     }
 
@@ -40,7 +48,7 @@ impl Layer {
         &mut self,
         io: &mut T,
         payload: &mut FramePayload,
-    ) -> Result<AddressPair, LinkError>
+    ) -> Result<FrameInfo, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -51,100 +59,132 @@ impl Layer {
         }
     }
 
-    async fn reply<T>(
-        &mut self,
-        destination: AnyAddress,
-        control: ControlField,
-        io: &mut T,
-    ) -> Result<(), LinkError>
-    where
-        T: AsyncWrite + Unpin,
-    {
-        let mut cursor = WriteCursor::new(self.tx_buffer.as_mut());
-        let start = cursor.position();
-        let addresses = AddressPair::new(destination, self.local_address.wrap());
-        self.formatter
-            .format_header_only(addresses, control, &mut cursor)?;
-        let reply_frame = cursor.written_since(start)?;
-        Ok(io.write_all(reply_frame).await?)
-    }
-
-    async fn acknowledge<T>(&mut self, destination: AnyAddress, io: &mut T) -> Result<(), LinkError>
-    where
-        T: AsyncWrite + Unpin,
-    {
-        self.reply(
-            destination,
-            ControlField::new(self.formatter.is_master(), Function::SecAck),
-            io,
-        )
-        .await
+    fn format_reply(&mut self, destination: EndpointAddress, function: Function) {
+        let control = ControlField::new(self.endpoint_type.dir_bit(), function);
+        format_header(
+            control,
+            destination.raw_value(),
+            self.local_address.raw_value(),
+            &mut self.tx_buffer,
+        );
     }
 
     async fn read_one<T>(
         &mut self,
         io: &mut T,
         payload: &mut FramePayload,
-    ) -> Result<Option<AddressPair>, LinkError>
+    ) -> Result<Option<FrameInfo>, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
         let header = self.reader.read(io, payload).await?;
+        let (info, reply) = self.process_header(&header);
+        if reply {
+            io.write_all(&self.tx_buffer).await?
+        }
+        Ok(info)
+    }
 
-        if header.control.master == self.formatter.is_master() {
-            // TODO - more useful on TCP than multi-drop serial where
-            // you have to ignore frames
+    fn process_header(&mut self, header: &Header) -> (Option<FrameInfo>, bool) {
+        // ignore frames sent from the same endpoint type
+        if header.control.master == self.endpoint_type.dir_bit() {
             if header.control.master {
                 log::info!("ignoring link frame from master");
             } else {
                 log::info!("ignoring link frame from outstation");
             }
-            return Ok(None);
+            return (None, false);
         }
 
-        // TODO - handle broadcast
-        if header.addresses.destination != self.local_address.wrap() {
-            log::info!(
-                "ignoring frame for destination address: {}",
-                header.addresses.destination.value()
-            );
-            return Ok(None);
+        // validate the source address
+        let source: EndpointAddress = match header.source {
+            AnyAddress::Endpoint(x) => x,
+            _ => {
+                log::warn!(
+                    "ignoring frame from disallowed source address: {}",
+                    header.source
+                );
+                return (None, false);
+            }
+        };
+
+        // validate the destination address
+        let broadcast: Option<BroadcastConfirmMode> = match header.destination {
+            AnyAddress::Endpoint(x) => {
+                if x == self.local_address {
+                    None
+                } else {
+                    log::warn!("ignoring frame sent to address: {}", x);
+                    return (None, false);
+                }
+            }
+            AnyAddress::SelfAddress => {
+                match self.self_address_support {
+                    SelfAddressSupport::Enabled => None, // just pretend like it was sent to us
+                    SelfAddressSupport::Disabled => {
+                        log::warn!("ignoring frame sent to self address");
+                        return (None, false);
+                    }
+                }
+            }
+            AnyAddress::Reserved(x) => {
+                log::warn!("ignoring frame sent to reserved address: {}", x);
+                return (None, false);
+            }
+            AnyAddress::Broadcast(mode) => match self.endpoint_type {
+                EndpointType::Master => {
+                    log::warn!("ignoring broadcast frame sent to master");
+                    return (None, false);
+                }
+                EndpointType::Outstation => Some(mode),
+            },
+        };
+
+        let info = FrameInfo::new(source, broadcast);
+
+        // broadcasts may only use unconfirmed user data
+        if broadcast.is_some() {
+            return match header.control.func {
+                Function::PriUnconfirmedUserData => (Some(info), false),
+                _ => {
+                    log::warn!(
+                        "ignoring broadcast frame with function: {:?}",
+                        header.control.func
+                    );
+                    (None, false)
+                }
+            };
         }
 
         match header.control.func {
-            Function::PriUnconfirmedUserData => Ok(Some(header.addresses)),
+            Function::PriUnconfirmedUserData => (Some(info), false),
             Function::PriResetLinkStates => {
-                self.secondary_state = SecondaryState::Reset(true); // TODO - does it start true or false?
-                self.acknowledge(header.addresses.source, io).await?;
-                Ok(None)
+                self.secondary_state = SecondaryState::Reset(true); // TODO - does it start true or false
+                self.format_reply(source, Function::SecAck);
+                (None, true)
             }
             Function::PriConfirmedUserData => match self.secondary_state {
                 SecondaryState::NotReset => {
                     log::info!("ignoring confirmed user data while secondary state is not reset");
-                    Ok(None)
+                    (None, false)
                 }
                 SecondaryState::Reset(expected) => {
                     if header.control.fcb == expected {
                         self.secondary_state = SecondaryState::Reset(!expected);
-                        Ok(Some(header.addresses))
+                        (Some(info), false)
                     } else {
                         log::info!("ignoring confirmed user data with non-matching fcb");
-                        Ok(None)
+                        (None, false)
                     }
                 }
             },
             Function::PriRequestLinkStatus => {
-                self.reply(
-                    header.addresses.source,
-                    ControlField::new(self.formatter.is_master(), Function::SecLinkStatus),
-                    io,
-                )
-                .await?;
-                Ok(None)
+                self.format_reply(source, Function::SecLinkStatus);
+                (None, true)
             }
             function => {
-                log::info!("ignoring frame with function code: {:?}", function);
-                Ok(None)
+                log::warn!("ignoring frame with function code: {:?}", function);
+                (None, false)
             }
         }
     }

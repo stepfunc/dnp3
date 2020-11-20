@@ -1,7 +1,7 @@
 use crate::link::header::AnyAddress;
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord)]
-pub struct LinkAddress {
+pub struct EndpointAddress {
     address: u16,
 }
 
@@ -22,16 +22,16 @@ impl std::fmt::Display for SpecialAddressError {
     }
 }
 
-impl LinkAddress {
+impl EndpointAddress {
     pub fn from(value: u16) -> Result<Self, SpecialAddressError> {
         match AnyAddress::from(value) {
-            AnyAddress::Normal(x) => Ok(x),
+            AnyAddress::Endpoint(x) => Ok(x),
             _ => Err(SpecialAddressError { address: value }),
         }
     }
 
-    pub(crate) const fn raw(address: u16) -> LinkAddress {
-        LinkAddress { address }
+    pub(crate) const fn raw(address: u16) -> EndpointAddress {
+        EndpointAddress { address }
     }
 
     pub(crate) fn raw_value(&self) -> u16 {
@@ -39,11 +39,11 @@ impl LinkAddress {
     }
 
     pub(crate) fn wrap(&self) -> AnyAddress {
-        AnyAddress::Normal(*self)
+        AnyAddress::Endpoint(*self)
     }
 }
 
-impl std::fmt::Display for LinkAddress {
+impl std::fmt::Display for EndpointAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.address)
     }

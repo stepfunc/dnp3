@@ -1,8 +1,10 @@
 use crate::app::parse::DecodeLogLevel;
-use crate::entry::LinkAddress;
+use crate::app::EndpointType;
+use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::link::header::{AddressPair, AnyAddress};
-use crate::transport::{Fragment, TransportType};
+use crate::link::header::{AnyAddress, FrameInfo};
+use crate::outstation::SelfAddressSupport;
+use crate::transport::Fragment;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub(crate) struct MockWriter {
@@ -12,13 +14,13 @@ pub(crate) struct MockWriter {
 pub(crate) struct MockReader {
     num_reads: usize,
     count: usize,
-    address: AddressPair,
+    info: FrameInfo,
     buffer: [u8; 2048],
 }
 
 // same signature as the real transport writer
 impl MockWriter {
-    pub(crate) fn new(_: TransportType, _: LinkAddress) -> Self {
+    pub(crate) fn new(_: EndpointType, _: EndpointAddress) -> Self {
         Self { num_writes: 0 }
     }
 
@@ -47,11 +49,19 @@ impl MockWriter {
 }
 
 impl MockReader {
-    pub(crate) fn new(_: TransportType, address: LinkAddress) -> Self {
+    pub(crate) fn master(address: EndpointAddress) -> Self {
+        Self::new(address)
+    }
+
+    pub(crate) fn outstation(address: EndpointAddress, _: SelfAddressSupport) -> Self {
+        Self::new(address)
+    }
+
+    fn new(address: EndpointAddress) -> Self {
         Self {
             num_reads: 0,
             count: 0,
-            address: AddressPair::new(address.wrap(), AnyAddress::from(1024)),
+            info: FrameInfo::new(address, None),
             buffer: [0; 2048],
         }
     }
@@ -66,7 +76,7 @@ impl MockReader {
         match self.count {
             0 => None,
             x => Some(Fragment {
-                address: self.address,
+                address: self.info,
                 data: &self.buffer[0..x],
             }),
         }

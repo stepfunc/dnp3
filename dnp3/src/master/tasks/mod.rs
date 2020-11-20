@@ -7,7 +7,7 @@ use crate::app::enums::FunctionCode;
 use crate::app::format::write::HeaderWriter;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::{HeaderCollection, Response};
-use crate::entry::LinkAddress;
+use crate::entry::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::poll::Poll;
@@ -20,13 +20,13 @@ use crate::util::cursor::WriteError;
 /// Queued task requiring I/O
 pub(crate) struct AssociationTask {
     /// Outstation address
-    pub(crate) address: LinkAddress,
+    pub(crate) address: EndpointAddress,
     /// Actual task to perform
     pub(crate) details: Task,
 }
 
 impl AssociationTask {
-    pub(crate) fn new(address: LinkAddress, details: Task) -> Self {
+    pub(crate) fn new(address: EndpointAddress, details: Task) -> Self {
         Self { address, details }
     }
 }
