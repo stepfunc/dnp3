@@ -1,17 +1,20 @@
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::parse::DecodeLogLevel;
+use dnp3::entry::EndpointAddress;
 use dnp3::outstation::database::config::*;
 use dnp3::outstation::database::EventClass;
 use dnp3::outstation::database::{Add, DatabaseConfig, Update, UpdateOptions};
 use dnp3::outstation::task::{OutstationConfig, OutstationTask};
+use dnp3::outstation::SelfAddressSupport;
 use std::net::Ipv4Addr;
 use std::time::Duration;
 
-fn get_outstation_config() -> OutstationConfig {
+fn get_outstation_config(address: EndpointAddress) -> OutstationConfig {
     OutstationConfig::new(
         2048,
-        10,
+        address,
+        SelfAddressSupport::Disabled,
         Some(1),
         DecodeLogLevel::ObjectValues,
         Duration::from_secs(2),
@@ -29,8 +32,10 @@ fn get_database_config() -> DatabaseConfig {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
 
-    let (mut task, mut handle) =
-        OutstationTask::create(get_outstation_config(), get_database_config());
+    let (mut task, mut handle) = OutstationTask::create(
+        get_outstation_config(EndpointAddress::from(10)?),
+        get_database_config(),
+    );
 
     handle.transaction(|db| {
         for i in 0..1000 {

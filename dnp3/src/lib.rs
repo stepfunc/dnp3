@@ -23,7 +23,7 @@
 //!
 //!     // spawn the master onto another task
 //!     let mut master = spawn_master_tcp_client(
-//!         1,
+//!         EndpointAddress::from(1)?,
 //!         DecodeLogLevel::ObjectValues,
 //!         ReconnectStrategy::default(),
 //!         Timeout::from_secs(1)?,
@@ -31,7 +31,7 @@
 //!         Listener::None,
 //!     );
 //!
-//!     let mut association = master.add_association(1024, Configuration::default(), NullHandler::boxed()).await?;
+//!     let mut association = master.add_association(EndpointAddress::from(1024)?, Configuration::default(), NullHandler::boxed()).await?;
 //!     association.add_poll(
 //!         EventClasses::all().to_classes().to_request(),
 //!         Duration::from_secs(5),
@@ -103,18 +103,12 @@ extern crate assert_matches;
 
 /// application layer types shared by both the master and outstation APIs
 pub mod app;
+/// entry points for creating and spawning async tasks
+pub mod entry;
 /// types, enums, and traits specific to masters
 pub mod master;
 /// types, enums, and traits specific to outstations
 pub mod outstation;
-/// entry points for creating and spawning async tasks
-pub mod entry {
-    /// entry points for creating and spawning master tasks
-    pub mod master {
-        /// entry points for creating and spawning TCP-based master tasks
-        pub mod tcp;
-    }
-}
 /// preludes for master and outstation
 pub mod prelude;
 

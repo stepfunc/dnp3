@@ -1,9 +1,10 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::app::timeout::Timeout;
+use crate::entry::EndpointAddress;
 use crate::master::error::Shutdown;
 use crate::master::handle::{Listener, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
-use crate::transport::{TransportReader, TransportType, TransportWriter};
+use crate::transport::{TransportReader, TransportWriter};
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::macros::support::Future;
@@ -94,7 +95,7 @@ pub(crate) struct MasterTask {
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
 pub fn spawn_master_tcp_client(
-    address: u16,
+    address: EndpointAddress,
     level: DecodeLogLevel,
     strategy: ReconnectStrategy,
     timeout: Timeout,
@@ -115,7 +116,7 @@ pub fn spawn_master_tcp_client(
 /// tasks instead of within the context of a runtime, e.g. in applications that cannot use
 /// `[tokio::main]` such as C language bindings.
 pub fn create_master_tcp_client(
-    address: u16,
+    address: EndpointAddress,
     level: DecodeLogLevel,
     strategy: ReconnectStrategy,
     response_timeout: Timeout,
@@ -135,7 +136,7 @@ pub fn create_master_tcp_client(
 
 impl MasterTask {
     fn new(
-        address: u16,
+        address: EndpointAddress,
         level: DecodeLogLevel,
         strategy: ReconnectStrategy,
         response_timeout: Timeout,
@@ -144,8 +145,7 @@ impl MasterTask {
     ) -> (Self, MasterHandle) {
         let (tx, rx) = tokio::sync::mpsc::channel(100); // TODO
         let session = MasterSession::new(level, response_timeout, rx);
-        let (reader, writer) =
-            crate::transport::create_transport_layer(TransportType::Master, address);
+        let (reader, writer) = crate::transport::create_master_transport_layer(address);
         let task = Self {
             endpoint,
             back_off: ExponentialBackOff::new(strategy),

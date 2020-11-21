@@ -1,3 +1,4 @@
+use dnp3::entry::EndpointAddress;
 use dnp3::prelude::master::*;
 use std::io::BufRead;
 use std::net::SocketAddr;
@@ -12,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // create
     let (future, mut master) = create_master_tcp_client(
-        1,
+        EndpointAddress::from(1)?,
         DecodeLogLevel::ObjectValues,
         ReconnectStrategy::default(),
         Timeout::from_secs(1)?,
@@ -25,8 +26,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the association
     let mut config = Configuration::default();
     config.auto_time_sync = Some(TimeSyncProcedure::LAN);
-    let mut association =
-        runtime.block_on(master.add_association(1024, config, NullHandler::boxed()))?;
+    let mut association = runtime.block_on(master.add_association(
+        EndpointAddress::from(1024)?,
+        config,
+        NullHandler::boxed(),
+    ))?;
 
     // Add an event poll
     let mut poll = runtime.block_on(association.add_poll(

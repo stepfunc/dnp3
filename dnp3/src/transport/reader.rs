@@ -1,8 +1,11 @@
+use crate::app::EndpointType;
+use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::parser::FramePayload;
+use crate::outstation::SelfAddressSupport;
 use crate::transport::assembler::{Assembler, AssemblyState};
 use crate::transport::header::Header;
-use crate::transport::{Fragment, TransportType};
+use crate::transport::Fragment;
 use tokio::prelude::{AsyncRead, AsyncWrite};
 
 pub(crate) struct Reader {
@@ -11,9 +14,38 @@ pub(crate) struct Reader {
 }
 
 impl Reader {
-    pub(crate) fn new(tt: TransportType, address: u16) -> Self {
+    fn new(
+        endpoint_type: EndpointType,
+        self_address: SelfAddressSupport,
+        source: EndpointAddress,
+    ) -> Self {
         Self {
-            link: crate::link::layer::Layer::new(tt.is_master(), address),
+            link: crate::link::layer::Layer::new(endpoint_type, self_address, source),
+            assembler: Assembler::new(),
+        }
+    }
+
+    pub(crate) fn master(source: EndpointAddress) -> Self {
+        Self {
+            link: crate::link::layer::Layer::new(
+                EndpointType::Master,
+                SelfAddressSupport::Disabled,
+                source,
+            ),
+            assembler: Assembler::new(),
+        }
+    }
+
+    pub(crate) fn outstation(
+        source: EndpointAddress,
+        self_address_support: SelfAddressSupport,
+    ) -> Self {
+        Self {
+            link: crate::link::layer::Layer::new(
+                EndpointType::Outstation,
+                self_address_support,
+                source,
+            ),
             assembler: Assembler::new(),
         }
     }
@@ -34,12 +66,11 @@ impl Reader {
         let mut payload = FramePayload::new();
 
         loop {
-            let address = self.link.read(io, &mut payload).await?;
+            let info = self.link.read(io, &mut payload).await?;
             match payload.get() {
                 [transport, data @ ..] => {
                     let header = Header::new(*transport);
-                    if let AssemblyState::Complete = self.assembler.assemble(address, header, data)
-                    {
+                    if let AssemblyState::Complete = self.assembler.assemble(info, header, data) {
                         return Ok(());
                     }
                 }

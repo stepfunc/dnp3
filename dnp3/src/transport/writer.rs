@@ -1,14 +1,17 @@
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::DecodeLogLevel;
+use crate::app::EndpointType;
+use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::link::formatter::{LinkFormatter, Payload};
+use crate::link::format::{format_unconfirmed_user_data, Payload};
+use crate::link::header::AnyAddress;
 use crate::transport::sequence::Sequence;
-use crate::transport::TransportType;
 use crate::util::cursor::WriteCursor;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 pub(crate) struct Writer {
-    formatter: LinkFormatter,
+    endpoint_type: EndpointType,
+    local_address: EndpointAddress,
     seq: Sequence,
     buffer: [u8; crate::link::constant::MAX_LINK_FRAME_LENGTH],
 }
@@ -27,9 +30,10 @@ impl Writer {
         acc | seq.value()
     }
 
-    pub(crate) fn new(tt: TransportType, address: u16) -> Self {
+    pub(crate) fn new(endpoint_type: EndpointType, local_address: EndpointAddress) -> Self {
         Self {
-            formatter: LinkFormatter::new(tt.is_master(), address),
+            endpoint_type,
+            local_address,
             seq: Sequence::default(),
             buffer: [0; crate::link::constant::MAX_LINK_FRAME_LENGTH],
         }
@@ -43,7 +47,7 @@ impl Writer {
         &mut self,
         io: &mut W,
         level: DecodeLogLevel,
-        destination: u16,
+        destination: AnyAddress,
         fragment: &[u8],
     ) -> Result<(), LinkError>
     where
@@ -65,8 +69,10 @@ impl Writer {
             let mut cursor = WriteCursor::new(&mut self.buffer);
             let transport_byte = Self::get_header(count == last, count == 0, self.seq.increment());
             let mark = cursor.position();
-            self.formatter.format_unconfirmed_user_data(
-                destination,
+            format_unconfirmed_user_data(
+                self.endpoint_type.dir_bit(),
+                destination.value(),
+                self.local_address.raw_value(),
                 Payload::new(transport_byte, chunk),
                 &mut cursor,
             )?;

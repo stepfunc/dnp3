@@ -1,3 +1,10 @@
+/// internal enum used all over the place to specify master or outstation
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) enum EndpointType {
+    Master,
+    Outstation,
+}
+
 /// publicly exported enumerations defined by the standard
 #[rustfmt::skip]
 pub mod enums;

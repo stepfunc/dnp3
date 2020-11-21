@@ -1,4 +1,5 @@
 use super::function::Function;
+use crate::entry::EndpointAddress;
 
 pub(crate) mod constants {
     pub(crate) const MASK_DIR: u8 = 0x80;
@@ -7,6 +8,81 @@ pub(crate) mod constants {
     pub(crate) const MASK_FCV: u8 = 0x10;
     pub(crate) const MASK_FUNC: u8 = 0x0F;
     pub(crate) const MASK_FUNC_OR_PRM: u8 = MASK_PRM | MASK_FUNC;
+    pub(crate) const BROADCAST_CONFIRM_OPTIONAL: u16 = 0xFFFF;
+    pub(crate) const BROADCAST_CONFIRM_MANDATORY: u16 = 0xFFFE;
+    pub(crate) const BROADCAST_CONFIRM_NOT_REQUIRED: u16 = 0xFFFD;
+    pub(crate) const SELF_ADDRESS: u16 = 0xFFFC;
+    pub(crate) const RESERVED_START: u16 = 0xFFF0;
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) enum BroadcastConfirmMode {
+    Optional,
+    Mandatory,
+    NotRequired,
+}
+
+impl BroadcastConfirmMode {
+    pub(crate) fn address(&self) -> u16 {
+        match self {
+            BroadcastConfirmMode::Optional => constants::BROADCAST_CONFIRM_OPTIONAL,
+            BroadcastConfirmMode::Mandatory => constants::BROADCAST_CONFIRM_MANDATORY,
+            BroadcastConfirmMode::NotRequired => constants::BROADCAST_CONFIRM_NOT_REQUIRED,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) enum AnyAddress {
+    Reserved(u16),
+    Endpoint(EndpointAddress),
+    Broadcast(BroadcastConfirmMode),
+    SelfAddress,
+}
+
+pub(crate) struct SourceAddressError;
+
+impl AnyAddress {
+    pub(crate) const fn from(address: u16) -> Self {
+        match address {
+            constants::BROADCAST_CONFIRM_OPTIONAL => {
+                Self::Broadcast(BroadcastConfirmMode::Optional)
+            }
+            constants::BROADCAST_CONFIRM_MANDATORY => {
+                Self::Broadcast(BroadcastConfirmMode::Mandatory)
+            }
+            constants::BROADCAST_CONFIRM_NOT_REQUIRED => {
+                Self::Broadcast(BroadcastConfirmMode::NotRequired)
+            }
+            constants::SELF_ADDRESS => Self::SelfAddress,
+            // reserved addresses
+            x if x >= constants::RESERVED_START => Self::Reserved(x),
+            // anything else is an allowed link address for a master or outstation
+            _ => Self::Endpoint(EndpointAddress::raw(address)),
+        }
+    }
+
+    pub(crate) fn value(&self) -> u16 {
+        match self {
+            Self::Reserved(x) => *x,
+            Self::Endpoint(x) => x.raw_value(),
+            Self::Broadcast(x) => x.address(),
+            Self::SelfAddress => constants::SELF_ADDRESS,
+        }
+    }
+}
+
+impl std::fmt::Display for AnyAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            AnyAddress::Reserved(x) => write!(f, "reserved address ({})", x),
+            AnyAddress::Endpoint(x) => write!(f, "normal address ({})", x),
+            AnyAddress::SelfAddress => write!(f, "self address ({})", constants::SELF_ADDRESS),
+            AnyAddress::Broadcast(details) => {
+                write!(f, "broadcast address ({})", details.address())
+            }
+        }
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -48,28 +124,34 @@ impl ControlField {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub(crate) struct Address {
-    pub(crate) destination: u16,
-    pub(crate) source: u16,
+pub(crate) struct FrameInfo {
+    pub(crate) source: EndpointAddress,
+    pub(crate) broadcast: Option<BroadcastConfirmMode>,
 }
 
-impl Address {
-    pub(crate) fn new(destination: u16, source: u16) -> Self {
-        Self {
-            destination,
-            source,
-        }
+impl FrameInfo {
+    pub(crate) fn new(source: EndpointAddress, broadcast: Option<BroadcastConfirmMode>) -> Self {
+        Self { source, broadcast }
     }
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub(crate) struct Header {
     pub(crate) control: ControlField,
-    pub(crate) address: Address,
+    pub(crate) destination: AnyAddress,
+    pub(crate) source: AnyAddress,
 }
 
 impl Header {
-    pub(crate) fn new(control: ControlField, address: Address) -> Header {
-        Header { control, address }
+    pub(crate) fn new(
+        control: ControlField,
+        destination: AnyAddress,
+        source: AnyAddress,
+    ) -> Header {
+        Header {
+            control,
+            destination,
+            source,
+        }
     }
 }

@@ -14,6 +14,7 @@ use crate::master::association::{AssociationMap, Next};
 use crate::master::messages::{MasterMsg, Message};
 
 use crate::app::parse::DecodeLogLevel;
+use crate::entry::EndpointAddress;
 use crate::master::error::{Shutdown, TaskError};
 use std::ops::Add;
 use std::time::Duration;
@@ -259,7 +260,7 @@ impl MasterSession {
     async fn run_non_read_task<T>(
         &mut self,
         io: &mut T,
-        address: u16,
+        destination: EndpointAddress,
         mut task: NonReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -268,10 +269,10 @@ impl MasterSession {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            let seq = match self.send_request(io, address, &task, writer).await {
+            let seq = match self.send_request(io, destination, &task, writer).await {
                 Ok(seq) => seq,
                 Err(err) => {
-                    task.on_task_error(self.associations.get_mut(address).ok(), err);
+                    task.on_task_error(self.associations.get_mut(destination).ok(), err);
                     return Err(err);
                 }
             };
@@ -280,18 +281,18 @@ impl MasterSession {
 
             loop {
                 if let Err(err) = self.read_next_response(io, deadline, reader).await {
-                    task.on_task_error(self.associations.get_mut(address).ok(), err);
+                    task.on_task_error(self.associations.get_mut(destination).ok(), err);
                     return Err(err);
                 }
 
                 match self
-                    .validate_non_read_response(address, seq, io, reader, writer)
+                    .validate_non_read_response(destination, seq, io, reader, writer)
                     .await
                 {
                     // continue reading responses until timeout
                     Ok(None) => continue,
                     Ok(Some(response)) => {
-                        match self.associations.get_mut(address) {
+                        match self.associations.get_mut(destination) {
                             Err(x) => {
                                 task.on_task_error(None, x.into());
                                 return Err(x.into());
@@ -310,7 +311,7 @@ impl MasterSession {
                         }
                     }
                     Err(err) => {
-                        task.on_task_error(self.associations.get_mut(address).ok(), err);
+                        task.on_task_error(self.associations.get_mut(destination).ok(), err);
                         return Err(err);
                     }
                 }
@@ -322,7 +323,7 @@ impl MasterSession {
     #[allow(clippy::needless_lifetimes)]
     async fn validate_non_read_response<'a, T>(
         &mut self,
-        address: u16,
+        destination: EndpointAddress,
         seq: Sequence,
         io: &mut T,
         reader: &'a mut TransportReader,
@@ -331,10 +332,14 @@ impl MasterSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
+        println!("sent to {}", destination);
+
         let (source, response) = match reader.get_response(self.level) {
             None => return Ok(None),
             Some(x) => x,
         };
+
+        println!("received from {}", source);
 
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
@@ -342,11 +347,11 @@ impl MasterSession {
             return Ok(None);
         }
 
-        if source != address {
+        if source != destination {
             log::warn!(
                 "Received response from {} while expecting response from {}",
                 source,
-                address
+                destination
             );
             return Ok(None);
         }
@@ -369,7 +374,7 @@ impl MasterSession {
     async fn run_read_task<T>(
         &mut self,
         io: &mut T,
-        address: u16,
+        destination: EndpointAddress,
         task: ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -378,17 +383,17 @@ impl MasterSession {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         let result = self
-            .execute_read_task(io, address, &task, writer, reader)
+            .execute_read_task(io, destination, &task, writer, reader)
             .await;
 
-        let association = self.associations.get_mut(address).ok();
+        let association = self.associations.get_mut(destination).ok();
 
         match result {
             Ok(_) => {
                 if let Some(association) = association {
                     task.complete(association);
                 } else {
-                    task.on_task_error(None, TaskError::NoSuchAssociation(address));
+                    task.on_task_error(None, TaskError::NoSuchAssociation(destination));
                 }
             }
             Err(err) => task.on_task_error(association, err),
@@ -400,7 +405,7 @@ impl MasterSession {
     async fn execute_read_task<T>(
         &mut self,
         io: &mut T,
-        address: u16,
+        destination: EndpointAddress,
         task: &ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -408,7 +413,7 @@ impl MasterSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let mut seq = self.send_request(io, address, task, writer).await?;
+        let mut seq = self.send_request(io, destination, task, writer).await?;
         let mut is_first = true;
 
         // read responses until we get a FIN or an error occurs
@@ -419,7 +424,7 @@ impl MasterSession {
                 self.read_next_response(io, deadline, reader).await?;
 
                 match self
-                    .process_read_response(address, is_first, seq, &task, io, writer, reader)
+                    .process_read_response(destination, is_first, seq, &task, io, writer, reader)
                     .await?
                 {
                     // continue reading responses on the inner loop
@@ -431,7 +436,7 @@ impl MasterSession {
                     // break to the outer loop and read another response
                     ReadResponseAction::ReadNext => {
                         is_first = false;
-                        seq = self.associations.get_mut(address)?.increment_seq();
+                        seq = self.associations.get_mut(destination)?.increment_seq();
                         break;
                     }
                 }
@@ -442,7 +447,7 @@ impl MasterSession {
     #[allow(clippy::too_many_arguments)] // TODO
     async fn process_read_response<T>(
         &mut self,
-        address: u16,
+        destination: EndpointAddress,
         is_first: bool,
         seq: Sequence,
         task: &ReadTask,
@@ -464,11 +469,11 @@ impl MasterSession {
             return Ok(ReadResponseAction::Ignore);
         }
 
-        if source != address {
+        if source != destination {
             log::warn!(
                 "Received response from {} while expecting response from {}",
                 source,
-                address
+                destination
             );
             return Ok(ReadResponseAction::Ignore);
         }
@@ -496,11 +501,11 @@ impl MasterSession {
             return Err(TaskError::NonFinWithoutCon);
         }
 
-        let association = self.associations.get_mut(address)?;
+        let association = self.associations.get_mut(destination)?;
         task.process_response(association, response.header, response.objects?);
 
         if response.header.control.con {
-            self.confirm_solicited(io, address, seq, writer).await?;
+            self.confirm_solicited(io, destination, seq, writer).await?;
         }
 
         if response.header.control.fin {
@@ -546,7 +551,7 @@ impl MasterSession {
 
     async fn handle_unsolicited<T>(
         &mut self,
-        source: u16,
+        source: EndpointAddress,
         response: &Response<'_>,
         io: &mut T,
         writer: &mut TransportWriter,
@@ -585,7 +590,7 @@ impl MasterSession {
     async fn confirm_solicited<T>(
         &mut self,
         io: &mut T,
-        destination: u16,
+        destination: EndpointAddress,
         seq: Sequence,
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
@@ -595,7 +600,7 @@ impl MasterSession {
         let mut cursor = WriteCursor::new(&mut self.buffer);
         write::confirm_solicited(seq, &mut cursor)?;
         writer
-            .write(io, self.level, destination, cursor.written())
+            .write(io, self.level, destination.wrap(), cursor.written())
             .await?;
         Ok(())
     }
@@ -603,7 +608,7 @@ impl MasterSession {
     async fn confirm_unsolicited<T>(
         &mut self,
         io: &mut T,
-        destination: u16,
+        destination: EndpointAddress,
         seq: Sequence,
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
@@ -614,7 +619,7 @@ impl MasterSession {
         crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
 
         writer
-            .write(io, self.level, destination, cursor.written())
+            .write(io, self.level, destination.wrap(), cursor.written())
             .await?;
         Ok(())
     }
@@ -622,7 +627,7 @@ impl MasterSession {
     async fn send_request<T, U>(
         &mut self,
         io: &mut T,
-        address: u16,
+        address: EndpointAddress,
         request: &U,
         writer: &mut TransportWriter,
     ) -> Result<Sequence, TaskError>
@@ -637,7 +642,7 @@ impl MasterSession {
         let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
         writer
-            .write(io, self.level, address, cursor.written())
+            .write(io, self.level, address.wrap(), cursor.written())
             .await?;
         Ok(seq)
     }
@@ -647,13 +652,16 @@ impl MasterSession {
 mod test {
     use super::*;
     use crate::app::parse::DecodeLogLevel;
+    use crate::link::header::FrameInfo;
     use crate::master::association::Configuration;
     use crate::master::handle::{MasterHandle, NullHandler};
-    use crate::transport::{create_transport_layer, TransportType};
+    use crate::transport::create_master_transport_layer;
     use tokio_test::io::Builder;
 
     #[tokio::test]
     async fn performs_startup_sequence_with_device_restart_asserted() {
+        let outstation_address = EndpointAddress::from(1024).unwrap();
+
         let (tx, rx) = tokio::sync::mpsc::channel(1);
         let mut runner = MasterSession::new(
             DecodeLogLevel::ObjectValues,
@@ -687,13 +695,18 @@ mod test {
             .read(&[0xC3, 0x81, 0x00, 0x00])
             .build_with_handle();
 
-        let (mut reader, mut writer) = create_transport_layer(TransportType::Master, 1);
+        let (mut reader, mut writer) =
+            create_master_transport_layer(EndpointAddress::from(1).unwrap());
+
+        reader
+            .get_inner()
+            .set_rx_frame_info(FrameInfo::new(outstation_address, None));
 
         let mut master_task =
             tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));
         let association = {
             let mut add_task = tokio_test::task::spawn(master.add_association(
-                1024,
+                outstation_address,
                 Configuration::default(),
                 NullHandler::boxed(),
             ));

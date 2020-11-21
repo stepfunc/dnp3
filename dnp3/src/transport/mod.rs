@@ -1,7 +1,10 @@
 use crate::app::parse::parser::{ParsedFragment, Request, Response};
 use crate::app::parse::DecodeLogLevel;
+use crate::app::EndpointType;
+use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::link::header::Address;
+use crate::link::header::FrameInfo;
+use crate::outstation::SelfAddressSupport;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 #[cfg(not(test))]
@@ -26,24 +29,9 @@ pub(crate) mod reader;
 pub(crate) mod sequence;
 pub(crate) mod writer;
 
-#[derive(Copy, Clone, Debug)]
-pub(crate) enum TransportType {
-    Master,
-    Outstation,
-}
-
-impl TransportType {
-    pub(crate) fn is_master(&self) -> bool {
-        match self {
-            TransportType::Master => true,
-            TransportType::Outstation => false,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub(crate) struct Fragment<'a> {
-    pub(crate) address: Address,
+    pub(crate) address: FrameInfo,
     pub(crate) data: &'a [u8],
 }
 
@@ -58,16 +46,23 @@ pub(crate) struct TransportReader {
 }
 
 impl TransportReader {
-    fn new(tt: TransportType, address: u16) -> Self {
+    fn master(address: EndpointAddress) -> Self {
         Self {
             logged: false,
-            inner: ReaderType::new(tt, address),
+            inner: ReaderType::master(address),
+        }
+    }
+
+    fn outstation(address: EndpointAddress, self_address_support: SelfAddressSupport) -> Self {
+        Self {
+            logged: false,
+            inner: ReaderType::outstation(address, self_address_support),
         }
     }
 
     #[cfg(test)]
-    pub(crate) fn get_inner(&self) -> &ReaderType {
-        &self.inner
+    pub(crate) fn get_inner(&mut self) -> &mut ReaderType {
+        &mut self.inner
     }
 
     pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
@@ -82,8 +77,11 @@ impl TransportReader {
         self.inner.reset()
     }
 
-    pub(crate) fn get_response(&mut self, level: DecodeLogLevel) -> Option<(u16, Response)> {
-        let (log, address, parsed) = self.peek(level)?;
+    pub(crate) fn get_response(
+        &mut self,
+        level: DecodeLogLevel,
+    ) -> Option<(EndpointAddress, Response)> {
+        let (log, info, parsed) = self.peek(level)?;
         match parsed.to_response() {
             Err(err) => {
                 if log {
@@ -91,12 +89,12 @@ impl TransportReader {
                 }
                 None
             }
-            Ok(response) => Some((address.source, response)),
+            Ok(response) => Some((info.source, response)),
         }
     }
 
-    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(Address, Request)> {
-        let (log, address, parsed) = self.peek(level)?;
+    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(FrameInfo, Request)> {
+        let (log, info, parsed) = self.peek(level)?;
         match parsed.to_request() {
             Err(err) => {
                 if log {
@@ -104,11 +102,11 @@ impl TransportReader {
                 }
                 None
             }
-            Ok(request) => Some((address, request)),
+            Ok(request) => Some((info, request)),
         }
     }
 
-    fn peek(&mut self, level: DecodeLogLevel) -> Option<(bool, Address, ParsedFragment)> {
+    fn peek(&mut self, level: DecodeLogLevel) -> Option<(bool, FrameInfo, ParsedFragment)> {
         let log_this_peek = !self.logged;
         self.logged = true;
         let fragment: Fragment = self.inner.peek()?;
@@ -135,12 +133,21 @@ impl TransportReader {
     }
 }
 
-pub(crate) fn create_transport_layer(
-    tt: TransportType,
-    address: u16,
+pub(crate) fn create_master_transport_layer(
+    address: EndpointAddress,
 ) -> (TransportReader, TransportWriter) {
     (
-        TransportReader::new(tt, address),
-        TransportWriter::new(tt, address),
+        TransportReader::master(address),
+        TransportWriter::new(EndpointType::Master, address),
+    )
+}
+
+pub(crate) fn create_outstation_transport_layer(
+    address: EndpointAddress,
+    self_address_support: SelfAddressSupport,
+) -> (TransportReader, TransportWriter) {
+    (
+        TransportReader::outstation(address, self_address_support),
+        TransportWriter::new(EndpointType::Outstation, address),
     )
 }

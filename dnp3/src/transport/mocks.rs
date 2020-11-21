@@ -1,7 +1,10 @@
 use crate::app::parse::DecodeLogLevel;
+use crate::app::EndpointType;
+use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::link::header::Address;
-use crate::transport::{Fragment, TransportType};
+use crate::link::header::{AnyAddress, FrameInfo};
+use crate::outstation::SelfAddressSupport;
+use crate::transport::Fragment;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub(crate) struct MockWriter {
@@ -11,13 +14,13 @@ pub(crate) struct MockWriter {
 pub(crate) struct MockReader {
     num_reads: usize,
     count: usize,
-    address: Address,
+    info: Option<FrameInfo>,
     buffer: [u8; 2048],
 }
 
 // same signature as the real transport writer
 impl MockWriter {
-    pub(crate) fn new(_: TransportType, _: u16) -> Self {
+    pub(crate) fn new(_: EndpointType, _: EndpointAddress) -> Self {
         Self { num_writes: 0 }
     }
 
@@ -32,7 +35,7 @@ impl MockWriter {
         &mut self,
         io: &mut W,
         _: DecodeLogLevel,
-        _destination: u16,
+        _: AnyAddress,
         fragment: &[u8],
     ) -> Result<(), LinkError>
     where
@@ -46,13 +49,25 @@ impl MockWriter {
 }
 
 impl MockReader {
-    pub(crate) fn new(_: TransportType, address: u16) -> Self {
+    pub(crate) fn master(_: EndpointAddress) -> Self {
+        Self::new()
+    }
+
+    pub(crate) fn outstation(_: EndpointAddress, _: SelfAddressSupport) -> Self {
+        Self::new()
+    }
+
+    fn new() -> Self {
         Self {
             num_reads: 0,
             count: 0,
-            address: Address::new(address, 1024),
+            info: None,
             buffer: [0; 2048],
         }
+    }
+
+    pub(crate) fn set_rx_frame_info(&mut self, info: FrameInfo) {
+        self.info = Some(info)
     }
 
     pub(crate) fn num_reads(&self) -> usize {
@@ -65,7 +80,9 @@ impl MockReader {
         match self.count {
             0 => None,
             x => Some(Fragment {
-                address: self.address,
+                address: self
+                    .info
+                    .expect("call set_rx_frame_info(..) before running test"),
                 data: &self.buffer[0..x],
             }),
         }

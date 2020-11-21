@@ -1,6 +1,8 @@
+use crate::app::EndpointType;
+
 mod crc;
 pub(crate) mod error;
-pub(crate) mod formatter;
+pub(crate) mod format;
 mod function;
 pub(crate) mod header;
 pub(crate) mod layer;
@@ -12,6 +14,7 @@ pub(crate) mod constant {
     pub(crate) const START2: u8 = 0x64;
 
     pub(crate) const MAX_FRAME_PAYLOAD_LENGTH: usize = 250;
+    pub(crate) const LINK_HEADER_LENGTH: usize = 10;
     pub(crate) const MAX_LINK_FRAME_LENGTH: usize = 292;
     pub(crate) const MAX_APP_BYTES_PER_FRAME: usize = MAX_FRAME_PAYLOAD_LENGTH - 1;
     pub(crate) const MIN_HEADER_LENGTH_VALUE: u8 = 5;
@@ -20,10 +23,19 @@ pub(crate) mod constant {
     pub(crate) const MAX_BLOCK_SIZE_WITH_CRC: usize = MAX_BLOCK_SIZE + CRC_LENGTH;
 }
 
+impl EndpointType {
+    pub(crate) fn dir_bit(&self) -> bool {
+        match self {
+            EndpointType::Master => true,
+            EndpointType::Outstation => false,
+        }
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod test_data {
     use crate::link::function::Function;
-    use crate::link::header::{Address, ControlField, Header};
+    use crate::link::header::{AnyAddress, ControlField, Header};
 
     pub(crate) struct TestFrame {
         pub(crate) bytes: &'static [u8],
@@ -40,10 +52,8 @@ pub(crate) mod test_data {
                 fcb: false,
                 fcv: false,
             },
-            address: Address {
-                destination: 1,
-                source: 1024,
-            },
+            destination: AnyAddress::from(1),
+            source: AnyAddress::from(1024),
         },
         payload: &[],
     };
@@ -57,10 +67,8 @@ pub(crate) mod test_data {
                 fcb: false,
                 fcv: false,
             },
-            address: Address {
-                destination: 1024,
-                source: 1,
-            },
+            destination: AnyAddress::from(1024),
+            source: AnyAddress::from(1),
         },
         payload: &[],
     };
@@ -79,10 +87,8 @@ pub(crate) mod test_data {
                 fcb: true,
                 fcv: true,
             },
-            address: Address {
-                destination: 1,
-                source: 1024,
-            },
+            destination: AnyAddress::from(1),
+            source: AnyAddress::from(1024),
         },
         payload: &[
             0xC0, 0xC3, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01,
@@ -102,10 +108,8 @@ pub(crate) mod test_data {
                 fcb: false,
                 fcv: false,
             },
-            address: Address {
-                destination: 1,
-                source: 1024,
-            },
+            destination: AnyAddress::from(1),
+            source: AnyAddress::from(1024),
         },
         payload: &[
             0xC0, 0xC5, 0x02, 0x32, 0x01, 0x07, 0x01, 0xF8, 0xB8, 0x6C, 0xAA, 0xF0, 0x00,
