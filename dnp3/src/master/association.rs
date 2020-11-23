@@ -1,5 +1,5 @@
 use crate::app::header::{ResponseHeader, IIN};
-use crate::app::parse::parser::HeaderCollection;
+use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::retry::{ExponentialBackOff, RetryStrategy};
 use crate::app::sequence::Sequence;
 use crate::app::types::Timestamp;
@@ -17,6 +17,7 @@ use crate::master::tasks::{AssociationTask, ReadTask, Task};
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
 use tokio::time::Instant;
+use xxhash_rust::xxh64::xxh64;
 
 use crate::entry::EndpointAddress;
 pub use crate::master::poll::PollHandle;
@@ -199,12 +200,28 @@ impl TaskStates {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct LastUnsolFragment {
+    header: ResponseHeader,
+    hash: u64,
+}
+
+impl LastUnsolFragment {
+    fn new(response: &Response) -> Self {
+        Self {
+            header: response.header,
+            hash: xxh64(response.raw_objects, 0),
+        }
+    }
+}
+
 /// A logical connection between a master and an outstation
 /// as defined by the DNP3 standard. A master manages requests
 /// and responses for multiple associations (i.e. multi-drop).
 pub(crate) struct Association {
     address: EndpointAddress,
     seq: Sequence,
+    last_unsol_frag: Option<LastUnsolFragment>,
     request_queue: VecDeque<Task>,
     auto_tasks: TaskStates,
     handler: Box<dyn AssociationHandler>,
@@ -221,6 +238,7 @@ impl Association {
         Self {
             address,
             seq: Sequence::default(),
+            last_unsol_frag: None,
             request_queue: VecDeque::new(),
             auto_tasks: TaskStates::new(),
             handler,
@@ -360,12 +378,36 @@ impl Association {
         self.auto_tasks.disable_unsolicited.failure(&self.config);
     }
 
-    pub(crate) fn handle_unsolicited_response(
-        &mut self,
-        header: ResponseHeader,
-        objects: HeaderCollection,
-    ) {
-        extract_measurements(header, objects, self.handler.get_unsolicited_handler());
+    pub(crate) fn handle_unsolicited_response(&mut self, response: &Response) -> bool {
+        if self.is_integrity_complete() // Startup sequence was completed
+            || (response.header.iin.iin1.get_device_restart() && response.raw_objects.is_empty())
+        // Or NULL response with IIN1.7 set
+        {
+            // Update last fragment received
+            let new_frag = LastUnsolFragment::new(response);
+            let last_frag = self.last_unsol_frag.replace(new_frag);
+
+            // Ignore repeat
+            if last_frag == Some(new_frag) {
+                log::warn!("Ignoring duplicate unsolicited response");
+                return true; // still want to send confirmation if requested
+            }
+
+            if let Ok(objects) = response.objects {
+                extract_measurements(
+                    response.header,
+                    objects,
+                    self.handler.get_unsolicited_handler(),
+                );
+            }
+
+            true
+        } else {
+            log::warn!(
+                "ignoring unsolicited response received before the end of the startup procedure"
+            );
+            false
+        }
     }
 
     pub(crate) fn handle_integrity_response(

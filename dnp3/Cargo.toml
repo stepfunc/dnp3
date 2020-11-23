@@ -8,6 +8,7 @@ edition = "2018"
 log = "0.4"
 chrono = "0.4"
 tokio = { version = "^0.2.23", features = ["tcp", "sync", "io-util", "io-std", "time", "rt-core", "rt-threaded", "macros"] }
+xxhash-rust = { version = "0.8.0-beta.5", features = ["xxh64"] }
 
 [dev-dependencies]
 assert_matches = "1.2"
