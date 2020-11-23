@@ -2,8 +2,8 @@ use std::time::Duration;
 
 #[derive(Copy, Clone, Debug)]
 pub struct RetryStrategy {
-    min_delay: Duration,
-    max_delay: Duration,
+    pub(crate) min_delay: Duration,
+    pub(crate) max_delay: Duration,
 }
 
 impl RetryStrategy {
@@ -12,6 +12,12 @@ impl RetryStrategy {
             min_delay,
             max_delay,
         }
+    }
+}
+
+impl Default for RetryStrategy {
+    fn default() -> Self {
+        Self::new(Duration::from_secs(1), Duration::from_secs(10))
     }
 }
 
@@ -52,11 +58,5 @@ impl ExponentialBackOff {
 
     pub(crate) fn min_delay(&self) -> Duration {
         self.strategy.min_delay
-    }
-}
-
-impl Default for RetryStrategy {
-    fn default() -> Self {
-        Self::new(Duration::from_secs(1), Duration::from_secs(10))
     }
 }
