@@ -69,13 +69,13 @@ impl EventClasses {
     pub(crate) fn as_iin1(&self) -> IIN1 {
         let mut iin = IIN1::default();
         if self.class1 {
-            iin = iin | IIN1::CLASS_1_EVENTS
+            iin |= IIN1::CLASS_1_EVENTS
         }
         if self.class2 {
-            iin = iin | IIN1::CLASS_2_EVENTS
+            iin |= IIN1::CLASS_2_EVENTS
         }
         if self.class3 {
-            iin = iin | IIN1::CLASS_3_EVENTS
+            iin |= IIN1::CLASS_3_EVENTS
         }
         iin
     }

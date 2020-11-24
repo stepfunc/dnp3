@@ -1,23 +1,99 @@
 use crate::app::enums::FunctionCode;
 use crate::app::header::{Control, ResponseFunction, ResponseHeader, IIN, IIN1, IIN2};
-use crate::app::parse::parser::Request;
+use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
 use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::link::error::LinkError;
-use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
-use crate::transport::{TransportReader, TransportWriter};
+use crate::outstation::database::{DatabaseConfig, DatabaseHandle, ResponseInfo};
+use crate::transport::{Timeout, TransportReader, TransportWriter};
 
+use crate::app::gen::ranged::RangedVariation;
+use crate::app::parse::error::ObjectParseError;
 use crate::entry::EndpointAddress;
-use crate::link::header::AnyAddress;
+use crate::link::header::{BroadcastConfirmMode, FrameInfo};
 use crate::outstation::SelfAddressSupport;
 use crate::util::buffer::Buffer;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::Duration;
+use xxhash_rust::xxh64::xxh64;
+
+#[derive(Copy, Clone, PartialEq)]
+struct ResponseSeries {
+    ecsn: Sequence,
+    last_response: bool,
+    master: EndpointAddress,
+}
+
+impl ResponseSeries {
+    fn new(ecsn: Sequence, last_response: bool, master: EndpointAddress) -> Self {
+        Self {
+            ecsn,
+            last_response,
+            master,
+        }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq)]
+enum NextState {
+    Idle,
+    SolConfirmWait(ResponseSeries),
+}
+
+impl ResponseInfo {
+    fn to_next_state(&self, ecsn: Sequence, source: EndpointAddress) -> NextState {
+        if self.need_confirm() {
+            NextState::SolConfirmWait(ResponseSeries::new(ecsn, self.complete, source))
+        } else {
+            NextState::Idle
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+struct LastValidRequest {
+    seq: Sequence,
+    request_hash: u64,
+    response_length: usize,
+    next: NextState,
+}
+
+impl LastValidRequest {
+    fn new(seq: Sequence, request_hash: u64, response_length: usize, next: NextState) -> Self {
+        LastValidRequest {
+            seq,
+            request_hash,
+            response_length,
+            next,
+        }
+    }
+}
+
+struct SessionConfig {
+    level: DecodeLogLevel,
+    master_address: EndpointAddress,
+    confirm_timeout: Duration,
+}
+
+struct SessionState {
+    restart_iin_asserted: bool,
+    last_valid_request: Option<LastValidRequest>,
+}
+
+impl SessionState {
+    fn new() -> Self {
+        Self {
+            restart_iin_asserted: true,
+            last_valid_request: None,
+        }
+    }
+}
 
 pub(crate) struct Session {
-    level: DecodeLogLevel,
     tx_buffer: Buffer,
+    config: SessionConfig,
     database: DatabaseHandle,
+    state: SessionState,
 }
 
 pub struct OutstationTask {
@@ -30,8 +106,8 @@ pub struct OutstationTask {
 pub struct OutstationConfig {
     pub tx_buffer_size: usize,
     pub outstation_address: EndpointAddress,
+    pub master_address: EndpointAddress,
     pub self_address_support: SelfAddressSupport,
-    pub master_address: Option<u16>,
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: Duration,
 }
@@ -40,8 +116,8 @@ impl OutstationConfig {
     pub fn new(
         tx_buffer_size: usize,
         outstation_address: EndpointAddress,
+        master_address: EndpointAddress,
         self_address_support: SelfAddressSupport,
-        master_address: Option<u16>,
         log_level: DecodeLogLevel,
         confirm_timeout: Duration,
     ) -> Self {
@@ -52,6 +128,14 @@ impl OutstationConfig {
             master_address,
             log_level,
             confirm_timeout,
+        }
+    }
+
+    fn to_session_config(&self) -> SessionConfig {
+        SessionConfig {
+            level: self.log_level,
+            master_address: self.master_address,
+            confirm_timeout: self.confirm_timeout,
         }
     }
 }
@@ -65,7 +149,11 @@ impl OutstationTask {
             config.self_address_support,
         );
         let task = Self {
-            session: Session::new(config.log_level, config.tx_buffer_size, handle.clone()),
+            session: Session::new(
+                config.to_session_config(),
+                config.tx_buffer_size,
+                handle.clone(),
+            ),
             reader,
             writer,
         };
@@ -83,30 +171,46 @@ impl OutstationTask {
     }
 }
 
-enum ResponseAction {
-    Respond(usize),
-    BeginReadResponse(Sequence, IIN2),
-}
-
 enum Confirm {
     Yes,
     Timeout,
     NewRequest,
 }
 
+enum FragmentType<'a> {
+    MalformedRequest(u64, ObjectParseError),
+    NewRead(u64, HeaderCollection<'a>),
+    RepeatRead(u64, usize, HeaderCollection<'a>),
+    NewNonRead(u64, HeaderCollection<'a>),
+    RepeatNonRead(u64, usize),
+    Broadcast(BroadcastConfirmMode),
+    SolicitedConfirm,
+    UnsolicitedConfirm,
+}
+
+#[derive(Copy, Clone)]
+enum ConfirmAction {
+    Confirmed,
+    NewRequest,
+    EchoLastResponse(usize),
+    ContinueWait,
+}
+
+enum ResponseSeriesAction {
+    ReadNewRequest,
+    HandleCurrentRequest,
+}
+
 impl Session {
     pub(crate) const DEFAULT_TX_BUFFER_SIZE: usize = 2048;
     pub(crate) const MIN_TX_BUFFER_SIZE: usize = 249; // 1 link frame
 
-    pub(crate) fn new(
-        level: DecodeLogLevel,
-        tx_buffer_size: usize,
-        database: DatabaseHandle,
-    ) -> Self {
+    fn new(config: SessionConfig, tx_buffer_size: usize, database: DatabaseHandle) -> Self {
         Self {
-            level,
-            tx_buffer: Buffer::new(tx_buffer_size.min(Self::MIN_TX_BUFFER_SIZE)),
+            config,
+            tx_buffer: Buffer::new(tx_buffer_size.max(Self::MIN_TX_BUFFER_SIZE)),
             database,
+            state: SessionState::new(),
         }
     }
 
@@ -120,137 +224,415 @@ impl Session {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            // process any available request fragments
-            if let Some((info, request)) = reader.get_request(self.level) {
-                if let Some(action) = self.process_request(request) {
-                    match action {
-                        ResponseAction::Respond(num) => {
-                            writer
-                                .write(
-                                    io,
-                                    self.level,
-                                    info.source.wrap(),
-                                    self.tx_buffer.get(num).unwrap(),
-                                )
-                                .await?
-                        }
-                        ResponseAction::BeginReadResponse(seq, iin2) => {
-                            self.respond_to_read(io, reader, writer, seq, iin2).await?;
-                        }
-                    }
-                }
-            }
-
-            // what for data to be available, this is where we can select on other things
-            reader.read(io).await?;
+            self.run_idle_state(io, reader, writer).await?;
         }
     }
 
-    fn process_request(&mut self, request: Request) -> Option<ResponseAction> {
-        if request.header.function == FunctionCode::Read {
-            let iin = match request.objects {
-                Err(_) => IIN2::PARAMETER_ERROR,
-                Ok(headers) => self.database.select(&headers),
-            };
-            Some(ResponseAction::BeginReadResponse(
-                request.header.control.seq,
-                iin,
-            ))
-        } else {
-            // here's where we'd call the non-read response processor
-            let mut cursor = self.tx_buffer.write_cursor();
-            let header = ResponseHeader::new(
-                request.header.control,
-                ResponseFunction::Response,
-                IIN::new(IIN1::default(), IIN2::NO_FUNC_CODE_SUPPORT),
-            );
-            let _ = header.write(&mut cursor);
-            Some(ResponseAction::Respond(cursor.written().len()))
-        }
-    }
-
-    async fn respond_to_read<T>(
-        &mut self,
+    async fn respond<T>(
+        &self,
         io: &mut T,
-        reader: &mut TransportReader,
         writer: &mut TransportWriter,
-        mut seq: Sequence,
-        iin2: IIN2,
+        num_bytes: usize,
+        address: EndpointAddress,
     ) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let mut fir = true;
-
-        loop {
-            let mut cursor = self.tx_buffer.write_cursor();
-            cursor.skip(4)?;
-            let info = self.database.write_response_headers(&mut cursor);
-
-            let confirm = info.need_confirm();
-
-            let iin2 = if fir { iin2 } else { IIN2::default() };
-            let header = ResponseHeader::new(
-                Control::response(seq, fir, info.complete, confirm),
-                ResponseFunction::Response,
-                IIN::new(info.unwritten.as_iin1(), iin2),
-            );
-            cursor.at_pos(0, |c| header.write(c))?;
-            writer
-                .write(io, self.level, AnyAddress::from(1), cursor.written())
-                .await?;
-
-            match self.wait_sol_confirm(io, reader, seq).await? {
-                Confirm::Timeout => {
-                    self.database.reset();
-                    return Ok(());
-                }
-                Confirm::NewRequest => {
-                    return Ok(());
-                }
-                Confirm::Yes => {}
-            }
-
-            self.database.clear_written_events();
-
-            if info.complete {
-                return Ok(());
-            }
-
-            fir = false;
-            seq.increment();
-        }
+        writer
+            .write(
+                io,
+                self.config.level,
+                address.wrap(),
+                self.tx_buffer.get(num_bytes).unwrap(),
+            )
+            .await
     }
 
-    async fn wait_sol_confirm<T>(
+    async fn run_idle_state<T>(
         &mut self,
         io: &mut T,
         reader: &mut TransportReader,
-        _seq: Sequence,
+        writer: &mut TransportWriter,
+    ) -> Result<(), LinkError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        let series: Option<ResponseSeries> = self
+            .handle_one_request_from_idle(io, reader, writer)
+            .await?;
+
+        if let Some(series) = series {
+            match self
+                .enter_sol_confirm_wait(io, reader, writer, series)
+                .await?
+            {
+                ResponseSeriesAction::ReadNewRequest => {}
+                // we skip reading, and instead return which will process the current request again
+                ResponseSeriesAction::HandleCurrentRequest => return Ok(()),
+            }
+        }
+
+        reader.read(io).await
+    }
+
+    async fn handle_one_request_from_idle<T>(
+        &mut self,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+    ) -> Result<Option<ResponseSeries>, LinkError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        if let Some((info, request)) = reader.get_request(self.config.level) {
+            if let Some(result) = self.process_request_from_idle(info, request) {
+                self.state.last_valid_request = Some(result);
+                self.respond(io, writer, result.response_length, info.source)
+                    .await?;
+                if let NextState::SolConfirmWait(series) = result.next {
+                    return Ok(Some(series));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn process_request_from_idle(
+        &mut self,
+        info: FrameInfo,
+        request: Request,
+    ) -> Option<LastValidRequest> {
+        let seq = request.header.control.seq;
+
+        match self.classify(info, request) {
+            FragmentType::MalformedRequest(hash, err) => {
+                let length = self.write_empty_response(seq, err.into());
+                Some(LastValidRequest::new(seq, hash, length, NextState::Idle))
+            }
+            FragmentType::NewRead(hash, objects) => {
+                let (length, next) = self.write_first_read_response(info.source, seq, objects);
+                Some(LastValidRequest::new(seq, hash, length, next))
+            }
+            FragmentType::RepeatRead(hash, _, objects) => {
+                // this deviates a bit from the spec, the specification says to
+                // also reply to duplicate READ requests from idle, but this
+                // is plainly wrong since it can't possibly handle a multi-fragmented
+                // response correctly. Answering a repeat READ with a fresh response is harmless
+                let (length, next) = self.write_first_read_response(info.source, seq, objects);
+                Some(LastValidRequest::new(seq, hash, length, next))
+            }
+            FragmentType::NewNonRead(hash, objects) => {
+                let length = self.handle_non_read(request.header.function, seq, objects);
+                Some(LastValidRequest::new(seq, hash, length, NextState::Idle))
+            }
+            FragmentType::RepeatNonRead(hash, last_response_length) => {
+                // per the spec, we just echo the last response
+                Some(LastValidRequest::new(
+                    seq,
+                    hash,
+                    last_response_length,
+                    NextState::Idle,
+                ))
+            }
+            FragmentType::Broadcast(mode) => {
+                self.process_broadcast(mode, request);
+                None
+            }
+            FragmentType::SolicitedConfirm => {
+                log::warn!(
+                    "ignoring solicited CONFIRM from idle state with seq: {}",
+                    seq.value()
+                );
+                None
+            }
+            FragmentType::UnsolicitedConfirm => {
+                log::warn!(
+                    "ignoring unsolicited CONFIRM from idle state with seq: {}",
+                    seq.value()
+                );
+                None
+            }
+        }
+    }
+
+    fn write_empty_response(&mut self, seq: Sequence, iin2: IIN2) -> usize {
+        let iin = IIN::new(self.get_response_iin(), iin2);
+        let header = ResponseHeader::new(
+            Control::response(seq, true, true, false),
+            ResponseFunction::Response,
+            iin,
+        );
+        let mut cursor = self.tx_buffer.write_cursor();
+        header.write(&mut cursor).unwrap();
+        cursor.written().len()
+    }
+
+    fn write_first_read_response(
+        &mut self,
+        master: EndpointAddress,
+        seq: Sequence,
+        object_headers: HeaderCollection,
+    ) -> (usize, NextState) {
+        let iin2 = self.database.select(&object_headers);
+        self.write_read_response(master, true, seq, iin2)
+    }
+
+    fn write_read_response(
+        &mut self,
+        master: EndpointAddress,
+        fir: bool,
+        seq: Sequence,
+        iin2: IIN2,
+    ) -> (usize, NextState) {
+        let iin1 = self.get_response_iin();
+        let mut cursor = self.tx_buffer.write_cursor();
+        cursor.skip(ResponseHeader::LENGTH).unwrap();
+        let info = self.database.write_response_headers(&mut cursor);
+        let header = ResponseHeader::new(
+            Control::response(seq, fir, info.complete, info.need_confirm()),
+            ResponseFunction::Response,
+            iin1 + iin2,
+        );
+        cursor.at_start(|cur| header.write(cur)).unwrap();
+        (cursor.written().len(), info.to_next_state(seq, master))
+    }
+
+    fn handle_non_read(
+        &mut self,
+        function: FunctionCode,
+        seq: Sequence,
+        object_headers: HeaderCollection,
+    ) -> usize {
+        match function {
+            FunctionCode::Write => self.handle_write(seq, object_headers),
+            _ => self.write_empty_response(seq, IIN2::NO_FUNC_CODE_SUPPORT),
+        }
+    }
+
+    fn handle_write(&mut self, seq: Sequence, object_headers: HeaderCollection) -> usize {
+        let mut iin2 = IIN2::default();
+
+        for header in object_headers.iter() {
+            match header.details {
+                HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(seq)) => {
+                    for (value, index) in seq.iter() {
+                        if index == 7 {
+                            // restart IIN
+                            if value {
+                                log::warn!("cannot write IIN 1.7 to TRUE");
+                                iin2 |= IIN2::PARAMETER_ERROR;
+                            } else {
+                                // clear the restart bit
+                                self.state.restart_iin_asserted = false;
+                            }
+                        } else {
+                            log::warn!("ignoring write of IIN index {} to value {}", index, value);
+                            iin2 |= IIN2::PARAMETER_ERROR;
+                        }
+                    }
+                }
+                _ => {
+                    log::warn!(
+                        "WRITE not supported with qualifier: {} and variation: {}",
+                        header.details.qualifier(),
+                        header.variation
+                    );
+                    iin2 |= IIN2::NO_FUNC_CODE_SUPPORT;
+                }
+            }
+        }
+
+        self.write_empty_response(seq, iin2)
+    }
+
+    fn get_response_iin(&self) -> IIN1 {
+        let mut iin1 = IIN1::default();
+        if self.state.restart_iin_asserted {
+            iin1 |= IIN1::RESTART
+        }
+        iin1
+    }
+
+    fn process_broadcast(&mut self, _: BroadcastConfirmMode, request: Request) {
+        // TODO - implement broadcast request handling
+        log::warn!(
+            "ignoring broadcast frame with function: {:?}",
+            request.header.function
+        )
+    }
+
+    fn new_confirm_deadline(&self) -> tokio::time::Instant {
+        tokio::time::Instant::now() + self.config.confirm_timeout
+    }
+
+    async fn enter_sol_confirm_wait<T>(
+        &mut self,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+        mut series: ResponseSeries,
+    ) -> Result<ResponseSeriesAction, LinkError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        loop {
+            match self
+                .wait_for_sol_confirm(io, reader, writer, series.ecsn)
+                .await?
+            {
+                Confirm::Yes => {
+                    self.database.clear_written_events();
+                    if series.last_response {
+                        // done with response series
+                        return Ok(ResponseSeriesAction::ReadNewRequest);
+                    }
+                    // format the next response in the series
+                    series.ecsn.increment();
+                    let (length, next_state) = self.write_read_response(
+                        series.master,
+                        false,
+                        series.ecsn,
+                        IIN2::default(),
+                    );
+                    self.respond(io, writer, length, series.master).await?;
+                    match next_state {
+                        NextState::Idle => return Ok(ResponseSeriesAction::ReadNewRequest),
+                        NextState::SolConfirmWait(next) => {
+                            series = next;
+                        }
+                    }
+                }
+                Confirm::Timeout => {
+                    self.database.reset();
+                    return Ok(ResponseSeriesAction::ReadNewRequest);
+                }
+                Confirm::NewRequest => {
+                    self.database.reset();
+                    return Ok(ResponseSeriesAction::HandleCurrentRequest);
+                }
+            }
+        }
+    }
+
+    async fn wait_for_sol_confirm<T>(
+        &mut self,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+        ecsn: Sequence,
     ) -> Result<Confirm, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let mut delay = tokio::time::delay_for(tokio::time::Duration::from_secs(5));
-
-        while !delay.is_elapsed() {
-            tokio::select! {
-                _ = &mut delay, if !delay.is_elapsed() => {
-                    return Ok(Confirm::Timeout);
-                }
-                _ = reader.read(io) => {
-                     if let Some((_address, request)) =  reader.get_request(self.level) {
-                        if request.header.function == FunctionCode::Confirm {
-                            return Ok(Confirm::Yes);
+        let mut deadline = self.new_confirm_deadline();
+        loop {
+            match reader.read_with_timeout(io, deadline).await? {
+                Timeout::Yes => return Ok(Confirm::Timeout),
+                // process data
+                Timeout::No => {
+                    if let Some((info, request)) = reader.get_request(self.config.level) {
+                        match self.expect_sol_confirm(ecsn, info, request) {
+                            ConfirmAction::ContinueWait => {}
+                            ConfirmAction::Confirmed => return Ok(Confirm::Yes),
+                            ConfirmAction::NewRequest => return Ok(Confirm::NewRequest),
+                            ConfirmAction::EchoLastResponse(length) => {
+                                self.respond(io, writer, length, info.source).await?;
+                                // per the spec, we restart the confirm timer
+                                deadline = self.new_confirm_deadline();
+                            }
                         }
-                        else {
-                            return Ok(Confirm::NewRequest);
-                        }
-                     }
+                    }
                 }
             }
         }
+    }
 
-        Ok(Confirm::Timeout)
+    fn expect_sol_confirm(
+        &self,
+        ecsn: Sequence,
+        info: FrameInfo,
+        request: Request,
+    ) -> ConfirmAction {
+        match self.classify(info, request) {
+            FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest,
+            FragmentType::NewRead(_, _) => ConfirmAction::NewRequest,
+            FragmentType::RepeatRead(_, response_length, _) => {
+                ConfirmAction::EchoLastResponse(response_length)
+            }
+            FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest,
+            // this should never happen, but if it does, new request is probably best course of action
+            FragmentType::RepeatNonRead(_, _) => ConfirmAction::NewRequest,
+            FragmentType::Broadcast(_) => ConfirmAction::NewRequest,
+            FragmentType::SolicitedConfirm => {
+                if request.header.control.seq == ecsn {
+                    ConfirmAction::Confirmed
+                } else {
+                    log::warn!("received solicited confirm with wrong sequence number, expected: {} received: {}", ecsn.value(), request.header.control.seq.value());
+                    ConfirmAction::ContinueWait
+                }
+            }
+            FragmentType::UnsolicitedConfirm => {
+                log::warn!(
+                    "ignoring unsolicited CONFIRM while waiting for solicited confirm, seq: {}",
+                    request.header.control.seq.value()
+                );
+                ConfirmAction::ContinueWait
+            }
+        }
+    }
+
+    fn classify<'a>(&self, info: FrameInfo, request: Request<'a>) -> FragmentType<'a> {
+        if request.header.function == FunctionCode::Confirm {
+            return if request.header.control.uns {
+                FragmentType::UnsolicitedConfirm
+            } else {
+                FragmentType::SolicitedConfirm
+            };
+        }
+
+        if let Some(mode) = info.broadcast {
+            return FragmentType::Broadcast(mode);
+        }
+
+        // we need to calculate a digest to deduplicate
+        let this_hash = xxh64(request.raw_fragment, 0);
+
+        let object_headers = match request.objects {
+            Ok(x) => x,
+            Err(err) => return FragmentType::MalformedRequest(this_hash, err),
+        };
+
+        // detect duplicate requests
+        if let Some(last) = self.state.last_valid_request {
+            if last.seq == request.header.control.seq && last.request_hash == this_hash {
+                return if request.header.function == FunctionCode::Read {
+                    FragmentType::RepeatRead(this_hash, last.response_length, object_headers)
+                } else {
+                    FragmentType::RepeatNonRead(this_hash, last.response_length)
+                };
+            }
+        }
+
+        if request.header.function == FunctionCode::Read {
+            FragmentType::NewRead(this_hash, object_headers)
+        } else {
+            FragmentType::NewNonRead(this_hash, object_headers)
+        }
+    }
+}
+
+impl From<ObjectParseError> for IIN2 {
+    fn from(err: ObjectParseError) -> Self {
+        // TODO - review these
+        match err {
+            ObjectParseError::InsufficientBytes => IIN2::PARAMETER_ERROR,
+            ObjectParseError::InvalidQualifierForVariation(_, _) => IIN2::NO_FUNC_CODE_SUPPORT,
+            ObjectParseError::InvalidRange(_, _) => IIN2::PARAMETER_ERROR,
+            ObjectParseError::UnknownGroupVariation(_, _) => IIN2::OBJECT_UNKNOWN,
+            ObjectParseError::UnsupportedQualifierCode(_) => IIN2::PARAMETER_ERROR,
+            ObjectParseError::UnknownQualifier(_) => IIN2::PARAMETER_ERROR,
+            ObjectParseError::ZeroLengthOctetData => IIN2::PARAMETER_ERROR,
+        }
     }
 }

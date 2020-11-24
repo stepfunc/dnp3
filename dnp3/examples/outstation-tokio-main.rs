@@ -10,12 +10,12 @@ use dnp3::outstation::SelfAddressSupport;
 use std::net::Ipv4Addr;
 use std::time::Duration;
 
-fn get_outstation_config(address: EndpointAddress) -> OutstationConfig {
+fn get_outstation_config(outstation: EndpointAddress, master: EndpointAddress) -> OutstationConfig {
     OutstationConfig::new(
         2048,
-        address,
+        outstation,
+        master,
         SelfAddressSupport::Disabled,
-        Some(1),
         DecodeLogLevel::ObjectValues,
         Duration::from_secs(2),
     )
@@ -32,8 +32,11 @@ fn get_database_config() -> DatabaseConfig {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
 
+    let outstation_address = EndpointAddress::from(10)?;
+    let master_address = EndpointAddress::from(1)?;
+
     let (mut task, mut handle) = OutstationTask::create(
-        get_outstation_config(EndpointAddress::from(10)?),
+        get_outstation_config(outstation_address, master_address),
         get_database_config(),
     );
 

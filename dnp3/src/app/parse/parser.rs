@@ -84,6 +84,7 @@ pub(crate) struct ParsedFragment<'a> {
     pub(crate) function: FunctionCode,
     pub(crate) iin: Option<IIN>,
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
+    pub(crate) raw_fragment: &'a [u8],
     pub(crate) raw_objects: &'a [u8],
 }
 
@@ -151,6 +152,7 @@ impl<'a> ParsedFragment<'a> {
 
         Ok(Request {
             header: RequestHeader::new(self.control, self.function),
+            raw_fragment: self.raw_fragment,
             raw_objects: self.raw_objects,
             objects: self.objects,
         })
@@ -205,6 +207,7 @@ impl<'a> ParsedFragment<'a> {
             function,
             iin,
             objects: HeaderCollection::parse(function, objects),
+            raw_fragment: fragment,
             raw_objects: objects,
         };
 
@@ -417,6 +420,7 @@ impl HeaderDetails<'_> {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Request<'a> {
     pub(crate) header: RequestHeader,
+    pub(crate) raw_fragment: &'a [u8],
     pub(crate) raw_objects: &'a [u8],
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
