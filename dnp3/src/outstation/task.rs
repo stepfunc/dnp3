@@ -289,7 +289,7 @@ impl Session {
         }
 
         tokio::select! {
-            frame_read = reader.read(io) => {
+            frame_read = reader.read_next(io) => {
                 frame_read?;
             }
             _ = self.database.wait_for_change() => {

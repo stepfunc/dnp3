@@ -116,7 +116,7 @@ impl MasterSession {
                    // we need to recheck the tasks
                    return Ok(result?);
                 }
-                result = reader.read(io) => {
+                result = reader.read_next(io) => {
                    result?;
                    self.handle_fragment_while_idle(io, writer, reader).await?;
                 }
@@ -143,7 +143,7 @@ impl MasterSession {
                    // we need to recheck the tasks
                    return Ok(result?);
                 }
-                result = reader.read(io) => {
+                result = reader.read_next(io) => {
                    result?;
                    self.handle_fragment_while_idle(io, writer, reader).await?;
                 }
@@ -205,7 +205,7 @@ impl MasterSession {
                          log::warn!("no response within timeout: {}", self.timeout);
                          return Err(TaskError::ResponseTimeout);
                     }
-                    x = reader.read(io)  => {
+                    x = reader.read_next(io)  => {
                         return Ok(x?);
                     }
                     y = self.process_message(true) => {

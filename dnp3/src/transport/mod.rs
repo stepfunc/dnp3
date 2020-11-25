@@ -71,12 +71,12 @@ impl TransportReader {
         &mut self.inner
     }
 
-    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    pub(crate) async fn read_next<T>(&mut self, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
         self.logged = false;
-        self.inner.read(io).await
+        self.inner.read_next(io).await
     }
 
     pub(crate) async fn read_with_timeout<T>(
@@ -87,7 +87,7 @@ impl TransportReader {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        match tokio::time::timeout_at(deadline, self.read(io)).await {
+        match tokio::time::timeout_at(deadline, self.read_next(io)).await {
             Err(_) => Ok(Timeout::Yes),
             Ok(res) => {
                 res?;
