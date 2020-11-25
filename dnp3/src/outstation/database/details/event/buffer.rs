@@ -829,7 +829,7 @@ impl Insertable for measurement::Analog {
     }
 
     fn decrement_type(counter: &mut TypeCounter) {
-        counter.num_frozen_counter.decrement();
+        counter.num_analog.decrement();
     }
 
     fn increment_type(counter: &mut TypeCounter) {

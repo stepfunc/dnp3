@@ -6,6 +6,7 @@ use dnp3::outstation::database::config::*;
 use dnp3::outstation::database::EventClass;
 use dnp3::outstation::database::{Add, DatabaseConfig, Update, UpdateOptions};
 use dnp3::outstation::task::{OutstationConfig, OutstationTask};
+use dnp3::outstation::traits::NullHandler;
 use dnp3::outstation::SelfAddressSupport;
 use std::net::Ipv4Addr;
 use std::time::Duration;
@@ -38,6 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (mut task, mut handle) = OutstationTask::create(
         get_outstation_config(outstation_address, master_address),
         get_database_config(),
+        NullHandler::create(),
     );
 
     handle.transaction(|db| {
