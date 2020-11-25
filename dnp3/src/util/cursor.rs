@@ -132,6 +132,13 @@ impl<'a> WriteCursor<'a> {
         result
     }
 
+    pub(crate) fn at_start<T, R>(&mut self, write: T) -> Result<R, WriteError>
+    where
+        T: Fn(&mut WriteCursor) -> Result<R, WriteError>,
+    {
+        self.at_pos(0, write)
+    }
+
     pub(crate) fn at_pos<T, R>(&mut self, pos: usize, write: T) -> Result<R, WriteError>
     where
         T: Fn(&mut WriteCursor) -> Result<R, WriteError>,

@@ -45,6 +45,12 @@ pub(crate) struct TransportReader {
     inner: ReaderType,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) enum Timeout {
+    Yes,
+    No,
+}
+
 impl TransportReader {
     fn master(address: EndpointAddress) -> Self {
         Self {
@@ -71,6 +77,23 @@ impl TransportReader {
     {
         self.logged = false;
         self.inner.read(io).await
+    }
+
+    pub(crate) async fn read_with_timeout<T>(
+        &mut self,
+        io: &mut T,
+        deadline: tokio::time::Instant,
+    ) -> Result<Timeout, LinkError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        match tokio::time::timeout_at(deadline, self.read(io)).await {
+            Err(_) => Ok(Timeout::Yes),
+            Ok(res) => {
+                res?;
+                Ok(Timeout::No)
+            }
+        }
     }
 
     pub(crate) fn reset(&mut self) {

@@ -87,16 +87,16 @@ impl State {
         State { head, tail, size }
     }
 
-    fn append(&self, new_tail: usize) -> Option<State> {
-        Some(Self {
+    fn append(&self, new_tail: usize) -> State {
+        Self {
             head: self.head,
             tail: new_tail,
             size: self.size + 1,
-        })
+        }
     }
 
-    fn single(index: usize) -> Option<State> {
-        Some(State::new(index, index, 1))
+    fn single(index: usize) -> State {
+        State::new(index, index, 1)
     }
 
     fn from(size: usize, head: Option<usize>, tail: Option<usize>) -> Option<State> {
@@ -170,7 +170,7 @@ impl<T> VecList<T> {
                     // update the previous tail
                     self.storage[current.tail].metadata.next = Some(idx);
 
-                    self.state = current.append(idx);
+                    self.state = Some(current.append(idx));
                     Index::new(self.version, idx)
                 } else {
                     let idx = self.storage.len();
@@ -181,19 +181,19 @@ impl<T> VecList<T> {
                     self.storage[current.tail].metadata.next = Some(idx);
 
                     // set the new tail
-                    self.state = current.append(idx);
+                    self.state = Some(current.append(idx));
                     Index::new(self.version, idx)
                 }
             }
             None => {
                 if let Some(idx) = self.free_stack.pop_front() {
                     self.storage[idx] = Entry::first(self.version, item);
-                    self.state = State::single(idx);
+                    self.state = Some(State::single(idx));
                     Index::new(self.version, idx)
                 } else {
                     let idx = self.storage.len();
                     self.storage.push(Entry::first(self.version, item));
-                    self.state = State::single(idx);
+                    self.state = Some(State::single(idx));
                     Index::new(self.version, idx)
                 }
             }
