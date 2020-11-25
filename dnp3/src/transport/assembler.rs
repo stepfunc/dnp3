@@ -42,6 +42,12 @@ impl Assembler {
         self.state = InternalState::Empty;
     }
 
+    pub(crate) fn discard(&mut self) {
+        if let InternalState::Complete(_, _) = self.state {
+            self.state = InternalState::Empty;
+        }
+    }
+
     pub(crate) fn peek(&self) -> Option<Fragment> {
         match self.state {
             InternalState::Complete(address, size) => Some(Fragment {

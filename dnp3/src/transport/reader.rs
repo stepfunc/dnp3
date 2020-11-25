@@ -63,8 +63,8 @@ impl Reader {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        // discard any existing frame
-        self.assembler.reset();
+        // discard any existing frame, but keep partial frames
+        self.assembler.discard();
 
         let mut payload = FramePayload::new();
 
