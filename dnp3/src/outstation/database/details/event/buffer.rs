@@ -69,13 +69,13 @@ impl EventClasses {
     pub(crate) fn as_iin1(&self) -> IIN1 {
         let mut iin = IIN1::default();
         if self.class1 {
-            iin = iin | IIN1::CLASS_1_EVENTS
+            iin |= IIN1::CLASS_1_EVENTS
         }
         if self.class2 {
-            iin = iin | IIN1::CLASS_2_EVENTS
+            iin |= IIN1::CLASS_2_EVENTS
         }
         if self.class3 {
-            iin = iin | IIN1::CLASS_3_EVENTS
+            iin |= IIN1::CLASS_3_EVENTS
         }
         iin
     }
@@ -829,7 +829,7 @@ impl Insertable for measurement::Analog {
     }
 
     fn decrement_type(counter: &mut TypeCounter) {
-        counter.num_frozen_counter.decrement();
+        counter.num_analog.decrement();
     }
 
     fn increment_type(counter: &mut TypeCounter) {

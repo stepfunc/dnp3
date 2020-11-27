@@ -7,7 +7,7 @@ pub(crate) struct Buffer {
 impl Buffer {
     pub(crate) fn new(size: usize) -> Self {
         Self {
-            inner: Vec::with_capacity(size).into_boxed_slice(),
+            inner: vec![0; size].into_boxed_slice(),
         }
     }
 

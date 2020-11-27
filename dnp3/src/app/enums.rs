@@ -345,6 +345,42 @@ pub enum FunctionCode {
     UnsolicitedResponse,
 }
 
+#[derive(Copy, Clone)]
+pub(crate) enum FunctionType {
+    Request,
+    Response,
+    Confirm,
+}
+
+#[derive(Copy, Clone)]
+pub(crate) struct FunctionInfo {
+    pub(crate) function_type: FunctionType,
+    pub(crate) objects_allowed: bool,
+}
+
+impl FunctionInfo {
+
+    const fn new(function_type: FunctionType, objects_allowed: bool) -> Self {
+        Self { function_type, objects_allowed }
+    }
+
+    pub(crate) const fn request_with_objects() -> Self {
+        Self { function_type: FunctionType::Request, objects_allowed: true }
+    }
+
+    pub(crate) const fn request_by_function_only() -> Self {
+        Self { function_type: FunctionType::Request, objects_allowed: false }
+    }
+
+    pub(crate) const fn response() -> Self {
+        Self { function_type: FunctionType::Response, objects_allowed: true }
+    }
+
+    pub(crate) const fn confirm() -> Self {
+        Self { function_type: FunctionType::Confirm, objects_allowed: false }
+    }
+}
+
 impl FunctionCode {
     /// try to create the enum from the underlying value, returning None
     /// if the specified value is undefined
@@ -428,6 +464,48 @@ impl FunctionCode {
     
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
+    }
+
+    pub(crate) fn get_function_info(&self) -> FunctionInfo {
+        match self {
+            // confirm
+            FunctionCode::Confirm => FunctionInfo::confirm(),
+            // requests that contain object headers
+            FunctionCode::Read => FunctionInfo::request_with_objects(),
+            FunctionCode::Write => FunctionInfo::request_with_objects(),
+            FunctionCode::Select => FunctionInfo::request_with_objects(),
+            FunctionCode::Operate => FunctionInfo::request_with_objects(),
+            FunctionCode::DirectOperate => FunctionInfo::request_with_objects(),
+            FunctionCode::DirectOperateNoResponse => FunctionInfo::request_with_objects(),
+            FunctionCode::ImmediateFreeze => FunctionInfo::request_with_objects(),
+            FunctionCode::ImmediateFreezeNoResponse => FunctionInfo::request_with_objects(),
+            FunctionCode::FreezeClear => FunctionInfo::request_with_objects(),
+            FunctionCode::FreezeClearNoResponse => FunctionInfo::request_with_objects(),
+            FunctionCode::FreezeAtTime => FunctionInfo::request_with_objects(),
+            FunctionCode::FreezeAtTimeNoResponse => FunctionInfo::request_with_objects(),
+            FunctionCode::InitializeApplication => FunctionInfo::request_with_objects(),
+            FunctionCode::StartApplication => FunctionInfo::request_with_objects(),
+            FunctionCode::StopApplication => FunctionInfo::request_with_objects(),
+            FunctionCode::EnableUnsolicited => FunctionInfo::request_with_objects(),
+            FunctionCode::DisableUnsolicited => FunctionInfo::request_with_objects(),
+            FunctionCode::AssignClass => FunctionInfo::request_with_objects(),
+            FunctionCode::OpenFile => FunctionInfo::request_with_objects(),
+            FunctionCode::CloseFile => FunctionInfo::request_with_objects(),
+            FunctionCode::DeleteFile => FunctionInfo::request_with_objects(),
+            FunctionCode::GetFileInfo => FunctionInfo::request_with_objects(),
+            FunctionCode::AuthenticateFile => FunctionInfo::request_with_objects(),
+            FunctionCode::AbortFile => FunctionInfo::request_with_objects(),
+            // requests that never have object headers
+            FunctionCode::ColdRestart => FunctionInfo::request_by_function_only(),
+            FunctionCode::WarmRestart => FunctionInfo::request_by_function_only(),
+            FunctionCode::InitializeData => FunctionInfo::request_by_function_only(),
+            FunctionCode::DelayMeasure => FunctionInfo::request_by_function_only(),
+            FunctionCode::RecordCurrentTime => FunctionInfo::request_by_function_only(),
+            FunctionCode::SaveConfiguration => FunctionInfo::request_by_function_only(),
+            // responses
+            FunctionCode::Response => FunctionInfo::response(),
+            FunctionCode::UnsolicitedResponse => FunctionInfo::response(),
+        }
     }
 }
 

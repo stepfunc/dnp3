@@ -277,6 +277,7 @@ impl Database {
 #[derive(Clone)]
 pub struct DatabaseHandle {
     inner: Arc<Mutex<Database>>,
+    notify: Arc<crate::tokio::sync::Notify>,
 }
 
 impl DatabaseHandle {
@@ -285,13 +286,19 @@ impl DatabaseHandle {
     where
         F: FnMut(&mut Database) -> R,
     {
-        let mut lock = self.inner.lock().unwrap();
-        func(&mut *lock)
+        let ret = func(&mut self.inner.lock().unwrap());
+        self.notify.notify();
+        ret
+    }
+
+    pub(crate) async fn wait_for_change(&self) {
+        self.notify.notified().await
     }
 
     pub(crate) fn new(config: DatabaseConfig) -> Self {
         Self {
             inner: Arc::new(Mutex::new(Database::new(config))),
+            notify: Arc::new(crate::tokio::sync::Notify::new()),
         }
     }
 

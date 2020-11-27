@@ -5,4 +5,4 @@ authors = ["Émile Grégoire <emile@automatak.com>"]
 edition = "2018"
 
 [dependencies]
-oo-bindgen = { git = "https://git@github.com/grid-io/oo_bindgen.git" }
+oo-bindgen = { git = "https://git@github.com/stepfunc/oo_bindgen.git" }

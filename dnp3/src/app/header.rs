@@ -4,7 +4,7 @@ use crate::util::bit::bits::*;
 use crate::util::bit::{format_bitfield, Bitfield};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::Formatter;
-use std::ops::BitOr;
+use std::ops::{Add, BitOr, BitOrAssign};
 
 /// Control field in the application-layer header
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -156,9 +156,14 @@ pub struct IIN {
 }
 
 impl IIN1 {
+    pub const BROADCAST: IIN1 = IIN1::new(BIT_0.value);
     pub const CLASS_1_EVENTS: IIN1 = IIN1::new(BIT_1.value);
     pub const CLASS_2_EVENTS: IIN1 = IIN1::new(BIT_2.value);
     pub const CLASS_3_EVENTS: IIN1 = IIN1::new(BIT_3.value);
+    pub const NEED_TIME: IIN1 = IIN1::new(BIT_5.value);
+    pub const LOCAL_CONTROL: IIN1 = IIN1::new(BIT_5.value);
+    pub const DEVICE_TROUBLE: IIN1 = IIN1::new(BIT_6.value);
+    pub const RESTART: IIN1 = IIN1::new(BIT_7.value);
 
     /// Construct IIN1 from its underlying value
     pub const fn new(value: u8) -> Self {
@@ -212,10 +217,27 @@ impl Default for IIN1 {
     }
 }
 
+impl Add<IIN2> for IIN1 {
+    type Output = IIN;
+
+    fn add(self, rhs: IIN2) -> Self::Output {
+        IIN::new(self, rhs)
+    }
+}
+
+impl BitOrAssign<IIN1> for IIN1 {
+    fn bitor_assign(&mut self, rhs: IIN1) {
+        self.value |= rhs.value
+    }
+}
+
 impl IIN2 {
     pub(crate) const NO_FUNC_CODE_SUPPORT: IIN2 = IIN2::new(BIT_0.value);
     pub(crate) const OBJECT_UNKNOWN: IIN2 = IIN2::new(BIT_1.value);
     pub(crate) const PARAMETER_ERROR: IIN2 = IIN2::new(BIT_2.value);
+    pub(crate) const EVENT_BUFFER_OVERFLOW: IIN2 = IIN2::new(BIT_3.value);
+    pub(crate) const ALREADY_EXECUTING: IIN2 = IIN2::new(BIT_4.value);
+    pub(crate) const CONFIG_CORRUPT: IIN2 = IIN2::new(BIT_5.value);
 
     /// Construct IIN2 from its underlying value
     pub const fn new(value: u8) -> Self {
@@ -276,6 +298,12 @@ impl BitOr for IIN1 {
         Self {
             value: self.value | rhs.value,
         }
+    }
+}
+
+impl BitOrAssign<IIN2> for IIN2 {
+    fn bitor_assign(&mut self, rhs: IIN2) {
+        self.value |= rhs.value;
     }
 }
 
@@ -452,6 +480,8 @@ impl RequestHeader {
 }
 
 impl ResponseHeader {
+    pub(crate) const LENGTH: usize = 4;
+
     pub(crate) fn new(control: Control, function: ResponseFunction, iin: IIN) -> Self {
         Self {
             control,
