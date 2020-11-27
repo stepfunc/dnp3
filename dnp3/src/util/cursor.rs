@@ -1,5 +1,5 @@
 /// custom read-only cursor
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ReadCursor<'a> {
     src: &'a [u8],
 }

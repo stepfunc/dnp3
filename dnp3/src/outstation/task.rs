@@ -1,21 +1,29 @@
-use crate::app::enums::FunctionCode;
+use crate::app::enums::{CommandStatus, FunctionCode};
 use crate::app::header::{Control, ResponseFunction, ResponseHeader, IIN, IIN1, IIN2};
-use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
+use crate::app::parse::parser::{ControlHeader, HeaderCollection, HeaderDetails, Request};
 use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::link::error::LinkError;
-use crate::outstation::database::{DatabaseConfig, DatabaseHandle, ResponseInfo};
-use crate::transport::{Timeout, TransportReader, TransportWriter};
+use crate::outstation::database::{Database, DatabaseConfig, DatabaseHandle, ResponseInfo};
+use crate::transport::{FragmentInfo, Timeout, TransportReader, TransportWriter};
 
 use crate::app::format::write::start_response;
 use crate::app::gen::ranged::RangedVariation;
+use crate::app::parse::count::CountSequence;
 use crate::app::parse::error::ObjectParseError;
-use crate::app::variations::{Group52Var1, Group52Var2};
+use crate::app::parse::prefix::Prefix;
+use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::variations::{
+    Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4, Group52Var1, Group52Var2,
+};
 use crate::entry::EndpointAddress;
-use crate::link::header::{BroadcastConfirmMode, FrameInfo};
-use crate::outstation::traits::{OutstationApplication, RestartDelay};
+use crate::link::header::BroadcastConfirmMode;
+use crate::outstation::helpers::PrefixWriter;
+use crate::outstation::traits::{ControlHandler, OperateType, OutstationApplication, RestartDelay};
 use crate::outstation::SelfAddressSupport;
 use crate::util::buffer::Buffer;
+use crate::util::cursor::{WriteCursor, WriteError};
+use std::borrow::BorrowMut;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::Duration;
 use xxhash_rust::xxh64::xxh64;
@@ -78,10 +86,35 @@ struct SessionConfig {
     confirm_timeout: Duration,
 }
 
+/// records when a select occurs
+struct SelectState {
+    /// sequence number of the SELECT
+    seq: Sequence,
+    /// frame count of the select, makes it easier to ensure that OPERATE directly follows SELECT
+    /// without requests in between
+    frame_count: u32,
+    /// time at which the SELECT occurred
+    time: tokio::time::Instant,
+    /// the hash of the object headers
+    object_hash: u64,
+}
+
+impl SelectState {
+    fn new(seq: Sequence, frame_count: u32, time: tokio::time::Instant, object_hash: u64) -> Self {
+        Self {
+            seq,
+            frame_count,
+            time,
+            object_hash,
+        }
+    }
+}
+
 /// state that mutates while the session runs
 struct SessionState {
     restart_iin_asserted: bool,
     last_valid_request: Option<LastValidRequest>,
+    select_state: Option<SelectState>,
 }
 
 impl SessionState {
@@ -89,6 +122,7 @@ impl SessionState {
         Self {
             restart_iin_asserted: true,
             last_valid_request: None,
+            select_state: None,
         }
     }
 }
@@ -98,7 +132,8 @@ pub(crate) struct Session {
     config: SessionConfig,
     database: DatabaseHandle,
     state: SessionState,
-    handler: Box<dyn OutstationApplication>,
+    application: Box<dyn OutstationApplication>,
+    control_handler: Box<dyn ControlHandler>,
 }
 
 pub struct OutstationTask {
@@ -150,7 +185,8 @@ impl OutstationTask {
     pub fn create(
         config: OutstationConfig,
         database: DatabaseConfig,
-        handler: Box<dyn OutstationApplication>,
+        application: Box<dyn OutstationApplication>,
+        control_handler: Box<dyn ControlHandler>,
     ) -> (Self, DatabaseHandle) {
         let handle = DatabaseHandle::new(database);
         let (reader, writer) = crate::transport::create_outstation_transport_layer(
@@ -162,7 +198,8 @@ impl OutstationTask {
                 config.to_session_config(),
                 config.tx_buffer_size,
                 handle.clone(),
-                handler,
+                application,
+                control_handler,
             ),
             reader,
             writer,
@@ -219,14 +256,16 @@ impl Session {
         config: SessionConfig,
         tx_buffer_size: usize,
         database: DatabaseHandle,
-        handler: Box<dyn OutstationApplication>,
+        application: Box<dyn OutstationApplication>,
+        control_handler: Box<dyn ControlHandler>,
     ) -> Self {
         Self {
             config,
             tx_buffer: Buffer::new(tx_buffer_size.max(Self::MIN_TX_BUFFER_SIZE)),
             database,
             state: SessionState::new(),
-            handler,
+            application,
+            control_handler,
         }
     }
 
@@ -325,7 +364,7 @@ impl Session {
 
     fn process_request_from_idle(
         &mut self,
-        info: FrameInfo,
+        info: FragmentInfo,
         request: Request,
     ) -> Option<LastValidRequest> {
         let seq = request.header.control.seq;
@@ -436,13 +475,15 @@ impl Session {
             // these function don't process objects
             FunctionCode::DelayMeasure => self.handle_delay_measure(seq, iin2),
             FunctionCode::ColdRestart => {
-                let delay = self.handler.cold_restart();
+                let delay = self.application.cold_restart();
                 self.handle_restart(seq, delay, iin2)
             }
             FunctionCode::WarmRestart => {
-                let delay = self.handler.warm_restart();
+                let delay = self.application.warm_restart();
                 self.handle_restart(seq, delay, iin2)
             }
+            // controls
+            FunctionCode::DirectOperate => self.handle_direct_operate(seq, object_headers),
             _ => {
                 log::warn!("unsupported function code: {:?}", function);
                 self.write_empty_response(seq, IIN2::NO_FUNC_CODE_SUPPORT)
@@ -512,7 +553,7 @@ impl Session {
         let iin = self.get_response_iin() + iin2;
 
         let g52v2 = Group52Var2 {
-            time: self.handler.get_processing_delay_ms(),
+            time: self.application.get_processing_delay_ms(),
         };
 
         let mut cursor = self.tx_buffer.write_cursor();
@@ -560,6 +601,182 @@ impl Session {
         }
 
         cursor.written().len()
+    }
+
+    fn handle_direct_operate(&mut self, seq: Sequence, object_headers: HeaderCollection) -> usize {
+        let controls = match object_headers.control_iter() {
+            Err(err) => {
+                log::warn!(
+                    "ignoring control request containing non-control object header {} - {}",
+                    err.variation,
+                    err.qualifier
+                );
+                return self.write_empty_response(seq, IIN2::PARAMETER_ERROR);
+            }
+            Ok(controls) => controls,
+        };
+
+        let iin = self.get_response_iin() + IIN2::default();
+        let mut cursor = self.tx_buffer.write_cursor();
+        ResponseHeader::new(
+            Control::single_response(seq),
+            ResponseFunction::Response,
+            iin,
+        )
+        .write(&mut cursor)
+        .unwrap();
+
+        let handler = self.control_handler.borrow_mut();
+
+        let result: Result<(), WriteError> = self.database.transaction(|database| {
+            for header in controls {
+                header.operate_with_response(
+                    OperateType::DirectOperate,
+                    &mut cursor,
+                    handler,
+                    database,
+                )?;
+            }
+            Ok(())
+        });
+
+        if result.is_err() {}
+
+        cursor.written().len()
+    }
+
+    fn handle_operate<'a>(
+        operate_type: OperateType,
+        cursor: &mut WriteCursor,
+        database: &mut Database,
+        handler: &mut dyn ControlHandler,
+        controls: &mut impl Iterator<Item = ControlHeader<'a>>,
+    ) -> Result<(), WriteError> {
+        for header in controls {
+            match header {
+                ControlHeader::OneByteGroup12Var1(seq) => {
+                    let mut writer = PrefixWriter::new();
+                    for item in seq.iter() {
+                        let status = handler.operate(
+                            item.value,
+                            item.index.widen_to_u16(),
+                            operate_type,
+                            database,
+                        );
+                        writer.write(cursor, item.value.with_status(status), item.index)?;
+                    }
+                }
+                ControlHeader::OneByteGroup41Var1(seq) => {
+                    let mut writer = PrefixWriter::new();
+                    for item in seq.iter() {
+                        let status = handler.operate(
+                            item.value,
+                            item.index.widen_to_u16(),
+                            operate_type,
+                            database,
+                        );
+                        writer.write(cursor, item.value.with_status(status), item.index)?;
+                    }
+                }
+                ControlHeader::OneByteGroup41Var2(seq) => {
+                    let mut writer = PrefixWriter::new();
+                    for item in seq.iter() {
+                        let status = handler.operate(
+                            item.value,
+                            item.index.widen_to_u16(),
+                            operate_type,
+                            database,
+                        );
+                        writer.write(cursor, item.value.with_status(status), item.index)?;
+                    }
+                }
+                ControlHeader::OneByteGroup41Var3(seq) => {
+                    let mut writer = PrefixWriter::new();
+                    for item in seq.iter() {
+                        let status = handler.operate(
+                            item.value,
+                            item.index.widen_to_u16(),
+                            operate_type,
+                            database,
+                        );
+                        writer.write(cursor, item.value.with_status(status), item.index)?;
+                    }
+                }
+                ControlHeader::OneByteGroup41Var4(seq) => {
+                    let mut writer = PrefixWriter::new();
+                    for item in seq.iter() {
+                        let status = handler.operate(
+                            item.value,
+                            item.index.widen_to_u16(),
+                            operate_type,
+                            database,
+                        );
+                        writer.write(cursor, item.value.with_status(status), item.index)?;
+                    }
+                }
+                ControlHeader::TwoByteGroup12Var1(seq) => {
+                    let mut writer = PrefixWriter::new();
+                    for item in seq.iter() {
+                        let status = handler.operate(
+                            item.value,
+                            item.index.widen_to_u16(),
+                            operate_type,
+                            database,
+                        );
+                        writer.write(cursor, item.value.with_status(status), item.index)?;
+                    }
+                }
+                ControlHeader::TwoByteGroup41Var1(seq) => {
+                    let mut writer = PrefixWriter::new();
+                    for item in seq.iter() {
+                        let status = handler.operate(
+                            item.value,
+                            item.index.widen_to_u16(),
+                            operate_type,
+                            database,
+                        );
+                        writer.write(cursor, item.value.with_status(status), item.index)?;
+                    }
+                }
+                ControlHeader::TwoByteGroup41Var2(seq) => {
+                    let mut writer = PrefixWriter::new();
+                    for item in seq.iter() {
+                        let status = handler.operate(
+                            item.value,
+                            item.index.widen_to_u16(),
+                            operate_type,
+                            database,
+                        );
+                        writer.write(cursor, item.value.with_status(status), item.index)?;
+                    }
+                }
+                ControlHeader::TwoByteGroup41Var3(seq) => {
+                    let mut writer = PrefixWriter::new();
+                    for item in seq.iter() {
+                        let status = handler.operate(
+                            item.value,
+                            item.index.widen_to_u16(),
+                            operate_type,
+                            database,
+                        );
+                        writer.write(cursor, item.value.with_status(status), item.index)?;
+                    }
+                }
+                ControlHeader::TwoByteGroup41Var4(seq) => {
+                    let mut writer = PrefixWriter::new();
+                    for item in seq.iter() {
+                        let status = handler.operate(
+                            item.value,
+                            item.index.widen_to_u16(),
+                            operate_type,
+                            database,
+                        );
+                        writer.write(cursor, item.value.with_status(status), item.index)?;
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     fn get_response_iin(&self) -> IIN1 {
@@ -667,7 +884,7 @@ impl Session {
     fn expect_sol_confirm(
         &self,
         ecsn: Sequence,
-        info: FrameInfo,
+        info: FragmentInfo,
         request: Request,
     ) -> ConfirmAction {
         match self.classify(info, request) {
@@ -698,7 +915,7 @@ impl Session {
         }
     }
 
-    fn classify<'a>(&self, info: FrameInfo, request: Request<'a>) -> FragmentType<'a> {
+    fn classify<'a>(&self, info: FragmentInfo, request: Request<'a>) -> FragmentType<'a> {
         if request.header.function == FunctionCode::Confirm {
             return if request.header.control.uns {
                 FragmentType::UnsolicitedConfirm
@@ -750,5 +967,188 @@ impl From<ObjectParseError> for IIN2 {
             ObjectParseError::UnknownQualifier(_) => IIN2::PARAMETER_ERROR,
             ObjectParseError::ZeroLengthOctetData => IIN2::PARAMETER_ERROR,
         }
+    }
+}
+
+impl<'a> ControlHeader<'a> {
+    fn operate_with_response(
+        &self,
+        operate_type: OperateType,
+        cursor: &mut WriteCursor,
+        handler: &mut dyn ControlHandler,
+        database: &mut Database,
+    ) -> Result<(), WriteError> {
+        match self {
+            Self::OneByteGroup12Var1(seq) => {
+                operate_header_with_response(cursor, seq, database, operate_type, handler)
+            }
+            Self::OneByteGroup41Var1(seq) => {
+                operate_header_with_response(cursor, seq, database, operate_type, handler)
+            }
+            Self::OneByteGroup41Var2(seq) => {
+                operate_header_with_response(cursor, seq, database, operate_type, handler)
+            }
+            Self::OneByteGroup41Var3(seq) => {
+                operate_header_with_response(cursor, seq, database, operate_type, handler)
+            }
+            Self::OneByteGroup41Var4(seq) => {
+                operate_header_with_response(cursor, seq, database, operate_type, handler)
+            }
+            Self::TwoByteGroup12Var1(seq) => {
+                operate_header_with_response(cursor, seq, database, operate_type, handler)
+            }
+            Self::TwoByteGroup41Var1(seq) => {
+                operate_header_with_response(cursor, seq, database, operate_type, handler)
+            }
+            Self::TwoByteGroup41Var2(seq) => {
+                operate_header_with_response(cursor, seq, database, operate_type, handler)
+            }
+            Self::TwoByteGroup41Var3(seq) => {
+                operate_header_with_response(cursor, seq, database, operate_type, handler)
+            }
+            Self::TwoByteGroup41Var4(seq) => {
+                operate_header_with_response(cursor, seq, database, operate_type, handler)
+            }
+        }
+    }
+}
+
+trait ControlType {
+    /// make a copy of the this control type with a new status code
+    fn with_status(&self, status: CommandStatus) -> Self;
+    /// select a control on a handler
+    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus;
+    /// operate a control on a handler
+    fn operate(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus;
+}
+
+fn operate_header_with_response<I, V>(
+    cursor: &mut WriteCursor,
+    seq: &CountSequence<Prefix<I, V>>,
+    database: &mut Database,
+    operate_type: OperateType,
+    handler: &mut dyn ControlHandler,
+) -> Result<(), WriteError>
+where
+    I: Index,
+    V: FixedSizeVariation + ControlType,
+{
+    let mut writer = PrefixWriter::new();
+    for item in seq.iter() {
+        let status = item
+            .value
+            .operate(handler, item.index.widen_to_u16(), operate_type, database);
+        writer.write(cursor, item.value.with_status(status), item.index)?;
+    }
+    Ok(())
+}
+
+pub(crate) trait WithCommandStatus {
+    fn with_status(self, status: CommandStatus) -> Self;
+}
+
+impl ControlType for Group12Var1 {
+    fn with_status(&self, status: CommandStatus) -> Self {
+        Self { status, ..*self }
+    }
+
+    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus {
+        handler.select(self, index)
+    }
+
+    fn operate(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        handler.operate(self, index, op_type, database)
+    }
+}
+
+impl ControlType for Group41Var1 {
+    fn with_status(&self, status: CommandStatus) -> Self {
+        Self { status, ..*self }
+    }
+
+    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus {
+        handler.select(self, index)
+    }
+
+    fn operate(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        handler.operate(self, index, op_type, database)
+    }
+}
+
+impl ControlType for Group41Var2 {
+    fn with_status(&self, status: CommandStatus) -> Self {
+        Self { status, ..*self }
+    }
+
+    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus {
+        handler.select(self, index)
+    }
+
+    fn operate(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        handler.operate(self, index, op_type, database)
+    }
+}
+
+impl ControlType for Group41Var3 {
+    fn with_status(&self, status: CommandStatus) -> Self {
+        Self { status, ..*self }
+    }
+
+    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus {
+        handler.select(self, index)
+    }
+
+    fn operate(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        handler.operate(self, index, op_type, database)
+    }
+}
+
+impl ControlType for Group41Var4 {
+    fn with_status(&self, status: CommandStatus) -> Self {
+        Self { status, ..*self }
+    }
+
+    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus {
+        handler.select(self, index)
+    }
+
+    fn operate(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        handler.operate(self, index, op_type, database)
     }
 }

@@ -3,7 +3,7 @@ use crate::app::parse::DecodeLogLevel;
 use crate::app::EndpointType;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::link::header::FrameInfo;
+use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::SelfAddressSupport;
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -29,9 +29,30 @@ pub(crate) mod reader;
 pub(crate) mod sequence;
 pub(crate) mod writer;
 
+#[derive(Debug, Copy, Clone)]
+pub(crate) struct FragmentInfo {
+    pub(crate) count: usize,
+    pub(crate) source: EndpointAddress,
+    pub(crate) broadcast: Option<BroadcastConfirmMode>,
+}
+
+impl FragmentInfo {
+    pub(crate) fn new(
+        count: usize,
+        source: EndpointAddress,
+        broadcast: Option<BroadcastConfirmMode>,
+    ) -> Self {
+        FragmentInfo {
+            count,
+            source,
+            broadcast,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Fragment<'a> {
-    pub(crate) address: FrameInfo,
+    pub(crate) info: FragmentInfo,
     pub(crate) data: &'a [u8],
 }
 
@@ -116,7 +137,7 @@ impl TransportReader {
         }
     }
 
-    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(FrameInfo, Request)> {
+    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(FragmentInfo, Request)> {
         let (log, info, parsed) = self.peek(level)?;
         match parsed.to_request() {
             Err(err) => {
@@ -129,7 +150,7 @@ impl TransportReader {
         }
     }
 
-    fn peek(&mut self, level: DecodeLogLevel) -> Option<(bool, FrameInfo, ParsedFragment)> {
+    fn peek(&mut self, level: DecodeLogLevel) -> Option<(bool, FragmentInfo, ParsedFragment)> {
         let log_this_peek = !self.logged;
         self.logged = true;
         let fragment: Fragment = self.inner.peek()?;
@@ -152,7 +173,7 @@ impl TransportReader {
                 log::warn!("error parsing object headers: {}", err)
             }
         }
-        Some((log_this_peek, fragment.address, parsed))
+        Some((log_this_peek, fragment.info, parsed))
     }
 }
 

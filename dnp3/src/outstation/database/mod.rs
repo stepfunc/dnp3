@@ -282,7 +282,7 @@ pub struct DatabaseHandle {
 
 impl DatabaseHandle {
     /// Perform a transaction on the underlying database using a closure
-    pub fn transaction<F, R>(&mut self, mut func: F) -> R
+    pub fn transaction<F, R>(&self, mut func: F) -> R
     where
         F: FnMut(&mut Database) -> R,
     {

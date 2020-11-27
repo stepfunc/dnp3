@@ -1,6 +1,6 @@
 use crate::link::header::FrameInfo;
 use crate::transport::header::Header;
-use crate::transport::Fragment;
+use crate::transport::{Fragment, FragmentInfo};
 
 #[derive(Copy, Clone)]
 enum InternalState {
@@ -8,7 +8,7 @@ enum InternalState {
     // last info, header, and accumulated length
     Running(FrameInfo, Header, usize),
     // buffer contains an assembled ADU
-    Complete(FrameInfo, usize),
+    Complete(FragmentInfo, usize),
 }
 
 impl InternalState {
@@ -27,7 +27,10 @@ pub(crate) enum AssemblyState {
 
 pub(crate) struct Assembler {
     state: InternalState,
-    buffer: [u8; 2048], // make this configurable and/or constant
+    // make this configurable and/or constant
+    buffer: [u8; 2048],
+    // assembled count
+    count: usize,
 }
 
 impl Assembler {
@@ -35,6 +38,7 @@ impl Assembler {
         Self {
             state: InternalState::Empty,
             buffer: [0; 2048],
+            count: 0,
         }
     }
 
@@ -50,8 +54,8 @@ impl Assembler {
 
     pub(crate) fn peek(&self) -> Option<Fragment> {
         match self.state {
-            InternalState::Complete(address, size) => Some(Fragment {
-                address,
+            InternalState::Complete(info, size) => Some(Fragment {
+                info,
                 data: &self.buffer[0..size],
             }),
             _ => None,
@@ -137,6 +141,9 @@ impl Assembler {
             Some(dest) => {
                 dest.copy_from_slice(data);
                 if header.fin {
+                    let count = self.count;
+                    let info = FragmentInfo::new(count, info.source, info.broadcast);
+                    self.count = self.count.wrapping_add(1);
                     self.state = InternalState::Complete(info, new_length)
                 } else {
                     self.state = InternalState::Running(info, header, new_length)

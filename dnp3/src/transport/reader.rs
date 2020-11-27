@@ -14,17 +14,6 @@ pub(crate) struct Reader {
 }
 
 impl Reader {
-    fn new(
-        endpoint_type: EndpointType,
-        self_address: SelfAddressSupport,
-        source: EndpointAddress,
-    ) -> Self {
-        Self {
-            link: crate::link::layer::Layer::new(endpoint_type, self_address, source),
-            assembler: Assembler::new(),
-        }
-    }
-
     pub(crate) fn master(source: EndpointAddress) -> Self {
         Self {
             link: crate::link::layer::Layer::new(

@@ -4,7 +4,7 @@ use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::{AnyAddress, FrameInfo};
 use crate::outstation::SelfAddressSupport;
-use crate::transport::Fragment;
+use crate::transport::{Fragment, FragmentInfo};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub(crate) struct MockWriter {
@@ -79,12 +79,16 @@ impl MockReader {
     pub(crate) fn peek(&self) -> Option<Fragment> {
         match self.count {
             0 => None,
-            x => Some(Fragment {
-                address: self
+            x => {
+                let info = self
                     .info
-                    .expect("call set_rx_frame_info(..) before running test"),
-                data: &self.buffer[0..x],
-            }),
+                    .expect("call set_rx_frame_info(..) before running test");
+                let fragment = Fragment {
+                    info: FragmentInfo::new(self.count, info.source, info.broadcast),
+                    data: &self.buffer[0..x],
+                };
+                Some(fragment)
+            }
         }
     }
 
