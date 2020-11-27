@@ -9,6 +9,8 @@ use crate::tokio::time;
 use crate::transport::create_master_transport_layer;
 use crate::util::cursor::WriteCursor;
 use std::future::Future;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
 
@@ -83,6 +85,118 @@ fn clear_restart_iin_is_higher_priority() {
     enable_unsol_request(&mut harness.io, seq);
     empty_response(&mut harness.io, seq.increment());
     harness.assert_io();
+}
+
+#[test]
+fn outstation_restart_procedure() {
+    let config = Configuration::default();
+    let mut seq = Sequence::default();
+    let mut harness = create_association(config);
+
+    startup_procedure(&mut harness, &mut seq);
+
+    // Unsolicited NULL response with DEVICE_RESTART IIN
+    unsol_null(&mut harness.io, seq, true);
+    unsol_confirm(&mut harness.io, seq);
+    harness.assert_io();
+
+    // Clear the restart flag
+    clear_restart_iin(&mut harness.io, seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+
+    // Integrity poll
+    integrity_poll_request(&mut harness.io, seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+
+    // Enable unsolicited
+    enable_unsol_request(&mut harness.io, seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+}
+
+#[test]
+fn ignore_unsolicited_response_with_data_before_first_integrity_poll() {
+    let config = Configuration::default();
+    let mut seq = Sequence::default();
+    let mut unsol_seq = Sequence::default();
+    let mut harness = create_association(config);
+
+    startup_procedure(&mut harness, &mut seq);
+
+    // Unsolicited NULL response with DEVICE_RESTART IIN
+    unsol_null(&mut harness.io, unsol_seq, true);
+    unsol_confirm(&mut harness.io, unsol_seq.increment());
+    harness.assert_io();
+
+    // Clear the restart flag
+    clear_restart_iin(&mut harness.io, seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+
+    // Integrity poll (never respond to)
+    integrity_poll_request(&mut harness.io, seq.increment());
+    harness.assert_io();
+
+    // Send unsolicited with data
+    unsol_with_data(&mut harness.io, unsol_seq, 42, true);
+    harness.assert_io();
+
+    // DO NOT CONFIRM AND IGNORE PAYLOAD
+    assert_eq!(harness.num_requests.fetch_add(0, Ordering::Relaxed), 0);
+
+    // Instead, wait for the integrity poll to timeout then
+    // restart the outstation startup procedure
+    time::advance(Duration::from_secs(1));
+    clear_restart_iin(&mut harness.io, seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+
+    // Integrity poll
+    time::advance(Duration::from_secs(1));
+    integrity_poll_request(&mut harness.io, seq);
+    harness.assert_io();
+    empty_response(&mut harness.io, seq.increment());
+
+    // Enable unsolicited
+    enable_unsol_request(&mut harness.io, seq);
+    harness.assert_io();
+    empty_response(&mut harness.io, seq.increment());
+}
+
+#[test]
+fn ignore_duplicate_unsolicited_response() {
+    let config = Configuration::default();
+    let mut seq = Sequence::default();
+    let mut unsol_seq = Sequence::default();
+    let mut harness = create_association(config);
+
+    startup_procedure(&mut harness, &mut seq);
+
+    // Send unsolicited with data
+    unsol_with_data(&mut harness.io, unsol_seq, 42, false);
+    unsol_confirm(&mut harness.io, unsol_seq);
+    harness.assert_io();
+    assert_eq!(harness.num_requests(), 1);
+
+    // Send exact same unsolicited response
+    unsol_with_data(&mut harness.io, unsol_seq, 42, false);
+    unsol_confirm(&mut harness.io, unsol_seq.increment());
+    harness.assert_io();
+    assert_eq!(harness.num_requests(), 1);
+
+    // Send different data
+    unsol_with_data(&mut harness.io, unsol_seq, 43, false);
+    unsol_confirm(&mut harness.io, unsol_seq.increment());
+    harness.assert_io();
+    assert_eq!(harness.num_requests(), 2);
+
+    // Send different sequence number
+    unsol_with_data(&mut harness.io, unsol_seq, 43, false);
+    unsol_confirm(&mut harness.io, unsol_seq.increment());
+    harness.assert_io();
+    assert_eq!(harness.num_requests(), 3);
 }
 
 #[test]
@@ -275,6 +389,60 @@ fn unsol_confirm(io: &mut io::Handle, seq: Sequence) {
     io.write(cursor.written());
 }
 
+fn unsol_with_data(io: &mut io::Handle, seq: Sequence, data: i16, restart_iin: bool) {
+    let iin = if restart_iin {
+        IIN::new(IIN1::new(0x80), IIN2::new(0x00))
+    } else {
+        IIN::default()
+    };
+
+    let mut buffer = [0; 20];
+    let mut cursor = WriteCursor::new(&mut buffer);
+    let mut response = start_response(
+        Control::unsolicited_response(seq),
+        ResponseFunction::UnsolicitedResponse,
+        iin,
+        &mut cursor,
+    )
+    .unwrap();
+
+    response
+        .write_prefixed_items(
+            [(
+                Group32Var2 {
+                    value: data,
+                    flags: 0x00,
+                },
+                0u8,
+            )]
+            .iter(),
+        )
+        .unwrap();
+
+    io.read(cursor.written());
+}
+
+// Whole procedure
+fn startup_procedure<F: Future<Output = RunError>>(
+    harness: &mut TestHarness<F>,
+    seq: &mut Sequence,
+) {
+    // Disable unsolicited
+    disable_unsol_request(&mut harness.io, *seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+
+    // Integrity poll
+    integrity_poll_request(&mut harness.io, *seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+
+    // Enable unsolicited
+    enable_unsol_request(&mut harness.io, *seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+}
+
 fn create_association(config: Configuration) -> TestHarness<impl Future<Output = RunError>> {
     let (mut io, io_handle) = io::mock();
 
@@ -298,9 +466,11 @@ fn create_association(config: Configuration) -> TestHarness<impl Future<Output =
     let mut master_task = spawn(async move { runner.run(&mut io, &mut writer, &mut reader).await });
 
     // Create the association
+    let handler = CountHandler::new();
+    let num_requests = handler.num_requests.clone();
     let association = {
         let mut add_task =
-            spawn(master.add_association(outstation_address, config, NullHandler::boxed()));
+            spawn(master.add_association(outstation_address, config, Box::new(handler)));
         assert_pending!(add_task.poll());
         assert_pending!(master_task.poll());
         assert_ready!(add_task.poll()).unwrap()
@@ -310,7 +480,97 @@ fn create_association(config: Configuration) -> TestHarness<impl Future<Output =
         session: master_task,
         master,
         association,
+        num_requests,
         io: io_handle,
+    }
+}
+
+struct CountHandler {
+    num_requests: Arc<AtomicU64>,
+}
+
+impl CountHandler {
+    fn new() -> Self {
+        Self {
+            num_requests: Arc::new(AtomicU64::new(0)),
+        }
+    }
+}
+
+impl AssociationHandler for CountHandler {
+    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
+        self
+    }
+
+    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
+        self
+    }
+
+    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
+        self
+    }
+}
+
+impl ReadHandler for CountHandler {
+    fn begin_fragment(&mut self, _header: crate::app::header::ResponseHeader) {}
+
+    fn end_fragment(&mut self, _header: crate::app::header::ResponseHeader) {}
+
+    fn handle_binary(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::Binary, u16)>,
+    ) {
+    }
+
+    fn handle_double_bit_binary(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::DoubleBitBinary, u16)>,
+    ) {
+    }
+
+    fn handle_binary_output_status(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::BinaryOutputStatus, u16)>,
+    ) {
+    }
+
+    fn handle_counter(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::Counter, u16)>,
+    ) {
+    }
+
+    fn handle_frozen_counter(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::FrozenCounter, u16)>,
+    ) {
+    }
+
+    fn handle_analog(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::Analog, u16)>,
+    ) {
+        self.num_requests.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn handle_analog_output_status(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::AnalogOutputStatus, u16)>,
+    ) {
+    }
+
+    fn handle_octet_string<'a>(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &'a mut dyn Iterator<Item = (crate::app::parse::bytes::Bytes<'a>, u16)>,
+    ) {
     }
 }
 
@@ -318,6 +578,7 @@ struct TestHarness<F: Future<Output = RunError>> {
     session: Spawn<F>,
     master: MasterHandle,
     association: AssociationHandle,
+    num_requests: Arc<AtomicU64>,
     io: io::Handle,
 }
 
@@ -329,5 +590,9 @@ impl<F: Future<Output = RunError>> TestHarness<F> {
     fn assert_io(&mut self) {
         assert_pending!(self.poll());
         assert!(self.io.all_done());
+    }
+
+    fn num_requests(&self) -> u64 {
+        self.num_requests.fetch_add(0, Ordering::Relaxed)
     }
 }

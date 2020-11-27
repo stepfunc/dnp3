@@ -118,7 +118,7 @@ impl MasterSession {
                 }
                 result = reader.read(io) => {
                    result?;
-                   self.handle_fragment_while_idle(io, writer, reader).await?;
+                   return self.handle_fragment_while_idle(io, writer, reader).await;
                 }
             }
         }
@@ -145,7 +145,7 @@ impl MasterSession {
                 }
                 result = reader.read(io) => {
                    result?;
-                   self.handle_fragment_while_idle(io, writer, reader).await?;
+                   return self.handle_fragment_while_idle(io, writer, reader).await;
                 }
                 _ = crate::tokio::time::delay_until(instant) => {
                    return Ok(());

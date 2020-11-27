@@ -107,9 +107,9 @@ impl AutoTaskState {
 
     /// Demand an execution of the task
     fn demand(&mut self) {
-        if self.is_idle() {
-            *self = Self::Pending;
-        }
+        //if self.is_idle() {
+        *self = Self::Pending;
+        //}
     }
 
     /// The task was accomplished
