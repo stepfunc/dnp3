@@ -5,11 +5,11 @@ use crate::entry::EndpointAddress;
 use crate::master::error::Shutdown;
 use crate::master::handle::{Listener, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
+use crate::tokio::net::TcpStream;
 use crate::transport::{TransportReader, TransportWriter};
+use std::future::Future;
 use std::net::SocketAddr;
 use std::time::Duration;
-use tokio::macros::support::Future;
-use tokio::net::TcpStream;
 
 /// state of TCP client connection
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -44,7 +44,7 @@ pub fn spawn_master_tcp_client(
     listener: Listener<ClientState>,
 ) -> MasterHandle {
     let (mut task, handle) = MasterTask::new(address, level, strategy, timeout, endpoint, listener);
-    tokio::spawn(async move { task.run().await });
+    crate::tokio::spawn(async move { task.run().await });
     handle
 }
 
@@ -84,7 +84,7 @@ impl MasterTask {
         endpoint: SocketAddr,
         listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
-        let (tx, rx) = tokio::sync::mpsc::channel(100); // TODO
+        let (tx, rx) = crate::tokio::sync::mpsc::channel(100); // TODO
         let session = MasterSession::new(level, response_timeout, rx);
         let (reader, writer) = crate::transport::create_master_transport_layer(address);
         let task = Self {

@@ -5,10 +5,10 @@ use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::master::association::NoAssociation;
 use crate::master::session::RunError;
+use crate::tokio::sync::mpsc::error::SendError;
+use crate::tokio::sync::oneshot::error::RecvError;
 use crate::util::cursor::WriteError;
 use std::error::Error;
-use tokio::sync::mpsc::error::SendError;
-use tokio::sync::oneshot::error::RecvError;
 
 /// Indicates that the master task has shutdown
 #[derive(Copy, Clone, Debug)]
@@ -233,12 +233,6 @@ impl From<WriteError> for TaskError {
 impl From<LinkError> for TaskError {
     fn from(err: LinkError) -> Self {
         TaskError::Lower(err)
-    }
-}
-
-impl From<tokio::time::Elapsed> for TaskError {
-    fn from(_: tokio::time::Elapsed) -> Self {
-        TaskError::ResponseTimeout
     }
 }
 

@@ -40,10 +40,10 @@ impl Timeout {
         Ok(Self { value })
     }
 
-    pub(crate) fn deadline_from_now(self) -> tokio::time::Instant {
+    pub(crate) fn deadline_from_now(self) -> crate::tokio::time::Instant {
         // if this panics due to overflow we have bigger problems than the panic
         // it means the tim value being returned by now() is WAAAY too big
-        tokio::time::Instant::now() + self.value
+        crate::tokio::time::Instant::now() + self.value
     }
 }
 

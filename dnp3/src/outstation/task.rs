@@ -10,9 +10,9 @@ use crate::transport::{TransportReader, TransportWriter};
 use crate::entry::EndpointAddress;
 use crate::link::header::AnyAddress;
 use crate::outstation::SelfAddressSupport;
+use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::util::buffer::Buffer;
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::time::Duration;
+use std::time::Duration;
 
 pub(crate) struct Session {
     level: DecodeLogLevel,
@@ -231,10 +231,10 @@ impl Session {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let mut delay = tokio::time::delay_for(tokio::time::Duration::from_secs(5));
+        let mut delay = crate::tokio::time::delay_for(Duration::from_secs(5));
 
         while !delay.is_elapsed() {
-            tokio::select! {
+            crate::tokio::select! {
                 _ = &mut delay, if !delay.is_elapsed() => {
                     return Ok(Confirm::Timeout);
                 }

@@ -4,7 +4,7 @@ use crate::link::error::LinkError;
 use crate::link::function::Function;
 use crate::link::header::{AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, Header};
 use crate::link::parser::FramePayload;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use crate::tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::link::format::format_header;
 use crate::outstation::SelfAddressSupport;

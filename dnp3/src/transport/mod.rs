@@ -5,7 +5,7 @@ use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
 use crate::outstation::SelfAddressSupport;
-use tokio::io::{AsyncRead, AsyncWrite};
+use crate::tokio::io::{AsyncRead, AsyncWrite};
 
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport reader during testing.

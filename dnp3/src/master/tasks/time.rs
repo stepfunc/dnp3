@@ -9,9 +9,9 @@ use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::handle::Promise;
 use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::NonReadTask;
+use crate::tokio::time::Instant;
 use crate::util::cursor::WriteError;
 use std::time::Duration;
-use tokio::time::Instant;
 
 enum State {
     MeasureDelay(Option<Instant>),
@@ -141,7 +141,7 @@ impl TimeSyncTask {
         let interval = match now.checked_duration_since(request_tx) {
             Some(x) => x,
             None => {
-                // This should NEVER happen. `tokio::time::Instant` is guaranteed to be monotonic and nondecreasing.
+                // This should NEVER happen. `crate::tokio::time::Instant` is guaranteed to be monotonic and nondecreasing.
                 log::error!("clock rollback detected while synchronizing outstation");
                 self.report_error(association, TimeSyncError::ClockRollback);
                 return None;
@@ -319,7 +319,6 @@ mod tests {
     use crate::prelude::master::*;
     use crate::util::cursor::WriteCursor;
     use std::cell::Cell;
-    use std::future::Future;
     use std::time::SystemTime;
 
     fn response_control_field(seq: Sequence) -> Control {
@@ -399,24 +398,23 @@ mod tests {
             }
         }
 
-        #[tokio::test]
-        async fn success() {
-            run_nonlan_timesync_test(|task, system_time, mut association, rx| async move {
+        #[test]
+        fn success() {
+            run_nonlan_timesync_test(|task, system_time, mut association, mut rx| {
                 let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+                crate::tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
                 let task = send_measure_delay_response(task, &mut association).unwrap();
                 let task = check_write_request(task, &mut association, system_time);
                 send_write_response(task, &mut association);
-                assert!(rx.await.unwrap().is_ok());
-            })
-            .await;
+                assert!(rx.try_recv().unwrap().is_ok());
+            });
         }
 
-        #[tokio::test]
-        async fn with_16bit_count() {
-            run_nonlan_timesync_test(|task, system_time, mut association, rx| async move {
+        #[test]
+        fn with_16bit_count() {
+            run_nonlan_timesync_test(|task, system_time, mut association, mut rx| {
                 let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+                crate::tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
 
                 let task = {
                     let mut buffer = [0; 20];
@@ -449,30 +447,28 @@ mod tests {
                 .unwrap();
                 let task = check_write_request(task, &mut association, system_time);
                 send_write_response(task, &mut association);
-                assert!(rx.await.unwrap().is_ok());
-            })
-            .await;
+                assert!(rx.try_recv().unwrap().is_ok());
+            });
         }
 
-        #[tokio::test]
-        async fn delay_reported_by_outstation_greater_than_actual_delay() {
-            run_nonlan_timesync_test(|task, _system_time, mut association, rx| async move {
+        #[test]
+        fn delay_reported_by_outstation_greater_than_actual_delay() {
+            run_nonlan_timesync_test(|task, _system_time, mut association, mut rx| {
                 let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(1)).await; // This delay is less than the reported delay of the outstation
+                crate::tokio::time::advance(Duration::from_millis(1)); // This delay is less than the reported delay of the outstation
                 assert!(send_measure_delay_response(task, &mut association).is_none());
                 assert_eq!(
                     Err(TimeSyncError::BadOutstationTimeDelay(OUTSTATION_DELAY_MS)),
-                    rx.await.unwrap()
+                    rx.try_recv().unwrap()
                 );
-            })
-            .await;
+            });
         }
 
-        #[tokio::test]
-        async fn empty_measure_delay_response() {
-            run_nonlan_timesync_test(|task, _system_time, mut association, rx| async move {
+        #[test]
+        fn empty_measure_delay_response() {
+            run_nonlan_timesync_test(|task, _system_time, mut association, mut rx| {
                 let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+                crate::tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
                 {
                     let mut buffer = [0; 20];
                     let mut cursor = WriteCursor::new(&mut buffer);
@@ -489,18 +485,17 @@ mod tests {
                     assert!(task.handle(&mut association, response).is_none());
                 }
                 assert_eq!(
-                    rx.await.unwrap(),
+                    rx.try_recv().unwrap(),
                     Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
                 );
-            })
-            .await;
+            });
         }
 
-        #[tokio::test]
-        async fn non_empty_write_response() {
-            run_nonlan_timesync_test(|task, system_time, mut association, rx| async move {
+        #[test]
+        fn non_empty_write_response() {
+            run_nonlan_timesync_test(|task, system_time, mut association, mut rx| {
                 let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+                crate::tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
                 let task = send_measure_delay_response(task, &mut association).unwrap();
                 let task = check_write_request(task, &mut association, system_time);
                 {
@@ -520,18 +515,17 @@ mod tests {
                     assert!(task.handle(&mut association, response).is_none());
                 }
                 assert_matches!(
-                    rx.await.unwrap(),
+                    rx.try_recv().unwrap(),
                     Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
                 );
-            })
-            .await;
+            });
         }
 
-        #[tokio::test]
-        async fn iin_bit_not_reset() {
-            run_nonlan_timesync_test(|task, system_time, mut association, rx| async move {
+        #[test]
+        fn iin_bit_not_reset() {
+            run_nonlan_timesync_test(|task, system_time, mut association, mut rx| {
                 let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+                crate::tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
                 let task = send_measure_delay_response(task, &mut association).unwrap();
                 let task = check_write_request(task, &mut association, system_time);
                 {
@@ -549,105 +543,99 @@ mod tests {
 
                     assert!(task.handle(&mut association, response).is_none());
                 }
-                assert_matches!(rx.await.unwrap(), Err(TimeSyncError::StillNeedsTime));
-            })
-            .await;
+                assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
+            });
         }
 
-        #[tokio::test]
-        async fn error_response() {
-            run_nonlan_timesync_test(|task, system_time, mut association, rx| async move {
+        #[test]
+        fn error_response() {
+            run_nonlan_timesync_test(|task, system_time, mut association, mut rx| {
                 let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+                crate::tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
                 let task = send_measure_delay_response(task, &mut association).unwrap();
                 let task = check_write_request(task, &mut association, system_time);
                 task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
                 assert_eq!(
-                    rx.await.unwrap(),
+                    rx.try_recv().unwrap(),
                     Err(TimeSyncError::Task(TaskError::ResponseTimeout))
                 );
-            })
-            .await;
+            });
         }
 
-        #[tokio::test]
-        async fn no_system_time_at_start() {
+        #[test]
+        fn no_system_time_at_start() {
             run_nonlan_timesync_single_timestamp_test(
-                |task, _system_time, mut association, rx| async move {
+                |task, _system_time, mut association, mut rx| {
                     association.get_system_time(); // Empty the time
 
                     assert!(task.start(&mut association).is_none());
                     assert_eq!(
-                        rx.await.unwrap(),
+                        rx.try_recv().unwrap(),
                         Err(TimeSyncError::SystemTimeNotAvailable)
                     );
                 },
-            )
-            .await;
+            );
         }
 
-        #[tokio::test]
-        async fn no_system_time_at_delay() {
+        #[test]
+        fn no_system_time_at_delay() {
             run_nonlan_timesync_single_timestamp_test(
-                |task, _system_time, mut association, rx| async move {
+                |task, _system_time, mut association, mut rx| {
                     let task = check_measure_delay_request(task, &mut association);
-                    tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+                    crate::tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
                     assert!(send_measure_delay_response(task, &mut association).is_none());
                     assert_eq!(
-                        rx.await.unwrap(),
+                        rx.try_recv().unwrap(),
                         Err(TimeSyncError::SystemTimeNotAvailable)
                     );
                 },
-            )
-            .await;
+            );
         }
 
-        async fn run_nonlan_timesync_test<F: Future>(
+        fn run_nonlan_timesync_test(
             test: impl FnOnce(
                 NonReadTask,
                 Timestamp,
                 Association,
-                tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
-            ) -> F,
+                crate::tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
+            ),
         ) {
-            tokio::time::pause();
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
                 Configuration::default(),
                 Box::new(TestHandler::new(system_time)),
             );
-            let (tx, rx) = tokio::sync::oneshot::channel();
+            let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
                 TimeSyncProcedure::NonLAN,
                 Promise::OneShot(tx),
             ));
 
-            test(task, system_time, association, rx).await;
+            test(task, system_time, association, rx);
         }
 
-        async fn run_nonlan_timesync_single_timestamp_test<F: Future>(
+        fn run_nonlan_timesync_single_timestamp_test(
             test: impl FnOnce(
                 NonReadTask,
                 Timestamp,
                 Association,
-                tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
-            ) -> F,
+                crate::tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
+            ),
         ) {
-            tokio::time::pause();
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
                 Configuration::default(),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
             );
-            let (tx, rx) = tokio::sync::oneshot::channel();
+            let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
                 TimeSyncProcedure::NonLAN,
                 Promise::OneShot(tx),
             ));
 
-            test(task, system_time, association, rx).await;
+            test(task, system_time, association, rx);
         }
 
         fn check_measure_delay_request(
@@ -751,24 +739,23 @@ mod tests {
 
         const DELAY_MS: u16 = 200;
 
-        #[tokio::test]
-        async fn success() {
-            run_lan_timesync_test(|task, system_time, mut association, rx| async move {
+        #[test]
+        fn success() {
+            run_lan_timesync_test(|task, system_time, mut association, mut rx| {
                 let task = check_record_current_time_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+                crate::tokio::time::advance(Duration::from_millis(DELAY_MS as u64));
                 let task = send_record_current_time_response(task, &mut association).unwrap();
                 let task = check_write_request(task, &mut association, system_time);
                 send_write_response(task, &mut association);
-                assert!(rx.await.unwrap().is_ok());
-            })
-            .await;
+                assert!(rx.try_recv().unwrap().is_ok());
+            });
         }
 
-        #[tokio::test]
-        async fn non_empty_record_current_time_response() {
-            run_lan_timesync_test(|task, _system_time, mut association, rx| async move {
+        #[test]
+        fn non_empty_record_current_time_response() {
+            run_lan_timesync_test(|task, _system_time, mut association, mut rx| {
                 let task = check_record_current_time_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+                crate::tokio::time::advance(Duration::from_millis(DELAY_MS as u64));
                 {
                     let mut buffer = [0; 20];
                     let mut cursor = WriteCursor::new(&mut buffer);
@@ -786,18 +773,17 @@ mod tests {
                     assert!(task.handle(&mut association, response).is_none());
                 }
                 assert_eq!(
-                    rx.await.unwrap(),
+                    rx.try_recv().unwrap(),
                     Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
                 );
-            })
-            .await;
+            });
         }
 
-        #[tokio::test]
-        async fn non_empty_write_response() {
-            run_lan_timesync_test(|task, system_time, mut association, rx| async move {
+        #[test]
+        fn non_empty_write_response() {
+            run_lan_timesync_test(|task, system_time, mut association, mut rx| {
                 let task = check_record_current_time_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+                crate::tokio::time::advance(Duration::from_millis(DELAY_MS as u64));
                 let task = send_record_current_time_response(task, &mut association).unwrap();
                 let task = check_write_request(task, &mut association, system_time);
                 {
@@ -817,18 +803,17 @@ mod tests {
                     assert!(task.handle(&mut association, response).is_none());
                 }
                 assert_eq!(
-                    rx.await.unwrap(),
+                    rx.try_recv().unwrap(),
                     Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
                 );
-            })
-            .await;
+            });
         }
 
-        #[tokio::test]
-        async fn iin_bit_not_reset() {
-            run_lan_timesync_test(|task, system_time, mut association, rx| async move {
+        #[test]
+        fn iin_bit_not_reset() {
+            run_lan_timesync_test(|task, system_time, mut association, mut rx| {
                 let task = check_record_current_time_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+                crate::tokio::time::advance(Duration::from_millis(DELAY_MS as u64));
                 let task = send_record_current_time_response(task, &mut association).unwrap();
                 let task = check_write_request(task, &mut association, system_time);
                 {
@@ -846,63 +831,59 @@ mod tests {
 
                     assert!(task.handle(&mut association, response).is_none());
                 }
-                assert_matches!(rx.await.unwrap(), Err(TimeSyncError::StillNeedsTime));
-            })
-            .await;
+                assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
+            });
         }
 
-        #[tokio::test]
-        async fn error_response() {
-            run_lan_timesync_test(|task, system_time, mut association, rx| async move {
+        #[test]
+        fn error_response() {
+            run_lan_timesync_test(|task, system_time, mut association, mut rx| {
                 let task = check_record_current_time_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+                crate::tokio::time::advance(Duration::from_millis(DELAY_MS as u64));
                 let task = send_record_current_time_response(task, &mut association).unwrap();
                 let task = check_write_request(task, &mut association, system_time);
                 task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
                 assert_eq!(
-                    rx.await.unwrap(),
+                    rx.try_recv().unwrap(),
                     Err(TimeSyncError::Task(TaskError::ResponseTimeout))
                 );
-            })
-            .await;
+            });
         }
 
-        #[tokio::test]
-        async fn no_system_time_available() {
-            run_lan_timesync_test(|task, _system_time, mut association, rx| async move {
+        #[test]
+        fn no_system_time_available() {
+            run_lan_timesync_test(|task, _system_time, mut association, mut rx| {
                 association.get_system_time(); // Empty the time
 
                 assert!(task.start(&mut association).is_none());
                 assert_eq!(
-                    rx.await.unwrap(),
+                    rx.try_recv().unwrap(),
                     Err(TimeSyncError::SystemTimeNotAvailable)
                 );
-            })
-            .await;
+            });
         }
 
-        async fn run_lan_timesync_test<F: Future>(
+        fn run_lan_timesync_test(
             test: impl FnOnce(
                 NonReadTask,
                 Timestamp,
                 Association,
-                tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
-            ) -> F,
+                crate::tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
+            ),
         ) {
-            tokio::time::pause();
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
                 Configuration::default(),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
             );
-            let (tx, rx) = tokio::sync::oneshot::channel();
+            let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
                 TimeSyncProcedure::LAN,
                 Promise::OneShot(tx),
             ));
 
-            test(task, system_time, association, rx).await;
+            test(task, system_time, association, rx);
         }
 
         fn check_record_current_time_request(

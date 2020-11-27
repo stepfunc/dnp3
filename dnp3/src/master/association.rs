@@ -14,9 +14,9 @@ use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::NonReadTask::TimeSync;
 use crate::master::tasks::{AssociationTask, ReadTask, Task};
+use crate::tokio::time::Instant;
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
-use tokio::time::Instant;
 use xxhash_rust::xxh64::xxh64;
 
 use crate::entry::EndpointAddress;
@@ -125,8 +125,8 @@ impl AutoTaskState {
                 Self::Failed(backoff.clone(), Instant::now() + delay)
             }
             _ => {
-                let backoff = ExponentialBackOff::new(config.auto_tasks_retry_strategy);
-                let delay = backoff.min_delay();
+                let mut backoff = ExponentialBackOff::new(config.auto_tasks_retry_strategy);
+                let delay = backoff.on_failure();
                 Self::Failed(backoff, Instant::now() + delay)
             }
         }

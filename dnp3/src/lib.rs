@@ -95,9 +95,6 @@ clippy::all
 #![allow(dead_code)]
 
 #[cfg(test)]
-extern crate tokio_test;
-
-#[cfg(test)]
 #[macro_use]
 extern crate assert_matches;
 
@@ -116,3 +113,5 @@ pub(crate) mod link;
 #[cfg_attr(test, allow(dead_code))]
 pub(crate) mod transport;
 pub(crate) mod util;
+
+pub(crate) mod tokio;
