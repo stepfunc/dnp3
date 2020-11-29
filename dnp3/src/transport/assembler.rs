@@ -30,7 +30,7 @@ pub(crate) struct Assembler {
     // make this configurable and/or constant
     buffer: [u8; 2048],
     // assembled count
-    count: usize,
+    frame_id: u32,
 }
 
 impl Assembler {
@@ -38,7 +38,7 @@ impl Assembler {
         Self {
             state: InternalState::Empty,
             buffer: [0; 2048],
-            count: 0,
+            frame_id: 0,
         }
     }
 
@@ -141,9 +141,9 @@ impl Assembler {
             Some(dest) => {
                 dest.copy_from_slice(data);
                 if header.fin {
-                    let count = self.count;
-                    let info = FragmentInfo::new(count, info.source, info.broadcast);
-                    self.count = self.count.wrapping_add(1);
+                    let frame_id = self.frame_id;
+                    let info = FragmentInfo::new(frame_id, info.source, info.broadcast);
+                    self.frame_id = self.frame_id.wrapping_add(1);
                     self.state = InternalState::Complete(info, new_length)
                 } else {
                     self.state = InternalState::Running(info, header, new_length)

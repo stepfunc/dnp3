@@ -92,7 +92,7 @@ struct SelectState {
     seq: Sequence,
     /// frame count of the select, makes it easier to ensure that OPERATE directly follows SELECT
     /// without requests in between
-    frame_count: u32,
+    frame_id: u32,
     /// time at which the SELECT occurred
     time: tokio::time::Instant,
     /// the hash of the object headers
@@ -100,10 +100,10 @@ struct SelectState {
 }
 
 impl SelectState {
-    fn new(seq: Sequence, frame_count: u32, time: tokio::time::Instant, object_hash: u64) -> Self {
+    fn new(seq: Sequence, frame_id: u32, time: tokio::time::Instant, object_hash: u64) -> Self {
         Self {
             seq,
-            frame_count,
+            frame_id,
             time,
             object_hash,
         }
@@ -387,7 +387,7 @@ impl Session {
                 Some(LastValidRequest::new(seq, hash, length, next))
             }
             FragmentType::NewNonRead(hash, objects) => {
-                let length = self.handle_non_read(request.header.function, seq, objects);
+                let length = self.handle_non_read(request.header.function, seq, info.id, objects);
                 Some(LastValidRequest::new(seq, hash, length, NextState::Idle))
             }
             FragmentType::RepeatNonRead(hash, last_response_length) => {
@@ -466,6 +466,7 @@ impl Session {
         &mut self,
         function: FunctionCode,
         seq: Sequence,
+        frame_id: u32,
         object_headers: HeaderCollection,
     ) -> usize {
         let iin2 = Self::get_iin2(function, object_headers);
@@ -483,7 +484,9 @@ impl Session {
                 self.handle_restart(seq, delay, iin2)
             }
             // controls
+            FunctionCode::Select => self.handle_select(seq, frame_id, object_headers),
             FunctionCode::DirectOperate => self.handle_direct_operate(seq, object_headers),
+
             _ => {
                 log::warn!("unsupported function code: {:?}", function);
                 self.write_empty_response(seq, IIN2::NO_FUNC_CODE_SUPPORT)
@@ -640,143 +643,72 @@ impl Session {
             Ok(())
         });
 
-        if result.is_err() {}
+        if result.is_err() {
+            log::warn!("unable to write complete response");
+        }
 
         cursor.written().len()
     }
 
-    fn handle_operate<'a>(
-        operate_type: OperateType,
-        cursor: &mut WriteCursor,
-        database: &mut Database,
-        handler: &mut dyn ControlHandler,
-        controls: &mut impl Iterator<Item = ControlHeader<'a>>,
-    ) -> Result<(), WriteError> {
-        for header in controls {
-            match header {
-                ControlHeader::OneByteGroup12Var1(seq) => {
-                    let mut writer = PrefixWriter::new();
-                    for item in seq.iter() {
-                        let status = handler.operate(
-                            item.value,
-                            item.index.widen_to_u16(),
-                            operate_type,
-                            database,
-                        );
-                        writer.write(cursor, item.value.with_status(status), item.index)?;
-                    }
-                }
-                ControlHeader::OneByteGroup41Var1(seq) => {
-                    let mut writer = PrefixWriter::new();
-                    for item in seq.iter() {
-                        let status = handler.operate(
-                            item.value,
-                            item.index.widen_to_u16(),
-                            operate_type,
-                            database,
-                        );
-                        writer.write(cursor, item.value.with_status(status), item.index)?;
-                    }
-                }
-                ControlHeader::OneByteGroup41Var2(seq) => {
-                    let mut writer = PrefixWriter::new();
-                    for item in seq.iter() {
-                        let status = handler.operate(
-                            item.value,
-                            item.index.widen_to_u16(),
-                            operate_type,
-                            database,
-                        );
-                        writer.write(cursor, item.value.with_status(status), item.index)?;
-                    }
-                }
-                ControlHeader::OneByteGroup41Var3(seq) => {
-                    let mut writer = PrefixWriter::new();
-                    for item in seq.iter() {
-                        let status = handler.operate(
-                            item.value,
-                            item.index.widen_to_u16(),
-                            operate_type,
-                            database,
-                        );
-                        writer.write(cursor, item.value.with_status(status), item.index)?;
-                    }
-                }
-                ControlHeader::OneByteGroup41Var4(seq) => {
-                    let mut writer = PrefixWriter::new();
-                    for item in seq.iter() {
-                        let status = handler.operate(
-                            item.value,
-                            item.index.widen_to_u16(),
-                            operate_type,
-                            database,
-                        );
-                        writer.write(cursor, item.value.with_status(status), item.index)?;
-                    }
-                }
-                ControlHeader::TwoByteGroup12Var1(seq) => {
-                    let mut writer = PrefixWriter::new();
-                    for item in seq.iter() {
-                        let status = handler.operate(
-                            item.value,
-                            item.index.widen_to_u16(),
-                            operate_type,
-                            database,
-                        );
-                        writer.write(cursor, item.value.with_status(status), item.index)?;
-                    }
-                }
-                ControlHeader::TwoByteGroup41Var1(seq) => {
-                    let mut writer = PrefixWriter::new();
-                    for item in seq.iter() {
-                        let status = handler.operate(
-                            item.value,
-                            item.index.widen_to_u16(),
-                            operate_type,
-                            database,
-                        );
-                        writer.write(cursor, item.value.with_status(status), item.index)?;
-                    }
-                }
-                ControlHeader::TwoByteGroup41Var2(seq) => {
-                    let mut writer = PrefixWriter::new();
-                    for item in seq.iter() {
-                        let status = handler.operate(
-                            item.value,
-                            item.index.widen_to_u16(),
-                            operate_type,
-                            database,
-                        );
-                        writer.write(cursor, item.value.with_status(status), item.index)?;
-                    }
-                }
-                ControlHeader::TwoByteGroup41Var3(seq) => {
-                    let mut writer = PrefixWriter::new();
-                    for item in seq.iter() {
-                        let status = handler.operate(
-                            item.value,
-                            item.index.widen_to_u16(),
-                            operate_type,
-                            database,
-                        );
-                        writer.write(cursor, item.value.with_status(status), item.index)?;
-                    }
-                }
-                ControlHeader::TwoByteGroup41Var4(seq) => {
-                    let mut writer = PrefixWriter::new();
-                    for item in seq.iter() {
-                        let status = handler.operate(
-                            item.value,
-                            item.index.widen_to_u16(),
-                            operate_type,
-                            database,
-                        );
-                        writer.write(cursor, item.value.with_status(status), item.index)?;
-                    }
-                }
+    fn handle_select(
+        &mut self,
+        seq: Sequence,
+        frame_id: u32,
+        object_headers: HeaderCollection,
+    ) -> usize {
+        let controls = match object_headers.control_iter() {
+            Err(err) => {
+                log::warn!(
+                    "ignoring select request containing non-control object header {} - {}",
+                    err.variation,
+                    err.qualifier
+                );
+                return self.write_empty_response(seq, IIN2::PARAMETER_ERROR);
+            }
+            Ok(controls) => controls,
+        };
+
+        let iin = self.get_response_iin() + IIN2::default();
+        let mut cursor = self.tx_buffer.write_cursor();
+        ResponseHeader::new(
+            Control::single_response(seq),
+            ResponseFunction::Response,
+            iin,
+        )
+        .write(&mut cursor)
+        .unwrap();
+
+        let handler = self.control_handler.borrow_mut();
+
+        let result: Result<CommandStatus, WriteError> = self.database.transaction(|database| {
+            let mut error = CommandStatus::Success;
+            for header in controls {
+                let status = header.select_with_response(&mut cursor, handler, database)?;
+                error = error.first_error(status);
+            }
+            Ok(error)
+        });
+
+        match result {
+            Ok(CommandStatus::Success) => {
+                // select was successful, compute the object hash
+
+                self.state.select_state = Some(SelectState::new(
+                    seq,
+                    frame_id,
+                    tokio::time::Instant::now(),
+                    object_headers.hash(),
+                ))
+            }
+            Ok(_) => {
+                // select failed with some error
+            }
+            Err(_) => {
+                log::warn!("unable to write complete select response");
             }
         }
-        Ok(())
+
+        cursor.written().len()
     }
 
     fn get_response_iin(&self) -> IIN1 {
@@ -971,6 +903,46 @@ impl From<ObjectParseError> for IIN2 {
 }
 
 impl<'a> ControlHeader<'a> {
+    fn select_with_response(
+        &self,
+        cursor: &mut WriteCursor,
+        handler: &mut dyn ControlHandler,
+        database: &mut Database,
+    ) -> Result<CommandStatus, WriteError> {
+        match self {
+            Self::OneByteGroup12Var1(seq) => {
+                select_header_with_response(cursor, seq, database, handler)
+            }
+            Self::OneByteGroup41Var1(seq) => {
+                select_header_with_response(cursor, seq, database, handler)
+            }
+            Self::OneByteGroup41Var2(seq) => {
+                select_header_with_response(cursor, seq, database, handler)
+            }
+            Self::OneByteGroup41Var3(seq) => {
+                select_header_with_response(cursor, seq, database, handler)
+            }
+            Self::OneByteGroup41Var4(seq) => {
+                select_header_with_response(cursor, seq, database, handler)
+            }
+            Self::TwoByteGroup12Var1(seq) => {
+                select_header_with_response(cursor, seq, database, handler)
+            }
+            Self::TwoByteGroup41Var1(seq) => {
+                select_header_with_response(cursor, seq, database, handler)
+            }
+            Self::TwoByteGroup41Var2(seq) => {
+                select_header_with_response(cursor, seq, database, handler)
+            }
+            Self::TwoByteGroup41Var3(seq) => {
+                select_header_with_response(cursor, seq, database, handler)
+            }
+            Self::TwoByteGroup41Var4(seq) => {
+                select_header_with_response(cursor, seq, database, handler)
+            }
+        }
+    }
+
     fn operate_with_response(
         &self,
         operate_type: OperateType,
@@ -1011,13 +983,33 @@ impl<'a> ControlHeader<'a> {
             }
         }
     }
+
+    fn operate_no_ack(&self, handler: &mut dyn ControlHandler, database: &mut Database) {
+        match self {
+            Self::OneByteGroup12Var1(seq) => operate_header_no_ack(seq, database, handler),
+            Self::OneByteGroup41Var1(seq) => operate_header_no_ack(seq, database, handler),
+            Self::OneByteGroup41Var2(seq) => operate_header_no_ack(seq, database, handler),
+            Self::OneByteGroup41Var3(seq) => operate_header_no_ack(seq, database, handler),
+            Self::OneByteGroup41Var4(seq) => operate_header_no_ack(seq, database, handler),
+            Self::TwoByteGroup12Var1(seq) => operate_header_no_ack(seq, database, handler),
+            Self::TwoByteGroup41Var1(seq) => operate_header_no_ack(seq, database, handler),
+            Self::TwoByteGroup41Var2(seq) => operate_header_no_ack(seq, database, handler),
+            Self::TwoByteGroup41Var3(seq) => operate_header_no_ack(seq, database, handler),
+            Self::TwoByteGroup41Var4(seq) => operate_header_no_ack(seq, database, handler),
+        }
+    }
 }
 
 trait ControlType {
     /// make a copy of the this control type with a new status code
     fn with_status(&self, status: CommandStatus) -> Self;
     /// select a control on a handler
-    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus;
+    fn select(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus;
     /// operate a control on a handler
     fn operate(
         self,
@@ -1026,6 +1018,28 @@ trait ControlType {
         op_type: OperateType,
         database: &mut Database,
     ) -> CommandStatus;
+}
+
+fn select_header_with_response<I, V>(
+    cursor: &mut WriteCursor,
+    seq: &CountSequence<Prefix<I, V>>,
+    database: &mut Database,
+    handler: &mut dyn ControlHandler,
+) -> Result<CommandStatus, WriteError>
+where
+    I: Index,
+    V: FixedSizeVariation + ControlType,
+{
+    let mut writer = PrefixWriter::new();
+    let mut ret = CommandStatus::Success;
+    for item in seq.iter() {
+        let status = item
+            .value
+            .select(handler, item.index.widen_to_u16(), database);
+        writer.write(cursor, item.value.with_status(status), item.index)?;
+        ret = ret.first_error(status);
+    }
+    Ok(ret)
 }
 
 fn operate_header_with_response<I, V>(
@@ -1049,6 +1063,24 @@ where
     Ok(())
 }
 
+fn operate_header_no_ack<I, V>(
+    seq: &CountSequence<Prefix<I, V>>,
+    database: &mut Database,
+    handler: &mut dyn ControlHandler,
+) where
+    I: Index,
+    V: FixedSizeVariation + ControlType,
+{
+    for item in seq.iter() {
+        item.value.operate(
+            handler,
+            item.index.widen_to_u16(),
+            OperateType::DirectOperateNoAck,
+            database,
+        );
+    }
+}
+
 pub(crate) trait WithCommandStatus {
     fn with_status(self, status: CommandStatus) -> Self;
 }
@@ -1058,8 +1090,13 @@ impl ControlType for Group12Var1 {
         Self { status, ..*self }
     }
 
-    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus {
-        handler.select(self, index)
+    fn select(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus {
+        handler.select(self, index, database)
     }
 
     fn operate(
@@ -1078,8 +1115,13 @@ impl ControlType for Group41Var1 {
         Self { status, ..*self }
     }
 
-    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus {
-        handler.select(self, index)
+    fn select(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus {
+        handler.select(self, index, database)
     }
 
     fn operate(
@@ -1098,8 +1140,13 @@ impl ControlType for Group41Var2 {
         Self { status, ..*self }
     }
 
-    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus {
-        handler.select(self, index)
+    fn select(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus {
+        handler.select(self, index, database)
     }
 
     fn operate(
@@ -1118,8 +1165,13 @@ impl ControlType for Group41Var3 {
         Self { status, ..*self }
     }
 
-    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus {
-        handler.select(self, index)
+    fn select(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus {
+        handler.select(self, index, database)
     }
 
     fn operate(
@@ -1138,8 +1190,13 @@ impl ControlType for Group41Var4 {
         Self { status, ..*self }
     }
 
-    fn select(self, handler: &mut dyn ControlHandler, index: u16) -> CommandStatus {
-        handler.select(self, index)
+    fn select(
+        self,
+        handler: &mut dyn ControlHandler,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus {
+        handler.select(self, index, database)
     }
 
     fn operate(

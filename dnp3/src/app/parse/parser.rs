@@ -15,6 +15,7 @@ use crate::app::variations::{
 };
 use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
+use xxhash_rust::xxh64::xxh64;
 
 #[derive(Copy, Clone)]
 pub(crate) struct DecodeSettings {
@@ -554,6 +555,10 @@ impl<'a> HeaderCollection<'a> {
         Ok(ControlHeaderIterator {
             parser: ObjectParser::one_pass(self.function, self.data),
         })
+    }
+
+    pub(crate) fn hash(&self) -> u64 {
+        xxh64(self.data, 0)
     }
 
     pub(crate) fn get_only_header(&self) -> Option<ObjectHeader<'a>> {

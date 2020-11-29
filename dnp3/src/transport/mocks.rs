@@ -14,6 +14,7 @@ pub(crate) struct MockWriter {
 pub(crate) struct MockReader {
     num_reads: usize,
     count: usize,
+    frame_id: u32,
     info: Option<FrameInfo>,
     buffer: [u8; 2048],
 }
@@ -61,6 +62,7 @@ impl MockReader {
         Self {
             num_reads: 0,
             count: 0,
+            frame_id: 0,
             info: None,
             buffer: [0; 2048],
         }
@@ -84,7 +86,7 @@ impl MockReader {
                     .info
                     .expect("call set_rx_frame_info(..) before running test");
                 let fragment = Fragment {
-                    info: FragmentInfo::new(self.count, info.source, info.broadcast),
+                    info: FragmentInfo::new(self.frame_id, info.source, info.broadcast),
                     data: &self.buffer[0..x],
                 };
                 Some(fragment)
@@ -98,6 +100,7 @@ impl MockReader {
     {
         self.count = io.read(&mut self.buffer).await?;
         self.num_reads += 1;
+        self.frame_id = self.frame_id.wrapping_add(1);
         println!("mock rx: {:02X?}", &self.buffer[0..self.count]);
         Ok(())
     }

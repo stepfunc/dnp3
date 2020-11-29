@@ -31,19 +31,19 @@ pub(crate) mod writer;
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct FragmentInfo {
-    pub(crate) count: usize,
+    pub(crate) id: u32,
     pub(crate) source: EndpointAddress,
     pub(crate) broadcast: Option<BroadcastConfirmMode>,
 }
 
 impl FragmentInfo {
     pub(crate) fn new(
-        count: usize,
+        id: u32,
         source: EndpointAddress,
         broadcast: Option<BroadcastConfirmMode>,
     ) -> Self {
         FragmentInfo {
-            count,
+            id,
             source,
             broadcast,
         }

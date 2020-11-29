@@ -196,9 +196,17 @@ impl CommandStatus {
             CommandStatus::Unknown(x) => x,
         }
     }
+
+    pub(crate) fn is_success(self) -> bool {
+        self == CommandStatus::Success
+    }
     
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
+    }
+
+    pub(crate) fn first_error(&self, other: Self) -> Self {
+        if self.is_success() { other } else { *self }
     }
 }
 
