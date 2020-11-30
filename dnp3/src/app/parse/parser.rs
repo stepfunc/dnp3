@@ -552,9 +552,7 @@ impl<'a> HeaderCollection<'a> {
             return Err(err);
         }
 
-        Ok(ControlHeaderIterator {
-            parser: ObjectParser::one_pass(self.function, self.data),
-        })
+        Ok(ControlHeaderIterator { inner: self.iter() })
     }
 
     pub(crate) fn hash(&self) -> u64 {
@@ -573,13 +571,14 @@ impl<'a> HeaderCollection<'a> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub(crate) struct HeaderIterator<'a> {
     parser: ObjectParser<'a>,
 }
 
 #[derive(Copy, Clone)]
 pub(crate) struct ControlHeaderIterator<'a> {
-    parser: ObjectParser<'a>,
+    inner: HeaderIterator<'a>,
 }
 
 impl<'a> Iterator for HeaderIterator<'a> {
@@ -599,11 +598,10 @@ impl<'a> Iterator for ControlHeaderIterator<'a> {
     type Item = ControlHeader<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.parser.next() {
+        match self.inner.next() {
             None => None,
-            Some(Ok(x)) => x.to_control_header().ok(),
-            // this should never happen, but this is better than blindly unwrapping
-            Some(Err(_)) => None,
+            // this should always be some b/c of pre-validation
+            Some(x) => x.to_control_header().ok(),
         }
     }
 }
