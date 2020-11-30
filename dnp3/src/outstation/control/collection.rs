@@ -1,186 +1,176 @@
-use crate::app::enums::CommandStatus;
+use crate::app::enums::{CommandStatus, QualifierCode};
+use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::ControlHeader;
+use crate::app::parse::parser::{HeaderCollection, HeaderDetails, HeaderIterator, ObjectHeader};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
+use crate::app::variations::{
+    Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4, Variation,
+};
+use crate::outstation::control::control_type::ControlType;
+use crate::outstation::control::prefix::PrefixWriter;
 use crate::outstation::database::Database;
-use crate::outstation::details::prefix::PrefixWriter;
 use crate::outstation::traits::{ControlHandler, OperateType};
 use crate::util::cursor::{WriteCursor, WriteError};
-use std::fmt::Debug;
 
-pub(crate) trait ControlType: Debug {
-    /// make a copy of this control type with a new status code
-    fn with_status(&self, status: CommandStatus) -> Self;
-
-    /// get the command status
-    fn status(&self) -> CommandStatus;
-
-    /// select a control on a handler
-    fn select(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        database: &mut Database,
-    ) -> CommandStatus;
-    /// operate a control on a handler
-    fn operate(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
-        database: &mut Database,
-    ) -> CommandStatus;
-}
-
-impl ControlType for Group12Var1 {
-    fn with_status(&self, status: CommandStatus) -> Self {
-        Self { status, ..*self }
-    }
-
-    fn status(&self) -> CommandStatus {
-        self.status
-    }
-
-    fn select(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.select(self, index, database)
-    }
-
-    fn operate(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.operate(self, index, op_type, database)
+impl<'a> ObjectHeader<'a> {
+    pub(crate) fn to_control_header(&self) -> Result<ControlHeader<'a>, BadControlHeader> {
+        match self.details {
+            // one byte headers
+            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
+                Ok(ControlHeader::OneByteGroup12Var1(seq))
+            }
+            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
+                Ok(ControlHeader::OneByteGroup41Var1(seq))
+            }
+            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
+                Ok(ControlHeader::OneByteGroup41Var2(seq))
+            }
+            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
+                Ok(ControlHeader::OneByteGroup41Var3(seq))
+            }
+            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
+                Ok(ControlHeader::OneByteGroup41Var4(seq))
+            }
+            // two byte headers
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
+                Ok(ControlHeader::TwoByteGroup12Var1(seq))
+            }
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
+                Ok(ControlHeader::TwoByteGroup41Var1(seq))
+            }
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
+                Ok(ControlHeader::TwoByteGroup41Var2(seq))
+            }
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
+                Ok(ControlHeader::TwoByteGroup41Var3(seq))
+            }
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
+                Ok(ControlHeader::TwoByteGroup41Var4(seq))
+            }
+            _ => Err(BadControlHeader::new(
+                self.variation,
+                self.details.qualifier(),
+            )),
+        }
     }
 }
 
-impl ControlType for Group41Var1 {
-    fn with_status(&self, status: CommandStatus) -> Self {
-        Self { status, ..*self }
-    }
+#[derive(Debug, PartialEq)]
+pub(crate) enum ControlHeader<'a> {
+    OneByteGroup12Var1(CountSequence<'a, Prefix<u8, Group12Var1>>),
+    OneByteGroup41Var1(CountSequence<'a, Prefix<u8, Group41Var1>>),
+    OneByteGroup41Var2(CountSequence<'a, Prefix<u8, Group41Var2>>),
+    OneByteGroup41Var3(CountSequence<'a, Prefix<u8, Group41Var3>>),
+    OneByteGroup41Var4(CountSequence<'a, Prefix<u8, Group41Var4>>),
+    TwoByteGroup12Var1(CountSequence<'a, Prefix<u16, Group12Var1>>),
+    TwoByteGroup41Var1(CountSequence<'a, Prefix<u16, Group41Var1>>),
+    TwoByteGroup41Var2(CountSequence<'a, Prefix<u16, Group41Var2>>),
+    TwoByteGroup41Var3(CountSequence<'a, Prefix<u16, Group41Var3>>),
+    TwoByteGroup41Var4(CountSequence<'a, Prefix<u16, Group41Var4>>),
+}
 
-    fn status(&self) -> CommandStatus {
-        self.status
-    }
+#[derive(Debug, PartialEq)]
+pub(crate) struct BadControlHeader {
+    pub(crate) variation: Variation,
+    pub(crate) qualifier: QualifierCode,
+}
 
-    fn select(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.select(self, index, database)
-    }
-
-    fn operate(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.operate(self, index, op_type, database)
+impl BadControlHeader {
+    pub(crate) fn new(variation: Variation, qualifier: QualifierCode) -> Self {
+        Self {
+            variation,
+            qualifier,
+        }
     }
 }
 
-impl ControlType for Group41Var2 {
-    fn with_status(&self, status: CommandStatus) -> Self {
-        Self { status, ..*self }
+pub(crate) struct ControlCollection<'a> {
+    inner: HeaderCollection<'a>,
+}
+
+impl<'a> ControlCollection<'a> {
+    pub(crate) fn from(headers: HeaderCollection<'a>) -> Result<Self, BadControlHeader> {
+        // do one pass to ensure that all headers are control headers
+        let non_control_header: Option<BadControlHeader> = headers.iter().find_map(|x| {
+            if let Err(header) = x.to_control_header() {
+                Some(header)
+            } else {
+                None
+            }
+        });
+
+        if let Some(err) = non_control_header {
+            return Err(err);
+        }
+
+        Ok(ControlCollection { inner: headers })
     }
 
-    fn status(&self) -> CommandStatus {
-        self.status
+    fn iter(&self) -> ControlHeaderIterator<'a> {
+        ControlHeaderIterator {
+            inner: self.inner.iter(),
+        }
     }
 
-    fn select(
-        self,
+    pub(crate) fn respond_with_status(
+        &self,
+        cursor: &mut WriteCursor,
+        status: CommandStatus,
+    ) -> Result<(), WriteError> {
+        for header in self.iter() {
+            header.respond_with_status(cursor, status)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn select_with_response(
+        &self,
+        cursor: &mut WriteCursor,
         handler: &mut dyn ControlHandler,
-        index: u16,
         database: &mut Database,
-    ) -> CommandStatus {
-        handler.select(self, index, database)
+    ) -> Result<CommandStatus, WriteError> {
+        let mut error = CommandStatus::Success;
+        for header in self.iter() {
+            let status = header.select_with_response(cursor, handler, database)?;
+            error = error.first_error(status);
+        }
+        Ok(error)
     }
 
-    fn operate(
-        self,
+    pub(crate) fn operate_with_response(
+        &self,
+        cursor: &mut WriteCursor,
+        operate_type: OperateType,
         handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
         database: &mut Database,
-    ) -> CommandStatus {
-        handler.operate(self, index, op_type, database)
+    ) -> Result<(), WriteError> {
+        for header in self.iter() {
+            header.operate_with_response(operate_type, cursor, handler, database)?;
+        }
+        Ok(())
     }
 }
 
-impl ControlType for Group41Var3 {
-    fn with_status(&self, status: CommandStatus) -> Self {
-        Self { status, ..*self }
-    }
-
-    fn status(&self) -> CommandStatus {
-        self.status
-    }
-
-    fn select(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.select(self, index, database)
-    }
-
-    fn operate(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.operate(self, index, op_type, database)
-    }
+#[derive(Copy, Clone)]
+pub(crate) struct ControlHeaderIterator<'a> {
+    inner: HeaderIterator<'a>,
 }
 
-impl ControlType for Group41Var4 {
-    fn with_status(&self, status: CommandStatus) -> Self {
-        Self { status, ..*self }
-    }
+impl<'a> Iterator for ControlHeaderIterator<'a> {
+    type Item = ControlHeader<'a>;
 
-    fn status(&self) -> CommandStatus {
-        self.status
-    }
-
-    fn select(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.select(self, index, database)
-    }
-
-    fn operate(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.operate(self, index, op_type, database)
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.inner.next() {
+            None => None,
+            // this should always be some b/c of pre-validation
+            Some(x) => x.to_control_header().ok(),
+        }
     }
 }
 
 impl<'a> ControlHeader<'a> {
-    pub(crate) fn respond_with_status(
+    fn respond_with_status(
         &self,
         cursor: &mut WriteCursor,
         status: CommandStatus,
@@ -199,7 +189,7 @@ impl<'a> ControlHeader<'a> {
         }
     }
 
-    pub(crate) fn select_with_response(
+    fn select_with_response(
         &self,
         cursor: &mut WriteCursor,
         handler: &mut dyn ControlHandler,
@@ -239,7 +229,7 @@ impl<'a> ControlHeader<'a> {
         }
     }
 
-    pub(crate) fn operate_with_response(
+    fn operate_with_response(
         &self,
         operate_type: OperateType,
         cursor: &mut WriteCursor,
@@ -280,7 +270,7 @@ impl<'a> ControlHeader<'a> {
         }
     }
 
-    pub(crate) fn operate_no_ack(&self, handler: &mut dyn ControlHandler, database: &mut Database) {
+    fn operate_no_ack(&self, handler: &mut dyn ControlHandler, database: &mut Database) {
         match self {
             Self::OneByteGroup12Var1(seq) => operate_header_no_ack(seq, database, handler),
             Self::OneByteGroup41Var1(seq) => operate_header_no_ack(seq, database, handler),

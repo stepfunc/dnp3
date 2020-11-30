@@ -4,15 +4,12 @@ use crate::app::gen::count::CountVariation;
 use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::header::{Control, RequestHeader, ResponseFunction, ResponseHeader, IIN};
-use crate::app::parse::count::CountSequence;
 use crate::app::parse::error::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::parse::DecodeLogLevel;
-use crate::app::variations::{
-    Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4, Variation,
-};
+use crate::app::variations::Variation;
 use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
 use xxhash_rust::xxh64::xxh64;
@@ -238,65 +235,9 @@ pub(crate) struct ObjectHeader<'a> {
     pub(crate) details: HeaderDetails<'a>,
 }
 
-#[derive(Debug, PartialEq)]
-pub(crate) struct BadControlHeader {
-    pub(crate) variation: Variation,
-    pub(crate) qualifier: QualifierCode,
-}
-
-impl BadControlHeader {
-    fn new(variation: Variation, qualifier: QualifierCode) -> Self {
-        Self {
-            variation,
-            qualifier,
-        }
-    }
-}
-
 impl<'a> ObjectHeader<'a> {
     pub(crate) fn new(variation: Variation, details: HeaderDetails<'a>) -> Self {
         Self { variation, details }
-    }
-
-    pub(crate) fn to_control_header(&self) -> Result<ControlHeader<'a>, BadControlHeader> {
-        match self.details {
-            // one byte headers
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
-                Ok(ControlHeader::OneByteGroup12Var1(seq))
-            }
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
-                Ok(ControlHeader::OneByteGroup41Var1(seq))
-            }
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
-                Ok(ControlHeader::OneByteGroup41Var2(seq))
-            }
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
-                Ok(ControlHeader::OneByteGroup41Var3(seq))
-            }
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
-                Ok(ControlHeader::OneByteGroup41Var4(seq))
-            }
-            // two byte headers
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
-                Ok(ControlHeader::TwoByteGroup12Var1(seq))
-            }
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
-                Ok(ControlHeader::TwoByteGroup41Var1(seq))
-            }
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
-                Ok(ControlHeader::TwoByteGroup41Var2(seq))
-            }
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
-                Ok(ControlHeader::TwoByteGroup41Var3(seq))
-            }
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
-                Ok(ControlHeader::TwoByteGroup41Var4(seq))
-            }
-            _ => Err(BadControlHeader::new(
-                self.variation,
-                self.details.qualifier(),
-            )),
-        }
     }
 
     pub(crate) fn format(&self, format_values: bool, f: &mut Formatter) -> std::fmt::Result {
@@ -455,20 +396,6 @@ pub(crate) enum HeaderDetails<'a> {
     TwoByteCountAndPrefix(u16, PrefixedVariation<'a, u16>),
 }
 
-#[derive(Debug, PartialEq)]
-pub(crate) enum ControlHeader<'a> {
-    OneByteGroup12Var1(CountSequence<'a, Prefix<u8, Group12Var1>>),
-    OneByteGroup41Var1(CountSequence<'a, Prefix<u8, Group41Var1>>),
-    OneByteGroup41Var2(CountSequence<'a, Prefix<u8, Group41Var2>>),
-    OneByteGroup41Var3(CountSequence<'a, Prefix<u8, Group41Var3>>),
-    OneByteGroup41Var4(CountSequence<'a, Prefix<u8, Group41Var4>>),
-    TwoByteGroup12Var1(CountSequence<'a, Prefix<u16, Group12Var1>>),
-    TwoByteGroup41Var1(CountSequence<'a, Prefix<u16, Group41Var1>>),
-    TwoByteGroup41Var2(CountSequence<'a, Prefix<u16, Group41Var2>>),
-    TwoByteGroup41Var3(CountSequence<'a, Prefix<u16, Group41Var3>>),
-    TwoByteGroup41Var4(CountSequence<'a, Prefix<u16, Group41Var4>>),
-}
-
 impl HeaderDetails<'_> {
     pub(crate) fn qualifier(&self) -> QualifierCode {
         match self {
@@ -538,27 +465,6 @@ impl<'a> HeaderCollection<'a> {
         }
     }
 
-    pub(crate) fn control_iter(&self) -> Result<ControlHeaderIterator<'a>, BadControlHeader> {
-        // do one pass to ensure that all headers are control headers
-        let non_control_header: Option<BadControlHeader> = self.iter().find_map(|x| {
-            if let Err(header) = x.to_control_header() {
-                Some(header)
-            } else {
-                None
-            }
-        });
-
-        if let Some(err) = non_control_header {
-            return Err(err);
-        }
-
-        Ok(ControlHeaderIterator { inner: self.iter() })
-    }
-
-    pub(crate) fn hash(&self) -> u64 {
-        xxh64(self.data, 0)
-    }
-
     pub(crate) fn get_only_header(&self) -> Option<ObjectHeader<'a>> {
         let mut iter = self.iter();
         match iter.next() {
@@ -569,16 +475,15 @@ impl<'a> HeaderCollection<'a> {
             },
         }
     }
+
+    pub(crate) fn hash(&self) -> u64 {
+        xxh64(self.data, 0)
+    }
 }
 
 #[derive(Copy, Clone)]
 pub(crate) struct HeaderIterator<'a> {
     parser: ObjectParser<'a>,
-}
-
-#[derive(Copy, Clone)]
-pub(crate) struct ControlHeaderIterator<'a> {
-    inner: HeaderIterator<'a>,
 }
 
 impl<'a> Iterator for HeaderIterator<'a> {
@@ -590,18 +495,6 @@ impl<'a> Iterator for HeaderIterator<'a> {
             Some(Ok(x)) => Some(x),
             // this should never happen, but this is better than blindly unwrapping
             Some(Err(_)) => None,
-        }
-    }
-}
-
-impl<'a> Iterator for ControlHeaderIterator<'a> {
-    type Item = ControlHeader<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.inner.next() {
-            None => None,
-            // this should always be some b/c of pre-validation
-            Some(x) => x.to_control_header().ok(),
         }
     }
 }

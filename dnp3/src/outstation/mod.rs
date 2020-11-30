@@ -13,4 +13,5 @@ pub enum SelfAddressSupport {
     Disabled,
 }
 
-pub(crate) mod details;
+/// functionality for processing control requests
+pub(crate) mod control;

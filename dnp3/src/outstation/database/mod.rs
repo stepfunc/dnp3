@@ -1,6 +1,6 @@
 /// types for configuring the database
 pub mod config;
-/// private internal details only needed by the parent module
+/// private internal control only needed by the parent module
 mod details;
 
 use crate::app::header::IIN2;

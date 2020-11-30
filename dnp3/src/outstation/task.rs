@@ -13,6 +13,7 @@ use crate::app::parse::error::ObjectParseError;
 use crate::app::variations::{Group52Var1, Group52Var2};
 use crate::entry::EndpointAddress;
 use crate::link::header::BroadcastConfirmMode;
+use crate::outstation::control::collection::ControlCollection;
 use crate::outstation::traits::{ControlHandler, OperateType, OutstationApplication, RestartDelay};
 use crate::outstation::SelfAddressSupport;
 use crate::util::buffer::Buffer;
@@ -601,7 +602,7 @@ impl Session {
     }
 
     fn handle_direct_operate(&mut self, seq: Sequence, object_headers: HeaderCollection) -> usize {
-        let controls = match object_headers.control_iter() {
+        let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
                 log::warn!(
                     "ignoring control request containing non-control object header {} - {}",
@@ -625,21 +626,14 @@ impl Session {
 
         let handler = self.control_handler.borrow_mut();
 
-        let result: Result<(), WriteError> = self.database.transaction(|database| {
-            for header in controls {
-                header.operate_with_response(
-                    OperateType::DirectOperate,
-                    &mut cursor,
-                    handler,
-                    database,
-                )?;
-            }
-            Ok(())
+        let _ = self.database.transaction(|database| {
+            controls.operate_with_response(
+                &mut cursor,
+                OperateType::DirectOperate,
+                handler,
+                database,
+            )
         });
-
-        if result.is_err() {
-            log::warn!("unable to write complete response");
-        }
 
         cursor.written().len()
     }
@@ -650,7 +644,7 @@ impl Session {
         frame_id: u32,
         object_headers: HeaderCollection,
     ) -> usize {
-        let controls = match object_headers.control_iter() {
+        let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
                 log::warn!(
                     "ignoring select request containing non-control object header {} - {}",
@@ -674,14 +668,9 @@ impl Session {
 
         let handler = self.control_handler.borrow_mut();
 
-        let result: Result<CommandStatus, WriteError> = self.database.transaction(|database| {
-            let mut error = CommandStatus::Success;
-            for header in controls {
-                let status = header.select_with_response(&mut cursor, handler, database)?;
-                error = error.first_error(status);
-            }
-            Ok(error)
-        });
+        let result: Result<CommandStatus, WriteError> = self
+            .database
+            .transaction(|database| controls.select_with_response(&mut cursor, handler, database));
 
         match result {
             Ok(CommandStatus::Success) => {
