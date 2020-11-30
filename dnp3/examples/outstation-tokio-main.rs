@@ -1,3 +1,4 @@
+use dnp3::app::enums::CommandStatus;
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::parse::DecodeLogLevel;
@@ -10,7 +11,6 @@ use dnp3::outstation::traits::{DefaultControlHandler, DefaultOutstationApplicati
 use dnp3::outstation::SelfAddressSupport;
 use std::net::Ipv4Addr;
 use std::time::Duration;
-use dnp3::app::enums::CommandStatus;
 
 fn get_outstation_config(outstation: EndpointAddress, master: EndpointAddress) -> OutstationConfig {
     OutstationConfig::new(
