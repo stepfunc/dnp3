@@ -180,6 +180,25 @@ impl ControlType for Group41Var4 {
 }
 
 impl<'a> ControlHeader<'a> {
+    pub(crate) fn respond_with_status(
+        &self,
+        cursor: &mut WriteCursor,
+        status: CommandStatus,
+    ) -> Result<(), WriteError> {
+        match self {
+            Self::OneByteGroup12Var1(seq) => respond_with_status(cursor, seq, status),
+            Self::OneByteGroup41Var1(seq) => respond_with_status(cursor, seq, status),
+            Self::OneByteGroup41Var2(seq) => respond_with_status(cursor, seq, status),
+            Self::OneByteGroup41Var3(seq) => respond_with_status(cursor, seq, status),
+            Self::OneByteGroup41Var4(seq) => respond_with_status(cursor, seq, status),
+            Self::TwoByteGroup12Var1(seq) => respond_with_status(cursor, seq, status),
+            Self::TwoByteGroup41Var1(seq) => respond_with_status(cursor, seq, status),
+            Self::TwoByteGroup41Var2(seq) => respond_with_status(cursor, seq, status),
+            Self::TwoByteGroup41Var3(seq) => respond_with_status(cursor, seq, status),
+            Self::TwoByteGroup41Var4(seq) => respond_with_status(cursor, seq, status),
+        }
+    }
+
     pub(crate) fn select_with_response(
         &self,
         cursor: &mut WriteCursor,
@@ -275,6 +294,22 @@ impl<'a> ControlHeader<'a> {
             Self::TwoByteGroup41Var4(seq) => operate_header_no_ack(seq, database, handler),
         }
     }
+}
+
+fn respond_with_status<I, V>(
+    cursor: &mut WriteCursor,
+    seq: &CountSequence<Prefix<I, V>>,
+    status: CommandStatus,
+) -> Result<(), WriteError>
+where
+    I: Index,
+    V: FixedSizeVariation + ControlType,
+{
+    let mut writer = PrefixWriter::new();
+    for item in seq.iter() {
+        writer.write(cursor, item.value.with_status(status), item.index)?;
+    }
+    Ok(())
 }
 
 fn select_header_with_response<I, V>(
