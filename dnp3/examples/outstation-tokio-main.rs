@@ -10,6 +10,7 @@ use dnp3::outstation::traits::{DefaultControlHandler, DefaultOutstationApplicati
 use dnp3::outstation::SelfAddressSupport;
 use std::net::Ipv4Addr;
 use std::time::Duration;
+use dnp3::app::enums::CommandStatus;
 
 fn get_outstation_config(outstation: EndpointAddress, master: EndpointAddress) -> OutstationConfig {
     OutstationConfig::new(
@@ -41,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         get_outstation_config(outstation_address, master_address),
         get_database_config(),
         DefaultOutstationApplication::create(),
-        DefaultControlHandler::create(),
+        DefaultControlHandler::with_status(CommandStatus::Success),
     );
 
     handle.transaction(|db| {
