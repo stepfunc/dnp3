@@ -5,7 +5,7 @@ use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
 use crate::outstation::SelfAddressSupport;
-use tokio::io::{AsyncRead, AsyncWrite};
+use crate::tokio::io::{AsyncRead, AsyncWrite};
 
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport reader during testing.
@@ -82,16 +82,18 @@ impl TransportReader {
     pub(crate) async fn read_with_timeout<T>(
         &mut self,
         io: &mut T,
-        deadline: tokio::time::Instant,
+        deadline: crate::tokio::time::Instant,
     ) -> Result<Timeout, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        match tokio::time::timeout_at(deadline, self.read(io)).await {
-            Err(_) => Ok(Timeout::Yes),
-            Ok(res) => {
+        crate::tokio::select! {
+            res = self.read(io) => {
                 res?;
                 Ok(Timeout::No)
+            },
+            _ = crate::tokio::time::delay_until(deadline) => {
+                Ok(Timeout::Yes)
             }
         }
     }

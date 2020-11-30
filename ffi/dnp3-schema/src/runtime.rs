@@ -1,12 +1,13 @@
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
+use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
 
 pub fn define(
     lib: &mut LibraryBuilder,
     decode_log_level_enum: NativeEnumHandle,
-) -> Result<ClassDeclarationHandle, BindingError> {
+) -> Result<(NativeStructHandle, ClassDeclarationHandle), BindingError> {
     // Forward declare the class
     let runtime_class = lib.declare_class("Runtime")?;
 
@@ -51,9 +52,9 @@ pub fn define(
         )?
         .build()?;
 
-    let reconnect_strategy = lib.declare_native_struct("ReconnectStrategy")?;
-    let reconnect_strategy = lib
-        .define_native_struct(&reconnect_strategy)?
+    let retry_strategy = lib.declare_native_struct("RetryStrategy")?;
+    let retry_strategy = lib
+        .define_native_struct(&retry_strategy)?
         .add(
             "min_delay",
             Type::Duration(DurationMapping::Milliseconds),
@@ -64,7 +65,7 @@ pub fn define(
             Type::Duration(DurationMapping::Milliseconds),
             "Maximum delay between two retries",
         )?
-        .doc(doc("Reconnection strategy configuration.").details(
+        .doc(doc("Retry strategy configuration.").details(
             "The strategy uses an exponential back-off with a minimum and maximum value.",
         ))?
         .build()?;
@@ -111,7 +112,7 @@ pub fn define(
         .param("runtime", Type::ClassRef(runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
         .param("address", Type::Uint16, "Local DNP3 data-link address")?
         .param("level", Type::Enum(decode_log_level_enum), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
-        .param("strategy", Type::Struct(reconnect_strategy), "Reconnection strategy to use")?
+        .param("strategy", Type::Struct(retry_strategy.clone()), "Reconnection strategy to use")?
         .param(
             "response_timeout",
             Type::Duration(DurationMapping::Milliseconds),
@@ -135,5 +136,5 @@ pub fn define(
         .doc("Event-queue based runtime handle")?
         .build()?;
 
-    Ok(master_class)
+    Ok((retry_strategy, master_class))
 }

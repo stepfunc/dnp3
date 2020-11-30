@@ -17,12 +17,12 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
+use crate::tokio::sync::mpsc::error::SendError;
 use std::time::{Duration, SystemTime};
-use tokio::sync::mpsc::error::SendError;
 
 #[derive(Clone, Debug)]
 pub struct MasterHandle {
-    sender: tokio::sync::mpsc::Sender<Message>,
+    sender: crate::tokio::sync::mpsc::Sender<Message>,
 }
 
 /// handle used to make requests against
@@ -33,7 +33,7 @@ pub struct AssociationHandle {
 }
 
 impl MasterHandle {
-    pub(crate) fn new(sender: tokio::sync::mpsc::Sender<Message>) -> Self {
+    pub(crate) fn new(sender: crate::tokio::sync::mpsc::Sender<Message>) -> Self {
         Self { sender }
     }
 
@@ -46,7 +46,7 @@ impl MasterHandle {
 
     /// Get the current decoding level used by this master
     pub async fn get_decode_log_level(&mut self) -> Result<DecodeLogLevel, Shutdown> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<DecodeLogLevel, Shutdown>>();
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<DecodeLogLevel, Shutdown>>();
         self.send_master_message(MasterMsg::GetDecodeLogLevel(Promise::OneShot(tx)))
             .await?;
         rx.await?
@@ -63,7 +63,7 @@ impl MasterHandle {
         handler: Box<dyn AssociationHandler>,
     ) -> Result<AssociationHandle, AssociationError> {
         let association = Association::new(address, config, handler);
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
         self.send_master_message(MasterMsg::AddAssociation(association, Promise::OneShot(tx)))
             .await?;
         rx.await?
@@ -105,7 +105,7 @@ impl AssociationHandle {
         request: ReadRequest,
         period: Duration,
     ) -> Result<PollHandle, PollError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<PollHandle, PollError>>();
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<PollHandle, PollError>>();
         self.send_poll_message(PollMsg::AddPoll(
             self.clone(),
             request,
@@ -124,7 +124,7 @@ impl AssociationHandle {
     }
 
     pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         let task = SingleReadTask::new(request, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
@@ -135,7 +135,7 @@ impl AssociationHandle {
         mode: CommandMode,
         headers: CommandHeaders,
     ) -> Result<(), CommandError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), CommandError>>();
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), CommandError>>();
         let task = CommandTask::from_mode(mode, headers, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
@@ -145,7 +145,7 @@ impl AssociationHandle {
         &mut self,
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
         let task = TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
@@ -175,7 +175,7 @@ pub enum Listener<T> {
     /// listener is a boxed FnMut
     BoxedFn(Box<dyn FnMut(T) + Send + Sync>),
     /// listener is a broadcast channel
-    Watch(tokio::sync::broadcast::Sender<T>),
+    Watch(crate::tokio::sync::broadcast::Sender<T>),
 }
 
 /// A generic callback type that must be invoked once and only once.
@@ -187,7 +187,7 @@ pub enum Promise<T> {
     /// Box<FnOnce> is consumed when the promise is completed
     BoxedFn(Box<dyn FnOnce(T) + Send + Sync>),
     /// one-shot reply channel is consumed when the promise is completed
-    OneShot(tokio::sync::oneshot::Sender<T>),
+    OneShot(crate::tokio::sync::oneshot::Sender<T>),
 }
 
 impl<T> Promise<T> {

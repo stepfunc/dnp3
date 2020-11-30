@@ -1,5 +1,6 @@
 use crate::ffi;
 use crate::*;
+use dnp3::app::retry::RetryStrategy;
 use dnp3::prelude::master::*;
 use std::ffi::CStr;
 use std::net::SocketAddr;
@@ -47,12 +48,12 @@ pub(crate) unsafe fn runtime_add_master_tcp(
     runtime: *mut tokio::runtime::Runtime,
     address: u16,
     level: ffi::DecodeLogLevel,
-    strategy: ffi::ReconnectStrategy,
+    strategy: ffi::RetryStrategy,
     response_timeout: Duration,
     endpoint: &CStr,
     listener: ffi::ClientStateListener,
 ) -> *mut Master {
-    let strategy = ReconnectStrategy::new(strategy.min_delay(), strategy.max_delay());
+    let strategy = RetryStrategy::new(strategy.min_delay(), strategy.max_delay());
     let response_timeout = response_timeout;
     let endpoint = if let Ok(endpoint) = SocketAddr::from_str(&endpoint.to_string_lossy()) {
         endpoint

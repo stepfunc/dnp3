@@ -15,9 +15,10 @@ use crate::entry::EndpointAddress;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo};
 use crate::outstation::traits::{OutstationApplication, RestartDelay};
 use crate::outstation::SelfAddressSupport;
+use crate::tokio::io::{AsyncRead, AsyncWrite};
+use crate::tokio::time::Instant;
 use crate::util::buffer::Buffer;
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::time::Duration;
+use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;
 
 #[derive(Copy, Clone, PartialEq)]
@@ -288,7 +289,7 @@ impl Session {
             }
         }
 
-        tokio::select! {
+        crate::tokio::select! {
             frame_read = reader.read(io) => {
                 frame_read?;
             }
@@ -578,8 +579,8 @@ impl Session {
         )
     }
 
-    fn new_confirm_deadline(&self) -> tokio::time::Instant {
-        tokio::time::Instant::now() + self.config.confirm_timeout
+    fn new_confirm_deadline(&self) -> Instant {
+        Instant::now() + self.config.confirm_timeout
     }
 
     async fn enter_sol_confirm_wait<T>(

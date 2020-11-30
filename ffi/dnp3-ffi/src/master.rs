@@ -1,6 +1,7 @@
 use crate::association::Association;
 use crate::ffi;
 
+use dnp3::app::retry::RetryStrategy;
 use dnp3::app::types::Timestamp;
 use dnp3::entry::EndpointAddress;
 use dnp3::master::association::Configuration;
@@ -45,6 +46,10 @@ pub unsafe fn master_add_association(
         convert_event_classes(&config.disable_unsol_classes()),
         convert_event_classes(&config.enable_unsol_classes()),
         convert_auto_time_sync(&config.auto_time_sync()),
+        RetryStrategy::new(
+            config.auto_tasks_retry_strategy.min_delay(),
+            config.auto_tasks_retry_strategy.max_delay(),
+        ),
     );
 
     let handler = AssociationHandlerAdapter {

@@ -2,6 +2,7 @@ use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
+use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
 
 pub fn define(
@@ -9,6 +10,7 @@ pub fn define(
     master_class: ClassDeclarationHandle,
     read_handler: InterfaceHandle,
     decode_log_level_enum: NativeEnumHandle,
+    retry_strategy: NativeStructHandle,
 ) -> Result<ClassDeclarationHandle, BindingError> {
     let destroy_fn = lib
         .declare_native_function("master_destroy")?
@@ -67,6 +69,11 @@ pub fn define(
             "auto_time_sync",
             Type::Enum(auto_time_sync_enum),
             "Automatic time sychronization configuration",
+        )?
+        .add(
+            "auto_tasks_retry_strategy",
+            Type::Struct(retry_strategy),
+            "Automatic tasks retry strategy",
         )?
         .doc("Association configuration")?
         .build()?;

@@ -31,7 +31,7 @@ impl AutoTask {
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
             AutoTask::ClearRestartBit => FunctionCode::Write,
-            AutoTask::EnableUnsolicited(_) => FunctionCode::EnabledUnsolicited,
+            AutoTask::EnableUnsolicited(_) => FunctionCode::EnableUnsolicited,
             AutoTask::DisableUnsolicited(_) => FunctionCode::DisableUnsolicited,
         }
     }
