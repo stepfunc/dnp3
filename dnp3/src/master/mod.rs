@@ -13,3 +13,6 @@ pub(crate) mod messages;
 pub(crate) mod poll;
 pub(crate) mod session;
 pub(crate) mod tasks;
+
+#[cfg(test)]
+mod tests;

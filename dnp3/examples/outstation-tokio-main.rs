@@ -35,7 +35,7 @@ fn get_database_config() -> DatabaseConfig {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
 
-    let outstation_address = EndpointAddress::from(10)?;
+    let outstation_address = EndpointAddress::from(1024)?;
     let master_address = EndpointAddress::from(1)?;
 
     let (mut task, handle) = OutstationTask::create(

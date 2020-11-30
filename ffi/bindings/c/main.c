@@ -234,7 +234,7 @@ int main()
     runtime_t* runtime = runtime_new(&runtime_config);
 
     // Create the master
-    reconnect_strategy_t strategy =
+    retry_strategy_t retry_strategy =
     {
         .min_delay = 100,
         .max_delay = 5000,
@@ -248,7 +248,7 @@ int main()
         runtime,
         1,
         DecodeLogLevel_ObjectValues,
-        strategy,
+        retry_strategy,
         5000,
         "127.0.0.1:20000",
         listener
@@ -284,6 +284,7 @@ int main()
             .class3 = true,
         },
         .auto_time_sync = AutoTimeSync_Lan,
+        .auto_tasks_retry_strategy = retry_strategy,
     };
     association_handlers_t association_handlers =
     {

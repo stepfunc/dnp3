@@ -148,13 +148,13 @@ public class Main {
         runtimeConfig.numCoreThreads = ushort(4);
         try(Runtime runtime = new Runtime(runtimeConfig)) {
             // Create the master
-            ReconnectStrategy reconnectStrategy = new ReconnectStrategy();
-            reconnectStrategy.minDelay = Duration.ofMillis(100);
-            reconnectStrategy.maxDelay = Duration.ofSeconds(5);
+            RetryStrategy retryStrategy = new RetryStrategy();
+            retryStrategy.minDelay = Duration.ofMillis(100);
+            retryStrategy.maxDelay = Duration.ofSeconds(5);
             Master master = runtime.addMasterTcp(
                     ushort(1),
                     DecodeLogLevel.OBJECT_VALUES,
-                    reconnectStrategy,
+                    retryStrategy,
                     Duration.ofSeconds(5),
                     "127.0.0.1:20000",
                     new TestListener()
@@ -172,6 +172,7 @@ public class Main {
             associationConfiguration.enableUnsolClasses.class2 = true;
             associationConfiguration.enableUnsolClasses.class3 = true;
             associationConfiguration.autoTimeSync = AutoTimeSync.LAN;
+            associationConfiguration.autoTasksRetryStrategy = retryStrategy;
             AssociationHandlers associationHandlers = new AssociationHandlers();
             associationHandlers.integrityHandler = readHandler;
             associationHandlers.unsolicitedHandler = readHandler;

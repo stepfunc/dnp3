@@ -14,4 +14,4 @@ tokio = { version = "^0.2.23", features = ["rt-threaded"] }
 
 [build-dependencies]
 dnp3-schema = { path = "../dnp3-schema" }
-rust-oo-bindgen = { git = "https://git@github.com/grid-io/oo_bindgen.git" }
+rust-oo-bindgen = { git = "https://git@github.com/stepfunc/oo_bindgen.git" }

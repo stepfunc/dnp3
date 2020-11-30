@@ -5,9 +5,9 @@ use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::format::{format_unconfirmed_user_data, Payload};
 use crate::link::header::AnyAddress;
+use crate::tokio::io::{AsyncWrite, AsyncWriteExt};
 use crate::transport::sequence::Sequence;
 use crate::util::cursor::WriteCursor;
-use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 pub(crate) struct Writer {
     endpoint_type: EndpointType,

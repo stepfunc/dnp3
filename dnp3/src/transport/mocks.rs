@@ -4,8 +4,8 @@ use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::{AnyAddress, FrameInfo};
 use crate::outstation::SelfAddressSupport;
+use crate::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::transport::{Fragment, FragmentInfo};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub(crate) struct MockWriter {
     num_writes: usize,

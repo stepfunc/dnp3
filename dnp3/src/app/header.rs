@@ -91,6 +91,16 @@ impl Control {
         }
     }
 
+    pub(crate) fn unsolicited_response(seq: Sequence) -> Self {
+        Self {
+            fir: true,
+            fin: true,
+            con: true,
+            uns: true,
+            seq,
+        }
+    }
+
     pub(crate) fn from(x: u8) -> Self {
         Self {
             fir: x & Self::FIR_MASK != 0,

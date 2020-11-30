@@ -158,7 +158,7 @@ class MainClass
             var master = runtime.AddMasterTcp(
                 1,
                 DecodeLogLevel.ObjectValues,
-                new ReconnectStrategy
+                new RetryStrategy
                 {
                     MinDelay = TimeSpan.FromMilliseconds(100),
                     MaxDelay = TimeSpan.FromSeconds(5),
@@ -186,6 +186,11 @@ class MainClass
                         Class3 = true,
                     },
                     AutoTimeSync = AutoTimeSync.Lan,
+                    AutoTasksRetryStrategy = new RetryStrategy
+                    {
+                        MinDelay = TimeSpan.FromSeconds(1),
+                        MaxDelay = TimeSpan.FromSeconds(5),
+                    }
                 },
                 new AssociationHandlers
                 {

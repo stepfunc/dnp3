@@ -16,11 +16,12 @@ use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::control::collection::ControlCollection;
 use crate::outstation::traits::{ControlHandler, OperateType, OutstationApplication, RestartDelay};
 use crate::outstation::SelfAddressSupport;
+use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
+
 use std::borrow::BorrowMut;
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::time::Duration;
+use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;
 
 #[derive(Copy, Clone, PartialEq)]
@@ -91,13 +92,18 @@ struct SelectState {
     /// without requests in between
     frame_id: u32,
     /// time at which the SELECT occurred
-    time: tokio::time::Instant,
+    time: crate::tokio::time::Instant,
     /// the hash of the object headers
     object_hash: u64,
 }
 
 impl SelectState {
-    fn new(seq: Sequence, frame_id: u32, time: tokio::time::Instant, object_hash: u64) -> Self {
+    fn new(
+        seq: Sequence,
+        frame_id: u32,
+        time: crate::tokio::time::Instant,
+        object_hash: u64,
+    ) -> Self {
         Self {
             seq,
             frame_id,
@@ -113,7 +119,7 @@ impl SelectState {
         frame_id: u32,
         object_hash: u64,
     ) -> Result<(), CommandStatus> {
-        let elapsed = tokio::time::Instant::now().checked_duration_since(self.time);
+        let elapsed = crate::tokio::time::Instant::now().checked_duration_since(self.time);
 
         // check the sequence number
         if self.seq.next() != seq.value() {
@@ -372,7 +378,7 @@ impl Session {
             }
         }
 
-        tokio::select! {
+        crate::tokio::select! {
             frame_read = reader.read_next(io) => {
                 frame_read?;
             }
@@ -727,7 +733,7 @@ impl Session {
             self.state.select_state = Some(SelectState::new(
                 seq,
                 frame_id,
-                tokio::time::Instant::now(),
+                crate::tokio::time::Instant::now(),
                 object_headers.hash(),
             ))
         }
@@ -812,8 +818,8 @@ impl Session {
         )
     }
 
-    fn new_confirm_deadline(&self) -> tokio::time::Instant {
-        tokio::time::Instant::now() + self.config.confirm_timeout
+    fn new_confirm_deadline(&self) -> crate::tokio::time::Instant {
+        crate::tokio::time::Instant::now() + self.config.confirm_timeout
     }
 
     async fn enter_sol_confirm_wait<T>(

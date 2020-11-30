@@ -16,10 +16,10 @@ use crate::master::messages::{MasterMsg, Message};
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
 use crate::master::error::{Shutdown, TaskError};
+use crate::tokio::io::{AsyncRead, AsyncWrite};
+use crate::tokio::time::Instant;
 use std::ops::Add;
 use std::time::Duration;
-use tokio::prelude::{AsyncRead, AsyncWrite};
-use tokio::time::Instant;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum RunError {
@@ -31,7 +31,7 @@ pub(crate) struct MasterSession {
     level: DecodeLogLevel,
     timeout: Timeout,
     associations: AssociationMap,
-    user_queue: tokio::sync::mpsc::Receiver<Message>,
+    user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
     buffer: [u8; 2048],
 }
 
@@ -45,7 +45,7 @@ impl MasterSession {
     pub(crate) fn new(
         level: DecodeLogLevel,
         response_timeout: Timeout,
-        user_queue: tokio::sync::mpsc::Receiver<Message>,
+        user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
     ) -> Self {
         Self {
             level,
@@ -61,11 +61,11 @@ impl MasterSession {
         let deadline = Instant::now().add(duration);
 
         loop {
-            tokio::select! {
+            crate::tokio::select! {
                 result = self.process_message(false) => {
                    result?;
                 }
-                _ = tokio::time::delay_until(deadline) => {
+                _ = crate::tokio::time::delay_until(deadline) => {
                    return Ok(());
                 }
             }
@@ -111,14 +111,14 @@ impl MasterSession {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            tokio::select! {
+            crate::tokio::select! {
                 result = self.process_message(true) => {
                    // we need to recheck the tasks
                    return Ok(result?);
                 }
                 result = reader.read_next(io) => {
                    result?;
-                   self.handle_fragment_while_idle(io, writer, reader).await?;
+                   return self.handle_fragment_while_idle(io, writer, reader).await;
                 }
             }
         }
@@ -138,16 +138,16 @@ impl MasterSession {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            tokio::select! {
+            crate::tokio::select! {
                 result = self.process_message(true) => {
                    // we need to recheck the tasks
                    return Ok(result?);
                 }
                 result = reader.read_next(io) => {
                    result?;
-                   self.handle_fragment_while_idle(io, writer, reader).await?;
+                   return self.handle_fragment_while_idle(io, writer, reader).await;
                 }
-                _ = tokio::time::delay_until(instant) => {
+                _ = crate::tokio::time::delay_until(instant) => {
                    return Ok(());
                 }
             }
@@ -200,8 +200,8 @@ impl MasterSession {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            tokio::select! {
-                    _ = tokio::time::delay_until(deadline) => {
+            crate::tokio::select! {
+                    _ = crate::tokio::time::delay_until(deadline) => {
                          log::warn!("no response within timeout: {}", self.timeout);
                          return Err(TaskError::ResponseTimeout);
                     }
@@ -332,14 +332,10 @@ impl MasterSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        println!("sent to {}", destination);
-
         let (source, response) = match reader.get_response(self.level) {
             None => return Ok(None),
             Some(x) => x,
         };
-
-        println!("received from {}", source);
 
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
@@ -572,11 +568,10 @@ impl MasterSession {
 
         association.process_iin(response.header.iin);
 
-        if let Ok(objects) = response.objects {
-            association.handle_unsolicited_response(response.header, objects);
-        }
+        let valid = association.handle_unsolicited_response(response);
 
-        if response.header.control.con {
+        // Send confirmation if required and wasn't ignored
+        if valid && response.header.control.con {
             self.confirm_unsolicited(io, source, response.header.control.seq, writer)
                 .await?;
         }
@@ -645,85 +640,5 @@ impl MasterSession {
             .write(io, self.level, address.wrap(), cursor.written())
             .await?;
         Ok(seq)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::app::parse::DecodeLogLevel;
-    use crate::link::header::FrameInfo;
-    use crate::master::association::Configuration;
-    use crate::master::handle::{MasterHandle, NullHandler};
-    use crate::transport::create_master_transport_layer;
-    use tokio_test::io::Builder;
-
-    #[tokio::test]
-    async fn performs_startup_sequence_with_device_restart_asserted() {
-        let outstation_address = EndpointAddress::from(1024).unwrap();
-
-        let (tx, rx) = tokio::sync::mpsc::channel(1);
-        let mut runner = MasterSession::new(
-            DecodeLogLevel::ObjectValues,
-            Timeout::from_secs(1).unwrap(),
-            rx,
-        );
-        let mut master = MasterHandle::new(tx);
-
-        let (mut io, _handle) = Builder::new()
-            // disable unsolicited
-            .write(&[
-                0xC0, 0x15, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
-            ])
-            // response w/ DEVICE_RESTART asserted
-            .read(&[0xC0, 0x81, 0x80, 0x00])
-            // clear the restart bit
-            .write(&[0xC1, 0x02, 0x50, 0x01, 0x00, 0x07, 0x07, 0x00])
-            // response w/ DEVICE_RESTART cleared
-            .read(&[0xC1, 0x81, 0x00, 0x00])
-            // integrity poll
-            .write(&[
-                0xC2, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
-            ])
-            // response
-            .read(&[0xC2, 0x81, 0x00, 0x00])
-            // enable unsolicited
-            .write(&[
-                0xC3, 0x14, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
-            ])
-            // response
-            .read(&[0xC3, 0x81, 0x00, 0x00])
-            .build_with_handle();
-
-        let (mut reader, mut writer) =
-            create_master_transport_layer(EndpointAddress::from(1).unwrap());
-
-        reader
-            .get_inner()
-            .set_rx_frame_info(FrameInfo::new(outstation_address, None));
-
-        let mut master_task =
-            tokio_test::task::spawn(runner.run(&mut io, &mut writer, &mut reader));
-        let association = {
-            let mut add_task = tokio_test::task::spawn(master.add_association(
-                outstation_address,
-                Configuration::default(),
-                NullHandler::boxed(),
-            ));
-            tokio_test::assert_pending!(add_task.poll());
-            tokio_test::assert_pending!(master_task.poll());
-            tokio_test::assert_ready_ok!(add_task.poll())
-        };
-
-        tokio_test::assert_pending!(master_task.poll());
-
-        // causes the task to shutdown
-        drop(master);
-        drop(association);
-
-        tokio_test::assert_ready_eq!(master_task.poll(), RunError::Shutdown);
-        drop(master_task);
-        assert_eq!(writer.num_writes(), 4);
-        assert_eq!(reader.get_inner().num_reads(), 4);
     }
 }
