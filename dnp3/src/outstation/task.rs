@@ -1,27 +1,22 @@
 use crate::app::enums::{CommandStatus, FunctionCode};
 use crate::app::header::{Control, ResponseFunction, ResponseHeader, IIN, IIN1, IIN2};
-use crate::app::parse::parser::{ControlHeader, HeaderCollection, HeaderDetails, Request};
+use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
 use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::link::error::LinkError;
-use crate::outstation::database::{Database, DatabaseConfig, DatabaseHandle, ResponseInfo};
+use crate::outstation::database::{DatabaseConfig, DatabaseHandle, ResponseInfo};
 use crate::transport::{FragmentInfo, Timeout, TransportReader, TransportWriter};
 
 use crate::app::format::write::start_response;
 use crate::app::gen::ranged::RangedVariation;
-use crate::app::parse::count::CountSequence;
 use crate::app::parse::error::ObjectParseError;
-use crate::app::parse::prefix::Prefix;
-use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::{Group52Var1, Group52Var2};
 use crate::entry::EndpointAddress;
 use crate::link::header::BroadcastConfirmMode;
-use crate::outstation::details::control::ControlType;
-use crate::outstation::details::prefix::PrefixWriter;
 use crate::outstation::traits::{ControlHandler, OperateType, OutstationApplication, RestartDelay};
 use crate::outstation::SelfAddressSupport;
 use crate::util::buffer::Buffer;
-use crate::util::cursor::{WriteCursor, WriteError};
+use crate::util::cursor::WriteError;
 use std::borrow::BorrowMut;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::Duration;
@@ -898,164 +893,5 @@ impl From<ObjectParseError> for IIN2 {
             ObjectParseError::UnknownQualifier(_) => IIN2::PARAMETER_ERROR,
             ObjectParseError::ZeroLengthOctetData => IIN2::PARAMETER_ERROR,
         }
-    }
-}
-
-impl<'a> ControlHeader<'a> {
-    fn select_with_response(
-        &self,
-        cursor: &mut WriteCursor,
-        handler: &mut dyn ControlHandler,
-        database: &mut Database,
-    ) -> Result<CommandStatus, WriteError> {
-        match self {
-            Self::OneByteGroup12Var1(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
-            }
-            Self::OneByteGroup41Var1(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
-            }
-            Self::OneByteGroup41Var2(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
-            }
-            Self::OneByteGroup41Var3(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
-            }
-            Self::OneByteGroup41Var4(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
-            }
-            Self::TwoByteGroup12Var1(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
-            }
-            Self::TwoByteGroup41Var1(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
-            }
-            Self::TwoByteGroup41Var2(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
-            }
-            Self::TwoByteGroup41Var3(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
-            }
-            Self::TwoByteGroup41Var4(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
-            }
-        }
-    }
-
-    fn operate_with_response(
-        &self,
-        operate_type: OperateType,
-        cursor: &mut WriteCursor,
-        handler: &mut dyn ControlHandler,
-        database: &mut Database,
-    ) -> Result<(), WriteError> {
-        match self {
-            Self::OneByteGroup12Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
-            }
-            Self::OneByteGroup41Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
-            }
-            Self::OneByteGroup41Var2(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
-            }
-            Self::OneByteGroup41Var3(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
-            }
-            Self::OneByteGroup41Var4(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
-            }
-            Self::TwoByteGroup12Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
-            }
-            Self::TwoByteGroup41Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
-            }
-            Self::TwoByteGroup41Var2(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
-            }
-            Self::TwoByteGroup41Var3(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
-            }
-            Self::TwoByteGroup41Var4(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
-            }
-        }
-    }
-
-    fn operate_no_ack(&self, handler: &mut dyn ControlHandler, database: &mut Database) {
-        match self {
-            Self::OneByteGroup12Var1(seq) => operate_header_no_ack(seq, database, handler),
-            Self::OneByteGroup41Var1(seq) => operate_header_no_ack(seq, database, handler),
-            Self::OneByteGroup41Var2(seq) => operate_header_no_ack(seq, database, handler),
-            Self::OneByteGroup41Var3(seq) => operate_header_no_ack(seq, database, handler),
-            Self::OneByteGroup41Var4(seq) => operate_header_no_ack(seq, database, handler),
-            Self::TwoByteGroup12Var1(seq) => operate_header_no_ack(seq, database, handler),
-            Self::TwoByteGroup41Var1(seq) => operate_header_no_ack(seq, database, handler),
-            Self::TwoByteGroup41Var2(seq) => operate_header_no_ack(seq, database, handler),
-            Self::TwoByteGroup41Var3(seq) => operate_header_no_ack(seq, database, handler),
-            Self::TwoByteGroup41Var4(seq) => operate_header_no_ack(seq, database, handler),
-        }
-    }
-}
-
-fn select_header_with_response<I, V>(
-    cursor: &mut WriteCursor,
-    seq: &CountSequence<Prefix<I, V>>,
-    database: &mut Database,
-    handler: &mut dyn ControlHandler,
-) -> Result<CommandStatus, WriteError>
-where
-    I: Index,
-    V: FixedSizeVariation + ControlType,
-{
-    let mut writer = PrefixWriter::new();
-    let mut ret = CommandStatus::Success;
-    for item in seq.iter() {
-        let status = item
-            .value
-            .select(handler, item.index.widen_to_u16(), database);
-        writer.write(cursor, item.value.with_status(status), item.index)?;
-        ret = ret.first_error(status);
-    }
-    Ok(ret)
-}
-
-fn operate_header_with_response<I, V>(
-    cursor: &mut WriteCursor,
-    seq: &CountSequence<Prefix<I, V>>,
-    database: &mut Database,
-    operate_type: OperateType,
-    handler: &mut dyn ControlHandler,
-) -> Result<(), WriteError>
-where
-    I: Index,
-    V: FixedSizeVariation + ControlType,
-{
-    let mut writer = PrefixWriter::new();
-    for item in seq.iter() {
-        let status = item
-            .value
-            .operate(handler, item.index.widen_to_u16(), operate_type, database);
-        writer.write(cursor, item.value.with_status(status), item.index)?;
-    }
-    Ok(())
-}
-
-fn operate_header_no_ack<I, V>(
-    seq: &CountSequence<Prefix<I, V>>,
-    database: &mut Database,
-    handler: &mut dyn ControlHandler,
-) where
-    I: Index,
-    V: FixedSizeVariation + ControlType,
-{
-    for item in seq.iter() {
-        item.value.operate(
-            handler,
-            item.index.widen_to_u16(),
-            OperateType::DirectOperateNoAck,
-            database,
-        );
     }
 }
