@@ -13,4 +13,4 @@ pub enum SelfAddressSupport {
     Disabled,
 }
 
-pub(crate) mod helpers;
+pub(crate) mod details;

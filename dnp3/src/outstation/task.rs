@@ -13,12 +13,11 @@ use crate::app::parse::count::CountSequence;
 use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::app::variations::{
-    Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4, Group52Var1, Group52Var2,
-};
+use crate::app::variations::{Group52Var1, Group52Var2};
 use crate::entry::EndpointAddress;
 use crate::link::header::BroadcastConfirmMode;
-use crate::outstation::helpers::PrefixWriter;
+use crate::outstation::details::control::ControlType;
+use crate::outstation::details::prefix::PrefixWriter;
 use crate::outstation::traits::{ControlHandler, OperateType, OutstationApplication, RestartDelay};
 use crate::outstation::SelfAddressSupport;
 use crate::util::buffer::Buffer;
@@ -1000,26 +999,6 @@ impl<'a> ControlHeader<'a> {
     }
 }
 
-trait ControlType {
-    /// make a copy of the this control type with a new status code
-    fn with_status(&self, status: CommandStatus) -> Self;
-    /// select a control on a handler
-    fn select(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        database: &mut Database,
-    ) -> CommandStatus;
-    /// operate a control on a handler
-    fn operate(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
-        database: &mut Database,
-    ) -> CommandStatus;
-}
-
 fn select_header_with_response<I, V>(
     cursor: &mut WriteCursor,
     seq: &CountSequence<Prefix<I, V>>,
@@ -1078,134 +1057,5 @@ fn operate_header_no_ack<I, V>(
             OperateType::DirectOperateNoAck,
             database,
         );
-    }
-}
-
-pub(crate) trait WithCommandStatus {
-    fn with_status(self, status: CommandStatus) -> Self;
-}
-
-impl ControlType for Group12Var1 {
-    fn with_status(&self, status: CommandStatus) -> Self {
-        Self { status, ..*self }
-    }
-
-    fn select(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.select(self, index, database)
-    }
-
-    fn operate(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.operate(self, index, op_type, database)
-    }
-}
-
-impl ControlType for Group41Var1 {
-    fn with_status(&self, status: CommandStatus) -> Self {
-        Self { status, ..*self }
-    }
-
-    fn select(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.select(self, index, database)
-    }
-
-    fn operate(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.operate(self, index, op_type, database)
-    }
-}
-
-impl ControlType for Group41Var2 {
-    fn with_status(&self, status: CommandStatus) -> Self {
-        Self { status, ..*self }
-    }
-
-    fn select(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.select(self, index, database)
-    }
-
-    fn operate(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.operate(self, index, op_type, database)
-    }
-}
-
-impl ControlType for Group41Var3 {
-    fn with_status(&self, status: CommandStatus) -> Self {
-        Self { status, ..*self }
-    }
-
-    fn select(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.select(self, index, database)
-    }
-
-    fn operate(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.operate(self, index, op_type, database)
-    }
-}
-
-impl ControlType for Group41Var4 {
-    fn with_status(&self, status: CommandStatus) -> Self {
-        Self { status, ..*self }
-    }
-
-    fn select(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.select(self, index, database)
-    }
-
-    fn operate(
-        self,
-        handler: &mut dyn ControlHandler,
-        index: u16,
-        op_type: OperateType,
-        database: &mut Database,
-    ) -> CommandStatus {
-        handler.operate(self, index, op_type, database)
     }
 }
