@@ -79,9 +79,11 @@ struct SessionConfig {
     level: DecodeLogLevel,
     master_address: EndpointAddress,
     confirm_timeout: Duration,
+    select_timeout: Duration,
 }
 
 /// records when a select occurs
+#[derive(Copy, Clone)]
 struct SelectState {
     /// sequence number of the SELECT
     seq: Sequence,
@@ -102,6 +104,50 @@ impl SelectState {
             time,
             object_hash,
         }
+    }
+
+    fn match_operate(
+        &self,
+        timeout: Duration,
+        seq: Sequence,
+        frame_id: u32,
+        object_hash: u64,
+    ) -> Result<(), CommandStatus> {
+        let elapsed = tokio::time::Instant::now().checked_duration_since(self.time);
+
+        // check the sequence number
+        if self.seq.next() != seq.value() {
+            log::warn!("received OPERATE with non-consecutive sequence number");
+            return Err(CommandStatus::NoSelect);
+        }
+
+        // check the frame_id to ensure there was no requests in between the SELECT and OPERATE
+        if self.frame_id.wrapping_add(1) != frame_id {
+            log::warn!("received OPERATE without prior SELECT");
+            return Err(CommandStatus::NoSelect);
+        }
+
+        // check the object hash
+        if self.object_hash != object_hash {
+            log::warn!("received OPERATE with different header than SELECT");
+            return Err(CommandStatus::NoSelect);
+        }
+
+        // check the time last
+        match elapsed {
+            None => {
+                log::error!("current time is less than time of SELECT, clock error?");
+                return Err(CommandStatus::Timeout);
+            }
+            Some(elapsed) => {
+                if elapsed > timeout {
+                    log::warn!("received valid OPERATE after SELECT timeout");
+                    return Err(CommandStatus::Timeout);
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -145,6 +191,7 @@ pub struct OutstationConfig {
     pub self_address_support: SelfAddressSupport,
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: Duration,
+    pub select_timeout: Duration,
 }
 
 impl OutstationConfig {
@@ -155,6 +202,7 @@ impl OutstationConfig {
         self_address_support: SelfAddressSupport,
         log_level: DecodeLogLevel,
         confirm_timeout: Duration,
+        select_timeout: Duration,
     ) -> Self {
         OutstationConfig {
             tx_buffer_size,
@@ -163,6 +211,7 @@ impl OutstationConfig {
             master_address,
             log_level,
             confirm_timeout,
+            select_timeout,
         }
     }
 
@@ -171,6 +220,7 @@ impl OutstationConfig {
             level: self.log_level,
             master_address: self.master_address,
             confirm_timeout: self.confirm_timeout,
+            select_timeout: self.select_timeout,
         }
     }
 }
@@ -480,6 +530,7 @@ impl Session {
             }
             // controls
             FunctionCode::Select => self.handle_select(seq, frame_id, object_headers),
+            FunctionCode::Operate => self.handle_operate(seq, frame_id, object_headers),
             FunctionCode::DirectOperate => self.handle_direct_operate(seq, object_headers),
 
             _ => {
@@ -672,22 +723,73 @@ impl Session {
             .database
             .transaction(|database| controls.select_with_response(&mut cursor, handler, database));
 
-        match result {
-            Ok(CommandStatus::Success) => {
-                // select was successful, compute the object hash
+        if let Ok(CommandStatus::Success) = result {
+            self.state.select_state = Some(SelectState::new(
+                seq,
+                frame_id,
+                tokio::time::Instant::now(),
+                object_headers.hash(),
+            ))
+        }
 
-                self.state.select_state = Some(SelectState::new(
+        cursor.written().len()
+    }
+
+    fn handle_operate(
+        &mut self,
+        seq: Sequence,
+        frame_id: u32,
+        object_headers: HeaderCollection,
+    ) -> usize {
+        let controls = match ControlCollection::from(object_headers) {
+            Err(err) => {
+                log::warn!(
+                    "ignoring OPERATE request containing non-control object header {} - {}",
+                    err.variation,
+                    err.qualifier
+                );
+                return self.write_empty_response(seq, IIN2::PARAMETER_ERROR);
+            }
+            Ok(controls) => controls,
+        };
+
+        let iin = self.get_response_iin() + IIN2::default();
+        let mut cursor = self.tx_buffer.write_cursor();
+        ResponseHeader::new(
+            Control::single_response(seq),
+            ResponseFunction::Response,
+            iin,
+        )
+        .write(&mut cursor)
+        .unwrap();
+
+        // determine if we have a matching SELECT
+        match self.state.select_state {
+            Some(s) => {
+                match s.match_operate(
+                    self.config.select_timeout,
                     seq,
                     frame_id,
-                    tokio::time::Instant::now(),
                     object_headers.hash(),
-                ))
+                ) {
+                    Err(status) => {
+                        let _ = controls.respond_with_status(&mut cursor, status);
+                    }
+                    Ok(()) => {
+                        let handler = self.control_handler.borrow_mut();
+                        let _ = self.database.transaction(|db| {
+                            controls.operate_with_response(
+                                &mut cursor,
+                                OperateType::SelectBeforeOperate,
+                                handler,
+                                db,
+                            )
+                        });
+                    }
+                }
             }
-            Ok(_) => {
-                // select failed with some error
-            }
-            Err(_) => {
-                log::warn!("unable to write complete select response");
+            None => {
+                let _ = controls.respond_with_status(&mut cursor, CommandStatus::NoSelect);
             }
         }
 

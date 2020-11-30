@@ -19,6 +19,7 @@ fn get_outstation_config(outstation: EndpointAddress, master: EndpointAddress) -
         SelfAddressSupport::Disabled,
         DecodeLogLevel::ObjectValues,
         Duration::from_secs(2),
+        Duration::from_secs(5),
     )
 }
 
