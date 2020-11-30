@@ -6,7 +6,6 @@ use std::ffi::CStr;
 use std::net::SocketAddr;
 use std::ptr::null_mut;
 use std::str::FromStr;
-use std::time::Duration;
 
 use dnp3::entry::EndpointAddress;
 pub use tokio::runtime::Runtime;
@@ -46,15 +45,16 @@ pub(crate) unsafe fn runtime_destroy(runtime: *mut tokio::runtime::Runtime) {
 
 pub(crate) unsafe fn runtime_add_master_tcp(
     runtime: *mut tokio::runtime::Runtime,
-    address: u16,
-    level: ffi::DecodeLogLevel,
-    strategy: ffi::RetryStrategy,
-    response_timeout: Duration,
+    config: ffi::MasterConfiguration,
     endpoint: &CStr,
     listener: ffi::ClientStateListener,
 ) -> *mut Master {
-    let strategy = RetryStrategy::new(strategy.min_delay(), strategy.max_delay());
-    let response_timeout = response_timeout;
+    let config = if let Some(config) = config.into() {
+        config
+    } else {
+        return std::ptr::null_mut();
+    };
+
     let endpoint = if let Ok(endpoint) = SocketAddr::from_str(&endpoint.to_string_lossy()) {
         endpoint
     } else {
@@ -62,25 +62,7 @@ pub(crate) unsafe fn runtime_add_master_tcp(
     };
     let listener = ClientStateListenerAdapter::new(listener);
 
-    let address = match EndpointAddress::from(address) {
-        Ok(x) => x,
-        Err(err) => {
-            log::warn!(
-                "special addresses may not be used for the master address: {}",
-                err.address
-            );
-            return std::ptr::null_mut();
-        }
-    };
-
-    let (future, handle) = create_master_tcp_client(
-        address,
-        level.into(),
-        strategy,
-        Timeout::from_duration(response_timeout).unwrap(),
-        endpoint,
-        listener.into_listener(),
-    );
+    let (future, handle) = create_master_tcp_client(config, endpoint, listener.into_listener());
 
     if let Some(runtime) = runtime.as_ref() {
         runtime.spawn(future);
@@ -93,6 +75,35 @@ pub(crate) unsafe fn runtime_add_master_tcp(
         Box::into_raw(Box::new(master))
     } else {
         std::ptr::null_mut()
+    }
+}
+
+impl ffi::MasterConfiguration {
+    fn into(self) -> Option<MasterConfiguration> {
+        let address = match EndpointAddress::from(self.address()) {
+            Ok(x) => x,
+            Err(err) => {
+                log::warn!(
+                    "special addresses may not be used for the master address: {}",
+                    err.address
+                );
+                return None;
+            }
+        };
+
+        let strategy = RetryStrategy::new(
+            self.reconnection_strategy().min_delay(),
+            self.reconnection_strategy.max_delay(),
+        );
+
+        Some(MasterConfiguration {
+            address,
+            level: self.level().into(),
+            reconnection_strategy: strategy,
+            response_timeout: Timeout::from_duration(self.response_timeout()).unwrap(),
+            tx_buffer_size: self.tx_buffer_size as usize,
+            rx_buffer_size: self.rx_buffer_size as usize,
+        })
     }
 }
 

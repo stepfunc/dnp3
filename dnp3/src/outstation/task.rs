@@ -94,7 +94,7 @@ impl SessionState {
     }
 }
 
-pub(crate) struct Session {
+pub(crate) struct OutstationSession {
     tx_buffer: Buffer,
     config: SessionConfig,
     database: DatabaseHandle,
@@ -103,7 +103,7 @@ pub(crate) struct Session {
 }
 
 pub struct OutstationTask {
-    session: Session,
+    session: OutstationSession,
     reader: TransportReader,
     writer: TransportWriter,
 }
@@ -111,6 +111,7 @@ pub struct OutstationTask {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OutstationConfig {
     pub tx_buffer_size: usize,
+    pub rx_buffer_size: usize,
     pub outstation_address: EndpointAddress,
     pub master_address: EndpointAddress,
     pub self_address_support: SelfAddressSupport,
@@ -121,6 +122,7 @@ pub struct OutstationConfig {
 impl OutstationConfig {
     pub fn new(
         tx_buffer_size: usize,
+        rx_buffer_size: usize,
         outstation_address: EndpointAddress,
         master_address: EndpointAddress,
         self_address_support: SelfAddressSupport,
@@ -129,6 +131,7 @@ impl OutstationConfig {
     ) -> Self {
         OutstationConfig {
             tx_buffer_size,
+            rx_buffer_size,
             outstation_address,
             self_address_support,
             master_address,
@@ -157,9 +160,10 @@ impl OutstationTask {
         let (reader, writer) = crate::transport::create_outstation_transport_layer(
             config.outstation_address,
             config.self_address_support,
+            config.rx_buffer_size,
         );
         let task = Self {
-            session: Session::new(
+            session: OutstationSession::new(
                 config.to_session_config(),
                 config.tx_buffer_size,
                 handle.clone(),
@@ -212,9 +216,9 @@ enum ResponseSeriesAction {
     HandleCurrentRequest,
 }
 
-impl Session {
-    pub(crate) const DEFAULT_TX_BUFFER_SIZE: usize = 2048;
+impl OutstationSession {
     pub(crate) const MIN_TX_BUFFER_SIZE: usize = 249; // 1 link frame
+    pub(crate) const MIN_RX_BUFFER_SIZE: usize = 249; // 1 link frame
 
     fn new(
         config: SessionConfig,
@@ -222,9 +226,16 @@ impl Session {
         database: DatabaseHandle,
         handler: Box<dyn OutstationApplication>,
     ) -> Self {
+        let tx_buffer_size = if tx_buffer_size < Self::MIN_TX_BUFFER_SIZE {
+            log::warn!("Minimum TX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", Self::MIN_TX_BUFFER_SIZE, tx_buffer_size);
+            Self::MIN_TX_BUFFER_SIZE
+        } else {
+            tx_buffer_size
+        };
+
         Self {
             config,
-            tx_buffer: Buffer::new(tx_buffer_size.max(Self::MIN_TX_BUFFER_SIZE)),
+            tx_buffer: Buffer::new(tx_buffer_size),
             database,
             state: SessionState::new(),
             handler,

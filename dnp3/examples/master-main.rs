@@ -13,10 +13,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // create
     let (future, mut master) = create_master_tcp_client(
-        EndpointAddress::from(1)?,
-        DecodeLogLevel::ObjectValues,
-        RetryStrategy::default(),
-        Timeout::from_secs(1)?,
+        MasterConfiguration::new(
+            EndpointAddress::from(1)?,
+            DecodeLogLevel::ObjectValues,
+            RetryStrategy::default(),
+            Timeout::from_secs(1)?,
+        ),
         SocketAddr::from_str("127.0.0.1:20000")?,
         Listener::None,
     );

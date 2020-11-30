@@ -1,6 +1,7 @@
 use crate::link::header::FrameInfo;
 use crate::transport::header::Header;
 use crate::transport::Fragment;
+use crate::util::buffer::Buffer;
 
 #[derive(Copy, Clone)]
 enum InternalState {
@@ -27,14 +28,14 @@ pub(crate) enum AssemblyState {
 
 pub(crate) struct Assembler {
     state: InternalState,
-    buffer: [u8; 2048], // make this configurable and/or constant
+    buffer: Buffer,
 }
 
 impl Assembler {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(max_buffer_size: usize) -> Self {
         Self {
             state: InternalState::Empty,
-            buffer: [0; 2048],
+            buffer: Buffer::new(max_buffer_size),
         }
     }
 
@@ -46,7 +47,10 @@ impl Assembler {
         match self.state {
             InternalState::Complete(address, size) => Some(Fragment {
                 address,
-                data: &self.buffer[0..size],
+                data: &self
+                    .buffer
+                    .get(size)
+                    .expect("tracking size greater than buffer size"),
             }),
             _ => None,
         }
@@ -120,16 +124,19 @@ impl Assembler {
     fn append(&mut self, info: FrameInfo, header: Header, acc_length: usize, data: &[u8]) {
         let new_length = acc_length + data.len();
 
-        match self.buffer.get_mut(acc_length..new_length) {
-            None => {
+        let mut cursor = self.buffer.write_cursor();
+        cursor
+            .skip(acc_length)
+            .expect("accumulated length is greater than the buffer size");
+        match cursor.write_slice(data) {
+            Err(_) => {
                 log::warn!(
                     "transport buffer overflow with {} bytes to write",
                     data.len()
                 );
                 self.state = InternalState::Empty;
             }
-            Some(dest) => {
-                dest.copy_from_slice(data);
+            Ok(_) => {
                 if header.fin {
                     self.state = InternalState::Complete(info, new_length)
                 } else {

@@ -457,11 +457,15 @@ fn create_association(config: Configuration) -> TestHarness<impl Future<Output =
     let mut runner = MasterSession::new(
         DecodeLogLevel::ObjectValues,
         Timeout::from_secs(1).unwrap(),
+        MasterSession::MIN_TX_BUFFER_SIZE,
         rx,
     );
     let mut master = MasterHandle::new(tx);
 
-    let (mut reader, mut writer) = create_master_transport_layer(EndpointAddress::from(1).unwrap());
+    let (mut reader, mut writer) = create_master_transport_layer(
+        EndpointAddress::from(1).unwrap(),
+        MasterSession::MIN_RX_BUFFER_SIZE,
+    );
 
     reader
         .get_inner()

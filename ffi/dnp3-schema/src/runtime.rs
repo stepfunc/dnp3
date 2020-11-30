@@ -105,19 +105,27 @@ pub fn define(
         .destroy_callback("on_destroy")?
         .build()?;
 
+    let master_config = lib.declare_native_struct("MasterConfiguration")?;
+    let master_config = lib.define_native_struct(&master_config)?
+        .add("address", Type::Uint16, "Local DNP3 data-link address")?
+        .add("level", Type::Enum(decode_log_level_enum), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
+        .add("reconnection_strategy", Type::Struct(retry_strategy.clone()), "Reconnection strategy to use")?
+        .add(
+            "response_timeout",
+            Type::Duration(DurationMapping::Milliseconds),
+            "Timeout for receiving a response"
+        )?
+        .add("tx_buffer_size", Type::Uint16, doc("TX buffer size").details("Should be at least 249"))?
+        .add("rx_buffer_size", Type::Uint16, doc("RX buffer size").details("Should be at least 2048"))?
+        .doc("Master configuration")?
+        .build()?;
+
     let master_class = lib.declare_class("Master")?;
 
     let add_master_tcp_fn = lib
         .declare_native_function("runtime_add_master_tcp")?
         .param("runtime", Type::ClassRef(runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
-        .param("address", Type::Uint16, "Local DNP3 data-link address")?
-        .param("level", Type::Enum(decode_log_level_enum), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
-        .param("strategy", Type::Struct(retry_strategy.clone()), "Reconnection strategy to use")?
-        .param(
-            "response_timeout",
-            Type::Duration(DurationMapping::Milliseconds),
-            "Timeout for receiving a response"
-        )?
+        .param("config", Type::Struct(master_config), "Master configuration")?
         .param("endpoint", Type::String, "IP address or DNS name and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\".")?
         .param("listener", Type::Interface(client_state_listener), "Client connection listener to receive updates on the status of the connection")?
         .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occured"))?
