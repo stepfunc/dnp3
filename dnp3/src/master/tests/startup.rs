@@ -149,20 +149,24 @@ fn ignore_unsolicited_response_with_data_before_first_integrity_poll() {
     // Instead, wait for the integrity poll to timeout then
     // restart the outstation startup procedure
     time::advance(Duration::from_secs(1));
+    assert_pending!(harness.poll());
+
     clear_restart_iin(&mut harness.io, seq);
     empty_response(&mut harness.io, seq.increment());
     harness.assert_io();
 
     // Integrity poll
     time::advance(Duration::from_secs(1));
+    assert_pending!(harness.poll());
+
     integrity_poll_request(&mut harness.io, seq);
-    harness.assert_io();
     empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
 
     // Enable unsolicited
     enable_unsol_request(&mut harness.io, seq);
-    harness.assert_io();
     empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
 }
 
 #[test]
