@@ -8,7 +8,7 @@ use crate::master::extract::extract_measurements;
 use crate::master::handle::{AssociationHandler, Promise};
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollMap, PollMsg};
-use crate::master::request::{EventClasses, TimeSyncProcedure};
+use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
 use crate::master::session::RunError;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
@@ -28,6 +28,10 @@ pub struct Configuration {
     pub disable_unsol_classes: EventClasses,
     /// The event classes to enable on startup
     pub enable_unsol_classes: EventClasses,
+    /// Startup integrity classes to ask on master startup and when an outstation restart is detected.
+    ///
+    /// For conformance, this should be Class 1230.
+    pub startup_integrity_classes: Classes,
     /// automatic time synchronization based on NEED_TIME IIN bit
     pub auto_time_sync: Option<TimeSyncProcedure>,
     /// automatic tasks retry strategy
@@ -38,12 +42,14 @@ impl Configuration {
     pub fn new(
         disable_unsol_classes: EventClasses,
         enable_unsol_classes: EventClasses,
+        startup_integrity_classes: Classes,
         auto_time_sync: Option<TimeSyncProcedure>,
         auto_tasks_retry_strategy: RetryStrategy,
     ) -> Self {
         Self {
             disable_unsol_classes,
             enable_unsol_classes,
+            startup_integrity_classes,
             auto_time_sync,
             auto_tasks_retry_strategy,
         }
@@ -53,6 +59,7 @@ impl Configuration {
         Configuration::new(
             EventClasses::none(),
             EventClasses::none(),
+            Classes::none(),
             None,
             auto_tasks_retry_strategy,
         )
@@ -64,6 +71,7 @@ impl Default for Configuration {
         Configuration::new(
             EventClasses::all(),
             EventClasses::all(),
+            Classes::integrity(),
             None,
             RetryStrategy::default(),
         )
@@ -176,10 +184,10 @@ impl TaskStates {
             });
         }
 
-        if self.integrity_scan.is_pending() {
-            return self
-                .integrity_scan
-                .create_next_task(|| Task::Read(ReadTask::StartupIntegrity));
+        if config.startup_integrity_classes.any() && self.integrity_scan.is_pending() {
+            return self.integrity_scan.create_next_task(|| {
+                Task::Read(ReadTask::StartupIntegrity(config.startup_integrity_classes))
+            });
         }
 
         if self.time_sync.is_pending() {
@@ -305,7 +313,7 @@ impl Association {
     }
 
     pub(crate) fn is_integrity_complete(&self) -> bool {
-        self.auto_tasks.integrity_scan.is_idle()
+        self.config.startup_integrity_classes.any() && self.auto_tasks.integrity_scan.is_idle()
     }
 
     pub(crate) fn process_iin(&mut self, iin: IIN) {

@@ -38,6 +38,8 @@ pub fn define(
         .doc("Event classes")?
         .build()?;
 
+    let classes = define_classes(lib)?;
+
     let auto_time_sync_enum = lib
         .define_native_enum("AutoTimeSync")?
         .push("None", "Do not perform automatic timesync")?
@@ -64,6 +66,11 @@ pub fn define(
             "enable_unsol_classes",
             Type::Struct(event_classes),
             "Classes to enable unsolicited responses at startup",
+        )?
+        .add(
+            "startup_integrity_classes",
+                Type::Struct(classes),
+                doc("Startup integrity classes to ask on master startup and when an outstation restart is detected.").details("For conformance, this should be Class 1230.")
         )?
         .add(
             "auto_time_sync",
@@ -226,4 +233,35 @@ fn define_time_provider(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, Bin
         .build()?
         .destroy_callback("on_destroy")?
         .build()
+}
+
+fn define_classes(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
+    let classes = lib.declare_native_struct("Classes")?;
+    let classes = lib
+        .define_native_struct(&classes)?
+        .add("class0", Type::Bool, "Class 0 (static data)")?
+        .add("class1", Type::Bool, "Class 1 events")?
+        .add("class2", Type::Bool, "Class 2 events")?
+        .add("class3", Type::Bool, "Class 3 events")?
+        .doc("Class 0, 1, 2 and 3 config")?
+        .build()?;
+
+    let classes_all_fn = lib
+        .declare_native_function("classes_all")?
+        .return_type(ReturnType::new(Type::Struct(classes.clone()), "Class 1230"))?
+        .doc("Class 1230")?
+        .build()?;
+
+    let classes_none_fn = lib
+        .declare_native_function("classes_none")?
+        .return_type(ReturnType::new(Type::Struct(classes.clone()), "No class"))?
+        .doc("No class")?
+        .build()?;
+
+    lib.define_struct(&classes)?
+        .static_method("all", &classes_all_fn)?
+        .static_method("none", &classes_none_fn)?
+        .build();
+
+    Ok(classes)
 }

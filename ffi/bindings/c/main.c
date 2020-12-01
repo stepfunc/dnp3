@@ -289,6 +289,7 @@ int main()
             .class2 = true,
             .class3 = true,
         },
+        .startup_integrity_classes = classes_all(),
         .auto_time_sync = AutoTimeSync_Lan,
         .auto_tasks_retry_strategy = retry_strategy,
     };

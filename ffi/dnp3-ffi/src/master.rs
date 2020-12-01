@@ -6,7 +6,7 @@ use dnp3::app::types::Timestamp;
 use dnp3::entry::EndpointAddress;
 use dnp3::master::association::Configuration;
 use dnp3::master::handle::{AssociationHandler, MasterHandle, ReadHandler};
-use dnp3::master::request::{EventClasses, TimeSyncProcedure};
+use dnp3::master::request::{Classes, EventClasses, TimeSyncProcedure};
 
 pub struct Master {
     pub runtime: tokio::runtime::Handle,
@@ -45,6 +45,7 @@ pub unsafe fn master_add_association(
     let config = Configuration::new(
         convert_event_classes(&config.disable_unsol_classes()),
         convert_event_classes(&config.enable_unsol_classes()),
+        convert_classes(&config.startup_integrity_classes()),
         convert_auto_time_sync(&config.auto_time_sync()),
         RetryStrategy::new(
             config.auto_tasks_retry_strategy.min_delay(),
@@ -105,8 +106,33 @@ pub unsafe fn master_get_decode_log_level(master: *mut Master) -> ffi::DecodeLog
     ffi::DecodeLogLevel::Nothing
 }
 
+pub fn classes_all() -> ffi::Classes {
+    ffi::Classes {
+        class0: true,
+        class1: true,
+        class2: true,
+        class3: true,
+    }
+}
+
+pub fn classes_none() -> ffi::Classes {
+    ffi::Classes {
+        class0: false,
+        class1: false,
+        class2: false,
+        class3: false,
+    }
+}
+
 fn convert_event_classes(config: &ffi::EventClasses) -> EventClasses {
     EventClasses::new(config.class1, config.class2, config.class3)
+}
+
+fn convert_classes(config: &ffi::Classes) -> Classes {
+    Classes::new(
+        config.class0,
+        EventClasses::new(config.class1, config.class2, config.class3),
+    )
 }
 
 fn convert_auto_time_sync(config: &ffi::AutoTimeSync) -> Option<TimeSyncProcedure> {

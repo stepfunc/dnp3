@@ -117,6 +117,14 @@ impl Classes {
         Self::new(true, EventClasses::all())
     }
 
+    pub fn none() -> Self {
+        Self::new(false, EventClasses::none())
+    }
+
+    pub fn any(&self) -> bool {
+        self.class0 || self.events.any()
+    }
+
     pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         self.events.write(writer)?;
         if self.class0 {

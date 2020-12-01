@@ -190,6 +190,7 @@ class MainClass
                         Class2 = true,
                         Class3 = true,
                     },
+                    StartupIntegrityClasses = Classes.All(),
                     AutoTimeSync = AutoTimeSync.Lan,
                     AutoTasksRetryStrategy = new RetryStrategy
                     {
