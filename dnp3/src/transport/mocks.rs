@@ -1,3 +1,4 @@
+use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::DecodeLogLevel;
 use crate::app::EndpointType;
 use crate::entry::EndpointAddress;
@@ -35,16 +36,18 @@ impl MockWriter {
     pub(crate) async fn write<W>(
         &mut self,
         io: &mut W,
-        _: DecodeLogLevel,
+        level: DecodeLogLevel,
         _: AnyAddress,
         fragment: &[u8],
     ) -> Result<(), LinkError>
     where
         W: AsyncWrite + Unpin,
     {
-        self.num_writes += 1;
-        println!("mock tx: {:02X?}", fragment);
+        if level != DecodeLogLevel::Nothing {
+            let _ = ParsedFragment::parse(level.transmit(), fragment);
+        }
         io.write(fragment).await?;
+        self.num_writes += 1;
         Ok(())
     }
 }
@@ -98,10 +101,10 @@ impl MockReader {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        self.count = io.read(&mut self.buffer).await?;
+        self.count = 0;
         self.num_reads += 1;
+        self.count = io.read(&mut self.buffer).await?;
         self.frame_id = self.frame_id.wrapping_add(1);
-        println!("mock rx: {:02X?}", &self.buffer[0..self.count]);
         Ok(())
     }
 }

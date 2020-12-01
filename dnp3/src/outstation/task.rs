@@ -999,17 +999,6 @@ mod test {
     use crate::link::header::FrameInfo;
     use crate::outstation::traits::{DefaultControlHandler, DefaultOutstationApplication};
     use crate::tokio::test::*;
-    use std::ptr::null;
-    use std::task::{Context, RawWaker, RawWakerVTable, Waker};
-
-    fn clone(_: *const ()) -> RawWaker {
-        RawWaker::new(null(), &NULL_WAKER_VTABLE)
-    }
-    fn wake(_: *const ()) {}
-    fn wake_by_ref(_: *const ()) {}
-    fn drop(_: *const ()) {}
-
-    const NULL_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
 
     struct OutstationTestHarness<T>
     where
@@ -1027,7 +1016,7 @@ mod test {
             config,
             DatabaseConfig::default(),
             DefaultOutstationApplication::create(),
-            DefaultControlHandler::create(),
+            DefaultControlHandler::with_status(CommandStatus::Success),
         );
 
         let mut task = Box::new(task);
@@ -1051,7 +1040,7 @@ mod test {
             EndpointAddress::from(10).unwrap(),
             EndpointAddress::from(1).unwrap(),
             SelfAddressSupport::Disabled,
-            DecodeLogLevel::Nothing,
+            DecodeLogLevel::ObjectHeaders,
             Duration::from_secs(2),
             Duration::from_secs(5),
         )
@@ -1065,22 +1054,20 @@ mod test {
 
         harness.io.read(&[
             // direct operate, seq == 0
-            0xC0, 0x05, // g41v1 - count == 1
-            41, 1, 0x17, 0x1,
+            0xC0, 0x05, // g41v2 - count == 1, index == 7
+            41, 2, 0x17, 0x01, 0x07, // value = 258, status == SUCCESS
+            0x01, 0x02, 0x00,
         ]);
 
         assert_pending!(harness.task.poll());
         assert!(harness.io.pending_write());
 
-        harness.io.write(&[0xC0, 0x81, 0x80, 0x04]);
+        harness.io.write(&[
+            // response, seq == 0, restart IIN
+            0xC0, 0x81, 0x80, 0x00, // echo of previous request
+            41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
+        ]);
         assert_pending!(harness.task.poll());
-
-        /*
-               harness.io.write(&[
-                   0xC0, 0x81, 0x80, 0x05
-               ]
-               );
-               assert!(harness.io.all_done());
-        */
+        assert!(harness.io.all_done())
     }
 }
