@@ -992,3 +992,95 @@ impl From<ObjectParseError> for IIN2 {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::link::header::FrameInfo;
+    use crate::outstation::traits::{DefaultControlHandler, DefaultOutstationApplication};
+    use crate::tokio::test::*;
+    use std::ptr::null;
+    use std::task::{Context, RawWaker, RawWakerVTable, Waker};
+
+    fn clone(_: *const ()) -> RawWaker {
+        RawWaker::new(null(), &NULL_WAKER_VTABLE)
+    }
+    fn wake(_: *const ()) {}
+    fn wake_by_ref(_: *const ()) {}
+    fn drop(_: *const ()) {}
+
+    const NULL_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
+
+    struct OutstationTestHarness<T>
+    where
+        T: std::future::Future<Output = Result<(), LinkError>>,
+    {
+        database: DatabaseHandle,
+        io: io::Handle,
+        task: Spawn<T>,
+    }
+
+    fn new_harness(
+        config: OutstationConfig,
+    ) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
+        let (task, database) = OutstationTask::create(
+            config,
+            DatabaseConfig::default(),
+            DefaultOutstationApplication::create(),
+            DefaultControlHandler::create(),
+        );
+
+        let mut task = Box::new(task);
+
+        task.reader
+            .get_inner()
+            .set_rx_frame_info(FrameInfo::new(EndpointAddress::from(10).unwrap(), None));
+
+        let (mut io, io_handle) = io::mock();
+
+        OutstationTestHarness {
+            database,
+            io: io_handle,
+            task: spawn(async move { task.run(&mut io).await }),
+        }
+    }
+
+    fn get_config() -> OutstationConfig {
+        OutstationConfig::new(
+            2048,
+            EndpointAddress::from(10).unwrap(),
+            EndpointAddress::from(1).unwrap(),
+            SelfAddressSupport::Disabled,
+            DecodeLogLevel::Nothing,
+            Duration::from_secs(2),
+            Duration::from_secs(5),
+        )
+    }
+
+    #[test]
+    fn performs_direct_operate() {
+        colog::init();
+
+        let mut harness = new_harness(get_config());
+
+        harness.io.read(&[
+            // direct operate, seq == 0
+            0xC0, 0x05, // g41v1 - count == 1
+            41, 1, 0x17, 0x1,
+        ]);
+
+        assert_pending!(harness.task.poll());
+        assert!(harness.io.pending_write());
+
+        harness.io.write(&[0xC0, 0x81, 0x80, 0x04]);
+        assert_pending!(harness.task.poll());
+
+        /*
+               harness.io.write(&[
+                   0xC0, 0x81, 0x80, 0x05
+               ]
+               );
+               assert!(harness.io.all_done());
+        */
+    }
+}
