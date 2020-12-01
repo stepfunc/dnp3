@@ -14,6 +14,7 @@ use std::time::Duration;
 fn get_outstation_config(outstation: EndpointAddress, master: EndpointAddress) -> OutstationConfig {
     OutstationConfig::new(
         2048,
+        2048,
         outstation,
         master,
         SelfAddressSupport::Disabled,

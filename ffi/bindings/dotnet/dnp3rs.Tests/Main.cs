@@ -156,14 +156,19 @@ class MainClass
         using (var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 }))
         {
             var master = runtime.AddMasterTcp(
-                1,
-                DecodeLogLevel.ObjectValues,
-                new RetryStrategy
+                new MasterConfiguration
                 {
-                    MinDelay = TimeSpan.FromMilliseconds(100),
-                    MaxDelay = TimeSpan.FromSeconds(5),
+                    Address = 1,
+                    Level = DecodeLogLevel.ObjectValues,
+                    ReconnectionStrategy = new RetryStrategy
+                    {
+                        MinDelay = TimeSpan.FromMilliseconds(100),
+                        MaxDelay = TimeSpan.FromSeconds(5),
+                    },
+                    ResponseTimeout = TimeSpan.FromSeconds(5),
+                    RxBufferSize = 2048,
+                    TxBufferSize = 2048,
                 },
-                TimeSpan.FromSeconds(5),
                 "127.0.0.1:20000",
                 new TestListener()
             );

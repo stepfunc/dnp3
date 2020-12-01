@@ -3,6 +3,8 @@ use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::DecodeLogLevel;
+use crate::app::retry::RetryStrategy;
+use crate::app::timeout::Timeout;
 use crate::app::types::Timestamp;
 use crate::app::variations::Variation;
 use crate::entry::EndpointAddress;
@@ -13,6 +15,7 @@ use crate::master::error::{
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
+use crate::master::session::MasterSession;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::time::TimeSyncTask;
@@ -25,11 +28,51 @@ pub struct MasterHandle {
     sender: crate::tokio::sync::mpsc::Sender<Message>,
 }
 
-/// handle used to make requests against
+/// Handle used to make requests against
 #[derive(Clone, Debug)]
 pub struct AssociationHandle {
     address: EndpointAddress,
     master: MasterHandle,
+}
+
+/// Master configuration
+#[derive(Copy, Clone, Debug)]
+pub struct MasterConfiguration {
+    /// Local DNP3 master address
+    pub address: EndpointAddress,
+    /// Decode-level for DNP3 objects
+    pub level: DecodeLogLevel,
+    /// Reconnection strategy
+    pub reconnection_strategy: RetryStrategy,
+    /// Response timeout
+    pub response_timeout: Timeout,
+    /// TX buffer size
+    ///
+    /// Should be at least 249.
+    pub tx_buffer_size: usize,
+    /// RX buffer size
+    ///
+    /// Should be at least 2048.
+    pub rx_buffer_size: usize,
+}
+
+impl MasterConfiguration {
+    /// Create a configuration with default buffer sizes
+    pub fn new(
+        address: EndpointAddress,
+        level: DecodeLogLevel,
+        reconnection_strategy: RetryStrategy,
+        response_timeout: Timeout,
+    ) -> Self {
+        Self {
+            address,
+            level,
+            reconnection_strategy,
+            response_timeout,
+            tx_buffer_size: MasterSession::DEFAULT_TX_BUFFER_SIZE,
+            rx_buffer_size: MasterSession::DEFAULT_RX_BUFFER_SIZE,
+        }
+    }
 }
 
 impl MasterHandle {
