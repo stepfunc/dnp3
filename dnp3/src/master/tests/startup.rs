@@ -39,6 +39,43 @@ fn master_startup_procedure() {
 #[test]
 fn master_startup_procedure_skips_unsolicited_if_none() {
     let mut config = Configuration::default();
+    config.startup_integrity_classes = Classes::none();
+    let mut seq = Sequence::default();
+    let mut harness = create_association(config);
+
+    // Disable unsolicited
+    disable_unsol_request(&mut harness.io, seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+
+    // NO Integrity poll
+
+    // Enable unsolicited
+    enable_unsol_request(&mut harness.io, seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+
+    // Unsolicited NULL response with RESTART IIN
+    unsol_null(&mut harness.io, seq, true);
+    unsol_confirm(&mut harness.io, seq);
+    harness.assert_io();
+
+    // Clear the restart flag
+    clear_restart_iin(&mut harness.io, seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+
+    // NO Integrity poll
+
+    // Enable unsolicited
+    enable_unsol_request(&mut harness.io, seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+}
+
+#[test]
+fn master_startup_procedure_skips_integrity_poll_if_none() {
+    let mut config = Configuration::default();
     config.disable_unsol_classes = EventClasses::none();
     config.enable_unsol_classes = EventClasses::none();
     let mut seq = Sequence::default();
