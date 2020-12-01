@@ -1,15 +1,15 @@
 use crate::app::format::write;
 use crate::app::parse::parser::Response;
 use crate::app::sequence::Sequence;
+use crate::app::timeout::Timeout;
 use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::transport::{TransportReader, TransportWriter};
 
 use crate::app::header::Control;
 use crate::link::error::LinkError;
-use crate::util::cursor::WriteCursor;
+use crate::util::buffer::Buffer;
 
 use crate::app::format::write::start_request;
-use crate::app::timeout::Timeout;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::messages::{MasterMsg, Message};
 
@@ -32,7 +32,7 @@ pub(crate) struct MasterSession {
     timeout: Timeout,
     associations: AssociationMap,
     user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
-    buffer: [u8; 2048],
+    tx_buffer: Buffer,
 }
 
 enum ReadResponseAction {
@@ -42,17 +42,31 @@ enum ReadResponseAction {
 }
 
 impl MasterSession {
+    pub(crate) const DEFAULT_TX_BUFFER_SIZE: usize = 2048;
+    pub(crate) const MIN_TX_BUFFER_SIZE: usize = 249;
+
+    pub(crate) const DEFAULT_RX_BUFFER_SIZE: usize = 2048;
+    pub(crate) const MIN_RX_BUFFER_SIZE: usize = 2048;
+
     pub(crate) fn new(
         level: DecodeLogLevel,
         response_timeout: Timeout,
+        tx_buffer_size: usize,
         user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
     ) -> Self {
+        let tx_buffer_size = if tx_buffer_size < Self::MIN_TX_BUFFER_SIZE {
+            log::warn!("Minimum TX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", Self::MIN_TX_BUFFER_SIZE, tx_buffer_size);
+            Self::MIN_TX_BUFFER_SIZE
+        } else {
+            tx_buffer_size
+        };
+
         Self {
             level,
             timeout: response_timeout,
             associations: AssociationMap::new(),
             user_queue,
-            buffer: [0; 2048],
+            tx_buffer: Buffer::new(tx_buffer_size),
         }
     }
 
@@ -592,7 +606,7 @@ impl MasterSession {
     where
         T: AsyncWrite + Unpin,
     {
-        let mut cursor = WriteCursor::new(&mut self.buffer);
+        let mut cursor = self.tx_buffer.write_cursor();
         write::confirm_solicited(seq, &mut cursor)?;
         writer
             .write(io, self.level, destination.wrap(), cursor.written())
@@ -610,7 +624,7 @@ impl MasterSession {
     where
         T: AsyncWrite + Unpin,
     {
-        let mut cursor = WriteCursor::new(&mut self.buffer);
+        let mut cursor = self.tx_buffer.write_cursor();
         crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
 
         writer
@@ -633,7 +647,7 @@ impl MasterSession {
         // format the request
         let association = self.associations.get_mut(address)?;
         let seq = association.increment_seq();
-        let mut cursor = WriteCursor::new(&mut self.buffer);
+        let mut cursor = self.tx_buffer.write_cursor();
         let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
         writer

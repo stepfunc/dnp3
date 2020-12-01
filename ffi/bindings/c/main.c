@@ -239,6 +239,15 @@ int main()
         .min_delay = 100,
         .max_delay = 5000,
     };
+    master_configuration_t master_config =
+    {
+        .address = 1,
+        .level = DecodeLogLevel_ObjectValues,
+        .reconnection_strategy = retry_strategy,
+        .response_timeout = 5000,
+        .rx_buffer_size = 2048,
+        .tx_buffer_size = 2048,
+    };
     client_state_listener_t listener =
     {
         .on_change = &client_state_on_change,
@@ -246,10 +255,7 @@ int main()
     };
     master_t* master = runtime_add_master_tcp(
         runtime,
-        1,
-        DecodeLogLevel_ObjectValues,
-        retry_strategy,
-        5000,
+        master_config,
         "127.0.0.1:20000",
         listener
     );

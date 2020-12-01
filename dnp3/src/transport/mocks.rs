@@ -7,6 +7,7 @@ use crate::link::header::{AnyAddress, FrameInfo};
 use crate::outstation::SelfAddressSupport;
 use crate::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::transport::{Fragment, FragmentInfo};
+use crate::util::buffer::Buffer;
 
 pub(crate) struct MockWriter {
     num_writes: usize,
@@ -17,7 +18,7 @@ pub(crate) struct MockReader {
     count: usize,
     frame_id: u32,
     info: Option<FrameInfo>,
-    buffer: [u8; 2048],
+    buffer: Buffer,
 }
 
 // same signature as the real transport writer
@@ -53,21 +54,25 @@ impl MockWriter {
 }
 
 impl MockReader {
-    pub(crate) fn master(_: EndpointAddress) -> Self {
-        Self::new()
+    pub(crate) fn master(_: EndpointAddress, rx_buffer_size: usize) -> Self {
+        Self::new(rx_buffer_size)
     }
 
-    pub(crate) fn outstation(_: EndpointAddress, _: SelfAddressSupport) -> Self {
-        Self::new()
+    pub(crate) fn outstation(
+        _: EndpointAddress,
+        _: SelfAddressSupport,
+        rx_buffer_size: usize,
+    ) -> Self {
+        Self::new(rx_buffer_size)
     }
 
-    fn new() -> Self {
+    fn new(buffer_size: usize) -> Self {
         Self {
             num_reads: 0,
             count: 0,
             frame_id: 0,
             info: None,
-            buffer: [0; 2048],
+            buffer: Buffer::new(buffer_size),
         }
     }
 
@@ -90,7 +95,7 @@ impl MockReader {
                     .expect("call set_rx_frame_info(..) before running test");
                 let fragment = Fragment {
                     info: FragmentInfo::new(self.frame_id, info.source, info.broadcast),
-                    data: &self.buffer[0..x],
+                    data: &self.buffer.get(x).unwrap(),
                 };
                 Some(fragment)
             }
@@ -103,7 +108,9 @@ impl MockReader {
     {
         self.count = 0;
         self.num_reads += 1;
-        self.count = io.read(&mut self.buffer).await?;
+        self.count = io
+            .read(self.buffer.get_mut(self.buffer.len()).unwrap())
+            .await?;
         self.frame_id = self.frame_id.wrapping_add(1);
         Ok(())
     }

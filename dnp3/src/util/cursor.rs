@@ -256,6 +256,14 @@ impl<'a> WriteCursor<'a> {
     pub(crate) fn write_f64_le(&mut self, value: f64) -> Result<(), WriteError> {
         self.write(&f64::to_le_bytes(value))
     }
+
+    pub(crate) fn write_slice(&mut self, slice: &[u8]) -> Result<(), WriteError> {
+        for byte in slice {
+            self.write_u8(*byte)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

@@ -14,20 +14,21 @@ pub(crate) struct Reader {
 }
 
 impl Reader {
-    pub(crate) fn master(source: EndpointAddress) -> Self {
+    pub(crate) fn master(source: EndpointAddress, max_tx_buffer: usize) -> Self {
         Self {
             link: crate::link::layer::Layer::new(
                 EndpointType::Master,
                 SelfAddressSupport::Disabled,
                 source,
             ),
-            assembler: Assembler::new(),
+            assembler: Assembler::new(max_tx_buffer),
         }
     }
 
     pub(crate) fn outstation(
         source: EndpointAddress,
         self_address_support: SelfAddressSupport,
+        max_rx_buffer: usize,
     ) -> Self {
         Self {
             link: crate::link::layer::Layer::new(
@@ -35,7 +36,7 @@ impl Reader {
                 self_address_support,
                 source,
             ),
-            assembler: Assembler::new(),
+            assembler: Assembler::new(max_rx_buffer),
         }
     }
 

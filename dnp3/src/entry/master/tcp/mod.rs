@@ -1,9 +1,6 @@
-use crate::app::parse::DecodeLogLevel;
-use crate::app::retry::{ExponentialBackOff, RetryStrategy};
-use crate::app::timeout::Timeout;
-use crate::entry::EndpointAddress;
+use crate::app::retry::ExponentialBackOff;
 use crate::master::error::Shutdown;
-use crate::master::handle::{Listener, MasterHandle};
+use crate::master::handle::{Listener, MasterConfiguration, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
 use crate::tokio::net::TcpStream;
 use crate::transport::{TransportReader, TransportWriter};
@@ -36,14 +33,11 @@ pub(crate) struct MasterTask {
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
 pub fn spawn_master_tcp_client(
-    address: EndpointAddress,
-    level: DecodeLogLevel,
-    strategy: RetryStrategy,
-    timeout: Timeout,
+    config: MasterConfiguration,
     endpoint: SocketAddr,
     listener: Listener<ClientState>,
 ) -> MasterHandle {
-    let (mut task, handle) = MasterTask::new(address, level, strategy, timeout, endpoint, listener);
+    let (mut task, handle) = MasterTask::new(config, endpoint, listener);
     crate::tokio::spawn(async move { task.run().await });
     handle
 }
@@ -57,39 +51,32 @@ pub fn spawn_master_tcp_client(
 /// tasks instead of within the context of a runtime, e.g. in applications that cannot use
 /// `[tokio::main]` such as C language bindings.
 pub fn create_master_tcp_client(
-    address: EndpointAddress,
-    level: DecodeLogLevel,
-    strategy: RetryStrategy,
-    response_timeout: Timeout,
+    config: MasterConfiguration,
     endpoint: SocketAddr,
     listener: Listener<ClientState>,
 ) -> (impl Future<Output = ()> + 'static, MasterHandle) {
-    let (mut task, handle) = MasterTask::new(
-        address,
-        level,
-        strategy,
-        response_timeout,
-        endpoint,
-        listener,
-    );
+    let (mut task, handle) = MasterTask::new(config, endpoint, listener);
     (async move { task.run().await }, handle)
 }
 
 impl MasterTask {
     fn new(
-        address: EndpointAddress,
-        level: DecodeLogLevel,
-        strategy: RetryStrategy,
-        response_timeout: Timeout,
+        config: MasterConfiguration,
         endpoint: SocketAddr,
         listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
         let (tx, rx) = crate::tokio::sync::mpsc::channel(100); // TODO
-        let session = MasterSession::new(level, response_timeout, rx);
-        let (reader, writer) = crate::transport::create_master_transport_layer(address);
+        let session = MasterSession::new(
+            config.level,
+            config.response_timeout,
+            config.tx_buffer_size,
+            rx,
+        );
+        let (reader, writer) =
+            crate::transport::create_master_transport_layer(config.address, config.rx_buffer_size);
         let task = Self {
             endpoint,
-            back_off: ExponentialBackOff::new(strategy),
+            back_off: ExponentialBackOff::new(config.reconnection_strategy),
             session,
             reader,
             writer,

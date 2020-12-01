@@ -151,11 +151,17 @@ public class Main {
             RetryStrategy retryStrategy = new RetryStrategy();
             retryStrategy.minDelay = Duration.ofMillis(100);
             retryStrategy.maxDelay = Duration.ofSeconds(5);
+
+            MasterConfiguration masterConfig = new MasterConfiguration();
+            masterConfig.address = ushort(1);
+            masterConfig.level = DecodeLogLevel.OBJECT_VALUES;
+            masterConfig.reconnectionStrategy = retryStrategy;
+            masterConfig.responseTimeout = Duration.ofSeconds(5);
+            masterConfig.rxBufferSize = ushort(2048);
+            masterConfig.txBufferSize = ushort(2048);
+
             Master master = runtime.addMasterTcp(
-                    ushort(1),
-                    DecodeLogLevel.OBJECT_VALUES,
-                    retryStrategy,
-                    Duration.ofSeconds(5),
+                    masterConfig,
                     "127.0.0.1:20000",
                     new TestListener()
             );
