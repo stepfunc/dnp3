@@ -11,6 +11,7 @@ use crate::entry::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::poll::Poll;
+use crate::master::request::Classes;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
@@ -70,7 +71,7 @@ pub(crate) enum ReadTask {
     /// Periodic polls that are configured when creating associations
     PeriodicPoll(Poll),
     /// Integrity poll that occurs during startup, or after outstation restarts
-    StartupIntegrity,
+    StartupIntegrity(Classes),
     /// One-time read request
     SingleRead(SingleReadTask),
 }
@@ -92,7 +93,7 @@ impl RequestWriter for ReadTask {
     fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
             ReadTask::PeriodicPoll(poll) => poll.format(writer),
-            ReadTask::StartupIntegrity => writer.write_class1230(),
+            ReadTask::StartupIntegrity(classes) => classes.write(writer),
             ReadTask::SingleRead(req) => req.format(writer),
         }
     }
@@ -124,7 +125,7 @@ impl ReadTask {
         objects: HeaderCollection,
     ) {
         match self {
-            ReadTask::StartupIntegrity => association.handle_integrity_response(header, objects),
+            ReadTask::StartupIntegrity(_) => association.handle_integrity_response(header, objects),
             ReadTask::PeriodicPoll(_) => association.handle_poll_response(header, objects),
             ReadTask::SingleRead(_) => association.handle_read_response(header, objects),
         }
@@ -132,7 +133,7 @@ impl ReadTask {
 
     pub(crate) fn complete(self, association: &mut Association) {
         match self {
-            ReadTask::StartupIntegrity => association.on_integrity_scan_complete(),
+            ReadTask::StartupIntegrity(_) => association.on_integrity_scan_complete(),
             ReadTask::PeriodicPoll(poll) => association.complete_poll(poll.id),
             ReadTask::SingleRead(task) => task.on_complete(),
         }
@@ -140,7 +141,7 @@ impl ReadTask {
 
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
         match self {
-            ReadTask::StartupIntegrity => {
+            ReadTask::StartupIntegrity(_) => {
                 if let Some(association) = association {
                     association.on_integrity_scan_failure();
                 }

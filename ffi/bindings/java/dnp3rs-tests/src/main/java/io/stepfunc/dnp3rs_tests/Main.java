@@ -177,6 +177,7 @@ public class Main {
             associationConfiguration.enableUnsolClasses.class1 = true;
             associationConfiguration.enableUnsolClasses.class2 = true;
             associationConfiguration.enableUnsolClasses.class3 = true;
+            associationConfiguration.startupIntegrityClasses = Classes.all();
             associationConfiguration.autoTimeSync = AutoTimeSync.LAN;
             associationConfiguration.autoTasksRetryStrategy = retryStrategy;
             AssociationHandlers associationHandlers = new AssociationHandlers();
