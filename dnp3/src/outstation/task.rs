@@ -1032,6 +1032,31 @@ mod test {
         events: EventHandle,
     }
 
+    impl<T> OutstationTestHarness<T>
+    where
+        T: std::future::Future<Output = Result<(), LinkError>>,
+    {
+        fn test_request_response(&mut self, request: &[u8], response: &[u8]) {
+            self.io.read(request);
+            assert_pending!(self.task.poll());
+            assert!(self.io.pending_write());
+            self.io.write(response);
+            assert_pending!(self.task.poll());
+            assert!(self.io.all_done());
+        }
+
+        fn check_events(&mut self, events: &[Event]) {
+            for event in events {
+                assert_eq!(*event, self.events.pop().unwrap());
+            }
+            assert_eq!(self.events.pop(), None);
+        }
+
+        fn check_no_events(&mut self) {
+            self.check_events(&[]);
+        }
+    }
+
     #[derive(Copy, Clone, Debug, PartialEq)]
     enum Control {
         G12V1(Group12Var1, u16),
@@ -1235,81 +1260,64 @@ mod test {
     fn performs_direct_operate() {
         let mut harness = new_harness(get_config());
 
-        harness.io.read(&[
+        harness.test_request_response(
             // direct operate, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
-            0xC0, 0x05, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00,
-        ]);
-
-        assert_pending!(harness.task.poll());
-        harness.io.write(&[
+            &[0xC0, 0x05, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00],
             // response, seq == 0, restart IIN + echo of request headers
-            0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
-        ]);
-        assert_pending!(harness.task.poll());
-        assert!(harness.io.all_done());
+            &[
+                0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
+            ],
+        );
 
-        assert_eq!(harness.events.pop().unwrap(), Event::BeginControls);
-        assert_eq!(
-            harness.events.pop().unwrap(),
+        harness.check_events(&[
+            Event::BeginControls,
             Event::Operate(
                 Control::G41V2(Group41Var2::new(513), 7),
-                OperateType::DirectOperate
-            )
-        );
-        assert_eq!(harness.events.pop().unwrap(), Event::EndControls);
-        assert_eq!(harness.events.pop(), None);
+                OperateType::DirectOperate,
+            ),
+            Event::EndControls,
+        ]);
     }
 
     #[test]
     fn performs_select_before_operate() {
         let mut harness = new_harness(get_config());
 
-        // ---------- select -------------------
-        harness.io.read(&[
+        // ------------ select -------------
+
+        harness.test_request_response(
             // select, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
-            0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00,
-        ]);
-
-        assert_pending!(harness.task.poll());
-        harness.io.write(&[
+            &[0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00],
             // response, seq == 0, restart IIN + echo of request headers
-            0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
-        ]);
-        assert_pending!(harness.task.poll());
-        assert!(harness.io.all_done());
-
-        assert_eq!(harness.events.pop().unwrap(), Event::BeginControls);
-        assert_eq!(
-            harness.events.pop().unwrap(),
-            Event::Select(Control::G41V2(Group41Var2::new(513), 7))
+            &[
+                0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
+            ],
         );
-        assert_eq!(harness.events.pop().unwrap(), Event::EndControls);
-        assert_eq!(harness.events.pop(), None);
 
-        // ---------- operate -------------------
-
-        harness.io.read(&[
-            // select, seq == 1, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
-            0xC1, 0x04, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00,
+        harness.check_events(&[
+            Event::BeginControls,
+            Event::Select(Control::G41V2(Group41Var2::new(513), 7)),
+            Event::EndControls,
         ]);
 
-        assert_pending!(harness.task.poll());
-        harness.io.write(&[
+        // ------------ operate -------------
+
+        harness.test_request_response(
+            // operate, seq == 1, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
+            &[0xC1, 0x04, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00],
             // response, seq == 0, restart IIN + echo of request headers
-            0xC1, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
-        ]);
-        assert_pending!(harness.task.poll());
-        assert!(harness.io.all_done());
+            &[
+                0xC1, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
+            ],
+        );
 
-        assert_eq!(harness.events.pop().unwrap(), Event::BeginControls);
-        assert_eq!(
-            harness.events.pop().unwrap(),
+        harness.check_events(&[
+            Event::BeginControls,
             Event::Operate(
                 Control::G41V2(Group41Var2::new(513), 7),
-                OperateType::SelectBeforeOperate
-            )
-        );
-        assert_eq!(harness.events.pop().unwrap(), Event::EndControls);
-        assert_eq!(harness.events.pop(), None);
+                OperateType::SelectBeforeOperate,
+            ),
+            Event::EndControls,
+        ]);
     }
 }
