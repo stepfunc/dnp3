@@ -3,7 +3,7 @@ use crate::master::error::Shutdown;
 use crate::master::handle::{Listener, MasterConfiguration, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
 use crate::tokio::net::TcpStream;
-use crate::transport::reader::TransportReader;
+use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
 use std::future::Future;
 use std::net::SocketAddr;

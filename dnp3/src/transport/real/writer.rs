@@ -1,5 +1,3 @@
-use crate::app::parse::parser::ParsedFragment;
-use crate::app::parse::DecodeLogLevel;
 use crate::app::EndpointType;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
@@ -47,17 +45,12 @@ impl Writer {
     pub(crate) async fn write<W>(
         &mut self,
         io: &mut W,
-        level: DecodeLogLevel,
         destination: AnyAddress,
         fragment: &[u8],
     ) -> Result<(), LinkError>
     where
         W: AsyncWrite + Unpin,
     {
-        if level != DecodeLogLevel::Nothing {
-            let _ = ParsedFragment::parse(level.transmit(), fragment);
-        }
-
         let chunks = fragment.chunks(crate::link::constant::MAX_APP_BYTES_PER_FRAME);
 
         let last = if chunks.len() == 0 {
