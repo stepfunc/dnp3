@@ -45,16 +45,21 @@ impl Reader {
         self.link.reset();
     }
 
+    pub(crate) fn pop(&mut self) -> Option<Fragment> {
+        self.assembler.pop()
+    }
+
     pub(crate) fn peek(&self) -> Option<Fragment> {
         self.assembler.peek()
     }
 
-    pub(crate) async fn read_next<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        // discard any existing frame, but keep partial frames
-        self.assembler.discard();
+        if self.assembler.peek().is_some() {
+            return Ok(());
+        }
 
         let mut payload = FramePayload::new();
 

@@ -298,11 +298,6 @@ enum ConfirmAction {
     ContinueWait,
 }
 
-enum ResponseSeriesAction {
-    ReadNewRequest,
-    HandleCurrentRequest,
-}
-
 impl OutstationSession {
     pub(crate) const MIN_TX_BUFFER_SIZE: usize = 249; // 1 link frame
     pub(crate) const MIN_RX_BUFFER_SIZE: usize = 249; // 1 link frame
@@ -378,19 +373,15 @@ impl OutstationSession {
             .handle_one_request_from_idle(io, reader, writer)
             .await?;
 
+        // we've handled the current fragment
+        reader.pop();
+
         if let Some(series) = series {
-            match self
-                .enter_sol_confirm_wait(io, reader, writer, series)
-                .await?
-            {
-                ResponseSeriesAction::ReadNewRequest => {}
-                // we skip reading, and instead return which will process the current request again
-                ResponseSeriesAction::HandleCurrentRequest => return Ok(()),
-            }
+            self.sol_confirm_wait(io, reader, writer, series).await?;
         }
 
         crate::tokio::select! {
-            frame_read = reader.read_next(io) => {
+            frame_read = reader.read(io) => {
                 frame_read?;
             }
             _ = self.database.wait_for_change() => {
@@ -410,7 +401,7 @@ impl OutstationSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        if let Some((info, request)) = reader.get_request(self.config.level) {
+        if let Some((info, request)) = reader.peek_request(self.config.level) {
             if let Some(result) = self.process_request_from_idle(info, request) {
                 self.state.last_valid_request = Some(result);
                 self.respond(io, writer, result.response_length, info.source)
@@ -833,13 +824,13 @@ impl OutstationSession {
         crate::tokio::time::Instant::now() + self.config.confirm_timeout
     }
 
-    async fn enter_sol_confirm_wait<T>(
+    async fn sol_confirm_wait<T>(
         &mut self,
         io: &mut T,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         mut series: ResponseSeries,
-    ) -> Result<ResponseSeriesAction, LinkError>
+    ) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -849,10 +840,11 @@ impl OutstationSession {
                 .await?
             {
                 Confirm::Yes => {
+                    reader.pop();
                     self.database.clear_written_events();
                     if series.last_response {
                         // done with response series
-                        return Ok(ResponseSeriesAction::ReadNewRequest);
+                        return Ok(());
                     }
                     // format the next response in the series
                     series.ecsn.increment();
@@ -864,7 +856,7 @@ impl OutstationSession {
                     );
                     self.respond(io, writer, length, series.master).await?;
                     match next_state {
-                        NextState::Idle => return Ok(ResponseSeriesAction::ReadNewRequest),
+                        NextState::Idle => return Ok(()),
                         NextState::SolConfirmWait(next) => {
                             series = next;
                         }
@@ -872,11 +864,11 @@ impl OutstationSession {
                 }
                 Confirm::Timeout => {
                     self.database.reset();
-                    return Ok(ResponseSeriesAction::ReadNewRequest);
+                    return Ok(());
                 }
                 Confirm::NewRequest => {
                     self.database.reset();
-                    return Ok(ResponseSeriesAction::HandleCurrentRequest);
+                    return Ok(());
                 }
             }
         }
@@ -898,7 +890,7 @@ impl OutstationSession {
                 Timeout::Yes => return Ok(Confirm::Timeout),
                 // process data
                 Timeout::No => {
-                    if let Some((info, request)) = reader.get_request(self.config.level) {
+                    if let Some((info, request)) = reader.peek_request(self.config.level) {
                         match self.expect_sol_confirm(ecsn, info, request) {
                             ConfirmAction::ContinueWait => {}
                             ConfirmAction::Confirmed => return Ok(Confirm::Yes),
@@ -1052,7 +1044,7 @@ mod test {
             EndpointAddress::from(10).unwrap(),
             EndpointAddress::from(1).unwrap(),
             SelfAddressSupport::Disabled,
-            DecodeLogLevel::ObjectHeaders,
+            DecodeLogLevel::ObjectValues,
             Duration::from_secs(2),
             Duration::from_secs(5),
         )
@@ -1065,19 +1057,14 @@ mod test {
         let mut harness = new_harness(get_config());
 
         harness.io.read(&[
-            // direct operate, seq == 0
-            0xC0, 0x05, // g41v2 - count == 1, index == 7
-            41, 2, 0x17, 0x01, 0x07, // value = 258, status == SUCCESS
-            0x01, 0x02, 0x00,
+            // direct operate, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
+            0xC0, 0x05, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00,
         ]);
 
         assert_pending!(harness.task.poll());
-        assert!(harness.io.pending_write());
-
         harness.io.write(&[
-            // response, seq == 0, restart IIN
-            0xC0, 0x81, 0x80, 0x00, // echo of previous request
-            41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
+            // response, seq == 0, restart IIN + echo of request headers
+            0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
         ]);
         assert_pending!(harness.task.poll());
         assert!(harness.io.all_done())

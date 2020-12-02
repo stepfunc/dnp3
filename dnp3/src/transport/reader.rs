@@ -4,7 +4,7 @@ use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::outstation::SelfAddressSupport;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
-use crate::transport::{Fragment, FragmentInfo};
+use crate::transport::FragmentInfo;
 
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport reader during testing.
@@ -48,12 +48,11 @@ impl TransportReader {
         &mut self.inner
     }
 
-    pub(crate) async fn read_next<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        self.logged = false;
-        self.inner.read_next(io).await
+        self.inner.read(io).await
     }
 
     pub(crate) async fn read_with_timeout<T>(
@@ -65,7 +64,7 @@ impl TransportReader {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         crate::tokio::select! {
-            res = self.read_next(io) => {
+            res = self.read(io) => {
                 res?;
                 Ok(Timeout::No)
             },
@@ -79,15 +78,27 @@ impl TransportReader {
         self.inner.reset()
     }
 
-    pub(crate) fn get_response(
+    pub(crate) fn pop(&mut self) {
+        self.inner.pop();
+        self.logged = false;
+    }
+
+    fn log_fragment(&mut self) -> bool {
+        let log_current_fragment = !self.logged;
+        self.logged = true;
+        log_current_fragment
+    }
+
+    pub(crate) fn pop_response(
         &mut self,
         level: DecodeLogLevel,
     ) -> Option<(EndpointAddress, Response)> {
-        let (log, info, parsed) = self.peek(level)?;
+        let log = self.log_fragment();
+        let (info, parsed) = self.parse(false, log, level)?;
         match parsed.to_response() {
             Err(err) => {
                 if log {
-                    log::error!("response error: {}", err)
+                    log::error!("response error: {}", err);
                 }
                 None
             }
@@ -95,12 +106,16 @@ impl TransportReader {
         }
     }
 
-    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(FragmentInfo, Request)> {
-        let (log, info, parsed) = self.peek(level)?;
+    pub(crate) fn peek_request(
+        &mut self,
+        level: DecodeLogLevel,
+    ) -> Option<(FragmentInfo, Request)> {
+        let log = self.log_fragment();
+        let (info, parsed) = self.parse(true, log, level)?;
         match parsed.to_request() {
             Err(err) => {
                 if log {
-                    log::error!("request error: {}", err)
+                    log::error!("request error: {}", err);
                 }
                 None
             }
@@ -108,29 +123,24 @@ impl TransportReader {
         }
     }
 
-    fn peek(&mut self, level: DecodeLogLevel) -> Option<(bool, FragmentInfo, ParsedFragment)> {
-        let log_this_peek = !self.logged;
-        self.logged = true;
-        let fragment: Fragment = self.inner.peek()?;
-        let level = if log_this_peek {
-            level
+    fn parse(
+        &mut self,
+        peek: bool,
+        log: bool,
+        level: DecodeLogLevel,
+    ) -> Option<(FragmentInfo, ParsedFragment)> {
+        let fragment = if peek {
+            self.inner.peek()?
         } else {
-            DecodeLogLevel::Nothing
+            self.inner.pop()?
         };
-        let parsed = match ParsedFragment::parse(level.receive(), fragment.data) {
-            Err(err) => {
-                if log_this_peek {
-                    log::warn!("error parsing fragment header: {}", err)
-                }
-                return None;
-            }
-            Ok(parsed) => parsed,
-        };
+        let level = if log { level } else { DecodeLogLevel::Nothing };
+        let parsed = ParsedFragment::parse(level.receive(), fragment.data).ok()?;
         if let Err(err) = parsed.objects {
-            if log_this_peek {
-                log::warn!("error parsing object headers: {}", err)
+            if log {
+                log::warn!("error parsing object headers: {}", err);
             }
         }
-        Some((log_this_peek, fragment.info, parsed))
+        Some((fragment.info, parsed))
     }
 }

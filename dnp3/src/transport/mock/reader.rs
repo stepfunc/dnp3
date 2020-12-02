@@ -48,26 +48,37 @@ impl MockReader {
     pub(crate) fn reset(&mut self) {}
 
     pub(crate) fn peek(&self) -> Option<Fragment> {
-        match self.count {
-            0 => None,
-            x => {
-                let info = self
-                    .info
-                    .expect("call set_rx_frame_info(..) before running test");
-                let fragment = Fragment {
-                    info: FragmentInfo::new(self.frame_id, info.source, info.broadcast),
-                    data: &self.buffer.get(x).unwrap(),
-                };
-                Some(fragment)
-            }
-        }
+        self.get(self.count)
     }
 
-    pub(crate) async fn read_next<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    pub(crate) fn pop(&mut self) -> Option<Fragment> {
+        let count = self.count;
+        self.count = 0;
+        self.get(count)
+    }
+
+    fn get(&self, count: usize) -> Option<Fragment> {
+        if count == 0 {
+            return None;
+        }
+        let info = self
+            .info
+            .expect("call set_rx_frame_info(..) before running test");
+        let fragment = Fragment {
+            info: FragmentInfo::new(self.frame_id, info.source, info.broadcast),
+            data: &self.buffer.get(count).unwrap(),
+        };
+        Some(fragment)
+    }
+
+    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        self.count = 0;
+        if self.count > 0 {
+            return Ok(());
+        }
+
         self.num_reads += 1;
         self.count = io
             .read(self.buffer.get_mut(self.buffer.len()).unwrap())
