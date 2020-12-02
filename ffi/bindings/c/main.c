@@ -207,6 +207,12 @@ void on_timesync_complete(time_sync_result_t result, void* arg)
     printf("TimeSyncResult: %s\n", TimeSyncResult_to_string(result));
 }
 
+// Restart callback
+void on_restart_complete(restart_result_t result, void* arg)
+{
+    printf("RestartResult: %s\n", RestartSuccess_to_string(result.success));
+}
+
 // Timestamp callback
 time_provider_timestamp_t get_time(void* arg)
 {
@@ -417,6 +423,24 @@ int main()
                 .ctx = NULL,
             };
             association_perform_time_sync(association, TimeSyncMode_NonLan, cb);
+        }
+        else if(strcmp(cbuf, "crt\n") == 0)
+        {
+            restart_task_callback_t cb =
+            {
+                .on_complete = &on_restart_complete,
+                .ctx = NULL,
+            };
+            association_cold_restart(association, cb);
+        }
+        else if(strcmp(cbuf, "wrt\n") == 0)
+        {
+            restart_task_callback_t cb =
+            {
+                .on_complete = &on_restart_complete,
+                .ctx = NULL,
+            };
+            association_warm_restart(association, cb);
         }
         else
         {

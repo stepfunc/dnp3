@@ -281,6 +281,18 @@ class MainClass
                             Console.WriteLine($"Result: {result}");
                             break;
                         }
+                    case "crt":
+                        {
+                            var result = await association.ColdRestart();
+                            Console.WriteLine($"Result: {result}");
+                            break;
+                        }
+                    case "wrt":
+                        {
+                            var result = await association.WarmRestart();
+                            Console.WriteLine($"Result: {result}");
+                            break;
+                        }
                     default:
                         Console.WriteLine("Unknown command");
                         break;

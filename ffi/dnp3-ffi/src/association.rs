@@ -200,3 +200,67 @@ pub unsafe fn association_perform_time_sync(
         callback.on_complete(result);
     });
 }
+
+pub unsafe fn association_cold_restart(
+    association: *mut Association,
+    callback: ffi::RestartTaskCallback,
+) {
+    let association = match association.as_mut() {
+        Some(association) => association,
+        None => {
+            callback.on_complete(ffi::RestartResult::error());
+            return;
+        }
+    };
+
+    let handle = &mut association.handle;
+    association.runtime.spawn(async move {
+        let result = match handle.cold_restart().await {
+            Ok(value) => ffi::RestartResult::new_success(value),
+            Err(_) => ffi::RestartResult::error(),
+        };
+
+        callback.on_complete(result);
+    });
+}
+
+pub unsafe fn association_warm_restart(
+    association: *mut Association,
+    callback: ffi::RestartTaskCallback,
+) {
+    let association = match association.as_mut() {
+        Some(association) => association,
+        None => {
+            callback.on_complete(ffi::RestartResult::error());
+            return;
+        }
+    };
+
+    let handle = &mut association.handle;
+    association.runtime.spawn(async move {
+        let result = match handle.warm_restart().await {
+            Ok(value) => ffi::RestartResult::new_success(value),
+            Err(_) => ffi::RestartResult::error(),
+        };
+
+        callback.on_complete(result);
+    });
+}
+
+impl ffi::RestartResult {
+    fn new_success(delay: Duration) -> Self {
+        ffi::RestartResultFields {
+            delay,
+            success: ffi::RestartSuccess::Success,
+        }
+        .into()
+    }
+
+    fn error() -> Self {
+        ffi::RestartResultFields {
+            delay: Duration::from_millis(0),
+            success: ffi::RestartSuccess::TaskError,
+        }
+        .into()
+    }
+}

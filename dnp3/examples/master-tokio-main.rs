@@ -102,6 +102,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     log::warn!("error: {}", err);
                 }
             }
+            "crt" => {
+                if let Err(err) = association.cold_restart().await {
+                    log::warn!("error: {}", err);
+                }
+            }
+            "wrt" => {
+                if let Err(err) = association.warm_restart().await {
+                    log::warn!("error: {}", err);
+                }
+            }
             s => println!("unknown command: {}", s),
         }
     }

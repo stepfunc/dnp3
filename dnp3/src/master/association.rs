@@ -298,6 +298,9 @@ impl Association {
 
         // Reset the auto tasks
         self.auto_tasks.reset();
+
+        // Clear last unsolicited fragment
+        self.last_unsol_frag = None;
     }
 
     pub(crate) fn get_system_time(&self) -> Option<Timestamp> {

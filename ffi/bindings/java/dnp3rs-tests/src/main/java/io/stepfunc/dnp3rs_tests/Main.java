@@ -259,6 +259,18 @@ public class Main {
                             System.out.println("Result: " + result);
                             break;
                         }
+                        case "crt":
+                        {
+                            RestartResult result = association.coldRestart().toCompletableFuture().get();
+                            System.out.println("Result: " + result);
+                            break;
+                        }
+                        case "wrt":
+                        {
+                            RestartResult result = association.warmRestart().toCompletableFuture().get();
+                            System.out.println("Result: " + result);
+                            break;
+                        }
                         default:
                             System.out.println("Unknown command");
                             break;

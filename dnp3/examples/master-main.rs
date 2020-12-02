@@ -88,6 +88,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     log::warn!("error: {}", err);
                 }
             }
+            "crt" => {
+                if let Err(err) = runtime.block_on(association.cold_restart()) {
+                    log::warn!("error: {}", err);
+                }
+            }
+            "wrt" => {
+                if let Err(err) = runtime.block_on(association.warm_restart()) {
+                    log::warn!("error: {}", err);
+                }
+            }
             s => println!("unknown command: {}", s),
         }
     }
