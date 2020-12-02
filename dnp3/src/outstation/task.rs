@@ -537,9 +537,24 @@ impl OutstationSession {
                 self.handle_restart(seq, delay, iin2)
             }
             // controls
-            FunctionCode::Select => self.handle_select(seq, frame_id, object_headers),
-            FunctionCode::Operate => self.handle_operate(seq, frame_id, object_headers),
-            FunctionCode::DirectOperate => self.handle_direct_operate(seq, object_headers),
+            FunctionCode::Select => {
+                self.control_handler.begin_fragment();
+                let count = self.handle_select(seq, frame_id, object_headers);
+                self.control_handler.end_fragment();
+                count
+            }
+            FunctionCode::Operate => {
+                self.control_handler.begin_fragment();
+                let count = self.handle_operate(seq, frame_id, object_headers);
+                self.control_handler.end_fragment();
+                count
+            }
+            FunctionCode::DirectOperate => {
+                self.control_handler.begin_fragment();
+                let count = self.handle_direct_operate(seq, object_headers);
+                self.control_handler.end_fragment();
+                count
+            }
 
             _ => {
                 log::warn!("unsupported function code: {:?}", function);
@@ -999,9 +1014,13 @@ impl From<ObjectParseError> for IIN2 {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
     use crate::link::header::FrameInfo;
-    use crate::outstation::traits::{DefaultControlHandler, DefaultOutstationApplication};
+    use crate::outstation::database::Database;
+    use crate::outstation::traits::{ControlSupport, DefaultOutstationApplication};
     use crate::tokio::test::*;
+    use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
 
     struct OutstationTestHarness<T>
     where
@@ -1010,16 +1029,177 @@ mod test {
         database: DatabaseHandle,
         io: io::Handle,
         task: Spawn<T>,
+        events: EventHandle,
+    }
+
+    #[derive(Copy, Clone, Debug, PartialEq)]
+    enum Control {
+        G12V1(Group12Var1, u16),
+        G41V1(Group41Var1, u16),
+        G41V2(Group41Var2, u16),
+        G41V3(Group41Var3, u16),
+        G41V4(Group41Var4, u16),
+    }
+
+    #[derive(Copy, Clone, Debug, PartialEq)]
+    enum Event {
+        BeginControls,
+        Select(Control),
+        Operate(Control, OperateType),
+        EndControls,
+    }
+
+    #[derive(Clone)]
+    struct EventHandle {
+        events: Arc<Mutex<VecDeque<Event>>>,
+    }
+
+    impl EventHandle {
+        fn new() -> Self {
+            EventHandle {
+                events: Arc::new(Mutex::new(VecDeque::new())),
+            }
+        }
+
+        fn push(&self, event: Event) {
+            self.events.lock().unwrap().push_back(event);
+        }
+
+        fn pop(&self) -> Option<Event> {
+            self.events.lock().unwrap().pop_front()
+        }
+    }
+
+    struct MockControlHandler {
+        events: EventHandle,
+    }
+
+    impl MockControlHandler {
+        fn new(events: EventHandle) -> Box<dyn ControlHandler> {
+            Box::new(Self { events })
+        }
+    }
+
+    impl ControlSupport<Group12Var1> for MockControlHandler {
+        fn select(&mut self, control: Group12Var1, index: u16, _: &mut Database) -> CommandStatus {
+            self.events
+                .push(Event::Select(Control::G12V1(control, index)));
+            CommandStatus::Success
+        }
+
+        fn operate(
+            &mut self,
+            control: Group12Var1,
+            index: u16,
+            op_type: OperateType,
+            _: &mut Database,
+        ) -> CommandStatus {
+            self.events
+                .push(Event::Operate(Control::G12V1(control, index), op_type));
+            CommandStatus::Success
+        }
+    }
+
+    impl ControlSupport<Group41Var1> for MockControlHandler {
+        fn select(&mut self, control: Group41Var1, index: u16, _: &mut Database) -> CommandStatus {
+            self.events
+                .push(Event::Select(Control::G41V1(control, index)));
+            CommandStatus::Success
+        }
+
+        fn operate(
+            &mut self,
+            control: Group41Var1,
+            index: u16,
+            op_type: OperateType,
+            _: &mut Database,
+        ) -> CommandStatus {
+            self.events
+                .push(Event::Operate(Control::G41V1(control, index), op_type));
+            CommandStatus::Success
+        }
+    }
+
+    impl ControlSupport<Group41Var2> for MockControlHandler {
+        fn select(&mut self, control: Group41Var2, index: u16, _: &mut Database) -> CommandStatus {
+            self.events
+                .push(Event::Select(Control::G41V2(control, index)));
+            CommandStatus::Success
+        }
+
+        fn operate(
+            &mut self,
+            control: Group41Var2,
+            index: u16,
+            op_type: OperateType,
+            _: &mut Database,
+        ) -> CommandStatus {
+            self.events
+                .push(Event::Operate(Control::G41V2(control, index), op_type));
+            CommandStatus::Success
+        }
+    }
+
+    impl ControlSupport<Group41Var3> for MockControlHandler {
+        fn select(&mut self, control: Group41Var3, index: u16, _: &mut Database) -> CommandStatus {
+            self.events
+                .push(Event::Select(Control::G41V3(control, index)));
+            CommandStatus::Success
+        }
+
+        fn operate(
+            &mut self,
+            control: Group41Var3,
+            index: u16,
+            op_type: OperateType,
+            _: &mut Database,
+        ) -> CommandStatus {
+            self.events
+                .push(Event::Operate(Control::G41V3(control, index), op_type));
+            CommandStatus::Success
+        }
+    }
+
+    impl ControlSupport<Group41Var4> for MockControlHandler {
+        fn select(&mut self, control: Group41Var4, index: u16, _: &mut Database) -> CommandStatus {
+            self.events
+                .push(Event::Select(Control::G41V4(control, index)));
+            CommandStatus::Success
+        }
+
+        fn operate(
+            &mut self,
+            control: Group41Var4,
+            index: u16,
+            op_type: OperateType,
+            _: &mut Database,
+        ) -> CommandStatus {
+            self.events
+                .push(Event::Operate(Control::G41V4(control, index), op_type));
+            CommandStatus::Success
+        }
+    }
+
+    impl ControlHandler for MockControlHandler {
+        fn begin_fragment(&mut self) {
+            self.events.push(Event::BeginControls);
+        }
+
+        fn end_fragment(&mut self) {
+            self.events.push(Event::EndControls);
+        }
     }
 
     fn new_harness(
         config: OutstationConfig,
     ) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
+        let events = EventHandle::new();
+
         let (task, database) = OutstationTask::create(
             config,
             DatabaseConfig::default(),
             DefaultOutstationApplication::create(),
-            DefaultControlHandler::with_status(CommandStatus::Success),
+            MockControlHandler::new(events.clone()),
         );
 
         let mut task = Box::new(task);
@@ -1034,6 +1214,7 @@ mod test {
             database,
             io: io_handle,
             task: spawn(async move { task.run(&mut io).await }),
+            events,
         }
     }
 
@@ -1052,8 +1233,6 @@ mod test {
 
     #[test]
     fn performs_direct_operate() {
-        colog::init();
-
         let mut harness = new_harness(get_config());
 
         harness.io.read(&[
@@ -1067,6 +1246,70 @@ mod test {
             0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
         ]);
         assert_pending!(harness.task.poll());
-        assert!(harness.io.all_done())
+        assert!(harness.io.all_done());
+
+        assert_eq!(harness.events.pop().unwrap(), Event::BeginControls);
+        assert_eq!(
+            harness.events.pop().unwrap(),
+            Event::Operate(
+                Control::G41V2(Group41Var2::new(513), 7),
+                OperateType::DirectOperate
+            )
+        );
+        assert_eq!(harness.events.pop().unwrap(), Event::EndControls);
+        assert_eq!(harness.events.pop(), None);
+    }
+
+    #[test]
+    fn performs_select_before_operate() {
+        let mut harness = new_harness(get_config());
+
+        // ---------- select -------------------
+        harness.io.read(&[
+            // select, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
+            0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00,
+        ]);
+
+        assert_pending!(harness.task.poll());
+        harness.io.write(&[
+            // response, seq == 0, restart IIN + echo of request headers
+            0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
+        ]);
+        assert_pending!(harness.task.poll());
+        assert!(harness.io.all_done());
+
+        assert_eq!(harness.events.pop().unwrap(), Event::BeginControls);
+        assert_eq!(
+            harness.events.pop().unwrap(),
+            Event::Select(Control::G41V2(Group41Var2::new(513), 7))
+        );
+        assert_eq!(harness.events.pop().unwrap(), Event::EndControls);
+        assert_eq!(harness.events.pop(), None);
+
+        // ---------- operate -------------------
+
+        harness.io.read(&[
+            // select, seq == 1, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
+            0xC1, 0x04, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00,
+        ]);
+
+        assert_pending!(harness.task.poll());
+        harness.io.write(&[
+            // response, seq == 0, restart IIN + echo of request headers
+            0xC1, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
+        ]);
+        assert_pending!(harness.task.poll());
+        assert!(harness.io.all_done());
+
+        assert_eq!(harness.events.pop().unwrap(), Event::BeginControls);
+        assert_eq!(
+            harness.events.pop().unwrap(),
+            Event::Operate(
+                Control::G41V2(Group41Var2::new(513), 7),
+                OperateType::SelectBeforeOperate
+            )
+        );
+        assert_eq!(harness.events.pop().unwrap(), Event::EndControls);
+        assert_eq!(harness.events.pop(), None);
     }
 }

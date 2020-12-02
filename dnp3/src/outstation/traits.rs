@@ -122,8 +122,8 @@ pub trait ControlHandler:
     + Send
     + 'static
 {
-    fn begin_fragment(&self) {}
-    fn end_fragment(&self) {}
+    fn begin_fragment(&mut self) {}
+    fn end_fragment(&mut self) {}
 }
 
 #[derive(Copy, Clone)]
