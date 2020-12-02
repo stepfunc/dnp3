@@ -6,7 +6,8 @@ use crate::link::error::LinkError;
 use crate::link::format::{format_unconfirmed_user_data, Payload};
 use crate::link::header::AnyAddress;
 use crate::tokio::io::{AsyncWrite, AsyncWriteExt};
-use crate::transport::sequence::Sequence;
+use crate::transport::constants::{FIN_MASK, FIR_MASK};
+use crate::transport::real::sequence::Sequence;
 use crate::util::cursor::WriteCursor;
 
 pub(crate) struct Writer {
@@ -21,10 +22,10 @@ impl Writer {
         let mut acc: u8 = 0;
 
         if fin {
-            acc |= super::constants::FIN_MASK;
+            acc |= FIN_MASK;
         }
         if fir {
-            acc |= super::constants::FIR_MASK;
+            acc |= FIR_MASK;
         }
 
         acc | seq.value()

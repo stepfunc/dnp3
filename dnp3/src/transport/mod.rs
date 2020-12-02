@@ -9,27 +9,24 @@ use crate::outstation::task::OutstationSession;
 use crate::outstation::SelfAddressSupport;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
 
+#[cfg(test)]
+pub(crate) mod mock;
+#[cfg(not(test))]
+pub(crate) mod real;
+
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport reader during testing.
 /// If Rust eventually allows `async fn` in traits, this can be removed
-pub(crate) type ReaderType = crate::transport::reader::Reader;
+pub(crate) type ReaderType = real::reader::Reader;
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport writer during testing.
 /// If Rust eventually allows `async fn` in traits, this can be removed
-pub(crate) type TransportWriter = crate::transport::writer::Writer;
+pub(crate) type TransportWriter = real::writer::Writer;
 
-#[cfg(test)]
-pub(crate) mod mock;
 #[cfg(test)]
 pub(crate) type ReaderType = crate::transport::mock::reader::MockReader;
 #[cfg(test)]
 pub(crate) type TransportWriter = crate::transport::mock::writer::MockWriter;
-
-pub(crate) mod assembler;
-pub(crate) mod header;
-pub(crate) mod reader;
-pub(crate) mod sequence;
-pub(crate) mod writer;
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct FragmentInfo {

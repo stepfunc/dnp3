@@ -4,8 +4,8 @@ use crate::link::error::LinkError;
 use crate::link::parser::FramePayload;
 use crate::outstation::SelfAddressSupport;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
-use crate::transport::assembler::{Assembler, AssemblyState};
-use crate::transport::header::Header;
+use crate::transport::real::assembler::{Assembler, AssemblyState};
+use crate::transport::real::header::Header;
 use crate::transport::Fragment;
 
 pub(crate) struct Reader {
