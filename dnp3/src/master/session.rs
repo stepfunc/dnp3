@@ -3,7 +3,8 @@ use crate::app::parse::parser::Response;
 use crate::app::sequence::Sequence;
 use crate::app::timeout::Timeout;
 use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
-use crate::transport::{TransportReader, TransportWriter};
+use crate::transport::reader::TransportReader;
+use crate::transport::TransportWriter;
 
 use crate::app::header::Control;
 use crate::link::error::LinkError;

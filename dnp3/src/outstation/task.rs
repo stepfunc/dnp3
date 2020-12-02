@@ -5,7 +5,7 @@ use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::link::error::LinkError;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle, ResponseInfo};
-use crate::transport::{FragmentInfo, Timeout, TransportReader, TransportWriter};
+use crate::transport::{FragmentInfo, TransportWriter};
 
 use crate::app::format::write::start_response;
 use crate::app::gen::ranged::RangedVariation;
@@ -20,6 +20,7 @@ use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 
+use crate::transport::reader::{Timeout, TransportReader};
 use std::borrow::BorrowMut;
 use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;

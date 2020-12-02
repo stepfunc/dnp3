@@ -6,7 +6,7 @@ use crate::link::error::LinkError;
 use crate::link::format::{format_unconfirmed_user_data, Payload};
 use crate::link::header::AnyAddress;
 use crate::tokio::io::{AsyncWrite, AsyncWriteExt};
-use crate::transport::constants::{FIN_MASK, FIR_MASK};
+use crate::transport::real::constants::{FIN_MASK, FIR_MASK};
 use crate::transport::real::sequence::Sequence;
 use crate::util::cursor::WriteCursor;
 

@@ -1,4 +1,4 @@
-use crate::transport::constants::{FIN_MASK, FIR_MASK};
+use crate::transport::real::constants::{FIN_MASK, FIR_MASK};
 use crate::transport::real::sequence::Sequence;
 
 #[derive(Copy, Clone)]
