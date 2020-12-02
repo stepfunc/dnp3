@@ -1,13 +1,11 @@
 use std::time::Duration;
 
 use crate::app::enums::FunctionCode;
-use crate::app::format::write::HeaderWriter;
 use crate::app::gen::count::CountVariation;
 use crate::app::parse::parser::Response;
 use crate::master::error::TaskError;
 use crate::master::handle::Promise;
 use crate::master::tasks::NonReadTask;
-use crate::util::cursor::WriteError;
 
 /// Type of restart to request
 pub(crate) enum RestartType {
@@ -53,11 +51,6 @@ impl RestartTask {
 
     pub(crate) fn function(&self) -> FunctionCode {
         self.restart_type.function()
-    }
-
-    pub(crate) fn write(&self, _writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        // empty body
-        Ok(())
     }
 
     pub(crate) fn on_task_error(self, err: TaskError) {
@@ -115,5 +108,108 @@ impl RestartTask {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::format::write::{start_request, start_response};
+    use crate::app::header::{Control, ResponseFunction, IIN};
+    use crate::app::sequence::Sequence;
+    use crate::master::tasks::RequestWriter;
+    use crate::prelude::master::*;
+    use crate::util::cursor::WriteCursor;
+
+    #[test]
+    fn cold_restart() {
+        let mut association = Association::new(
+            EndpointAddress::from(1).unwrap(),
+            Configuration::default(),
+            NullHandler::boxed(),
+        );
+        let (tx, mut rx) = crate::tokio::sync::oneshot::channel();
+        let task = NonReadTask::Restart(RestartTask::new(
+            RestartType::ColdRestart,
+            Promise::OneShot(tx),
+        ));
+
+        // Cold restart request
+        let mut buffer = [0; 20];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let task = task.start(&mut association).unwrap();
+        let mut writer = start_request(
+            Control::request(Sequence::default()),
+            task.function(),
+            &mut cursor,
+        )
+        .unwrap();
+        task.write(&mut writer).unwrap();
+        let request = writer.to_parsed().to_request().unwrap();
+
+        assert_eq!(request.header.function, FunctionCode::ColdRestart);
+        assert!(request.raw_objects.is_empty());
+
+        // Response with delay (in seconds)
+        let mut buffer = [0; 20];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let mut writer = start_response(
+            Control::response(Sequence::default(), true, true, false),
+            ResponseFunction::Response,
+            IIN::default(),
+            &mut cursor,
+        )
+        .unwrap();
+        writer.write_count_of_one(Group52Var1 { time: 2 }).unwrap();
+        let response = writer.to_parsed().to_response().unwrap();
+
+        assert!(task.handle(&mut association, response).is_none());
+        assert_eq!(rx.try_recv().unwrap(), Ok(Duration::from_secs(2)));
+    }
+
+    #[test]
+    fn warm_restart() {
+        let mut association = Association::new(
+            EndpointAddress::from(1).unwrap(),
+            Configuration::default(),
+            NullHandler::boxed(),
+        );
+        let (tx, mut rx) = crate::tokio::sync::oneshot::channel();
+        let task = NonReadTask::Restart(RestartTask::new(
+            RestartType::WarmRestart,
+            Promise::OneShot(tx),
+        ));
+
+        // Cold restart request
+        let mut buffer = [0; 20];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let task = task.start(&mut association).unwrap();
+        let mut writer = start_request(
+            Control::request(Sequence::default()),
+            task.function(),
+            &mut cursor,
+        )
+        .unwrap();
+        task.write(&mut writer).unwrap();
+        let request = writer.to_parsed().to_request().unwrap();
+
+        assert_eq!(request.header.function, FunctionCode::WarmRestart);
+        assert!(request.raw_objects.is_empty());
+
+        // Response with delay (in seconds)
+        let mut buffer = [0; 20];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let mut writer = start_response(
+            Control::response(Sequence::default(), true, true, false),
+            ResponseFunction::Response,
+            IIN::default(),
+            &mut cursor,
+        )
+        .unwrap();
+        writer.write_count_of_one(Group52Var2 { time: 2 }).unwrap();
+        let response = writer.to_parsed().to_response().unwrap();
+
+        assert!(task.handle(&mut association, response).is_none());
+        assert_eq!(rx.try_recv().unwrap(), Ok(Duration::from_millis(2)));
     }
 }

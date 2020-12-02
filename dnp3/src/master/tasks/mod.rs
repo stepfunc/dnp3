@@ -112,7 +112,7 @@ impl RequestWriter for NonReadTask {
             NonReadTask::Auto(t) => t.write(writer),
             NonReadTask::Command(t) => t.write(writer),
             NonReadTask::TimeSync(t) => t.write(writer),
-            NonReadTask::Restart(t) => t.write(writer),
+            NonReadTask::Restart(_) => Ok(()),
         }
     }
 }

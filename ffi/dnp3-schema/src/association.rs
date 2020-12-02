@@ -469,7 +469,10 @@ pub fn define(
         .build()?;
 
     let timesync_cb = lib
-        .define_one_time_callback("TimeSyncTaskCallback", "Handler for time synchronization tasks")?
+        .define_one_time_callback(
+            "TimeSyncTaskCallback",
+            "Handler for time synchronization tasks",
+        )?
         .callback(
             "on_complete",
             "Called when the timesync task reached completion or failed",

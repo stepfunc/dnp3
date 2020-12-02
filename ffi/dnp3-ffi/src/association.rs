@@ -252,13 +252,15 @@ impl ffi::RestartResult {
         ffi::RestartResultFields {
             delay,
             success: ffi::RestartSuccess::Success,
-        }.into()
+        }
+        .into()
     }
 
     fn error() -> Self {
         ffi::RestartResultFields {
             delay: Duration::from_millis(0),
             success: ffi::RestartSuccess::TaskError,
-        }.into()
+        }
+        .into()
     }
 }
