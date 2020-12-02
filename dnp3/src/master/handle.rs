@@ -18,6 +18,7 @@ use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncP
 use crate::master::session::MasterSession;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
+use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
 use crate::tokio::sync::mpsc::error::SendError;
@@ -180,6 +181,20 @@ impl AssociationHandle {
     ) -> Result<(), CommandError> {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), CommandError>>();
         let task = CommandTask::from_mode(mode, headers, Promise::OneShot(tx));
+        self.send_task(task.wrap().wrap()).await?;
+        rx.await?
+    }
+
+    pub async fn warm_restart(&mut self) -> Result<Duration, TaskError> {
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
+        let task = RestartTask::new(RestartType::WarmRestart, Promise::OneShot(tx));
+        self.send_task(task.wrap().wrap()).await?;
+        rx.await?
+    }
+
+    pub async fn cold_restart(&mut self) -> Result<Duration, TaskError> {
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
+        let task = RestartTask::new(RestartType::ColdRestart, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
     }

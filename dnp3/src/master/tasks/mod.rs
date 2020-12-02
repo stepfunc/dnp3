@@ -1,6 +1,7 @@
 pub(crate) mod auto;
 pub(crate) mod command;
 pub(crate) mod read;
+pub(crate) mod restart;
 pub(crate) mod time;
 
 use crate::app::enums::FunctionCode;
@@ -14,6 +15,7 @@ use crate::master::poll::Poll;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
+use crate::master::tasks::restart::RestartTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::util::cursor::WriteError;
 
@@ -82,6 +84,8 @@ pub(crate) enum NonReadTask {
     Command(CommandTask),
     /// time synchronization
     TimeSync(TimeSyncTask),
+    /// restart operation
+    Restart(RestartTask),
 }
 
 impl RequestWriter for ReadTask {
@@ -108,6 +112,7 @@ impl RequestWriter for NonReadTask {
             NonReadTask::Auto(t) => t.write(writer),
             NonReadTask::Command(t) => t.write(writer),
             NonReadTask::TimeSync(t) => t.write(writer),
+            NonReadTask::Restart(t) => t.write(writer),
         }
     }
 }
@@ -166,6 +171,7 @@ impl NonReadTask {
             NonReadTask::Command(_) => Some(self),
             NonReadTask::Auto(_) => Some(self),
             NonReadTask::TimeSync(task) => task.start(association).map(|task| task.wrap()),
+            NonReadTask::Restart(_) => Some(self),
         }
     }
 
@@ -174,6 +180,7 @@ impl NonReadTask {
             NonReadTask::Command(task) => task.function(),
             NonReadTask::Auto(task) => task.function(),
             NonReadTask::TimeSync(task) => task.function(),
+            NonReadTask::Restart(task) => task.function(),
         }
     }
 
@@ -182,6 +189,7 @@ impl NonReadTask {
             NonReadTask::Command(task) => task.on_task_error(err),
             NonReadTask::TimeSync(task) => task.on_task_error(association, err),
             NonReadTask::Auto(task) => task.on_task_error(association, err),
+            NonReadTask::Restart(task) => task.on_task_error(err),
         }
     }
 
@@ -197,6 +205,7 @@ impl NonReadTask {
                 None => None,
             },
             NonReadTask::TimeSync(task) => task.handle(association, response),
+            NonReadTask::Restart(task) => task.handle(response),
         }
     }
 }

@@ -469,7 +469,7 @@ pub fn define(
         .build()?;
 
     let timesync_cb = lib
-        .define_one_time_callback("TimeSyncTaskCallback", "Handler for command tasks")?
+        .define_one_time_callback("TimeSyncTaskCallback", "Handler for time synchronization tasks")?
         .callback(
             "on_complete",
             "Called when the timesync task reached completion or failed",
@@ -477,7 +477,7 @@ pub fn define(
         .param(
             "result",
             Type::Enum(timesync_result),
-            "Result of the command task",
+            "Result of the time synchronization task",
         )?
         .return_type(ReturnType::void())?
         .build()?
@@ -500,12 +500,75 @@ pub fn define(
         .doc("Asynchronously perform a timesync operation to the association")?
         .build()?;
 
+    let restart_success = lib
+        .define_native_enum("RestartSuccess")?
+        .push("Success", "Restart was perform successfully")?
+        .push("TaskError", "The restart was not performed properly")?
+        .doc("Result of a read operation")?
+        .build()?;
+
+    let restart_result = lib.declare_native_struct("RestartResult")?;
+    let restart_result = lib.define_native_struct(&restart_result)?
+        .add("delay", Type::Duration(DurationMapping::Milliseconds), "Delay value returned by the outstation. Valid only if {struct:RestartResult.success} is {enum:RestartSuccess.Success}.")?
+        .add("success", Type::Enum(restart_success), "Success status of the restart task")?
+        .doc("Result of a restart task")?
+        .build()?;
+
+    let restart_cb = lib
+        .define_one_time_callback("RestartTaskCallback", "Handler for restart tasks")?
+        .callback(
+            "on_complete",
+            "Called when the restart task reached completion or failed",
+        )?
+        .param(
+            "result",
+            Type::Struct(restart_result),
+            "Result of the restart task",
+        )?
+        .return_type(ReturnType::void())?
+        .build()?
+        .build()?;
+
+    let cold_restart_fn = lib
+        .declare_native_function("association_cold_restart")?
+        .param(
+            "association",
+            Type::ClassRef(association_class.clone()),
+            "Association to perform the cold restart",
+        )?
+        .param(
+            "callback",
+            Type::OneTimeCallback(restart_cb.clone()),
+            "Callback that will receive the result of the restart",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Asynchronously perform a cold restart operation to the association")?
+        .build()?;
+
+    let warm_restart_fn = lib
+        .declare_native_function("association_warm_restart")?
+        .param(
+            "association",
+            Type::ClassRef(association_class.clone()),
+            "Association to perform the warm restart",
+        )?
+        .param(
+            "callback",
+            Type::OneTimeCallback(restart_cb),
+            "Callback that will receive the result of the restart",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Asynchronously perform a warm restart operation to the association")?
+        .build()?;
+
     lib.define_class(&association_class)?
         .destructor(&destroy_fn)?
         .method("AddPoll", &add_poll_fn)?
         .async_method("Read", &read_fn)?
         .async_method("Operate", &operate_fn)?
         .async_method("PerformTimeSync", &perform_time_sync_fn)?
+        .async_method("ColdRestart", &cold_restart_fn)?
+        .async_method("WarmRestart", &warm_restart_fn)?
         .doc("Master-outstation association to interact with")?
         .build()?;
 
