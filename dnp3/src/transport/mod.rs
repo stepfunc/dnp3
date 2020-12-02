@@ -19,11 +19,11 @@ pub(crate) type ReaderType = crate::transport::reader::Reader;
 pub(crate) type TransportWriter = crate::transport::writer::Writer;
 
 #[cfg(test)]
-pub(crate) mod mocks;
+pub(crate) mod mock;
 #[cfg(test)]
-pub(crate) type ReaderType = crate::transport::mocks::MockReader;
+pub(crate) type ReaderType = crate::transport::mock::reader::MockReader;
 #[cfg(test)]
-pub(crate) type TransportWriter = crate::transport::mocks::MockWriter;
+pub(crate) type TransportWriter = crate::transport::mock::writer::MockWriter;
 
 pub(crate) mod assembler;
 pub(crate) mod header;
