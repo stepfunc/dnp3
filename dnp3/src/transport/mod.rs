@@ -3,7 +3,7 @@ use crate::app::parse::DecodeLogLevel;
 use crate::app::EndpointType;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::link::header::FrameInfo;
+use crate::link::header::BroadcastConfirmMode;
 use crate::master::session::MasterSession;
 use crate::outstation::task::OutstationSession;
 use crate::outstation::SelfAddressSupport;
@@ -31,9 +31,30 @@ pub(crate) mod reader;
 pub(crate) mod sequence;
 pub(crate) mod writer;
 
+#[derive(Debug, Copy, Clone)]
+pub(crate) struct FragmentInfo {
+    pub(crate) id: u32,
+    pub(crate) source: EndpointAddress,
+    pub(crate) broadcast: Option<BroadcastConfirmMode>,
+}
+
+impl FragmentInfo {
+    pub(crate) fn new(
+        id: u32,
+        source: EndpointAddress,
+        broadcast: Option<BroadcastConfirmMode>,
+    ) -> Self {
+        FragmentInfo {
+            id,
+            source,
+            broadcast,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Fragment<'a> {
-    pub(crate) address: FrameInfo,
+    pub(crate) info: FragmentInfo,
     pub(crate) data: &'a [u8],
 }
 
@@ -77,12 +98,12 @@ impl TransportReader {
         &mut self.inner
     }
 
-    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    pub(crate) async fn read_next<T>(&mut self, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
         self.logged = false;
-        self.inner.read(io).await
+        self.inner.read_next(io).await
     }
 
     pub(crate) async fn read_with_timeout<T>(
@@ -94,7 +115,7 @@ impl TransportReader {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         crate::tokio::select! {
-            res = self.read(io) => {
+            res = self.read_next(io) => {
                 res?;
                 Ok(Timeout::No)
             },
@@ -124,7 +145,7 @@ impl TransportReader {
         }
     }
 
-    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(FrameInfo, Request)> {
+    pub(crate) fn get_request(&mut self, level: DecodeLogLevel) -> Option<(FragmentInfo, Request)> {
         let (log, info, parsed) = self.peek(level)?;
         match parsed.to_request() {
             Err(err) => {
@@ -137,7 +158,7 @@ impl TransportReader {
         }
     }
 
-    fn peek(&mut self, level: DecodeLogLevel) -> Option<(bool, FrameInfo, ParsedFragment)> {
+    fn peek(&mut self, level: DecodeLogLevel) -> Option<(bool, FragmentInfo, ParsedFragment)> {
         let log_this_peek = !self.logged;
         self.logged = true;
         let fragment: Fragment = self.inner.peek()?;
@@ -160,7 +181,7 @@ impl TransportReader {
                 log::warn!("error parsing object headers: {}", err)
             }
         }
-        Some((log_this_peek, fragment.address, parsed))
+        Some((log_this_peek, fragment.info, parsed))
     }
 }
 

@@ -41,7 +41,7 @@
 //!
 //!     // In a real application, use the handle to make requests. Measurement data
 //!     // comes back via the handler specified when creating the association. See
-//!     // the provided examples for more details.
+//!     // the provided examples for more control.
 //!     tokio::time::delay_for(Duration::from_secs(60)).await;
 //!     Ok(())
 //! }
@@ -87,7 +87,7 @@ unused_qualifications,
 clippy::all
 )]
 #![forbid(
-    unsafe_code,
+    // unsafe_code,
     // intra_doc_link_resolution_failure, broken_intra_doc_links
     safe_packed_borrows,
     while_true,

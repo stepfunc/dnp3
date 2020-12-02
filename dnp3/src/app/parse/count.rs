@@ -1,10 +1,10 @@
 use crate::app::parse::traits::FixedSize;
 use crate::util::cursor::{ReadCursor, ReadError};
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct CountSequence<'a, T>
 where
-    T: FixedSize,
+    T: FixedSize + Copy + Clone,
 {
     count: usize,
     data: &'a [u8],
@@ -13,7 +13,7 @@ where
 
 impl<'a, T> CountSequence<'a, T>
 where
-    T: FixedSize,
+    T: FixedSize + Copy + Clone,
 {
     pub(crate) fn parse(
         count: u16,

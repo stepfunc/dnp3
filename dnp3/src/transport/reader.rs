@@ -49,12 +49,12 @@ impl Reader {
         self.assembler.peek()
     }
 
-    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    pub(crate) async fn read_next<T>(&mut self, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        // discard any existing frame
-        self.assembler.reset();
+        // discard any existing frame, but keep partial frames
+        self.assembler.discard();
 
         let mut payload = FramePayload::new();
 

@@ -1,23 +1,26 @@
-use crate::app::enums::FunctionCode;
+use crate::app::enums::{CommandStatus, FunctionCode};
 use crate::app::header::{Control, ResponseFunction, ResponseHeader, IIN, IIN1, IIN2};
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
 use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::link::error::LinkError;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle, ResponseInfo};
-use crate::transport::{Timeout, TransportReader, TransportWriter};
+use crate::transport::{FragmentInfo, Timeout, TransportReader, TransportWriter};
 
 use crate::app::format::write::start_response;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::error::ObjectParseError;
 use crate::app::variations::{Group52Var1, Group52Var2};
 use crate::entry::EndpointAddress;
-use crate::link::header::{BroadcastConfirmMode, FrameInfo};
-use crate::outstation::traits::{OutstationApplication, RestartDelay};
+use crate::link::header::BroadcastConfirmMode;
+use crate::outstation::control::collection::ControlCollection;
+use crate::outstation::traits::{ControlHandler, OperateType, OutstationApplication, RestartDelay};
 use crate::outstation::SelfAddressSupport;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
-use crate::tokio::time::Instant;
 use crate::util::buffer::Buffer;
+use crate::util::cursor::WriteError;
+
+use std::borrow::BorrowMut;
 use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;
 
@@ -77,12 +80,88 @@ struct SessionConfig {
     level: DecodeLogLevel,
     master_address: EndpointAddress,
     confirm_timeout: Duration,
+    select_timeout: Duration,
+}
+
+/// records when a select occurs
+#[derive(Copy, Clone)]
+struct SelectState {
+    /// sequence number of the SELECT
+    seq: Sequence,
+    /// frame count of the select, makes it easier to ensure that OPERATE directly follows SELECT
+    /// without requests in between
+    frame_id: u32,
+    /// time at which the SELECT occurred
+    time: crate::tokio::time::Instant,
+    /// the hash of the object headers
+    object_hash: u64,
+}
+
+impl SelectState {
+    fn new(
+        seq: Sequence,
+        frame_id: u32,
+        time: crate::tokio::time::Instant,
+        object_hash: u64,
+    ) -> Self {
+        Self {
+            seq,
+            frame_id,
+            time,
+            object_hash,
+        }
+    }
+
+    fn match_operate(
+        &self,
+        timeout: Duration,
+        seq: Sequence,
+        frame_id: u32,
+        object_hash: u64,
+    ) -> Result<(), CommandStatus> {
+        let elapsed = crate::tokio::time::Instant::now().checked_duration_since(self.time);
+
+        // check the sequence number
+        if self.seq.next() != seq.value() {
+            log::warn!("received OPERATE with non-consecutive sequence number");
+            return Err(CommandStatus::NoSelect);
+        }
+
+        // check the frame_id to ensure there was no requests in between the SELECT and OPERATE
+        if self.frame_id.wrapping_add(1) != frame_id {
+            log::warn!("received OPERATE without prior SELECT");
+            return Err(CommandStatus::NoSelect);
+        }
+
+        // check the object hash
+        if self.object_hash != object_hash {
+            log::warn!("received OPERATE with different header than SELECT");
+            return Err(CommandStatus::NoSelect);
+        }
+
+        // check the time last
+        match elapsed {
+            None => {
+                log::error!("current time is less than time of SELECT, clock error?");
+                return Err(CommandStatus::Timeout);
+            }
+            Some(elapsed) => {
+                if elapsed > timeout {
+                    log::warn!("received valid OPERATE after SELECT timeout");
+                    return Err(CommandStatus::Timeout);
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// state that mutates while the session runs
 struct SessionState {
     restart_iin_asserted: bool,
     last_valid_request: Option<LastValidRequest>,
+    select_state: Option<SelectState>,
 }
 
 impl SessionState {
@@ -90,6 +169,7 @@ impl SessionState {
         Self {
             restart_iin_asserted: true,
             last_valid_request: None,
+            select_state: None,
         }
     }
 }
@@ -99,7 +179,8 @@ pub(crate) struct OutstationSession {
     config: SessionConfig,
     database: DatabaseHandle,
     state: SessionState,
-    handler: Box<dyn OutstationApplication>,
+    application: Box<dyn OutstationApplication>,
+    control_handler: Box<dyn ControlHandler>,
 }
 
 pub struct OutstationTask {
@@ -117,9 +198,11 @@ pub struct OutstationConfig {
     pub self_address_support: SelfAddressSupport,
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: Duration,
+    pub select_timeout: Duration,
 }
 
 impl OutstationConfig {
+    #[allow(clippy::too_many_arguments)] // TODO
     pub fn new(
         tx_buffer_size: usize,
         rx_buffer_size: usize,
@@ -128,6 +211,7 @@ impl OutstationConfig {
         self_address_support: SelfAddressSupport,
         log_level: DecodeLogLevel,
         confirm_timeout: Duration,
+        select_timeout: Duration,
     ) -> Self {
         OutstationConfig {
             tx_buffer_size,
@@ -137,6 +221,7 @@ impl OutstationConfig {
             master_address,
             log_level,
             confirm_timeout,
+            select_timeout,
         }
     }
 
@@ -145,6 +230,7 @@ impl OutstationConfig {
             level: self.log_level,
             master_address: self.master_address,
             confirm_timeout: self.confirm_timeout,
+            select_timeout: self.select_timeout,
         }
     }
 }
@@ -154,7 +240,8 @@ impl OutstationTask {
     pub fn create(
         config: OutstationConfig,
         database: DatabaseConfig,
-        handler: Box<dyn OutstationApplication>,
+        application: Box<dyn OutstationApplication>,
+        control_handler: Box<dyn ControlHandler>,
     ) -> (Self, DatabaseHandle) {
         let handle = DatabaseHandle::new(database);
         let (reader, writer) = crate::transport::create_outstation_transport_layer(
@@ -167,7 +254,8 @@ impl OutstationTask {
                 config.to_session_config(),
                 config.tx_buffer_size,
                 handle.clone(),
-                handler,
+                application,
+                control_handler,
             ),
             reader,
             writer,
@@ -224,7 +312,8 @@ impl OutstationSession {
         config: SessionConfig,
         tx_buffer_size: usize,
         database: DatabaseHandle,
-        handler: Box<dyn OutstationApplication>,
+        application: Box<dyn OutstationApplication>,
+        control_handler: Box<dyn ControlHandler>,
     ) -> Self {
         let tx_buffer_size = if tx_buffer_size < Self::MIN_TX_BUFFER_SIZE {
             log::warn!("Minimum TX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", Self::MIN_TX_BUFFER_SIZE, tx_buffer_size);
@@ -238,7 +327,8 @@ impl OutstationSession {
             tx_buffer: Buffer::new(tx_buffer_size),
             database,
             state: SessionState::new(),
-            handler,
+            application,
+            control_handler,
         }
     }
 
@@ -301,7 +391,7 @@ impl OutstationSession {
         }
 
         crate::tokio::select! {
-            frame_read = reader.read(io) => {
+            frame_read = reader.read_next(io) => {
                 frame_read?;
             }
             _ = self.database.wait_for_change() => {
@@ -337,7 +427,7 @@ impl OutstationSession {
 
     fn process_request_from_idle(
         &mut self,
-        info: FrameInfo,
+        info: FragmentInfo,
         request: Request,
     ) -> Option<LastValidRequest> {
         let seq = request.header.control.seq;
@@ -360,7 +450,7 @@ impl OutstationSession {
                 Some(LastValidRequest::new(seq, hash, length, next))
             }
             FragmentType::NewNonRead(hash, objects) => {
-                let length = self.handle_non_read(request.header.function, seq, objects);
+                let length = self.handle_non_read(request.header.function, seq, info.id, objects);
                 Some(LastValidRequest::new(seq, hash, length, NextState::Idle))
             }
             FragmentType::RepeatNonRead(hash, last_response_length) => {
@@ -439,6 +529,7 @@ impl OutstationSession {
         &mut self,
         function: FunctionCode,
         seq: Sequence,
+        frame_id: u32,
         object_headers: HeaderCollection,
     ) -> usize {
         let iin2 = Self::get_iin2(function, object_headers);
@@ -448,13 +539,18 @@ impl OutstationSession {
             // these function don't process objects
             FunctionCode::DelayMeasure => self.handle_delay_measure(seq, iin2),
             FunctionCode::ColdRestart => {
-                let delay = self.handler.cold_restart();
+                let delay = self.application.cold_restart();
                 self.handle_restart(seq, delay, iin2)
             }
             FunctionCode::WarmRestart => {
-                let delay = self.handler.warm_restart();
+                let delay = self.application.warm_restart();
                 self.handle_restart(seq, delay, iin2)
             }
+            // controls
+            FunctionCode::Select => self.handle_select(seq, frame_id, object_headers),
+            FunctionCode::Operate => self.handle_operate(seq, frame_id, object_headers),
+            FunctionCode::DirectOperate => self.handle_direct_operate(seq, object_headers),
+
             _ => {
                 log::warn!("unsupported function code: {:?}", function);
                 self.write_empty_response(seq, IIN2::NO_FUNC_CODE_SUPPORT)
@@ -524,7 +620,7 @@ impl OutstationSession {
         let iin = self.get_response_iin() + iin2;
 
         let g52v2 = Group52Var2 {
-            time: self.handler.get_processing_delay_ms(),
+            time: self.application.get_processing_delay_ms(),
         };
 
         let mut cursor = self.tx_buffer.write_cursor();
@@ -574,6 +670,150 @@ impl OutstationSession {
         cursor.written().len()
     }
 
+    fn handle_direct_operate(&mut self, seq: Sequence, object_headers: HeaderCollection) -> usize {
+        let controls = match ControlCollection::from(object_headers) {
+            Err(err) => {
+                log::warn!(
+                    "ignoring control request containing non-control object header {} - {}",
+                    err.variation,
+                    err.qualifier
+                );
+                return self.write_empty_response(seq, IIN2::PARAMETER_ERROR);
+            }
+            Ok(controls) => controls,
+        };
+
+        let iin = self.get_response_iin() + IIN2::default();
+        let mut cursor = self.tx_buffer.write_cursor();
+        ResponseHeader::new(
+            Control::single_response(seq),
+            ResponseFunction::Response,
+            iin,
+        )
+        .write(&mut cursor)
+        .unwrap();
+
+        let handler = self.control_handler.borrow_mut();
+
+        let _ = self.database.transaction(|database| {
+            controls.operate_with_response(
+                &mut cursor,
+                OperateType::DirectOperate,
+                handler,
+                database,
+            )
+        });
+
+        cursor.written().len()
+    }
+
+    fn handle_select(
+        &mut self,
+        seq: Sequence,
+        frame_id: u32,
+        object_headers: HeaderCollection,
+    ) -> usize {
+        let controls = match ControlCollection::from(object_headers) {
+            Err(err) => {
+                log::warn!(
+                    "ignoring select request containing non-control object header {} - {}",
+                    err.variation,
+                    err.qualifier
+                );
+                return self.write_empty_response(seq, IIN2::PARAMETER_ERROR);
+            }
+            Ok(controls) => controls,
+        };
+
+        let iin = self.get_response_iin() + IIN2::default();
+        let mut cursor = self.tx_buffer.write_cursor();
+        ResponseHeader::new(
+            Control::single_response(seq),
+            ResponseFunction::Response,
+            iin,
+        )
+        .write(&mut cursor)
+        .unwrap();
+
+        let handler = self.control_handler.borrow_mut();
+
+        let result: Result<CommandStatus, WriteError> = self
+            .database
+            .transaction(|database| controls.select_with_response(&mut cursor, handler, database));
+
+        if let Ok(CommandStatus::Success) = result {
+            self.state.select_state = Some(SelectState::new(
+                seq,
+                frame_id,
+                crate::tokio::time::Instant::now(),
+                object_headers.hash(),
+            ))
+        }
+
+        cursor.written().len()
+    }
+
+    fn handle_operate(
+        &mut self,
+        seq: Sequence,
+        frame_id: u32,
+        object_headers: HeaderCollection,
+    ) -> usize {
+        let controls = match ControlCollection::from(object_headers) {
+            Err(err) => {
+                log::warn!(
+                    "ignoring OPERATE request containing non-control object header {} - {}",
+                    err.variation,
+                    err.qualifier
+                );
+                return self.write_empty_response(seq, IIN2::PARAMETER_ERROR);
+            }
+            Ok(controls) => controls,
+        };
+
+        let iin = self.get_response_iin() + IIN2::default();
+        let mut cursor = self.tx_buffer.write_cursor();
+        ResponseHeader::new(
+            Control::single_response(seq),
+            ResponseFunction::Response,
+            iin,
+        )
+        .write(&mut cursor)
+        .unwrap();
+
+        // determine if we have a matching SELECT
+        match self.state.select_state {
+            Some(s) => {
+                match s.match_operate(
+                    self.config.select_timeout,
+                    seq,
+                    frame_id,
+                    object_headers.hash(),
+                ) {
+                    Err(status) => {
+                        let _ = controls.respond_with_status(&mut cursor, status);
+                    }
+                    Ok(()) => {
+                        let handler = self.control_handler.borrow_mut();
+                        let _ = self.database.transaction(|db| {
+                            controls.operate_with_response(
+                                &mut cursor,
+                                OperateType::SelectBeforeOperate,
+                                handler,
+                                db,
+                            )
+                        });
+                    }
+                }
+            }
+            None => {
+                let _ = controls.respond_with_status(&mut cursor, CommandStatus::NoSelect);
+            }
+        }
+
+        cursor.written().len()
+    }
+
     fn get_response_iin(&self) -> IIN1 {
         let mut iin1 = IIN1::default();
         if self.state.restart_iin_asserted {
@@ -590,8 +830,8 @@ impl OutstationSession {
         )
     }
 
-    fn new_confirm_deadline(&self) -> Instant {
-        Instant::now() + self.config.confirm_timeout
+    fn new_confirm_deadline(&self) -> crate::tokio::time::Instant {
+        crate::tokio::time::Instant::now() + self.config.confirm_timeout
     }
 
     async fn enter_sol_confirm_wait<T>(
@@ -679,7 +919,7 @@ impl OutstationSession {
     fn expect_sol_confirm(
         &self,
         ecsn: Sequence,
-        info: FrameInfo,
+        info: FragmentInfo,
         request: Request,
     ) -> ConfirmAction {
         match self.classify(info, request) {
@@ -710,7 +950,7 @@ impl OutstationSession {
         }
     }
 
-    fn classify<'a>(&self, info: FrameInfo, request: Request<'a>) -> FragmentType<'a> {
+    fn classify<'a>(&self, info: FragmentInfo, request: Request<'a>) -> FragmentType<'a> {
         if request.header.function == FunctionCode::Confirm {
             return if request.header.control.uns {
                 FragmentType::UnsolicitedConfirm
@@ -762,5 +1002,85 @@ impl From<ObjectParseError> for IIN2 {
             ObjectParseError::UnknownQualifier(_) => IIN2::PARAMETER_ERROR,
             ObjectParseError::ZeroLengthOctetData => IIN2::PARAMETER_ERROR,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::link::header::FrameInfo;
+    use crate::outstation::traits::{DefaultControlHandler, DefaultOutstationApplication};
+    use crate::tokio::test::*;
+
+    struct OutstationTestHarness<T>
+    where
+        T: std::future::Future<Output = Result<(), LinkError>>,
+    {
+        database: DatabaseHandle,
+        io: io::Handle,
+        task: Spawn<T>,
+    }
+
+    fn new_harness(
+        config: OutstationConfig,
+    ) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
+        let (task, database) = OutstationTask::create(
+            config,
+            DatabaseConfig::default(),
+            DefaultOutstationApplication::create(),
+            DefaultControlHandler::with_status(CommandStatus::Success),
+        );
+
+        let mut task = Box::new(task);
+
+        task.reader
+            .get_inner()
+            .set_rx_frame_info(FrameInfo::new(EndpointAddress::from(10).unwrap(), None));
+
+        let (mut io, io_handle) = io::mock();
+
+        OutstationTestHarness {
+            database,
+            io: io_handle,
+            task: spawn(async move { task.run(&mut io).await }),
+        }
+    }
+
+    fn get_config() -> OutstationConfig {
+        OutstationConfig::new(
+            2048,
+            2048,
+            EndpointAddress::from(10).unwrap(),
+            EndpointAddress::from(1).unwrap(),
+            SelfAddressSupport::Disabled,
+            DecodeLogLevel::ObjectHeaders,
+            Duration::from_secs(2),
+            Duration::from_secs(5),
+        )
+    }
+
+    #[test]
+    fn performs_direct_operate() {
+        colog::init();
+
+        let mut harness = new_harness(get_config());
+
+        harness.io.read(&[
+            // direct operate, seq == 0
+            0xC0, 0x05, // g41v2 - count == 1, index == 7
+            41, 2, 0x17, 0x01, 0x07, // value = 258, status == SUCCESS
+            0x01, 0x02, 0x00,
+        ]);
+
+        assert_pending!(harness.task.poll());
+        assert!(harness.io.pending_write());
+
+        harness.io.write(&[
+            // response, seq == 0, restart IIN
+            0xC0, 0x81, 0x80, 0x00, // echo of previous request
+            41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
+        ]);
+        assert_pending!(harness.task.poll());
+        assert!(harness.io.all_done())
     }
 }

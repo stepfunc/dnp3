@@ -1,3 +1,4 @@
+use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::DecodeLogLevel;
 use crate::app::EndpointType;
 use crate::entry::EndpointAddress;
@@ -5,7 +6,7 @@ use crate::link::error::LinkError;
 use crate::link::header::{AnyAddress, FrameInfo};
 use crate::outstation::SelfAddressSupport;
 use crate::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use crate::transport::Fragment;
+use crate::transport::{Fragment, FragmentInfo};
 use crate::util::buffer::Buffer;
 
 pub(crate) struct MockWriter {
@@ -15,6 +16,7 @@ pub(crate) struct MockWriter {
 pub(crate) struct MockReader {
     num_reads: usize,
     count: usize,
+    frame_id: u32,
     info: Option<FrameInfo>,
     buffer: Buffer,
 }
@@ -35,16 +37,18 @@ impl MockWriter {
     pub(crate) async fn write<W>(
         &mut self,
         io: &mut W,
-        _: DecodeLogLevel,
+        level: DecodeLogLevel,
         _: AnyAddress,
         fragment: &[u8],
     ) -> Result<(), LinkError>
     where
         W: AsyncWrite + Unpin,
     {
-        self.num_writes += 1;
-        println!("mock tx: {:02X?}", fragment);
+        if level != DecodeLogLevel::Nothing {
+            let _ = ParsedFragment::parse(level.transmit(), fragment);
+        }
         io.write(fragment).await?;
+        self.num_writes += 1;
         Ok(())
     }
 }
@@ -66,6 +70,7 @@ impl MockReader {
         Self {
             num_reads: 0,
             count: 0,
+            frame_id: 0,
             info: None,
             buffer: Buffer::new(buffer_size),
         }
@@ -84,24 +89,29 @@ impl MockReader {
     pub(crate) fn peek(&self) -> Option<Fragment> {
         match self.count {
             0 => None,
-            x => Some(Fragment {
-                address: self
+            x => {
+                let info = self
                     .info
-                    .expect("call set_rx_frame_info(..) before running test"),
-                data: &self.buffer.get(x).unwrap(),
-            }),
+                    .expect("call set_rx_frame_info(..) before running test");
+                let fragment = Fragment {
+                    info: FragmentInfo::new(self.frame_id, info.source, info.broadcast),
+                    data: &self.buffer.get(x).unwrap(),
+                };
+                Some(fragment)
+            }
         }
     }
 
-    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    pub(crate) async fn read_next<T>(&mut self, io: &mut T) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
+        self.count = 0;
+        self.num_reads += 1;
         self.count = io
             .read(self.buffer.get_mut(self.buffer.len()).unwrap())
             .await?;
-        self.num_reads += 1;
-        println!("mock rx: {:02X?}", &self.buffer.get(self.count).unwrap());
+        self.frame_id = self.frame_id.wrapping_add(1);
         Ok(())
     }
 }

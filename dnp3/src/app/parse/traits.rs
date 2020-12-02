@@ -3,7 +3,7 @@ use crate::app::variations::Variation;
 use crate::util::cursor::*;
 use std::fmt::Display;
 
-pub(crate) trait FixedSize
+pub(crate) trait FixedSize: Copy + Clone
 where
     Self: Sized,
 {
@@ -13,10 +13,22 @@ where
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError>;
 }
 
-pub(crate) trait Index: FixedSize + PartialEq + Display {
+pub(crate) trait Index: Copy + Clone + FixedSize + PartialEq + Display {
     fn zero() -> Self;
-    fn increment(&mut self);
+    fn next(self) -> Self;
     fn widen_to_u16(self) -> u16;
+
+    fn is_zero(&self) -> bool {
+        *self == Self::zero()
+    }
+
+    fn one() -> Self {
+        Self::zero().next()
+    }
+
+    fn increment(&mut self) {
+        *self = self.next()
+    }
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode;
     const RANGE_QUALIFIER: QualifierCode;
@@ -51,8 +63,8 @@ impl Index for u8 {
     fn zero() -> Self {
         0
     }
-    fn increment(&mut self) {
-        *self += 1;
+    fn next(self) -> Self {
+        self + 1
     }
     fn widen_to_u16(self) -> u16 {
         self as u16
@@ -66,8 +78,8 @@ impl Index for u16 {
     fn zero() -> Self {
         0
     }
-    fn increment(&mut self) {
-        *self += 1;
+    fn next(self) -> Self {
+        self + 1
     }
     fn widen_to_u16(self) -> u16 {
         self

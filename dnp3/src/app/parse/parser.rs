@@ -12,6 +12,7 @@ use crate::app::parse::DecodeLogLevel;
 use crate::app::variations::Variation;
 use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
+use xxhash_rust::xxh64::xxh64;
 
 #[derive(Copy, Clone)]
 pub(crate) struct DecodeSettings {
@@ -432,6 +433,7 @@ pub(crate) struct Response<'a> {
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
+#[derive(Copy, Clone)]
 struct ObjectParser<'a> {
     errored: bool,
     function: FunctionCode,
@@ -473,8 +475,13 @@ impl<'a> HeaderCollection<'a> {
             },
         }
     }
+
+    pub(crate) fn hash(&self) -> u64 {
+        xxh64(self.data, 0)
+    }
 }
 
+#[derive(Copy, Clone)]
 pub(crate) struct HeaderIterator<'a> {
     parser: ObjectParser<'a>,
 }
@@ -694,7 +701,6 @@ mod test {
         assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);
     }
 
-    /*
     fn test_request_validation_error(input: &[u8], err: RequestValidationError) {
         assert_eq!(
             ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), input)
@@ -705,7 +711,6 @@ mod test {
             err
         );
     }
-    */
 
     fn test_response_validation_error(input: &[u8], err: ResponseValidationError) {
         assert_eq!(
@@ -739,7 +744,6 @@ mod test {
         }
     }
 
-    /*
     #[test]
     fn parses_valid_request() {
         let fragment = &[0xC2, 0x02, 0xAA];
@@ -765,7 +769,6 @@ mod test {
             ObjectParseError::InsufficientBytes
         )
     }
-    */
 
     #[test]
     fn parses_valid_unsolicited_response() {
@@ -813,7 +816,6 @@ mod test {
         );
     }
 
-    /*
     #[test]
     fn fails_bad_request_function_with_uns_bit() {
         test_request_validation_error(
@@ -821,9 +823,7 @@ mod test {
             RequestValidationError::UnexpectedUnsBit(FunctionCode::Write),
         );
     }
-    */
 
-    /*
     #[test]
     fn confirms_may_or_may_not_have_uns_set() {
         {
@@ -845,7 +845,6 @@ mod test {
             assert!(!request.header.control.uns);
         }
     }
-    */
 
     #[test]
     fn parses_integrity_scan() {

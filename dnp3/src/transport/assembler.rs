@@ -1,6 +1,6 @@
 use crate::link::header::FrameInfo;
 use crate::transport::header::Header;
-use crate::transport::Fragment;
+use crate::transport::{Fragment, FragmentInfo};
 use crate::util::buffer::Buffer;
 
 #[derive(Copy, Clone)]
@@ -9,7 +9,7 @@ enum InternalState {
     // last info, header, and accumulated length
     Running(FrameInfo, Header, usize),
     // buffer contains an assembled ADU
-    Complete(FrameInfo, usize),
+    Complete(FragmentInfo, usize),
 }
 
 impl InternalState {
@@ -28,6 +28,8 @@ pub(crate) enum AssemblyState {
 
 pub(crate) struct Assembler {
     state: InternalState,
+    // assembled count
+    frame_id: u32,
     buffer: Buffer,
 }
 
@@ -35,6 +37,7 @@ impl Assembler {
     pub(crate) fn new(max_buffer_size: usize) -> Self {
         Self {
             state: InternalState::Empty,
+            frame_id: 0,
             buffer: Buffer::new(max_buffer_size),
         }
     }
@@ -43,10 +46,16 @@ impl Assembler {
         self.state = InternalState::Empty;
     }
 
+    pub(crate) fn discard(&mut self) {
+        if let InternalState::Complete(_, _) = self.state {
+            self.state = InternalState::Empty;
+        }
+    }
+
     pub(crate) fn peek(&self) -> Option<Fragment> {
         match self.state {
-            InternalState::Complete(address, size) => Some(Fragment {
-                address,
+            InternalState::Complete(info, size) => Some(Fragment {
+                info,
                 data: &self
                     .buffer
                     .get(size)
@@ -138,6 +147,9 @@ impl Assembler {
             }
             Ok(_) => {
                 if header.fin {
+                    let frame_id = self.frame_id;
+                    let info = FragmentInfo::new(frame_id, info.source, info.broadcast);
+                    self.frame_id = self.frame_id.wrapping_add(1);
                     self.state = InternalState::Complete(info, new_length)
                 } else {
                     self.state = InternalState::Running(info, header, new_length)

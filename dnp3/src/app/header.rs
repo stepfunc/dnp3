@@ -51,6 +51,16 @@ impl Control {
         }
     }
 
+    pub(crate) fn single_response(seq: Sequence) -> Self {
+        Self {
+            fir: true,
+            fin: true,
+            con: false,
+            uns: false,
+            seq,
+        }
+    }
+
     pub(crate) fn request(seq: Sequence) -> Self {
         Self {
             fir: true,

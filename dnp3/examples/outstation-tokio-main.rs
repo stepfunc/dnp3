@@ -1,3 +1,4 @@
+use dnp3::app::enums::CommandStatus;
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::parse::DecodeLogLevel;
@@ -6,7 +7,7 @@ use dnp3::outstation::database::config::*;
 use dnp3::outstation::database::EventClass;
 use dnp3::outstation::database::{Add, DatabaseConfig, Update, UpdateOptions};
 use dnp3::outstation::task::{OutstationConfig, OutstationTask};
-use dnp3::outstation::traits::NullHandler;
+use dnp3::outstation::traits::{DefaultControlHandler, DefaultOutstationApplication};
 use dnp3::outstation::SelfAddressSupport;
 use std::net::Ipv4Addr;
 use std::time::Duration;
@@ -20,6 +21,7 @@ fn get_outstation_config(outstation: EndpointAddress, master: EndpointAddress) -
         SelfAddressSupport::Disabled,
         DecodeLogLevel::ObjectValues,
         Duration::from_secs(2),
+        Duration::from_secs(5),
     )
 }
 
@@ -37,10 +39,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let outstation_address = EndpointAddress::from(1024)?;
     let master_address = EndpointAddress::from(1)?;
 
-    let (mut task, mut handle) = OutstationTask::create(
+    let (mut task, handle) = OutstationTask::create(
         get_outstation_config(outstation_address, master_address),
         get_database_config(),
-        NullHandler::create(),
+        DefaultOutstationApplication::create(),
+        DefaultControlHandler::with_status(CommandStatus::Success),
     );
 
     handle.transaction(|db| {

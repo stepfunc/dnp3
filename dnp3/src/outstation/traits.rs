@@ -1,3 +1,10 @@
+use crate::app::enums::CommandStatus;
+use crate::app::parse::count::CountSequence;
+use crate::app::parse::prefix::Prefix;
+use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
+use crate::outstation::database::Database;
+
 /// Enumeration returned for cold/warm restart
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum RestartDelay {
@@ -50,13 +57,268 @@ pub trait OutstationApplication: Sync + Send + 'static {
     }
 }
 
-#[derive(Copy, Clone)]
-pub struct NullHandler;
+/// enumeration describing how the master requested the control operation
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum OperateType {
+    /// control point was properly selected before the operate request
+    SelectBeforeOperate,
+    /// operate the control via a DirectOperate request
+    DirectOperate,
+    /// operate the control via a DirectOperateNoAck request
+    DirectOperateNoAck,
+}
 
-impl NullHandler {
+/// select, operate, direct operate, or direct operate no-ack a control point
+pub trait ControlSupport<T> {
+    /// Select a control point, but do not operate. Implementors can think of
+    /// this function ask the question "is this control supported"?
+    ///
+    /// Most implementations should not alter the database in this method. It
+    /// is only provided in the event that some event counters reflected via the API
+    /// get updated on SELECT, but this would be highly abnormal.
+    ///
+    /// arguments:
+    ///
+    /// * `control` value of the control
+    /// * `index` index of the control
+    /// * `database` reference to the database
+    ///
+    /// returns:
+    ///
+    /// `CommandStatus` enumeration returning either `CommandStatus::Success` if the operation is
+    /// supported, or an error variant otherwise.
+    fn select(&mut self, control: T, index: u16, database: &mut Database) -> CommandStatus;
+
+    /// Operate a control point
+    ///
+    /// arguments:
+    ///
+    /// * `control` value of the control
+    /// * `op_type` enumeration describing how the master requested the control operation. Most implementations
+    ///             should just ignore this argument as the behavior is the same regardless.
+    /// * `index` index of the control
+    /// * `database` reference to the database
+    ///
+    /// returns:
+    ///
+    /// `CommandStatus` enumeration returning either `CommandStatus::Success` if the operation was accepted.
+    fn operate(
+        &mut self,
+        control: T,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus;
+}
+
+/// callbacks for handling controls
+pub trait ControlHandler:
+    ControlSupport<Group12Var1>
+    + ControlSupport<Group41Var1>
+    + ControlSupport<Group41Var2>
+    + ControlSupport<Group41Var3>
+    + ControlSupport<Group41Var4>
+    + Sync
+    + Send
+    + 'static
+{
+    fn begin_fragment(&self) {}
+    fn end_fragment(&self) {}
+}
+
+#[derive(Copy, Clone)]
+pub struct DefaultOutstationApplication;
+
+impl DefaultOutstationApplication {
     pub fn create() -> Box<dyn OutstationApplication> {
-        Box::new(NullHandler)
+        Box::new(DefaultOutstationApplication)
     }
 }
 
-impl OutstationApplication for NullHandler {}
+impl OutstationApplication for DefaultOutstationApplication {}
+
+#[derive(Copy, Clone)]
+pub struct DefaultControlHandler {
+    status: CommandStatus,
+}
+
+impl DefaultControlHandler {
+    pub fn create() -> Box<dyn ControlHandler> {
+        Self::with_status(CommandStatus::NotSupported)
+    }
+
+    pub fn with_status(status: CommandStatus) -> Box<dyn ControlHandler> {
+        Box::new(DefaultControlHandler { status })
+    }
+}
+
+impl ControlHandler for DefaultControlHandler {}
+
+impl ControlSupport<Group12Var1> for DefaultControlHandler {
+    fn select(
+        &mut self,
+        _control: Group12Var1,
+        _index: u16,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.status
+    }
+
+    fn operate(
+        &mut self,
+        _control: Group12Var1,
+        _index: u16,
+        _op_type: OperateType,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.status
+    }
+}
+
+impl ControlSupport<Group41Var1> for DefaultControlHandler {
+    fn select(
+        &mut self,
+        _control: Group41Var1,
+        _index: u16,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.status
+    }
+
+    fn operate(
+        &mut self,
+        _control: Group41Var1,
+        _index: u16,
+        _op_type: OperateType,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.status
+    }
+}
+
+impl ControlSupport<Group41Var2> for DefaultControlHandler {
+    fn select(
+        &mut self,
+        _control: Group41Var2,
+        _index: u16,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.status
+    }
+
+    fn operate(
+        &mut self,
+        _control: Group41Var2,
+        _index: u16,
+        _op_type: OperateType,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.status
+    }
+}
+
+impl ControlSupport<Group41Var3> for DefaultControlHandler {
+    fn select(
+        &mut self,
+        _control: Group41Var3,
+        _index: u16,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.status
+    }
+
+    fn operate(
+        &mut self,
+        _control: Group41Var3,
+        _index: u16,
+        _op_type: OperateType,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.status
+    }
+}
+
+impl ControlSupport<Group41Var4> for DefaultControlHandler {
+    fn select(
+        &mut self,
+        _control: Group41Var4,
+        _index: u16,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.status
+    }
+
+    fn operate(
+        &mut self,
+        _control: Group41Var4,
+        _index: u16,
+        _op_type: OperateType,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.status
+    }
+}
+
+trait HasCommandStatus {
+    fn status(&self) -> CommandStatus;
+    fn with_status(&self, status: CommandStatus) -> Self;
+}
+
+trait ControlSupportExt<T>: ControlSupport<T>
+where
+    T: FixedSizeVariation + HasCommandStatus,
+{
+    fn operate<I, F>(
+        &mut self,
+        seq: CountSequence<Prefix<I, T>>,
+        op_type: OperateType,
+        database: &mut Database,
+        mut func: F,
+    ) where
+        F: FnMut(T, I),
+        I: Index,
+    {
+        for item in seq.iter() {
+            let status = {
+                if item.value.status() == CommandStatus::Success {
+                    ControlSupport::<T>::operate(
+                        self,
+                        item.value,
+                        item.index.widen_to_u16(),
+                        op_type,
+                        database,
+                    )
+                } else {
+                    CommandStatus::FormatError
+                }
+            };
+            func(item.value.with_status(status), item.index)
+        }
+    }
+
+    fn select<I, F>(
+        &mut self,
+        seq: CountSequence<Prefix<I, T>>,
+        database: &mut Database,
+        mut func: F,
+    ) where
+        F: FnMut(T, I),
+        I: Index,
+    {
+        for item in seq.iter() {
+            let status = {
+                if item.value.status() == CommandStatus::Success {
+                    ControlSupport::<T>::select(
+                        self,
+                        item.value,
+                        item.index.widen_to_u16(),
+                        database,
+                    )
+                } else {
+                    CommandStatus::FormatError
+                }
+            };
+            func(item.value.with_status(status), item.index)
+        }
+    }
+}
