@@ -130,7 +130,7 @@ impl MasterSession {
                    // we need to recheck the tasks
                    return Ok(result?);
                 }
-                result = reader.read_next(io) => {
+                result = reader.read(io) => {
                    result?;
                    return self.handle_fragment_while_idle(io, writer, reader).await;
                 }
@@ -157,7 +157,7 @@ impl MasterSession {
                    // we need to recheck the tasks
                    return Ok(result?);
                 }
-                result = reader.read_next(io) => {
+                result = reader.read(io) => {
                    result?;
                    return self.handle_fragment_while_idle(io, writer, reader).await;
                 }
@@ -219,7 +219,7 @@ impl MasterSession {
                          log::warn!("no response within timeout: {}", self.timeout);
                          return Err(TaskError::ResponseTimeout);
                     }
-                    x = reader.read_next(io)  => {
+                    x = reader.read(io)  => {
                         return Ok(x?);
                     }
                     y = self.process_message(true) => {
@@ -299,10 +299,11 @@ impl MasterSession {
                     return Err(err);
                 }
 
-                match self
+                let result = self
                     .validate_non_read_response(destination, seq, io, reader, writer)
-                    .await
-                {
+                    .await;
+
+                match result {
                     // continue reading responses until timeout
                     Ok(None) => continue,
                     Ok(Some(response)) => {
@@ -346,7 +347,7 @@ impl MasterSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let (source, response) = match reader.get_response(self.level) {
+        let (source, response) = match reader.pop_response(self.level) {
             None => return Ok(None),
             Some(x) => x,
         };
@@ -433,10 +434,11 @@ impl MasterSession {
             loop {
                 self.read_next_response(io, deadline, reader).await?;
 
-                match self
+                let action = self
                     .process_read_response(destination, is_first, seq, &task, io, writer, reader)
-                    .await?
-                {
+                    .await?;
+
+                match action {
                     // continue reading responses on the inner loop
                     ReadResponseAction::Ignore => continue,
                     // read task complete
@@ -468,7 +470,7 @@ impl MasterSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let (source, response) = match reader.get_response(self.level) {
+        let (source, response) = match reader.pop_response(self.level) {
             Some(x) => x,
             None => return Ok(ReadResponseAction::Ignore),
         };
@@ -541,7 +543,7 @@ impl MasterSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let (source, response) = match reader.get_response(self.level) {
+        let (source, response) = match reader.pop_response(self.level) {
             None => return Ok(()),
             Some(x) => x,
         };

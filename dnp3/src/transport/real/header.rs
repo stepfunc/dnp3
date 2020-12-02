@@ -1,4 +1,5 @@
-use crate::transport::sequence::Sequence;
+use crate::transport::real::constants::{FIN_MASK, FIR_MASK};
+use crate::transport::real::sequence::Sequence;
 
 #[derive(Copy, Clone)]
 pub(crate) struct Header {
@@ -10,8 +11,8 @@ pub(crate) struct Header {
 impl Header {
     pub(crate) fn new(value: u8) -> Self {
         Self {
-            fin: value & super::constants::FIN_MASK != 0,
-            fir: value & super::constants::FIR_MASK != 0,
+            fin: value & FIN_MASK != 0,
+            fir: value & FIR_MASK != 0,
             seq: Sequence::new(value),
         }
     }

@@ -1,5 +1,5 @@
 use crate::link::header::FrameInfo;
-use crate::transport::header::Header;
+use crate::transport::real::header::Header;
 use crate::transport::{Fragment, FragmentInfo};
 use crate::util::buffer::Buffer;
 
@@ -46,21 +46,29 @@ impl Assembler {
         self.state = InternalState::Empty;
     }
 
-    pub(crate) fn discard(&mut self) {
-        if let InternalState::Complete(_, _) = self.state {
-            self.state = InternalState::Empty;
+    pub(crate) fn peek(&self) -> Option<Fragment> {
+        match self.state {
+            InternalState::Complete(info, size) => {
+                let data = self
+                    .buffer
+                    .get(size)
+                    .expect("tracking size greater than buffer size");
+                Some(Fragment { info, data })
+            }
+            _ => None,
         }
     }
 
-    pub(crate) fn peek(&self) -> Option<Fragment> {
+    pub(crate) fn pop(&mut self) -> Option<Fragment> {
         match self.state {
-            InternalState::Complete(info, size) => Some(Fragment {
-                info,
-                data: &self
+            InternalState::Complete(info, size) => {
+                self.state = InternalState::Empty;
+                let data = self
                     .buffer
                     .get(size)
-                    .expect("tracking size greater than buffer size"),
-            }),
+                    .expect("tracking size greater than buffer size");
+                Some(Fragment { info, data })
+            }
             _ => None,
         }
     }
