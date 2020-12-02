@@ -10,7 +10,7 @@ use crate::app::variations::{Group52Var1, Group52Var2};
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
-use crate::outstation::control::collection::ControlCollection;
+use crate::outstation::control::collection::{ControlCollection, ControlTransaction};
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle, ResponseInfo};
 use crate::outstation::traits::{ControlHandler, OperateType, OutstationApplication, RestartDelay};
 use crate::outstation::SelfAddressSupport;
@@ -537,24 +537,9 @@ impl OutstationSession {
                 self.handle_restart(seq, delay, iin2)
             }
             // controls
-            FunctionCode::Select => {
-                self.control_handler.begin_fragment();
-                let count = self.handle_select(seq, frame_id, object_headers);
-                self.control_handler.end_fragment();
-                count
-            }
-            FunctionCode::Operate => {
-                self.control_handler.begin_fragment();
-                let count = self.handle_operate(seq, frame_id, object_headers);
-                self.control_handler.end_fragment();
-                count
-            }
-            FunctionCode::DirectOperate => {
-                self.control_handler.begin_fragment();
-                let count = self.handle_direct_operate(seq, object_headers);
-                self.control_handler.end_fragment();
-                count
-            }
+            FunctionCode::Select => self.handle_select(seq, frame_id, object_headers),
+            FunctionCode::Operate => self.handle_operate(seq, frame_id, object_headers),
+            FunctionCode::DirectOperate => self.handle_direct_operate(seq, object_headers),
 
             _ => {
                 log::warn!("unsupported function code: {:?}", function);
@@ -698,13 +683,13 @@ impl OutstationSession {
         .write(&mut cursor)
         .unwrap();
 
-        let handler = self.control_handler.borrow_mut();
+        let mut control_tx = ControlTransaction::new(self.control_handler.borrow_mut());
 
         let _ = self.database.transaction(|database| {
             controls.operate_with_response(
                 &mut cursor,
                 OperateType::DirectOperate,
-                handler,
+                &mut control_tx,
                 database,
             )
         });
@@ -740,11 +725,11 @@ impl OutstationSession {
         .write(&mut cursor)
         .unwrap();
 
-        let handler = self.control_handler.borrow_mut();
+        let mut transaction = ControlTransaction::new(self.control_handler.borrow_mut());
 
-        let result: Result<CommandStatus, WriteError> = self
-            .database
-            .transaction(|database| controls.select_with_response(&mut cursor, handler, database));
+        let result: Result<CommandStatus, WriteError> = self.database.transaction(|database| {
+            controls.select_with_response(&mut cursor, &mut transaction, database)
+        });
 
         if let Ok(CommandStatus::Success) = result {
             self.state.select_state = Some(SelectState::new(
@@ -799,12 +784,13 @@ impl OutstationSession {
                         let _ = controls.respond_with_status(&mut cursor, status);
                     }
                     Ok(()) => {
-                        let handler = self.control_handler.borrow_mut();
+                        let mut control_tx =
+                            ControlTransaction::new(self.control_handler.borrow_mut());
                         let _ = self.database.transaction(|db| {
                             controls.operate_with_response(
                                 &mut cursor,
                                 OperateType::SelectBeforeOperate,
-                                handler,
+                                &mut control_tx,
                                 db,
                             )
                         });
@@ -1319,5 +1305,42 @@ mod test {
             ),
             Event::EndControls,
         ]);
+    }
+
+    #[test]
+    fn select_can_time_out() {
+        let mut harness = new_harness(get_config());
+
+        // ------------ select -------------
+
+        harness.test_request_response(
+            // select, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
+            &[0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00],
+            // response, seq == 0, restart IIN + echo of request headers
+            &[
+                0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
+            ],
+        );
+
+        harness.check_events(&[
+            Event::BeginControls,
+            Event::Select(Control::G41V2(Group41Var2::new(513), 7)),
+            Event::EndControls,
+        ]);
+
+        crate::tokio::time::advance(Duration::from_millis(5001));
+
+        // ------------ operate -------------
+
+        harness.test_request_response(
+            // operate, seq == 1, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
+            &[0xC1, 0x04, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00],
+            // response, seq == 0, restart IIN + echo of request headers but with STATUS == 1 (TIMEOUT)
+            &[
+                0xC1, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x01,
+            ],
+        );
+
+        harness.check_no_events();
     }
 }

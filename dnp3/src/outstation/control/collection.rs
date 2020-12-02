@@ -10,8 +10,152 @@ use crate::app::variations::{
 use crate::outstation::control::control_type::ControlType;
 use crate::outstation::control::prefix::PrefixWriter;
 use crate::outstation::database::Database;
-use crate::outstation::traits::{ControlHandler, OperateType};
+use crate::outstation::traits::{ControlHandler, ControlSupport, OperateType};
 use crate::util::cursor::{WriteCursor, WriteError};
+
+pub(crate) struct ControlTransaction<'a> {
+    stared: bool,
+    handler: &'a mut dyn ControlHandler,
+}
+
+impl<'a> ControlTransaction<'a> {
+    pub(crate) fn new(handler: &'a mut dyn ControlHandler) -> Self {
+        ControlTransaction {
+            stared: false,
+            handler,
+        }
+    }
+
+    fn start(&mut self) {
+        if !self.stared {
+            self.stared = true;
+            self.handler.begin_fragment();
+        }
+    }
+}
+
+impl<'a> Drop for ControlTransaction<'a> {
+    fn drop(&mut self) {
+        if self.stared {
+            self.handler.end_fragment();
+        }
+    }
+}
+
+impl<'a> ControlSupport<Group12Var1> for ControlTransaction<'a> {
+    fn select(
+        &mut self,
+        control: Group12Var1,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.start();
+        self.handler.select(control, index, database)
+    }
+
+    fn operate(
+        &mut self,
+        control: Group12Var1,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.start();
+        self.handler.operate(control, index, op_type, database)
+    }
+}
+
+impl<'a> ControlSupport<Group41Var1> for ControlTransaction<'a> {
+    fn select(
+        &mut self,
+        control: Group41Var1,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.start();
+        self.handler.select(control, index, database)
+    }
+
+    fn operate(
+        &mut self,
+        control: Group41Var1,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.start();
+        self.handler.operate(control, index, op_type, database)
+    }
+}
+
+impl<'a> ControlSupport<Group41Var2> for ControlTransaction<'a> {
+    fn select(
+        &mut self,
+        control: Group41Var2,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.start();
+        self.handler.select(control, index, database)
+    }
+
+    fn operate(
+        &mut self,
+        control: Group41Var2,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.start();
+        self.handler.operate(control, index, op_type, database)
+    }
+}
+
+impl<'a> ControlSupport<Group41Var3> for ControlTransaction<'a> {
+    fn select(
+        &mut self,
+        control: Group41Var3,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.start();
+        self.handler.select(control, index, database)
+    }
+
+    fn operate(
+        &mut self,
+        control: Group41Var3,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.start();
+        self.handler.operate(control, index, op_type, database)
+    }
+}
+
+impl<'a> ControlSupport<Group41Var4> for ControlTransaction<'a> {
+    fn select(
+        &mut self,
+        control: Group41Var4,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.start();
+        self.handler.select(control, index, database)
+    }
+
+    fn operate(
+        &mut self,
+        control: Group41Var4,
+        index: u16,
+        op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.start();
+        self.handler.operate(control, index, op_type, database)
+    }
+}
 
 impl<'a> ObjectHeader<'a> {
     pub(crate) fn to_control_header(&self) -> Result<ControlHeader<'a>, BadControlHeader> {
@@ -127,12 +271,12 @@ impl<'a> ControlCollection<'a> {
     pub(crate) fn select_with_response(
         &self,
         cursor: &mut WriteCursor,
-        handler: &mut dyn ControlHandler,
+        transaction: &mut ControlTransaction,
         database: &mut Database,
     ) -> Result<CommandStatus, WriteError> {
         let mut error = CommandStatus::Success;
         for header in self.iter() {
-            let status = header.select_with_response(cursor, handler, database)?;
+            let status = header.select_with_response(cursor, transaction, database)?;
             error = error.first_error(status);
         }
         Ok(error)
@@ -142,11 +286,11 @@ impl<'a> ControlCollection<'a> {
         &self,
         cursor: &mut WriteCursor,
         operate_type: OperateType,
-        handler: &mut dyn ControlHandler,
+        transaction: &mut ControlTransaction,
         database: &mut Database,
     ) -> Result<(), WriteError> {
         for header in self.iter() {
-            header.operate_with_response(operate_type, cursor, handler, database)?;
+            header.operate_with_response(operate_type, cursor, transaction, database)?;
         }
         Ok(())
     }
@@ -192,39 +336,39 @@ impl<'a> ControlHeader<'a> {
     fn select_with_response(
         &self,
         cursor: &mut WriteCursor,
-        handler: &mut dyn ControlHandler,
+        transaction: &mut ControlTransaction,
         database: &mut Database,
     ) -> Result<CommandStatus, WriteError> {
         match self {
             Self::OneByteGroup12Var1(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
+                select_header_with_response(cursor, seq, database, transaction)
             }
             Self::OneByteGroup41Var1(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
+                select_header_with_response(cursor, seq, database, transaction)
             }
             Self::OneByteGroup41Var2(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
+                select_header_with_response(cursor, seq, database, transaction)
             }
             Self::OneByteGroup41Var3(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
+                select_header_with_response(cursor, seq, database, transaction)
             }
             Self::OneByteGroup41Var4(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
+                select_header_with_response(cursor, seq, database, transaction)
             }
             Self::TwoByteGroup12Var1(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
+                select_header_with_response(cursor, seq, database, transaction)
             }
             Self::TwoByteGroup41Var1(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
+                select_header_with_response(cursor, seq, database, transaction)
             }
             Self::TwoByteGroup41Var2(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
+                select_header_with_response(cursor, seq, database, transaction)
             }
             Self::TwoByteGroup41Var3(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
+                select_header_with_response(cursor, seq, database, transaction)
             }
             Self::TwoByteGroup41Var4(seq) => {
-                select_header_with_response(cursor, seq, database, handler)
+                select_header_with_response(cursor, seq, database, transaction)
             }
         }
     }
@@ -233,55 +377,55 @@ impl<'a> ControlHeader<'a> {
         &self,
         operate_type: OperateType,
         cursor: &mut WriteCursor,
-        handler: &mut dyn ControlHandler,
+        transaction: &mut ControlTransaction,
         database: &mut Database,
     ) -> Result<(), WriteError> {
         match self {
             Self::OneByteGroup12Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
+                operate_header_with_response(cursor, seq, database, operate_type, transaction)
             }
             Self::OneByteGroup41Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
+                operate_header_with_response(cursor, seq, database, operate_type, transaction)
             }
             Self::OneByteGroup41Var2(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
+                operate_header_with_response(cursor, seq, database, operate_type, transaction)
             }
             Self::OneByteGroup41Var3(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
+                operate_header_with_response(cursor, seq, database, operate_type, transaction)
             }
             Self::OneByteGroup41Var4(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
+                operate_header_with_response(cursor, seq, database, operate_type, transaction)
             }
             Self::TwoByteGroup12Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
+                operate_header_with_response(cursor, seq, database, operate_type, transaction)
             }
             Self::TwoByteGroup41Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
+                operate_header_with_response(cursor, seq, database, operate_type, transaction)
             }
             Self::TwoByteGroup41Var2(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
+                operate_header_with_response(cursor, seq, database, operate_type, transaction)
             }
             Self::TwoByteGroup41Var3(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
+                operate_header_with_response(cursor, seq, database, operate_type, transaction)
             }
             Self::TwoByteGroup41Var4(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, handler)
+                operate_header_with_response(cursor, seq, database, operate_type, transaction)
             }
         }
     }
 
-    fn operate_no_ack(&self, handler: &mut dyn ControlHandler, database: &mut Database) {
+    fn operate_no_ack(&self, transaction: &mut ControlTransaction, database: &mut Database) {
         match self {
-            Self::OneByteGroup12Var1(seq) => operate_header_no_ack(seq, database, handler),
-            Self::OneByteGroup41Var1(seq) => operate_header_no_ack(seq, database, handler),
-            Self::OneByteGroup41Var2(seq) => operate_header_no_ack(seq, database, handler),
-            Self::OneByteGroup41Var3(seq) => operate_header_no_ack(seq, database, handler),
-            Self::OneByteGroup41Var4(seq) => operate_header_no_ack(seq, database, handler),
-            Self::TwoByteGroup12Var1(seq) => operate_header_no_ack(seq, database, handler),
-            Self::TwoByteGroup41Var1(seq) => operate_header_no_ack(seq, database, handler),
-            Self::TwoByteGroup41Var2(seq) => operate_header_no_ack(seq, database, handler),
-            Self::TwoByteGroup41Var3(seq) => operate_header_no_ack(seq, database, handler),
-            Self::TwoByteGroup41Var4(seq) => operate_header_no_ack(seq, database, handler),
+            Self::OneByteGroup12Var1(seq) => operate_header_no_ack(seq, database, transaction),
+            Self::OneByteGroup41Var1(seq) => operate_header_no_ack(seq, database, transaction),
+            Self::OneByteGroup41Var2(seq) => operate_header_no_ack(seq, database, transaction),
+            Self::OneByteGroup41Var3(seq) => operate_header_no_ack(seq, database, transaction),
+            Self::OneByteGroup41Var4(seq) => operate_header_no_ack(seq, database, transaction),
+            Self::TwoByteGroup12Var1(seq) => operate_header_no_ack(seq, database, transaction),
+            Self::TwoByteGroup41Var1(seq) => operate_header_no_ack(seq, database, transaction),
+            Self::TwoByteGroup41Var2(seq) => operate_header_no_ack(seq, database, transaction),
+            Self::TwoByteGroup41Var3(seq) => operate_header_no_ack(seq, database, transaction),
+            Self::TwoByteGroup41Var4(seq) => operate_header_no_ack(seq, database, transaction),
         }
     }
 }
@@ -306,7 +450,7 @@ fn select_header_with_response<I, V>(
     cursor: &mut WriteCursor,
     seq: &CountSequence<Prefix<I, V>>,
     database: &mut Database,
-    handler: &mut dyn ControlHandler,
+    transaction: &mut ControlTransaction,
 ) -> Result<CommandStatus, WriteError>
 where
     I: Index,
@@ -317,7 +461,7 @@ where
     for item in seq.iter() {
         let status = item
             .value
-            .select(handler, item.index.widen_to_u16(), database);
+            .select(transaction, item.index.widen_to_u16(), database);
         writer.write(cursor, item.value.with_status(status), item.index)?;
         ret = ret.first_error(status);
     }
@@ -329,7 +473,7 @@ fn operate_header_with_response<I, V>(
     seq: &CountSequence<Prefix<I, V>>,
     database: &mut Database,
     operate_type: OperateType,
-    handler: &mut dyn ControlHandler,
+    transaction: &mut ControlTransaction,
 ) -> Result<(), WriteError>
 where
     I: Index,
@@ -337,9 +481,12 @@ where
 {
     let mut writer = PrefixWriter::new();
     for item in seq.iter() {
-        let status = item
-            .value
-            .operate(handler, item.index.widen_to_u16(), operate_type, database);
+        let status = item.value.operate(
+            transaction,
+            item.index.widen_to_u16(),
+            operate_type,
+            database,
+        );
         writer.write(cursor, item.value.with_status(status), item.index)?;
     }
     Ok(())
@@ -348,14 +495,14 @@ where
 fn operate_header_no_ack<I, V>(
     seq: &CountSequence<Prefix<I, V>>,
     database: &mut Database,
-    handler: &mut dyn ControlHandler,
+    transaction: &mut ControlTransaction,
 ) where
     I: Index,
     V: FixedSizeVariation + ControlType,
 {
     for item in seq.iter() {
         item.value.operate(
-            handler,
+            transaction,
             item.index.widen_to_u16(),
             OperateType::DirectOperateNoAck,
             database,
