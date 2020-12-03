@@ -15,3 +15,6 @@ pub enum SelfAddressSupport {
 
 /// functionality for processing control requests
 pub(crate) mod control;
+
+#[cfg(test)]
+mod tests;
