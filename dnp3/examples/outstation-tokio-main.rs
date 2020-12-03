@@ -8,7 +8,7 @@ use dnp3::outstation::database::EventClass;
 use dnp3::outstation::database::{Add, DatabaseConfig, Update, UpdateOptions};
 use dnp3::outstation::task::{OutstationConfig, OutstationTask};
 use dnp3::outstation::traits::{DefaultControlHandler, DefaultOutstationApplication};
-use dnp3::outstation::SelfAddressSupport;
+use dnp3::outstation::{BroadcastAddressSupport, SelfAddressSupport};
 use std::net::Ipv4Addr;
 use std::time::Duration;
 
@@ -22,6 +22,7 @@ fn get_outstation_config(outstation: EndpointAddress, master: EndpointAddress) -
         DecodeLogLevel::ObjectValues,
         Duration::from_secs(2),
         Duration::from_secs(5),
+        BroadcastAddressSupport::Enabled,
     )
 }
 

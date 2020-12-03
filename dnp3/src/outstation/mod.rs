@@ -13,6 +13,30 @@ pub enum SelfAddressSupport {
     Disabled,
 }
 
+impl SelfAddressSupport {
+    pub(crate) fn is_enabled(&self) -> bool {
+        *self == SelfAddressSupport::Enabled
+    }
+    pub(crate) fn is_disabled(&self) -> bool {
+        !self.is_enabled()
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum BroadcastAddressSupport {
+    Enabled,
+    Disabled,
+}
+
+impl BroadcastAddressSupport {
+    pub(crate) fn is_enabled(&self) -> bool {
+        *self == BroadcastAddressSupport::Enabled
+    }
+    pub(crate) fn is_disabled(&self) -> bool {
+        !self.is_enabled()
+    }
+}
+
 /// functionality for processing control requests
 pub(crate) mod control;
 

@@ -13,7 +13,7 @@ use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::control::collection::{ControlCollection, ControlTransaction};
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle, ResponseInfo};
 use crate::outstation::traits::{ControlHandler, OperateType, OutstationApplication, RestartDelay};
-use crate::outstation::SelfAddressSupport;
+use crate::outstation::{BroadcastAddressSupport, SelfAddressSupport};
 use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::{FragmentInfo, Timeout, TransportReader, TransportWriter};
 use crate::util::buffer::Buffer;
@@ -85,6 +85,7 @@ struct SessionConfig {
     master_address: EndpointAddress,
     confirm_timeout: Duration,
     select_timeout: Duration,
+    broadcast_support: BroadcastAddressSupport,
 }
 
 /// records when a select occurs
@@ -203,6 +204,7 @@ pub struct OutstationConfig {
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: Duration,
     pub select_timeout: Duration,
+    pub broadcast_support: BroadcastAddressSupport,
 }
 
 impl OutstationConfig {
@@ -216,6 +218,7 @@ impl OutstationConfig {
         log_level: DecodeLogLevel,
         confirm_timeout: Duration,
         select_timeout: Duration,
+        broadcast_support: BroadcastAddressSupport,
     ) -> Self {
         OutstationConfig {
             tx_buffer_size,
@@ -226,6 +229,7 @@ impl OutstationConfig {
             log_level,
             confirm_timeout,
             select_timeout,
+            broadcast_support,
         }
     }
 
@@ -235,6 +239,7 @@ impl OutstationConfig {
             master_address: self.master_address,
             confirm_timeout: self.confirm_timeout,
             select_timeout: self.select_timeout,
+            broadcast_support: self.broadcast_support,
         }
     }
 }
@@ -725,7 +730,7 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return ();
+                return;
             }
             Ok(controls) => controls,
         };
@@ -854,11 +859,36 @@ impl OutstationSession {
     }
 
     fn process_broadcast(&mut self, _: BroadcastConfirmMode, request: Request) {
-        // TODO - implement broadcast request handling
-        log::warn!(
-            "ignoring broadcast frame with function: {:?}",
-            request.header.function
-        )
+        if !self.config.broadcast_support.is_enabled() {
+            log::warn!(
+                "ignoring broadcast request (broadcast support disabled): {:?}",
+                request.header.function
+            );
+            return;
+        }
+
+        let objects = match request.objects {
+            Ok(x) => x,
+            Err(err) => {
+                log::warn!(
+                    "ignoring broadcast message with bad object headers: {}",
+                    err
+                );
+                return;
+            }
+        };
+
+        match request.header.function {
+            FunctionCode::DirectOperateNoResponse => {
+                self.handle_direct_operate_no_ack(objects);
+            }
+            _ => {
+                log::warn!(
+                    "unsupported broadcast function: {:?}",
+                    request.header.function
+                );
+            }
+        }
     }
 
     fn new_confirm_deadline(&self) -> crate::tokio::time::Instant {

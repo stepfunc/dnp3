@@ -4,7 +4,7 @@ use crate::entry::EndpointAddress;
 use crate::outstation::task::OutstationConfig;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::OperateType;
-use crate::outstation::SelfAddressSupport;
+use crate::outstation::{BroadcastAddressSupport, SelfAddressSupport};
 use tokio::time::Duration;
 
 fn get_config() -> OutstationConfig {
@@ -17,6 +17,7 @@ fn get_config() -> OutstationConfig {
         DecodeLogLevel::ObjectValues,
         Duration::from_secs(2),
         Duration::from_secs(5),
+        BroadcastAddressSupport::Enabled,
     )
 }
 

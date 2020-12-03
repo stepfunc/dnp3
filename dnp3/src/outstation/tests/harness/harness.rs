@@ -1,4 +1,3 @@
-use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
@@ -65,7 +64,7 @@ pub(crate) fn new_harness(
 
     task.get_reader()
         .get_inner()
-        .set_rx_frame_info(FrameInfo::new(EndpointAddress::from(10).unwrap(), None));
+        .set_rx_frame_info(FrameInfo::new(config.master_address, None));
 
     let (mut io, io_handle) = io::mock();
 
