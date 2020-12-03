@@ -33,9 +33,10 @@ const OPERATE_SEQ1_G41V2_INDEX_8: &[u8] = &[0xC1, 0x04, 41, 2, 0x17, 0x01, 0x08,
 // operate, seq == 2, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
 const OPERATE_SEQ2_G41V2: &[u8] = &[0xC2, 0x04, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
 // direct operate, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
-const DO_SEQ0_G41V2: &[u8] = &[0xC0, 0x05, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
+const DIRECT_OPERATE_SEQ0_G41V2: &[u8] = &[0xC0, 0x05, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
 // direct operate no ack, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
-const DO_NO_ACK_SEQ0_G41V2: &[u8] = &[0xC0, 0x06, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
+const DIRECT_OPERATE_NO_ACK_SEQ0_G41V2: &[u8] =
+    &[0xC0, 0x06, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
 // response, seq == 0, restart IIN + echo of request headers
 const RESPONSE_SEQ0_G41V2_SUCCESS: &[u8] = &[
     0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
@@ -61,7 +62,7 @@ const RESPONSE_SEQ1_G41V2_SELECT_TIMEOUT: &[u8] = &[
 fn performs_direct_operate() {
     let mut harness = new_harness(get_config());
 
-    harness.test_request_response(DO_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
+    harness.test_request_response(DIRECT_OPERATE_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
 
     harness.check_events(&[
         Event::BeginControls,
@@ -77,7 +78,7 @@ fn performs_direct_operate() {
 fn performs_direct_operate_no_ack() {
     let mut harness = new_harness(get_config());
 
-    harness.test_request_no_response(DO_NO_ACK_SEQ0_G41V2);
+    harness.test_request_no_response(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2);
 
     harness.check_events(&[
         Event::BeginControls,
@@ -94,7 +95,7 @@ fn performs_direct_operate_no_ack_via_broadcast() {
     let mut harness =
         new_harness_with_broadcast(get_config(), Some(BroadcastConfirmMode::Mandatory));
 
-    harness.test_request_no_response(DO_NO_ACK_SEQ0_G41V2);
+    harness.test_request_no_response(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2);
 
     harness.check_events(&[
         Event::BeginControls,
