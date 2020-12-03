@@ -60,12 +60,17 @@ impl ResponseInfo {
 struct LastValidRequest {
     seq: Sequence,
     request_hash: u64,
-    response_length: usize,
+    response_length: Option<usize>,
     next: NextState,
 }
 
 impl LastValidRequest {
-    fn new(seq: Sequence, request_hash: u64, response_length: usize, next: NextState) -> Self {
+    fn new(
+        seq: Sequence,
+        request_hash: u64,
+        response_length: Option<usize>,
+        next: NextState,
+    ) -> Self {
         LastValidRequest {
             seq,
             request_hash,
@@ -287,9 +292,9 @@ enum Confirm {
 enum FragmentType<'a> {
     MalformedRequest(u64, ObjectParseError),
     NewRead(u64, HeaderCollection<'a>),
-    RepeatRead(u64, usize, HeaderCollection<'a>),
+    RepeatRead(u64, Option<usize>, HeaderCollection<'a>),
     NewNonRead(u64, HeaderCollection<'a>),
-    RepeatNonRead(u64, usize),
+    RepeatNonRead(u64, Option<usize>),
     Broadcast(BroadcastConfirmMode),
     SolicitedConfirm,
     UnsolicitedConfirm,
@@ -299,7 +304,7 @@ enum FragmentType<'a> {
 enum ConfirmAction {
     Confirmed,
     NewRequest,
-    EchoLastResponse(usize),
+    EchoLastResponse(Option<usize>),
     ContinueWait,
 }
 
@@ -409,8 +414,9 @@ impl OutstationSession {
         if let Some((info, request)) = reader.peek_request(self.config.level) {
             if let Some(result) = self.process_request_from_idle(info, request) {
                 self.state.last_valid_request = Some(result);
-                self.respond(io, writer, result.response_length, info.source)
-                    .await?;
+                if let Some(length) = result.response_length {
+                    self.respond(io, writer, length, info.source).await?;
+                }
                 if let NextState::SolConfirmWait(series) = result.next {
                     return Ok(Some(series));
                 }
@@ -430,11 +436,16 @@ impl OutstationSession {
         match self.classify(info, request) {
             FragmentType::MalformedRequest(hash, err) => {
                 let length = self.write_empty_response(seq, err.into());
-                Some(LastValidRequest::new(seq, hash, length, NextState::Idle))
+                Some(LastValidRequest::new(
+                    seq,
+                    hash,
+                    Some(length),
+                    NextState::Idle,
+                ))
             }
             FragmentType::NewRead(hash, objects) => {
                 let (length, next) = self.write_first_read_response(info.source, seq, objects);
-                Some(LastValidRequest::new(seq, hash, length, next))
+                Some(LastValidRequest::new(seq, hash, Some(length), next))
             }
             FragmentType::RepeatRead(hash, _, objects) => {
                 // this deviates a bit from the spec, the specification says to
@@ -442,7 +453,7 @@ impl OutstationSession {
                 // is plainly wrong since it can't possibly handle a multi-fragmented
                 // response correctly. Answering a repeat READ with a fresh response is harmless
                 let (length, next) = self.write_first_read_response(info.source, seq, objects);
-                Some(LastValidRequest::new(seq, hash, length, next))
+                Some(LastValidRequest::new(seq, hash, Some(length), next))
             }
             FragmentType::NewNonRead(hash, objects) => {
                 let length = self.handle_non_read(request.header.function, seq, info.id, objects);
@@ -526,29 +537,33 @@ impl OutstationSession {
         seq: Sequence,
         frame_id: u32,
         object_headers: HeaderCollection,
-    ) -> usize {
+    ) -> Option<usize> {
         let iin2 = Self::get_iin2(function, object_headers);
 
         match function {
-            FunctionCode::Write => self.handle_write(seq, object_headers),
+            FunctionCode::Write => Some(self.handle_write(seq, object_headers)),
             // these function don't process objects
-            FunctionCode::DelayMeasure => self.handle_delay_measure(seq, iin2),
+            FunctionCode::DelayMeasure => Some(self.handle_delay_measure(seq, iin2)),
             FunctionCode::ColdRestart => {
                 let delay = self.application.cold_restart();
-                self.handle_restart(seq, delay, iin2)
+                Some(self.handle_restart(seq, delay, iin2))
             }
             FunctionCode::WarmRestart => {
                 let delay = self.application.warm_restart();
-                self.handle_restart(seq, delay, iin2)
+                Some(self.handle_restart(seq, delay, iin2))
             }
             // controls
-            FunctionCode::Select => self.handle_select(seq, frame_id, object_headers),
-            FunctionCode::Operate => self.handle_operate(seq, frame_id, object_headers),
-            FunctionCode::DirectOperate => self.handle_direct_operate(seq, object_headers),
+            FunctionCode::Select => Some(self.handle_select(seq, frame_id, object_headers)),
+            FunctionCode::Operate => Some(self.handle_operate(seq, frame_id, object_headers)),
+            FunctionCode::DirectOperate => Some(self.handle_direct_operate(seq, object_headers)),
+            FunctionCode::DirectOperateNoResponse => {
+                self.handle_direct_operate_no_ack(object_headers);
+                None
+            }
 
             _ => {
                 log::warn!("unsupported function code: {:?}", function);
-                self.write_empty_response(seq, IIN2::NO_FUNC_CODE_SUPPORT)
+                Some(self.write_empty_response(seq, IIN2::NO_FUNC_CODE_SUPPORT))
             }
         }
     }
@@ -700,6 +715,26 @@ impl OutstationSession {
         });
 
         cursor.written().len()
+    }
+
+    fn handle_direct_operate_no_ack(&mut self, object_headers: HeaderCollection) {
+        let controls = match ControlCollection::from(object_headers) {
+            Err(err) => {
+                log::warn!(
+                    "ignoring control request containing non-control object header {} - {}",
+                    err.variation,
+                    err.qualifier
+                );
+                return ();
+            }
+            Ok(controls) => controls,
+        };
+
+        let mut control_tx = ControlTransaction::new(self.control_handler.borrow_mut());
+
+        let _ = self
+            .database
+            .transaction(|database| controls.operate_no_ack(&mut control_tx, database));
     }
 
     fn handle_select(
@@ -902,7 +937,9 @@ impl OutstationSession {
                             ConfirmAction::Confirmed => return Ok(Confirm::Yes),
                             ConfirmAction::NewRequest => return Ok(Confirm::NewRequest),
                             ConfirmAction::EchoLastResponse(length) => {
-                                self.respond(io, writer, length, info.source).await?;
+                                if let Some(length) = length {
+                                    self.respond(io, writer, length, info.source).await?;
+                                }
                                 // per the spec, we restart the confirm timer
                                 deadline = self.new_confirm_deadline();
                             }

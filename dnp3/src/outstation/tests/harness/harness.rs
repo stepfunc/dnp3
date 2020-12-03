@@ -30,9 +30,16 @@ where
         assert!(self.io.all_done());
     }
 
+    pub(crate) fn test_request_no_response(&mut self, request: &[u8]) {
+        self.io.read(request);
+        assert_pending!(self.task.poll());
+        assert!(!self.io.pending_write());
+        assert!(self.io.all_done());
+    }
+
     pub(crate) fn check_events(&mut self, events: &[Event]) {
         for event in events {
-            assert_eq!(*event, self.events.pop().unwrap());
+            assert_eq!(Some(*event), self.events.pop());
         }
         assert_eq!(self.events.pop(), None);
     }
