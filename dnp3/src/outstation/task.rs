@@ -212,28 +212,19 @@ pub struct OutstationConfig {
 }
 
 impl OutstationConfig {
-    #[allow(clippy::too_many_arguments)] // TODO
-    pub fn new(
-        tx_buffer_size: usize,
-        rx_buffer_size: usize,
-        outstation_address: EndpointAddress,
-        master_address: EndpointAddress,
-        self_address_support: SelfAddressSupport,
-        log_level: DecodeLogLevel,
-        confirm_timeout: Duration,
-        select_timeout: Duration,
-        broadcast_support: BroadcastAddressSupport,
-    ) -> Self {
-        OutstationConfig {
-            tx_buffer_size,
-            rx_buffer_size,
+    /// constructs an `OutstationConfig` with default settings, except for the
+    /// master and outstation link addresses which really don't have good defaults
+    pub fn new(outstation_address: EndpointAddress, master_address: EndpointAddress) -> Self {
+        Self {
+            tx_buffer_size: OutstationSession::DEFAULT_TX_BUFFER_SIZE,
+            rx_buffer_size: OutstationSession::DEFAULT_RX_BUFFER_SIZE,
             outstation_address,
-            self_address_support,
             master_address,
-            log_level,
-            confirm_timeout,
-            select_timeout,
-            broadcast_support,
+            self_address_support: SelfAddressSupport::Disabled,
+            log_level: DecodeLogLevel::Nothing,
+            confirm_timeout: Duration::from_secs(5),
+            select_timeout: Duration::from_secs(5),
+            broadcast_support: BroadcastAddressSupport::Enabled,
         }
     }
 
@@ -321,7 +312,10 @@ enum ConfirmAction {
 
 impl OutstationSession {
     pub(crate) const MIN_TX_BUFFER_SIZE: usize = 249; // 1 link frame
-    pub(crate) const MIN_RX_BUFFER_SIZE: usize = 249; // 1 link frame
+    pub(crate) const MIN_RX_BUFFER_SIZE: usize = Self::MIN_TX_BUFFER_SIZE;
+
+    pub(crate) const DEFAULT_RX_BUFFER_SIZE: usize = 2048;
+    pub(crate) const DEFAULT_TX_BUFFER_SIZE: usize = Self::DEFAULT_RX_BUFFER_SIZE;
 
     fn new(
         config: SessionConfig,
@@ -950,6 +944,7 @@ impl OutstationSession {
                     }
                 }
                 Confirm::Timeout => {
+                    self.information.solicited_confirm_timeout(series.ecsn);
                     self.database.reset();
                     return Ok(());
                 }

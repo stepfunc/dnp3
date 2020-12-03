@@ -1,4 +1,6 @@
 pub(crate) mod harness;
 
-// test suites for the outstation
+/// control functionality
 mod controls;
+/// time synchronization
+mod time;

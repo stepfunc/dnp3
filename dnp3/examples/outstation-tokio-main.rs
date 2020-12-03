@@ -10,23 +10,8 @@ use dnp3::outstation::task::{OutstationConfig, OutstationTask};
 use dnp3::outstation::traits::{
     DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
 };
-use dnp3::outstation::{BroadcastAddressSupport, SelfAddressSupport};
 use std::net::Ipv4Addr;
 use std::time::Duration;
-
-fn get_outstation_config(outstation: EndpointAddress, master: EndpointAddress) -> OutstationConfig {
-    OutstationConfig::new(
-        2048,
-        2048,
-        outstation,
-        master,
-        SelfAddressSupport::Disabled,
-        DecodeLogLevel::ObjectValues,
-        Duration::from_secs(2),
-        Duration::from_secs(5),
-        BroadcastAddressSupport::Enabled,
-    )
-}
 
 fn get_database_config() -> DatabaseConfig {
     let mut config = DatabaseConfig::default();
@@ -42,8 +27,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let outstation_address = EndpointAddress::from(1024)?;
     let master_address = EndpointAddress::from(1)?;
 
+    let mut config = OutstationConfig::new(outstation_address, master_address);
+    config.log_level = DecodeLogLevel::ObjectValues;
+
     let (mut task, handle) = OutstationTask::create(
-        get_outstation_config(outstation_address, master_address),
+        OutstationConfig::new(outstation_address, master_address),
         get_database_config(),
         DefaultOutstationApplication::create(),
         DefaultOutstationInformation::create(),

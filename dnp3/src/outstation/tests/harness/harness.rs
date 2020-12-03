@@ -3,19 +3,21 @@ use crate::link::header::{BroadcastConfirmMode, FrameInfo};
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
 use crate::outstation::task::{OutstationConfig, OutstationTask};
 use crate::outstation::tests::harness::{
-    Event, EventHandle, MockControlHandler, MockOutstationInformation,
+    ApplicationData, Event, EventHandle, MockControlHandler, MockOutstationApplication,
+    MockOutstationInformation,
 };
-use crate::outstation::traits::DefaultOutstationApplication;
 use crate::tokio::test::*;
+use std::sync::{Arc, Mutex};
 
 pub(crate) struct OutstationTestHarness<T>
 where
     T: std::future::Future<Output = Result<(), LinkError>>,
 {
-    database: DatabaseHandle,
+    pub(crate) database: DatabaseHandle,
     io: io::Handle,
     task: Spawn<T>,
     events: EventHandle,
+    pub(crate) application_data: Arc<Mutex<ApplicationData>>,
 }
 
 impl<T> OutstationTestHarness<T>
@@ -62,10 +64,12 @@ pub(crate) fn new_harness_with_broadcast(
 ) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
     let events = EventHandle::new();
 
+    let (data, application) = MockOutstationApplication::new(events.clone());
+
     let (task, database) = OutstationTask::create(
         config,
         DatabaseConfig::default(),
-        DefaultOutstationApplication::create(),
+        application,
         MockOutstationInformation::new(events.clone()),
         MockControlHandler::new(events.clone()),
     );
@@ -83,5 +87,6 @@ pub(crate) fn new_harness_with_broadcast(
         io: io_handle,
         task: spawn(async move { task.run(&mut io).await }),
         events,
+        application_data: data,
     }
 }

@@ -2,6 +2,7 @@ use crate::app::enums::{CommandStatus, FunctionCode};
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::sequence::Sequence;
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 use crate::outstation::database::Database;
 
@@ -76,6 +77,8 @@ pub enum BroadcastAction {
 pub trait OutstationInformation: Sync + Send + 'static {
     /// Called when a broadcast request is received by the outstation
     fn broadcast_received(&mut self, _function: FunctionCode, _action: BroadcastAction) {}
+    /// failed to receive a solicited confirm before the timeout occurred
+    fn solicited_confirm_timeout(&mut self, _ecsn: Sequence) {}
 }
 
 /// enumeration describing how the master requested the control operation

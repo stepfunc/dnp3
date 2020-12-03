@@ -1,29 +1,21 @@
 use crate::app::enums::FunctionCode;
-use crate::app::parse::DecodeLogLevel;
 use crate::app::variations::Group41Var2;
 use crate::entry::EndpointAddress;
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::task::OutstationConfig;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
-use crate::outstation::{BroadcastAddressSupport, SelfAddressSupport};
+use crate::outstation::BroadcastAddressSupport;
 use tokio::time::Duration;
 
 fn get_config() -> OutstationConfig {
     OutstationConfig::new(
-        2048,
-        2048,
         EndpointAddress::from(10).unwrap(),
         EndpointAddress::from(1).unwrap(),
-        SelfAddressSupport::Disabled,
-        DecodeLogLevel::ObjectValues,
-        Duration::from_secs(2),
-        Duration::from_secs(5),
-        BroadcastAddressSupport::Enabled,
     )
 }
 
-const G41V2_VALUE: Group41Var2 = Group41Var2::new(513);
+const G41V2_INDEX_7: Control = Control::G41V2(Group41Var2::new(513), 7);
 // select, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS,
 const SELECT_SEQ0_G41V2: &[u8] = &[0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
 // operate, seq == 1, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
@@ -82,10 +74,7 @@ fn performs_direct_operate_no_ack() {
 
     harness.check_events(&[
         Event::BeginControls,
-        Event::Operate(
-            Control::G41V2(G41V2_VALUE, 7),
-            OperateType::DirectOperateNoAck,
-        ),
+        Event::Operate(G41V2_INDEX_7, OperateType::DirectOperateNoAck),
         Event::EndControls,
     ]);
 }
@@ -99,16 +88,28 @@ fn performs_direct_operate_no_ack_via_broadcast() {
 
     harness.check_events(&[
         Event::BeginControls,
-        Event::Operate(
-            Control::G41V2(G41V2_VALUE, 7),
-            OperateType::DirectOperateNoAck,
-        ),
+        Event::Operate(G41V2_INDEX_7, OperateType::DirectOperateNoAck),
         Event::EndControls,
         Event::BroadcastReceived(
             FunctionCode::DirectOperateNoResponse,
             BroadcastAction::Processed,
         ),
     ]);
+}
+
+#[test]
+fn broadcast_support_can_be_disabled() {
+    let mut config = get_config();
+    config.broadcast_support = BroadcastAddressSupport::Disabled;
+
+    let mut harness = new_harness_with_broadcast(config, Some(BroadcastConfirmMode::Mandatory));
+
+    harness.test_request_no_response(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2);
+
+    harness.check_events(&[Event::BroadcastReceived(
+        FunctionCode::DirectOperateNoResponse,
+        BroadcastAction::IgnoredByConfiguration,
+    )]);
 }
 
 #[test]
@@ -121,7 +122,7 @@ fn performs_select_before_operate() {
 
     harness.check_events(&[
         Event::BeginControls,
-        Event::Select(Control::G41V2(G41V2_VALUE, 7)),
+        Event::Select(G41V2_INDEX_7),
         Event::EndControls,
     ]);
 
@@ -131,10 +132,7 @@ fn performs_select_before_operate() {
 
     harness.check_events(&[
         Event::BeginControls,
-        Event::Operate(
-            Control::G41V2(G41V2_VALUE, 7),
-            OperateType::SelectBeforeOperate,
-        ),
+        Event::Operate(G41V2_INDEX_7, OperateType::SelectBeforeOperate),
         Event::EndControls,
     ]);
 }
@@ -148,7 +146,7 @@ fn rejects_operate_with_non_consecutive_sequence() {
 
     harness.check_events(&[
         Event::BeginControls,
-        Event::Select(Control::G41V2(G41V2_VALUE, 7)),
+        Event::Select(G41V2_INDEX_7),
         Event::EndControls,
     ]);
 
@@ -168,7 +166,7 @@ fn rejects_operate_with_non_matching_headers() {
 
     harness.check_events(&[
         Event::BeginControls,
-        Event::Select(Control::G41V2(G41V2_VALUE, 7)),
+        Event::Select(G41V2_INDEX_7),
         Event::EndControls,
     ]);
 
@@ -192,7 +190,7 @@ fn select_can_time_out() {
 
     harness.check_events(&[
         Event::BeginControls,
-        Event::Select(Control::G41V2(G41V2_VALUE, 7)),
+        Event::Select(G41V2_INDEX_7),
         Event::EndControls,
     ]);
 
