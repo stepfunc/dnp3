@@ -1,8 +1,10 @@
 use crate::link::error::LinkError;
-use crate::link::header::FrameInfo;
+use crate::link::header::{BroadcastConfirmMode, FrameInfo};
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
 use crate::outstation::task::{OutstationConfig, OutstationTask};
-use crate::outstation::tests::harness::{Event, EventHandle, MockControlHandler};
+use crate::outstation::tests::harness::{
+    Event, EventHandle, MockControlHandler, MockOutstationInformation,
+};
 use crate::outstation::traits::DefaultOutstationApplication;
 use crate::tokio::test::*;
 
@@ -51,12 +53,20 @@ where
 pub(crate) fn new_harness(
     config: OutstationConfig,
 ) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
+    new_harness_with_broadcast(config, None)
+}
+
+pub(crate) fn new_harness_with_broadcast(
+    config: OutstationConfig,
+    broadcast: Option<BroadcastConfirmMode>,
+) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
     let events = EventHandle::new();
 
     let (task, database) = OutstationTask::create(
         config,
         DatabaseConfig::default(),
         DefaultOutstationApplication::create(),
+        MockOutstationInformation::new(events.clone()),
         MockControlHandler::new(events.clone()),
     );
 
@@ -64,7 +74,7 @@ pub(crate) fn new_harness(
 
     task.get_reader()
         .get_inner()
-        .set_rx_frame_info(FrameInfo::new(config.master_address, None));
+        .set_rx_frame_info(FrameInfo::new(config.master_address, broadcast));
 
     let (mut io, io_handle) = io::mock();
 

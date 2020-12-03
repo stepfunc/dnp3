@@ -12,7 +12,10 @@ use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::control::collection::{ControlCollection, ControlTransaction};
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle, ResponseInfo};
-use crate::outstation::traits::{ControlHandler, OperateType, OutstationApplication, RestartDelay};
+use crate::outstation::traits::{
+    BroadcastAction, ControlHandler, OperateType, OutstationApplication, OutstationInformation,
+    RestartDelay,
+};
 use crate::outstation::{BroadcastAddressSupport, SelfAddressSupport};
 use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::{FragmentInfo, Timeout, TransportReader, TransportWriter};
@@ -185,6 +188,7 @@ pub(crate) struct OutstationSession {
     database: DatabaseHandle,
     state: SessionState,
     application: Box<dyn OutstationApplication>,
+    information: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
 }
 
@@ -250,6 +254,7 @@ impl OutstationTask {
         config: OutstationConfig,
         database: DatabaseConfig,
         application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
     ) -> (Self, DatabaseHandle) {
         let handle = DatabaseHandle::new(database);
@@ -264,6 +269,7 @@ impl OutstationTask {
                 config.tx_buffer_size,
                 handle.clone(),
                 application,
+                information,
                 control_handler,
             ),
             reader,
@@ -322,6 +328,7 @@ impl OutstationSession {
         tx_buffer_size: usize,
         database: DatabaseHandle,
         application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
     ) -> Self {
         let tx_buffer_size = if tx_buffer_size < Self::MIN_TX_BUFFER_SIZE {
@@ -337,6 +344,7 @@ impl OutstationSession {
             database,
             state: SessionState::new(),
             application,
+            information,
             control_handler,
         }
     }
@@ -858,13 +866,19 @@ impl OutstationSession {
         iin1
     }
 
-    fn process_broadcast(&mut self, _: BroadcastConfirmMode, request: Request) {
+    fn process_broadcast(&mut self, _mode: BroadcastConfirmMode, request: Request) {
+        let action = self.process_broadcast_get_action(request);
+        self.information
+            .broadcast_received(request.header.function, action)
+    }
+
+    fn process_broadcast_get_action(&mut self, request: Request) -> BroadcastAction {
         if !self.config.broadcast_support.is_enabled() {
             log::warn!(
                 "ignoring broadcast request (broadcast support disabled): {:?}",
                 request.header.function
             );
-            return;
+            return BroadcastAction::IgnoredByConfiguration;
         }
 
         let objects = match request.objects {
@@ -874,19 +888,21 @@ impl OutstationSession {
                     "ignoring broadcast message with bad object headers: {}",
                     err
                 );
-                return;
+                return BroadcastAction::BadObjectHeaders;
             }
         };
 
         match request.header.function {
             FunctionCode::DirectOperateNoResponse => {
                 self.handle_direct_operate_no_ack(objects);
+                BroadcastAction::Processed
             }
             _ => {
                 log::warn!(
                     "unsupported broadcast function: {:?}",
                     request.header.function
                 );
+                BroadcastAction::UnsupportedFunction(request.header.function)
             }
         }
     }

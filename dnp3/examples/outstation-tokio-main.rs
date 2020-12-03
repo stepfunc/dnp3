@@ -7,7 +7,9 @@ use dnp3::outstation::database::config::*;
 use dnp3::outstation::database::EventClass;
 use dnp3::outstation::database::{Add, DatabaseConfig, Update, UpdateOptions};
 use dnp3::outstation::task::{OutstationConfig, OutstationTask};
-use dnp3::outstation::traits::{DefaultControlHandler, DefaultOutstationApplication};
+use dnp3::outstation::traits::{
+    DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
+};
 use dnp3::outstation::{BroadcastAddressSupport, SelfAddressSupport};
 use std::net::Ipv4Addr;
 use std::time::Duration;
@@ -44,6 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         get_outstation_config(outstation_address, master_address),
         get_database_config(),
         DefaultOutstationApplication::create(),
+        DefaultOutstationInformation::create(),
         DefaultControlHandler::with_status(CommandStatus::Success),
     );
 

@@ -1,16 +1,34 @@
-use crate::app::enums::CommandStatus;
+use crate::app::enums::{CommandStatus, FunctionCode};
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 use crate::outstation::database::Database;
 use crate::outstation::tests::harness::{Control, Event, EventHandle};
-use crate::outstation::traits::{ControlHandler, ControlSupport, OperateType};
+use crate::outstation::traits::{
+    BroadcastAction, ControlHandler, ControlSupport, OperateType, OutstationInformation,
+};
 
 pub(crate) struct MockControlHandler {
+    events: EventHandle,
+}
+
+pub(crate) struct MockOutstationInformation {
     events: EventHandle,
 }
 
 impl MockControlHandler {
     pub(crate) fn new(events: EventHandle) -> Box<dyn ControlHandler> {
         Box::new(Self { events })
+    }
+}
+
+impl MockOutstationInformation {
+    pub(crate) fn new(events: EventHandle) -> Box<dyn OutstationInformation> {
+        Box::new(Self { events })
+    }
+}
+
+impl OutstationInformation for MockOutstationInformation {
+    fn broadcast_received(&mut self, function: FunctionCode, action: BroadcastAction) {
+        self.events.push(Event::BroadcastReceived(function, action))
     }
 }
 

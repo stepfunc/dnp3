@@ -1,9 +1,11 @@
+use crate::app::enums::FunctionCode;
 use crate::app::parse::DecodeLogLevel;
 use crate::app::variations::Group41Var2;
 use crate::entry::EndpointAddress;
+use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::task::OutstationConfig;
 use crate::outstation::tests::harness::*;
-use crate::outstation::traits::OperateType;
+use crate::outstation::traits::{BroadcastAction, OperateType};
 use crate::outstation::{BroadcastAddressSupport, SelfAddressSupport};
 use tokio::time::Duration;
 
@@ -84,6 +86,27 @@ fn performs_direct_operate_no_ack() {
             OperateType::DirectOperateNoAck,
         ),
         Event::EndControls,
+    ]);
+}
+
+#[test]
+fn performs_direct_operate_no_ack_via_broadcast() {
+    let mut harness =
+        new_harness_with_broadcast(get_config(), Some(BroadcastConfirmMode::Mandatory));
+
+    harness.test_request_no_response(DO_NO_ACK_SEQ0_G41V2);
+
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Operate(
+            Control::G41V2(G41V2_VALUE, 7),
+            OperateType::DirectOperateNoAck,
+        ),
+        Event::EndControls,
+        Event::BroadcastReceived(
+            FunctionCode::DirectOperateNoResponse,
+            BroadcastAction::Processed,
+        ),
     ]);
 }
 
