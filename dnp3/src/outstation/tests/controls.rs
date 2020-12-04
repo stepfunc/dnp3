@@ -1,19 +1,11 @@
 use crate::app::enums::FunctionCode;
 use crate::app::variations::Group41Var2;
-use crate::entry::EndpointAddress;
 use crate::link::header::BroadcastConfirmMode;
-use crate::outstation::task::OutstationConfig;
+use crate::outstation::tests::get_default_config;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
 use crate::outstation::BroadcastAddressSupport;
 use tokio::time::Duration;
-
-fn get_config() -> OutstationConfig {
-    OutstationConfig::new(
-        EndpointAddress::from(10).unwrap(),
-        EndpointAddress::from(1).unwrap(),
-    )
-}
 
 const G41V2_INDEX_7: Control = Control::G41V2(Group41Var2::new(513), 7);
 // select, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS,
@@ -52,7 +44,7 @@ const RESPONSE_SEQ1_G41V2_SELECT_TIMEOUT: &[u8] = &[
 
 #[test]
 fn performs_direct_operate() {
-    let mut harness = new_harness(get_config());
+    let mut harness = new_harness();
 
     harness.test_request_response(DIRECT_OPERATE_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
 
@@ -68,7 +60,7 @@ fn performs_direct_operate() {
 
 #[test]
 fn performs_direct_operate_no_ack() {
-    let mut harness = new_harness(get_config());
+    let mut harness = new_harness();
 
     harness.test_request_no_response(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2);
 
@@ -82,7 +74,7 @@ fn performs_direct_operate_no_ack() {
 #[test]
 fn performs_direct_operate_no_ack_via_broadcast() {
     let mut harness =
-        new_harness_with_broadcast(get_config(), Some(BroadcastConfirmMode::Mandatory));
+        new_harness_with_broadcast(get_default_config(), Some(BroadcastConfirmMode::Mandatory));
 
     harness.test_request_no_response(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2);
 
@@ -99,7 +91,7 @@ fn performs_direct_operate_no_ack_via_broadcast() {
 
 #[test]
 fn broadcast_support_can_be_disabled() {
-    let mut config = get_config();
+    let mut config = get_default_config();
     config.broadcast_support = BroadcastAddressSupport::Disabled;
 
     let mut harness = new_harness_with_broadcast(config, Some(BroadcastConfirmMode::Mandatory));
@@ -114,7 +106,7 @@ fn broadcast_support_can_be_disabled() {
 
 #[test]
 fn performs_select_before_operate() {
-    let mut harness = new_harness(get_config());
+    let mut harness = new_harness();
 
     // ------------ select -------------
 
@@ -139,7 +131,7 @@ fn performs_select_before_operate() {
 
 #[test]
 fn rejects_operate_with_non_consecutive_sequence() {
-    let mut harness = new_harness(get_config());
+    let mut harness = new_harness();
 
     // ------------ select -------------
     harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
@@ -159,7 +151,7 @@ fn rejects_operate_with_non_consecutive_sequence() {
 
 #[test]
 fn rejects_operate_with_non_matching_headers() {
-    let mut harness = new_harness(get_config());
+    let mut harness = new_harness();
 
     // ------------ select -------------
     harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
@@ -182,8 +174,7 @@ fn rejects_operate_with_non_matching_headers() {
 
 #[test]
 fn select_can_time_out() {
-    let config = get_config();
-    let mut harness = new_harness(config);
+    let mut harness = new_harness();
 
     // ------------ select -------------
     harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
@@ -194,7 +185,7 @@ fn select_can_time_out() {
         Event::EndControls,
     ]);
 
-    crate::tokio::time::advance(config.select_timeout + Duration::from_millis(1));
+    crate::tokio::time::advance(get_default_config().select_timeout + Duration::from_millis(1));
 
     // ------------ operate -------------
 

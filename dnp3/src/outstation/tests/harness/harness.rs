@@ -2,6 +2,7 @@ use crate::link::error::LinkError;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo};
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
 use crate::outstation::task::{OutstationConfig, OutstationTask};
+use crate::outstation::tests::get_default_config;
 use crate::outstation::tests::harness::{
     ApplicationData, Event, EventHandle, MockControlHandler, MockOutstationApplication,
     MockOutstationInformation,
@@ -52,10 +53,15 @@ where
     }
 }
 
-pub(crate) fn new_harness(
+pub(crate) fn new_harness_with_config(
     config: OutstationConfig,
 ) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
     new_harness_with_broadcast(config, None)
+}
+
+pub(crate) fn new_harness(
+) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
+    new_harness_with_broadcast(get_default_config(), None)
 }
 
 pub(crate) fn new_harness_with_broadcast(
