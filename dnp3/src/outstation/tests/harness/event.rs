@@ -24,6 +24,7 @@ pub(crate) enum Event {
     SolConfirmTimeout(Sequence),
     ColdRestart(Option<RestartDelay>),
     WarmRestart(Option<RestartDelay>),
+    ClearRestartIIN,
 }
 
 #[derive(Clone)]

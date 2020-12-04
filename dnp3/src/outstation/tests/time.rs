@@ -1,13 +1,4 @@
-use crate::entry::EndpointAddress;
-use crate::outstation::task::OutstationConfig;
-use crate::outstation::tests::harness::new_harness;
-
-fn get_config() -> OutstationConfig {
-    OutstationConfig::new(
-        EndpointAddress::from(10).unwrap(),
-        EndpointAddress::from(1).unwrap(),
-    )
-}
+use crate::outstation::tests::get_default_config;
 
 const DELAY_MEASURE: &[u8] = &[0xC0, 23];
 const RESPONSE_TIME_DELAY_FINE: &[u8] =
@@ -15,7 +6,7 @@ const RESPONSE_TIME_DELAY_FINE: &[u8] =
 
 #[test]
 fn rejects_operate_with_non_consecutive_sequence() {
-    let mut harness = new_harness(get_config());
+    let mut harness = super::harness::new_harness(get_default_config());
 
     harness.application_data.lock().unwrap().processing_delay = 0xCAFE;
 

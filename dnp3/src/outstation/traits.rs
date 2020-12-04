@@ -79,6 +79,8 @@ pub trait OutstationInformation: Sync + Send + 'static {
     fn broadcast_received(&mut self, _function: FunctionCode, _action: BroadcastAction) {}
     /// failed to receive a solicited confirm before the timeout occurred
     fn solicited_confirm_timeout(&mut self, _ecsn: Sequence) {}
+    /// master cleared the restart IIN bit
+    fn clear_restart_iin(&mut self) {}
 }
 
 /// enumeration describing how the master requested the control operation

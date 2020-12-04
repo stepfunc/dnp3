@@ -21,4 +21,8 @@ impl OutstationInformation for MockOutstationInformation {
     fn solicited_confirm_timeout(&mut self, ecsn: Sequence) {
         self.events.push(Event::SolConfirmTimeout(ecsn))
     }
+
+    fn clear_restart_iin(&mut self) {
+        self.events.push(Event::ClearRestartIIN)
+    }
 }

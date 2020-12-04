@@ -16,7 +16,7 @@ impl ApplicationData {
     fn new() -> Self {
         Self {
             processing_delay: 0xFFFF,
-            restart_delay: Some(RestartDelay::Milliseconds(1234)),
+            restart_delay: None,
         }
     }
 }
@@ -44,6 +44,6 @@ impl OutstationApplication for MockOutstationApplication {
     fn warm_restart(&mut self) -> Option<RestartDelay> {
         let delay = self.data.lock().unwrap().restart_delay;
         self.events.push(Event::WarmRestart(delay));
-        Some(RestartDelay::Seconds(1))
+        delay
     }
 }

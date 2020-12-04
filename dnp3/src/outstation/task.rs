@@ -612,6 +612,7 @@ impl OutstationSession {
                             } else {
                                 // clear the restart bit
                                 self.state.restart_iin_asserted = false;
+                                self.information.clear_restart_iin();
                             }
                         } else {
                             log::warn!("ignoring write of IIN index {} to value {}", index, value);
