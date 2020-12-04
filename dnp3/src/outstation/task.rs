@@ -967,16 +967,24 @@ impl OutstationSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
+        self.information.expect_solicited_confirm(ecsn);
+
         let mut deadline = self.new_confirm_deadline();
         loop {
             match reader.read_with_timeout(io, deadline).await? {
-                Timeout::Yes => return Ok(Confirm::Timeout),
+                Timeout::Yes => {
+                    self.information.solicited_confirm_timeout(ecsn);
+                    return Ok(Confirm::Timeout);
+                }
                 // process data
                 Timeout::No => {
                     if let Some((info, request)) = reader.peek_request(self.config.level) {
                         match self.expect_sol_confirm(ecsn, info, request) {
                             ConfirmAction::ContinueWait => {}
-                            ConfirmAction::Confirmed => return Ok(Confirm::Yes),
+                            ConfirmAction::Confirmed => {
+                                self.information.solicited_confirm_received(ecsn);
+                                return Ok(Confirm::Yes);
+                            }
                             ConfirmAction::NewRequest => return Ok(Confirm::NewRequest),
                             ConfirmAction::EchoLastResponse(length) => {
                                 if let Some(length) = length {

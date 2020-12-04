@@ -12,6 +12,8 @@ pub(crate) fn get_default_config() -> OutstationConfig {
 
 /// control functionality
 mod controls;
+/// state machine for READ requests
+mod read_states;
 /// clear restart IIN + cold/warm restart
 mod restart;
 /// time synchronization

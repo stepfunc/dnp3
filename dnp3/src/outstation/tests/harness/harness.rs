@@ -1,6 +1,6 @@
 use crate::link::error::LinkError;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo};
-use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
+use crate::outstation::database::{DatabaseConfig, DatabaseHandle, EventBufferConfig};
 use crate::outstation::task::{OutstationConfig, OutstationTask};
 use crate::outstation::tests::get_default_config;
 use crate::outstation::tests::harness::{
@@ -31,14 +31,21 @@ where
         assert!(self.io.pending_write());
         self.io.write(response);
         assert_pending!(self.task.poll());
-        assert!(self.io.all_done());
+        assert!(self.io.all_read());
+        assert!(self.io.all_written());
+    }
+
+    pub(crate) fn send(&mut self, request: &[u8]) {
+        self.io.read(request);
+        assert_pending!(self.task.poll());
     }
 
     pub(crate) fn test_request_no_response(&mut self, request: &[u8]) {
         self.io.read(request);
         assert_pending!(self.task.poll());
         assert!(!self.io.pending_write());
-        assert!(self.io.all_done());
+        assert!(self.io.all_read());
+        assert!(self.io.all_written());
     }
 
     pub(crate) fn check_events(&mut self, events: &[Event]) {
@@ -72,9 +79,12 @@ pub(crate) fn new_harness_with_broadcast(
 
     let (data, application) = MockOutstationApplication::new(events.clone());
 
+    let mut db_config = DatabaseConfig::default();
+    db_config.events = EventBufferConfig::all_types(5);
+
     let (task, database) = OutstationTask::create(
         config,
-        DatabaseConfig::default(),
+        db_config,
         application,
         MockOutstationInformation::new(events.clone()),
         MockControlHandler::new(events.clone()),

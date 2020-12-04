@@ -14,9 +14,7 @@ const RESPONSE_TIME_DELAY_COARSE: &[u8] =
 #[test]
 fn can_clear_the_restart_iin_bit() {
     let mut harness = new_harness();
-
     harness.test_request_response(CLEAR_RESTART_IIN, RESPONSE_NO_RESTART_IIN);
-
     harness.check_events(&[Event::ClearRestartIIN])
 }
 

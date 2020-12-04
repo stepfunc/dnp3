@@ -75,10 +75,14 @@ pub enum BroadcastAction {
 /// but may be useful to certain applications to assess the health of the communication
 /// or to count statistics
 pub trait OutstationInformation: Sync + Send + 'static {
-    /// Called when a broadcast request is received by the outstation
+    /// called when a broadcast request is received by the outstation
     fn broadcast_received(&mut self, _function: FunctionCode, _action: BroadcastAction) {}
+    /// outstation has begun waiting for a solicited confirm
+    fn expect_solicited_confirm(&mut self, _ecsn: Sequence) {}
     /// failed to receive a solicited confirm before the timeout occurred
     fn solicited_confirm_timeout(&mut self, _ecsn: Sequence) {}
+    /// received the expected confirm
+    fn solicited_confirm_received(&mut self, _ecsn: Sequence) {}
     /// master cleared the restart IIN bit
     fn clear_restart_iin(&mut self) {}
 }

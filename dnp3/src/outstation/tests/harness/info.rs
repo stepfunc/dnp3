@@ -18,8 +18,16 @@ impl OutstationInformation for MockOutstationInformation {
         self.events.push(Event::BroadcastReceived(function, action))
     }
 
+    fn expect_solicited_confirm(&mut self, ecsn: Sequence) {
+        self.events.push(Event::ExpectSolicitedConfirm(ecsn))
+    }
+
     fn solicited_confirm_timeout(&mut self, ecsn: Sequence) {
-        self.events.push(Event::SolConfirmTimeout(ecsn))
+        self.events.push(Event::SolicitedConfirmTimeout(ecsn))
+    }
+
+    fn solicited_confirm_received(&mut self, ecsn: Sequence) {
+        self.events.push(Event::SolicitedConfirmReceived(ecsn))
     }
 
     fn clear_restart_iin(&mut self) {
