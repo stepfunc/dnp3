@@ -15,7 +15,7 @@ use crate::outstation::database::{DatabaseConfig, DatabaseHandle, ResponseInfo};
 use crate::outstation::traits::{ControlHandler, OperateType, OutstationApplication, RestartDelay};
 use crate::outstation::SelfAddressSupport;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
-use crate::transport::{FragmentInfo, Timeout, TransportReader, TransportWriter};
+use crate::transport::{FragmentInfo, Timeout, TransportReader, TransportRequest, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 
@@ -406,7 +406,9 @@ impl OutstationSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        if let Some((info, request)) = reader.peek_request(self.config.level) {
+        if let Some(TransportRequest::Request(info, request)) =
+            reader.peek_request(self.config.level)
+        {
             if let Some(result) = self.process_request_from_idle(info, request) {
                 self.state.last_valid_request = Some(result);
                 self.respond(io, writer, result.response_length, info.source)
@@ -896,7 +898,9 @@ impl OutstationSession {
                 Timeout::Yes => return Ok(Confirm::Timeout),
                 // process data
                 Timeout::No => {
-                    if let Some((info, request)) = reader.peek_request(self.config.level) {
+                    if let Some(TransportRequest::Request(info, request)) =
+                        reader.peek_request(self.config.level)
+                    {
                         match self.expect_sol_confirm(ecsn, info, request) {
                             ConfirmAction::ContinueWait => {}
                             ConfirmAction::Confirmed => return Ok(Confirm::Yes),

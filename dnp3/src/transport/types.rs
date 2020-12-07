@@ -1,3 +1,4 @@
+use crate::app::parse::parser::{Request, Response};
 use crate::entry::EndpointAddress;
 use crate::link::header::BroadcastConfirmMode;
 
@@ -26,4 +27,32 @@ impl FragmentInfo {
 pub(crate) struct Fragment<'a> {
     pub(crate) info: FragmentInfo,
     pub(crate) data: &'a [u8],
+}
+
+#[derive(Debug)]
+pub(crate) enum TransportData<'a> {
+    Fragment(Fragment<'a>),
+    LinkLayerMessage(LinkLayerMessage),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) struct LinkLayerMessage {
+    pub(crate) source: EndpointAddress,
+    pub(crate) message: LinkLayerMessageType,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) enum LinkLayerMessageType {
+    LinkStatusRequest,
+    LinkStatusResponse,
+}
+
+pub(crate) enum TransportResponse<'a> {
+    Response(EndpointAddress, Response<'a>),
+    LinkLayerMessage(LinkLayerMessage),
+}
+
+pub(crate) enum TransportRequest<'a> {
+    Request(FragmentInfo, Request<'a>),
+    LinkLayerMessage(LinkLayerMessage),
 }

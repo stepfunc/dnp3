@@ -3,7 +3,7 @@ use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
 use crate::outstation::SelfAddressSupport;
 use crate::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
-use crate::transport::{Fragment, FragmentInfo};
+use crate::transport::{Fragment, FragmentInfo, TransportData};
 use crate::util::buffer::Buffer;
 
 pub(crate) struct MockReader {
@@ -47,14 +47,14 @@ impl MockReader {
 
     pub(crate) fn reset(&mut self) {}
 
-    pub(crate) fn peek(&self) -> Option<Fragment> {
-        self.get(self.count)
+    pub(crate) fn peek(&self) -> Option<TransportData> {
+        Some(TransportData::Fragment(self.get(self.count)?))
     }
 
-    pub(crate) fn pop(&mut self) -> Option<Fragment> {
+    pub(crate) fn pop(&mut self) -> Option<TransportData> {
         let count = self.count;
         self.count = 0;
-        self.get(count)
+        Some(TransportData::Fragment(self.get(count)?))
     }
 
     fn get(&self, count: usize) -> Option<Fragment> {

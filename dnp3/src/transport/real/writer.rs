@@ -1,7 +1,7 @@
 use crate::app::EndpointType;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::link::format::{format_unconfirmed_user_data, Payload};
+use crate::link::format::{format_link_status_request, format_unconfirmed_user_data, Payload};
 use crate::link::header::AnyAddress;
 use crate::tokio::io::{AsyncWrite, AsyncWriteExt};
 use crate::transport::real::constants::{FIN_MASK, FIR_MASK};
@@ -73,6 +73,26 @@ impl Writer {
             let written = cursor.written_since(mark)?;
             io.write_all(written).await?;
         }
+
+        Ok(())
+    }
+
+    pub(crate) async fn write_link_status_request<W>(
+        &mut self,
+        io: &mut W,
+        destination: AnyAddress,
+    ) -> Result<(), LinkError>
+    where
+        W: AsyncWrite + Unpin,
+    {
+        let mut cursor = WriteCursor::new(&mut self.buffer);
+        format_link_status_request(
+            self.endpoint_type.dir_bit(),
+            destination.value(),
+            self.local_address.raw_value(),
+            &mut cursor,
+        )?;
+        io.write_all(cursor.written()).await?;
 
         Ok(())
     }

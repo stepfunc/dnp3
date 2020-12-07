@@ -1,7 +1,7 @@
 use crate::app::format::write::{start_request, start_response};
 use crate::app::header::{Control, ResponseFunction, IIN, IIN1, IIN2};
 use crate::app::sequence::Sequence;
-use crate::link::header::FrameInfo;
+use crate::link::header::{FrameInfo, FrameType};
 use crate::master::session::{MasterSession, RunError};
 use crate::prelude::master::*;
 use crate::tokio::test::*;
@@ -506,7 +506,7 @@ fn create_association(config: Configuration) -> TestHarness<impl Future<Output =
 
     reader
         .get_inner()
-        .set_rx_frame_info(FrameInfo::new(outstation_address, None));
+        .set_rx_frame_info(FrameInfo::new(outstation_address, None, FrameType::Data));
 
     let mut master_task = spawn(async move { runner.run(&mut io, &mut writer, &mut reader).await });
 
@@ -634,7 +634,11 @@ impl<F: Future<Output = RunError>> TestHarness<F> {
 
     fn assert_io(&mut self) {
         assert_pending!(self.poll());
-        assert!(self.io.all_done());
+        assert!(
+            self.io.all_written(),
+            "Some expected bytes were not written"
+        );
+        assert!(self.io.all_read(), "Some bytess were not read");
     }
 
     fn num_requests(&self) -> u64 {

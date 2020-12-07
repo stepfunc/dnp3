@@ -127,12 +127,28 @@ impl ControlField {
 pub(crate) struct FrameInfo {
     pub(crate) source: EndpointAddress,
     pub(crate) broadcast: Option<BroadcastConfirmMode>,
+    pub(crate) frame_type: FrameType,
 }
 
 impl FrameInfo {
-    pub(crate) fn new(source: EndpointAddress, broadcast: Option<BroadcastConfirmMode>) -> Self {
-        Self { source, broadcast }
+    pub(crate) fn new(
+        source: EndpointAddress,
+        broadcast: Option<BroadcastConfirmMode>,
+        frame_type: FrameType,
+    ) -> Self {
+        Self {
+            source,
+            broadcast,
+            frame_type,
+        }
     }
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub(crate) enum FrameType {
+    Data,
+    LinkStatusRequest,
+    LinkStatusResponse,
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]

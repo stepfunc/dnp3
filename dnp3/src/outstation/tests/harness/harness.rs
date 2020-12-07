@@ -1,6 +1,6 @@
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::link::header::FrameInfo;
+use crate::link::header::{FrameInfo, FrameType};
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
 use crate::outstation::task::{OutstationConfig, OutstationTask};
 use crate::outstation::tests::harness::{Event, EventHandle, MockControlHandler};
@@ -58,7 +58,11 @@ pub(crate) fn new_harness(
 
     task.get_reader()
         .get_inner()
-        .set_rx_frame_info(FrameInfo::new(EndpointAddress::from(10).unwrap(), None));
+        .set_rx_frame_info(FrameInfo::new(
+            EndpointAddress::from(10).unwrap(),
+            None,
+            FrameType::Data,
+        ));
 
     let (mut io, io_handle) = io::mock();
 

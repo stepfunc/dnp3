@@ -3,7 +3,7 @@ use crate::app::parse::parser::Response;
 use crate::app::sequence::Sequence;
 use crate::app::timeout::Timeout;
 use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
-use crate::transport::{TransportReader, TransportWriter};
+use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 
 use crate::app::header::Control;
 use crate::link::error::LinkError;
@@ -132,7 +132,11 @@ impl MasterSession {
                 }
                 result = reader.read(io) => {
                    result?;
-                   return self.handle_fragment_while_idle(io, writer, reader).await;
+                   match reader.pop_response(self.level) {
+                        Some(TransportResponse::Response(source, response)) => return self.handle_fragment_while_idle(io, writer, source, response).await,
+                        Some(TransportResponse::LinkLayerMessage(_msg)) => todo!(),
+                        None => return Ok(())
+                   }
                 }
             }
         }
@@ -159,7 +163,11 @@ impl MasterSession {
                 }
                 result = reader.read(io) => {
                    result?;
-                   return self.handle_fragment_while_idle(io, writer, reader).await;
+                   match reader.pop_response(self.level) {
+                        Some(TransportResponse::Response(source, response)) => return self.handle_fragment_while_idle(io, writer, source, response).await,
+                        Some(TransportResponse::LinkLayerMessage(_msg)) => todo!(),
+                        None => return Ok(())
+                   }
                 }
                 _ = crate::tokio::time::delay_until(instant) => {
                    return Ok(());
@@ -200,31 +208,6 @@ impl MasterSession {
             }
             MasterMsg::GetDecodeLogLevel(promise) => {
                 promise.complete(Ok(self.level));
-            }
-        }
-    }
-
-    async fn read_next_response<T>(
-        &mut self,
-        io: &mut T,
-        deadline: Instant,
-        reader: &mut TransportReader,
-    ) -> Result<(), TaskError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
-        loop {
-            crate::tokio::select! {
-                    _ = crate::tokio::time::delay_until(deadline) => {
-                         log::warn!("no response within timeout: {}", self.timeout);
-                         return Err(TaskError::ResponseTimeout);
-                    }
-                    x = reader.read(io)  => {
-                        return Ok(x?);
-                    }
-                    y = self.process_message(true) => {
-                        y?; // unless shutdown, proceed to next event
-                    }
             }
         }
     }
@@ -294,64 +277,84 @@ impl MasterSession {
             let deadline = self.timeout.deadline_from_now();
 
             loop {
-                if let Err(err) = self.read_next_response(io, deadline, reader).await {
-                    task.on_task_error(self.associations.get_mut(destination).ok(), err);
-                    return Err(err);
-                }
+                crate::tokio::select! {
+                    _ = crate::tokio::time::delay_until(deadline) => {
+                        log::warn!("no response within timeout: {}", self.timeout);
+                        task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
+                        return Err(TaskError::ResponseTimeout);
+                    }
+                    x = reader.read(io) => {
+                        if let Err(err) = x {
+                            task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
+                            return Err(err.into());
+                        }
 
-                let result = self
-                    .validate_non_read_response(destination, seq, io, reader, writer)
-                    .await;
+                        match reader.pop_response(self.level) {
+                            Some(TransportResponse::Response(source, response)) => {
 
-                match result {
-                    // continue reading responses until timeout
-                    Ok(None) => continue,
-                    Ok(Some(response)) => {
-                        match self.associations.get_mut(destination) {
-                            Err(x) => {
-                                task.on_task_error(None, x.into());
-                                return Err(x.into());
-                            }
-                            Ok(association) => {
-                                association.process_iin(response.header.iin);
-                                match task.handle(association, response) {
-                                    None => return Ok(()),
-                                    Some(next) => {
-                                        task = next;
-                                        // break from the inner loop and execute the next request
-                                        break;
+                                let result = self
+                                    .validate_non_read_response(destination, seq, io, writer, source, response)
+                                    .await;
+
+                                match result {
+                                    // continue reading responses until timeout
+                                    Ok(None) => continue,
+                                    Ok(Some(response)) => {
+                                        match self.associations.get_mut(destination) {
+                                            Err(x) => {
+                                                task.on_task_error(None, x.into());
+                                                return Err(x.into());
+                                            }
+                                            Ok(association) => {
+                                                association.process_iin(response.header.iin);
+                                                match task.handle(association, response) {
+                                                    None => return Ok(()),
+                                                    Some(next) => {
+                                                        task = next;
+                                                        // break from the inner loop and execute the next request
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(err) => {
+                                        task.on_task_error(self.associations.get_mut(destination).ok(), err);
+                                        return Err(err);
                                     }
                                 }
                             }
+                            Some(TransportResponse::LinkLayerMessage(_msg)) => todo!(),
+                            None => continue
                         }
                     }
-                    Err(err) => {
-                        task.on_task_error(self.associations.get_mut(destination).ok(), err);
-                        return Err(err);
+                    y = self.process_message(true) => {
+                        match y {
+                            Ok(_) => (), // unless shutdown, proceed to next event
+                            Err(err) => {
+                                task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
+                                return Err(err.into());
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    // As of 1.43, clippy erroneously says these lifetimes aren't required
     #[allow(clippy::needless_lifetimes)]
     async fn validate_non_read_response<'a, T>(
         &mut self,
         destination: EndpointAddress,
         seq: Sequence,
         io: &mut T,
-        reader: &'a mut TransportReader,
         writer: &mut TransportWriter,
+        source: EndpointAddress,
+        response: Response<'a>,
     ) -> Result<Option<Response<'a>>, TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let (source, response) = match reader.pop_response(self.level) {
-            None => return Ok(None),
-            Some(x) => x,
-        };
-
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
                 .await?;
@@ -432,24 +435,37 @@ impl MasterSession {
             let deadline = self.timeout.deadline_from_now();
 
             loop {
-                self.read_next_response(io, deadline, reader).await?;
-
-                let action = self
-                    .process_read_response(destination, is_first, seq, &task, io, writer, reader)
-                    .await?;
-
-                match action {
-                    // continue reading responses on the inner loop
-                    ReadResponseAction::Ignore => continue,
-                    // read task complete
-                    ReadResponseAction::Complete => {
-                        return Ok(());
+                crate::tokio::select! {
+                    _ = crate::tokio::time::delay_until(deadline) => {
+                            log::warn!("no response within timeout: {}", self.timeout);
+                            return Err(TaskError::ResponseTimeout);
                     }
-                    // break to the outer loop and read another response
-                    ReadResponseAction::ReadNext => {
-                        is_first = false;
-                        seq = self.associations.get_mut(destination)?.increment_seq();
-                        break;
+                    x = reader.read(io) => {
+                        x?;
+                        match reader.pop_response(self.level) {
+                            Some(TransportResponse::Response(source, response)) => {
+                                let action = self.process_read_response(destination, is_first, seq, &task, io, writer, source, response).await?;
+                                match action {
+                                    // continue reading responses on the inner loop
+                                    ReadResponseAction::Ignore => continue,
+                                    // read task complete
+                                    ReadResponseAction::Complete => {
+                                        return Ok(());
+                                    }
+                                    // break to the outer loop and read another response
+                                    ReadResponseAction::ReadNext => {
+                                        is_first = false;
+                                        seq = self.associations.get_mut(destination)?.increment_seq();
+                                        break;
+                                    }
+                                }
+                            }
+                            Some(TransportResponse::LinkLayerMessage(_msg)) => todo!(),
+                            None => continue
+                        }
+                    }
+                    y = self.process_message(true) => {
+                        y?; // unless shutdown, proceed to next event
                     }
                 }
             }
@@ -465,16 +481,12 @@ impl MasterSession {
         task: &ReadTask,
         io: &mut T,
         writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        source: EndpointAddress,
+        response: Response<'_>,
     ) -> Result<ReadResponseAction, TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let (source, response) = match reader.pop_response(self.level) {
-            Some(x) => x,
-            None => return Ok(ReadResponseAction::Ignore),
-        };
-
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
                 .await?;
@@ -538,16 +550,12 @@ impl MasterSession {
         &mut self,
         io: &mut T,
         writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        source: EndpointAddress,
+        response: Response<'_>,
     ) -> Result<(), RunError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        let (source, response) = match reader.pop_response(self.level) {
-            None => return Ok(()),
-            Some(x) => x,
-        };
-
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
                 .await?;
