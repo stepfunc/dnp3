@@ -18,7 +18,7 @@ use crate::outstation::traits::{
 };
 use crate::outstation::{BroadcastAddressSupport, SelfAddressSupport};
 use crate::tokio::io::{AsyncRead, AsyncWrite};
-use crate::transport::{FragmentInfo, Timeout, TransportReader, TransportWriter};
+use crate::transport::{FragmentInfo, RequestGuard, Timeout, TransportReader, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 
@@ -418,7 +418,7 @@ impl OutstationSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        if let Some((info, request)) = reader.peek_request(self.config.level) {
+        if let Some((info, request)) = reader.pop_request(self.config.level).get() {
             if let Some(result) = self.process_request_from_idle(info, request) {
                 self.state.last_valid_request = Some(result);
                 if let Some(length) = result.response_length {
@@ -945,7 +945,8 @@ impl OutstationSession {
                     }
                 }
                 Confirm::Timeout => {
-                    self.information.solicited_confirm_timeout(series.ecsn);
+                    self.information
+                        .solicited_confirm_timeout(series.ecsn.value());
                     self.database.reset();
                     return Ok(());
                 }
@@ -967,32 +968,36 @@ impl OutstationSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        self.information.expect_solicited_confirm(ecsn);
+        self.information.enter_solicited_confirm_wait(ecsn.value());
 
         let mut deadline = self.new_confirm_deadline();
         loop {
             match reader.read_with_timeout(io, deadline).await? {
                 Timeout::Yes => {
-                    self.information.solicited_confirm_timeout(ecsn);
+                    self.information.solicited_confirm_timeout(ecsn.value());
                     return Ok(Confirm::Timeout);
                 }
                 // process data
                 Timeout::No => {
-                    if let Some((info, request)) = reader.peek_request(self.config.level) {
-                        match self.expect_sol_confirm(ecsn, info, request) {
-                            ConfirmAction::ContinueWait => {}
-                            ConfirmAction::Confirmed => {
-                                self.information.solicited_confirm_received(ecsn);
-                                return Ok(Confirm::Yes);
+                    let mut guard = reader.pop_request(self.config.level);
+                    match self.expect_sol_confirm(ecsn, &mut guard) {
+                        ConfirmAction::ContinueWait => {}
+                        ConfirmAction::Confirmed => {
+                            self.information.solicited_confirm_received(ecsn.value());
+                            return Ok(Confirm::Yes);
+                        }
+                        ConfirmAction::NewRequest => {
+                            // retain the fragment so that it can be processed from the idle state
+                            guard.retain();
+                            return Ok(Confirm::NewRequest);
+                        }
+                        ConfirmAction::EchoLastResponse(length) => {
+                            if let Some(length) = length {
+                                self.respond(io, writer, length, self.config.master_address)
+                                    .await?;
                             }
-                            ConfirmAction::NewRequest => return Ok(Confirm::NewRequest),
-                            ConfirmAction::EchoLastResponse(length) => {
-                                if let Some(length) = length {
-                                    self.respond(io, writer, length, info.source).await?;
-                                }
-                                // per the spec, we restart the confirm timer
-                                deadline = self.new_confirm_deadline();
-                            }
+                            // per the spec, we restart the confirm timer
+                            deadline = self.new_confirm_deadline();
                         }
                     }
                 }
@@ -1000,12 +1005,12 @@ impl OutstationSession {
         }
     }
 
-    fn expect_sol_confirm(
-        &self,
-        ecsn: Sequence,
-        info: FragmentInfo,
-        request: Request,
-    ) -> ConfirmAction {
+    fn expect_sol_confirm(&self, ecsn: Sequence, request: &mut RequestGuard) -> ConfirmAction {
+        let (info, request) = match request.get() {
+            Some(x) => x,
+            None => return ConfirmAction::ContinueWait,
+        };
+
         match self.classify(info, request) {
             FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest,
             FragmentType::NewRead(_, _) => ConfirmAction::NewRequest,

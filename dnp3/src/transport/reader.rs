@@ -24,6 +24,30 @@ pub(crate) enum Timeout {
     No,
 }
 
+pub(crate) struct RequestGuard<'a> {
+    canceled: bool,
+    level: DecodeLogLevel,
+    reader: &'a mut TransportReader,
+}
+
+impl<'a> RequestGuard<'a> {
+    pub(crate) fn retain(&mut self) {
+        self.canceled = true
+    }
+
+    pub(crate) fn get(&mut self) -> Option<(FragmentInfo, Request)> {
+        self.reader.peek_request(self.level)
+    }
+}
+
+impl<'a> Drop for RequestGuard<'a> {
+    fn drop(&mut self) {
+        if !self.canceled {
+            self.reader.pop()
+        }
+    }
+}
+
 impl TransportReader {
     pub(crate) fn master(address: EndpointAddress, rx_buffer_size: usize) -> Self {
         Self {
@@ -106,10 +130,28 @@ impl TransportReader {
         }
     }
 
-    pub(crate) fn peek_request(
-        &mut self,
-        level: DecodeLogLevel,
-    ) -> Option<(FragmentInfo, Request)> {
+    pub(crate) fn pop_request(&mut self, level: DecodeLogLevel) -> RequestGuard<'_> {
+        RequestGuard {
+            canceled: false,
+            level,
+            reader: self,
+        }
+        /*
+        let log = self.log_fragment();
+        let (info, parsed) = self.parse(true, log, level)?;
+        match parsed.to_request() {
+            Err(err) => {
+                if log {
+                    log::error!("request error: {}", err);
+                }
+                None
+            }
+            Ok(request) => Some((info, request)),
+        }
+        */
+    }
+
+    fn peek_request(&mut self, level: DecodeLogLevel) -> Option<(FragmentInfo, Request)> {
         let log = self.log_fragment();
         let (info, parsed) = self.parse(true, log, level)?;
         match parsed.to_request() {

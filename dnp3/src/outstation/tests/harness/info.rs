@@ -1,5 +1,4 @@
 use crate::app::enums::FunctionCode;
-use crate::app::sequence::Sequence;
 use crate::outstation::tests::harness::{Event, EventHandle};
 use crate::outstation::traits::{BroadcastAction, OutstationInformation};
 
@@ -18,15 +17,15 @@ impl OutstationInformation for MockOutstationInformation {
         self.events.push(Event::BroadcastReceived(function, action))
     }
 
-    fn expect_solicited_confirm(&mut self, ecsn: Sequence) {
-        self.events.push(Event::ExpectSolicitedConfirm(ecsn))
+    fn enter_solicited_confirm_wait(&mut self, ecsn: u8) {
+        self.events.push(Event::EnterSolicitedConfirmWait(ecsn))
     }
 
-    fn solicited_confirm_timeout(&mut self, ecsn: Sequence) {
+    fn solicited_confirm_timeout(&mut self, ecsn: u8) {
         self.events.push(Event::SolicitedConfirmTimeout(ecsn))
     }
 
-    fn solicited_confirm_received(&mut self, ecsn: Sequence) {
+    fn solicited_confirm_received(&mut self, ecsn: u8) {
         self.events.push(Event::SolicitedConfirmReceived(ecsn))
     }
 
