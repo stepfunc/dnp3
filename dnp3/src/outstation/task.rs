@@ -390,9 +390,6 @@ impl OutstationSession {
             .handle_one_request_from_idle(io, reader, writer)
             .await?;
 
-        // we've handled the current fragment
-        reader.pop();
-
         if let Some(series) = series {
             self.sol_confirm_wait(io, reader, writer, series).await?;
         }
@@ -922,7 +919,6 @@ impl OutstationSession {
                 .await?
             {
                 Confirm::Yes => {
-                    reader.pop();
                     self.database.clear_written_events();
                     if series.last_response {
                         // done with response series

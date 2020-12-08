@@ -32,7 +32,11 @@ pub(crate) struct RequestGuard<'a> {
 
 impl<'a> RequestGuard<'a> {
     fn new(level: DecodeLogLevel, reader: &'a mut TransportReader) -> Self {
-        RequestGuard { canceled: false, level, reader }
+        RequestGuard {
+            canceled: false,
+            level,
+            reader,
+        }
     }
 
     pub(crate) fn retain(&mut self) {
@@ -106,7 +110,7 @@ impl TransportReader {
         self.inner.reset()
     }
 
-    pub(crate) fn pop(&mut self) {
+    fn pop(&mut self) {
         self.inner.pop();
         self.logged = false;
     }
