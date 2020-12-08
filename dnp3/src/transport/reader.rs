@@ -31,6 +31,10 @@ pub(crate) struct RequestGuard<'a> {
 }
 
 impl<'a> RequestGuard<'a> {
+    fn new(level: DecodeLogLevel, reader: &'a mut TransportReader) -> Self {
+        RequestGuard { canceled: false, level, reader }
+    }
+
     pub(crate) fn retain(&mut self) {
         self.canceled = true
     }
@@ -131,24 +135,7 @@ impl TransportReader {
     }
 
     pub(crate) fn pop_request(&mut self, level: DecodeLogLevel) -> RequestGuard<'_> {
-        RequestGuard {
-            canceled: false,
-            level,
-            reader: self,
-        }
-        /*
-        let log = self.log_fragment();
-        let (info, parsed) = self.parse(true, log, level)?;
-        match parsed.to_request() {
-            Err(err) => {
-                if log {
-                    log::error!("request error: {}", err);
-                }
-                None
-            }
-            Ok(request) => Some((info, request)),
-        }
-        */
+        RequestGuard::new(level, self)
     }
 
     fn peek_request(&mut self, level: DecodeLogLevel) -> Option<(FragmentInfo, Request)> {
