@@ -1,7 +1,9 @@
 use crate::app::enums::{CommandStatus, FunctionCode};
+use crate::app::header::RequestHeader;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::sequence::Sequence;
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 use crate::outstation::database::Database;
 
@@ -74,14 +76,22 @@ pub enum BroadcastAction {
 /// but may be useful to certain applications to assess the health of the communication
 /// or to count statistics
 pub trait OutstationInformation: Sync + Send + 'static {
+    /// called when a request is processed from the IDLE state
+    fn process_request_from_idle(&mut self, _header: RequestHeader) {}
     /// called when a broadcast request is received by the outstation
     fn broadcast_received(&mut self, _function: FunctionCode, _action: BroadcastAction) {}
     /// outstation has begun waiting for a solicited confirm
-    fn enter_solicited_confirm_wait(&mut self, _ecsn: u8) {}
+    fn enter_solicited_confirm_wait(&mut self, _ecsn: Sequence) {}
     /// failed to receive a solicited confirm before the timeout occurred
-    fn solicited_confirm_timeout(&mut self, _ecsn: u8) {}
+    fn solicited_confirm_timeout(&mut self, _ecsn: Sequence) {}
     /// received the expected confirm
-    fn solicited_confirm_received(&mut self, _ecsn: u8) {}
+    fn solicited_confirm_received(&mut self, _ecsn: Sequence) {}
+    /// received a new request while waiting for a solicited confirm, aborting the response series
+    fn solicited_confirm_wait_new_request(&mut self, _header: RequestHeader) {}
+    /// received a solicited confirm with the wrong sequence number
+    fn wrong_solicited_confirm_seq(&mut self, _ecsn: Sequence, _seq: Sequence) {}
+    /// received a confirm when not expecting one
+    fn unexpected_confirm(&mut self, _unsolicited: bool, _seq: Sequence) {}
     /// master cleared the restart IIN bit
     fn clear_restart_iin(&mut self) {}
 }

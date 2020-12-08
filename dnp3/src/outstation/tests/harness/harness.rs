@@ -25,9 +25,13 @@ impl<T> OutstationTestHarness<T>
 where
     T: std::future::Future<Output = Result<(), LinkError>>,
 {
+    pub(crate) fn poll_pending(&mut self) {
+        assert_pending!(self.task.poll());
+    }
+
     pub(crate) fn test_request_response(&mut self, request: &[u8], response: &[u8]) {
         self.io.read(request);
-        assert_pending!(self.task.poll());
+        self.poll_pending();
         assert!(self.io.pending_write());
         self.io.write(response);
         assert_pending!(self.task.poll());
@@ -37,12 +41,12 @@ where
 
     pub(crate) fn send(&mut self, request: &[u8]) {
         self.io.read(request);
-        assert_pending!(self.task.poll());
+        self.poll_pending();
     }
 
     pub(crate) fn test_request_no_response(&mut self, request: &[u8]) {
         self.io.read(request);
-        assert_pending!(self.task.poll());
+        self.poll_pending();
         assert!(!self.io.pending_write());
         assert!(self.io.all_read());
         assert!(self.io.all_written());

@@ -1,7 +1,9 @@
 use crate::app::enums::{CommandStatus, FunctionCode};
 use crate::app::format::write::start_response;
 use crate::app::gen::ranged::RangedVariation;
-use crate::app::header::{Control, ResponseFunction, ResponseHeader, IIN, IIN1, IIN2};
+use crate::app::header::{
+    Control, RequestHeader, ResponseFunction, ResponseHeader, IIN, IIN1, IIN2,
+};
 use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
 use crate::app::parse::DecodeLogLevel;
@@ -305,7 +307,7 @@ enum FragmentType<'a> {
 #[derive(Copy, Clone)]
 enum ConfirmAction {
     Confirmed,
-    NewRequest,
+    NewRequest(RequestHeader),
     EchoLastResponse(Option<usize>),
     ContinueWait,
 }
@@ -435,6 +437,8 @@ impl OutstationSession {
         info: FragmentInfo,
         request: Request,
     ) -> Option<LastValidRequest> {
+        self.information.process_request_from_idle(request.header);
+
         let seq = request.header.control.seq;
 
         match self.classify(info, request) {
@@ -941,8 +945,6 @@ impl OutstationSession {
                     }
                 }
                 Confirm::Timeout => {
-                    self.information
-                        .solicited_confirm_timeout(series.ecsn.value());
                     self.database.reset();
                     return Ok(());
                 }
@@ -964,25 +966,29 @@ impl OutstationSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        self.information.enter_solicited_confirm_wait(ecsn.value());
+        self.information.enter_solicited_confirm_wait(ecsn);
 
         let mut deadline = self.new_confirm_deadline();
         loop {
             match reader.read_with_timeout(io, deadline).await? {
                 Timeout::Yes => {
-                    self.information.solicited_confirm_timeout(ecsn.value());
+                    self.information.solicited_confirm_timeout(ecsn);
                     return Ok(Confirm::Timeout);
                 }
                 // process data
                 Timeout::No => {
                     let mut guard = reader.pop_request(self.config.level);
                     match self.expect_sol_confirm(ecsn, &mut guard) {
-                        ConfirmAction::ContinueWait => {}
+                        ConfirmAction::ContinueWait => {
+                            // we ignored whatever the request was and logged it elsewhere
+                            // just go back to the loop and read another fragment
+                        }
                         ConfirmAction::Confirmed => {
-                            self.information.solicited_confirm_received(ecsn.value());
+                            self.information.solicited_confirm_received(ecsn);
                             return Ok(Confirm::Yes);
                         }
-                        ConfirmAction::NewRequest => {
+                        ConfirmAction::NewRequest(header) => {
+                            self.information.solicited_confirm_wait_new_request(header);
                             // retain the fragment so that it can be processed from the idle state
                             guard.retain();
                             return Ok(Confirm::NewRequest);
@@ -1001,31 +1007,35 @@ impl OutstationSession {
         }
     }
 
-    fn expect_sol_confirm(&self, ecsn: Sequence, request: &mut RequestGuard) -> ConfirmAction {
+    fn expect_sol_confirm(&mut self, ecsn: Sequence, request: &mut RequestGuard) -> ConfirmAction {
         let (info, request) = match request.get() {
             Some(x) => x,
             None => return ConfirmAction::ContinueWait,
         };
 
         match self.classify(info, request) {
-            FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest,
-            FragmentType::NewRead(_, _) => ConfirmAction::NewRequest,
+            FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest(request.header),
+            FragmentType::NewRead(_, _) => ConfirmAction::NewRequest(request.header),
             FragmentType::RepeatRead(_, response_length, _) => {
                 ConfirmAction::EchoLastResponse(response_length)
             }
-            FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest,
+            FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest(request.header),
             // this should never happen, but if it does, new request is probably best course of action
-            FragmentType::RepeatNonRead(_, _) => ConfirmAction::NewRequest,
-            FragmentType::Broadcast(_) => ConfirmAction::NewRequest,
+            FragmentType::RepeatNonRead(_, _) => ConfirmAction::NewRequest(request.header),
+            FragmentType::Broadcast(_) => ConfirmAction::NewRequest(request.header),
             FragmentType::SolicitedConfirm => {
                 if request.header.control.seq == ecsn {
                     ConfirmAction::Confirmed
                 } else {
+                    self.information
+                        .wrong_solicited_confirm_seq(ecsn, request.header.control.seq);
                     log::warn!("received solicited confirm with wrong sequence number, expected: {} received: {}", ecsn.value(), request.header.control.seq.value());
                     ConfirmAction::ContinueWait
                 }
             }
             FragmentType::UnsolicitedConfirm => {
+                self.information
+                    .unexpected_confirm(true, request.header.control.seq);
                 log::warn!(
                     "ignoring unsolicited CONFIRM while waiting for solicited confirm, seq: {}",
                     request.header.control.seq.value()
