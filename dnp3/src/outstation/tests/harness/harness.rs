@@ -1,7 +1,8 @@
 use crate::link::error::LinkError;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo};
+use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle, EventBufferConfig};
-use crate::outstation::task::{OutstationConfig, OutstationTask};
+use crate::outstation::task::OutstationTask;
 use crate::outstation::tests::get_default_config;
 use crate::outstation::tests::harness::{
     ApplicationData, Event, EventHandle, MockControlHandler, MockOutstationApplication,

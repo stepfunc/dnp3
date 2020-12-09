@@ -2,7 +2,7 @@ use crate::app::EndpointType;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::parser::FramePayload;
-use crate::outstation::SelfAddressSupport;
+use crate::outstation::config::SelfAddressSupport;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::real::assembler::{Assembler, AssemblyState};
 use crate::transport::real::header::Header;
