@@ -9,7 +9,6 @@ use crate::app::parse::parser::HeaderCollection;
 use crate::util::cursor::WriteCursor;
 
 use config::*;
-use details::event::buffer::EventClasses;
 use details::range::static_db::{Deadband, FlagsDetector, PointConfig};
 
 use std::sync::{Arc, Mutex};
@@ -153,8 +152,10 @@ pub(crate) struct ResponseInfo {
     pub(crate) has_events: bool,
     /// true if all selected data has been written (FIN == 1)
     pub(crate) complete: bool,
+    /*
     /// flags for IIN
     pub(crate) unwritten: EventClasses,
+     */
 }
 
 /// Configuration of the database

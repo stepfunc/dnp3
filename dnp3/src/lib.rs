@@ -49,7 +49,7 @@
 //!
 
 #![deny(
-//dead_code,
+dead_code,
 arithmetic_overflow,
 invalid_type_param_default,
 //missing_fragment_specifier,
@@ -94,7 +94,7 @@ clippy::all
     bare_trait_objects
 )]
 // TODO - remove before release
-#![allow(dead_code)]
+#![cfg_attr(test, allow(dead_code))]
 
 #[cfg(test)]
 #[macro_use]

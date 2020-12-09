@@ -44,11 +44,6 @@ impl EventClasses {
             class3,
         }
     }
-    /*
-       pub(crate) fn any(&self) -> bool {
-           self.class1 | self.class2 | self.class3
-       }
-    */
 
     pub fn all() -> Self {
         Self::new(true, true, true)
@@ -65,21 +60,6 @@ impl EventClasses {
             EventClass::Class3 => self.class3,
         }
     }
-    /*
-       pub(crate) fn as_iin1(&self) -> IIN1 {
-           let mut iin = IIN1::default();
-           if self.class1 {
-               iin |= IIN1::CLASS_1_EVENTS
-           }
-           if self.class2 {
-               iin |= IIN1::CLASS_2_EVENTS
-           }
-           if self.class3 {
-               iin |= IIN1::CLASS_3_EVENTS
-           }
-           iin
-       }
-    */
 }
 
 impl BitOr<EventClasses> for EventClasses {
@@ -218,9 +198,11 @@ impl TypeCounter {
         self.modify(event, |cnt| cnt.increment())
     }
 
-    fn decrement(&mut self, event: &Event) {
-        self.modify(event, |cnt| cnt.decrement())
-    }
+    /*
+       fn decrement(&mut self, event: &Event) {
+           self.modify(event, |cnt| cnt.decrement())
+       }
+    */
 
     fn modify<F>(&mut self, event: &Event, op: F)
     where
@@ -283,11 +265,6 @@ impl Counters {
     fn increment(&mut self, record: &EventRecord) {
         self.types.increment(&record.event);
         self.classes.increment(record.class);
-    }
-
-    fn decrement(&mut self, record: &EventRecord) {
-        self.types.decrement(&record.event);
-        self.classes.decrement(record.class);
     }
 }
 
@@ -446,6 +423,8 @@ impl EventBuffer {
         }
     }
 
+    // once we actually use this, we can remove the test attribute
+    #[cfg(test)]
     pub(crate) fn unwritten_classes(&self) -> EventClasses {
         let unwritten = self.total.classes.subtract(&self.written.classes);
         EventClasses::new(
