@@ -1,7 +1,9 @@
-use crate::app::enums::CommandStatus;
+use crate::app::enums::{CommandStatus, FunctionCode};
+use crate::app::header::RequestHeader;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::sequence::Sequence;
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 use crate::outstation::database::Database;
 
@@ -55,6 +57,43 @@ pub trait OutstationApplication: Sync + Send + 'static {
     fn warm_restart(&mut self) -> Option<RestartDelay> {
         None
     }
+}
+
+/// enumeration describing how the outstation processed a broadcast request
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum BroadcastAction {
+    /// Outstation processed the broadcast
+    Processed,
+    /// Outstation ignored the broadcast message b/c it is disabled by configuration
+    IgnoredByConfiguration,
+    /// Outstation was unable to parse the object headers and ignored the request
+    BadObjectHeaders,
+    /// Outstation ignore the broadcast message b/c the function is not supported via Broadcast
+    UnsupportedFunction(FunctionCode),
+}
+
+/// Informational callbacks that the outstation doesn't rely on to function,
+/// but may be useful to certain applications to assess the health of the communication
+/// or to count statistics
+pub trait OutstationInformation: Sync + Send + 'static {
+    /// called when a request is processed from the IDLE state
+    fn process_request_from_idle(&mut self, _header: RequestHeader) {}
+    /// called when a broadcast request is received by the outstation
+    fn broadcast_received(&mut self, _function: FunctionCode, _action: BroadcastAction) {}
+    /// outstation has begun waiting for a solicited confirm
+    fn enter_solicited_confirm_wait(&mut self, _ecsn: Sequence) {}
+    /// failed to receive a solicited confirm before the timeout occurred
+    fn solicited_confirm_timeout(&mut self, _ecsn: Sequence) {}
+    /// received the expected confirm
+    fn solicited_confirm_received(&mut self, _ecsn: Sequence) {}
+    /// received a new request while waiting for a solicited confirm, aborting the response series
+    fn solicited_confirm_wait_new_request(&mut self, _header: RequestHeader) {}
+    /// received a solicited confirm with the wrong sequence number
+    fn wrong_solicited_confirm_seq(&mut self, _ecsn: Sequence, _seq: Sequence) {}
+    /// received a confirm when not expecting one
+    fn unexpected_confirm(&mut self, _unsolicited: bool, _seq: Sequence) {}
+    /// master cleared the restart IIN bit
+    fn clear_restart_iin(&mut self) {}
 }
 
 /// enumeration describing how the master requested the control operation
@@ -129,13 +168,24 @@ pub trait ControlHandler:
 #[derive(Copy, Clone)]
 pub struct DefaultOutstationApplication;
 
+impl OutstationApplication for DefaultOutstationApplication {}
+
 impl DefaultOutstationApplication {
     pub fn create() -> Box<dyn OutstationApplication> {
         Box::new(DefaultOutstationApplication)
     }
 }
 
-impl OutstationApplication for DefaultOutstationApplication {}
+#[derive(Copy, Clone)]
+pub struct DefaultOutstationInformation;
+
+impl OutstationInformation for DefaultOutstationInformation {}
+
+impl DefaultOutstationInformation {
+    pub fn create() -> Box<dyn OutstationInformation> {
+        Box::new(DefaultOutstationInformation)
+    }
+}
 
 #[derive(Copy, Clone)]
 pub struct DefaultControlHandler {

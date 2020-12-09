@@ -7,7 +7,7 @@ use crate::util::bit::bits::{BIT_6, BIT_7};
 
 impl Group12Var1 {
     /// construct a `Group12Var1` instance. The status field is automatically set to `CommandStatus::Success`
-    pub fn new(code: ControlCode, count: u8, on_time: u32, off_time: u32) -> Self {
+    pub const fn new(code: ControlCode, count: u8, on_time: u32, off_time: u32) -> Self {
         Self {
             code,
             count,
@@ -50,7 +50,7 @@ impl Group12Var1 {
 
 impl Group41Var1 {
     /// construct a `Group41Var1` instance. The status field is automatically set to `CommandStatus::Success`
-    pub fn new(value: i32) -> Self {
+    pub const fn new(value: i32) -> Self {
         Self {
             value,
             status: CommandStatus::Success,
@@ -60,7 +60,7 @@ impl Group41Var1 {
 
 impl Group41Var2 {
     /// construct a `Group41Var2` instance. The status field is automatically set to `CommandStatus::Success`
-    pub fn new(value: i16) -> Self {
+    pub const fn new(value: i16) -> Self {
         Self {
             value,
             status: CommandStatus::Success,
@@ -70,7 +70,7 @@ impl Group41Var2 {
 
 impl Group41Var3 {
     /// construct a `Group41Var3` instance. The status field is automatically set to `CommandStatus::Success`
-    pub fn new(value: f32) -> Self {
+    pub const fn new(value: f32) -> Self {
         Self {
             value,
             status: CommandStatus::Success,
@@ -80,7 +80,7 @@ impl Group41Var3 {
 
 impl Group41Var4 {
     /// construct a `Group41Var4` instance. The status field is automatically set to `CommandStatus::Success`
-    pub fn new(value: f64) -> Self {
+    pub const fn new(value: f64) -> Self {
         Self {
             value,
             status: CommandStatus::Success,

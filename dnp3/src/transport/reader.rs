@@ -26,6 +26,38 @@ pub(crate) enum Timeout {
     No,
 }
 
+pub(crate) struct RequestGuard<'a> {
+    canceled: bool,
+    level: DecodeLogLevel,
+    reader: &'a mut TransportReader,
+}
+
+impl<'a> RequestGuard<'a> {
+    fn new(level: DecodeLogLevel, reader: &'a mut TransportReader) -> Self {
+        RequestGuard {
+            canceled: false,
+            level,
+            reader,
+        }
+    }
+
+    pub(crate) fn retain(&mut self) {
+        self.canceled = true
+    }
+
+    pub(crate) fn get(&mut self) -> Option<TransportRequest> {
+        self.reader.peek_request(self.level)
+    }
+}
+
+impl<'a> Drop for RequestGuard<'a> {
+    fn drop(&mut self) {
+        if !self.canceled {
+            self.reader.pop()
+        }
+    }
+}
+
 impl TransportReader {
     pub(crate) fn master(address: EndpointAddress, rx_buffer_size: usize) -> Self {
         Self {
@@ -80,7 +112,7 @@ impl TransportReader {
         self.inner.reset()
     }
 
-    pub(crate) fn pop(&mut self) {
+    fn pop(&mut self) {
         self.inner.pop();
         self.logged = false;
     }
@@ -111,7 +143,11 @@ impl TransportReader {
         }
     }
 
-    pub(crate) fn peek_request(&mut self, level: DecodeLogLevel) -> Option<TransportRequest> {
+    pub(crate) fn pop_request(&mut self, level: DecodeLogLevel) -> RequestGuard<'_> {
+        RequestGuard::new(level, self)
+    }
+
+    fn peek_request(&mut self, level: DecodeLogLevel) -> Option<TransportRequest> {
         let log = self.log_fragment();
         let data = self.parse(true, log, level)?;
 

@@ -1,7 +1,9 @@
 use crate::app::enums::{CommandStatus, FunctionCode};
 use crate::app::format::write::start_response;
 use crate::app::gen::ranged::RangedVariation;
-use crate::app::header::{Control, ResponseFunction, ResponseHeader, IIN, IIN1, IIN2};
+use crate::app::header::{
+    Control, RequestHeader, ResponseFunction, ResponseHeader, IIN, IIN1, IIN2,
+};
 use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
 use crate::app::parse::DecodeLogLevel;
@@ -12,10 +14,15 @@ use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::control::collection::{ControlCollection, ControlTransaction};
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle, ResponseInfo};
-use crate::outstation::traits::{ControlHandler, OperateType, OutstationApplication, RestartDelay};
-use crate::outstation::SelfAddressSupport;
+use crate::outstation::traits::{
+    BroadcastAction, ControlHandler, OperateType, OutstationApplication, OutstationInformation,
+    RestartDelay,
+};
+use crate::outstation::{BroadcastAddressSupport, SelfAddressSupport};
 use crate::tokio::io::{AsyncRead, AsyncWrite};
-use crate::transport::{FragmentInfo, Timeout, TransportReader, TransportRequest, TransportWriter};
+use crate::transport::{
+    FragmentInfo, RequestGuard, Timeout, TransportReader, TransportRequest, TransportWriter,
+};
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 
@@ -60,12 +67,17 @@ impl ResponseInfo {
 struct LastValidRequest {
     seq: Sequence,
     request_hash: u64,
-    response_length: usize,
+    response_length: Option<usize>,
     next: NextState,
 }
 
 impl LastValidRequest {
-    fn new(seq: Sequence, request_hash: u64, response_length: usize, next: NextState) -> Self {
+    fn new(
+        seq: Sequence,
+        request_hash: u64,
+        response_length: Option<usize>,
+        next: NextState,
+    ) -> Self {
         LastValidRequest {
             seq,
             request_hash,
@@ -80,6 +92,7 @@ struct SessionConfig {
     master_address: EndpointAddress,
     confirm_timeout: Duration,
     select_timeout: Duration,
+    broadcast_support: BroadcastAddressSupport,
 }
 
 /// records when a select occurs
@@ -179,6 +192,7 @@ pub(crate) struct OutstationSession {
     database: DatabaseHandle,
     state: SessionState,
     application: Box<dyn OutstationApplication>,
+    information: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
 }
 
@@ -198,29 +212,23 @@ pub struct OutstationConfig {
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: Duration,
     pub select_timeout: Duration,
+    pub broadcast_support: BroadcastAddressSupport,
 }
 
 impl OutstationConfig {
-    #[allow(clippy::too_many_arguments)] // TODO
-    pub fn new(
-        tx_buffer_size: usize,
-        rx_buffer_size: usize,
-        outstation_address: EndpointAddress,
-        master_address: EndpointAddress,
-        self_address_support: SelfAddressSupport,
-        log_level: DecodeLogLevel,
-        confirm_timeout: Duration,
-        select_timeout: Duration,
-    ) -> Self {
-        OutstationConfig {
-            tx_buffer_size,
-            rx_buffer_size,
+    /// constructs an `OutstationConfig` with default settings, except for the
+    /// master and outstation link addresses which really don't have good defaults
+    pub fn new(outstation_address: EndpointAddress, master_address: EndpointAddress) -> Self {
+        Self {
+            tx_buffer_size: OutstationSession::DEFAULT_TX_BUFFER_SIZE,
+            rx_buffer_size: OutstationSession::DEFAULT_RX_BUFFER_SIZE,
             outstation_address,
-            self_address_support,
             master_address,
-            log_level,
-            confirm_timeout,
-            select_timeout,
+            self_address_support: SelfAddressSupport::Disabled,
+            log_level: DecodeLogLevel::Nothing,
+            confirm_timeout: Duration::from_secs(5),
+            select_timeout: Duration::from_secs(5),
+            broadcast_support: BroadcastAddressSupport::Enabled,
         }
     }
 
@@ -230,6 +238,7 @@ impl OutstationConfig {
             master_address: self.master_address,
             confirm_timeout: self.confirm_timeout,
             select_timeout: self.select_timeout,
+            broadcast_support: self.broadcast_support,
         }
     }
 }
@@ -240,6 +249,7 @@ impl OutstationTask {
         config: OutstationConfig,
         database: DatabaseConfig,
         application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
     ) -> (Self, DatabaseHandle) {
         let handle = DatabaseHandle::new(database);
@@ -254,6 +264,7 @@ impl OutstationTask {
                 config.tx_buffer_size,
                 handle.clone(),
                 application,
+                information,
                 control_handler,
             ),
             reader,
@@ -287,9 +298,9 @@ enum Confirm {
 enum FragmentType<'a> {
     MalformedRequest(u64, ObjectParseError),
     NewRead(u64, HeaderCollection<'a>),
-    RepeatRead(u64, usize, HeaderCollection<'a>),
+    RepeatRead(u64, Option<usize>, HeaderCollection<'a>),
     NewNonRead(u64, HeaderCollection<'a>),
-    RepeatNonRead(u64, usize),
+    RepeatNonRead(u64, Option<usize>),
     Broadcast(BroadcastConfirmMode),
     SolicitedConfirm,
     UnsolicitedConfirm,
@@ -298,20 +309,24 @@ enum FragmentType<'a> {
 #[derive(Copy, Clone)]
 enum ConfirmAction {
     Confirmed,
-    NewRequest,
-    EchoLastResponse(usize),
+    NewRequest(RequestHeader),
+    EchoLastResponse(Option<usize>),
     ContinueWait,
 }
 
 impl OutstationSession {
     pub(crate) const MIN_TX_BUFFER_SIZE: usize = 249; // 1 link frame
-    pub(crate) const MIN_RX_BUFFER_SIZE: usize = 249; // 1 link frame
+    pub(crate) const MIN_RX_BUFFER_SIZE: usize = Self::MIN_TX_BUFFER_SIZE;
+
+    pub(crate) const DEFAULT_RX_BUFFER_SIZE: usize = 2048;
+    pub(crate) const DEFAULT_TX_BUFFER_SIZE: usize = Self::DEFAULT_RX_BUFFER_SIZE;
 
     fn new(
         config: SessionConfig,
         tx_buffer_size: usize,
         database: DatabaseHandle,
         application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
     ) -> Self {
         let tx_buffer_size = if tx_buffer_size < Self::MIN_TX_BUFFER_SIZE {
@@ -327,6 +342,7 @@ impl OutstationSession {
             database,
             state: SessionState::new(),
             application,
+            information,
             control_handler,
         }
     }
@@ -378,9 +394,6 @@ impl OutstationSession {
             .handle_one_request_from_idle(io, reader, writer)
             .await?;
 
-        // we've handled the current fragment
-        reader.pop();
-
         if let Some(series) = series {
             self.sol_confirm_wait(io, reader, writer, series).await?;
         }
@@ -407,12 +420,13 @@ impl OutstationSession {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         if let Some(TransportRequest::Request(info, request)) =
-            reader.peek_request(self.config.level)
+            reader.pop_request(self.config.level).get()
         {
             if let Some(result) = self.process_request_from_idle(info, request) {
                 self.state.last_valid_request = Some(result);
-                self.respond(io, writer, result.response_length, info.source)
-                    .await?;
+                if let Some(length) = result.response_length {
+                    self.respond(io, writer, length, info.source).await?;
+                }
                 if let NextState::SolConfirmWait(series) = result.next {
                     return Ok(Some(series));
                 }
@@ -427,16 +441,23 @@ impl OutstationSession {
         info: FragmentInfo,
         request: Request,
     ) -> Option<LastValidRequest> {
+        self.information.process_request_from_idle(request.header);
+
         let seq = request.header.control.seq;
 
         match self.classify(info, request) {
             FragmentType::MalformedRequest(hash, err) => {
                 let length = self.write_empty_response(seq, err.into());
-                Some(LastValidRequest::new(seq, hash, length, NextState::Idle))
+                Some(LastValidRequest::new(
+                    seq,
+                    hash,
+                    Some(length),
+                    NextState::Idle,
+                ))
             }
             FragmentType::NewRead(hash, objects) => {
                 let (length, next) = self.write_first_read_response(info.source, seq, objects);
-                Some(LastValidRequest::new(seq, hash, length, next))
+                Some(LastValidRequest::new(seq, hash, Some(length), next))
             }
             FragmentType::RepeatRead(hash, _, objects) => {
                 // this deviates a bit from the spec, the specification says to
@@ -444,7 +465,7 @@ impl OutstationSession {
                 // is plainly wrong since it can't possibly handle a multi-fragmented
                 // response correctly. Answering a repeat READ with a fresh response is harmless
                 let (length, next) = self.write_first_read_response(info.source, seq, objects);
-                Some(LastValidRequest::new(seq, hash, length, next))
+                Some(LastValidRequest::new(seq, hash, Some(length), next))
             }
             FragmentType::NewNonRead(hash, objects) => {
                 let length = self.handle_non_read(request.header.function, seq, info.id, objects);
@@ -528,29 +549,33 @@ impl OutstationSession {
         seq: Sequence,
         frame_id: u32,
         object_headers: HeaderCollection,
-    ) -> usize {
+    ) -> Option<usize> {
         let iin2 = Self::get_iin2(function, object_headers);
 
         match function {
-            FunctionCode::Write => self.handle_write(seq, object_headers),
+            FunctionCode::Write => Some(self.handle_write(seq, object_headers)),
             // these function don't process objects
-            FunctionCode::DelayMeasure => self.handle_delay_measure(seq, iin2),
+            FunctionCode::DelayMeasure => Some(self.handle_delay_measure(seq, iin2)),
             FunctionCode::ColdRestart => {
                 let delay = self.application.cold_restart();
-                self.handle_restart(seq, delay, iin2)
+                Some(self.handle_restart(seq, delay, iin2))
             }
             FunctionCode::WarmRestart => {
                 let delay = self.application.warm_restart();
-                self.handle_restart(seq, delay, iin2)
+                Some(self.handle_restart(seq, delay, iin2))
             }
             // controls
-            FunctionCode::Select => self.handle_select(seq, frame_id, object_headers),
-            FunctionCode::Operate => self.handle_operate(seq, frame_id, object_headers),
-            FunctionCode::DirectOperate => self.handle_direct_operate(seq, object_headers),
+            FunctionCode::Select => Some(self.handle_select(seq, frame_id, object_headers)),
+            FunctionCode::Operate => Some(self.handle_operate(seq, frame_id, object_headers)),
+            FunctionCode::DirectOperate => Some(self.handle_direct_operate(seq, object_headers)),
+            FunctionCode::DirectOperateNoResponse => {
+                self.handle_direct_operate_no_ack(object_headers);
+                None
+            }
 
             _ => {
                 log::warn!("unsupported function code: {:?}", function);
-                self.write_empty_response(seq, IIN2::NO_FUNC_CODE_SUPPORT)
+                Some(self.write_empty_response(seq, IIN2::NO_FUNC_CODE_SUPPORT))
             }
         }
     }
@@ -592,6 +617,7 @@ impl OutstationSession {
                             } else {
                                 // clear the restart bit
                                 self.state.restart_iin_asserted = false;
+                                self.information.clear_restart_iin();
                             }
                         } else {
                             log::warn!("ignoring write of IIN index {} to value {}", index, value);
@@ -702,6 +728,26 @@ impl OutstationSession {
         });
 
         cursor.written().len()
+    }
+
+    fn handle_direct_operate_no_ack(&mut self, object_headers: HeaderCollection) {
+        let controls = match ControlCollection::from(object_headers) {
+            Err(err) => {
+                log::warn!(
+                    "ignoring control request containing non-control object header {} - {}",
+                    err.variation,
+                    err.qualifier
+                );
+                return;
+            }
+            Ok(controls) => controls,
+        };
+
+        let mut control_tx = ControlTransaction::new(self.control_handler.borrow_mut());
+
+        let _ = self
+            .database
+            .transaction(|database| controls.operate_no_ack(&mut control_tx, database));
     }
 
     fn handle_select(
@@ -820,12 +866,45 @@ impl OutstationSession {
         iin1
     }
 
-    fn process_broadcast(&mut self, _: BroadcastConfirmMode, request: Request) {
-        // TODO - implement broadcast request handling
-        log::warn!(
-            "ignoring broadcast frame with function: {:?}",
-            request.header.function
-        )
+    fn process_broadcast(&mut self, _mode: BroadcastConfirmMode, request: Request) {
+        let action = self.process_broadcast_get_action(request);
+        self.information
+            .broadcast_received(request.header.function, action)
+    }
+
+    fn process_broadcast_get_action(&mut self, request: Request) -> BroadcastAction {
+        if !self.config.broadcast_support.is_enabled() {
+            log::warn!(
+                "ignoring broadcast request (broadcast support disabled): {:?}",
+                request.header.function
+            );
+            return BroadcastAction::IgnoredByConfiguration;
+        }
+
+        let objects = match request.objects {
+            Ok(x) => x,
+            Err(err) => {
+                log::warn!(
+                    "ignoring broadcast message with bad object headers: {}",
+                    err
+                );
+                return BroadcastAction::BadObjectHeaders;
+            }
+        };
+
+        match request.header.function {
+            FunctionCode::DirectOperateNoResponse => {
+                self.handle_direct_operate_no_ack(objects);
+                BroadcastAction::Processed
+            }
+            _ => {
+                log::warn!(
+                    "unsupported broadcast function: {:?}",
+                    request.header.function
+                );
+                BroadcastAction::UnsupportedFunction(request.header.function)
+            }
+        }
     }
 
     fn new_confirm_deadline(&self) -> crate::tokio::time::Instant {
@@ -848,7 +927,6 @@ impl OutstationSession {
                 .await?
             {
                 Confirm::Yes => {
-                    reader.pop();
                     self.database.clear_written_events();
                     if series.last_response {
                         // done with response series
@@ -892,24 +970,40 @@ impl OutstationSession {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
+        self.information.enter_solicited_confirm_wait(ecsn);
+
         let mut deadline = self.new_confirm_deadline();
         loop {
             match reader.read_with_timeout(io, deadline).await? {
-                Timeout::Yes => return Ok(Confirm::Timeout),
+                Timeout::Yes => {
+                    self.information.solicited_confirm_timeout(ecsn);
+                    return Ok(Confirm::Timeout);
+                }
                 // process data
                 Timeout::No => {
-                    if let Some(TransportRequest::Request(info, request)) =
-                        reader.peek_request(self.config.level)
-                    {
-                        match self.expect_sol_confirm(ecsn, info, request) {
-                            ConfirmAction::ContinueWait => {}
-                            ConfirmAction::Confirmed => return Ok(Confirm::Yes),
-                            ConfirmAction::NewRequest => return Ok(Confirm::NewRequest),
-                            ConfirmAction::EchoLastResponse(length) => {
-                                self.respond(io, writer, length, info.source).await?;
-                                // per the spec, we restart the confirm timer
-                                deadline = self.new_confirm_deadline();
+                    let mut guard = reader.pop_request(self.config.level);
+                    match self.expect_sol_confirm(ecsn, &mut guard) {
+                        ConfirmAction::ContinueWait => {
+                            // we ignored whatever the request was and logged it elsewhere
+                            // just go back to the loop and read another fragment
+                        }
+                        ConfirmAction::Confirmed => {
+                            self.information.solicited_confirm_received(ecsn);
+                            return Ok(Confirm::Yes);
+                        }
+                        ConfirmAction::NewRequest(header) => {
+                            self.information.solicited_confirm_wait_new_request(header);
+                            // retain the fragment so that it can be processed from the idle state
+                            guard.retain();
+                            return Ok(Confirm::NewRequest);
+                        }
+                        ConfirmAction::EchoLastResponse(length) => {
+                            if let Some(length) = length {
+                                self.respond(io, writer, length, self.config.master_address)
+                                    .await?;
                             }
+                            // per the spec, we restart the confirm timer
+                            deadline = self.new_confirm_deadline();
                         }
                     }
                 }
@@ -917,31 +1011,39 @@ impl OutstationSession {
         }
     }
 
-    fn expect_sol_confirm(
-        &self,
-        ecsn: Sequence,
-        info: FragmentInfo,
-        request: Request,
-    ) -> ConfirmAction {
+    fn expect_sol_confirm(&mut self, ecsn: Sequence, request: &mut RequestGuard) -> ConfirmAction {
+        let (info, request) = match request.get() {
+            Some(TransportRequest::Request(info, request)) => (info, request),
+            Some(TransportRequest::LinkLayerMessage(_)) => {
+                // TODO: do something with the link layer event
+                return ConfirmAction::ContinueWait;
+            }
+            None => return ConfirmAction::ContinueWait,
+        };
+
         match self.classify(info, request) {
-            FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest,
-            FragmentType::NewRead(_, _) => ConfirmAction::NewRequest,
+            FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest(request.header),
+            FragmentType::NewRead(_, _) => ConfirmAction::NewRequest(request.header),
             FragmentType::RepeatRead(_, response_length, _) => {
                 ConfirmAction::EchoLastResponse(response_length)
             }
-            FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest,
+            FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest(request.header),
             // this should never happen, but if it does, new request is probably best course of action
-            FragmentType::RepeatNonRead(_, _) => ConfirmAction::NewRequest,
-            FragmentType::Broadcast(_) => ConfirmAction::NewRequest,
+            FragmentType::RepeatNonRead(_, _) => ConfirmAction::NewRequest(request.header),
+            FragmentType::Broadcast(_) => ConfirmAction::NewRequest(request.header),
             FragmentType::SolicitedConfirm => {
                 if request.header.control.seq == ecsn {
                     ConfirmAction::Confirmed
                 } else {
+                    self.information
+                        .wrong_solicited_confirm_seq(ecsn, request.header.control.seq);
                     log::warn!("received solicited confirm with wrong sequence number, expected: {} received: {}", ecsn.value(), request.header.control.seq.value());
                     ConfirmAction::ContinueWait
                 }
             }
             FragmentType::UnsolicitedConfirm => {
+                self.information
+                    .unexpected_confirm(true, request.header.control.seq);
                 log::warn!(
                     "ignoring unsolicited CONFIRM while waiting for solicited confirm, seq: {}",
                     request.header.control.seq.value()

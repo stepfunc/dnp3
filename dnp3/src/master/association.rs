@@ -412,7 +412,7 @@ impl Association {
 
     pub(crate) fn handle_unsolicited_response(&mut self, response: &Response) -> bool {
         if self.is_integrity_complete() // Startup sequence was completed
-            || (response.header.iin.iin1.get_device_restart() && response.raw_objects.is_empty())
+            || /*(response.header.iin.iin1.get_device_restart() && */response.raw_objects.is_empty()
         // Or NULL response with IIN1.7 set
         {
             // Update last fragment received

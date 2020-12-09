@@ -294,6 +294,16 @@ impl<'a> ControlCollection<'a> {
         }
         Ok(())
     }
+
+    pub(crate) fn operate_no_ack(
+        &self,
+        transaction: &mut ControlTransaction,
+        database: &mut Database,
+    ) {
+        for header in self.iter() {
+            header.operate_no_ack(transaction, database);
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
