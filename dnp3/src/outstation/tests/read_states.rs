@@ -19,8 +19,6 @@ const BINARY_EVENT_RESPONSE: &[u8] = &[
     0xE0, 0x81, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
 ];
 
-const DELAY_MEASURE: &[u8] = &[0xC0, 23];
-
 fn create_binary_and_event(database: &mut Database) {
     database.add(0, Some(EventClass::Class1), BinaryConfig::default());
     database.update(
