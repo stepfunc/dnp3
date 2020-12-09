@@ -1,7 +1,6 @@
 use super::list::VecList;
 use super::traits::BaseEvent;
 use super::writer::EventWriter;
-use crate::app::header::IIN1;
 use crate::app::measurement;
 use crate::outstation::database::config::*;
 use crate::outstation::database::{EventBufferConfig, EventClass};
@@ -45,10 +44,11 @@ impl EventClasses {
             class3,
         }
     }
-
-    pub(crate) fn any(&self) -> bool {
-        self.class1 | self.class2 | self.class3
-    }
+    /*
+       pub(crate) fn any(&self) -> bool {
+           self.class1 | self.class2 | self.class3
+       }
+    */
 
     pub fn all() -> Self {
         Self::new(true, true, true)
@@ -65,20 +65,21 @@ impl EventClasses {
             EventClass::Class3 => self.class3,
         }
     }
-
-    pub(crate) fn as_iin1(&self) -> IIN1 {
-        let mut iin = IIN1::default();
-        if self.class1 {
-            iin |= IIN1::CLASS_1_EVENTS
-        }
-        if self.class2 {
-            iin |= IIN1::CLASS_2_EVENTS
-        }
-        if self.class3 {
-            iin |= IIN1::CLASS_3_EVENTS
-        }
-        iin
-    }
+    /*
+       pub(crate) fn as_iin1(&self) -> IIN1 {
+           let mut iin = IIN1::default();
+           if self.class1 {
+               iin |= IIN1::CLASS_1_EVENTS
+           }
+           if self.class2 {
+               iin |= IIN1::CLASS_2_EVENTS
+           }
+           if self.class3 {
+               iin |= IIN1::CLASS_3_EVENTS
+           }
+           iin
+       }
+    */
 }
 
 impl BitOr<EventClasses> for EventClasses {
@@ -393,10 +394,11 @@ impl EventRecord {
             state: Cell::new(EventState::Unselected),
         }
     }
-
-    fn is_selected(&self) -> bool {
-        self.state.get() == EventState::Selected
-    }
+    /*
+       fn is_selected(&self) -> bool {
+           self.state.get() == EventState::Selected
+       }
+    */
 }
 
 pub(crate) trait Insertable: BaseEvent {
@@ -498,6 +500,7 @@ impl EventBuffer {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn select_specific_variation<T>(
         &mut self,
         limit: Option<usize>,
@@ -509,6 +512,7 @@ impl EventBuffer {
         self.select(limit, |e| T::select_variation(e, variation))
     }
 
+    #[cfg(test)]
     pub(crate) fn select_default_variation<T>(&mut self, limit: Option<usize>) -> usize
     where
         T: Insertable,

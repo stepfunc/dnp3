@@ -503,15 +503,6 @@ impl OutstationSession {
         }
     }
 
-    fn expect_empty(function: FunctionCode, object_headers: HeaderCollection) -> IIN2 {
-        if object_headers.is_empty() {
-            IIN2::default()
-        } else {
-            log::warn!("ignoring object headers in {:?} request", function);
-            IIN2::NO_FUNC_CODE_SUPPORT
-        }
-    }
-
     fn handle_write(&mut self, seq: Sequence, object_headers: HeaderCollection) -> usize {
         let mut iin2 = IIN2::default();
 

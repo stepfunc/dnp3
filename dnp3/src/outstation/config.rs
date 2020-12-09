@@ -27,21 +27,27 @@ pub struct OutstationConfig {
 }
 
 impl SelfAddressSupport {
+    /*
     pub(crate) fn is_enabled(&self) -> bool {
         *self == SelfAddressSupport::Enabled
     }
+
     pub(crate) fn is_disabled(&self) -> bool {
         !self.is_enabled()
     }
+     */
 }
 
 impl BroadcastAddressSupport {
     pub(crate) fn is_enabled(&self) -> bool {
         *self == BroadcastAddressSupport::Enabled
     }
+    /*
     pub(crate) fn is_disabled(&self) -> bool {
         !self.is_enabled()
     }
+
+     */
 }
 
 impl OutstationConfig {

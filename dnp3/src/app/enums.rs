@@ -354,38 +354,26 @@ pub enum FunctionCode {
 }
 
 #[derive(Copy, Clone)]
-pub(crate) enum FunctionType {
-    Request,
-    Response,
-    Confirm,
-}
-
-#[derive(Copy, Clone)]
 pub(crate) struct FunctionInfo {
-    pub(crate) function_type: FunctionType,
     pub(crate) objects_allowed: bool,
 }
 
 impl FunctionInfo {
 
-    const fn new(function_type: FunctionType, objects_allowed: bool) -> Self {
-        Self { function_type, objects_allowed }
-    }
-
     pub(crate) const fn request_with_objects() -> Self {
-        Self { function_type: FunctionType::Request, objects_allowed: true }
+        Self { objects_allowed: true }
     }
 
     pub(crate) const fn request_by_function_only() -> Self {
-        Self { function_type: FunctionType::Request, objects_allowed: false }
+        Self { objects_allowed: false }
     }
 
     pub(crate) const fn response() -> Self {
-        Self { function_type: FunctionType::Response, objects_allowed: true }
+        Self { objects_allowed: true }
     }
 
     pub(crate) const fn confirm() -> Self {
-        Self { function_type: FunctionType::Confirm, objects_allowed: false }
+        Self { objects_allowed: false }
     }
 }
 

@@ -65,12 +65,6 @@ where
     }
 }
 
-pub(crate) fn new_harness_with_config(
-    config: OutstationConfig,
-) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
-    new_harness_with_broadcast(config, None)
-}
-
 pub(crate) fn new_harness(
 ) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
     new_harness_with_broadcast(get_default_config(), None)
