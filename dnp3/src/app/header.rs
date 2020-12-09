@@ -71,16 +71,6 @@ impl Control {
         }
     }
 
-    pub(crate) fn response_with_confirmation(seq: Sequence) -> Self {
-        Self {
-            fir: true,
-            fin: true,
-            con: true,
-            uns: false,
-            seq,
-        }
-    }
-
     pub(crate) fn unsolicited(seq: Sequence) -> Self {
         Self {
             fir: true,
@@ -91,6 +81,7 @@ impl Control {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn unsolicited_response(seq: Sequence) -> Self {
         Self {
             fir: true,
@@ -242,12 +233,12 @@ impl BitOrAssign<IIN1> for IIN1 {
 }
 
 impl IIN2 {
-    pub(crate) const NO_FUNC_CODE_SUPPORT: IIN2 = IIN2::new(BIT_0.value);
-    pub(crate) const OBJECT_UNKNOWN: IIN2 = IIN2::new(BIT_1.value);
-    pub(crate) const PARAMETER_ERROR: IIN2 = IIN2::new(BIT_2.value);
-    pub(crate) const EVENT_BUFFER_OVERFLOW: IIN2 = IIN2::new(BIT_3.value);
-    pub(crate) const ALREADY_EXECUTING: IIN2 = IIN2::new(BIT_4.value);
-    pub(crate) const CONFIG_CORRUPT: IIN2 = IIN2::new(BIT_5.value);
+    pub const NO_FUNC_CODE_SUPPORT: IIN2 = IIN2::new(BIT_0.value);
+    pub const OBJECT_UNKNOWN: IIN2 = IIN2::new(BIT_1.value);
+    pub const PARAMETER_ERROR: IIN2 = IIN2::new(BIT_2.value);
+    pub const EVENT_BUFFER_OVERFLOW: IIN2 = IIN2::new(BIT_3.value);
+    pub const ALREADY_EXECUTING: IIN2 = IIN2::new(BIT_4.value);
+    pub const CONFIG_CORRUPT: IIN2 = IIN2::new(BIT_5.value);
 
     /// Construct IIN2 from its underlying value
     pub const fn new(value: u8) -> Self {
@@ -498,10 +489,6 @@ impl ResponseHeader {
             function,
             iin,
         }
-    }
-
-    pub(crate) fn function(self) -> FunctionCode {
-        self.function.into()
     }
 
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {

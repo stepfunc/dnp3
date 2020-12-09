@@ -20,10 +20,11 @@ pub(crate) struct DecodeSettings {
     level: DecodeLogLevel,
 }
 
+#[cfg(test)]
 impl DecodeSettings {
     pub(crate) fn none() -> Self {
-        DecodeSettings {
-            is_transmit: false,
+        Self {
+            is_transmit: true,
             level: DecodeLogLevel::Nothing,
         }
     }

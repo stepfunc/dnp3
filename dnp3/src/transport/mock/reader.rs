@@ -1,7 +1,7 @@
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
-use crate::outstation::SelfAddressSupport;
+use crate::outstation::config::SelfAddressSupport;
 use crate::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use crate::transport::{Fragment, FragmentInfo};
 use crate::util::buffer::Buffer;

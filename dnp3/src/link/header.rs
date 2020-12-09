@@ -40,8 +40,6 @@ pub(crate) enum AnyAddress {
     SelfAddress,
 }
 
-pub(crate) struct SourceAddressError;
-
 impl AnyAddress {
     pub(crate) const fn from(address: u16) -> Self {
         match address {

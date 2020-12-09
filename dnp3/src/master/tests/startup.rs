@@ -523,8 +523,8 @@ fn create_association(config: Configuration) -> TestHarness<impl Future<Output =
 
     TestHarness {
         session: master_task,
-        master,
-        association,
+        _master: master,
+        _association: association,
         num_requests,
         io: io_handle,
     }
@@ -621,8 +621,8 @@ impl ReadHandler for CountHandler {
 
 struct TestHarness<F: Future<Output = RunError>> {
     session: Spawn<F>,
-    master: MasterHandle,
-    association: AssociationHandle,
+    _master: MasterHandle,
+    _association: AssociationHandle,
     num_requests: Arc<AtomicU64>,
     io: io::Handle,
 }

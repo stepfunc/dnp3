@@ -1,5 +1,5 @@
 use crate::entry::EndpointAddress;
-use crate::outstation::task::OutstationConfig;
+use crate::outstation::config::OutstationConfig;
 
 pub(crate) mod harness;
 
