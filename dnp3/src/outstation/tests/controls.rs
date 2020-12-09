@@ -1,10 +1,10 @@
 use crate::app::enums::FunctionCode;
 use crate::app::variations::Group41Var2;
 use crate::link::header::BroadcastConfirmMode;
+use crate::outstation::config::BroadcastAddressSupport;
 use crate::outstation::tests::get_default_config;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
-use crate::outstation::BroadcastAddressSupport;
 use tokio::time::Duration;
 
 const G41V2_INDEX_7: Control = Control::G41V2(Group41Var2::new(513), 7);

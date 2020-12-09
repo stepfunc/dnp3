@@ -236,12 +236,6 @@ impl Default for StaticDatabase {
     }
 }
 
-#[derive(Copy, Clone)]
-enum NextWriteAction {
-    Complete,
-    NewHeader,
-}
-
 impl StaticDatabase {
     pub(crate) fn new(max_selection: Option<u16>, class_zero: ClassZeroConfig) -> Self {
         // don't allow values smaller than the default
@@ -411,6 +405,7 @@ impl StaticDatabase {
         Ok(())
     }
 
+    /*
     fn get_first_variation<T>(&mut self, range: IndexRange) -> Option<T::StaticVariation>
     where
         T: Updatable,
@@ -421,6 +416,7 @@ impl StaticDatabase {
             .next()
             .map(|x| x.1.config.s_var)
     }
+     */
 
     fn get_map<T>(&mut self) -> &mut PointMap<T>
     where

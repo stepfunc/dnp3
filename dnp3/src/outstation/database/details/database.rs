@@ -125,7 +125,6 @@ impl Database {
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {
         // first we write events
         let result = self.event_buffer.write_events(cursor);
-        let unwritten_event_classes = self.event_buffer.unwritten_classes();
         let has_events = match result {
             Ok(count) => count > 0,
             Err(count) => count > 0,
@@ -142,7 +141,6 @@ impl Database {
         ResponseInfo {
             has_events,
             complete,
-            unwritten: unwritten_event_classes,
         }
     }
 }
