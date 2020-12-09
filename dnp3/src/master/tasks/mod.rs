@@ -41,6 +41,8 @@ pub(crate) enum Task {
     Read(ReadTask),
     /// NonRead tasks always require FIR/FIN == 1, but might require multiple read/response cycles, e.g. SBO
     NonRead(NonReadTask),
+    /// Send link status request
+    LinkStatus,
 }
 
 impl Task {
@@ -48,6 +50,7 @@ impl Task {
         match self {
             Task::NonRead(task) => task.on_task_error(association, err),
             Task::Read(task) => task.on_task_error(association, err),
+            Task::LinkStatus => (),
         }
     }
 

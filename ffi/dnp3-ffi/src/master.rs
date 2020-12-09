@@ -51,6 +51,7 @@ pub unsafe fn master_add_association(
             config.auto_tasks_retry_strategy.min_delay(),
             config.auto_tasks_retry_strategy.max_delay(),
         ),
+        None, // TODO: modify this
     );
 
     let handler = AssociationHandlerAdapter {

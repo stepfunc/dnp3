@@ -260,6 +260,15 @@ impl From<Shutdown> for TaskError {
     }
 }
 
+impl From<RunError> for TaskError {
+    fn from(x: RunError) -> Self {
+        match x {
+            RunError::Shutdown => TaskError::Shutdown,
+            RunError::Link(x) => TaskError::Lower(x),
+        }
+    }
+}
+
 impl From<NoAssociation> for TaskError {
     fn from(x: NoAssociation) -> Self {
         TaskError::NoSuchAssociation(x.address)

@@ -17,6 +17,7 @@ use crate::master::tasks::{AssociationTask, ReadTask, Task};
 use crate::tokio::time::Instant;
 use crate::util::Smallest;
 use std::collections::{BTreeMap, VecDeque};
+use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;
 
 use crate::entry::EndpointAddress;
@@ -36,6 +37,11 @@ pub struct Configuration {
     pub auto_time_sync: Option<TimeSyncProcedure>,
     /// automatic tasks retry strategy
     pub auto_tasks_retry_strategy: RetryStrategy,
+    /// Keep-alive timeout
+    ///
+    /// When no bytes are received within this timeout value,
+    /// a `REQUEST_LINK_STATUS` request is sent
+    pub keep_alive_timeout: Option<Duration>,
 }
 
 impl Configuration {
@@ -45,6 +51,7 @@ impl Configuration {
         startup_integrity_classes: Classes,
         auto_time_sync: Option<TimeSyncProcedure>,
         auto_tasks_retry_strategy: RetryStrategy,
+        keep_alive_timeout: Option<Duration>,
     ) -> Self {
         Self {
             disable_unsol_classes,
@@ -52,6 +59,7 @@ impl Configuration {
             startup_integrity_classes,
             auto_time_sync,
             auto_tasks_retry_strategy,
+            keep_alive_timeout,
         }
     }
 
@@ -62,6 +70,7 @@ impl Configuration {
             Classes::none(),
             None,
             auto_tasks_retry_strategy,
+            None,
         )
     }
 }
@@ -74,6 +83,7 @@ impl Default for Configuration {
             Classes::integrity(),
             None,
             RetryStrategy::default(),
+            None,
         )
     }
 }
@@ -235,6 +245,7 @@ pub(crate) struct Association {
     handler: Box<dyn AssociationHandler>,
     config: Configuration,
     polls: PollMap,
+    next_link_status: Option<Instant>,
 }
 
 impl Association {
@@ -252,6 +263,9 @@ impl Association {
             handler,
             config,
             polls: PollMap::new(),
+            next_link_status: config
+                .keep_alive_timeout
+                .map(|delay| Instant::now() + delay),
         }
     }
 
@@ -389,6 +403,13 @@ impl Association {
         self.auto_tasks.disable_unsolicited.failure(&self.config);
     }
 
+    pub(crate) fn on_link_activity(&mut self) {
+        self.next_link_status = match self.config.keep_alive_timeout {
+            Some(timeout) => Some(Instant::now() + timeout),
+            None => None,
+        }
+    }
+
     pub(crate) fn handle_unsolicited_response(&mut self, response: &Response) -> bool {
         if self.is_integrity_complete() // Startup sequence was completed
             || (response.header.iin.iin1.get_device_restart() && response.raw_objects.is_empty())
@@ -475,15 +496,31 @@ impl Association {
         // Check for automatic tasks
         let next = self.auto_tasks.next(&self.config);
 
+        // Startup task have greater priority
         if !matches!(next, Next::None) {
             return next;
         }
 
-        // If no automatic tasks to complete, check for lower priority polls
+        // If no automatic tasks to complete, check for lower priority polls or link status request
         match self.polls.next(now) {
-            Next::None => Next::None,
-            Next::NotBefore(x) => Next::NotBefore(x),
             Next::Now(poll) => Next::Now(Task::Read(ReadTask::PeriodicPoll(poll))),
+            Next::NotBefore(next_poll) => match self.next_link_status {
+                Some(next_link_status) => {
+                    Next::NotBefore(Instant::min(next_link_status, next_poll))
+                }
+                None => Next::NotBefore(next_poll),
+            },
+            Next::None => match self.next_link_status {
+                Some(next) => {
+                    let now = Instant::now();
+                    if now < next {
+                        Next::NotBefore(next)
+                    } else {
+                        Next::Now(Task::LinkStatus)
+                    }
+                }
+                None => Next::None,
+            },
         }
     }
 }

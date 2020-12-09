@@ -133,8 +133,11 @@ impl MasterSession {
                 result = reader.read(io) => {
                    result?;
                    match reader.pop_response(self.level) {
-                        Some(TransportResponse::Response(source, response)) => return self.handle_fragment_while_idle(io, writer, source, response).await,
-                        Some(TransportResponse::LinkLayerMessage(_msg)) => todo!(),
+                        Some(TransportResponse::Response(source, response)) => {
+                            self.notify_link_activity(source);
+                            return self.handle_fragment_while_idle(io, writer, source, response).await
+                        }
+                        Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
                         None => return Ok(())
                    }
                 }
@@ -164,8 +167,11 @@ impl MasterSession {
                 result = reader.read(io) => {
                    result?;
                    match reader.pop_response(self.level) {
-                        Some(TransportResponse::Response(source, response)) => return self.handle_fragment_while_idle(io, writer, source, response).await,
-                        Some(TransportResponse::LinkLayerMessage(_msg)) => todo!(),
+                        Some(TransportResponse::Response(source, response)) => {
+                            self.notify_link_activity(source);
+                            return self.handle_fragment_while_idle(io, writer, source, response).await
+                        }
+                        Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
                         None => return Ok(())
                    }
                 }
@@ -241,6 +247,10 @@ impl MasterSession {
                 self.run_non_read_task(io, task.address, t, writer, reader)
                     .await
             }
+            Task::LinkStatus => {
+                self.run_link_status_task(io, task.address, writer, reader)
+                    .await
+            }
         };
 
         // if a task error occurs, if might be a run error
@@ -291,6 +301,7 @@ impl MasterSession {
 
                         match reader.pop_response(self.level) {
                             Some(TransportResponse::Response(source, response)) => {
+                                self.notify_link_activity(source);
 
                                 let result = self
                                     .validate_non_read_response(destination, seq, io, writer, source, response)
@@ -324,7 +335,7 @@ impl MasterSession {
                                     }
                                 }
                             }
-                            Some(TransportResponse::LinkLayerMessage(_msg)) => todo!(),
+                            Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
                             None => continue
                         }
                     }
@@ -444,14 +455,13 @@ impl MasterSession {
                         x?;
                         match reader.pop_response(self.level) {
                             Some(TransportResponse::Response(source, response)) => {
+                                self.notify_link_activity(source);
                                 let action = self.process_read_response(destination, is_first, seq, &task, io, writer, source, response).await?;
                                 match action {
                                     // continue reading responses on the inner loop
                                     ReadResponseAction::Ignore => continue,
                                     // read task complete
-                                    ReadResponseAction::Complete => {
-                                        return Ok(());
-                                    }
+                                    ReadResponseAction::Complete => return Ok(()),
                                     // break to the outer loop and read another response
                                     ReadResponseAction::ReadNext => {
                                         is_first = false;
@@ -460,7 +470,7 @@ impl MasterSession {
                                     }
                                 }
                             }
-                            Some(TransportResponse::LinkLayerMessage(_msg)) => todo!(),
+                            Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
                             None => continue
                         }
                     }
@@ -664,5 +674,59 @@ impl MasterSession {
             .write(io, self.level, address.wrap(), cursor.written())
             .await?;
         Ok(seq)
+    }
+}
+
+// Link status stuff
+impl MasterSession {
+    async fn run_link_status_task<T>(
+        &mut self,
+        io: &mut T,
+        destination: EndpointAddress,
+        writer: &mut TransportWriter,
+        reader: &mut TransportReader,
+    ) -> Result<(), TaskError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        // Send link status request
+        log::info!("Sending link status request (for {})", destination);
+        writer
+            .write_link_status_request(io, destination.wrap())
+            .await?;
+
+        loop {
+            // Wait for something on the link
+            crate::tokio::select! {
+                _ = crate::tokio::time::delay_until(self.timeout.deadline_from_now()) => {
+                    log::warn!("no response within timeout: {}", self.timeout);
+                    return Err(TaskError::ResponseTimeout);
+                }
+                x = reader.read(io) => {
+                    x?;
+                    match reader.pop_response(self.level) {
+                        Some(TransportResponse::Response(source, response)) => {
+                            self.notify_link_activity(source);
+                            return Ok(self.handle_fragment_while_idle(io, writer, source, response).await?);
+                        }
+                        Some(TransportResponse::LinkLayerMessage(msg)) => {
+                            self.notify_link_activity(msg.source);
+                            return Ok(());
+                            // TODO: notify the task of success
+                        }
+                        None => continue
+                    }
+                }
+                y = self.process_message(true) => {
+                    y?; // unless shutdown, proceed to next event
+                }
+            }
+        }
+    }
+
+    fn notify_link_activity(&mut self, source: EndpointAddress) {
+        if let Ok(association) = self.associations.get_mut(source) {
+            association.on_link_activity();
+        }
     }
 }
