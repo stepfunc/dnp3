@@ -24,7 +24,7 @@ impl OutstationTask {
         let handle = DatabaseHandle::new(database);
         let (reader, writer) = crate::transport::create_outstation_transport_layer(
             config.outstation_address,
-            config.self_address_support,
+            config.features.self_address,
             config.rx_buffer_size,
         );
         let task = Self {

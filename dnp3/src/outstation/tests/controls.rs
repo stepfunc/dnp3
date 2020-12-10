@@ -1,7 +1,7 @@
 use crate::app::enums::FunctionCode;
 use crate::app::variations::Group41Var2;
 use crate::link::header::BroadcastConfirmMode;
-use crate::outstation::config::BroadcastAddressSupport;
+use crate::outstation::config::Feature;
 use crate::outstation::tests::get_default_config;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
@@ -92,7 +92,7 @@ fn performs_direct_operate_no_ack_via_broadcast() {
 #[test]
 fn broadcast_support_can_be_disabled() {
     let mut config = get_default_config();
-    config.broadcast_support = BroadcastAddressSupport::Disabled;
+    config.features.broadcast = Feature::Disabled;
 
     let mut harness = new_harness_with_broadcast(config, Some(BroadcastConfirmMode::Mandatory));
 

@@ -1,7 +1,6 @@
 use crate::app::EndpointType;
 use crate::entry::EndpointAddress;
 use crate::master::session::MasterSession;
-use crate::outstation::config::SelfAddressSupport;
 
 #[cfg(test)]
 pub(crate) mod mock;
@@ -12,7 +11,7 @@ mod reader;
 mod types;
 mod writer;
 
-use crate::outstation::config::OutstationConfig;
+use crate::outstation::config::{Feature, OutstationConfig};
 pub(crate) use reader::*;
 pub(crate) use types::*;
 pub(crate) use writer::*;
@@ -36,7 +35,7 @@ pub(crate) fn create_master_transport_layer(
 
 pub(crate) fn create_outstation_transport_layer(
     address: EndpointAddress,
-    self_address_support: SelfAddressSupport,
+    self_address: Feature,
     rx_buffer_size: usize,
 ) -> (TransportReader, TransportWriter) {
     let rx_buffer_size = if rx_buffer_size < OutstationConfig::MIN_RX_BUFFER_SIZE {
@@ -47,7 +46,7 @@ pub(crate) fn create_outstation_transport_layer(
     };
 
     (
-        TransportReader::outstation(address, self_address_support, rx_buffer_size),
+        TransportReader::outstation(address, self_address, rx_buffer_size),
         TransportWriter::new(EndpointType::Outstation, address),
     )
 }

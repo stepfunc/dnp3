@@ -2,7 +2,7 @@ use crate::app::parse::parser::{ParsedFragment, Request, Response};
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::outstation::config::SelfAddressSupport;
+use crate::outstation::config::Feature;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::FragmentInfo;
 
@@ -66,12 +66,12 @@ impl TransportReader {
 
     pub(crate) fn outstation(
         address: EndpointAddress,
-        self_address_support: SelfAddressSupport,
+        self_address: Feature,
         rx_buffer_size: usize,
     ) -> Self {
         Self {
             logged: false,
-            inner: InnerReaderType::outstation(address, self_address_support, rx_buffer_size),
+            inner: InnerReaderType::outstation(address, self_address, rx_buffer_size),
         }
     }
 

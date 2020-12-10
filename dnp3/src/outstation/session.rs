@@ -12,7 +12,7 @@ use crate::app::variations::{Group52Var1, Group52Var2};
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
-use crate::outstation::config::BroadcastAddressSupport;
+use crate::outstation::config::Feature;
 use crate::outstation::control::collection::{ControlCollection, ControlTransaction};
 use crate::outstation::database::{DatabaseHandle, ResponseInfo};
 use crate::outstation::traits::{
@@ -91,7 +91,7 @@ pub(crate) struct SessionConfig {
     master_address: EndpointAddress,
     confirm_timeout: Duration,
     select_timeout: Duration,
-    broadcast_support: BroadcastAddressSupport,
+    broadcast: Feature,
 }
 
 impl From<OutstationConfig> for SessionConfig {
@@ -101,7 +101,7 @@ impl From<OutstationConfig> for SessionConfig {
             master_address: config.master_address,
             confirm_timeout: config.confirm_timeout,
             select_timeout: config.select_timeout,
-            broadcast_support: config.broadcast_support,
+            broadcast: config.features.broadcast,
         }
     }
 }
@@ -774,7 +774,7 @@ impl OutstationSession {
     }
 
     fn process_broadcast_get_action(&mut self, request: Request) -> BroadcastAction {
-        if !self.config.broadcast_support.is_enabled() {
+        if self.config.broadcast.is_disabled() {
             log::warn!(
                 "ignoring broadcast request (broadcast support disabled): {:?}",
                 request.header.function
