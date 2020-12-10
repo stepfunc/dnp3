@@ -180,6 +180,7 @@ public class Main {
             associationConfiguration.startupIntegrityClasses = Classes.all();
             associationConfiguration.autoTimeSync = AutoTimeSync.LAN;
             associationConfiguration.autoTasksRetryStrategy = retryStrategy;
+            associationConfiguration.keepAliveTimeout = Duration.ofSeconds(3600);
             AssociationHandlers associationHandlers = new AssociationHandlers();
             associationHandlers.integrityHandler = readHandler;
             associationHandlers.unsolicitedHandler = readHandler;

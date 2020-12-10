@@ -82,6 +82,10 @@ pub fn define(
             Type::Struct(retry_strategy),
             "Automatic tasks retry strategy",
         )?
+        .add("keep_alive_timeout",
+            Type::Duration(DurationMapping::Seconds),
+            doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the outstation").details("A value of zero means no automatic keep-alives.")
+        )?
         .doc("Association configuration")?
         .build()?;
 

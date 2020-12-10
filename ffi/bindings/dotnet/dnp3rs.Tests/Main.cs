@@ -196,7 +196,8 @@ class MainClass
                     {
                         MinDelay = TimeSpan.FromSeconds(1),
                         MaxDelay = TimeSpan.FromSeconds(5),
-                    }
+                    },
+                    KeepAliveTimeout = TimeSpan.FromSeconds(3600),
                 },
                 new AssociationHandlers
                 {

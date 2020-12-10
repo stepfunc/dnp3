@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::association::Association;
 use crate::ffi;
 
@@ -51,7 +53,11 @@ pub unsafe fn master_add_association(
             config.auto_tasks_retry_strategy.min_delay(),
             config.auto_tasks_retry_strategy.max_delay(),
         ),
-        None, // TODO: modify this
+        if config.keep_alive_timeout() == Duration::from_secs(0) {
+            None
+        } else {
+            Some(config.keep_alive_timeout())
+        },
     );
 
     let handler = AssociationHandlerAdapter {

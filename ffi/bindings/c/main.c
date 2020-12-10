@@ -298,6 +298,7 @@ int main()
         .startup_integrity_classes = classes_all(),
         .auto_time_sync = AutoTimeSync_Lan,
         .auto_tasks_retry_strategy = retry_strategy,
+        .keep_alive_timeout = 3600,
     };
     association_handlers_t association_handlers =
     {
