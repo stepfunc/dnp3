@@ -56,4 +56,9 @@ impl OutstationInformation for MockOutstationInformation {
     fn clear_restart_iin(&mut self) {
         self.events.push(Event::ClearRestartIIN)
     }
+
+    fn enter_unsolicited_confirm_wait(&mut self, ecsn: Sequence) {
+        self.events
+            .push(Event::EnterSolicitedConfirmWait(ecsn.value()))
+    }
 }

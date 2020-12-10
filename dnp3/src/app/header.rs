@@ -81,7 +81,6 @@ impl Control {
         }
     }
 
-    #[cfg(test)]
     pub(crate) fn unsolicited_response(seq: Sequence) -> Self {
         Self {
             fir: true,

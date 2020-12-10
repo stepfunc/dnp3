@@ -2,7 +2,6 @@ use crate::app::enums::FunctionCode;
 use crate::app::variations::Group41Var2;
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::Feature;
-use crate::outstation::tests::get_default_config;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
 use tokio::time::Duration;
@@ -44,7 +43,7 @@ const RESPONSE_SEQ1_G41V2_SELECT_TIMEOUT: &[u8] = &[
 
 #[test]
 fn performs_direct_operate() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
 
     harness.test_request_response(DIRECT_OPERATE_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
 
@@ -60,7 +59,7 @@ fn performs_direct_operate() {
 
 #[test]
 fn performs_direct_operate_no_ack() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
 
     harness.test_request_no_response(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2);
 
@@ -74,7 +73,7 @@ fn performs_direct_operate_no_ack() {
 #[test]
 fn performs_direct_operate_no_ack_via_broadcast() {
     let mut harness =
-        new_harness_with_broadcast(get_default_config(), Some(BroadcastConfirmMode::Mandatory));
+        new_harness_for_broadcast(get_default_config(), BroadcastConfirmMode::Mandatory);
 
     harness.test_request_no_response(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2);
 
@@ -94,7 +93,7 @@ fn broadcast_support_can_be_disabled() {
     let mut config = get_default_config();
     config.features.broadcast = Feature::Disabled;
 
-    let mut harness = new_harness_with_broadcast(config, Some(BroadcastConfirmMode::Mandatory));
+    let mut harness = new_harness_for_broadcast(config, BroadcastConfirmMode::Mandatory);
 
     harness.test_request_no_response(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2);
 
@@ -106,7 +105,7 @@ fn broadcast_support_can_be_disabled() {
 
 #[test]
 fn performs_select_before_operate() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
 
     // ------------ select -------------
 
@@ -131,7 +130,7 @@ fn performs_select_before_operate() {
 
 #[test]
 fn rejects_operate_with_non_consecutive_sequence() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
 
     // ------------ select -------------
     harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
@@ -151,7 +150,7 @@ fn rejects_operate_with_non_consecutive_sequence() {
 
 #[test]
 fn rejects_operate_with_non_matching_headers() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
 
     // ------------ select -------------
     harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
@@ -174,7 +173,7 @@ fn rejects_operate_with_non_matching_headers() {
 
 #[test]
 fn select_can_time_out() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
 
     // ------------ select -------------
     harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);

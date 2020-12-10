@@ -2,6 +2,7 @@ use super::list::VecList;
 use super::traits::BaseEvent;
 use super::writer::EventWriter;
 use crate::app::measurement;
+use crate::master::request::EventClasses;
 use crate::outstation::database::config::*;
 use crate::outstation::database::{EventBufferConfig, EventClass};
 use crate::util::cursor::{WriteCursor, WriteError};
@@ -29,30 +30,7 @@ impl BitOr<EventClass> for EventClass {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct EventClasses {
-    class1: bool,
-    class2: bool,
-    class3: bool,
-}
-
 impl EventClasses {
-    pub fn new(class1: bool, class2: bool, class3: bool) -> Self {
-        Self {
-            class1,
-            class2,
-            class3,
-        }
-    }
-
-    pub fn all() -> Self {
-        Self::new(true, true, true)
-    }
-
-    pub fn none() -> Self {
-        Self::new(false, false, false)
-    }
-
     fn matches(&self, class: EventClass) -> bool {
         match class {
             EventClass::Class1 => self.class1,

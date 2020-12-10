@@ -35,12 +35,15 @@ impl Default for Features {
 pub struct OutstationConfig {
     pub outstation_address: EndpointAddress,
     pub master_address: EndpointAddress,
-    pub tx_buffer_size: usize,
+    pub solicited_tx_buffer_size: usize,
+    pub unsolicited_tx_buffer_size: usize,
     pub rx_buffer_size: usize,
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: std::time::Duration,
     pub select_timeout: std::time::Duration,
     pub features: Features,
+    pub unsolicited_retries: Option<usize>,
+    pub unsolicited_retry_delay: std::time::Duration,
 }
 
 impl Feature {
@@ -62,6 +65,8 @@ impl OutstationConfig {
 
     pub const DEFAULT_CONFIRM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
     pub const DEFAULT_SELECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+    pub const DEFAULT_UNSOLICITED_RETRY_DELAY: std::time::Duration =
+        std::time::Duration::from_secs(5);
 
     /// constructs an `OutstationConfig` with default settings, except for the
     /// master and outstation link addresses which really don't have good defaults
@@ -69,12 +74,15 @@ impl OutstationConfig {
         Self {
             outstation_address,
             master_address,
-            tx_buffer_size: Self::DEFAULT_TX_BUFFER_SIZE,
+            solicited_tx_buffer_size: Self::DEFAULT_TX_BUFFER_SIZE,
+            unsolicited_tx_buffer_size: Self::DEFAULT_TX_BUFFER_SIZE,
             rx_buffer_size: Self::DEFAULT_RX_BUFFER_SIZE,
             log_level: DecodeLogLevel::Nothing,
             confirm_timeout: Self::DEFAULT_CONFIRM_TIMEOUT,
             select_timeout: Self::DEFAULT_SELECT_TIMEOUT,
             features: Features::default(),
+            unsolicited_retries: None,
+            unsolicited_retry_delay: Self::DEFAULT_UNSOLICITED_RETRY_DELAY,
         }
     }
 }

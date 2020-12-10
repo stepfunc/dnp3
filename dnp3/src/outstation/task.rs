@@ -30,7 +30,8 @@ impl OutstationTask {
         let task = Self {
             session: OutstationSession::new(
                 config.into(),
-                config.tx_buffer_size,
+                config.solicited_tx_buffer_size,
+                config.unsolicited_tx_buffer_size,
                 handle.clone(),
                 application,
                 information,
