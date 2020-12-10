@@ -1,7 +1,8 @@
 use crate::link::error::LinkError;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
+use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle, EventBufferConfig};
-use crate::outstation::task::{OutstationConfig, OutstationTask};
+use crate::outstation::task::OutstationTask;
 use crate::outstation::tests::get_default_config;
 use crate::outstation::tests::harness::{
     ApplicationData, Event, EventHandle, MockControlHandler, MockOutstationApplication,
@@ -62,12 +63,6 @@ where
     pub(crate) fn check_no_events(&mut self) {
         self.check_events(&[]);
     }
-}
-
-pub(crate) fn new_harness_with_config(
-    config: OutstationConfig,
-) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
-    new_harness_with_broadcast(config, None)
 }
 
 pub(crate) fn new_harness(

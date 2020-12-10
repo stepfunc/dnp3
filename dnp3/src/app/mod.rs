@@ -5,6 +5,12 @@ pub(crate) enum EndpointType {
     Outstation,
 }
 
+impl EndpointType {
+    pub(crate) fn dir_bit(&self) -> bool {
+        *self == EndpointType::Master
+    }
+}
+
 /// publicly exported enumerations defined by the standard
 #[rustfmt::skip]
 pub mod enums;

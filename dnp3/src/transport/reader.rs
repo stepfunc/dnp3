@@ -2,7 +2,7 @@ use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
-use crate::outstation::SelfAddressSupport;
+use crate::outstation::config::SelfAddressSupport;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::{
     FragmentInfo, LinkLayerMessage, TransportData, TransportRequest, TransportResponse,

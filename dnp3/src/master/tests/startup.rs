@@ -1,11 +1,12 @@
-use super::harness::create_association;
-use super::harness::requests::*;
 use crate::app::sequence::Sequence;
 use crate::prelude::master::*;
 use crate::tokio::test::*;
 use crate::tokio::time;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
+
+use super::harness::create_association;
+use super::harness::requests::*;
 
 #[test]
 fn master_startup_procedure() {

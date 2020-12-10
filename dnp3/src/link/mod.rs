@@ -1,5 +1,3 @@
-use crate::app::EndpointType;
-
 mod crc;
 pub(crate) mod error;
 pub(crate) mod format;
@@ -21,15 +19,6 @@ pub(crate) mod constant {
     pub(crate) const MAX_BLOCK_SIZE: usize = 16;
     pub(crate) const CRC_LENGTH: usize = 2;
     pub(crate) const MAX_BLOCK_SIZE_WITH_CRC: usize = MAX_BLOCK_SIZE + CRC_LENGTH;
-}
-
-impl EndpointType {
-    pub(crate) fn dir_bit(&self) -> bool {
-        match self {
-            EndpointType::Master => true,
-            EndpointType::Outstation => false,
-        }
-    }
 }
 
 #[cfg(test)]

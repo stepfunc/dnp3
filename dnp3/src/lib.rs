@@ -49,7 +49,7 @@
 //!
 
 #![deny(
-//dead_code,
+dead_code,
 arithmetic_overflow,
 invalid_type_param_default,
 //missing_fragment_specifier,
@@ -87,14 +87,14 @@ unused_qualifications,
 clippy::all
 )]
 #![forbid(
-    // unsafe_code,
+    unsafe_code,
     // intra_doc_link_resolution_failure, broken_intra_doc_links
     safe_packed_borrows,
     while_true,
     bare_trait_objects
 )]
 // TODO - remove before release
-#![allow(dead_code)]
+#![cfg_attr(test, allow(dead_code))]
 
 #[cfg(test)]
 #[macro_use]

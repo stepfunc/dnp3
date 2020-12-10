@@ -9,7 +9,7 @@ use crate::link::parser::FramePayload;
 use crate::tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::link::format::format_header;
-use crate::outstation::SelfAddressSupport;
+use crate::outstation::config::SelfAddressSupport;
 
 enum SecondaryState {
     NotReset,

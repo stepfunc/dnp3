@@ -3,10 +3,11 @@ use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::parse::DecodeLogLevel;
 use dnp3::entry::EndpointAddress;
+use dnp3::outstation::config::OutstationConfig;
 use dnp3::outstation::database::config::*;
 use dnp3::outstation::database::EventClass;
 use dnp3::outstation::database::{Add, DatabaseConfig, Update, UpdateOptions};
-use dnp3::outstation::task::{OutstationConfig, OutstationTask};
+use dnp3::outstation::task::OutstationTask;
 use dnp3::outstation::traits::{
     DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
 };
