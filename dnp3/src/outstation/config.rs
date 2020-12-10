@@ -33,10 +33,10 @@ impl Default for Features {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OutstationConfig {
-    pub tx_buffer_size: usize,
-    pub rx_buffer_size: usize,
     pub outstation_address: EndpointAddress,
     pub master_address: EndpointAddress,
+    pub tx_buffer_size: usize,
+    pub rx_buffer_size: usize,
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: std::time::Duration,
     pub select_timeout: std::time::Duration,
@@ -54,23 +54,26 @@ impl Feature {
 }
 
 impl OutstationConfig {
-    pub(crate) const MIN_TX_BUFFER_SIZE: usize = 249; // 1 link frame
-    pub(crate) const DEFAULT_TX_BUFFER_SIZE: usize = 2048;
+    pub const MIN_TX_BUFFER_SIZE: usize = 249; // 1 link frame
+    pub const DEFAULT_TX_BUFFER_SIZE: usize = 2048;
 
-    pub(crate) const MIN_RX_BUFFER_SIZE: usize = Self::MIN_TX_BUFFER_SIZE;
-    pub(crate) const DEFAULT_RX_BUFFER_SIZE: usize = Self::DEFAULT_TX_BUFFER_SIZE;
+    pub const MIN_RX_BUFFER_SIZE: usize = Self::MIN_TX_BUFFER_SIZE;
+    pub const DEFAULT_RX_BUFFER_SIZE: usize = Self::DEFAULT_TX_BUFFER_SIZE;
+
+    pub const DEFAULT_CONFIRM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+    pub const DEFAULT_SELECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
     /// constructs an `OutstationConfig` with default settings, except for the
     /// master and outstation link addresses which really don't have good defaults
     pub fn new(outstation_address: EndpointAddress, master_address: EndpointAddress) -> Self {
         Self {
-            tx_buffer_size: Self::DEFAULT_TX_BUFFER_SIZE,
-            rx_buffer_size: Self::DEFAULT_RX_BUFFER_SIZE,
             outstation_address,
             master_address,
+            tx_buffer_size: Self::DEFAULT_TX_BUFFER_SIZE,
+            rx_buffer_size: Self::DEFAULT_RX_BUFFER_SIZE,
             log_level: DecodeLogLevel::Nothing,
-            confirm_timeout: std::time::Duration::from_secs(5),
-            select_timeout: std::time::Duration::from_secs(5),
+            confirm_timeout: Self::DEFAULT_CONFIRM_TIMEOUT,
+            select_timeout: Self::DEFAULT_SELECT_TIMEOUT,
             features: Features::default(),
         }
     }

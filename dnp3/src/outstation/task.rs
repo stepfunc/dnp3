@@ -3,8 +3,8 @@ use crate::outstation::config::*;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
 use crate::outstation::session::OutstationSession;
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
-use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::{TransportReader, TransportWriter};
+use crate::util::io::IOStream;
 
 pub struct OutstationTask {
     session: OutstationSession,
@@ -45,7 +45,7 @@ impl OutstationTask {
     /// run the outstation task asynchronously until a `LinkError` occurs
     pub async fn run<T>(&mut self, io: &mut T) -> Result<(), LinkError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         self.session
             .run(io, &mut self.reader, &mut self.writer)

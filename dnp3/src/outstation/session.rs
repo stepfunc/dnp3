@@ -19,12 +19,12 @@ use crate::outstation::traits::{
     BroadcastAction, ControlHandler, OperateType, OutstationApplication, OutstationInformation,
     RestartDelay,
 };
-use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::{FragmentInfo, RequestGuard, Timeout, TransportReader, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 
 use crate::outstation::config::OutstationConfig;
+use crate::util::io::IOStream;
 use std::borrow::BorrowMut;
 use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;
@@ -266,7 +266,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         loop {
             self.run_idle_state(io, reader, writer).await?;
@@ -281,7 +281,7 @@ impl OutstationSession {
         address: EndpointAddress,
     ) -> Result<(), LinkError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         writer
             .write(
@@ -300,7 +300,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         let series: Option<ResponseSeries> = self
             .handle_one_request_from_idle(io, reader, writer)
@@ -329,7 +329,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
     ) -> Result<Option<ResponseSeries>, LinkError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         if let Some((info, request)) = reader.pop_request(self.config.level).get() {
             if let Some(result) = self.process_request_from_idle(info, request) {
@@ -820,7 +820,7 @@ impl OutstationSession {
         mut series: ResponseSeries,
     ) -> Result<(), LinkError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         loop {
             match self
@@ -869,7 +869,7 @@ impl OutstationSession {
         ecsn: Sequence,
     ) -> Result<Confirm, LinkError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         self.information.enter_solicited_confirm_wait(ecsn);
 
