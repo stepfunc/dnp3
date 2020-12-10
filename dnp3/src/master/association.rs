@@ -411,10 +411,17 @@ impl Association {
     }
 
     pub(crate) fn handle_unsolicited_response(&mut self, response: &Response) -> bool {
-        if self.is_integrity_complete() // Startup sequence was completed
-            || /*(response.header.iin.iin1.get_device_restart() && */response.raw_objects.is_empty()
-        // Or NULL response with IIN1.7 set
-        {
+        // Accept the fragment only if the startup sequence was completed or if it's a null response.
+        //
+        // Now here's the deal. According to TB2015-002a, we should also ignore null responses without
+        // the DEVICE_RESTART (IIN1.7) bit set. But this creates a timeout race. Imagine you're a master
+        // that disconnected from an outstation. When the master reconnects to the outstation, it will try
+        // to perform an integrity poll, but the outstation might send an unsolicited null response without
+        // IIN1.7 (cause it haven't restarted!). If the master ignores it, the outstation will wait until
+        // the unsolicited confirm times out then send the deferred read response. This might elapse the
+        // master timeout and here we go, we're now in the same situation as a video call with a 3 seconds
+        // lag, each waiting for the other to talk, but end up talking at the same time.
+        if self.is_integrity_complete() || response.raw_objects.is_empty() {
             // Update last fragment received
             let new_frag = LastUnsolFragment::new(response);
             let last_frag = self.last_unsol_frag.replace(new_frag);
@@ -516,7 +523,7 @@ impl Association {
                     if now < next {
                         Next::NotBefore(next)
                     } else {
-                        Next::Now(Task::LinkStatus)
+                        Next::Now(Task::LinkStatus(Promise::None))
                     }
                 }
                 None => Next::None,

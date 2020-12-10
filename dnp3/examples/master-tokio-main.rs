@@ -113,6 +113,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     log::warn!("error: {}", err);
                 }
             }
+            "lsr" => {
+                log::info!("{:?}", association.check_link_status().await);
+            }
             s => println!("unknown command: {}", s),
         }
     }

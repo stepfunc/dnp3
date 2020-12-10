@@ -11,8 +11,9 @@ use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::entry::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
+use crate::master::handle::Promise;
 use crate::master::poll::Poll;
-use crate::master::request::Classes;
+use crate::master::request::{Classes, LinkStatusResult};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
@@ -42,7 +43,7 @@ pub(crate) enum Task {
     /// NonRead tasks always require FIR/FIN == 1, but might require multiple read/response cycles, e.g. SBO
     NonRead(NonReadTask),
     /// Send link status request
-    LinkStatus,
+    LinkStatus(Promise<Result<LinkStatusResult, TaskError>>),
 }
 
 impl Task {
@@ -50,7 +51,7 @@ impl Task {
         match self {
             Task::NonRead(task) => task.on_task_error(association, err),
             Task::Read(task) => task.on_task_error(association, err),
-            Task::LinkStatus => (),
+            Task::LinkStatus(promise) => promise.complete(Err(err)),
         }
     }
 

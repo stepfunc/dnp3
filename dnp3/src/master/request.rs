@@ -22,6 +22,17 @@ pub enum TimeSyncProcedure {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+pub enum LinkStatusResult {
+    /// The outstation responded with a valid `LINK_STATUS`
+    Success,
+    /// There was activity on the link, but it wasn't a `LINK_STATUS`
+    ///
+    /// The link is still alive, but the behaviour of the outstation
+    /// is unexpected.
+    UnexpectedResponse,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct EventClasses {
     pub class1: bool,
     pub class2: bool,

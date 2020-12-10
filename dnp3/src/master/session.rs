@@ -1,23 +1,21 @@
 use crate::app::format::write;
+use crate::app::format::write::start_request;
+use crate::app::header::Control;
 use crate::app::parse::parser::Response;
+use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::app::timeout::Timeout;
-use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
-use crate::transport::{TransportReader, TransportResponse, TransportWriter};
-
-use crate::app::header::Control;
-use crate::link::error::LinkError;
-use crate::util::buffer::Buffer;
-
-use crate::app::format::write::start_request;
-use crate::master::association::{AssociationMap, Next};
-use crate::master::messages::{MasterMsg, Message};
-
-use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
+use crate::link::error::LinkError;
+use crate::master::association::{AssociationMap, Next};
 use crate::master::error::{Shutdown, TaskError};
+use crate::master::messages::{MasterMsg, Message};
+use crate::master::request::LinkStatusResult;
+use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::tokio::time::Instant;
+use crate::transport::{TransportReader, TransportResponse, TransportWriter};
+use crate::util::buffer::Buffer;
 use std::ops::Add;
 use std::time::Duration;
 
@@ -247,9 +245,20 @@ impl MasterSession {
                 self.run_non_read_task(io, task.address, t, writer, reader)
                     .await
             }
-            Task::LinkStatus => {
-                self.run_link_status_task(io, task.address, writer, reader)
+            Task::LinkStatus(promise) => {
+                match self
+                    .run_link_status_task(io, task.address, writer, reader)
                     .await
+                {
+                    Ok(result) => {
+                        promise.complete(Ok(result));
+                        Ok(())
+                    }
+                    Err(err) => {
+                        promise.complete(Err(err));
+                        Err(err)
+                    }
+                }
             }
         };
 
@@ -685,7 +694,7 @@ impl MasterSession {
         destination: EndpointAddress,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<(), TaskError>
+    ) -> Result<LinkStatusResult, TaskError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -707,12 +716,12 @@ impl MasterSession {
                     match reader.pop_response(self.level) {
                         Some(TransportResponse::Response(source, response)) => {
                             self.notify_link_activity(source);
-                            return Ok(self.handle_fragment_while_idle(io, writer, source, response).await?);
+                            self.handle_fragment_while_idle(io, writer, source, response).await?;
+                            return Ok(LinkStatusResult::UnexpectedResponse);
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => {
                             self.notify_link_activity(msg.source);
-                            return Ok(());
-                            // TODO: notify the task of success
+                            return Ok(LinkStatusResult::Success);
                         }
                         None => continue
                     }

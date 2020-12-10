@@ -14,7 +14,9 @@ use crate::master::error::{
 };
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
-use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
+use crate::master::request::{
+    CommandHeaders, CommandMode, LinkStatusResult, ReadRequest, TimeSyncProcedure,
+};
 use crate::master::session::MasterSession;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
@@ -206,6 +208,14 @@ impl AssociationHandle {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
         let task = TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
+        rx.await?
+    }
+
+    pub async fn check_link_status(&mut self) -> Result<LinkStatusResult, TaskError> {
+        let (tx, rx) =
+            crate::tokio::sync::oneshot::channel::<Result<LinkStatusResult, TaskError>>();
+        self.send_task(Task::LinkStatus(Promise::OneShot(tx)))
+            .await?;
         rx.await?
     }
 
