@@ -73,6 +73,10 @@ where
         self.io.read(request);
         self.poll_pending();
         assert!(!self.io.pending_write());
+        self.check_all_io_consumed();
+    }
+
+    pub(crate) fn check_all_io_consumed(&mut self) {
         assert!(self.io.all_read());
         assert!(self.io.all_written());
     }

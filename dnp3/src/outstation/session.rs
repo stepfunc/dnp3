@@ -50,6 +50,30 @@ impl ResponseSeries {
     }
 }
 
+struct RetryCounter {
+    retries: Option<usize>,
+}
+
+impl RetryCounter {
+    fn new(limit: Option<usize>) -> Self {
+        Self { retries: limit }
+    }
+
+    fn retry(&mut self) -> bool {
+        match self.retries {
+            None => true,
+            Some(x) => {
+                if x == 0 {
+                    false
+                } else {
+                    self.retries = Some(x - 1);
+                    true
+                }
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone, PartialEq)]
 enum NextState {
     Idle,
@@ -97,7 +121,7 @@ pub(crate) struct SessionConfig {
     select_timeout: std::time::Duration,
     broadcast: Feature,
     unsolicited: Feature,
-    unsolicited_retries: Option<usize>,
+    max_unsolicited_retries: Option<usize>,
     unsolicited_retry_delay: std::time::Duration,
 }
 
@@ -110,7 +134,7 @@ impl From<OutstationConfig> for SessionConfig {
             select_timeout: config.select_timeout,
             broadcast: config.features.broadcast,
             unsolicited: config.features.unsolicited,
-            unsolicited_retries: config.unsolicited_retries,
+            max_unsolicited_retries: config.max_unsolicited_retries,
             unsolicited_retry_delay: config.unsolicited_retry_delay,
         }
     }
@@ -379,19 +403,18 @@ impl OutstationSession {
         // enter unsolicited confirm wait state
         self.information.enter_unsolicited_confirm_wait(uns_ecsn);
 
-        let mut retries = self.config.unsolicited_retries;
+        let mut retry_count = RetryCounter::new(self.config.max_unsolicited_retries);
 
         let mut deadline = self.new_confirm_deadline();
 
         loop {
             if let Timeout::Yes = reader.read_with_timeout(io, deadline).await? {
-                if let Some(num) = retries {
-                    if num == 0 {
-                        return Ok(UnsolicitedResult::Timeout);
-                    } else {
-                        retries = Some(num - 1);
-                    }
-                };
+                let retry = retry_count.retry();
+                self.information
+                    .unsolicited_confirm_timeout(uns_ecsn, retry);
+                if !retry {
+                    return Ok(UnsolicitedResult::Timeout);
+                }
 
                 // write the same data and reset the deadline
                 writer

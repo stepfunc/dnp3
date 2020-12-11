@@ -42,7 +42,7 @@ pub struct OutstationConfig {
     pub confirm_timeout: std::time::Duration,
     pub select_timeout: std::time::Duration,
     pub features: Features,
-    pub unsolicited_retries: Option<usize>,
+    pub max_unsolicited_retries: Option<usize>,
     pub unsolicited_retry_delay: std::time::Duration,
 }
 
@@ -81,7 +81,7 @@ impl OutstationConfig {
             confirm_timeout: Self::DEFAULT_CONFIRM_TIMEOUT,
             select_timeout: Self::DEFAULT_SELECT_TIMEOUT,
             features: Features::default(),
-            unsolicited_retries: None,
+            max_unsolicited_retries: None,
             unsolicited_retry_delay: Self::DEFAULT_UNSOLICITED_RETRY_DELAY,
         }
     }

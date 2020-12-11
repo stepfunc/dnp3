@@ -59,6 +59,11 @@ impl OutstationInformation for MockOutstationInformation {
 
     fn enter_unsolicited_confirm_wait(&mut self, ecsn: Sequence) {
         self.events
-            .push(Event::EnterSolicitedConfirmWait(ecsn.value()))
+            .push(Event::EnterUnsolicitedConfirmWait(ecsn.value()))
+    }
+
+    fn unsolicited_confirm_timeout(&mut self, ecsn: Sequence, retry: bool) {
+        self.events
+            .push(Event::UnsolicitedConfirmTimeout(ecsn.value(), retry))
     }
 }

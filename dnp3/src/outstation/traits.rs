@@ -94,6 +94,8 @@ pub trait OutstationInformation: Sync + Send + 'static {
     fn unexpected_confirm(&mut self, _unsolicited: bool, _seq: Sequence) {}
     /// outstation has begun waiting for an unsolicited confirm
     fn enter_unsolicited_confirm_wait(&mut self, _ecsn: Sequence) {}
+    /// failed to receive an unsolicited confirm before the timeout occurred
+    fn unsolicited_confirm_timeout(&mut self, _ecsn: Sequence, _retry: bool) {}
     /// master cleared the restart IIN bit
     fn clear_restart_iin(&mut self) {}
 }
