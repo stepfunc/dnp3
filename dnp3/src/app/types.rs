@@ -7,6 +7,17 @@ use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use std::convert::TryFrom;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+pub enum LinkStatusResult {
+    /// The other device responded with a valid `LINK_STATUS`
+    Success,
+    /// There was activity on the link, but it wasn't a `LINK_STATUS`
+    ///
+    /// The link is still alive, but the behaviour of the other device
+    /// is unexpected.
+    UnexpectedResponse,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Timestamp {
     value: u64,
 }

@@ -5,6 +5,7 @@ use crate::app::parse::bytes::Bytes;
 use crate::app::parse::DecodeLogLevel;
 use crate::app::retry::RetryStrategy;
 use crate::app::timeout::Timeout;
+use crate::app::types::LinkStatusResult;
 use crate::app::types::Timestamp;
 use crate::app::variations::Variation;
 use crate::entry::EndpointAddress;
@@ -14,9 +15,7 @@ use crate::master::error::{
 };
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
-use crate::master::request::{
-    CommandHeaders, CommandMode, LinkStatusResult, ReadRequest, TimeSyncProcedure,
-};
+use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
 use crate::master::session::MasterSession;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;

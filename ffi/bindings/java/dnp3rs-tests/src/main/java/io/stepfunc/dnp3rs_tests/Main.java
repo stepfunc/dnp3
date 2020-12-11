@@ -180,7 +180,7 @@ public class Main {
             associationConfiguration.startupIntegrityClasses = Classes.all();
             associationConfiguration.autoTimeSync = AutoTimeSync.LAN;
             associationConfiguration.autoTasksRetryStrategy = retryStrategy;
-            associationConfiguration.keepAliveTimeout = Duration.ofSeconds(3600);
+            associationConfiguration.keepAliveTimeout = Duration.ofSeconds(60);
             AssociationHandlers associationHandlers = new AssociationHandlers();
             associationHandlers.integrityHandler = readHandler;
             associationHandlers.unsolicitedHandler = readHandler;
@@ -269,6 +269,12 @@ public class Main {
                         case "wrt":
                         {
                             RestartResult result = association.warmRestart().toCompletableFuture().get();
+                            System.out.println("Result: " + result);
+                            break;
+                        }
+                        case "lsr":
+                        {
+                            LinkStatusResult result = association.checkLinkStatus().toCompletableFuture().get();
                             System.out.println("Result: " + result);
                             break;
                         }

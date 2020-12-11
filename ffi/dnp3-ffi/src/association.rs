@@ -1,6 +1,7 @@
 use crate::command::Command;
 use crate::ffi;
 use crate::request::Request;
+use dnp3::app::types::LinkStatusResult;
 use dnp3::master::association::PollHandle;
 use dnp3::master::error::{CommandError, CommandResponseError, TimeSyncError};
 use dnp3::master::handle::AssociationHandle;
@@ -241,6 +242,30 @@ pub unsafe fn association_warm_restart(
         let result = match handle.warm_restart().await {
             Ok(value) => ffi::RestartResult::new_success(value),
             Err(_) => ffi::RestartResult::error(),
+        };
+
+        callback.on_complete(result);
+    });
+}
+
+pub unsafe fn association_check_link_status(
+    association: *mut Association,
+    callback: ffi::LinkStatusCallback,
+) {
+    let association = match association.as_mut() {
+        Some(association) => association,
+        None => {
+            callback.on_complete(ffi::LinkStatusResult::TaskError);
+            return;
+        }
+    };
+
+    let handle = &mut association.handle;
+    association.runtime.spawn(async move {
+        let result = match handle.check_link_status().await {
+            Ok(LinkStatusResult::Success) => ffi::LinkStatusResult::Success,
+            Ok(LinkStatusResult::UnexpectedResponse) => ffi::LinkStatusResult::UnexpectedResponse,
+            Err(_) => ffi::LinkStatusResult::TaskError,
         };
 
         callback.on_complete(result);

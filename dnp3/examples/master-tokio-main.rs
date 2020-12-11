@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the association
     let mut config = Configuration::default();
     config.auto_time_sync = Some(TimeSyncProcedure::LAN);
-    config.keep_alive_timeout = Some(Duration::from_secs(5));
+    config.keep_alive_timeout = Some(Duration::from_secs(60));
     let mut association = master
         .add_association(EndpointAddress::from(1024)?, config, NullHandler::boxed())
         .await?;

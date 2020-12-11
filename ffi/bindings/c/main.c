@@ -213,6 +213,11 @@ void on_restart_complete(restart_result_t result, void* arg)
     printf("RestartResult: %s\n", RestartSuccess_to_string(result.success));
 }
 
+void on_link_status_complete(link_status_result_t result, void* arg)
+{
+    printf("LinkStatusResult: %s\n", LinkStatusResult_to_string(result));
+}
+
 // Timestamp callback
 time_provider_timestamp_t get_time(void* arg)
 {
@@ -298,7 +303,7 @@ int main()
         .startup_integrity_classes = classes_all(),
         .auto_time_sync = AutoTimeSync_Lan,
         .auto_tasks_retry_strategy = retry_strategy,
-        .keep_alive_timeout = 3600,
+        .keep_alive_timeout = 60,
     };
     association_handlers_t association_handlers =
     {
@@ -442,6 +447,15 @@ int main()
                 .ctx = NULL,
             };
             association_warm_restart(association, cb);
+        }
+        else if(strcmp(cbuf, "lsr\n") == 0)
+        {
+           link_status_callback_t cb =
+            {
+                .on_complete = &on_link_status_complete,
+                .ctx = NULL,
+            };
+            association_check_link_status(association, cb);
         }
         else
         {

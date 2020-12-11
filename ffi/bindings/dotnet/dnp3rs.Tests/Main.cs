@@ -197,7 +197,7 @@ class MainClass
                         MinDelay = TimeSpan.FromSeconds(1),
                         MaxDelay = TimeSpan.FromSeconds(5),
                     },
-                    KeepAliveTimeout = TimeSpan.FromSeconds(3600),
+                    KeepAliveTimeout = TimeSpan.FromSeconds(60),
                 },
                 new AssociationHandlers
                 {
@@ -291,6 +291,12 @@ class MainClass
                     case "wrt":
                         {
                             var result = await association.WarmRestart();
+                            Console.WriteLine($"Result: {result}");
+                            break;
+                        }
+                    case "lsr":
+                        {
+                            var result = await association.CheckLinkStatus();
                             Console.WriteLine($"Result: {result}");
                             break;
                         }
