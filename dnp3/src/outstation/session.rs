@@ -59,7 +59,7 @@ impl RetryCounter {
         Self { retries: limit }
     }
 
-    fn retry(&mut self) -> bool {
+    fn decrement(&mut self) -> bool {
         match self.retries {
             None => true,
             Some(x) => {
@@ -210,6 +210,13 @@ enum UnsolicitedResult {
     Confirmed,
     Timeout,
     ReturnToIdle,
+}
+
+#[derive(Copy, Clone)]
+enum UnsolicitedWaitResult {
+    Timeout,
+    ReadNext,
+    Complete(UnsolicitedResult),
 }
 
 enum FragmentType<'a> {
@@ -408,81 +415,112 @@ impl OutstationSession {
         let mut deadline = self.new_confirm_deadline();
 
         loop {
-            if let Timeout::Yes = reader.read_with_timeout(io, deadline).await? {
-                let retry = retry_count.retry();
-                self.information
-                    .unsolicited_confirm_timeout(uns_ecsn, retry);
-                if !retry {
-                    return Ok(UnsolicitedResult::Timeout);
-                }
+            match self
+                .wait_for_unsolicited_confirm(uns_ecsn, deadline, io, reader, writer)
+                .await?
+            {
+                UnsolicitedWaitResult::Complete(result) => return Ok(result),
+                // we do nothing, just go to next iteration
+                UnsolicitedWaitResult::ReadNext => {}
+                UnsolicitedWaitResult::Timeout => {
+                    let retry = retry_count.decrement();
+                    self.information
+                        .unsolicited_confirm_timeout(uns_ecsn, retry);
 
-                // write the same data and reset the deadline
-                writer
-                    .write(
-                        io,
-                        self.config.level,
-                        self.config.master_address.wrap(),
-                        self.unsol_tx_buffer.get(length).unwrap(),
-                    )
-                    .await?;
-                deadline = self.new_confirm_deadline();
-                continue;
-            }
+                    if !retry {
+                        return Ok(UnsolicitedResult::Timeout);
+                    }
 
-            if let Some((info, request)) = reader.pop_request(self.config.level).get() {
-                match self.classify(info, request) {
-                    FragmentType::UnsolicitedConfirm(seq) => {
-                        if seq == uns_ecsn {
-                            return Ok(UnsolicitedResult::Confirmed);
-                        } else {
-                            log::warn!("ignoring unsolicited confirm with wrong sequence number ({}) while expecting ({})", seq.value(), uns_ecsn.value());
-                        }
-                    }
-                    FragmentType::SolicitedConfirm(_) => {
-                        log::warn!(
-                            "ignoring solicited confirm while waiting for unsolicited confirm"
-                        );
-                    }
-                    FragmentType::Broadcast(mode) => {
-                        self.process_broadcast(mode, request);
-                    }
-                    FragmentType::MalformedRequest(_, err) => {
-                        let length = self
-                            .write_empty_solicited_response(request.header.control.seq, err.into());
-                        self.respond(io, writer, length, self.config.master_address)
-                            .await?;
-                    }
-                    FragmentType::NewNonRead(_hash, objects) => {
-                        if let Some(length) = self.handle_non_read(
-                            request.header.function,
-                            request.header.control.seq,
-                            info.id,
-                            objects,
-                        ) {
-                            self.respond(io, writer, length, self.config.master_address)
-                                .await?;
-                        }
-                    }
-                    FragmentType::NewRead(_, _) => {
-                        // TODO
-                    }
-                    FragmentType::RepeatRead(_, _, _) => {
-                        // TODO
-                    }
-                    FragmentType::RepeatNonRead(_, _) => {
-                        // TODO
-                    }
+                    // perform a retry
+                    writer
+                        .write(
+                            io,
+                            self.config.level,
+                            self.config.master_address.wrap(),
+                            self.unsol_tx_buffer.get(length).unwrap(),
+                        )
+                        .await?;
+
+                    // update the deadline
+                    deadline = self.new_confirm_deadline();
                 }
             }
         }
     }
 
-    /*
-    fn expect_unsolicited_confirm(&mut self, guard: RequestGuard) -> UnsolicitedResult {
+    async fn wait_for_unsolicited_confirm<T>(
+        &mut self,
+        uns_ecsn: Sequence,
+        deadline: crate::tokio::time::Instant,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+    ) -> Result<UnsolicitedWaitResult, LinkError>
+    where
+        T: IOStream,
+    {
+        if let Timeout::Yes = reader.read_with_timeout(io, deadline).await? {
+            return Ok(UnsolicitedWaitResult::Timeout);
+        }
 
+        let mut guard = reader.pop_request(self.config.level);
+        let (info, request) = match guard.get() {
+            None => return Ok(UnsolicitedWaitResult::ReadNext),
+            Some(x) => x,
+        };
+
+        match self.classify(info, request) {
+            FragmentType::UnsolicitedConfirm(seq) => {
+                if seq == uns_ecsn {
+                    Ok(UnsolicitedWaitResult::Complete(
+                        UnsolicitedResult::Confirmed,
+                    ))
+                } else {
+                    log::warn!("ignoring unsolicited confirm with wrong sequence number ({}) while expecting ({})", seq.value(), uns_ecsn.value());
+                    Ok(UnsolicitedWaitResult::ReadNext)
+                }
+            }
+            FragmentType::SolicitedConfirm(_) => {
+                log::warn!("ignoring solicited confirm while waiting for unsolicited confirm");
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::Broadcast(mode) => {
+                self.process_broadcast(mode, request);
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::MalformedRequest(_, err) => {
+                let length =
+                    self.write_empty_solicited_response(request.header.control.seq, err.into());
+                self.respond(io, writer, length, self.config.master_address)
+                    .await?;
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::NewNonRead(_hash, objects) => {
+                if let Some(length) = self.handle_non_read(
+                    request.header.function,
+                    request.header.control.seq,
+                    info.id,
+                    objects,
+                ) {
+                    self.respond(io, writer, length, self.config.master_address)
+                        .await?;
+                }
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::NewRead(_, _) => {
+                // TODO
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::RepeatRead(_, _, _) => {
+                // TODO
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::RepeatNonRead(_, _) => {
+                // TODO
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+        }
     }
-
-     */
 
     async fn sleep_until(instant: Option<crate::tokio::time::Instant>) {
         match instant {

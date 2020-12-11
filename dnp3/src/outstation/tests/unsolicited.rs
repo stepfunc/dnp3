@@ -15,6 +15,7 @@ fn null_unsolicited_can_time_out_and_retry() {
     harness.expect_response(NULL_UNSOL);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
 
+    // this would go on forever, but let's just test 3 iterations
     for _ in 0..3 {
         crate::tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
         harness.expect_response(NULL_UNSOL);
