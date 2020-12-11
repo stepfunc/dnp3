@@ -37,15 +37,13 @@ use crate::outstation::control::select::SelectState;
 struct ResponseSeries {
     ecsn: Sequence,
     last_response: bool,
-    master: EndpointAddress,
 }
 
 impl ResponseSeries {
-    fn new(ecsn: Sequence, last_response: bool, master: EndpointAddress) -> Self {
+    fn new(ecsn: Sequence, last_response: bool) -> Self {
         Self {
             ecsn,
             last_response,
-            master,
         }
     }
 }
@@ -81,9 +79,9 @@ enum NextState {
 }
 
 impl ResponseInfo {
-    fn to_next_state(&self, ecsn: Sequence, source: EndpointAddress) -> NextState {
+    fn to_next_state(&self, ecsn: Sequence) -> NextState {
         if self.need_confirm() {
-            NextState::SolConfirmWait(ResponseSeries::new(ecsn, self.complete, source))
+            NextState::SolConfirmWait(ResponseSeries::new(ecsn, self.complete))
         } else {
             NextState::Idle
         }
@@ -195,7 +193,7 @@ pub(crate) struct OutstationSession {
     database: DatabaseHandle,
     state: SessionState,
     application: Box<dyn OutstationApplication>,
-    information: Box<dyn OutstationInformation>,
+    info: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
 }
 
@@ -269,7 +267,7 @@ impl OutstationSession {
             database,
             state: SessionState::new(),
             application,
-            information,
+            info: information,
             control_handler,
         }
     }
@@ -288,12 +286,11 @@ impl OutstationSession {
         }
     }
 
-    async fn respond<T>(
+    async fn write_unsolicited<T>(
         &self,
         io: &mut T,
         writer: &mut TransportWriter,
-        num_bytes: usize,
-        address: EndpointAddress,
+        length: usize,
     ) -> Result<(), LinkError>
     where
         T: IOStream,
@@ -302,8 +299,27 @@ impl OutstationSession {
             .write(
                 io,
                 self.config.level,
-                address.wrap(),
-                self.sol_tx_buffer.get(num_bytes).unwrap(),
+                self.config.master_address.wrap(),
+                self.unsol_tx_buffer.get(length).unwrap(),
+            )
+            .await
+    }
+
+    async fn write_solicited<T>(
+        &self,
+        io: &mut T,
+        writer: &mut TransportWriter,
+        length: usize,
+    ) -> Result<(), LinkError>
+    where
+        T: IOStream,
+    {
+        writer
+            .write(
+                io,
+                self.config.level,
+                self.config.master_address.wrap(),
+                self.sol_tx_buffer.get(length).unwrap(),
             )
             .await
     }
@@ -322,7 +338,7 @@ impl OutstationSession {
             .await?
         {
             // enter the solicited confirm wait state
-            self.information.enter_solicited_confirm_wait(series.ecsn);
+            self.info.enter_solicited_confirm_wait(series.ecsn);
             self.sol_confirm_wait(io, reader, writer, series).await?;
         }
 
@@ -392,23 +408,27 @@ impl OutstationSession {
     where
         T: IOStream,
     {
-        let (uns_ecsn, length) = {
-            let seq = self.state.unsolicited_seq.increment();
-            (seq, self.write_null_unsolicited_response(seq))
-        };
+        let seq = self.state.unsolicited_seq.increment();
+        let length = self.write_null_unsolicited_response(seq);
+        self.perform_unsolicited_response_series(seq, length, io, reader, writer)
+            .await
+    }
 
-        // write the data
-        writer
-            .write(
-                io,
-                self.config.level,
-                self.config.master_address.wrap(),
-                self.unsol_tx_buffer.get(length).unwrap(),
-            )
-            .await?;
+    async fn perform_unsolicited_response_series<T>(
+        &mut self,
+        uns_ecsn: Sequence,
+        length: usize,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+    ) -> Result<UnsolicitedResult, LinkError>
+    where
+        T: IOStream,
+    {
+        self.write_unsolicited(io, writer, length).await?;
 
         // enter unsolicited confirm wait state
-        self.information.enter_unsolicited_confirm_wait(uns_ecsn);
+        self.info.enter_unsolicited_confirm_wait(uns_ecsn);
 
         let mut retry_count = RetryCounter::new(self.config.max_unsolicited_retries);
 
@@ -419,27 +439,20 @@ impl OutstationSession {
                 .wait_for_unsolicited_confirm(uns_ecsn, deadline, io, reader, writer)
                 .await?
             {
+                UnsolicitedWaitResult::ReadNext => {
+                    // just go to next iteration without changing the deadline
+                }
                 UnsolicitedWaitResult::Complete(result) => return Ok(result),
-                // we do nothing, just go to next iteration
-                UnsolicitedWaitResult::ReadNext => {}
                 UnsolicitedWaitResult::Timeout => {
                     let retry = retry_count.decrement();
-                    self.information
-                        .unsolicited_confirm_timeout(uns_ecsn, retry);
+                    self.info.unsolicited_confirm_timeout(uns_ecsn, retry);
 
                     if !retry {
                         return Ok(UnsolicitedResult::Timeout);
                     }
 
                     // perform a retry
-                    writer
-                        .write(
-                            io,
-                            self.config.level,
-                            self.config.master_address.wrap(),
-                            self.unsol_tx_buffer.get(length).unwrap(),
-                        )
-                        .await?;
+                    self.write_unsolicited(io, writer, length).await?;
 
                     // update the deadline
                     deadline = self.new_confirm_deadline();
@@ -491,8 +504,7 @@ impl OutstationSession {
             FragmentType::MalformedRequest(_, err) => {
                 let length =
                     self.write_empty_solicited_response(request.header.control.seq, err.into());
-                self.respond(io, writer, length, self.config.master_address)
-                    .await?;
+                self.write_solicited(io, writer, length).await?;
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::NewNonRead(_hash, objects) => {
@@ -502,8 +514,7 @@ impl OutstationSession {
                     info.id,
                     objects,
                 ) {
-                    self.respond(io, writer, length, self.config.master_address)
-                        .await?;
+                    self.write_solicited(io, writer, length).await?;
                 }
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
@@ -545,7 +556,7 @@ impl OutstationSession {
             if let Some(result) = self.process_request_from_idle(info, request) {
                 self.state.last_valid_request = Some(result);
                 if let Some(length) = result.response_length {
-                    self.respond(io, writer, length, info.source).await?;
+                    self.write_solicited(io, writer, length).await?;
                 }
                 if let NextState::SolConfirmWait(series) = result.next {
                     return Ok(Some(series));
@@ -561,7 +572,7 @@ impl OutstationSession {
         info: FragmentInfo,
         request: Request,
     ) -> Option<LastValidRequest> {
-        self.information.process_request_from_idle(request.header);
+        self.info.process_request_from_idle(request.header);
 
         let seq = request.header.control.seq;
 
@@ -576,7 +587,7 @@ impl OutstationSession {
                 ))
             }
             FragmentType::NewRead(hash, objects) => {
-                let (length, next) = self.write_first_read_response(info.source, seq, objects);
+                let (length, next) = self.write_first_read_response(seq, objects);
                 Some(LastValidRequest::new(seq, hash, Some(length), next))
             }
             FragmentType::RepeatRead(hash, _, objects) => {
@@ -584,7 +595,7 @@ impl OutstationSession {
                 // also reply to duplicate READ requests from idle, but this
                 // is plainly wrong since it can't possibly handle a multi-fragmented
                 // response correctly. Answering a repeat READ with a fresh response is harmless
-                let (length, next) = self.write_first_read_response(info.source, seq, objects);
+                let (length, next) = self.write_first_read_response(seq, objects);
                 Some(LastValidRequest::new(seq, hash, Some(length), next))
             }
             FragmentType::NewNonRead(hash, objects) => {
@@ -647,21 +658,14 @@ impl OutstationSession {
 
     fn write_first_read_response(
         &mut self,
-        master: EndpointAddress,
         seq: Sequence,
         object_headers: HeaderCollection,
     ) -> (usize, NextState) {
         let iin2 = self.database.select(&object_headers);
-        self.write_read_response(master, true, seq, iin2)
+        self.write_read_response(true, seq, iin2)
     }
 
-    fn write_read_response(
-        &mut self,
-        master: EndpointAddress,
-        fir: bool,
-        seq: Sequence,
-        iin2: IIN2,
-    ) -> (usize, NextState) {
+    fn write_read_response(&mut self, fir: bool, seq: Sequence, iin2: IIN2) -> (usize, NextState) {
         let iin1 = self.get_response_iin();
         let mut cursor = self.sol_tx_buffer.write_cursor();
         cursor.skip(ResponseHeader::LENGTH).unwrap();
@@ -672,7 +676,7 @@ impl OutstationSession {
             iin1 + iin2,
         );
         cursor.at_start(|cur| header.write(cur)).unwrap();
-        (cursor.written().len(), info.to_next_state(seq, master))
+        (cursor.written().len(), info.to_next_state(seq))
     }
 
     fn handle_non_read(
@@ -746,7 +750,7 @@ impl OutstationSession {
                             } else {
                                 // clear the restart bit
                                 self.state.restart_iin_asserted = false;
-                                self.information.clear_restart_iin();
+                                self.info.clear_restart_iin();
                             }
                         } else {
                             log::warn!("ignoring write of IIN index {} to value {}", index, value);
@@ -1041,7 +1045,7 @@ impl OutstationSession {
 
     fn process_broadcast(&mut self, _mode: BroadcastConfirmMode, request: Request) {
         let action = self.process_broadcast_get_action(request);
-        self.information
+        self.info
             .broadcast_received(request.header.function, action)
     }
 
@@ -1111,13 +1115,9 @@ impl OutstationSession {
                     }
                     // format the next response in the series
                     series.ecsn.increment();
-                    let (length, next_state) = self.write_read_response(
-                        series.master,
-                        false,
-                        series.ecsn,
-                        IIN2::default(),
-                    );
-                    self.respond(io, writer, length, series.master).await?;
+                    let (length, next_state) =
+                        self.write_read_response(false, series.ecsn, IIN2::default());
+                    self.write_solicited(io, writer, length).await?;
                     match next_state {
                         NextState::Idle => return Ok(()),
                         NextState::SolConfirmWait(next) => {
@@ -1151,7 +1151,7 @@ impl OutstationSession {
         loop {
             match reader.read_with_timeout(io, deadline).await? {
                 Timeout::Yes => {
-                    self.information.solicited_confirm_timeout(ecsn);
+                    self.info.solicited_confirm_timeout(ecsn);
                     return Ok(Confirm::Timeout);
                 }
                 // process data
@@ -1163,19 +1163,18 @@ impl OutstationSession {
                             // just go back to the loop and read another fragment
                         }
                         ConfirmAction::Confirmed => {
-                            self.information.solicited_confirm_received(ecsn);
+                            self.info.solicited_confirm_received(ecsn);
                             return Ok(Confirm::Yes);
                         }
                         ConfirmAction::NewRequest(header) => {
-                            self.information.solicited_confirm_wait_new_request(header);
+                            self.info.solicited_confirm_wait_new_request(header);
                             // retain the fragment so that it can be processed from the idle state
                             guard.retain();
                             return Ok(Confirm::NewRequest);
                         }
                         ConfirmAction::EchoLastResponse(length) => {
                             if let Some(length) = length {
-                                self.respond(io, writer, length, self.config.master_address)
-                                    .await?;
+                                self.write_solicited(io, writer, length).await?;
                             }
                             // per the spec, we restart the confirm timer
                             deadline = self.new_confirm_deadline();
@@ -1206,14 +1205,14 @@ impl OutstationSession {
                 if seq == ecsn {
                     ConfirmAction::Confirmed
                 } else {
-                    self.information
+                    self.info
                         .wrong_solicited_confirm_seq(ecsn, request.header.control.seq);
                     log::warn!("received solicited confirm with wrong sequence number, expected: {} received: {}", ecsn.value(), seq.value());
                     ConfirmAction::ContinueWait
                 }
             }
             FragmentType::UnsolicitedConfirm(seq) => {
-                self.information.unexpected_confirm(true, seq);
+                self.info.unexpected_confirm(true, seq);
                 log::warn!(
                     "ignoring unsolicited CONFIRM while waiting for solicited confirm, seq: {}",
                     seq.value()
