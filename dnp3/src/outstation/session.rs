@@ -333,18 +333,14 @@ impl OutstationSession {
     where
         T: IOStream,
     {
-        if let Some(series) = self
-            .handle_one_request_from_idle(io, reader, writer)
-            .await?
-        {
-            // enter the solicited confirm wait state
-            self.info.enter_solicited_confirm_wait(series.ecsn);
-            self.sol_confirm_wait(io, reader, writer, series).await?;
-        }
+        // handle a request fragment if present
+        self.handle_one_request_from_idle(io, reader, writer)
+            .await?;
 
         // check to see if we should perform unsolicited
         let deadline = self.check_unsolicited(io, reader, writer).await?;
 
+        // wait for an event
         crate::tokio::select! {
             frame_read = reader.read(io) => {
                 // make sure an I/O error didn't occur, ending the session
@@ -548,23 +544,31 @@ impl OutstationSession {
         io: &mut T,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
-    ) -> Result<Option<ResponseSeries>, LinkError>
+    ) -> Result<(), LinkError>
     where
         T: IOStream,
     {
-        if let Some((info, request)) = reader.pop_request(self.config.level).get() {
+        let mut guard = reader.pop_request(self.config.level);
+        if let Some((info, request)) = guard.get() {
             if let Some(result) = self.process_request_from_idle(info, request) {
                 self.state.last_valid_request = Some(result);
+
+                // optional response
                 if let Some(length) = result.response_length {
                     self.write_solicited(io, writer, length).await?;
                 }
+
+                // maybe start a response series
                 if let NextState::SolConfirmWait(series) = result.next {
-                    return Ok(Some(series));
+                    drop(guard);
+                    // enter the solicited confirm wait state
+                    self.info.enter_solicited_confirm_wait(series.ecsn);
+                    self.sol_confirm_wait(io, reader, writer, series).await?;
                 }
             }
         }
 
-        Ok(None)
+        Ok(())
     }
 
     fn process_request_from_idle(
