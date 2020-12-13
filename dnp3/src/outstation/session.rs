@@ -138,29 +138,11 @@ impl From<OutstationConfig> for SessionConfig {
     }
 }
 
-/*
-#[derive(Copy, Clone)]
-struct UnsolicitedRetry {
-    /// length of the unsolicited message to retry
-    length: usize,
-    /// optional remaining retries of this series
-    retries: Option<usize>,
-    /// time at which we can retry the unsolicited response
-    deadline: crate::tokio::time::Instant,
-}
-*/
-
 #[derive(Copy, Clone)]
 enum UnsolicitedState {
     /// need to perform NULL unsolicited, possibly waiting for a retry deadline
     NullRequired(Option<crate::tokio::time::Instant>),
-    Complete,
-    /*
-    /// Ready to send normal unsolicited
-    Ready,
-    /// Retry unsolicited w/ last length, optional retries, and deadline
-    Retry(UnsolicitedRetry),
-     */
+    Ready(Option<crate::tokio::time::Instant>),
 }
 
 /// state that mutates while the session runs
@@ -371,7 +353,6 @@ impl OutstationSession {
         }
 
         match self.state.unsolicited {
-            UnsolicitedState::Complete => Ok(None),
             UnsolicitedState::NullRequired(deadline) => {
                 if let Some(deadline) = deadline {
                     if crate::tokio::time::Instant::now() < deadline {
@@ -387,7 +368,32 @@ impl OutstationSession {
                         Ok(Some(retry_at))
                     }
                     UnsolicitedResult::Confirmed => {
-                        self.state.unsolicited = UnsolicitedState::Complete;
+                        self.state.unsolicited = UnsolicitedState::Ready(None);
+                        Ok(None)
+                    }
+                }
+            }
+            UnsolicitedState::Ready(deadline) => {
+                if let Some(deadline) = deadline {
+                    if crate::tokio::time::Instant::now() < deadline {
+                        return Ok(Some(deadline)); // not ready yet
+                    }
+                }
+
+                // perform regular unsolicited
+                match self.maybe_perform_unsolicited(io, reader, writer).await? {
+                    None => {
+                        // there was nothing to send
+                        Ok(None)
+                    }
+                    Some(UnsolicitedResult::Timeout) | Some(UnsolicitedResult::ReturnToIdle) => {
+                        let retry_at = self.new_unsolicited_retry_deadline();
+                        self.state.unsolicited = UnsolicitedState::Ready(Some(retry_at));
+                        Ok(Some(retry_at))
+                    }
+                    Some(UnsolicitedResult::Confirmed) => {
+                        self.database.clear_written_events();
+                        self.state.unsolicited = UnsolicitedState::Ready(None);
                         Ok(None)
                     }
                 }
@@ -408,6 +414,54 @@ impl OutstationSession {
         let length = self.write_null_unsolicited_response(seq);
         self.perform_unsolicited_response_series(seq, length, io, reader, writer)
             .await
+    }
+
+    async fn maybe_perform_unsolicited<T>(
+        &mut self,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+    ) -> Result<Option<UnsolicitedResult>, LinkError>
+    where
+        T: IOStream,
+    {
+        if !self.state.enabled_unsolicited_classes.any() {
+            return Ok(None);
+        }
+
+        match self.write_unsolicited_data() {
+            None => Ok(None),
+            Some((seq, length)) => {
+                let result = self
+                    .perform_unsolicited_response_series(seq, length, io, reader, writer)
+                    .await?;
+                Ok(Some(result))
+            }
+        }
+    }
+
+    fn write_unsolicited_data(&mut self) -> Option<(Sequence, usize)> {
+        let iin = self.get_response_iin() + IIN2::default();
+        let mut cursor = self.unsol_tx_buffer.write_cursor();
+        let _ = cursor.skip(ResponseHeader::LENGTH);
+
+        let count = self
+            .database
+            .write_unsolicited(self.state.enabled_unsolicited_classes, &mut cursor);
+
+        if count == 0 {
+            return None;
+        }
+
+        let seq = self.state.unsolicited_seq.increment();
+
+        let header = ResponseHeader::new(
+            Control::unsolicited_response(seq),
+            ResponseFunction::UnsolicitedResponse,
+            iin,
+        );
+        cursor.at_start(|cur| header.write(cur)).unwrap();
+        Some((seq, cursor.position()))
     }
 
     async fn perform_unsolicited_response_series<T>(

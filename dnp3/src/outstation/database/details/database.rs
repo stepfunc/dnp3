@@ -1,6 +1,7 @@
 use crate::app::gen::all::AllObjectsVariation;
 use crate::app::header::IIN2;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
+use crate::master::request::EventClasses;
 use crate::outstation::database::details::event::buffer::EventBuffer;
 use crate::outstation::database::details::range::static_db::{
     PointConfig, StaticDatabase, Updatable,
@@ -67,6 +68,10 @@ impl Database {
         }
 
         result
+    }
+
+    pub(crate) fn select_event_classes(&mut self, classes: EventClasses) -> usize {
+        self.event_buffer.select_by_class(classes, None)
     }
 
     fn select_all_objects(&mut self, variation: AllObjectsVariation) -> IIN2 {
@@ -141,6 +146,14 @@ impl Database {
         ResponseInfo {
             has_events,
             complete,
+        }
+    }
+
+    pub(crate) fn write_events_only(&mut self, cursor: &mut WriteCursor) -> usize {
+        // doesn't matter if we wrote all of them or not
+        match self.event_buffer.write_events(cursor) {
+            Ok(x) => x,
+            Err(x) => x,
         }
     }
 }

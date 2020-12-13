@@ -11,6 +11,7 @@ use crate::util::cursor::WriteCursor;
 use config::*;
 use details::range::static_db::{Deadband, FlagsDetector, PointConfig};
 
+use crate::master::request::EventClasses;
 use std::sync::{Arc, Mutex};
 
 /// Controls how are events are processed when updating values in the database
@@ -317,6 +318,20 @@ impl DatabaseHandle {
             .unwrap()
             .inner
             .write_response_headers(cursor)
+    }
+
+    pub(crate) fn write_unsolicited(
+        &mut self,
+        classes: EventClasses,
+        cursor: &mut WriteCursor,
+    ) -> usize {
+        let mut guard = self.inner.lock().unwrap();
+        guard.inner.reset();
+        let count = guard.inner.select_event_classes(classes);
+        if count == 0 {
+            return 0;
+        }
+        guard.inner.write_events_only(cursor)
     }
 
     pub(crate) fn reset(&mut self) {
