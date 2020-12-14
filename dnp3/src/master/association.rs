@@ -42,6 +42,8 @@ pub struct Configuration {
     /// When no bytes are received within this timeout value,
     /// a `REQUEST_LINK_STATUS` request is sent
     pub keep_alive_timeout: Option<Duration>,
+    /// Automatic integrity scan when a `EVENT_BUFFER_OVERFLOW` is detected
+    pub auto_integrity_scan_on_buffer_overflow: bool,
 }
 
 impl Configuration {
@@ -52,6 +54,7 @@ impl Configuration {
         auto_time_sync: Option<TimeSyncProcedure>,
         auto_tasks_retry_strategy: RetryStrategy,
         keep_alive_timeout: Option<Duration>,
+        auto_integrity_scan_on_buffer_overflow: bool,
     ) -> Self {
         Self {
             disable_unsol_classes,
@@ -60,6 +63,7 @@ impl Configuration {
             auto_time_sync,
             auto_tasks_retry_strategy,
             keep_alive_timeout,
+            auto_integrity_scan_on_buffer_overflow,
         }
     }
 
@@ -71,6 +75,7 @@ impl Configuration {
             None,
             auto_tasks_retry_strategy,
             None,
+            false,
         )
     }
 }
@@ -84,6 +89,7 @@ impl Default for Configuration {
             None,
             RetryStrategy::default(),
             None,
+            true,
         )
     }
 }
@@ -125,9 +131,9 @@ impl AutoTaskState {
 
     /// Demand an execution of the task
     fn demand(&mut self) {
-        //if self.is_idle() {
-        *self = Self::Pending;
-        //}
+        if self.is_idle() {
+            *self = Self::Pending;
+        }
     }
 
     /// The task was accomplished
@@ -246,6 +252,7 @@ pub(crate) struct Association {
     config: Configuration,
     polls: PollMap,
     next_link_status: Option<Instant>,
+    startup_integrity_done: bool,
 }
 
 impl Association {
@@ -266,6 +273,7 @@ impl Association {
             next_link_status: config
                 .keep_alive_timeout
                 .map(|delay| Instant::now() + delay),
+            startup_integrity_done: false,
         }
     }
 
@@ -312,6 +320,7 @@ impl Association {
 
         // Reset the auto tasks
         self.auto_tasks.reset();
+        self.startup_integrity_done = false;
 
         // Clear last unsolicited fragment
         self.last_unsol_frag = None;
@@ -330,7 +339,7 @@ impl Association {
     }
 
     pub(crate) fn is_integrity_complete(&self) -> bool {
-        self.config.startup_integrity_classes.any() && self.auto_tasks.integrity_scan.is_idle()
+        !self.config.startup_integrity_classes.any() || self.startup_integrity_done
     }
 
     pub(crate) fn process_iin(&mut self, iin: IIN) {
@@ -340,12 +349,16 @@ impl Association {
         if iin.iin1.get_need_time() {
             self.on_need_time_observed();
         }
+        if iin.iin2.get_event_buffer_overflow() {
+            self.on_event_buffer_overflow_observed();
+        }
     }
 
     pub(crate) fn on_restart_iin_observed(&mut self) {
         if self.auto_tasks.clear_restart_iin.is_idle() {
             log::warn!("device restart detected (address == {})", self.address);
             self.auto_tasks.on_restart_iin();
+            self.startup_integrity_done = false;
         }
     }
 
@@ -353,8 +366,15 @@ impl Association {
         self.auto_tasks.time_sync.demand();
     }
 
+    pub(crate) fn on_event_buffer_overflow_observed(&mut self) {
+        if self.config.auto_integrity_scan_on_buffer_overflow {
+            self.auto_tasks.integrity_scan.demand();
+        }
+    }
+
     pub(crate) fn on_integrity_scan_complete(&mut self) {
         self.auto_tasks.integrity_scan.done();
+        self.startup_integrity_done = true;
     }
 
     pub(crate) fn on_integrity_scan_failure(&mut self) {

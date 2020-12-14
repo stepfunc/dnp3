@@ -198,6 +198,7 @@ class MainClass
                         MaxDelay = TimeSpan.FromSeconds(5),
                     },
                     KeepAliveTimeout = TimeSpan.FromSeconds(60),
+                    AutoIntegrityScanOnBufferOverflow = true,
                 },
                 new AssociationHandlers
                 {

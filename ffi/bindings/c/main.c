@@ -304,6 +304,7 @@ int main()
         .auto_time_sync = AutoTimeSync_Lan,
         .auto_tasks_retry_strategy = retry_strategy,
         .keep_alive_timeout = 60,
+        .auto_integrity_scan_on_buffer_overflow = true,
     };
     association_handlers_t association_handlers =
     {

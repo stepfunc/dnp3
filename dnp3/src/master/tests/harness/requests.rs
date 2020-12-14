@@ -122,6 +122,10 @@ pub(crate) fn unsol_null(io: &mut io::Handle, seq: Sequence, restart_iin: bool) 
         IIN::default()
     };
 
+    unsol_null_custom_iin(io, seq, iin);
+}
+
+pub(crate) fn unsol_null_custom_iin(io: &mut io::Handle, seq: Sequence, iin: IIN) {
     let mut buffer = [0; 4];
     let mut cursor = WriteCursor::new(&mut buffer);
     start_response(

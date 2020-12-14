@@ -58,6 +58,7 @@ pub unsafe fn master_add_association(
         } else {
             Some(config.keep_alive_timeout())
         },
+        config.auto_integrity_scan_on_buffer_overflow(),
     );
 
     let handler = AssociationHandlerAdapter {

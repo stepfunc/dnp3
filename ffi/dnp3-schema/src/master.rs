@@ -86,6 +86,10 @@ pub fn define(
             Type::Duration(DurationMapping::Seconds),
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the outstation").details("A value of zero means no automatic keep-alives.")
         )?
+        .add("auto_integrity_scan_on_buffer_overflow",
+            Type::Bool,
+            doc("Automatic integrity scan when an EVENT_BUFFER_OVERFLOW is detected")
+        )?
         .doc("Association configuration")?
         .build()?;
 

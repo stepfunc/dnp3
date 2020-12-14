@@ -181,6 +181,7 @@ public class Main {
             associationConfiguration.autoTimeSync = AutoTimeSync.LAN;
             associationConfiguration.autoTasksRetryStrategy = retryStrategy;
             associationConfiguration.keepAliveTimeout = Duration.ofSeconds(60);
+            associationConfiguration.autoIntegrityScanOnBufferOverflow = true;
             AssociationHandlers associationHandlers = new AssociationHandlers();
             associationHandlers.integrityHandler = readHandler;
             associationHandlers.unsolicitedHandler = readHandler;
