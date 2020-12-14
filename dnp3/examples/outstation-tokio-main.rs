@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.log_level = DecodeLogLevel::ObjectValues;
 
     let (mut task, handle) = OutstationTask::create(
-        OutstationConfig::new(outstation_address, master_address),
+        config,
         get_database_config(),
         DefaultOutstationApplication::create(),
         DefaultOutstationInformation::create(),
