@@ -64,7 +64,7 @@ pub fn define(
         )?
         .add(
             "enable_unsol_classes",
-            Type::Struct(event_classes),
+            Type::Struct(event_classes.clone()),
             "Classes to enable unsolicited responses at startup",
         )?
         .add(
@@ -89,6 +89,10 @@ pub fn define(
         .add("auto_integrity_scan_on_buffer_overflow",
             Type::Bool,
             doc("Automatic integrity scan when an EVENT_BUFFER_OVERFLOW is detected")
+        )?
+        .add("event_scan_on_events_available",
+            Type::Struct(event_classes),
+            doc("Classes to automaticaly send reads when the IIN bit is asserted")
         )?
         .doc("Association configuration")?
         .build()?;

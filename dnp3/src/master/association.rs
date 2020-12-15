@@ -44,53 +44,37 @@ pub struct Configuration {
     pub keep_alive_timeout: Option<Duration>,
     /// Automatic integrity scan when a `EVENT_BUFFER_OVERFLOW` is detected
     pub auto_integrity_scan_on_buffer_overflow: bool,
+    /// Classes to perform an automatic class scan when their IIN bit is detected
+    pub event_scan_on_events_available: EventClasses,
 }
 
 impl Configuration {
-    pub fn new(
-        disable_unsol_classes: EventClasses,
-        enable_unsol_classes: EventClasses,
-        startup_integrity_classes: Classes,
-        auto_time_sync: Option<TimeSyncProcedure>,
-        auto_tasks_retry_strategy: RetryStrategy,
-        keep_alive_timeout: Option<Duration>,
-        auto_integrity_scan_on_buffer_overflow: bool,
-    ) -> Self {
-        Self {
-            disable_unsol_classes,
-            enable_unsol_classes,
-            startup_integrity_classes,
-            auto_time_sync,
-            auto_tasks_retry_strategy,
-            keep_alive_timeout,
-            auto_integrity_scan_on_buffer_overflow,
-        }
-    }
-
     pub fn none(auto_tasks_retry_strategy: RetryStrategy) -> Self {
-        Configuration::new(
-            EventClasses::none(),
-            EventClasses::none(),
-            Classes::none(),
-            None,
+        Self {
+            disable_unsol_classes: EventClasses::none(),
+            enable_unsol_classes: EventClasses::none(),
+            startup_integrity_classes: Classes::none(),
+            auto_time_sync: None,
             auto_tasks_retry_strategy,
-            None,
-            false,
-        )
+            keep_alive_timeout: None,
+            auto_integrity_scan_on_buffer_overflow: false,
+            event_scan_on_events_available: EventClasses::none(),
+        }
     }
 }
 
 impl Default for Configuration {
     fn default() -> Self {
-        Configuration::new(
-            EventClasses::all(),
-            EventClasses::all(),
-            Classes::integrity(),
-            None,
-            RetryStrategy::default(),
-            None,
-            true,
-        )
+        Self {
+            disable_unsol_classes: EventClasses::all(),
+            enable_unsol_classes: EventClasses::all(),
+            startup_integrity_classes: Classes::integrity(),
+            auto_time_sync: None,
+            auto_tasks_retry_strategy: RetryStrategy::default(),
+            keep_alive_timeout: None,
+            auto_integrity_scan_on_buffer_overflow: true,
+            event_scan_on_events_available: EventClasses::none(),
+        }
     }
 }
 
@@ -164,6 +148,7 @@ pub(crate) struct TaskStates {
     enabled_unsolicited: AutoTaskState,
     clear_restart_iin: AutoTaskState,
     time_sync: AutoTaskState,
+    event_scan: AutoTaskState,
 }
 
 impl TaskStates {
@@ -174,6 +159,7 @@ impl TaskStates {
             enabled_unsolicited: AutoTaskState::Pending,
             clear_restart_iin: AutoTaskState::Idle,
             time_sync: AutoTaskState::Idle,
+            event_scan: AutoTaskState::Idle,
         }
     }
 
@@ -187,7 +173,7 @@ impl TaskStates {
         self.enabled_unsolicited.demand();
     }
 
-    fn next(&self, config: &Configuration) -> Next<Task> {
+    fn next(&self, config: &Configuration, association: &Association) -> Next<Task> {
         if self.clear_restart_iin.is_pending() {
             return self
                 .clear_restart_iin
@@ -218,6 +204,13 @@ impl TaskStates {
             return self.enabled_unsolicited.create_next_task(|| {
                 AutoTask::EnableUnsolicited(config.enable_unsol_classes).wrap()
             });
+        }
+
+        let events_to_scan = association.events_available & config.event_scan_on_events_available;
+        if events_to_scan.any() {
+            return self
+                .event_scan
+                .create_next_task(|| ReadTask::EventScan(events_to_scan).wrap());
         }
 
         Next::None
@@ -253,6 +246,7 @@ pub(crate) struct Association {
     polls: PollMap,
     next_link_status: Option<Instant>,
     startup_integrity_done: bool,
+    events_available: EventClasses,
 }
 
 impl Association {
@@ -274,6 +268,7 @@ impl Association {
                 .keep_alive_timeout
                 .map(|delay| Instant::now() + delay),
             startup_integrity_done: false,
+            events_available: EventClasses::none(),
         }
     }
 
@@ -352,6 +347,14 @@ impl Association {
         if iin.iin2.get_event_buffer_overflow() {
             self.on_event_buffer_overflow_observed();
         }
+
+        // Check events
+        self.events_available.class1 = iin.iin1.get_class_1_events();
+        self.events_available.class2 = iin.iin1.get_class_2_events();
+        self.events_available.class3 = iin.iin1.get_class_3_events();
+        if (self.events_available & self.config.event_scan_on_events_available).any() {
+            self.auto_tasks.event_scan.demand();
+        }
     }
 
     pub(crate) fn on_restart_iin_observed(&mut self) {
@@ -380,6 +383,15 @@ impl Association {
     pub(crate) fn on_integrity_scan_failure(&mut self) {
         log::warn!("startup integrity scan failed");
         self.auto_tasks.integrity_scan.failure(&self.config);
+    }
+
+    pub(crate) fn on_event_scan_complete(&mut self) {
+        self.auto_tasks.event_scan.done();
+    }
+
+    pub(crate) fn on_event_scan_failure(&mut self) {
+        log::warn!("automatic event scan failed");
+        self.auto_tasks.event_scan.failure(&self.config);
     }
 
     pub(crate) fn on_clear_restart_iin_response(&mut self, iin: IIN) {
@@ -485,6 +497,14 @@ impl Association {
         extract_measurements(header, objects, self.handler.get_default_poll_handler());
     }
 
+    pub(crate) fn handle_event_scan_response(
+        &mut self,
+        header: ResponseHeader,
+        objects: HeaderCollection,
+    ) {
+        extract_measurements(header, objects, self.handler.get_integrity_handler());
+    }
+
     pub(crate) fn handle_read_response(
         &mut self,
         header: ResponseHeader,
@@ -521,7 +541,7 @@ impl Association {
 
     fn get_next_task(&self, now: Instant) -> Next<Task> {
         // Check for automatic tasks
-        let next = self.auto_tasks.next(&self.config);
+        let next = self.auto_tasks.next(&self.config, self);
 
         // Startup task have greater priority
         if !matches!(next, Next::None) {

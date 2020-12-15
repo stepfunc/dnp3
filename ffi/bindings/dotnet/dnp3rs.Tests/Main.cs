@@ -199,6 +199,12 @@ class MainClass
                     },
                     KeepAliveTimeout = TimeSpan.FromSeconds(60),
                     AutoIntegrityScanOnBufferOverflow = true,
+                    EventScanOnEventsAvailable = new EventClasses
+                    {
+                        Class1 = false,
+                        Class2 = false,
+                        Class3 = false,
+                    },
                 },
                 new AssociationHandlers
                 {

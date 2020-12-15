@@ -1,3 +1,5 @@
+use std::ops::BitAnd;
+
 use crate::app::enums::CommandStatus;
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::prefixed::PrefixedVariation;
@@ -97,6 +99,18 @@ impl EventClasses {
             writer.write_all_objects_header(Variation::Group60Var4)?;
         }
         Ok(())
+    }
+}
+
+impl BitAnd for EventClasses {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self::new(
+            self.class1 && rhs.class1,
+            self.class2 && rhs.class2,
+            self.class3 && rhs.class3,
+        )
     }
 }
 

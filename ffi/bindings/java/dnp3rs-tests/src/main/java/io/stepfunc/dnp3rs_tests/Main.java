@@ -182,6 +182,10 @@ public class Main {
             associationConfiguration.autoTasksRetryStrategy = retryStrategy;
             associationConfiguration.keepAliveTimeout = Duration.ofSeconds(60);
             associationConfiguration.autoIntegrityScanOnBufferOverflow = true;
+            associationConfiguration.eventScanOnEventsAvailable = new EventClasses();
+            associationConfiguration.eventScanOnEventsAvailable.class1 = false;
+            associationConfiguration.eventScanOnEventsAvailable.class2 = false;
+            associationConfiguration.eventScanOnEventsAvailable.class3 = false;
             AssociationHandlers associationHandlers = new AssociationHandlers();
             associationHandlers.integrityHandler = readHandler;
             associationHandlers.unsolicitedHandler = readHandler;

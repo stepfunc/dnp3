@@ -14,7 +14,7 @@ use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::handle::Promise;
 use crate::master::poll::Poll;
-use crate::master::request::Classes;
+use crate::master::request::{Classes, EventClasses};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
@@ -79,6 +79,8 @@ pub(crate) enum ReadTask {
     PeriodicPoll(Poll),
     /// Integrity poll that occurs during startup, or after outstation restarts
     StartupIntegrity(Classes),
+    /// Event scan when IIN bit is detected
+    EventScan(EventClasses),
     /// One-time read request
     SingleRead(SingleReadTask),
 }
@@ -103,6 +105,7 @@ impl RequestWriter for ReadTask {
         match self {
             ReadTask::PeriodicPoll(poll) => poll.format(writer),
             ReadTask::StartupIntegrity(classes) => classes.write(writer),
+            ReadTask::EventScan(classes) => classes.write(writer),
             ReadTask::SingleRead(req) => req.format(writer),
         }
     }
@@ -137,6 +140,7 @@ impl ReadTask {
         match self {
             ReadTask::StartupIntegrity(_) => association.handle_integrity_response(header, objects),
             ReadTask::PeriodicPoll(_) => association.handle_poll_response(header, objects),
+            ReadTask::EventScan(_) => association.handle_event_scan_response(header, objects),
             ReadTask::SingleRead(_) => association.handle_read_response(header, objects),
         }
     }
@@ -145,6 +149,7 @@ impl ReadTask {
         match self {
             ReadTask::StartupIntegrity(_) => association.on_integrity_scan_complete(),
             ReadTask::PeriodicPoll(poll) => association.complete_poll(poll.id),
+            ReadTask::EventScan(_) => association.on_event_scan_complete(),
             ReadTask::SingleRead(task) => task.on_complete(),
         }
     }
@@ -160,6 +165,11 @@ impl ReadTask {
                 if let Some(association) = association {
                     log::warn!("Poll {} failed", poll.id);
                     association.complete_poll(poll.id);
+                }
+            }
+            ReadTask::EventScan(_) => {
+                if let Some(association) = association {
+                    association.on_event_scan_failure();
                 }
             }
             ReadTask::SingleRead(task) => task.on_task_error(err),

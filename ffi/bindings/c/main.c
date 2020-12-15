@@ -305,6 +305,12 @@ int main()
         .auto_tasks_retry_strategy = retry_strategy,
         .keep_alive_timeout = 60,
         .auto_integrity_scan_on_buffer_overflow = true,
+        .event_scan_on_events_available =
+        {
+            .class1 = false,
+            .class2 = false,
+            .class3 = false,
+        }
     };
     association_handlers_t association_handlers =
     {
