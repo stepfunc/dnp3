@@ -11,7 +11,7 @@ mod reader;
 mod types;
 mod writer;
 
-use crate::outstation::config::{Feature, OutstationConfig};
+use crate::outstation::config::Feature;
 pub(crate) use reader::*;
 pub(crate) use types::*;
 pub(crate) use writer::*;
@@ -36,17 +36,10 @@ pub(crate) fn create_master_transport_layer(
 pub(crate) fn create_outstation_transport_layer(
     address: EndpointAddress,
     self_address: Feature,
-    rx_buffer_size: usize,
+    rx_buffer_size: crate::outstation::config::BufferSize,
 ) -> (TransportReader, TransportWriter) {
-    let rx_buffer_size = if rx_buffer_size < OutstationConfig::MIN_RX_BUFFER_SIZE {
-        log::warn!("Minimum RX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", OutstationConfig::MIN_RX_BUFFER_SIZE, rx_buffer_size);
-        OutstationConfig::MIN_RX_BUFFER_SIZE
-    } else {
-        rx_buffer_size
-    };
-
     (
-        TransportReader::outstation(address, self_address, rx_buffer_size),
+        TransportReader::outstation(address, self_address, rx_buffer_size.value()),
         TransportWriter::new(EndpointType::Outstation, address),
     )
 }

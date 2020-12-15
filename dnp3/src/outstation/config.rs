@@ -1,5 +1,46 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
+use crate::util::buffer::Buffer;
+
+/// Validated buffer size for use in the outstation
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct BufferSize {
+    size: usize,
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum BufferSizeError {
+    /// provided size
+    TooSmall(usize),
+}
+
+impl BufferSize {
+    pub const MIN: usize = 249; // 1 link frame
+    pub const DEFAULT: usize = 2048; // default max ASDU size for DNP3
+
+    pub(crate) fn create_buffer(&self) -> Buffer {
+        Buffer::new(self.size)
+    }
+
+    pub(crate) fn value(&self) -> usize {
+        self.size
+    }
+
+    pub fn new(size: usize) -> Result<Self, BufferSizeError> {
+        if size < Self::MIN {
+            return Err(BufferSizeError::TooSmall(size));
+        }
+        Ok(Self { size })
+    }
+}
+
+impl Default for BufferSize {
+    fn default() -> Self {
+        Self {
+            size: Self::DEFAULT,
+        }
+    }
+}
 
 /// describes whether an optional feature is enabled or disabled
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -35,9 +76,9 @@ impl Default for Features {
 pub struct OutstationConfig {
     pub outstation_address: EndpointAddress,
     pub master_address: EndpointAddress,
-    pub solicited_tx_buffer_size: usize,
-    pub unsolicited_tx_buffer_size: usize,
-    pub rx_buffer_size: usize,
+    pub solicited_tx_buffer_size: BufferSize,
+    pub unsolicited_tx_buffer_size: BufferSize,
+    pub rx_buffer_size: BufferSize,
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: std::time::Duration,
     pub select_timeout: std::time::Duration,
@@ -57,12 +98,6 @@ impl Feature {
 }
 
 impl OutstationConfig {
-    pub const MIN_TX_BUFFER_SIZE: usize = 249; // 1 link frame
-    pub const DEFAULT_TX_BUFFER_SIZE: usize = 2048;
-
-    pub const MIN_RX_BUFFER_SIZE: usize = Self::MIN_TX_BUFFER_SIZE;
-    pub const DEFAULT_RX_BUFFER_SIZE: usize = Self::DEFAULT_TX_BUFFER_SIZE;
-
     pub const DEFAULT_CONFIRM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
     pub const DEFAULT_SELECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
     pub const DEFAULT_UNSOLICITED_RETRY_DELAY: std::time::Duration =
@@ -74,9 +109,9 @@ impl OutstationConfig {
         Self {
             outstation_address,
             master_address,
-            solicited_tx_buffer_size: Self::DEFAULT_TX_BUFFER_SIZE,
-            unsolicited_tx_buffer_size: Self::DEFAULT_TX_BUFFER_SIZE,
-            rx_buffer_size: Self::DEFAULT_RX_BUFFER_SIZE,
+            solicited_tx_buffer_size: BufferSize::default(),
+            unsolicited_tx_buffer_size: BufferSize::default(),
+            rx_buffer_size: BufferSize::default(),
             log_level: DecodeLogLevel::Nothing,
             confirm_timeout: Self::DEFAULT_CONFIRM_TIMEOUT,
             select_timeout: Self::DEFAULT_SELECT_TIMEOUT,
@@ -86,3 +121,18 @@ impl OutstationConfig {
         }
     }
 }
+
+impl std::fmt::Display for BufferSizeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::TooSmall(size) => write!(
+                f,
+                "provided size {} is less than the minimum allowed size of {}",
+                size,
+                BufferSize::MIN
+            ),
+        }
+    }
+}
+
+impl std::error::Error for BufferSizeError {}

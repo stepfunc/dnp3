@@ -12,7 +12,7 @@ use crate::app::variations::{Group52Var1, Group52Var2};
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
-use crate::outstation::config::Feature;
+use crate::outstation::config::{BufferSize, Feature};
 use crate::outstation::control::collection::{ControlCollection, ControlTransaction};
 use crate::outstation::database::{DatabaseHandle, ResponseInfo};
 use crate::outstation::traits::{
@@ -230,31 +230,17 @@ impl OutstationSession {
     pub(crate) fn new(
         receiver: Receiver<OutstationMessage>,
         config: SessionConfig,
-        sol_tx_buffer_size: usize,
-        unsol_tx_buffer_size: usize,
+        sol_tx_buffer_size: BufferSize,
+        unsol_tx_buffer_size: BufferSize,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
     ) -> Self {
-        let sol_tx_buffer_size = if sol_tx_buffer_size < OutstationConfig::MIN_TX_BUFFER_SIZE {
-            log::warn!("Minimum TX buffer size is {}. Defaulting the solicited tx buffer to this size because the provided value ({}) is too low.", OutstationConfig::MIN_TX_BUFFER_SIZE, sol_tx_buffer_size);
-            OutstationConfig::MIN_TX_BUFFER_SIZE
-        } else {
-            sol_tx_buffer_size
-        };
-
-        let unsol_tx_buffer_size = if unsol_tx_buffer_size < OutstationConfig::MIN_TX_BUFFER_SIZE {
-            log::warn!("Minimum TX buffer size is {}. Defaulting the unsolicited tx buffer to this size because the provided value ({}) is too low.", OutstationConfig::MIN_TX_BUFFER_SIZE, unsol_tx_buffer_size);
-            OutstationConfig::MIN_TX_BUFFER_SIZE
-        } else {
-            unsol_tx_buffer_size
-        };
-
         Self {
             receiver,
             config,
-            sol_tx_buffer: Buffer::new(sol_tx_buffer_size),
-            unsol_tx_buffer: Buffer::new(unsol_tx_buffer_size),
+            sol_tx_buffer: sol_tx_buffer_size.create_buffer(),
+            unsol_tx_buffer: unsol_tx_buffer_size.create_buffer(),
             state: SessionState::new(),
             application,
             info: information,
