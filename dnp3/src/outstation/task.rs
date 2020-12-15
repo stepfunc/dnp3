@@ -1,10 +1,16 @@
-use crate::link::error::LinkError;
+use crate::app::parse::DecodeLogLevel;
 use crate::outstation::config::*;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
 use crate::outstation::session::OutstationSession;
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::io::IOStream;
+use crate::util::task::{Receiver, RunError};
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum OutstationMessage {
+    SetDecodeLogLevel(DecodeLogLevel),
+}
 
 pub struct OutstationTask {
     session: OutstationSession,
@@ -16,6 +22,7 @@ pub struct OutstationTask {
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
     pub fn create(
+        receiver: crate::tokio::sync::mpsc::Receiver<OutstationMessage>,
         config: OutstationConfig,
         database: DatabaseConfig,
         application: Box<dyn OutstationApplication>,
@@ -30,6 +37,7 @@ impl OutstationTask {
         );
         let task = Self {
             session: OutstationSession::new(
+                Receiver::new(receiver),
                 config.into(),
                 config.solicited_tx_buffer_size,
                 config.unsolicited_tx_buffer_size,
@@ -45,7 +53,7 @@ impl OutstationTask {
     }
 
     /// run the outstation task asynchronously until a `LinkError` occurs
-    pub async fn run<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    pub async fn run<T>(&mut self, io: &mut T) -> Result<(), RunError>
     where
         T: IOStream,
     {

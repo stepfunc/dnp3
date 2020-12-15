@@ -9,9 +9,7 @@ use crate::app::types::Timestamp;
 use crate::app::variations::Variation;
 use crate::entry::EndpointAddress;
 use crate::master::association::{Association, Configuration};
-use crate::master::error::{
-    AssociationError, CommandError, PollError, Shutdown, TaskError, TimeSyncError,
-};
+use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
@@ -22,6 +20,7 @@ use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
 use crate::tokio::sync::mpsc::error::SendError;
+use crate::util::task::Shutdown;
 use std::time::{Duration, SystemTime};
 
 #[derive(Clone, Debug)]

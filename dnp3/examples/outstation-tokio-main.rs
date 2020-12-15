@@ -31,7 +31,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = OutstationConfig::new(outstation_address, master_address);
     config.log_level = DecodeLogLevel::ObjectValues;
 
+    let (_tx, rx) = tokio::sync::mpsc::channel(10);
+
     let (mut task, handle) = OutstationTask::create(
+        rx,
         config,
         get_database_config(),
         DefaultOutstationApplication::create(),

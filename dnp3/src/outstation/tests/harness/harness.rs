@@ -1,15 +1,15 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
-use crate::link::error::LinkError;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo};
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle, EventBufferConfig};
-use crate::outstation::task::OutstationTask;
+use crate::outstation::task::{OutstationMessage, OutstationTask};
 use crate::outstation::tests::harness::{
     ApplicationData, Event, EventHandle, MockControlHandler, MockOutstationApplication,
     MockOutstationInformation,
 };
 use crate::tokio::test::*;
+use crate::util::task::RunError;
 use std::sync::{Arc, Mutex};
 
 pub(crate) fn get_default_config() -> OutstationConfig {
@@ -31,18 +31,19 @@ pub(crate) fn get_default_unsolicited_config() -> OutstationConfig {
 
 pub(crate) struct OutstationTestHarness<T>
 where
-    T: std::future::Future<Output = Result<(), LinkError>>,
+    T: std::future::Future<Output = Result<(), RunError>>,
 {
     pub(crate) database: DatabaseHandle,
     io: io::Handle,
     task: Spawn<T>,
     events: EventHandle,
+    sender: crate::tokio::sync::mpsc::Sender<OutstationMessage>,
     pub(crate) application_data: Arc<Mutex<ApplicationData>>,
 }
 
 impl<T> OutstationTestHarness<T>
 where
-    T: std::future::Future<Output = Result<(), LinkError>>,
+    T: std::future::Future<Output = Result<(), RunError>>,
 {
     pub(crate) fn poll_pending(&mut self) {
         assert_pending!(self.task.poll());
@@ -106,21 +107,21 @@ where
 
 pub(crate) fn new_harness(
     config: OutstationConfig,
-) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
+) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), RunError>>> {
     new_harness_impl(config, None)
 }
 
 pub(crate) fn new_harness_for_broadcast(
     config: OutstationConfig,
     broadcast: BroadcastConfirmMode,
-) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
+) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), RunError>>> {
     new_harness_impl(config, Some(broadcast))
 }
 
 fn new_harness_impl(
     config: OutstationConfig,
     broadcast: Option<BroadcastConfirmMode>,
-) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), LinkError>>> {
+) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), RunError>>> {
     let events = EventHandle::new();
 
     let (data, application) = MockOutstationApplication::new(events.clone());
@@ -128,7 +129,10 @@ fn new_harness_impl(
     let mut db_config = DatabaseConfig::default();
     db_config.events = EventBufferConfig::all_types(5);
 
+    let (tx, rx) = crate::tokio::sync::mpsc::channel(10);
+
     let (task, database) = OutstationTask::create(
+        rx,
         config,
         db_config,
         application,
@@ -149,6 +153,7 @@ fn new_harness_impl(
         io: io_handle,
         task: spawn(async move { task.run(&mut io).await }),
         events,
+        sender: tx,
         application_data: data,
     }
 }

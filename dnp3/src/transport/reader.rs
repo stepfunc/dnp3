@@ -18,12 +18,6 @@ pub(crate) struct TransportReader {
     inner: InnerReaderType,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub(crate) enum Timeout {
-    Yes,
-    No,
-}
-
 pub(crate) struct RequestGuard<'a> {
     canceled: bool,
     level: DecodeLogLevel,
@@ -85,25 +79,6 @@ impl TransportReader {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         self.inner.read(io).await
-    }
-
-    pub(crate) async fn read_with_timeout<T>(
-        &mut self,
-        io: &mut T,
-        deadline: crate::tokio::time::Instant,
-    ) -> Result<Timeout, LinkError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
-        crate::tokio::select! {
-            res = self.read(io) => {
-                res?;
-                Ok(Timeout::No)
-            },
-            _ = crate::tokio::time::delay_until(deadline) => {
-                Ok(Timeout::Yes)
-            }
-        }
     }
 
     pub(crate) fn reset(&mut self) {

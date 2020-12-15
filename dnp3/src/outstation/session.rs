@@ -19,7 +19,7 @@ use crate::outstation::traits::{
     BroadcastAction, ControlHandler, OperateType, OutstationApplication, OutstationInformation,
     RestartDelay,
 };
-use crate::transport::{FragmentInfo, RequestGuard, Timeout, TransportReader, TransportWriter};
+use crate::transport::{FragmentInfo, RequestGuard, TransportReader, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 
@@ -32,6 +32,14 @@ use xxhash_rust::xxh64::xxh64;
 use crate::app::gen::all::AllObjectsVariation;
 use crate::master::request::EventClasses;
 use crate::outstation::control::select::SelectState;
+use crate::outstation::task::OutstationMessage;
+use crate::util::task::{Receiver, RunError, Shutdown};
+
+#[derive(Copy, Clone)]
+enum Timeout {
+    Yes,
+    No,
+}
 
 #[derive(Copy, Clone, PartialEq)]
 struct ResponseSeries {
@@ -169,6 +177,7 @@ impl SessionState {
 }
 
 pub(crate) struct OutstationSession {
+    receiver: Receiver<OutstationMessage>,
     sol_tx_buffer: Buffer,
     unsol_tx_buffer: Buffer,
     config: SessionConfig,
@@ -219,6 +228,7 @@ enum ConfirmAction {
 
 impl OutstationSession {
     pub(crate) fn new(
+        receiver: Receiver<OutstationMessage>,
         config: SessionConfig,
         sol_tx_buffer_size: usize,
         unsol_tx_buffer_size: usize,
@@ -241,6 +251,7 @@ impl OutstationSession {
         };
 
         Self {
+            receiver,
             config,
             sol_tx_buffer: Buffer::new(sol_tx_buffer_size),
             unsol_tx_buffer: Buffer::new(unsol_tx_buffer_size),
@@ -257,7 +268,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), LinkError>
+    ) -> Result<(), RunError>
     where
         T: IOStream,
     {
@@ -310,7 +321,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), LinkError>
+    ) -> Result<(), RunError>
     where
         T: IOStream,
     {
@@ -344,7 +355,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<crate::tokio::time::Instant>, LinkError>
+    ) -> Result<Option<crate::tokio::time::Instant>, RunError>
     where
         T: IOStream,
     {
@@ -413,7 +424,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<UnsolicitedResult, LinkError>
+    ) -> Result<UnsolicitedResult, RunError>
     where
         T: IOStream,
     {
@@ -429,7 +440,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<UnsolicitedResult>, LinkError>
+    ) -> Result<Option<UnsolicitedResult>, RunError>
     where
         T: IOStream,
     {
@@ -481,7 +492,7 @@ impl OutstationSession {
         io: &mut T,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
-    ) -> Result<UnsolicitedResult, LinkError>
+    ) -> Result<UnsolicitedResult, RunError>
     where
         T: IOStream,
     {
@@ -529,11 +540,11 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<UnsolicitedWaitResult, LinkError>
+    ) -> Result<UnsolicitedWaitResult, RunError>
     where
         T: IOStream,
     {
-        if let Timeout::Yes = reader.read_with_timeout(io, deadline).await? {
+        if let Timeout::Yes = self.read_until(io, reader, deadline).await? {
             return Ok(UnsolicitedWaitResult::Timeout);
         }
 
@@ -595,12 +606,59 @@ impl OutstationSession {
         }
     }
 
-    async fn sleep_until(&mut self, instant: Option<crate::tokio::time::Instant>) {
-        match instant {
-            Some(x) => crate::tokio::time::delay_until(x).await,
-            None => {
-                // sleep forever
-                crate::util::future::forever().await;
+    async fn read_until<T>(
+        &mut self,
+        io: &mut T,
+        reader: &mut TransportReader,
+        deadline: crate::tokio::time::Instant,
+    ) -> Result<Timeout, RunError>
+    where
+        T: IOStream,
+    {
+        loop {
+            crate::tokio::select! {
+                 res = self.sleep_until(Some(deadline)) => {
+                     res?;
+                     return Ok(Timeout::Yes);
+                 }
+                 res = reader.read(io) => {
+                     res?;
+                     return Ok(Timeout::No);
+                 }
+            }
+        }
+    }
+
+    async fn sleep_until(
+        &mut self,
+        instant: Option<crate::tokio::time::Instant>,
+    ) -> Result<(), Shutdown> {
+        async fn sleep_only(instant: Option<crate::tokio::time::Instant>) {
+            match instant {
+                Some(x) => crate::tokio::time::delay_until(x).await,
+                None => {
+                    // sleep forever
+                    crate::util::future::forever().await;
+                }
+            }
+        }
+
+        loop {
+            crate::tokio::select! {
+                 _ = sleep_only(instant) => {
+                        return Ok(());
+                 }
+                 message = self.receiver.next() => {
+                     self.handle_message(message?);
+                 }
+            }
+        }
+    }
+
+    fn handle_message(&mut self, message: OutstationMessage) {
+        match message {
+            OutstationMessage::SetDecodeLogLevel(level) => {
+                self.config.level = level;
             }
         }
     }
@@ -611,7 +669,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), LinkError>
+    ) -> Result<(), RunError>
     where
         T: IOStream,
     {
@@ -1205,7 +1263,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
         mut series: ResponseSeries,
-    ) -> Result<(), LinkError>
+    ) -> Result<(), RunError>
     where
         T: IOStream,
     {
@@ -1250,13 +1308,13 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         ecsn: Sequence,
-    ) -> Result<Confirm, LinkError>
+    ) -> Result<Confirm, RunError>
     where
         T: IOStream,
     {
         let mut deadline = self.new_confirm_deadline();
         loop {
-            match reader.read_with_timeout(io, deadline).await? {
+            match self.read_until(io, reader, deadline).await? {
                 Timeout::Yes => {
                     self.info.solicited_confirm_timeout(ecsn);
                     return Ok(Confirm::Timeout);

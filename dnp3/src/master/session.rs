@@ -15,17 +15,12 @@ use crate::master::messages::{MasterMsg, Message};
 
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
-use crate::master::error::{Shutdown, TaskError};
+use crate::master::error::TaskError;
 use crate::tokio::time::Instant;
 use crate::util::io::IOStream;
+use crate::util::task::{RunError, Shutdown};
 use std::ops::Add;
 use std::time::Duration;
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum RunError {
-    Link(LinkError),
-    Shutdown,
-}
 
 pub(crate) struct MasterSession {
     level: DecodeLogLevel,

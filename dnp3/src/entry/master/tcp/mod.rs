@@ -1,10 +1,10 @@
 use crate::app::retry::ExponentialBackOff;
-use crate::master::error::Shutdown;
 use crate::master::handle::{Listener, MasterConfiguration, MasterHandle};
-use crate::master::session::{MasterSession, RunError};
+use crate::master::session::MasterSession;
 use crate::tokio::net::TcpStream;
 use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
+use crate::util::task::{RunError, Shutdown};
 use std::future::Future;
 use std::net::SocketAddr;
 use std::time::Duration;
