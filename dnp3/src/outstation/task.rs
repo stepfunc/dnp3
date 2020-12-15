@@ -10,6 +10,7 @@ pub struct OutstationTask {
     session: OutstationSession,
     reader: TransportReader,
     writer: TransportWriter,
+    database: DatabaseHandle,
 }
 
 impl OutstationTask {
@@ -32,13 +33,13 @@ impl OutstationTask {
                 config.into(),
                 config.solicited_tx_buffer_size,
                 config.unsolicited_tx_buffer_size,
-                handle.clone(),
                 application,
                 information,
                 control_handler,
             ),
             reader,
             writer,
+            database: handle.clone(),
         };
         (task, handle)
     }
@@ -49,7 +50,7 @@ impl OutstationTask {
         T: IOStream,
     {
         self.session
-            .run(io, &mut self.reader, &mut self.writer)
+            .run(io, &mut self.reader, &mut self.writer, &mut self.database)
             .await
     }
 
