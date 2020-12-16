@@ -32,12 +32,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Create event poll
-    /*let mut poll = association
-    .add_poll(
-        EventClasses::all().to_classes().to_request(),
-        Duration::from_secs(5),
-    )
-    .await?;*/
+    let mut poll = association
+        .add_poll(
+            EventClasses::all().to_classes().to_request(),
+            Duration::from_secs(5),
+        )
+        .await?;
 
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     log::warn!("error: {}", err);
                 }
             }
-            //"evt" => poll.demand().await,
+            "evt" => poll.demand().await,
             "lts" => {
                 if let Err(err) = association.perform_time_sync(TimeSyncProcedure::LAN).await {
                     log::warn!("error: {}", err);

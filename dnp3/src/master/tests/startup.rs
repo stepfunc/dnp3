@@ -1,7 +1,10 @@
+use crate::app::format::write::start_request;
+use crate::app::header::{Control, IIN, IIN1, IIN2};
 use crate::app::sequence::Sequence;
 use crate::prelude::master::*;
 use crate::tokio::test::*;
 use crate::tokio::time;
+use crate::util::cursor::WriteCursor;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
@@ -143,6 +146,53 @@ fn outstation_restart_procedure() {
 
     // Enable unsolicited
     enable_unsol_request(&mut harness.io, seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+}
+
+#[test]
+fn detect_restart_in_read_response() {
+    let config = Configuration::default();
+    let mut seq = Sequence::default();
+    let mut harness = create_association(config);
+
+    startup_procedure(&mut harness, &mut seq);
+
+    // Send Class 0 read request
+    {
+        let mut read_task = spawn(
+            harness
+                .association
+                .read(Classes::new(true, EventClasses::none()).to_request()),
+        );
+        assert_pending!(read_task.poll());
+    }
+    harness.assert_io();
+
+    {
+        // Read class 0 data
+        let mut buffer = [0; 20];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let mut request =
+            start_request(Control::request(seq), FunctionCode::Read, &mut cursor).unwrap();
+
+        request
+            .write_all_objects_header(Variation::Group60Var1)
+            .unwrap();
+
+        harness.io.write(cursor.written());
+    }
+
+    // Response with DEVICE_RESTART IIN bit set
+    empty_response_custom_iin(
+        &mut harness.io,
+        seq.increment(),
+        IIN::new(IIN1::new(0x80), IIN2::new(0x00)),
+    );
+    harness.assert_io();
+
+    // Clear the restart flag
+    clear_restart_iin(&mut harness.io, seq);
     empty_response(&mut harness.io, seq.increment());
     harness.assert_io();
 }

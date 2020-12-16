@@ -100,12 +100,16 @@ pub(crate) fn clear_restart_iin(io: &mut io::Handle, seq: Sequence) {
 }
 
 pub(crate) fn empty_response(io: &mut io::Handle, seq: Sequence) {
+    empty_response_custom_iin(io, seq, IIN::default());
+}
+
+pub(crate) fn empty_response_custom_iin(io: &mut io::Handle, seq: Sequence, iin: IIN) {
     let mut buffer = [0; 4];
     let mut cursor = WriteCursor::new(&mut buffer);
     start_response(
         Control::response(seq, true, true, false),
         ResponseFunction::Response,
-        IIN::default(),
+        iin,
         &mut cursor,
     )
     .unwrap();

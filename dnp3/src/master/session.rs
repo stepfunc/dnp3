@@ -545,6 +545,7 @@ impl MasterSession {
         }
 
         let association = self.associations.get_mut(destination)?;
+        association.process_iin(response.header.iin);
         task.process_response(association, response.header, response.objects?);
 
         if response.header.control.con {
