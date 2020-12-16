@@ -1,13 +1,19 @@
+use crate::tokio::io::{AsyncRead, AsyncWrite};
+
 use crate::app::retry::ExponentialBackOff;
 use crate::master::error::Shutdown;
 use crate::master::handle::{Listener, MasterConfiguration, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
-use crate::tokio::net::TcpStream;
 use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
 use std::future::Future;
-use std::net::SocketAddr;
+use std::io::Error;
 use std::time::Duration;
+
+/// entry points for creating and spawning serial-based master tasks
+pub mod serial;
+/// entry points for creating and spawning TCP-based master tasks
+pub mod tcp;
 
 /// state of TCP client connection
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -19,8 +25,13 @@ pub enum ClientState {
     Shutdown,
 }
 
-pub(crate) struct MasterTask {
-    endpoint: SocketAddr,
+pub(crate) struct MasterTask<S, Fut, F>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    Fut: Future<Output = Result<S, Error>>,
+    F: Fn() -> Fut,
+{
+    connect_fn: F,
     back_off: ExponentialBackOff,
     session: MasterSession,
     reader: TransportReader,
@@ -28,42 +39,15 @@ pub(crate) struct MasterTask {
     listener: Listener<ClientState>,
 }
 
-/// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
-/// `AssociationHandle` created from it, are dropped.
-///
-/// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
-/// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
-pub fn spawn_master_tcp_client(
-    config: MasterConfiguration,
-    endpoint: SocketAddr,
-    listener: Listener<ClientState>,
-) -> MasterHandle {
-    let (mut task, handle) = MasterTask::new(config, endpoint, listener);
-    crate::tokio::spawn(async move { task.run().await });
-    handle
-}
-
-/// Create a Future, which can be spawned onto a runtime, along with a controlling handle.
-///
-/// Once spawned or otherwise executed using the `run` method, the task runs until the handle
-/// and any `AssociationHandle` created from it are dropped.
-///
-/// **Note**: This function is required instead of `spawn` when using a runtime to directly spawn
-/// tasks instead of within the context of a runtime, e.g. in applications that cannot use
-/// `[tokio::main]` such as C language bindings.
-pub fn create_master_tcp_client(
-    config: MasterConfiguration,
-    endpoint: SocketAddr,
-    listener: Listener<ClientState>,
-) -> (impl Future<Output = ()> + 'static, MasterHandle) {
-    let (mut task, handle) = MasterTask::new(config, endpoint, listener);
-    (async move { task.run().await }, handle)
-}
-
-impl MasterTask {
+impl<S, Fut, F> MasterTask<S, Fut, F>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    Fut: Future<Output = Result<S, Error>>,
+    F: Fn() -> Fut,
+{
     fn new(
+        connect_fn: F,
         config: MasterConfiguration,
-        endpoint: SocketAddr,
         listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
         let (tx, rx) = crate::tokio::sync::mpsc::channel(100); // TODO
@@ -76,7 +60,7 @@ impl MasterTask {
         let (reader, writer) =
             crate::transport::create_master_transport_layer(config.address, config.rx_buffer_size);
         let task = Self {
-            endpoint,
+            connect_fn,
             back_off: ExponentialBackOff::new(config.reconnection_strategy),
             session,
             reader,
@@ -93,7 +77,7 @@ impl MasterTask {
     async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
             self.listener.update(ClientState::Connecting);
-            match TcpStream::connect(self.endpoint).await {
+            match (self.connect_fn)().await {
                 Err(err) => {
                     let delay = self.back_off.on_failure();
                     log::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
@@ -102,7 +86,7 @@ impl MasterTask {
                     self.session.delay_for(delay).await?;
                 }
                 Ok(mut socket) => {
-                    log::info!("connected to: {}", self.endpoint);
+                    log::info!("connected");
                     self.back_off.on_success();
                     self.listener.update(ClientState::Connected);
                     match self
