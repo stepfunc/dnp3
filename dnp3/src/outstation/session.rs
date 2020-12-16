@@ -28,7 +28,6 @@ use crate::util::io::IOStream;
 use std::borrow::BorrowMut;
 use xxhash_rust::xxh64::xxh64;
 
-// TODO - maybe move this to the app module?
 use crate::app::gen::all::AllObjectsVariation;
 use crate::master::request::EventClasses;
 use crate::outstation::control::select::SelectState;
@@ -44,15 +43,12 @@ enum Timeout {
 #[derive(Copy, Clone, PartialEq)]
 struct ResponseSeries {
     ecsn: Sequence,
-    last_response: bool,
+    fin: bool,
 }
 
 impl ResponseSeries {
-    fn new(ecsn: Sequence, last_response: bool) -> Self {
-        Self {
-            ecsn,
-            last_response,
-        }
+    fn new(ecsn: Sequence, fin: bool) -> Self {
+        Self { ecsn, fin }
     }
 }
 
@@ -231,6 +227,7 @@ impl OutstationSession {
         receiver: Receiver<OutstationMessage>,
         config: SessionConfig,
         sol_tx_buffer_size: BufferSize,
+        _sol_rx_buffer_size: BufferSize,
         unsol_tx_buffer_size: BufferSize,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
@@ -1260,7 +1257,7 @@ impl OutstationSession {
             {
                 Confirm::Yes => {
                     database.clear_written_events();
-                    if series.last_response {
+                    if series.fin {
                         // done with response series
                         return Ok(());
                     }

@@ -39,8 +39,9 @@ impl OutstationTask {
             session: OutstationSession::new(
                 Receiver::new(receiver),
                 config.into(),
-                config.solicited_tx_buffer_size,
-                config.unsolicited_tx_buffer_size,
+                config.solicited_buffer_size,
+                config.solicited_buffer_size,
+                config.unsolicited_buffer_size,
                 application,
                 information,
                 control_handler,

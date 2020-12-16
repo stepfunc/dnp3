@@ -4,6 +4,7 @@ use super::writer::EventWriter;
 use crate::app::measurement;
 use crate::master::request::EventClasses;
 use crate::outstation::database::config::*;
+use crate::outstation::database::read::EventReadHeader;
 use crate::outstation::database::{EventBufferConfig, EventClass};
 use crate::util::cursor::{WriteCursor, WriteError};
 use std::cell::Cell;
@@ -446,6 +447,41 @@ impl EventBuffer {
         ret
     }
 
+    pub(crate) fn select_by_header(&mut self, header: EventReadHeader) -> usize {
+        match header {
+            EventReadHeader::Class1(limit) => {
+                self.select_by_class(EventClass::Class1.into(), limit)
+            }
+            EventReadHeader::Class2(limit) => {
+                self.select_by_class(EventClass::Class2.into(), limit)
+            }
+            EventReadHeader::Class3(limit) => {
+                self.select_by_class(EventClass::Class3.into(), limit)
+            }
+            EventReadHeader::Binary(v, limit) => {
+                self.select_by_type::<measurement::Binary>(v, limit)
+            }
+            EventReadHeader::DoubleBitBinary(v, limit) => {
+                self.select_by_type::<measurement::DoubleBitBinary>(v, limit)
+            }
+            EventReadHeader::BinaryOutputStatus(v, limit) => {
+                self.select_by_type::<measurement::BinaryOutputStatus>(v, limit)
+            }
+            EventReadHeader::Counter(v, limit) => {
+                self.select_by_type::<measurement::Counter>(v, limit)
+            }
+            EventReadHeader::FrozenCounter(v, limit) => {
+                self.select_by_type::<measurement::FrozenCounter>(v, limit)
+            }
+            EventReadHeader::Analog(v, limit) => {
+                self.select_by_type::<measurement::Analog>(v, limit)
+            }
+            EventReadHeader::AnalogOutputStatus(v, limit) => {
+                self.select_by_type::<measurement::AnalogOutputStatus>(v, limit)
+            }
+        }
+    }
+
     pub(crate) fn select_by_class(&mut self, classes: EventClasses, limit: Option<usize>) -> usize {
         self.select(limit, |e| {
             if classes.matches(e.class) {
@@ -457,8 +493,21 @@ impl EventBuffer {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn select_specific_variation<T>(
+    fn select_by_type<T>(
+        &mut self,
+        specific_variation: Option<T::EventVariation>,
+        limit: Option<usize>,
+    ) -> usize
+    where
+        T: Insertable,
+    {
+        match specific_variation {
+            Some(x) => self.select_specific_variation::<T>(limit, x),
+            None => self.select_default_variation::<T>(limit),
+        }
+    }
+
+    fn select_specific_variation<T>(
         &mut self,
         limit: Option<usize>,
         variation: T::EventVariation,
@@ -469,8 +518,7 @@ impl EventBuffer {
         self.select(limit, |e| T::select_variation(e, variation))
     }
 
-    #[cfg(test)]
-    pub(crate) fn select_default_variation<T>(&mut self, limit: Option<usize>) -> usize
+    fn select_default_variation<T>(&mut self, limit: Option<usize>) -> usize
     where
         T: Insertable,
     {

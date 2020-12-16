@@ -2,6 +2,8 @@
 pub mod config;
 /// private internal control only needed by the parent module
 mod details;
+/// read headers
+pub(crate) mod read;
 
 use crate::app::header::IIN2;
 use crate::app::measurement::*;
@@ -12,6 +14,7 @@ use config::*;
 use details::range::static_db::{Deadband, FlagsDetector, PointConfig};
 
 use crate::master::request::EventClasses;
+use crate::outstation::database::read::ReadHeader;
 use std::sync::{Arc, Mutex};
 
 /// Controls how are events are processed when updating values in the database
@@ -309,7 +312,22 @@ impl DatabaseHandle {
     }
 
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> IIN2 {
-        self.inner.lock().unwrap().inner.select(headers)
+        let mut iin2 = IIN2::default();
+        let mut guard = self.inner.lock().unwrap();
+        for header in headers.iter() {
+            match ReadHeader::from(&header.details) {
+                None => {
+                    log::warn!(
+                        "{} with qualifier {} is not supported in READ requests",
+                        header.variation,
+                        header.details.qualifier()
+                    );
+                    iin2 |= IIN2::NO_FUNC_CODE_SUPPORT;
+                }
+                Some(x) => iin2 |= guard.inner.select_by_header(x),
+            }
+        }
+        iin2
     }
 
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {

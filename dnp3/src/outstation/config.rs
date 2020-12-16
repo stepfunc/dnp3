@@ -26,6 +26,10 @@ impl BufferSize {
         self.size
     }
 
+    pub fn min() -> Self {
+        Self { size: Self::MIN }
+    }
+
     pub fn new(size: usize) -> Result<Self, BufferSizeError> {
         if size < Self::MIN {
             return Err(BufferSizeError::TooSmall(size));
@@ -76,8 +80,8 @@ impl Default for Features {
 pub struct OutstationConfig {
     pub outstation_address: EndpointAddress,
     pub master_address: EndpointAddress,
-    pub solicited_tx_buffer_size: BufferSize,
-    pub unsolicited_tx_buffer_size: BufferSize,
+    pub solicited_buffer_size: BufferSize,
+    pub unsolicited_buffer_size: BufferSize,
     pub rx_buffer_size: BufferSize,
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: std::time::Duration,
@@ -109,8 +113,8 @@ impl OutstationConfig {
         Self {
             outstation_address,
             master_address,
-            solicited_tx_buffer_size: BufferSize::default(),
-            unsolicited_tx_buffer_size: BufferSize::default(),
+            solicited_buffer_size: BufferSize::default(),
+            unsolicited_buffer_size: BufferSize::default(),
             rx_buffer_size: BufferSize::default(),
             log_level: DecodeLogLevel::Nothing,
             confirm_timeout: Self::DEFAULT_CONFIRM_TIMEOUT,
