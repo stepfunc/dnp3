@@ -190,7 +190,7 @@ impl Default for DatabaseConfig {
 
 impl DatabaseConfig {
     /// minimum that may be configured for 'max_read_request_headers', also the default.
-    pub const DEFAULT_READ_REQUEST_HEADERS: u16 = 64;
+    pub const DEFAULT_MAX_READ_REQUEST_HEADERS: u16 = 64;
 }
 
 /// Options that control how the update is performed. 99% of the time
@@ -315,13 +315,8 @@ impl DatabaseHandle {
         let mut iin2 = IIN2::default();
         let mut guard = self.inner.lock().unwrap();
         for header in headers.iter() {
-            match ReadHeader::from(&header.details) {
+            match ReadHeader::get(&header) {
                 None => {
-                    log::warn!(
-                        "{} with qualifier {} is not supported in READ requests",
-                        header.variation,
-                        header.details.qualifier()
-                    );
                     iin2 |= IIN2::NO_FUNC_CODE_SUPPORT;
                 }
                 Some(x) => iin2 |= guard.inner.select_by_header(x),

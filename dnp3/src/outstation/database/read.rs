@@ -1,7 +1,7 @@
 use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::ranged::RangedVariation;
-use crate::app::parse::parser::HeaderDetails;
+use crate::app::parse::parser::{HeaderDetails, ObjectHeader};
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::range::static_db::IndexRange;
 
@@ -61,7 +61,19 @@ impl From<EventReadHeader> for ReadHeader {
 }
 
 impl ReadHeader {
-    pub(crate) fn from(header: &HeaderDetails) -> Option<ReadHeader> {
+    pub(crate) fn get(header: &ObjectHeader) -> Option<ReadHeader> {
+        let res = Self::get_impl(&header.details);
+        if res.is_none() {
+            log::warn!(
+                "{} - {} not supported in READ requests",
+                header.variation,
+                header.details.qualifier()
+            );
+        }
+        res
+    }
+
+    fn get_impl(header: &HeaderDetails) -> Option<ReadHeader> {
         match header {
             HeaderDetails::AllObjects(x) => Self::from_all_objects(x),
             HeaderDetails::OneByteCount(_, x) => Self::from_count(x),

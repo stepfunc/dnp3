@@ -249,8 +249,8 @@ impl StaticDatabase {
     pub(crate) fn new(max_selection: Option<u16>, class_zero: ClassZeroConfig) -> Self {
         // don't allow values smaller than the default
         let max_selection = max_selection
-            .map(|x| x.max(DatabaseConfig::DEFAULT_READ_REQUEST_HEADERS))
-            .unwrap_or(DatabaseConfig::DEFAULT_READ_REQUEST_HEADERS);
+            .map(|x| x.max(DatabaseConfig::DEFAULT_MAX_READ_REQUEST_HEADERS))
+            .unwrap_or(DatabaseConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
 
         Self {
             class_zero,

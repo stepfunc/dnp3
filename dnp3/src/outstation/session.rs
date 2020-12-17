@@ -31,6 +31,7 @@ use xxhash_rust::xxh64::xxh64;
 use crate::app::gen::all::AllObjectsVariation;
 use crate::master::request::EventClasses;
 use crate::outstation::control::select::SelectState;
+use crate::outstation::deferred::DeferredRead;
 use crate::outstation::task::OutstationMessage;
 use crate::util::task::{Receiver, RunError, Shutdown};
 
@@ -157,10 +158,11 @@ struct SessionState {
     select: Option<SelectState>,
     unsolicited: UnsolicitedState,
     unsolicited_seq: Sequence,
+    deferred_read: DeferredRead,
 }
 
 impl SessionState {
-    fn new() -> Self {
+    fn new(max_read_headers: u16) -> Self {
         Self {
             enabled_unsolicited_classes: EventClasses::none(),
             restart_iin_asserted: true,
@@ -168,6 +170,7 @@ impl SessionState {
             select: None,
             unsolicited: UnsolicitedState::NullRequired(None),
             unsolicited_seq: Sequence::default(),
+            deferred_read: DeferredRead::new(max_read_headers),
         }
     }
 }
@@ -223,11 +226,13 @@ enum ConfirmAction {
 }
 
 impl OutstationSession {
+    // TODO
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         receiver: Receiver<OutstationMessage>,
         config: SessionConfig,
+        max_read_headers_per_request: u16,
         sol_tx_buffer_size: BufferSize,
-        _sol_rx_buffer_size: BufferSize,
         unsol_tx_buffer_size: BufferSize,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
@@ -238,7 +243,7 @@ impl OutstationSession {
             config,
             sol_tx_buffer: sol_tx_buffer_size.create_buffer(),
             unsol_tx_buffer: unsol_tx_buffer_size.create_buffer(),
-            state: SessionState::new(),
+            state: SessionState::new(max_read_headers_per_request),
             application,
             info: information,
             control_handler,
@@ -308,6 +313,10 @@ impl OutstationSession {
     where
         T: IOStream,
     {
+        // handle a deferred read request if it exists
+        self.handle_deferred_read(io, reader, writer, database)
+            .await?;
+
         // handle a request fragment if present
         self.handle_one_request_from_idle(io, reader, writer, database)
             .await?;
@@ -553,16 +562,19 @@ impl OutstationSession {
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::Broadcast(mode) => {
+                self.state.deferred_read.clear();
                 self.process_broadcast(database, mode, request);
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::MalformedRequest(_, err) => {
+                self.state.deferred_read.clear();
                 let length =
                     self.write_empty_solicited_response(request.header.control.seq, err.into());
                 self.write_solicited(io, writer, length).await?;
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::NewNonRead(_hash, objects) => {
+                self.state.deferred_read.clear();
                 if let Some(length) = self.handle_non_read(
                     database,
                     request.header.function,
@@ -574,16 +586,22 @@ impl OutstationSession {
                 }
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
-            FragmentType::NewRead(_, _) => {
-                // TODO
+            FragmentType::NewRead(hash, headers) => {
+                self.state
+                    .deferred_read
+                    .set(hash, request.header.control.seq, info, headers);
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
-            FragmentType::RepeatRead(_, _, _) => {
-                // TODO
+            FragmentType::RepeatRead(hash, _, headers) => {
+                self.state
+                    .deferred_read
+                    .set(hash, request.header.control.seq, info, headers);
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::RepeatNonRead(_, _) => {
-                // TODO
+                // TODO - send the response?
+
+                self.state.deferred_read.clear();
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
         }
@@ -646,6 +664,35 @@ impl OutstationSession {
         }
     }
 
+    async fn handle_deferred_read<T>(
+        &mut self,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+        database: &mut DatabaseHandle,
+    ) -> Result<(), RunError>
+    where
+        T: IOStream,
+    {
+        if let Some(x) = self.state.deferred_read.select(database) {
+            let (length, next_state) = self.write_read_response(database, true, x.seq, x.iin2);
+            self.state.last_valid_request = Some(LastValidRequest::new(
+                x.seq,
+                x.hash,
+                Some(length),
+                next_state,
+            ));
+            self.write_solicited(io, writer, length).await?;
+            if let NextState::SolConfirmWait(series) = next_state {
+                // enter the solicited confirm wait state
+                self.sol_confirm_wait(io, reader, writer, database, series)
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
     async fn handle_one_request_from_idle<T>(
         &mut self,
         io: &mut T,
@@ -670,7 +717,6 @@ impl OutstationSession {
                 if let NextState::SolConfirmWait(series) = result.next {
                     drop(guard);
                     // enter the solicited confirm wait state
-                    self.info.enter_solicited_confirm_wait(series.ecsn);
                     self.sol_confirm_wait(io, reader, writer, database, series)
                         .await?;
                 }
@@ -1250,6 +1296,8 @@ impl OutstationSession {
     where
         T: IOStream,
     {
+        self.info.enter_solicited_confirm_wait(series.ecsn);
+
         loop {
             match self
                 .wait_for_sol_confirm(io, reader, writer, series.ecsn)

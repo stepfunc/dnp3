@@ -39,7 +39,7 @@ impl OutstationTask {
             session: OutstationSession::new(
                 Receiver::new(receiver),
                 config.into(),
-                config.solicited_buffer_size,
+                config.max_read_headers_per_request,
                 config.solicited_buffer_size,
                 config.unsolicited_buffer_size,
                 application,

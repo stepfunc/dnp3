@@ -1,5 +1,6 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
+use crate::outstation::database::DatabaseConfig;
 use crate::util::buffer::Buffer;
 
 /// Validated buffer size for use in the outstation
@@ -89,6 +90,7 @@ pub struct OutstationConfig {
     pub features: Features,
     pub max_unsolicited_retries: Option<usize>,
     pub unsolicited_retry_delay: std::time::Duration,
+    pub max_read_headers_per_request: u16,
 }
 
 impl Feature {
@@ -122,6 +124,7 @@ impl OutstationConfig {
             features: Features::default(),
             max_unsolicited_retries: None,
             unsolicited_retry_delay: Self::DEFAULT_UNSOLICITED_RETRY_DELAY,
+            max_read_headers_per_request: DatabaseConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
         }
     }
 }
