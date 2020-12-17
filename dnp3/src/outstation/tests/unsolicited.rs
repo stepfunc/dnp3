@@ -1,8 +1,22 @@
 use super::harness::*;
 use crate::outstation::config::OutstationConfig;
+use crate::util::task::RunError;
 
 const NULL_UNSOL_SEQ_0: &[u8] = &[0xF0, 0x82, 0x80, 0x00];
 const NULL_UNSOL_SEQ_1: &[u8] = &[0xF1, 0x82, 0x80, 0x00];
+const UNS_CONFIRM_SEQ_0: &[u8] = &[0b1101_0000, 0x00];
+
+fn confirm_null_unsolicited<T>(harness: &mut OutstationTestHarness<T>)
+where
+    T: std::future::Future<Output = Result<(), RunError>>,
+{
+    harness.expect_response(NULL_UNSOL_SEQ_0);
+    harness.send(UNS_CONFIRM_SEQ_0);
+    harness.check_events(&[
+        Event::EnterUnsolicitedConfirmWait(0),
+        Event::UnsolicitedConfirmReceived(0),
+    ]);
+}
 
 fn config_with_limited_retries(retries: usize) -> OutstationConfig {
     let mut config = get_default_unsolicited_config();
@@ -57,4 +71,10 @@ fn null_unsolicited_can_timeout_series_wait_and_start_another_series() {
     crate::tokio::time::advance(OutstationConfig::DEFAULT_UNSOLICITED_RETRY_DELAY);
     harness.expect_response(NULL_UNSOL_SEQ_1);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+}
+
+#[test]
+fn null_unsolicited_can_be_confirmed() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness);
 }

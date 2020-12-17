@@ -549,6 +549,7 @@ impl OutstationSession {
         match self.classify(info, request) {
             FragmentType::UnsolicitedConfirm(seq) => {
                 if seq == uns_ecsn {
+                    self.info.unsolicited_confirmed(seq);
                     Ok(UnsolicitedWaitResult::Complete(
                         UnsolicitedResult::Confirmed,
                     ))

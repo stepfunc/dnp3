@@ -25,6 +25,7 @@ pub(crate) enum Event {
     EnterUnsolicitedConfirmWait(u8),
     SolicitedConfirmTimeout(u8),
     UnsolicitedConfirmTimeout(u8, bool),
+    UnsolicitedConfirmReceived(u8),
     SolicitedConfirmReceived(u8),
     SolicitedConfirmWaitNewRequest(RequestHeader),
     UnexpectedConfirm(bool, u8),
