@@ -4,8 +4,12 @@ use std::future::Future;
 use std::path::PathBuf;
 use tokio_serial::Serial;
 
+pub use tokio_serial::DataBits;
+pub use tokio_serial::FlowControl;
+pub use tokio_serial::Parity;
 /// Serial port settings
 pub use tokio_serial::SerialPortSettings;
+pub use tokio_serial::StopBits;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.

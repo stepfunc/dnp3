@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             RetryStrategy::default(),
             Timeout::from_secs(1)?,
         ),
-        "COM1",
+        "/dev/pts/4",
         SerialPortSettings::default(),
         Listener::None,
     );

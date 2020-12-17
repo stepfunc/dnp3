@@ -6,6 +6,7 @@ use std::ffi::CStr;
 use std::net::SocketAddr;
 use std::ptr::null_mut;
 use std::str::FromStr;
+use std::time::Duration;
 
 use dnp3::entry::EndpointAddress;
 pub use tokio::runtime::Runtime;
@@ -78,6 +79,41 @@ pub(crate) unsafe fn runtime_add_master_tcp(
     }
 }
 
+pub(crate) unsafe fn runtime_add_master_serial(
+    runtime: *mut tokio::runtime::Runtime,
+    config: ffi::MasterConfiguration,
+    path: &CStr,
+    serial_params: ffi::SerialPortSettings,
+    listener: ffi::ClientStateListener,
+) -> *mut Master {
+    let config = if let Some(config) = config.into() {
+        config
+    } else {
+        return std::ptr::null_mut();
+    };
+    let listener = ClientStateListenerAdapter::new(listener);
+
+    let (future, handle) = create_master_serial_client(
+        config,
+        path.to_string_lossy().to_string(),
+        serial_params.into(),
+        listener.into_listener(),
+    );
+
+    if let Some(runtime) = runtime.as_ref() {
+        runtime.spawn(future);
+
+        let master = Master {
+            runtime: runtime.handle().clone(),
+            handle,
+        };
+
+        Box::into_raw(Box::new(master))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 impl ffi::MasterConfiguration {
     fn into(self) -> Option<MasterConfiguration> {
         let address = match EndpointAddress::from(self.address()) {
@@ -127,5 +163,34 @@ impl ClientStateListenerAdapter {
             };
             self.native_cb.on_change(value);
         }))
+    }
+}
+
+impl From<ffi::SerialPortSettings> for SerialPortSettings {
+    fn from(from: ffi::SerialPortSettings) -> Self {
+        Self {
+            baud_rate: from.baud_rate(),
+            data_bits: match from.data_bits() {
+                ffi::DataBits::Five => DataBits::Five,
+                ffi::DataBits::Six => DataBits::Six,
+                ffi::DataBits::Seven => DataBits::Seven,
+                ffi::DataBits::Eight => DataBits::Eight,
+            },
+            flow_control: match from.flow_control() {
+                ffi::FlowControl::None => FlowControl::None,
+                ffi::FlowControl::Software => FlowControl::Software,
+                ffi::FlowControl::Hardware => FlowControl::Hardware,
+            },
+            parity: match from.parity() {
+                ffi::Parity::None => Parity::None,
+                ffi::Parity::Odd => Parity::Odd,
+                ffi::Parity::Even => Parity::Even,
+            },
+            stop_bits: match from.stop_bits() {
+                ffi::StopBits::One => StopBits::One,
+                ffi::StopBits::Two => StopBits::Two,
+            },
+            timeout: Duration::from_millis(1),
+        }
     }
 }
