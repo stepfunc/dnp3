@@ -79,18 +79,12 @@ impl RetryCounter {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
-enum NextState {
-    Idle,
-    SolConfirmWait(ResponseSeries),
-}
-
 impl ResponseInfo {
-    fn to_next_state(&self, ecsn: Sequence) -> NextState {
+    fn get_response_series(&self, ecsn: Sequence) -> Option<ResponseSeries> {
         if self.need_confirm() {
-            NextState::SolConfirmWait(ResponseSeries::new(ecsn, self.complete))
+            Some(ResponseSeries::new(ecsn, self.complete))
         } else {
-            NextState::Idle
+            None
         }
     }
 }
@@ -100,7 +94,7 @@ struct LastValidRequest {
     seq: Sequence,
     request_hash: u64,
     response_length: Option<usize>,
-    next: NextState,
+    series: Option<ResponseSeries>,
 }
 
 impl LastValidRequest {
@@ -108,13 +102,13 @@ impl LastValidRequest {
         seq: Sequence,
         request_hash: u64,
         response_length: Option<usize>,
-        next: NextState,
+        series: Option<ResponseSeries>,
     ) -> Self {
         LastValidRequest {
             seq,
             request_hash,
             response_length,
-            next,
+            series,
         }
     }
 }
@@ -682,15 +676,11 @@ impl OutstationSession {
         T: IOStream,
     {
         if let Some(x) = self.state.deferred_read.select(database) {
-            let (length, next_state) = self.write_read_response(database, true, x.seq, x.iin2);
-            self.state.last_valid_request = Some(LastValidRequest::new(
-                x.seq,
-                x.hash,
-                Some(length),
-                next_state,
-            ));
+            let (length, series) = self.write_read_response(database, true, x.seq, x.iin2);
+            self.state.last_valid_request =
+                Some(LastValidRequest::new(x.seq, x.hash, Some(length), series));
             self.write_solicited(io, writer, length).await?;
-            if let NextState::SolConfirmWait(series) = next_state {
+            if let Some(series) = series {
                 // enter the solicited confirm wait state
                 self.sol_confirm_wait(io, reader, writer, database, series)
                     .await?;
@@ -721,7 +711,7 @@ impl OutstationSession {
                 }
 
                 // maybe start a response series
-                if let NextState::SolConfirmWait(series) = result.next {
+                if let Some(series) = result.series {
                     drop(guard);
                     // enter the solicited confirm wait state
                     self.sol_confirm_wait(io, reader, writer, database, series)
@@ -747,38 +737,28 @@ impl OutstationSession {
         match self.classify(info, request) {
             FragmentType::MalformedRequest(hash, err) => {
                 let length = self.write_empty_solicited_response(seq, err.into());
-                Some(LastValidRequest::new(
-                    seq,
-                    hash,
-                    Some(length),
-                    NextState::Idle,
-                ))
+                Some(LastValidRequest::new(seq, hash, Some(length), None))
             }
             FragmentType::NewRead(hash, objects) => {
-                let (length, next) = self.write_first_read_response(database, seq, objects);
-                Some(LastValidRequest::new(seq, hash, Some(length), next))
+                let (length, series) = self.write_first_read_response(database, seq, objects);
+                Some(LastValidRequest::new(seq, hash, Some(length), series))
             }
             FragmentType::RepeatRead(hash, _, objects) => {
                 // this deviates a bit from the spec, the specification says to
                 // also reply to duplicate READ requests from idle, but this
                 // is plainly wrong since it can't possibly handle a multi-fragmented
                 // response correctly. Answering a repeat READ with a fresh response is harmless
-                let (length, next) = self.write_first_read_response(database, seq, objects);
-                Some(LastValidRequest::new(seq, hash, Some(length), next))
+                let (length, series) = self.write_first_read_response(database, seq, objects);
+                Some(LastValidRequest::new(seq, hash, Some(length), series))
             }
             FragmentType::NewNonRead(hash, objects) => {
                 let length =
                     self.handle_non_read(database, request.header.function, seq, info.id, objects);
-                Some(LastValidRequest::new(seq, hash, length, NextState::Idle))
+                Some(LastValidRequest::new(seq, hash, length, None))
             }
             FragmentType::RepeatNonRead(hash, last_response_length) => {
                 // per the spec, we just echo the last response
-                Some(LastValidRequest::new(
-                    seq,
-                    hash,
-                    last_response_length,
-                    NextState::Idle,
-                ))
+                Some(LastValidRequest::new(seq, hash, last_response_length, None))
             }
             FragmentType::Broadcast(mode) => {
                 self.process_broadcast(database, mode, request);
@@ -830,7 +810,7 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection,
-    ) -> (usize, NextState) {
+    ) -> (usize, Option<ResponseSeries>) {
         let iin2 = database.select(&object_headers);
         self.write_read_response(database, true, seq, iin2)
     }
@@ -841,7 +821,7 @@ impl OutstationSession {
         fir: bool,
         seq: Sequence,
         iin2: IIN2,
-    ) -> (usize, NextState) {
+    ) -> (usize, Option<ResponseSeries>) {
         let iin1 = self.get_response_iin();
         let mut cursor = self.sol_tx_buffer.write_cursor();
         cursor.skip(ResponseHeader::LENGTH).unwrap();
@@ -852,7 +832,7 @@ impl OutstationSession {
             iin1 + iin2,
         );
         cursor.at_start(|cur| header.write(cur)).unwrap();
-        (cursor.written().len(), info.to_next_state(seq))
+        (cursor.written().len(), info.get_response_series(seq))
     }
 
     fn handle_non_read(
@@ -1319,12 +1299,12 @@ impl OutstationSession {
                     }
                     // format the next response in the series
                     series.ecsn.increment();
-                    let (length, next_state) =
+                    let (length, next) =
                         self.write_read_response(database, false, series.ecsn, IIN2::default());
                     self.write_solicited(io, writer, length).await?;
-                    match next_state {
-                        NextState::Idle => return Ok(()),
-                        NextState::SolConfirmWait(next) => {
+                    match next {
+                        None => return Ok(()),
+                        Some(next) => {
                             series = next;
                         }
                     }
