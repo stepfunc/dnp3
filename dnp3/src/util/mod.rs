@@ -1,8 +1,11 @@
 pub(crate) mod bit;
 pub(crate) mod buffer;
 pub(crate) mod cursor;
+pub(crate) mod future;
+pub(crate) mod io;
 pub(crate) mod sequence;
 pub(crate) mod slice_ext;
+pub(crate) mod task;
 
 pub(crate) struct Smallest<T>
 where

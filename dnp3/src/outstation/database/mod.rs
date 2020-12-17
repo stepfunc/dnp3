@@ -2,6 +2,8 @@
 pub mod config;
 /// private internal control only needed by the parent module
 mod details;
+/// read headers
+pub(crate) mod read;
 
 use crate::app::header::IIN2;
 use crate::app::measurement::*;
@@ -11,6 +13,8 @@ use crate::util::cursor::WriteCursor;
 use config::*;
 use details::range::static_db::{Deadband, FlagsDetector, PointConfig};
 
+use crate::master::request::EventClasses;
+use crate::outstation::database::read::ReadHeader;
 use std::sync::{Arc, Mutex};
 
 /// Controls how are events are processed when updating values in the database
@@ -186,7 +190,7 @@ impl Default for DatabaseConfig {
 
 impl DatabaseConfig {
     /// minimum that may be configured for 'max_read_request_headers', also the default.
-    pub const DEFAULT_READ_REQUEST_HEADERS: u16 = 64;
+    pub const DEFAULT_MAX_READ_REQUEST_HEADERS: u16 = 64;
 }
 
 /// Options that control how the update is performed. 99% of the time
@@ -308,7 +312,17 @@ impl DatabaseHandle {
     }
 
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> IIN2 {
-        self.inner.lock().unwrap().inner.select(headers)
+        let mut iin2 = IIN2::default();
+        let mut guard = self.inner.lock().unwrap();
+        for header in headers.iter() {
+            match ReadHeader::get(&header) {
+                None => {
+                    iin2 |= IIN2::NO_FUNC_CODE_SUPPORT;
+                }
+                Some(x) => iin2 |= guard.inner.select_by_header(x),
+            }
+        }
+        iin2
     }
 
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {
@@ -317,6 +331,20 @@ impl DatabaseHandle {
             .unwrap()
             .inner
             .write_response_headers(cursor)
+    }
+
+    pub(crate) fn write_unsolicited(
+        &mut self,
+        classes: EventClasses,
+        cursor: &mut WriteCursor,
+    ) -> usize {
+        let mut guard = self.inner.lock().unwrap();
+        guard.inner.reset();
+        let count = guard.inner.select_event_classes(classes);
+        if count == 0 {
+            return 0;
+        }
+        guard.inner.write_events_only(cursor)
     }
 
     pub(crate) fn reset(&mut self) {

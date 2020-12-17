@@ -1,11 +1,11 @@
-use crate::app::gen::all::AllObjectsVariation;
 use crate::app::header::IIN2;
-use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
+use crate::master::request::EventClasses;
 use crate::outstation::database::details::event::buffer::EventBuffer;
 use crate::outstation::database::details::range::static_db::{
     PointConfig, StaticDatabase, Updatable,
 };
-use crate::outstation::database::{DatabaseConfig, EventClass, ResponseInfo, UpdateOptions};
+use crate::outstation::database::read::ReadHeader;
+use crate::outstation::database::{DatabaseConfig, ResponseInfo, UpdateOptions};
 use crate::util::cursor::WriteCursor;
 
 pub(crate) struct Database {
@@ -30,67 +30,18 @@ impl Database {
         self.event_buffer.clear_written();
     }
 
-    pub(crate) fn select(&mut self, headers: &HeaderCollection) -> IIN2 {
-        // ensure that any previous selection is cleared
-        self.static_db.reset();
-
-        let iin = headers.iter().fold(IIN2::default(), |iin, header| {
-            iin | self.select_one(&header)
-        });
-
-        if let Some(num) = self.static_db.exceeded_capacity() {
-            log::warn!(
-                "READ operation contained {} more ranges than the maximum configured limit of {}",
-                num,
-                self.static_db.selection_capacity()
-            );
-            iin | IIN2::PARAMETER_ERROR
-        } else {
-            iin
+    pub(crate) fn select_by_header(&mut self, header: ReadHeader) -> IIN2 {
+        match header {
+            ReadHeader::Static(header) => self.static_db.select(header),
+            ReadHeader::Event(header) => {
+                self.event_buffer.select_by_header(header);
+                IIN2::default()
+            }
         }
     }
 
-    pub(crate) fn select_one(&mut self, header: &ObjectHeader) -> IIN2 {
-        let result: IIN2 = match &header.details {
-            // classes and specific variations
-            HeaderDetails::AllObjects(var) => self.select_all_objects(*var),
-            // other header types are not used for READ operations at this time
-            _ => IIN2::NO_FUNC_CODE_SUPPORT,
-        };
-
-        if result.get_no_func_code_support() {
-            log::warn!(
-                "READ operation not supported for: {} - {}",
-                header.variation,
-                header.details.qualifier()
-            );
-        }
-
-        result
-    }
-
-    fn select_all_objects(&mut self, variation: AllObjectsVariation) -> IIN2 {
-        match variation {
-            AllObjectsVariation::Group60Var1 => {
-                self.static_db.select_class_zero();
-            }
-            AllObjectsVariation::Group60Var2 => {
-                self.event_buffer
-                    .select_by_class(EventClass::Class1.into(), None);
-            }
-            AllObjectsVariation::Group60Var3 => {
-                self.event_buffer
-                    .select_by_class(EventClass::Class2.into(), None);
-            }
-            AllObjectsVariation::Group60Var4 => {
-                self.event_buffer
-                    .select_by_class(EventClass::Class3.into(), None);
-            }
-            // not supported (yet)
-            _ => return IIN2::NO_FUNC_CODE_SUPPORT,
-        };
-
-        IIN2::default()
+    pub(crate) fn select_event_classes(&mut self, classes: EventClasses) -> usize {
+        self.event_buffer.select_by_class(classes, None)
     }
 
     pub(crate) fn add<T>(&mut self, index: u16, config: PointConfig<T>) -> bool
@@ -141,6 +92,14 @@ impl Database {
         ResponseInfo {
             has_events,
             complete,
+        }
+    }
+
+    pub(crate) fn write_events_only(&mut self, cursor: &mut WriteCursor) -> usize {
+        // doesn't matter if we wrote all of them or not
+        match self.event_buffer.write_events(cursor) {
+            Ok(x) => x,
+            Err(x) => x,
         }
     }
 }

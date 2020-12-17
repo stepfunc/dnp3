@@ -10,6 +10,8 @@ pub mod traits;
 
 /// functionality for processing control requests
 pub(crate) mod control;
+/// handling of deferred read requests
+pub(crate) mod deferred;
 /// outstation session
 pub(crate) mod session;
 

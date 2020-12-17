@@ -7,6 +7,8 @@ use crate::outstation::database::details::range::traits::StaticVariation;
 use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::util::cursor::{WriteCursor, WriteError};
 
+use crate::app::header::IIN2;
+use crate::outstation::database::read::StaticReadHeader;
 use crate::outstation::database::{
     ClassZeroConfig, DatabaseConfig, EventClass, EventMode, UpdateOptions,
 };
@@ -202,6 +204,13 @@ where
     }
 
     fn select_all(&mut self) -> Option<VariationRange> {
+        self.select_all_with_variation(None)
+    }
+
+    fn select_all_with_variation(
+        &mut self,
+        variation: Option<T::StaticVariation>,
+    ) -> Option<VariationRange> {
         self.inner
             .values_mut()
             .for_each(|x| x.selected = x.current.clone());
@@ -213,7 +222,7 @@ where
         */
         let start = self.inner.iter().next().map(|(key, _)| *key)?;
         let stop = self.inner.iter().next_back().map(|(key, _)| *key)?;
-        Some(T::wrap(IndexRange::new(start, stop), None))
+        Some(T::wrap(IndexRange::new(start, stop), variation))
     }
 }
 
@@ -240,8 +249,8 @@ impl StaticDatabase {
     pub(crate) fn new(max_selection: Option<u16>, class_zero: ClassZeroConfig) -> Self {
         // don't allow values smaller than the default
         let max_selection = max_selection
-            .map(|x| x.max(DatabaseConfig::DEFAULT_READ_REQUEST_HEADERS))
-            .unwrap_or(DatabaseConfig::DEFAULT_READ_REQUEST_HEADERS);
+            .map(|x| x.max(DatabaseConfig::DEFAULT_MAX_READ_REQUEST_HEADERS))
+            .unwrap_or(DatabaseConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
 
         Self {
             class_zero,
@@ -255,15 +264,17 @@ impl StaticDatabase {
             analog_output_status: PointMap::empty(),
         }
     }
+    /*
+       pub(crate) fn exceeded_capacity(&self) -> Option<usize> {
+           if self.selected.capacity_exceeded > 0 {
+               Some(self.selected.capacity_exceeded)
+           } else {
+               None
+           }
+       }
+    */
 
-    pub(crate) fn exceeded_capacity(&self) -> Option<usize> {
-        if self.selected.capacity_exceeded > 0 {
-            Some(self.selected.capacity_exceeded)
-        } else {
-            None
-        }
-    }
-
+    #[cfg(test)]
     pub(crate) fn selection_capacity(&self) -> usize {
         self.selected.queue.capacity()
     }
@@ -405,18 +416,60 @@ impl StaticDatabase {
         Ok(())
     }
 
-    /*
-    fn get_first_variation<T>(&mut self, range: IndexRange) -> Option<T::StaticVariation>
+    pub(crate) fn select(&mut self, variation: StaticReadHeader) -> IIN2 {
+        match variation {
+            StaticReadHeader::Class0 => self.select_class_zero(),
+            StaticReadHeader::Binary(variation, range) => {
+                self.select_by_type::<Binary>(variation, range)
+            }
+            StaticReadHeader::DoubleBitBinary(variation, range) => {
+                self.select_by_type::<DoubleBitBinary>(variation, range)
+            }
+            StaticReadHeader::BinaryOutputStatus(variation, range) => {
+                self.select_by_type::<BinaryOutputStatus>(variation, range)
+            }
+            StaticReadHeader::Counter(variation, range) => {
+                self.select_by_type::<Counter>(variation, range)
+            }
+            StaticReadHeader::FrozenCounter(variation, range) => {
+                self.select_by_type::<FrozenCounter>(variation, range)
+            }
+            StaticReadHeader::Analog(variation, range) => {
+                self.select_by_type::<Analog>(variation, range)
+            }
+            StaticReadHeader::AnalogOutputStatus(variation, range) => {
+                self.select_by_type::<AnalogOutputStatus>(variation, range)
+            }
+        }
+    }
+
+    fn select_by_type<T>(
+        &mut self,
+        variation: Option<T::StaticVariation>,
+        range: Option<IndexRange>,
+    ) -> IIN2
     where
         T: Updatable,
     {
-        self.get_map::<T>()
-            .inner
-            .range(range)
-            .next()
-            .map(|x| x.1.config.s_var)
+        match range {
+            Some(range) => self.push_selection(T::wrap(range, variation)),
+            None => {
+                if let Some(x) = T::get_map(self).select_all_with_variation(variation) {
+                    self.push_selection(x)
+                } else {
+                    IIN2::default()
+                }
+            }
+        }
     }
-     */
+
+    fn push_selection(&mut self, range: VariationRange) -> IIN2 {
+        if self.selected.push_back(range) {
+            IIN2::default()
+        } else {
+            IIN2::PARAMETER_ERROR
+        }
+    }
 
     fn get_map<T>(&mut self) -> &mut PointMap<T>
     where
@@ -425,25 +478,35 @@ impl StaticDatabase {
         T::get_map(self)
     }
 
-    fn select_class_zero_type<T>(&mut self)
+    fn select_class_zero_type<T>(&mut self) -> IIN2
     where
         T: Updatable,
     {
         if T::enabled_class_zero(&self.class_zero) {
-            T::get_map(self)
-                .select_all()
-                .map(|x| self.selected.push_back(x));
+            let full_range = match T::get_map(self).select_all() {
+                None => return IIN2::default(),
+                Some(x) => x,
+            };
+
+            if self.selected.push_back(full_range) {
+                IIN2::default()
+            } else {
+                // out of space for read headers
+                IIN2::PARAMETER_ERROR
+            }
+        } else {
+            IIN2::default()
         }
     }
 
-    pub(crate) fn select_class_zero(&mut self) {
-        self.select_class_zero_type::<Binary>();
-        self.select_class_zero_type::<DoubleBitBinary>();
-        self.select_class_zero_type::<BinaryOutputStatus>();
-        self.select_class_zero_type::<Counter>();
-        self.select_class_zero_type::<FrozenCounter>();
-        self.select_class_zero_type::<Analog>();
-        self.select_class_zero_type::<AnalogOutputStatus>();
+    fn select_class_zero(&mut self) -> IIN2 {
+        self.select_class_zero_type::<Binary>()
+            | self.select_class_zero_type::<DoubleBitBinary>()
+            | self.select_class_zero_type::<BinaryOutputStatus>()
+            | self.select_class_zero_type::<Counter>()
+            | self.select_class_zero_type::<FrozenCounter>()
+            | self.select_class_zero_type::<Analog>()
+            | self.select_class_zero_type::<AnalogOutputStatus>()
     }
 }
 

@@ -1,0 +1,76 @@
+use crate::app::enums::CommandStatus;
+use crate::app::sequence::Sequence;
+
+/// records when a select occurs
+#[derive(Copy, Clone)]
+pub(crate) struct SelectState {
+    /// sequence number of the SELECT
+    seq: Sequence,
+    /// frame count of the select, makes it easier to ensure that OPERATE directly follows SELECT
+    /// without requests in between
+    frame_id: u32,
+    /// time at which the SELECT occurred
+    time: crate::tokio::time::Instant,
+    /// the hash of the object headers
+    object_hash: u64,
+}
+
+impl SelectState {
+    pub(crate) fn new(
+        seq: Sequence,
+        frame_id: u32,
+        time: crate::tokio::time::Instant,
+        object_hash: u64,
+    ) -> Self {
+        Self {
+            seq,
+            frame_id,
+            time,
+            object_hash,
+        }
+    }
+
+    pub(crate) fn match_operate(
+        &self,
+        timeout: std::time::Duration,
+        seq: Sequence,
+        frame_id: u32,
+        object_hash: u64,
+    ) -> Result<(), CommandStatus> {
+        let elapsed = crate::tokio::time::Instant::now().checked_duration_since(self.time);
+
+        // check the sequence number
+        if self.seq.next() != seq.value() {
+            log::warn!("received OPERATE with non-consecutive sequence number");
+            return Err(CommandStatus::NoSelect);
+        }
+
+        // check the frame_id to ensure there was no requests in between the SELECT and OPERATE
+        if self.frame_id.wrapping_add(1) != frame_id {
+            log::warn!("received OPERATE without prior SELECT");
+            return Err(CommandStatus::NoSelect);
+        }
+
+        // check the object hash
+        if self.object_hash != object_hash {
+            log::warn!("received OPERATE with different header than SELECT");
+            return Err(CommandStatus::NoSelect);
+        }
+
+        // check the time last
+        match elapsed {
+            None => {
+                log::error!("current time is less than time of SELECT, clock error?");
+                return Err(CommandStatus::Timeout);
+            }
+            Some(elapsed) => {
+                if elapsed > timeout {
+                    log::warn!("received valid OPERATE after SELECT timeout");
+                    return Err(CommandStatus::Timeout);
+                }
+            }
+        }
+
+        Ok(())
+    }
+}

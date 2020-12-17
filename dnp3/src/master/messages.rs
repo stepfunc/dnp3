@@ -1,11 +1,12 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
 use crate::master::association::Association;
-use crate::master::error::AssociationError;
-use crate::master::error::{PollError, Shutdown, TaskError};
+use crate::master::error::PollError;
+use crate::master::error::{AssociationError, TaskError};
 use crate::master::handle::Promise;
 use crate::master::poll::PollMsg;
 use crate::master::tasks::Task;
+use crate::util::task::Shutdown;
 
 /// Messages sent from the handles to the master task via an mpsc.
 pub(crate) enum Message {

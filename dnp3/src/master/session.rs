@@ -15,17 +15,12 @@ use crate::master::messages::{MasterMsg, Message};
 
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
-use crate::master::error::{Shutdown, TaskError};
-use crate::tokio::io::{AsyncRead, AsyncWrite};
+use crate::master::error::TaskError;
 use crate::tokio::time::Instant;
+use crate::util::io::IOStream;
+use crate::util::task::{RunError, Shutdown};
 use std::ops::Add;
 use std::time::Duration;
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum RunError {
-    Link(LinkError),
-    Shutdown,
-}
 
 pub(crate) struct MasterSession {
     level: DecodeLogLevel,
@@ -94,7 +89,7 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> RunError
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         loop {
             let result = match self.get_next_task() {
@@ -122,7 +117,7 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         loop {
             crate::tokio::select! {
@@ -149,7 +144,7 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         loop {
             crate::tokio::select! {
@@ -211,7 +206,7 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> Result<(), TaskError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         loop {
             crate::tokio::select! {
@@ -247,7 +242,7 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         let result = match task.details {
             Task::Read(t) => {
@@ -280,7 +275,7 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> Result<(), TaskError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         loop {
             let seq = match self.send_request(io, destination, &task, writer).await {
@@ -345,7 +340,7 @@ impl MasterSession {
         writer: &mut TransportWriter,
     ) -> Result<Option<Response<'a>>, TaskError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         let (source, response) = match reader.pop_response(self.level) {
             None => return Ok(None),
@@ -391,7 +386,7 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> Result<(), TaskError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         let result = self
             .execute_read_task(io, destination, &task, writer, reader)
@@ -422,7 +417,7 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> Result<(), TaskError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         let mut seq = self.send_request(io, destination, task, writer).await?;
         let mut is_first = true;
@@ -468,7 +463,7 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> Result<ReadResponseAction, TaskError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         let (source, response) = match reader.pop_response(self.level) {
             Some(x) => x,
@@ -541,7 +536,7 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> Result<(), RunError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         let (source, response) = match reader.pop_response(self.level) {
             None => return Ok(()),
@@ -569,7 +564,7 @@ impl MasterSession {
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         let association = match self.associations.get_mut(source).ok() {
             Some(x) => x,
@@ -606,7 +601,7 @@ impl MasterSession {
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
     where
-        T: AsyncWrite + Unpin,
+        T: IOStream,
     {
         let mut cursor = self.tx_buffer.write_cursor();
         write::confirm_solicited(seq, &mut cursor)?;
@@ -624,7 +619,7 @@ impl MasterSession {
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError>
     where
-        T: AsyncWrite + Unpin,
+        T: IOStream,
     {
         let mut cursor = self.tx_buffer.write_cursor();
         crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
@@ -643,7 +638,7 @@ impl MasterSession {
         writer: &mut TransportWriter,
     ) -> Result<Sequence, TaskError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
         U: RequestWriter,
     {
         // format the request
