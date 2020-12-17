@@ -5,8 +5,7 @@ use crate::app::measurement::{Binary, Time};
 use crate::app::types::Timestamp;
 use crate::outstation::database::config::BinaryConfig;
 use crate::outstation::database::{Add, Database, EventClass, Update, UpdateOptions};
-use crate::outstation::tests::get_default_config;
-use crate::outstation::tests::harness::Event;
+use crate::outstation::tests::harness::*;
 use tokio::time::Duration;
 
 const EMPTY_READ: &[u8] = &[0xC0, 0x01];
@@ -30,14 +29,14 @@ fn create_binary_and_event(database: &mut Database) {
 
 #[test]
 fn empty_read_yields_empty_response() {
-    let mut harness = super::harness::new_harness();
+    let mut harness = new_harness(get_default_config());
     harness.test_request_response(EMPTY_READ, EMPTY_RESPONSE);
     harness.check_no_events();
 }
 
 #[test]
 fn can_read_and_confirm_events() {
-    let mut harness = super::harness::new_harness();
+    let mut harness = new_harness(get_default_config());
 
     harness.database.transaction(create_binary_and_event);
 
@@ -49,7 +48,7 @@ fn can_read_and_confirm_events() {
 
 #[test]
 fn ignores_confirm_with_wrong_seq() {
-    let mut harness = super::harness::new_harness();
+    let mut harness = new_harness(get_default_config());
 
     harness.database.transaction(create_binary_and_event);
 
@@ -61,7 +60,7 @@ fn ignores_confirm_with_wrong_seq() {
 
 #[test]
 fn ignores_unsolicited_confirm_with_correct_seq() {
-    let mut harness = super::harness::new_harness();
+    let mut harness = new_harness(get_default_config());
 
     harness.database.transaction(create_binary_and_event);
 
@@ -73,7 +72,7 @@ fn ignores_unsolicited_confirm_with_correct_seq() {
 
 #[test]
 fn confirm_can_time_out() {
-    let mut harness = super::harness::new_harness();
+    let mut harness = new_harness(get_default_config());
 
     harness.database.transaction(create_binary_and_event);
 
@@ -86,7 +85,7 @@ fn confirm_can_time_out() {
 
 #[test]
 fn sol_confirm_wait_goes_back_to_idle_with_new_request() {
-    let mut harness = super::harness::new_harness();
+    let mut harness = new_harness(get_default_config());
 
     harness.database.transaction(create_binary_and_event);
     harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);

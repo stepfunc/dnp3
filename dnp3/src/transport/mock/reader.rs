@@ -1,7 +1,7 @@
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
-use crate::outstation::config::SelfAddressSupport;
+use crate::outstation::config::Feature;
 use crate::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use crate::transport::{Fragment, FragmentInfo, TransportData};
 use crate::util::buffer::Buffer;
@@ -21,7 +21,7 @@ impl MockReader {
 
     pub(crate) fn outstation(
         _: EndpointAddress,
-        _: SelfAddressSupport,
+        _self_address: Feature,
         rx_buffer_size: usize,
     ) -> Self {
         Self::new(rx_buffer_size)

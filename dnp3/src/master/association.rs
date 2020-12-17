@@ -9,7 +9,6 @@ use crate::master::handle::{AssociationHandler, Promise};
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollMap, PollMsg};
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
-use crate::master::session::RunError;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::NonReadTask::TimeSync;
@@ -22,6 +21,7 @@ use xxhash_rust::xxh64::xxh64;
 
 use crate::entry::EndpointAddress;
 pub use crate::master::poll::PollHandle;
+use crate::util::task::RunError;
 
 #[derive(Copy, Clone)]
 pub struct Configuration {

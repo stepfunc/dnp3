@@ -3,7 +3,7 @@ use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;
-use crate::outstation::config::SelfAddressSupport;
+use crate::outstation::config::Feature;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::real::assembler::{Assembler, AssemblyState};
 use crate::transport::real::header::Header;
@@ -18,11 +18,7 @@ pub(crate) struct Reader {
 impl Reader {
     pub(crate) fn master(source: EndpointAddress, max_tx_buffer: usize) -> Self {
         Self {
-            link: crate::link::layer::Layer::new(
-                EndpointType::Master,
-                SelfAddressSupport::Disabled,
-                source,
-            ),
+            link: crate::link::layer::Layer::new(EndpointType::Master, Feature::Disabled, source),
             assembler: Assembler::new(max_tx_buffer),
             pending_link_layer_message: None,
         }
@@ -30,15 +26,11 @@ impl Reader {
 
     pub(crate) fn outstation(
         source: EndpointAddress,
-        self_address_support: SelfAddressSupport,
+        self_address: Feature,
         max_rx_buffer: usize,
     ) -> Self {
         Self {
-            link: crate::link::layer::Layer::new(
-                EndpointType::Outstation,
-                self_address_support,
-                source,
-            ),
+            link: crate::link::layer::Layer::new(EndpointType::Outstation, self_address, source),
             assembler: Assembler::new(max_rx_buffer),
             pending_link_layer_message: None,
         }

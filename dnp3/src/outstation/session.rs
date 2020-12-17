@@ -12,38 +12,69 @@ use crate::app::variations::{Group52Var1, Group52Var2};
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
-use crate::outstation::config::BroadcastAddressSupport;
+use crate::outstation::config::{BufferSize, Feature};
 use crate::outstation::control::collection::{ControlCollection, ControlTransaction};
 use crate::outstation::database::{DatabaseHandle, ResponseInfo};
 use crate::outstation::traits::{
     BroadcastAction, ControlHandler, OperateType, OutstationApplication, OutstationInformation,
     RestartDelay,
 };
-use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::{
-    FragmentInfo, RequestGuard, Timeout, TransportReader, TransportRequest, TransportWriter,
+    FragmentInfo, RequestGuard, TransportReader, TransportRequest, TransportWriter,
 };
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 
 use crate::outstation::config::OutstationConfig;
+use crate::util::io::IOStream;
 use std::borrow::BorrowMut;
-use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;
+
+use crate::app::gen::all::AllObjectsVariation;
+use crate::master::request::EventClasses;
+use crate::outstation::control::select::SelectState;
+use crate::outstation::deferred::DeferredRead;
+use crate::outstation::task::OutstationMessage;
+use crate::util::task::{Receiver, RunError, Shutdown};
+
+#[derive(Copy, Clone)]
+enum Timeout {
+    Yes,
+    No,
+}
 
 #[derive(Copy, Clone, PartialEq)]
 struct ResponseSeries {
     ecsn: Sequence,
-    last_response: bool,
-    master: EndpointAddress,
+    fin: bool,
 }
 
 impl ResponseSeries {
-    fn new(ecsn: Sequence, last_response: bool, master: EndpointAddress) -> Self {
-        Self {
-            ecsn,
-            last_response,
-            master,
+    fn new(ecsn: Sequence, fin: bool) -> Self {
+        Self { ecsn, fin }
+    }
+}
+
+struct RetryCounter {
+    retries: Option<usize>,
+}
+
+impl RetryCounter {
+    fn new(limit: Option<usize>) -> Self {
+        Self { retries: limit }
+    }
+
+    fn decrement(&mut self) -> bool {
+        match self.retries {
+            None => true,
+            Some(x) => {
+                if x == 0 {
+                    false
+                } else {
+                    self.retries = Some(x - 1);
+                    true
+                }
+            }
         }
     }
 }
@@ -55,9 +86,9 @@ enum NextState {
 }
 
 impl ResponseInfo {
-    fn to_next_state(&self, ecsn: Sequence, source: EndpointAddress) -> NextState {
+    fn to_next_state(&self, ecsn: Sequence) -> NextState {
         if self.need_confirm() {
-            NextState::SolConfirmWait(ResponseSeries::new(ecsn, self.complete, source))
+            NextState::SolConfirmWait(ResponseSeries::new(ecsn, self.complete))
         } else {
             NextState::Idle
         }
@@ -91,9 +122,12 @@ impl LastValidRequest {
 pub(crate) struct SessionConfig {
     level: DecodeLogLevel,
     master_address: EndpointAddress,
-    confirm_timeout: Duration,
-    select_timeout: Duration,
-    broadcast_support: BroadcastAddressSupport,
+    confirm_timeout: std::time::Duration,
+    select_timeout: std::time::Duration,
+    broadcast: Feature,
+    unsolicited: Feature,
+    max_unsolicited_retries: Option<usize>,
+    unsolicited_retry_delay: std::time::Duration,
 }
 
 impl From<OutstationConfig> for SessionConfig {
@@ -103,109 +137,54 @@ impl From<OutstationConfig> for SessionConfig {
             master_address: config.master_address,
             confirm_timeout: config.confirm_timeout,
             select_timeout: config.select_timeout,
-            broadcast_support: config.broadcast_support,
+            broadcast: config.features.broadcast,
+            unsolicited: config.features.unsolicited,
+            max_unsolicited_retries: config.max_unsolicited_retries,
+            unsolicited_retry_delay: config.unsolicited_retry_delay,
         }
     }
 }
 
-/// records when a select occurs
 #[derive(Copy, Clone)]
-struct SelectState {
-    /// sequence number of the SELECT
-    seq: Sequence,
-    /// frame count of the select, makes it easier to ensure that OPERATE directly follows SELECT
-    /// without requests in between
-    frame_id: u32,
-    /// time at which the SELECT occurred
-    time: crate::tokio::time::Instant,
-    /// the hash of the object headers
-    object_hash: u64,
-}
-
-impl SelectState {
-    fn new(
-        seq: Sequence,
-        frame_id: u32,
-        time: crate::tokio::time::Instant,
-        object_hash: u64,
-    ) -> Self {
-        Self {
-            seq,
-            frame_id,
-            time,
-            object_hash,
-        }
-    }
-
-    fn match_operate(
-        &self,
-        timeout: Duration,
-        seq: Sequence,
-        frame_id: u32,
-        object_hash: u64,
-    ) -> Result<(), CommandStatus> {
-        let elapsed = crate::tokio::time::Instant::now().checked_duration_since(self.time);
-
-        // check the sequence number
-        if self.seq.next() != seq.value() {
-            log::warn!("received OPERATE with non-consecutive sequence number");
-            return Err(CommandStatus::NoSelect);
-        }
-
-        // check the frame_id to ensure there was no requests in between the SELECT and OPERATE
-        if self.frame_id.wrapping_add(1) != frame_id {
-            log::warn!("received OPERATE without prior SELECT");
-            return Err(CommandStatus::NoSelect);
-        }
-
-        // check the object hash
-        if self.object_hash != object_hash {
-            log::warn!("received OPERATE with different header than SELECT");
-            return Err(CommandStatus::NoSelect);
-        }
-
-        // check the time last
-        match elapsed {
-            None => {
-                log::error!("current time is less than time of SELECT, clock error?");
-                return Err(CommandStatus::Timeout);
-            }
-            Some(elapsed) => {
-                if elapsed > timeout {
-                    log::warn!("received valid OPERATE after SELECT timeout");
-                    return Err(CommandStatus::Timeout);
-                }
-            }
-        }
-
-        Ok(())
-    }
+enum UnsolicitedState {
+    /// need to perform NULL unsolicited, possibly waiting for a retry deadline
+    NullRequired(Option<crate::tokio::time::Instant>),
+    Ready(Option<crate::tokio::time::Instant>),
 }
 
 /// state that mutates while the session runs
 struct SessionState {
     restart_iin_asserted: bool,
+    enabled_unsolicited_classes: EventClasses,
     last_valid_request: Option<LastValidRequest>,
-    select_state: Option<SelectState>,
+    select: Option<SelectState>,
+    unsolicited: UnsolicitedState,
+    unsolicited_seq: Sequence,
+    deferred_read: DeferredRead,
 }
 
 impl SessionState {
-    fn new() -> Self {
+    fn new(max_read_headers: u16) -> Self {
         Self {
+            enabled_unsolicited_classes: EventClasses::none(),
             restart_iin_asserted: true,
             last_valid_request: None,
-            select_state: None,
+            select: None,
+            unsolicited: UnsolicitedState::NullRequired(None),
+            unsolicited_seq: Sequence::default(),
+            deferred_read: DeferredRead::new(max_read_headers),
         }
     }
 }
 
 pub(crate) struct OutstationSession {
-    tx_buffer: Buffer,
+    receiver: Receiver<OutstationMessage>,
+    sol_tx_buffer: Buffer,
+    unsol_tx_buffer: Buffer,
     config: SessionConfig,
-    database: DatabaseHandle,
     state: SessionState,
     application: Box<dyn OutstationApplication>,
-    information: Box<dyn OutstationInformation>,
+    info: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
 }
 
@@ -215,6 +194,20 @@ enum Confirm {
     NewRequest,
 }
 
+#[derive(Copy, Clone)]
+enum UnsolicitedResult {
+    Confirmed,
+    Timeout,
+    ReturnToIdle,
+}
+
+#[derive(Copy, Clone)]
+enum UnsolicitedWaitResult {
+    Timeout,
+    ReadNext,
+    Complete(UnsolicitedResult),
+}
+
 enum FragmentType<'a> {
     MalformedRequest(u64, ObjectParseError),
     NewRead(u64, HeaderCollection<'a>),
@@ -222,8 +215,8 @@ enum FragmentType<'a> {
     NewNonRead(u64, HeaderCollection<'a>),
     RepeatNonRead(u64, Option<usize>),
     Broadcast(BroadcastConfirmMode),
-    SolicitedConfirm,
-    UnsolicitedConfirm,
+    SolicitedConfirm(Sequence),
+    UnsolicitedConfirm(Sequence),
 }
 
 #[derive(Copy, Clone)]
@@ -235,28 +228,26 @@ enum ConfirmAction {
 }
 
 impl OutstationSession {
+    // TODO
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
+        receiver: Receiver<OutstationMessage>,
         config: SessionConfig,
-        tx_buffer_size: usize,
-        database: DatabaseHandle,
+        max_read_headers_per_request: u16,
+        sol_tx_buffer_size: BufferSize,
+        unsol_tx_buffer_size: BufferSize,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
     ) -> Self {
-        let tx_buffer_size = if tx_buffer_size < OutstationConfig::MIN_TX_BUFFER_SIZE {
-            log::warn!("Minimum TX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", OutstationConfig::MIN_TX_BUFFER_SIZE, tx_buffer_size);
-            OutstationConfig::MIN_TX_BUFFER_SIZE
-        } else {
-            tx_buffer_size
-        };
-
         Self {
+            receiver,
             config,
-            tx_buffer: Buffer::new(tx_buffer_size),
-            database,
-            state: SessionState::new(),
+            sol_tx_buffer: sol_tx_buffer_size.create_buffer(),
+            unsol_tx_buffer: unsol_tx_buffer_size.create_buffer(),
+            state: SessionState::new(max_read_headers_per_request),
             application,
-            information,
+            info: information,
             control_handler,
         }
     }
@@ -266,31 +257,50 @@ impl OutstationSession {
         io: &mut T,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
-    ) -> Result<(), LinkError>
+        database: &mut DatabaseHandle,
+    ) -> Result<(), RunError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         loop {
-            self.run_idle_state(io, reader, writer).await?;
+            self.run_idle_state(io, reader, writer, database).await?;
         }
     }
 
-    async fn respond<T>(
+    async fn write_unsolicited<T>(
         &self,
         io: &mut T,
         writer: &mut TransportWriter,
-        num_bytes: usize,
-        address: EndpointAddress,
+        length: usize,
     ) -> Result<(), LinkError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
         writer
             .write(
                 io,
                 self.config.level,
-                address.wrap(),
-                self.tx_buffer.get(num_bytes).unwrap(),
+                self.config.master_address.wrap(),
+                self.unsol_tx_buffer.get(length).unwrap(),
+            )
+            .await
+    }
+
+    async fn write_solicited<T>(
+        &self,
+        io: &mut T,
+        writer: &mut TransportWriter,
+        length: usize,
+    ) -> Result<(), LinkError>
+    where
+        T: IOStream,
+    {
+        writer
+            .write(
+                io,
+                self.config.level,
+                self.config.master_address.wrap(),
+                self.sol_tx_buffer.get(length).unwrap(),
             )
             .await
     }
@@ -300,24 +310,390 @@ impl OutstationSession {
         io: &mut T,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
-    ) -> Result<(), LinkError>
+        database: &mut DatabaseHandle,
+    ) -> Result<(), RunError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
-        let series: Option<ResponseSeries> = self
-            .handle_one_request_from_idle(io, reader, writer)
+        // handle a deferred read request if it exists
+        self.handle_deferred_read(io, reader, writer, database)
             .await?;
 
-        if let Some(series) = series {
-            self.sol_confirm_wait(io, reader, writer, series).await?;
-        }
+        // handle a request fragment if present
+        self.handle_one_request_from_idle(io, reader, writer, database)
+            .await?;
 
+        // check to see if we should perform unsolicited
+        let deadline = self.check_unsolicited(io, reader, writer, database).await?;
+
+        // wait for an event
         crate::tokio::select! {
             frame_read = reader.read(io) => {
+                // make sure an I/O error didn't occur, ending the session
                 frame_read?;
             }
-            _ = self.database.wait_for_change() => {
+            _ = database.wait_for_change() => {
                 // wake for unsolicited here
+            }
+            _ = self.sleep_until(deadline) => {
+                // just wake up
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn check_unsolicited<T>(
+        &mut self,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+        database: &mut DatabaseHandle,
+    ) -> Result<Option<crate::tokio::time::Instant>, RunError>
+    where
+        T: IOStream,
+    {
+        if self.config.unsolicited.is_disabled() {
+            return Ok(None);
+        }
+
+        match self.state.unsolicited {
+            UnsolicitedState::NullRequired(deadline) => {
+                if let Some(deadline) = deadline {
+                    if crate::tokio::time::Instant::now() < deadline {
+                        return Ok(Some(deadline)); // not ready yet
+                    }
+                }
+
+                // perform NULL unsolicited
+                match self
+                    .perform_null_unsolicited(io, reader, writer, database)
+                    .await?
+                {
+                    UnsolicitedResult::Timeout | UnsolicitedResult::ReturnToIdle => {
+                        let retry_at = self.new_unsolicited_retry_deadline();
+                        self.state.unsolicited = UnsolicitedState::NullRequired(Some(retry_at));
+                        Ok(Some(retry_at))
+                    }
+                    UnsolicitedResult::Confirmed => {
+                        self.state.unsolicited = UnsolicitedState::Ready(None);
+                        Ok(None)
+                    }
+                }
+            }
+            UnsolicitedState::Ready(deadline) => {
+                if let Some(deadline) = deadline {
+                    if crate::tokio::time::Instant::now() < deadline {
+                        return Ok(Some(deadline)); // not ready yet
+                    }
+                }
+
+                // perform regular unsolicited
+                match self
+                    .maybe_perform_unsolicited(io, reader, writer, database)
+                    .await?
+                {
+                    None => {
+                        // there was nothing to send
+                        Ok(None)
+                    }
+                    Some(UnsolicitedResult::Timeout) | Some(UnsolicitedResult::ReturnToIdle) => {
+                        let retry_at = self.new_unsolicited_retry_deadline();
+                        self.state.unsolicited = UnsolicitedState::Ready(Some(retry_at));
+                        Ok(Some(retry_at))
+                    }
+                    Some(UnsolicitedResult::Confirmed) => {
+                        database.clear_written_events();
+                        self.state.unsolicited = UnsolicitedState::Ready(None);
+                        Ok(None)
+                    }
+                }
+            }
+        }
+    }
+
+    async fn perform_null_unsolicited<T>(
+        &mut self,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+        database: &mut DatabaseHandle,
+    ) -> Result<UnsolicitedResult, RunError>
+    where
+        T: IOStream,
+    {
+        let seq = self.state.unsolicited_seq.increment();
+        let length = self.write_null_unsolicited_response(seq);
+        self.perform_unsolicited_response_series(database, seq, length, io, reader, writer)
+            .await
+    }
+
+    async fn maybe_perform_unsolicited<T>(
+        &mut self,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+        database: &mut DatabaseHandle,
+    ) -> Result<Option<UnsolicitedResult>, RunError>
+    where
+        T: IOStream,
+    {
+        if !self.state.enabled_unsolicited_classes.any() {
+            return Ok(None);
+        }
+
+        match self.write_unsolicited_data(database) {
+            None => Ok(None),
+            Some((seq, length)) => {
+                let result = self
+                    .perform_unsolicited_response_series(database, seq, length, io, reader, writer)
+                    .await?;
+                Ok(Some(result))
+            }
+        }
+    }
+
+    fn write_unsolicited_data(
+        &mut self,
+        database: &mut DatabaseHandle,
+    ) -> Option<(Sequence, usize)> {
+        let iin = self.get_response_iin() + IIN2::default();
+        let mut cursor = self.unsol_tx_buffer.write_cursor();
+        let _ = cursor.skip(ResponseHeader::LENGTH);
+
+        let count = database.write_unsolicited(self.state.enabled_unsolicited_classes, &mut cursor);
+
+        if count == 0 {
+            return None;
+        }
+
+        let seq = self.state.unsolicited_seq.increment();
+
+        let header = ResponseHeader::new(
+            Control::unsolicited_response(seq),
+            ResponseFunction::UnsolicitedResponse,
+            iin,
+        );
+        cursor.at_start(|cur| header.write(cur)).unwrap();
+        Some((seq, cursor.position()))
+    }
+
+    async fn perform_unsolicited_response_series<T>(
+        &mut self,
+        database: &mut DatabaseHandle,
+        uns_ecsn: Sequence,
+        length: usize,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+    ) -> Result<UnsolicitedResult, RunError>
+    where
+        T: IOStream,
+    {
+        self.write_unsolicited(io, writer, length).await?;
+
+        // enter unsolicited confirm wait state
+        self.info.enter_unsolicited_confirm_wait(uns_ecsn);
+
+        let mut retry_count = RetryCounter::new(self.config.max_unsolicited_retries);
+
+        let mut deadline = self.new_confirm_deadline();
+
+        loop {
+            match self
+                .wait_for_unsolicited_confirm(uns_ecsn, deadline, io, reader, writer, database)
+                .await?
+            {
+                UnsolicitedWaitResult::ReadNext => {
+                    // just go to next iteration without changing the deadline
+                }
+                UnsolicitedWaitResult::Complete(result) => return Ok(result),
+                UnsolicitedWaitResult::Timeout => {
+                    let retry = retry_count.decrement();
+                    self.info.unsolicited_confirm_timeout(uns_ecsn, retry);
+
+                    if !retry {
+                        return Ok(UnsolicitedResult::Timeout);
+                    }
+
+                    // perform a retry
+                    self.write_unsolicited(io, writer, length).await?;
+
+                    // update the deadline
+                    deadline = self.new_confirm_deadline();
+                }
+            }
+        }
+    }
+
+    async fn wait_for_unsolicited_confirm<T>(
+        &mut self,
+        uns_ecsn: Sequence,
+        deadline: crate::tokio::time::Instant,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+        database: &mut DatabaseHandle,
+    ) -> Result<UnsolicitedWaitResult, RunError>
+    where
+        T: IOStream,
+    {
+        if let Timeout::Yes = self.read_until(io, reader, deadline).await? {
+            return Ok(UnsolicitedWaitResult::Timeout);
+        }
+
+        let mut guard = reader.pop_request(self.config.level);
+        let (info, request) = match guard.get() {
+            None => return Ok(UnsolicitedWaitResult::ReadNext),
+            Some(TransportRequest::Request(info, request)) => (info, request),
+            Some(TransportRequest::LinkLayerMessage(_)) => {
+                // TODO: do something with the message
+                return Ok(UnsolicitedWaitResult::ReadNext);
+            }
+        };
+
+        match self.classify(info, request) {
+            FragmentType::UnsolicitedConfirm(seq) => {
+                if seq == uns_ecsn {
+                    self.info.unsolicited_confirmed(seq);
+                    Ok(UnsolicitedWaitResult::Complete(
+                        UnsolicitedResult::Confirmed,
+                    ))
+                } else {
+                    log::warn!("ignoring unsolicited confirm with wrong sequence number ({}) while expecting ({})", seq.value(), uns_ecsn.value());
+                    Ok(UnsolicitedWaitResult::ReadNext)
+                }
+            }
+            FragmentType::SolicitedConfirm(_) => {
+                log::warn!("ignoring solicited confirm while waiting for unsolicited confirm");
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::Broadcast(mode) => {
+                self.state.deferred_read.clear();
+                self.process_broadcast(database, mode, request);
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::MalformedRequest(_, err) => {
+                self.state.deferred_read.clear();
+                let length =
+                    self.write_empty_solicited_response(request.header.control.seq, err.into());
+                self.write_solicited(io, writer, length).await?;
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::NewNonRead(_hash, objects) => {
+                self.state.deferred_read.clear();
+                if let Some(length) = self.handle_non_read(
+                    database,
+                    request.header.function,
+                    request.header.control.seq,
+                    info.id,
+                    objects,
+                ) {
+                    self.write_solicited(io, writer, length).await?;
+                }
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::NewRead(hash, headers) => {
+                self.state
+                    .deferred_read
+                    .set(hash, request.header.control.seq, info, headers);
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::RepeatRead(hash, _, headers) => {
+                self.state
+                    .deferred_read
+                    .set(hash, request.header.control.seq, info, headers);
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+            FragmentType::RepeatNonRead(_, _) => {
+                // TODO - send the response?
+
+                self.state.deferred_read.clear();
+                Ok(UnsolicitedWaitResult::ReadNext)
+            }
+        }
+    }
+
+    async fn read_until<T>(
+        &mut self,
+        io: &mut T,
+        reader: &mut TransportReader,
+        deadline: crate::tokio::time::Instant,
+    ) -> Result<Timeout, RunError>
+    where
+        T: IOStream,
+    {
+        loop {
+            crate::tokio::select! {
+                 res = self.sleep_until(Some(deadline)) => {
+                     res?;
+                     return Ok(Timeout::Yes);
+                 }
+                 res = reader.read(io) => {
+                     res?;
+                     return Ok(Timeout::No);
+                 }
+            }
+        }
+    }
+
+    async fn sleep_until(
+        &mut self,
+        instant: Option<crate::tokio::time::Instant>,
+    ) -> Result<(), Shutdown> {
+        async fn sleep_only(instant: Option<crate::tokio::time::Instant>) {
+            match instant {
+                Some(x) => crate::tokio::time::delay_until(x).await,
+                None => {
+                    // sleep forever
+                    crate::util::future::forever().await;
+                }
+            }
+        }
+
+        loop {
+            crate::tokio::select! {
+                 _ = sleep_only(instant) => {
+                        return Ok(());
+                 }
+                 message = self.receiver.next() => {
+                     self.handle_message(message?);
+                 }
+            }
+        }
+    }
+
+    fn handle_message(&mut self, message: OutstationMessage) {
+        match message {
+            OutstationMessage::SetDecodeLogLevel(level) => {
+                self.config.level = level;
+            }
+        }
+    }
+
+    async fn handle_deferred_read<T>(
+        &mut self,
+        io: &mut T,
+        reader: &mut TransportReader,
+        writer: &mut TransportWriter,
+        database: &mut DatabaseHandle,
+    ) -> Result<(), RunError>
+    where
+        T: IOStream,
+    {
+        if let Some(x) = self.state.deferred_read.select(database) {
+            let (length, next_state) = self.write_read_response(database, true, x.seq, x.iin2);
+            self.state.last_valid_request = Some(LastValidRequest::new(
+                x.seq,
+                x.hash,
+                Some(length),
+                next_state,
+            ));
+            self.write_solicited(io, writer, length).await?;
+            if let NextState::SolConfirmWait(series) = next_state {
+                // enter the solicited confirm wait state
+                self.sol_confirm_wait(io, reader, writer, database, series)
+                    .await?;
             }
         }
 
@@ -329,40 +705,48 @@ impl OutstationSession {
         io: &mut T,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
-    ) -> Result<Option<ResponseSeries>, LinkError>
+        database: &mut DatabaseHandle,
+    ) -> Result<(), RunError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
-        if let Some(TransportRequest::Request(info, request)) =
-            reader.pop_request(self.config.level).get()
-        {
-            if let Some(result) = self.process_request_from_idle(info, request) {
+        let mut guard = reader.pop_request(self.config.level);
+        if let Some(TransportRequest::Request(info, request)) = guard.get() {
+            if let Some(result) = self.process_request_from_idle(info, request, database) {
                 self.state.last_valid_request = Some(result);
+
+                // optional response
                 if let Some(length) = result.response_length {
-                    self.respond(io, writer, length, info.source).await?;
+                    self.write_solicited(io, writer, length).await?;
                 }
+
+                // maybe start a response series
                 if let NextState::SolConfirmWait(series) = result.next {
-                    return Ok(Some(series));
+                    drop(guard);
+                    // enter the solicited confirm wait state
+                    self.sol_confirm_wait(io, reader, writer, database, series)
+                        .await?;
                 }
             }
         }
         // TODO: handle link-layer messages
 
-        Ok(None)
+        Ok(())
     }
 
     fn process_request_from_idle(
         &mut self,
         info: FragmentInfo,
         request: Request,
+        database: &mut DatabaseHandle,
     ) -> Option<LastValidRequest> {
-        self.information.process_request_from_idle(request.header);
+        self.info.process_request_from_idle(request.header);
 
         let seq = request.header.control.seq;
 
         match self.classify(info, request) {
             FragmentType::MalformedRequest(hash, err) => {
-                let length = self.write_empty_response(seq, err.into());
+                let length = self.write_empty_solicited_response(seq, err.into());
                 Some(LastValidRequest::new(
                     seq,
                     hash,
@@ -371,7 +755,7 @@ impl OutstationSession {
                 ))
             }
             FragmentType::NewRead(hash, objects) => {
-                let (length, next) = self.write_first_read_response(info.source, seq, objects);
+                let (length, next) = self.write_first_read_response(database, seq, objects);
                 Some(LastValidRequest::new(seq, hash, Some(length), next))
             }
             FragmentType::RepeatRead(hash, _, objects) => {
@@ -379,11 +763,12 @@ impl OutstationSession {
                 // also reply to duplicate READ requests from idle, but this
                 // is plainly wrong since it can't possibly handle a multi-fragmented
                 // response correctly. Answering a repeat READ with a fresh response is harmless
-                let (length, next) = self.write_first_read_response(info.source, seq, objects);
+                let (length, next) = self.write_first_read_response(database, seq, objects);
                 Some(LastValidRequest::new(seq, hash, Some(length), next))
             }
             FragmentType::NewNonRead(hash, objects) => {
-                let length = self.handle_non_read(request.header.function, seq, info.id, objects);
+                let length =
+                    self.handle_non_read(database, request.header.function, seq, info.id, objects);
                 Some(LastValidRequest::new(seq, hash, length, NextState::Idle))
             }
             FragmentType::RepeatNonRead(hash, last_response_length) => {
@@ -396,17 +781,17 @@ impl OutstationSession {
                 ))
             }
             FragmentType::Broadcast(mode) => {
-                self.process_broadcast(mode, request);
+                self.process_broadcast(database, mode, request);
                 None
             }
-            FragmentType::SolicitedConfirm => {
+            FragmentType::SolicitedConfirm(seq) => {
                 log::warn!(
                     "ignoring solicited CONFIRM from idle state with seq: {}",
                     seq.value()
                 );
                 None
             }
-            FragmentType::UnsolicitedConfirm => {
+            FragmentType::UnsolicitedConfirm(seq) => {
                 log::warn!(
                     "ignoring unsolicited CONFIRM from idle state with seq: {}",
                     seq.value()
@@ -416,50 +801,63 @@ impl OutstationSession {
         }
     }
 
-    fn write_empty_response(&mut self, seq: Sequence, iin2: IIN2) -> usize {
+    fn write_empty_solicited_response(&mut self, seq: Sequence, iin2: IIN2) -> usize {
         let iin = IIN::new(self.get_response_iin(), iin2);
         let header = ResponseHeader::new(
             Control::response(seq, true, true, false),
             ResponseFunction::Response,
             iin,
         );
-        let mut cursor = self.tx_buffer.write_cursor();
+        let mut cursor = self.sol_tx_buffer.write_cursor();
+        header.write(&mut cursor).unwrap();
+        cursor.written().len()
+    }
+
+    fn write_null_unsolicited_response(&mut self, seq: Sequence) -> usize {
+        let iin = IIN::new(self.get_response_iin(), IIN2::default());
+        let header = ResponseHeader::new(
+            Control::unsolicited_response(seq),
+            ResponseFunction::UnsolicitedResponse,
+            iin,
+        );
+        let mut cursor = self.unsol_tx_buffer.write_cursor();
         header.write(&mut cursor).unwrap();
         cursor.written().len()
     }
 
     fn write_first_read_response(
         &mut self,
-        master: EndpointAddress,
+        database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection,
     ) -> (usize, NextState) {
-        let iin2 = self.database.select(&object_headers);
-        self.write_read_response(master, true, seq, iin2)
+        let iin2 = database.select(&object_headers);
+        self.write_read_response(database, true, seq, iin2)
     }
 
     fn write_read_response(
         &mut self,
-        master: EndpointAddress,
+        database: &mut DatabaseHandle,
         fir: bool,
         seq: Sequence,
         iin2: IIN2,
     ) -> (usize, NextState) {
         let iin1 = self.get_response_iin();
-        let mut cursor = self.tx_buffer.write_cursor();
+        let mut cursor = self.sol_tx_buffer.write_cursor();
         cursor.skip(ResponseHeader::LENGTH).unwrap();
-        let info = self.database.write_response_headers(&mut cursor);
+        let info = database.write_response_headers(&mut cursor);
         let header = ResponseHeader::new(
             Control::response(seq, fir, info.complete, info.need_confirm()),
             ResponseFunction::Response,
             iin1 + iin2,
         );
         cursor.at_start(|cur| header.write(cur)).unwrap();
-        (cursor.written().len(), info.to_next_state(seq, master))
+        (cursor.written().len(), info.to_next_state(seq))
     }
 
     fn handle_non_read(
         &mut self,
+        database: &mut DatabaseHandle,
         function: FunctionCode,
         seq: Sequence,
         frame_id: u32,
@@ -480,17 +878,29 @@ impl OutstationSession {
                 Some(self.handle_restart(seq, delay, iin2))
             }
             // controls
-            FunctionCode::Select => Some(self.handle_select(seq, frame_id, object_headers)),
-            FunctionCode::Operate => Some(self.handle_operate(seq, frame_id, object_headers)),
-            FunctionCode::DirectOperate => Some(self.handle_direct_operate(seq, object_headers)),
+            FunctionCode::Select => {
+                Some(self.handle_select(database, seq, frame_id, object_headers))
+            }
+            FunctionCode::Operate => {
+                Some(self.handle_operate(database, seq, frame_id, object_headers))
+            }
+            FunctionCode::DirectOperate => {
+                Some(self.handle_direct_operate(database, seq, object_headers))
+            }
             FunctionCode::DirectOperateNoResponse => {
-                self.handle_direct_operate_no_ack(object_headers);
+                self.handle_direct_operate_no_ack(database, object_headers);
                 None
+            }
+            FunctionCode::EnableUnsolicited => {
+                Some(self.handle_enable_or_disable_unsolicited(true, seq, object_headers))
+            }
+            FunctionCode::DisableUnsolicited => {
+                Some(self.handle_enable_or_disable_unsolicited(false, seq, object_headers))
             }
 
             _ => {
                 log::warn!("unsupported function code: {:?}", function);
-                Some(self.write_empty_response(seq, IIN2::NO_FUNC_CODE_SUPPORT))
+                Some(self.write_empty_solicited_response(seq, IIN2::NO_FUNC_CODE_SUPPORT))
             }
         }
     }
@@ -523,7 +933,7 @@ impl OutstationSession {
                             } else {
                                 // clear the restart bit
                                 self.state.restart_iin_asserted = false;
-                                self.information.clear_restart_iin();
+                                self.info.clear_restart_iin();
                             }
                         } else {
                             log::warn!("ignoring write of IIN index {} to value {}", index, value);
@@ -542,7 +952,7 @@ impl OutstationSession {
             }
         }
 
-        self.write_empty_response(seq, iin2)
+        self.write_empty_solicited_response(seq, iin2)
     }
 
     fn handle_delay_measure(&mut self, seq: Sequence, iin2: IIN2) -> usize {
@@ -552,7 +962,7 @@ impl OutstationSession {
             time: self.application.get_processing_delay_ms(),
         };
 
-        let mut cursor = self.tx_buffer.write_cursor();
+        let mut cursor = self.sol_tx_buffer.write_cursor();
         let mut writer = start_response(
             Control::response(seq, true, true, false),
             ResponseFunction::Response,
@@ -567,14 +977,16 @@ impl OutstationSession {
 
     fn handle_restart(&mut self, seq: Sequence, delay: Option<RestartDelay>, iin2: IIN2) -> usize {
         let delay = match delay {
-            None => return self.write_empty_response(seq, iin2 | IIN2::NO_FUNC_CODE_SUPPORT),
+            None => {
+                return self.write_empty_solicited_response(seq, iin2 | IIN2::NO_FUNC_CODE_SUPPORT)
+            }
             Some(x) => x,
         };
 
         let iin = self.get_response_iin() + iin2;
 
         // respond with the delay
-        let mut cursor = self.tx_buffer.write_cursor();
+        let mut cursor = self.sol_tx_buffer.write_cursor();
         let mut writer = start_response(
             Control::response(seq, true, true, false),
             ResponseFunction::Response,
@@ -599,7 +1011,12 @@ impl OutstationSession {
         cursor.written().len()
     }
 
-    fn handle_direct_operate(&mut self, seq: Sequence, object_headers: HeaderCollection) -> usize {
+    fn handle_direct_operate(
+        &mut self,
+        database: &mut DatabaseHandle,
+        seq: Sequence,
+        object_headers: HeaderCollection,
+    ) -> usize {
         let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
                 log::warn!(
@@ -607,13 +1024,13 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return self.write_empty_response(seq, IIN2::PARAMETER_ERROR);
+                return self.write_empty_solicited_response(seq, IIN2::PARAMETER_ERROR);
             }
             Ok(controls) => controls,
         };
 
         let iin = self.get_response_iin() + IIN2::default();
-        let mut cursor = self.tx_buffer.write_cursor();
+        let mut cursor = self.sol_tx_buffer.write_cursor();
         ResponseHeader::new(
             Control::single_response(seq),
             ResponseFunction::Response,
@@ -624,7 +1041,7 @@ impl OutstationSession {
 
         let mut control_tx = ControlTransaction::new(self.control_handler.borrow_mut());
 
-        let _ = self.database.transaction(|database| {
+        let _ = database.transaction(|database| {
             controls.operate_with_response(
                 &mut cursor,
                 OperateType::DirectOperate,
@@ -636,7 +1053,53 @@ impl OutstationSession {
         cursor.written().len()
     }
 
-    fn handle_direct_operate_no_ack(&mut self, object_headers: HeaderCollection) {
+    fn handle_enable_or_disable_unsolicited(
+        &mut self,
+        enable: bool,
+        seq: Sequence,
+        object_headers: HeaderCollection,
+    ) -> usize {
+        fn to_string(enable: bool) -> &'static str {
+            if enable {
+                "ENABLE"
+            } else {
+                "DISABLE"
+            }
+        }
+
+        if self.config.unsolicited.is_disabled() {
+            log::warn!("received {} unsolicited request, but unsolicited support is disabled by configuration", to_string(enable));
+            return self.write_empty_solicited_response(seq, IIN2::NO_FUNC_CODE_SUPPORT);
+        }
+
+        let mut iin2 = IIN2::default();
+
+        for header in object_headers.iter() {
+            match header.details {
+                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var2) => {
+                    self.state.enabled_unsolicited_classes.class1 = enable;
+                }
+                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var3) => {
+                    self.state.enabled_unsolicited_classes.class2 = enable;
+                }
+                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var4) => {
+                    self.state.enabled_unsolicited_classes.class3 = enable;
+                }
+                _ => {
+                    log::warn!("received {} unsolicited request for unsupported qualifier ({}) and variation ({})", to_string(enable), header.details.qualifier(), header.variation);
+                    iin2 |= IIN2::NO_FUNC_CODE_SUPPORT;
+                }
+            }
+        }
+
+        self.write_empty_solicited_response(seq, iin2)
+    }
+
+    fn handle_direct_operate_no_ack(
+        &mut self,
+        database: &mut DatabaseHandle,
+        object_headers: HeaderCollection,
+    ) {
         let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
                 log::warn!(
@@ -651,13 +1114,12 @@ impl OutstationSession {
 
         let mut control_tx = ControlTransaction::new(self.control_handler.borrow_mut());
 
-        let _ = self
-            .database
-            .transaction(|database| controls.operate_no_ack(&mut control_tx, database));
+        let _ = database.transaction(|database| controls.operate_no_ack(&mut control_tx, database));
     }
 
     fn handle_select(
         &mut self,
+        database: &mut DatabaseHandle,
         seq: Sequence,
         frame_id: u32,
         object_headers: HeaderCollection,
@@ -669,13 +1131,13 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return self.write_empty_response(seq, IIN2::PARAMETER_ERROR);
+                return self.write_empty_solicited_response(seq, IIN2::PARAMETER_ERROR);
             }
             Ok(controls) => controls,
         };
 
         let iin = self.get_response_iin() + IIN2::default();
-        let mut cursor = self.tx_buffer.write_cursor();
+        let mut cursor = self.sol_tx_buffer.write_cursor();
         ResponseHeader::new(
             Control::single_response(seq),
             ResponseFunction::Response,
@@ -686,12 +1148,12 @@ impl OutstationSession {
 
         let mut transaction = ControlTransaction::new(self.control_handler.borrow_mut());
 
-        let result: Result<CommandStatus, WriteError> = self.database.transaction(|database| {
+        let result: Result<CommandStatus, WriteError> = database.transaction(|database| {
             controls.select_with_response(&mut cursor, &mut transaction, database)
         });
 
         if let Ok(CommandStatus::Success) = result {
-            self.state.select_state = Some(SelectState::new(
+            self.state.select = Some(SelectState::new(
                 seq,
                 frame_id,
                 crate::tokio::time::Instant::now(),
@@ -704,6 +1166,7 @@ impl OutstationSession {
 
     fn handle_operate(
         &mut self,
+        database: &mut DatabaseHandle,
         seq: Sequence,
         frame_id: u32,
         object_headers: HeaderCollection,
@@ -715,13 +1178,13 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return self.write_empty_response(seq, IIN2::PARAMETER_ERROR);
+                return self.write_empty_solicited_response(seq, IIN2::PARAMETER_ERROR);
             }
             Ok(controls) => controls,
         };
 
         let iin = self.get_response_iin() + IIN2::default();
-        let mut cursor = self.tx_buffer.write_cursor();
+        let mut cursor = self.sol_tx_buffer.write_cursor();
         ResponseHeader::new(
             Control::single_response(seq),
             ResponseFunction::Response,
@@ -731,7 +1194,7 @@ impl OutstationSession {
         .unwrap();
 
         // determine if we have a matching SELECT
-        match self.state.select_state {
+        match self.state.select {
             Some(s) => {
                 match s.match_operate(
                     self.config.select_timeout,
@@ -745,7 +1208,7 @@ impl OutstationSession {
                     Ok(()) => {
                         let mut control_tx =
                             ControlTransaction::new(self.control_handler.borrow_mut());
-                        let _ = self.database.transaction(|db| {
+                        let _ = database.transaction(|db| {
                             controls.operate_with_response(
                                 &mut cursor,
                                 OperateType::SelectBeforeOperate,
@@ -772,14 +1235,23 @@ impl OutstationSession {
         iin1
     }
 
-    fn process_broadcast(&mut self, _mode: BroadcastConfirmMode, request: Request) {
-        let action = self.process_broadcast_get_action(request);
-        self.information
+    fn process_broadcast(
+        &mut self,
+        database: &mut DatabaseHandle,
+        _mode: BroadcastConfirmMode,
+        request: Request,
+    ) {
+        let action = self.process_broadcast_get_action(database, request);
+        self.info
             .broadcast_received(request.header.function, action)
     }
 
-    fn process_broadcast_get_action(&mut self, request: Request) -> BroadcastAction {
-        if !self.config.broadcast_support.is_enabled() {
+    fn process_broadcast_get_action(
+        &mut self,
+        database: &mut DatabaseHandle,
+        request: Request,
+    ) -> BroadcastAction {
+        if self.config.broadcast.is_disabled() {
             log::warn!(
                 "ignoring broadcast request (broadcast support disabled): {:?}",
                 request.header.function
@@ -800,7 +1272,7 @@ impl OutstationSession {
 
         match request.header.function {
             FunctionCode::DirectOperateNoResponse => {
-                self.handle_direct_operate_no_ack(objects);
+                self.handle_direct_operate_no_ack(database, objects);
                 BroadcastAction::Processed
             }
             _ => {
@@ -817,36 +1289,39 @@ impl OutstationSession {
         crate::tokio::time::Instant::now() + self.config.confirm_timeout
     }
 
+    fn new_unsolicited_retry_deadline(&self) -> crate::tokio::time::Instant {
+        crate::tokio::time::Instant::now() + self.config.unsolicited_retry_delay
+    }
+
     async fn sol_confirm_wait<T>(
         &mut self,
         io: &mut T,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
+        database: &mut DatabaseHandle,
         mut series: ResponseSeries,
-    ) -> Result<(), LinkError>
+    ) -> Result<(), RunError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
+        self.info.enter_solicited_confirm_wait(series.ecsn);
+
         loop {
             match self
                 .wait_for_sol_confirm(io, reader, writer, series.ecsn)
                 .await?
             {
                 Confirm::Yes => {
-                    self.database.clear_written_events();
-                    if series.last_response {
+                    database.clear_written_events();
+                    if series.fin {
                         // done with response series
                         return Ok(());
                     }
                     // format the next response in the series
                     series.ecsn.increment();
-                    let (length, next_state) = self.write_read_response(
-                        series.master,
-                        false,
-                        series.ecsn,
-                        IIN2::default(),
-                    );
-                    self.respond(io, writer, length, series.master).await?;
+                    let (length, next_state) =
+                        self.write_read_response(database, false, series.ecsn, IIN2::default());
+                    self.write_solicited(io, writer, length).await?;
                     match next_state {
                         NextState::Idle => return Ok(()),
                         NextState::SolConfirmWait(next) => {
@@ -855,11 +1330,11 @@ impl OutstationSession {
                     }
                 }
                 Confirm::Timeout => {
-                    self.database.reset();
+                    database.reset();
                     return Ok(());
                 }
                 Confirm::NewRequest => {
-                    self.database.reset();
+                    database.reset();
                     return Ok(());
                 }
             }
@@ -872,17 +1347,15 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         ecsn: Sequence,
-    ) -> Result<Confirm, LinkError>
+    ) -> Result<Confirm, RunError>
     where
-        T: AsyncRead + AsyncWrite + Unpin,
+        T: IOStream,
     {
-        self.information.enter_solicited_confirm_wait(ecsn);
-
         let mut deadline = self.new_confirm_deadline();
         loop {
-            match reader.read_with_timeout(io, deadline).await? {
+            match self.read_until(io, reader, deadline).await? {
                 Timeout::Yes => {
-                    self.information.solicited_confirm_timeout(ecsn);
+                    self.info.solicited_confirm_timeout(ecsn);
                     return Ok(Confirm::Timeout);
                 }
                 // process data
@@ -894,19 +1367,18 @@ impl OutstationSession {
                             // just go back to the loop and read another fragment
                         }
                         ConfirmAction::Confirmed => {
-                            self.information.solicited_confirm_received(ecsn);
+                            self.info.solicited_confirm_received(ecsn);
                             return Ok(Confirm::Yes);
                         }
                         ConfirmAction::NewRequest(header) => {
-                            self.information.solicited_confirm_wait_new_request(header);
+                            self.info.solicited_confirm_wait_new_request(header);
                             // retain the fragment so that it can be processed from the idle state
                             guard.retain();
                             return Ok(Confirm::NewRequest);
                         }
                         ConfirmAction::EchoLastResponse(length) => {
                             if let Some(length) = length {
-                                self.respond(io, writer, length, self.config.master_address)
-                                    .await?;
+                                self.write_solicited(io, writer, length).await?;
                             }
                             // per the spec, we restart the confirm timer
                             deadline = self.new_confirm_deadline();
@@ -937,22 +1409,21 @@ impl OutstationSession {
             // this should never happen, but if it does, new request is probably best course of action
             FragmentType::RepeatNonRead(_, _) => ConfirmAction::NewRequest(request.header),
             FragmentType::Broadcast(_) => ConfirmAction::NewRequest(request.header),
-            FragmentType::SolicitedConfirm => {
-                if request.header.control.seq == ecsn {
+            FragmentType::SolicitedConfirm(seq) => {
+                if seq == ecsn {
                     ConfirmAction::Confirmed
                 } else {
-                    self.information
+                    self.info
                         .wrong_solicited_confirm_seq(ecsn, request.header.control.seq);
-                    log::warn!("received solicited confirm with wrong sequence number, expected: {} received: {}", ecsn.value(), request.header.control.seq.value());
+                    log::warn!("received solicited confirm with wrong sequence number, expected: {} received: {}", ecsn.value(), seq.value());
                     ConfirmAction::ContinueWait
                 }
             }
-            FragmentType::UnsolicitedConfirm => {
-                self.information
-                    .unexpected_confirm(true, request.header.control.seq);
+            FragmentType::UnsolicitedConfirm(seq) => {
+                self.info.unexpected_confirm(true, seq);
                 log::warn!(
                     "ignoring unsolicited CONFIRM while waiting for solicited confirm, seq: {}",
-                    request.header.control.seq.value()
+                    seq.value()
                 );
                 ConfirmAction::ContinueWait
             }
@@ -962,9 +1433,9 @@ impl OutstationSession {
     fn classify<'a>(&self, info: FragmentInfo, request: Request<'a>) -> FragmentType<'a> {
         if request.header.function == FunctionCode::Confirm {
             return if request.header.control.uns {
-                FragmentType::UnsolicitedConfirm
+                FragmentType::UnsolicitedConfirm(request.header.control.seq)
             } else {
-                FragmentType::SolicitedConfirm
+                FragmentType::SolicitedConfirm(request.header.control.seq)
             };
         }
 

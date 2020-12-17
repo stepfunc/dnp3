@@ -1,10 +1,10 @@
 use crate::app::format::write::{start_request, start_response};
 use crate::app::header::{Control, ResponseFunction, IIN, IIN1, IIN2};
 use crate::app::sequence::Sequence;
-use crate::master::session::RunError;
 use crate::prelude::master::*;
 use crate::tokio::test::*;
 use crate::util::cursor::WriteCursor;
+use crate::util::task::RunError;
 use std::future::Future;
 
 pub(crate) fn startup_procedure<F: Future<Output = RunError>>(

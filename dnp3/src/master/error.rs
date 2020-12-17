@@ -4,15 +4,11 @@ use crate::app::parse::error::ObjectParseError;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::master::association::NoAssociation;
-use crate::master::session::RunError;
 use crate::tokio::sync::mpsc::error::SendError;
 use crate::tokio::sync::oneshot::error::RecvError;
 use crate::util::cursor::WriteError;
+use crate::util::task::{RunError, Shutdown};
 use std::error::Error;
-
-/// Indicates that the master task has shutdown
-#[derive(Copy, Clone, Debug)]
-pub struct Shutdown;
 
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -242,18 +238,6 @@ impl From<ObjectParseError> for TaskError {
     }
 }
 
-impl From<LinkError> for RunError {
-    fn from(err: LinkError) -> Self {
-        RunError::Link(err)
-    }
-}
-
-impl From<Shutdown> for RunError {
-    fn from(_: Shutdown) -> Self {
-        RunError::Shutdown
-    }
-}
-
 impl From<Shutdown> for TaskError {
     fn from(_: Shutdown) -> Self {
         TaskError::Shutdown
@@ -308,12 +292,6 @@ impl From<TaskError> for CommandError {
 impl From<TaskError> for TimeSyncError {
     fn from(err: TaskError) -> Self {
         TimeSyncError::Task(err)
-    }
-}
-
-impl From<RecvError> for Shutdown {
-    fn from(_: RecvError) -> Self {
-        Shutdown
     }
 }
 

@@ -22,7 +22,7 @@ use crate::master::handle::{ReadHandler, HeaderInfo};
 use crate::app::parse::error::ObjectParseError;
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum PrefixedVariation<'a, I> where I : Copy + Clone + FixedSize + Index + std::fmt::Display {
+pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
     /// Binary Input Event - Without Time
     Group2Var1(CountSequence<'a, Prefix<I, Group2Var1>>),
     /// Binary Input Event - With Absolute Time
@@ -101,7 +101,7 @@ pub(crate) enum PrefixedVariation<'a, I> where I : Copy + Clone + FixedSize + In
     Group111VarX(u8, PrefixedBytesSequence<'a, I>),
 }
 
-impl<'a, I> PrefixedVariation<'a, I> where I : Copy + Clone + FixedSize + Index + std::fmt::Display {
+impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
     pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
         match v {
             Variation::Group2Var1 => Ok(PrefixedVariation::Group2Var1(CountSequence::parse(count, cursor)?)),

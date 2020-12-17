@@ -22,7 +22,10 @@ pub(crate) enum Event {
     EndControls,
     BroadcastReceived(FunctionCode, BroadcastAction),
     EnterSolicitedConfirmWait(u8),
+    EnterUnsolicitedConfirmWait(u8),
     SolicitedConfirmTimeout(u8),
+    UnsolicitedConfirmTimeout(u8, bool),
+    UnsolicitedConfirmReceived(u8),
     SolicitedConfirmReceived(u8),
     SolicitedConfirmWaitNewRequest(RequestHeader),
     UnexpectedConfirm(bool, u8),
@@ -46,6 +49,10 @@ impl EventHandle {
 
     pub(crate) fn push(&self, event: Event) {
         self.events.lock().unwrap().push_back(event);
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.events.lock().unwrap().is_empty()
     }
 
     pub(crate) fn pop(&self) -> Option<Event> {

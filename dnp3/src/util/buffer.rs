@@ -20,12 +20,12 @@ impl Buffer {
     }
 
     #[cfg(test)]
-    pub(crate) fn len(&self) -> usize {
-        self.inner.len()
+    pub(crate) fn get_mut(&mut self, length: usize) -> Option<&mut [u8]> {
+        self.inner.get_mut(0..length)
     }
 
     #[cfg(test)]
-    pub(crate) fn get_mut(&mut self, length: usize) -> Option<&mut [u8]> {
-        self.inner.get_mut(0..length)
+    pub(crate) fn len(&self) -> usize {
+        self.inner.len()
     }
 }

@@ -1,4 +1,4 @@
-use crate::outstation::tests::harness::{new_harness, Event};
+use crate::outstation::tests::harness::*;
 use crate::outstation::traits::RestartDelay;
 
 const CLEAR_RESTART_IIN: &[u8] = &[0xC0, 0x02, 80, 1, 0x00, 07, 07, 0x00];
@@ -13,21 +13,21 @@ const RESPONSE_TIME_DELAY_COARSE: &[u8] =
 
 #[test]
 fn can_clear_the_restart_iin_bit() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
     harness.test_request_response(CLEAR_RESTART_IIN, RESPONSE_NO_RESTART_IIN);
     harness.check_events(&[Event::ClearRestartIIN])
 }
 
 #[test]
 fn handles_cold_restart_when_not_supported() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
     harness.test_request_response(COLD_RESTART, RESPONSE_NO_FUNCTION_SUPPORT);
     harness.check_events(&[Event::ColdRestart(None)])
 }
 
 #[test]
 fn handles_cold_restart_when_supported_via_time_delay_fine() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
     harness.application_data.lock().unwrap().restart_delay =
         Some(RestartDelay::Milliseconds(0xCAFE));
     harness.test_request_response(COLD_RESTART, RESPONSE_TIME_DELAY_FINE);
@@ -36,7 +36,7 @@ fn handles_cold_restart_when_supported_via_time_delay_fine() {
 
 #[test]
 fn handles_cold_restart_when_supported_via_time_delay_coarse() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
     harness.application_data.lock().unwrap().restart_delay = Some(RestartDelay::Seconds(0xCAFE));
     harness.test_request_response(COLD_RESTART, RESPONSE_TIME_DELAY_COARSE);
     harness.check_events(&[Event::ColdRestart(Some(RestartDelay::Seconds(0xCAFE)))])
@@ -44,14 +44,14 @@ fn handles_cold_restart_when_supported_via_time_delay_coarse() {
 
 #[test]
 fn handles_warm_restart_when_not_supported() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
     harness.test_request_response(WARM_RESTART, RESPONSE_NO_FUNCTION_SUPPORT);
     harness.check_events(&[Event::WarmRestart(None)])
 }
 
 #[test]
 fn handles_warm_restart_when_supported_via_time_delay_fine() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
     harness.application_data.lock().unwrap().restart_delay =
         Some(RestartDelay::Milliseconds(0xCAFE));
     harness.test_request_response(WARM_RESTART, RESPONSE_TIME_DELAY_FINE);
@@ -60,7 +60,7 @@ fn handles_warm_restart_when_supported_via_time_delay_fine() {
 
 #[test]
 fn handles_warm_restart_when_supported_via_time_delay_coarse() {
-    let mut harness = new_harness();
+    let mut harness = new_harness(get_default_config());
     harness.application_data.lock().unwrap().restart_delay = Some(RestartDelay::Seconds(0xCAFE));
     harness.test_request_response(WARM_RESTART, RESPONSE_TIME_DELAY_COARSE);
     harness.check_events(&[Event::WarmRestart(Some(RestartDelay::Seconds(0xCAFE)))])

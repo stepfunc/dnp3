@@ -9,7 +9,7 @@ use crate::link::parser::FramePayload;
 use crate::tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::link::format::format_header;
-use crate::outstation::config::SelfAddressSupport;
+use crate::outstation::config::Feature;
 
 enum SecondaryState {
     NotReset,
@@ -18,7 +18,7 @@ enum SecondaryState {
 
 pub(crate) struct Layer {
     endpoint_type: EndpointType,
-    self_address_support: SelfAddressSupport,
+    self_address: Feature,
     local_address: EndpointAddress,
     secondary_state: SecondaryState,
     reader: super::reader::Reader,
@@ -39,12 +39,12 @@ impl Reply {
 impl Layer {
     pub(crate) fn new(
         endpoint_type: EndpointType,
-        self_address_support: SelfAddressSupport,
+        self_address: Feature,
         local_address: EndpointAddress,
     ) -> Self {
         Self {
             endpoint_type,
-            self_address_support,
+            self_address,
             local_address,
             secondary_state: SecondaryState::NotReset,
             reader: super::reader::Reader::default(),
@@ -128,12 +128,12 @@ impl Layer {
                 }
             }
             AnyAddress::SelfAddress => {
-                match self.self_address_support {
-                    SelfAddressSupport::Enabled => None, // just pretend like it was sent to us
-                    SelfAddressSupport::Disabled => {
-                        log::warn!("ignoring frame sent to self address");
-                        return (None, None);
-                    }
+                if self.self_address.is_enabled() {
+                    // just pretend like it was sent to us
+                    None
+                } else {
+                    log::warn!("ignoring frame sent to self address");
+                    return (None, None);
                 }
             }
             AnyAddress::Reserved(x) => {
