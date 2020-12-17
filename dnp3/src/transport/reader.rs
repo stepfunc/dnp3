@@ -1,10 +1,12 @@
-use crate::app::parse::parser::{ParsedFragment, Request, Response};
+use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::outstation::config::Feature;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
-use crate::transport::FragmentInfo;
+use crate::transport::{
+    FragmentInfo, LinkLayerMessage, TransportData, TransportRequest, TransportResponse,
+};
 
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport reader during testing.
@@ -37,7 +39,7 @@ impl<'a> RequestGuard<'a> {
         self.canceled = true
     }
 
-    pub(crate) fn get(&mut self) -> Option<(FragmentInfo, Request)> {
+    pub(crate) fn get(&mut self) -> Option<TransportRequest> {
         self.reader.peek_request(self.level)
     }
 }
@@ -96,20 +98,23 @@ impl TransportReader {
         log_current_fragment
     }
 
-    pub(crate) fn pop_response(
-        &mut self,
-        level: DecodeLogLevel,
-    ) -> Option<(EndpointAddress, Response)> {
+    pub(crate) fn pop_response(&mut self, level: DecodeLogLevel) -> Option<TransportResponse> {
         let log = self.log_fragment();
-        let (info, parsed) = self.parse(false, log, level)?;
-        match parsed.to_response() {
-            Err(err) => {
-                if log {
-                    log::error!("response error: {}", err);
+        let data = self.parse(false, log, level)?;
+
+        match data {
+            ParsedTransportData::Fragment(info, fragment) => match fragment.to_response() {
+                Err(err) => {
+                    if log {
+                        log::error!("response error: {}", err);
+                    }
+                    None
                 }
-                None
+                Ok(response) => Some(TransportResponse::Response(info.source, response)),
+            },
+            ParsedTransportData::LinkLayerMessage(msg) => {
+                Some(TransportResponse::LinkLayerMessage(msg))
             }
-            Ok(response) => Some((info.source, response)),
         }
     }
 
@@ -117,17 +122,23 @@ impl TransportReader {
         RequestGuard::new(level, self)
     }
 
-    fn peek_request(&mut self, level: DecodeLogLevel) -> Option<(FragmentInfo, Request)> {
+    fn peek_request(&mut self, level: DecodeLogLevel) -> Option<TransportRequest> {
         let log = self.log_fragment();
-        let (info, parsed) = self.parse(true, log, level)?;
-        match parsed.to_request() {
-            Err(err) => {
-                if log {
-                    log::error!("request error: {}", err);
+        let data = self.parse(true, log, level)?;
+
+        match data {
+            ParsedTransportData::Fragment(info, fragment) => match fragment.to_request() {
+                Err(err) => {
+                    if log {
+                        log::error!("request error: {}", err);
+                    }
+                    None
                 }
-                None
+                Ok(request) => Some(TransportRequest::Request(info, request)),
+            },
+            ParsedTransportData::LinkLayerMessage(msg) => {
+                Some(TransportRequest::LinkLayerMessage(msg))
             }
-            Ok(request) => Some((info, request)),
         }
     }
 
@@ -136,19 +147,32 @@ impl TransportReader {
         peek: bool,
         log: bool,
         level: DecodeLogLevel,
-    ) -> Option<(FragmentInfo, ParsedFragment)> {
-        let fragment = if peek {
+    ) -> Option<ParsedTransportData> {
+        let transport_data = if peek {
             self.inner.peek()?
         } else {
             self.inner.pop()?
         };
-        let level = if log { level } else { DecodeLogLevel::Nothing };
-        let parsed = ParsedFragment::parse(level.receive(), fragment.data).ok()?;
-        if let Err(err) = parsed.objects {
-            if log {
-                log::warn!("error parsing object headers: {}", err);
+
+        match transport_data {
+            TransportData::Fragment(fragment) => {
+                let level = if log { level } else { DecodeLogLevel::Nothing };
+                let parsed = ParsedFragment::parse(level.receive(), fragment.data).ok()?;
+                if let Err(err) = parsed.objects {
+                    if log {
+                        log::warn!("error parsing object headers: {}", err);
+                    }
+                }
+                Some(ParsedTransportData::Fragment(fragment.info, parsed))
+            }
+            TransportData::LinkLayerMessage(msg) => {
+                Some(ParsedTransportData::LinkLayerMessage(msg))
             }
         }
-        Some((fragment.info, parsed))
     }
+}
+
+enum ParsedTransportData<'a> {
+    Fragment(FragmentInfo, ParsedFragment<'a>),
+    LinkLayerMessage(LinkLayerMessage),
 }

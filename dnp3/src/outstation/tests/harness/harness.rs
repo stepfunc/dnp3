@@ -1,6 +1,6 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
-use crate::link::header::{BroadcastConfirmMode, FrameInfo};
+use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle, EventBufferConfig};
 use crate::outstation::task::{OutstationMessage, OutstationTask};
@@ -144,7 +144,11 @@ fn new_harness_impl(
 
     task.get_reader()
         .get_inner()
-        .set_rx_frame_info(FrameInfo::new(config.master_address, broadcast));
+        .set_rx_frame_info(FrameInfo::new(
+            config.master_address,
+            broadcast,
+            FrameType::Data,
+        ));
 
     let (mut io, io_handle) = io::mock();
 

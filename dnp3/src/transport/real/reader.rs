@@ -1,16 +1,18 @@
 use crate::app::EndpointType;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
+use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;
 use crate::outstation::config::Feature;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::real::assembler::{Assembler, AssemblyState};
 use crate::transport::real::header::Header;
-use crate::transport::Fragment;
+use crate::transport::{LinkLayerMessage, LinkLayerMessageType, TransportData};
 
 pub(crate) struct Reader {
     link: crate::link::layer::Layer,
     assembler: Assembler,
+    pending_link_layer_message: Option<LinkLayerMessage>,
 }
 
 impl Reader {
@@ -18,6 +20,7 @@ impl Reader {
         Self {
             link: crate::link::layer::Layer::new(EndpointType::Master, Feature::Disabled, source),
             assembler: Assembler::new(max_tx_buffer),
+            pending_link_layer_message: None,
         }
     }
 
@@ -29,20 +32,30 @@ impl Reader {
         Self {
             link: crate::link::layer::Layer::new(EndpointType::Outstation, self_address, source),
             assembler: Assembler::new(max_rx_buffer),
+            pending_link_layer_message: None,
         }
     }
 
     pub(crate) fn reset(&mut self) {
         self.assembler.reset();
         self.link.reset();
+        self.pending_link_layer_message = None;
     }
 
-    pub(crate) fn pop(&mut self) -> Option<Fragment> {
-        self.assembler.pop()
+    pub(crate) fn pop(&mut self) -> Option<TransportData> {
+        if let Some(msg) = self.pending_link_layer_message.take() {
+            return Some(TransportData::LinkLayerMessage(msg));
+        }
+
+        self.assembler.pop().map(TransportData::Fragment)
     }
 
-    pub(crate) fn peek(&self) -> Option<Fragment> {
-        self.assembler.peek()
+    pub(crate) fn peek(&self) -> Option<TransportData> {
+        if let Some(msg) = self.pending_link_layer_message {
+            return Some(TransportData::LinkLayerMessage(msg));
+        }
+
+        self.assembler.peek().map(TransportData::Fragment)
     }
 
     pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
@@ -57,14 +70,32 @@ impl Reader {
 
         loop {
             let info = self.link.read(io, &mut payload).await?;
-            match payload.get() {
-                [transport, data @ ..] => {
-                    let header = Header::new(*transport);
-                    if let AssemblyState::Complete = self.assembler.assemble(info, header, data) {
-                        return Ok(());
+
+            match info.frame_type {
+                FrameType::Data => match payload.get() {
+                    [transport, data @ ..] => {
+                        let header = Header::new(*transport);
+                        if let AssemblyState::Complete = self.assembler.assemble(info, header, data)
+                        {
+                            return Ok(());
+                        }
                     }
+                    [] => log::warn!("received link data frame with no payload"),
+                },
+                FrameType::LinkStatusRequest => {
+                    self.pending_link_layer_message = Some(LinkLayerMessage {
+                        source: info.source,
+                        message: LinkLayerMessageType::LinkStatusRequest,
+                    });
+                    return Ok(());
                 }
-                [] => log::warn!("received link data frame with no payload"),
+                FrameType::LinkStatusResponse => {
+                    self.pending_link_layer_message = Some(LinkLayerMessage {
+                        source: info.source,
+                        message: LinkLayerMessageType::LinkStatusResponse,
+                    });
+                    return Ok(());
+                }
             }
         }
     }

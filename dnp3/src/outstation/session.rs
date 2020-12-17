@@ -19,7 +19,9 @@ use crate::outstation::traits::{
     BroadcastAction, ControlHandler, OperateType, OutstationApplication, OutstationInformation,
     RestartDelay,
 };
-use crate::transport::{FragmentInfo, RequestGuard, TransportReader, TransportWriter};
+use crate::transport::{
+    FragmentInfo, RequestGuard, TransportReader, TransportRequest, TransportWriter,
+};
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 
@@ -543,7 +545,11 @@ impl OutstationSession {
         let mut guard = reader.pop_request(self.config.level);
         let (info, request) = match guard.get() {
             None => return Ok(UnsolicitedWaitResult::ReadNext),
-            Some(x) => x,
+            Some(TransportRequest::Request(info, request)) => (info, request),
+            Some(TransportRequest::LinkLayerMessage(_)) => {
+                // TODO: do something with the message
+                return Ok(UnsolicitedWaitResult::ReadNext);
+            }
         };
 
         match self.classify(info, request) {
@@ -705,7 +711,7 @@ impl OutstationSession {
         T: IOStream,
     {
         let mut guard = reader.pop_request(self.config.level);
-        if let Some((info, request)) = guard.get() {
+        if let Some(TransportRequest::Request(info, request)) = guard.get() {
             if let Some(result) = self.process_request_from_idle(info, request, database) {
                 self.state.last_valid_request = Some(result);
 
@@ -723,6 +729,7 @@ impl OutstationSession {
                 }
             }
         }
+        // TODO: handle link-layer messages
 
         Ok(())
     }
@@ -1384,7 +1391,11 @@ impl OutstationSession {
 
     fn expect_sol_confirm(&mut self, ecsn: Sequence, request: &mut RequestGuard) -> ConfirmAction {
         let (info, request) = match request.get() {
-            Some(x) => x,
+            Some(TransportRequest::Request(info, request)) => (info, request),
+            Some(TransportRequest::LinkLayerMessage(_)) => {
+                // TODO: do something with the message
+                return ConfirmAction::ContinueWait;
+            }
             None => return ConfirmAction::ContinueWait,
         };
 

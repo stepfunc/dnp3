@@ -7,7 +7,7 @@ use crate::master::association::NoAssociation;
 use crate::tokio::sync::mpsc::error::SendError;
 use crate::tokio::sync::oneshot::error::RecvError;
 use crate::util::cursor::WriteError;
-use crate::util::task::Shutdown;
+use crate::util::task::{RunError, Shutdown};
 use std::error::Error;
 
 /// Errors that can occur when adding an association
@@ -241,6 +241,15 @@ impl From<ObjectParseError> for TaskError {
 impl From<Shutdown> for TaskError {
     fn from(_: Shutdown) -> Self {
         TaskError::Shutdown
+    }
+}
+
+impl From<RunError> for TaskError {
+    fn from(x: RunError) -> Self {
+        match x {
+            RunError::Shutdown => TaskError::Shutdown,
+            RunError::Link(x) => TaskError::Lower(x),
+        }
     }
 }
 

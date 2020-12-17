@@ -28,6 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the association
     let mut config = Configuration::default();
     config.auto_time_sync = Some(TimeSyncProcedure::LAN);
+    config.keep_alive_timeout = Some(Duration::from_secs(60));
     let mut association = runtime.block_on(master.add_association(
         EndpointAddress::from(1024)?,
         config,
@@ -97,6 +98,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Err(err) = runtime.block_on(association.warm_restart()) {
                     log::warn!("error: {}", err);
                 }
+            }
+            "lsr" => {
+                log::info!("{:?}", runtime.block_on(association.check_link_status()));
             }
             s => println!("unknown command: {}", s),
         }

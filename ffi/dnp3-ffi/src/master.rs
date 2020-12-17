@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::association::Association;
 use crate::ffi;
 
@@ -42,16 +44,25 @@ pub unsafe fn master_add_association(
         }
     };
 
-    let config = Configuration::new(
-        convert_event_classes(&config.disable_unsol_classes()),
-        convert_event_classes(&config.enable_unsol_classes()),
-        convert_classes(&config.startup_integrity_classes()),
-        convert_auto_time_sync(&config.auto_time_sync()),
-        RetryStrategy::new(
+    let config = Configuration {
+        disable_unsol_classes: convert_event_classes(&config.disable_unsol_classes()),
+        enable_unsol_classes: convert_event_classes(&config.enable_unsol_classes()),
+        startup_integrity_classes: convert_classes(&config.startup_integrity_classes()),
+        auto_time_sync: convert_auto_time_sync(&config.auto_time_sync()),
+        auto_tasks_retry_strategy: RetryStrategy::new(
             config.auto_tasks_retry_strategy.min_delay(),
             config.auto_tasks_retry_strategy.max_delay(),
         ),
-    );
+        keep_alive_timeout: if config.keep_alive_timeout() == Duration::from_secs(0) {
+            None
+        } else {
+            Some(config.keep_alive_timeout())
+        },
+        auto_integrity_scan_on_buffer_overflow: config.auto_integrity_scan_on_buffer_overflow(),
+        event_scan_on_events_available: convert_event_classes(
+            &config.event_scan_on_events_available(),
+        ),
+    };
 
     let handler = AssociationHandlerAdapter {
         integrity_handler: handlers.integrity_handler,

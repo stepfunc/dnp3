@@ -70,6 +70,21 @@ pub(crate) fn format_unconfirmed_user_data(
     )
 }
 
+pub(crate) fn format_link_status_request(
+    is_master: bool,
+    destination: u16,
+    source: u16,
+    cursor: &mut WriteCursor,
+) -> Result<(), WriteError> {
+    format(
+        ControlField::new(is_master, Function::PriRequestLinkStatus),
+        destination,
+        source,
+        None,
+        cursor,
+    )
+}
+
 fn format(
     control: ControlField,
     destination: u16,

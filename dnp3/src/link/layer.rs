@@ -2,7 +2,9 @@ use crate::app::EndpointType;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::function::Function;
-use crate::link::header::{AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, Header};
+use crate::link::header::{
+    AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, FrameType, Header,
+};
 use crate::link::parser::FramePayload;
 use crate::tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
@@ -147,12 +149,13 @@ impl Layer {
             },
         };
 
-        let info = FrameInfo::new(source, broadcast);
-
         // broadcasts may only use unconfirmed user data
         if broadcast.is_some() {
             return match header.control.func {
-                Function::PriUnconfirmedUserData => (Some(info), None),
+                Function::PriUnconfirmedUserData => (
+                    Some(FrameInfo::new(source, broadcast, FrameType::Data)),
+                    None,
+                ),
                 _ => {
                     log::warn!(
                         "ignoring broadcast frame with function: {:?}",
@@ -164,7 +167,10 @@ impl Layer {
         }
 
         match header.control.func {
-            Function::PriUnconfirmedUserData => (Some(info), None),
+            Function::PriUnconfirmedUserData => (
+                Some(FrameInfo::new(source, broadcast, FrameType::Data)),
+                None,
+            ),
             Function::PriResetLinkStates => {
                 self.secondary_state = SecondaryState::Reset(true); // TODO - does it start true or false
                 (None, Some(Reply::new(source, Function::SecAck)))
@@ -177,16 +183,32 @@ impl Layer {
                 SecondaryState::Reset(expected) => {
                     if header.control.fcb == expected {
                         self.secondary_state = SecondaryState::Reset(!expected);
-                        (Some(info), None)
+                        (
+                            Some(FrameInfo::new(source, broadcast, FrameType::Data)),
+                            None,
+                        )
                     } else {
                         log::info!("ignoring confirmed user data with non-matching fcb");
                         (None, None)
                     }
                 }
             },
-            Function::PriRequestLinkStatus => {
-                (None, Some(Reply::new(source, Function::SecLinkStatus)))
-            }
+            Function::PriRequestLinkStatus => (
+                Some(FrameInfo::new(
+                    source,
+                    broadcast,
+                    FrameType::LinkStatusRequest,
+                )),
+                Some(Reply::new(source, Function::SecLinkStatus)),
+            ),
+            Function::SecLinkStatus => (
+                Some(FrameInfo::new(
+                    source,
+                    broadcast,
+                    FrameType::LinkStatusResponse,
+                )),
+                None,
+            ),
             function => {
                 log::warn!("ignoring frame with function code: {:?}", function);
                 (None, None)

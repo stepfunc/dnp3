@@ -1,19 +1,15 @@
-use crate::app::format::write::{start_request, start_response};
-use crate::app::header::{Control, ResponseFunction, IIN, IIN1, IIN2};
+use crate::app::format::write::start_request;
+use crate::app::header::{Control, IIN, IIN1, IIN2};
 use crate::app::sequence::Sequence;
-use crate::link::header::FrameInfo;
-use crate::master::session::MasterSession;
 use crate::prelude::master::*;
 use crate::tokio::test::*;
 use crate::tokio::time;
-use crate::transport::create_master_transport_layer;
 use crate::util::cursor::WriteCursor;
-use crate::util::task::RunError;
-use std::future::Future;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::task::Poll;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
+
+use super::harness::create_association;
+use super::harness::requests::*;
 
 #[test]
 fn master_startup_procedure() {
@@ -150,6 +146,53 @@ fn outstation_restart_procedure() {
 
     // Enable unsolicited
     enable_unsol_request(&mut harness.io, seq);
+    empty_response(&mut harness.io, seq.increment());
+    harness.assert_io();
+}
+
+#[test]
+fn detect_restart_in_read_response() {
+    let config = Configuration::default();
+    let mut seq = Sequence::default();
+    let mut harness = create_association(config);
+
+    startup_procedure(&mut harness, &mut seq);
+
+    // Send Class 0 read request
+    {
+        let mut read_task = spawn(
+            harness
+                .association
+                .read(Classes::new(true, EventClasses::none()).to_request()),
+        );
+        assert_pending!(read_task.poll());
+    }
+    harness.assert_io();
+
+    {
+        // Read class 0 data
+        let mut buffer = [0; 20];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let mut request =
+            start_request(Control::request(seq), FunctionCode::Read, &mut cursor).unwrap();
+
+        request
+            .write_all_objects_header(Variation::Group60Var1)
+            .unwrap();
+
+        harness.io.write(cursor.written());
+    }
+
+    // Response with DEVICE_RESTART IIN bit set
+    empty_response_custom_iin(
+        &mut harness.io,
+        seq.increment(),
+        IIN::new(IIN1::new(0x80), IIN2::new(0x00)),
+    );
+    harness.assert_io();
+
+    // Clear the restart flag
+    clear_restart_iin(&mut harness.io, seq);
     empty_response(&mut harness.io, seq.increment());
     harness.assert_io();
 }
@@ -308,337 +351,4 @@ fn master_startup_retry_procedure() {
     enable_unsol_request(&mut harness.io, seq);
     empty_response(&mut harness.io, seq.increment());
     harness.assert_io();
-}
-
-fn disable_unsol_request(io: &mut io::Handle, seq: Sequence) {
-    // DISABLE_UNSOLICITED request
-    let mut buffer = [0; 20];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    let mut request = start_request(
-        Control::request(seq),
-        FunctionCode::DisableUnsolicited,
-        &mut cursor,
-    )
-    .unwrap();
-
-    request
-        .write_all_objects_header(Variation::Group60Var2)
-        .unwrap();
-    request
-        .write_all_objects_header(Variation::Group60Var3)
-        .unwrap();
-    request
-        .write_all_objects_header(Variation::Group60Var4)
-        .unwrap();
-
-    io.write(cursor.written());
-}
-
-fn integrity_poll_request(io: &mut io::Handle, seq: Sequence) {
-    // Integrity poll
-    let mut buffer = [0; 20];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    let mut request =
-        start_request(Control::request(seq), FunctionCode::Read, &mut cursor).unwrap();
-
-    request.write_class1230().unwrap();
-
-    io.write(cursor.written());
-}
-
-fn enable_unsol_request(io: &mut io::Handle, seq: Sequence) {
-    // ENABLE_UNSOLICITED request
-    let mut buffer = [0; 20];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    let mut request = start_request(
-        Control::request(seq),
-        FunctionCode::EnableUnsolicited,
-        &mut cursor,
-    )
-    .unwrap();
-
-    request
-        .write_all_objects_header(Variation::Group60Var2)
-        .unwrap();
-    request
-        .write_all_objects_header(Variation::Group60Var3)
-        .unwrap();
-    request
-        .write_all_objects_header(Variation::Group60Var4)
-        .unwrap();
-
-    io.write(cursor.written());
-}
-
-fn clear_restart_iin(io: &mut io::Handle, seq: Sequence) {
-    // ENABLE_UNSOLICITED request
-    let mut buffer = [0; 20];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    let mut request =
-        start_request(Control::request(seq), FunctionCode::Write, &mut cursor).unwrap();
-
-    request.write_clear_restart().unwrap();
-
-    io.write(cursor.written());
-}
-
-fn empty_response(io: &mut io::Handle, seq: Sequence) {
-    let mut buffer = [0; 4];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    start_response(
-        Control::response(seq, true, true, false),
-        ResponseFunction::Response,
-        IIN::default(),
-        &mut cursor,
-    )
-    .unwrap();
-
-    io.read(cursor.written());
-}
-
-// Unsolicited stuff
-
-fn unsol_null(io: &mut io::Handle, seq: Sequence, restart_iin: bool) {
-    let iin = if restart_iin {
-        IIN::new(IIN1::new(0x80), IIN2::new(0x00))
-    } else {
-        IIN::default()
-    };
-
-    let mut buffer = [0; 4];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    start_response(
-        Control::unsolicited_response(seq),
-        ResponseFunction::UnsolicitedResponse,
-        iin,
-        &mut cursor,
-    )
-    .unwrap();
-
-    io.read(cursor.written());
-}
-
-fn unsol_confirm(io: &mut io::Handle, seq: Sequence) {
-    let mut buffer = [0; 2];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    start_request(
-        Control::unsolicited(seq),
-        FunctionCode::Confirm,
-        &mut cursor,
-    )
-    .unwrap();
-
-    io.write(cursor.written());
-}
-
-fn unsol_with_data(io: &mut io::Handle, seq: Sequence, data: i16, restart_iin: bool) {
-    let iin = if restart_iin {
-        IIN::new(IIN1::new(0x80), IIN2::new(0x00))
-    } else {
-        IIN::default()
-    };
-
-    let mut buffer = [0; 20];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    let mut response = start_response(
-        Control::unsolicited_response(seq),
-        ResponseFunction::UnsolicitedResponse,
-        iin,
-        &mut cursor,
-    )
-    .unwrap();
-
-    response
-        .write_prefixed_items(
-            [(
-                Group32Var2 {
-                    value: data,
-                    flags: 0x00,
-                },
-                0u8,
-            )]
-            .iter(),
-        )
-        .unwrap();
-
-    io.read(cursor.written());
-}
-
-// Whole procedure
-fn startup_procedure<F: Future<Output = RunError>>(
-    harness: &mut TestHarness<F>,
-    seq: &mut Sequence,
-) {
-    // Disable unsolicited
-    disable_unsol_request(&mut harness.io, *seq);
-    empty_response(&mut harness.io, seq.increment());
-    harness.assert_io();
-
-    // Integrity poll
-    integrity_poll_request(&mut harness.io, *seq);
-    empty_response(&mut harness.io, seq.increment());
-    harness.assert_io();
-
-    // Enable unsolicited
-    enable_unsol_request(&mut harness.io, *seq);
-    empty_response(&mut harness.io, seq.increment());
-    harness.assert_io();
-}
-
-fn create_association(config: Configuration) -> TestHarness<impl Future<Output = RunError>> {
-    let (mut io, io_handle) = io::mock();
-
-    let outstation_address = EndpointAddress::from(1024).unwrap();
-
-    // Create the master session
-    let (tx, rx) = crate::tokio::sync::mpsc::channel(1);
-    let mut runner = MasterSession::new(
-        DecodeLogLevel::ObjectValues,
-        Timeout::from_secs(1).unwrap(),
-        MasterSession::MIN_TX_BUFFER_SIZE,
-        rx,
-    );
-    let mut master = MasterHandle::new(tx);
-
-    let (mut reader, mut writer) = create_master_transport_layer(
-        EndpointAddress::from(1).unwrap(),
-        MasterSession::MIN_RX_BUFFER_SIZE,
-    );
-
-    reader
-        .get_inner()
-        .set_rx_frame_info(FrameInfo::new(outstation_address, None));
-
-    let mut master_task = spawn(async move { runner.run(&mut io, &mut writer, &mut reader).await });
-
-    // Create the association
-    let handler = CountHandler::new();
-    let num_requests = handler.num_requests.clone();
-    let association = {
-        let mut add_task =
-            spawn(master.add_association(outstation_address, config, Box::new(handler)));
-        assert_pending!(add_task.poll());
-        assert_pending!(master_task.poll());
-        assert_ready!(add_task.poll()).unwrap()
-    };
-
-    TestHarness {
-        session: master_task,
-        _master: master,
-        _association: association,
-        num_requests,
-        io: io_handle,
-    }
-}
-
-struct CountHandler {
-    num_requests: Arc<AtomicU64>,
-}
-
-impl CountHandler {
-    fn new() -> Self {
-        Self {
-            num_requests: Arc::new(AtomicU64::new(0)),
-        }
-    }
-}
-
-impl AssociationHandler for CountHandler {
-    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-}
-
-impl ReadHandler for CountHandler {
-    fn begin_fragment(&mut self, _header: crate::app::header::ResponseHeader) {}
-
-    fn end_fragment(&mut self, _header: crate::app::header::ResponseHeader) {}
-
-    fn handle_binary(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::Binary, u16)>,
-    ) {
-    }
-
-    fn handle_double_bit_binary(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::DoubleBitBinary, u16)>,
-    ) {
-    }
-
-    fn handle_binary_output_status(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::BinaryOutputStatus, u16)>,
-    ) {
-    }
-
-    fn handle_counter(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::Counter, u16)>,
-    ) {
-    }
-
-    fn handle_frozen_counter(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::FrozenCounter, u16)>,
-    ) {
-    }
-
-    fn handle_analog(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::Analog, u16)>,
-    ) {
-        self.num_requests.fetch_add(1, Ordering::SeqCst);
-    }
-
-    fn handle_analog_output_status(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::AnalogOutputStatus, u16)>,
-    ) {
-    }
-
-    fn handle_octet_string<'a>(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &'a mut dyn Iterator<Item = (crate::app::parse::bytes::Bytes<'a>, u16)>,
-    ) {
-    }
-}
-
-struct TestHarness<F: Future<Output = RunError>> {
-    session: Spawn<F>,
-    _master: MasterHandle,
-    _association: AssociationHandle,
-    num_requests: Arc<AtomicU64>,
-    io: io::Handle,
-}
-
-impl<F: Future<Output = RunError>> TestHarness<F> {
-    fn poll(&mut self) -> Poll<RunError> {
-        self.session.poll()
-    }
-
-    fn assert_io(&mut self) {
-        assert_pending!(self.poll());
-        assert!(self.io.all_done());
-    }
-
-    fn num_requests(&self) -> u64 {
-        self.num_requests.fetch_add(0, Ordering::Relaxed)
-    }
 }

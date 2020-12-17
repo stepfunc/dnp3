@@ -5,6 +5,7 @@ use crate::app::parse::bytes::Bytes;
 use crate::app::parse::DecodeLogLevel;
 use crate::app::retry::RetryStrategy;
 use crate::app::timeout::Timeout;
+use crate::app::types::LinkStatusResult;
 use crate::app::types::Timestamp;
 use crate::app::variations::Variation;
 use crate::entry::EndpointAddress;
@@ -205,6 +206,14 @@ impl AssociationHandle {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
         let task = TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
+        rx.await?
+    }
+
+    pub async fn check_link_status(&mut self) -> Result<LinkStatusResult, TaskError> {
+        let (tx, rx) =
+            crate::tokio::sync::oneshot::channel::<Result<LinkStatusResult, TaskError>>();
+        self.send_task(Task::LinkStatus(Promise::OneShot(tx)))
+            .await?;
         rx.await?
     }
 

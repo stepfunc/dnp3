@@ -1,7 +1,5 @@
 use dnp3::entry::EndpointAddress;
 use dnp3::prelude::master::*;
-use std::net::SocketAddr;
-use std::str::FromStr;
 use std::time::Duration;
 use tokio::stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
@@ -12,14 +10,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     colog::init();
 
     // spawn the master onto another task
-    let mut master = spawn_master_tcp_client(
+    let mut master = spawn_master_serial_client(
         MasterConfiguration::new(
             EndpointAddress::from(1)?,
             DecodeLogLevel::ObjectValues,
             RetryStrategy::default(),
             Timeout::from_secs(1)?,
         ),
-        SocketAddr::from_str("127.0.0.1:20000")?,
+        "/dev/pts/4",
+        SerialPortSettings::default(),
         Listener::None,
     );
 

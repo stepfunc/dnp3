@@ -50,7 +50,4 @@ impl std::fmt::Display for EndpointAddress {
 }
 
 /// entry points for creating and spawning master tasks
-pub mod master {
-    /// entry points for creating and spawning TCP-based master tasks
-    pub mod tcp;
-}
+pub mod master;

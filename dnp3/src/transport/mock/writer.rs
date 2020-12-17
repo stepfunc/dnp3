@@ -34,4 +34,16 @@ impl MockWriter {
         self.num_writes += 1;
         Ok(())
     }
+
+    pub(crate) async fn write_link_status_request<W>(
+        &mut self,
+        _: &mut W,
+        _: AnyAddress,
+    ) -> Result<(), LinkError>
+    where
+        W: AsyncWrite + Unpin,
+    {
+        // ignore this yet
+        Ok(())
+    }
 }

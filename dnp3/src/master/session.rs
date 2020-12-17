@@ -1,22 +1,21 @@
 use crate::app::format::write;
+use crate::app::format::write::start_request;
+use crate::app::header::Control;
 use crate::app::parse::parser::Response;
+use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::app::timeout::Timeout;
-use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
-use crate::transport::{TransportReader, TransportWriter};
-
-use crate::app::header::Control;
-use crate::link::error::LinkError;
-use crate::util::buffer::Buffer;
-
-use crate::app::format::write::start_request;
-use crate::master::association::{AssociationMap, Next};
-use crate::master::messages::{MasterMsg, Message};
-
-use crate::app::parse::DecodeLogLevel;
+use crate::app::types::LinkStatusResult;
 use crate::entry::EndpointAddress;
+use crate::link::error::LinkError;
+use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
+use crate::master::messages::{MasterMsg, Message};
+use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
+use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::tokio::time::Instant;
+use crate::transport::{TransportReader, TransportResponse, TransportWriter};
+use crate::util::buffer::Buffer;
 use crate::util::io::IOStream;
 use crate::util::task::{RunError, Shutdown};
 use std::ops::Add;
@@ -127,7 +126,14 @@ impl MasterSession {
                 }
                 result = reader.read(io) => {
                    result?;
-                   return self.handle_fragment_while_idle(io, writer, reader).await;
+                   match reader.pop_response(self.level) {
+                        Some(TransportResponse::Response(source, response)) => {
+                            self.notify_link_activity(source);
+                            return self.handle_fragment_while_idle(io, writer, source, response).await
+                        }
+                        Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
+                        None => return Ok(())
+                   }
                 }
             }
         }
@@ -154,7 +160,14 @@ impl MasterSession {
                 }
                 result = reader.read(io) => {
                    result?;
-                   return self.handle_fragment_while_idle(io, writer, reader).await;
+                   match reader.pop_response(self.level) {
+                        Some(TransportResponse::Response(source, response)) => {
+                            self.notify_link_activity(source);
+                            return self.handle_fragment_while_idle(io, writer, source, response).await
+                        }
+                        Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
+                        None => return Ok(())
+                   }
                 }
                 _ = crate::tokio::time::delay_until(instant) => {
                    return Ok(());
@@ -199,31 +212,6 @@ impl MasterSession {
         }
     }
 
-    async fn read_next_response<T>(
-        &mut self,
-        io: &mut T,
-        deadline: Instant,
-        reader: &mut TransportReader,
-    ) -> Result<(), TaskError>
-    where
-        T: IOStream,
-    {
-        loop {
-            crate::tokio::select! {
-                    _ = crate::tokio::time::delay_until(deadline) => {
-                         log::warn!("no response within timeout: {}", self.timeout);
-                         return Err(TaskError::ResponseTimeout);
-                    }
-                    x = reader.read(io)  => {
-                        return Ok(x?);
-                    }
-                    y = self.process_message(true) => {
-                        y?; // unless shutdown, proceed to next event
-                    }
-            }
-        }
-    }
-
     fn reset(&mut self, err: RunError) {
         self.associations.reset(err);
     }
@@ -252,6 +240,21 @@ impl MasterSession {
             Task::NonRead(t) => {
                 self.run_non_read_task(io, task.address, t, writer, reader)
                     .await
+            }
+            Task::LinkStatus(promise) => {
+                match self
+                    .run_link_status_task(io, task.address, writer, reader)
+                    .await
+                {
+                    Ok(result) => {
+                        promise.complete(Ok(result));
+                        Ok(())
+                    }
+                    Err(err) => {
+                        promise.complete(Err(err));
+                        Err(err)
+                    }
+                }
             }
         };
 
@@ -289,64 +292,85 @@ impl MasterSession {
             let deadline = self.timeout.deadline_from_now();
 
             loop {
-                if let Err(err) = self.read_next_response(io, deadline, reader).await {
-                    task.on_task_error(self.associations.get_mut(destination).ok(), err);
-                    return Err(err);
-                }
+                crate::tokio::select! {
+                    _ = crate::tokio::time::delay_until(deadline) => {
+                        log::warn!("no response within timeout: {}", self.timeout);
+                        task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
+                        return Err(TaskError::ResponseTimeout);
+                    }
+                    x = reader.read(io) => {
+                        if let Err(err) = x {
+                            task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
+                            return Err(err.into());
+                        }
 
-                let result = self
-                    .validate_non_read_response(destination, seq, io, reader, writer)
-                    .await;
+                        match reader.pop_response(self.level) {
+                            Some(TransportResponse::Response(source, response)) => {
+                                self.notify_link_activity(source);
 
-                match result {
-                    // continue reading responses until timeout
-                    Ok(None) => continue,
-                    Ok(Some(response)) => {
-                        match self.associations.get_mut(destination) {
-                            Err(x) => {
-                                task.on_task_error(None, x.into());
-                                return Err(x.into());
-                            }
-                            Ok(association) => {
-                                association.process_iin(response.header.iin);
-                                match task.handle(association, response) {
-                                    None => return Ok(()),
-                                    Some(next) => {
-                                        task = next;
-                                        // break from the inner loop and execute the next request
-                                        break;
+                                let result = self
+                                    .validate_non_read_response(destination, seq, io, writer, source, response)
+                                    .await;
+
+                                match result {
+                                    // continue reading responses until timeout
+                                    Ok(None) => continue,
+                                    Ok(Some(response)) => {
+                                        match self.associations.get_mut(destination) {
+                                            Err(x) => {
+                                                task.on_task_error(None, x.into());
+                                                return Err(x.into());
+                                            }
+                                            Ok(association) => {
+                                                association.process_iin(response.header.iin);
+                                                match task.handle(association, response) {
+                                                    None => return Ok(()),
+                                                    Some(next) => {
+                                                        task = next;
+                                                        // break from the inner loop and execute the next request
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(err) => {
+                                        task.on_task_error(self.associations.get_mut(destination).ok(), err);
+                                        return Err(err);
                                     }
                                 }
                             }
+                            Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
+                            None => continue
                         }
                     }
-                    Err(err) => {
-                        task.on_task_error(self.associations.get_mut(destination).ok(), err);
-                        return Err(err);
+                    y = self.process_message(true) => {
+                        match y {
+                            Ok(_) => (), // unless shutdown, proceed to next event
+                            Err(err) => {
+                                task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
+                                return Err(err.into());
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    // As of 1.43, clippy erroneously says these lifetimes aren't required
     #[allow(clippy::needless_lifetimes)]
     async fn validate_non_read_response<'a, T>(
         &mut self,
         destination: EndpointAddress,
         seq: Sequence,
         io: &mut T,
-        reader: &'a mut TransportReader,
         writer: &mut TransportWriter,
+        source: EndpointAddress,
+        response: Response<'a>,
     ) -> Result<Option<Response<'a>>, TaskError>
     where
         T: IOStream,
     {
-        let (source, response) = match reader.pop_response(self.level) {
-            None => return Ok(None),
-            Some(x) => x,
-        };
-
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
                 .await?;
@@ -427,24 +451,36 @@ impl MasterSession {
             let deadline = self.timeout.deadline_from_now();
 
             loop {
-                self.read_next_response(io, deadline, reader).await?;
-
-                let action = self
-                    .process_read_response(destination, is_first, seq, &task, io, writer, reader)
-                    .await?;
-
-                match action {
-                    // continue reading responses on the inner loop
-                    ReadResponseAction::Ignore => continue,
-                    // read task complete
-                    ReadResponseAction::Complete => {
-                        return Ok(());
+                crate::tokio::select! {
+                    _ = crate::tokio::time::delay_until(deadline) => {
+                            log::warn!("no response within timeout: {}", self.timeout);
+                            return Err(TaskError::ResponseTimeout);
                     }
-                    // break to the outer loop and read another response
-                    ReadResponseAction::ReadNext => {
-                        is_first = false;
-                        seq = self.associations.get_mut(destination)?.increment_seq();
-                        break;
+                    x = reader.read(io) => {
+                        x?;
+                        match reader.pop_response(self.level) {
+                            Some(TransportResponse::Response(source, response)) => {
+                                self.notify_link_activity(source);
+                                let action = self.process_read_response(destination, is_first, seq, &task, io, writer, source, response).await?;
+                                match action {
+                                    // continue reading responses on the inner loop
+                                    ReadResponseAction::Ignore => continue,
+                                    // read task complete
+                                    ReadResponseAction::Complete => return Ok(()),
+                                    // break to the outer loop and read another response
+                                    ReadResponseAction::ReadNext => {
+                                        is_first = false;
+                                        seq = self.associations.get_mut(destination)?.increment_seq();
+                                        break;
+                                    }
+                                }
+                            }
+                            Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
+                            None => continue
+                        }
+                    }
+                    y = self.process_message(true) => {
+                        y?; // unless shutdown, proceed to next event
                     }
                 }
             }
@@ -460,16 +496,12 @@ impl MasterSession {
         task: &ReadTask,
         io: &mut T,
         writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        source: EndpointAddress,
+        response: Response<'_>,
     ) -> Result<ReadResponseAction, TaskError>
     where
         T: IOStream,
     {
-        let (source, response) = match reader.pop_response(self.level) {
-            Some(x) => x,
-            None => return Ok(ReadResponseAction::Ignore),
-        };
-
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
                 .await?;
@@ -509,6 +541,7 @@ impl MasterSession {
         }
 
         let association = self.associations.get_mut(destination)?;
+        association.process_iin(response.header.iin);
         task.process_response(association, response.header, response.objects?);
 
         if response.header.control.con {
@@ -533,16 +566,12 @@ impl MasterSession {
         &mut self,
         io: &mut T,
         writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        source: EndpointAddress,
+        response: Response<'_>,
     ) -> Result<(), RunError>
     where
         T: IOStream,
     {
-        let (source, response) = match reader.pop_response(self.level) {
-            None => return Ok(()),
-            Some(x) => x,
-        };
-
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
                 .await?;
@@ -651,5 +680,59 @@ impl MasterSession {
             .write(io, self.level, address.wrap(), cursor.written())
             .await?;
         Ok(seq)
+    }
+}
+
+// Link status stuff
+impl MasterSession {
+    async fn run_link_status_task<T>(
+        &mut self,
+        io: &mut T,
+        destination: EndpointAddress,
+        writer: &mut TransportWriter,
+        reader: &mut TransportReader,
+    ) -> Result<LinkStatusResult, TaskError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        // Send link status request
+        log::info!("Sending link status request (for {})", destination);
+        writer
+            .write_link_status_request(io, destination.wrap())
+            .await?;
+
+        loop {
+            // Wait for something on the link
+            crate::tokio::select! {
+                _ = crate::tokio::time::delay_until(self.timeout.deadline_from_now()) => {
+                    log::warn!("no response within timeout: {}", self.timeout);
+                    return Err(TaskError::ResponseTimeout);
+                }
+                x = reader.read(io) => {
+                    x?;
+                    match reader.pop_response(self.level) {
+                        Some(TransportResponse::Response(source, response)) => {
+                            self.notify_link_activity(source);
+                            self.handle_fragment_while_idle(io, writer, source, response).await?;
+                            return Ok(LinkStatusResult::UnexpectedResponse);
+                        }
+                        Some(TransportResponse::LinkLayerMessage(msg)) => {
+                            self.notify_link_activity(msg.source);
+                            return Ok(LinkStatusResult::Success);
+                        }
+                        None => continue
+                    }
+                }
+                y = self.process_message(true) => {
+                    y?; // unless shutdown, proceed to next event
+                }
+            }
+        }
+    }
+
+    fn notify_link_activity(&mut self, source: EndpointAddress) {
+        if let Ok(association) = self.associations.get_mut(source) {
+            association.on_link_activity();
+        }
     }
 }
