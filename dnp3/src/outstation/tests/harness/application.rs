@@ -15,7 +15,7 @@ pub(crate) struct ApplicationData {
 impl ApplicationData {
     fn new() -> Self {
         Self {
-            processing_delay: 0xFFFF,
+            processing_delay: 0,
             restart_delay: None,
         }
     }

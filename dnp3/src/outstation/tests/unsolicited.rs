@@ -144,3 +144,25 @@ fn defers_read_during_unsol_confirm_wait() {
     harness.check_all_io_consumed();
     harness.check_no_events();
 }
+
+#[test]
+fn handles_non_read_during_unsolicited_confirm_wait() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness);
+    enable_unsolicited(&mut harness);
+
+    generate_binary_event(&mut harness.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1);
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+    // send a delay measurement request while still in unsolicited confirm wait
+    harness.test_request_response(
+        super::data::DELAY_MEASURE,
+        super::data::RESPONSE_TIME_DELAY_FINE_ZERO,
+    );
+    harness.check_no_events();
+
+    // now send the confirm
+    harness.send(UNS_CONFIRM_SEQ_1);
+    harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
+    harness.check_all_io_consumed();
+}
