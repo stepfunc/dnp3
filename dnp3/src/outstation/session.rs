@@ -309,16 +309,16 @@ impl OutstationSession {
     where
         T: IOStream,
     {
-        // handle a deferred read request if it exists
-        self.handle_deferred_read(io, reader, writer, database)
-            .await?;
-
         // handle a request fragment if present
         self.handle_one_request_from_idle(io, reader, writer, database)
             .await?;
 
         // check to see if we should perform unsolicited
         let deadline = self.check_unsolicited(io, reader, writer, database).await?;
+
+        // handle a deferred read request if it was produced during unsolicited
+        self.handle_deferred_read(io, reader, writer, database)
+            .await?;
 
         // wait for an event
         crate::tokio::select! {
@@ -574,17 +574,24 @@ impl OutstationSession {
                 self.write_solicited(io, writer, length).await?;
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
-            FragmentType::NewNonRead(_hash, objects) => {
+            FragmentType::NewNonRead(hash, objects) => {
                 self.state.deferred_read.clear();
-                if let Some(length) = self.handle_non_read(
+                let length = self.handle_non_read(
                     database,
                     request.header.function,
                     request.header.control.seq,
                     info.id,
                     objects,
-                ) {
+                );
+                if let Some(length) = length {
                     self.write_solicited(io, writer, length).await?;
                 }
+                self.state.last_valid_request = Some(LastValidRequest::new(
+                    request.header.control.seq,
+                    hash,
+                    length,
+                    None,
+                ));
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::NewRead(hash, headers) => {
@@ -599,9 +606,10 @@ impl OutstationSession {
                     .set(hash, request.header.control.seq, info, headers);
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
-            FragmentType::RepeatNonRead(_, _) => {
-                // TODO - send the response?
-
+            FragmentType::RepeatNonRead(_, length) => {
+                if let Some(length) = length {
+                    self.write_solicited(io, writer, length).await?
+                }
                 self.state.deferred_read.clear();
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
