@@ -574,17 +574,24 @@ impl OutstationSession {
                 self.write_solicited(io, writer, length).await?;
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
-            FragmentType::NewNonRead(_hash, objects) => {
+            FragmentType::NewNonRead(hash, objects) => {
                 self.state.deferred_read.clear();
-                if let Some(length) = self.handle_non_read(
+                let length = self.handle_non_read(
                     database,
                     request.header.function,
                     request.header.control.seq,
                     info.id,
                     objects,
-                ) {
+                );
+                if let Some(length) = length {
                     self.write_solicited(io, writer, length).await?;
                 }
+                self.state.last_valid_request = Some(LastValidRequest::new(
+                    request.header.control.seq,
+                    hash,
+                    length,
+                    None,
+                ));
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::NewRead(hash, headers) => {
@@ -599,9 +606,10 @@ impl OutstationSession {
                     .set(hash, request.header.control.seq, info, headers);
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
-            FragmentType::RepeatNonRead(_, _) => {
-                // TODO - send the response?
-
+            FragmentType::RepeatNonRead(_, length) => {
+                if let Some(length) = length {
+                    self.write_solicited(io, writer, length).await?
+                }
                 self.state.deferred_read.clear();
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
