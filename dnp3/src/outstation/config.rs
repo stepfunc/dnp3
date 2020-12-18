@@ -91,6 +91,7 @@ pub struct OutstationConfig {
     pub max_unsolicited_retries: Option<usize>,
     pub unsolicited_retry_delay: std::time::Duration,
     pub max_read_headers_per_request: u16,
+    pub keep_alive_timeout: Option<std::time::Duration>,
 }
 
 impl Feature {
@@ -125,6 +126,7 @@ impl OutstationConfig {
             max_unsolicited_retries: None,
             unsolicited_retry_delay: Self::DEFAULT_UNSOLICITED_RETRY_DELAY,
             max_read_headers_per_request: DatabaseConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
+            keep_alive_timeout: Some(std::time::Duration::from_secs(60)),
         }
     }
 }

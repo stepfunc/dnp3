@@ -122,6 +122,7 @@ pub(crate) struct SessionConfig {
     unsolicited: Feature,
     max_unsolicited_retries: Option<usize>,
     unsolicited_retry_delay: std::time::Duration,
+    keep_alive_timeout: Option<std::time::Duration>,
 }
 
 impl From<OutstationConfig> for SessionConfig {
@@ -135,6 +136,7 @@ impl From<OutstationConfig> for SessionConfig {
             unsolicited: config.features.unsolicited,
             max_unsolicited_retries: config.max_unsolicited_retries,
             unsolicited_retry_delay: config.unsolicited_retry_delay,
+            keep_alive_timeout: config.keep_alive_timeout,
         }
     }
 }
@@ -180,6 +182,7 @@ pub(crate) struct OutstationSession {
     application: Box<dyn OutstationApplication>,
     info: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
+    next_link_status: Option<crate::tokio::time::Instant>,
 }
 
 enum Confirm {
@@ -234,6 +237,10 @@ impl OutstationSession {
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
     ) -> Self {
+        let next_link_status = config
+            .keep_alive_timeout
+            .map(|delay| crate::tokio::time::Instant::now() + delay);
+
         Self {
             receiver,
             config,
@@ -243,6 +250,7 @@ impl OutstationSession {
             application,
             info: information,
             control_handler,
+            next_link_status,
         }
     }
 
@@ -319,6 +327,19 @@ impl OutstationSession {
 
         // check to see if we should perform unsolicited
         let deadline = self.check_unsolicited(io, reader, writer, database).await?;
+
+        // check to see if we should perform a link status check
+        self.check_link_status(io, writer).await?;
+
+        let deadline = match deadline {
+            Some(deadline) => match self.next_link_status {
+                Some(link_deadline) => {
+                    Some(crate::tokio::time::Instant::min(deadline, link_deadline))
+                }
+                None => Some(deadline),
+            },
+            None => self.next_link_status,
+        };
 
         // wait for an event
         crate::tokio::select! {
@@ -404,6 +425,33 @@ impl OutstationSession {
                 }
             }
         }
+    }
+
+    async fn check_link_status<T>(
+        &mut self,
+        io: &mut T,
+        writer: &mut TransportWriter,
+    ) -> Result<(), RunError>
+    where
+        T: IOStream,
+    {
+        match self.next_link_status {
+            Some(next) => {
+                // Wait until we need to send the link status
+                if next > crate::tokio::time::Instant::now() {
+                    return Ok(());
+                }
+
+                writer
+                    .write_link_status_request(io, self.config.master_address.wrap())
+                    .await?;
+
+                self.on_link_activity();
+            }
+            None => (),
+        }
+
+        Ok(())
     }
 
     async fn perform_null_unsolicited<T>(
@@ -539,9 +587,12 @@ impl OutstationSession {
         let mut guard = reader.pop_request(self.config.level);
         let (info, request) = match guard.get() {
             None => return Ok(UnsolicitedWaitResult::ReadNext),
-            Some(TransportRequest::Request(info, request)) => (info, request),
+            Some(TransportRequest::Request(info, request)) => {
+                self.on_link_activity();
+                (info, request)
+            }
             Some(TransportRequest::LinkLayerMessage(_)) => {
-                // TODO: do something with the message
+                self.on_link_activity();
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
         };
@@ -701,25 +752,31 @@ impl OutstationSession {
         T: IOStream,
     {
         let mut guard = reader.pop_request(self.config.level);
-        if let Some(TransportRequest::Request(info, request)) = guard.get() {
-            if let Some(result) = self.process_request_from_idle(info, request, database) {
-                self.state.last_valid_request = Some(result);
+        match guard.get() {
+            Some(TransportRequest::Request(info, request)) => {
+                self.on_link_activity();
+                if let Some(result) = self.process_request_from_idle(info, request, database) {
+                    self.state.last_valid_request = Some(result);
 
-                // optional response
-                if let Some(length) = result.response_length {
-                    self.write_solicited(io, writer, length).await?;
-                }
+                    // optional response
+                    if let Some(length) = result.response_length {
+                        self.write_solicited(io, writer, length).await?;
+                    }
 
-                // maybe start a response series
-                if let Some(series) = result.series {
-                    drop(guard);
-                    // enter the solicited confirm wait state
-                    self.sol_confirm_wait(io, reader, writer, database, series)
-                        .await?;
+                    // maybe start a response series
+                    if let Some(series) = result.series {
+                        drop(guard);
+                        // enter the solicited confirm wait state
+                        self.sol_confirm_wait(io, reader, writer, database, series)
+                            .await?;
+                    }
                 }
             }
+            Some(TransportRequest::LinkLayerMessage(_)) => {
+                self.on_link_activity();
+            }
+            None => (),
         }
-        // TODO: handle link-layer messages
 
         Ok(())
     }
@@ -1371,9 +1428,12 @@ impl OutstationSession {
 
     fn expect_sol_confirm(&mut self, ecsn: Sequence, request: &mut RequestGuard) -> ConfirmAction {
         let (info, request) = match request.get() {
-            Some(TransportRequest::Request(info, request)) => (info, request),
+            Some(TransportRequest::Request(info, request)) => {
+                self.on_link_activity();
+                (info, request)
+            }
             Some(TransportRequest::LinkLayerMessage(_)) => {
-                // TODO: do something with the message
+                self.on_link_activity();
                 return ConfirmAction::ContinueWait;
             }
             None => return ConfirmAction::ContinueWait,
@@ -1446,6 +1506,13 @@ impl OutstationSession {
             FragmentType::NewRead(this_hash, object_headers)
         } else {
             FragmentType::NewNonRead(this_hash, object_headers)
+        }
+    }
+
+    fn on_link_activity(&mut self) {
+        self.next_link_status = match self.config.keep_alive_timeout {
+            Some(timeout) => Some(crate::tokio::time::Instant::now() + timeout),
+            None => None,
         }
     }
 }
