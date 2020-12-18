@@ -20,7 +20,12 @@ const UNSOL_G2V1_SEQ1: &[u8] = &[
 const ENABLE_UNSOLICITED_SEQ0: &[u8] = &[
     0xC0, 0x14, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
 ];
+
+const READ_CLASS_0: &[u8] = &[0xC0, 0x01, 0x3C, 0x01, 0x06];
 const EMPTY_RESPONSE_SEQ0: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
+const CLASS_0_RESPONSE_SEQ0: &[u8] = &[
+    0xC0, 0x81, 0x80, 0x00, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01,
+];
 
 fn generate_binary_event(handle: &mut DatabaseHandle) {
     handle.transaction(|db| {
@@ -118,4 +123,24 @@ fn data_unsolicited_can_be_confirmed() {
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
     harness.send(UNS_CONFIRM_SEQ_1);
     harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
+}
+
+#[test]
+fn defers_read_during_unsol_confirm_wait() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness);
+    enable_unsolicited(&mut harness);
+
+    generate_binary_event(&mut harness.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1);
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+    // send a read which will be deferred
+    harness.send(READ_CLASS_0);
+    harness.check_no_events();
+    // now send the confirm
+    harness.send(UNS_CONFIRM_SEQ_1);
+    harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
+    harness.expect_response(CLASS_0_RESPONSE_SEQ0);
+    harness.check_all_io_consumed();
+    harness.check_no_events();
 }

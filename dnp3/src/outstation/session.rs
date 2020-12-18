@@ -309,16 +309,16 @@ impl OutstationSession {
     where
         T: IOStream,
     {
-        // handle a deferred read request if it exists
-        self.handle_deferred_read(io, reader, writer, database)
-            .await?;
-
         // handle a request fragment if present
         self.handle_one_request_from_idle(io, reader, writer, database)
             .await?;
 
         // check to see if we should perform unsolicited
         let deadline = self.check_unsolicited(io, reader, writer, database).await?;
+
+        // handle a deferred read request if it was produced during unsolicited
+        self.handle_deferred_read(io, reader, writer, database)
+            .await?;
 
         // wait for an event
         crate::tokio::select! {
