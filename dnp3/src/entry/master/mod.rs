@@ -57,8 +57,11 @@ where
             config.tx_buffer_size,
             rx,
         );
-        let (reader, writer) =
-            crate::transport::create_master_transport_layer(config.address, config.rx_buffer_size);
+        let (reader, writer) = crate::transport::create_master_transport_layer(
+            config.address,
+            config.rx_buffer_size,
+            config.bubble_framing_errors,
+        );
         let task = Self {
             connect_fn,
             back_off: ExponentialBackOff::new(config.reconnection_strategy),

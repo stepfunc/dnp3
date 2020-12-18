@@ -435,20 +435,17 @@ impl OutstationSession {
     where
         T: IOStream,
     {
-        match self.next_link_status {
-            Some(next) => {
-                // Wait until we need to send the link status
-                if next > crate::tokio::time::Instant::now() {
-                    return Ok(());
-                }
-
-                writer
-                    .write_link_status_request(io, self.config.master_address.wrap())
-                    .await?;
-
-                self.on_link_activity();
+        if let Some(next) = self.next_link_status {
+            // Wait until we need to send the link status
+            if next > crate::tokio::time::Instant::now() {
+                return Ok(());
             }
-            None => (),
+
+            writer
+                .write_link_status_request(io, self.config.master_address.wrap())
+                .await?;
+
+            self.on_link_activity();
         }
 
         Ok(())

@@ -55,6 +55,8 @@ pub struct MasterConfiguration {
     ///
     /// Should be at least 2048.
     pub rx_buffer_size: usize,
+    /// Close the connection when a framing error occurs
+    pub bubble_framing_errors: bool,
 }
 
 impl MasterConfiguration {
@@ -72,6 +74,7 @@ impl MasterConfiguration {
             response_timeout,
             tx_buffer_size: MasterSession::DEFAULT_TX_BUFFER_SIZE,
             rx_buffer_size: MasterSession::DEFAULT_RX_BUFFER_SIZE,
+            bubble_framing_errors: false,
         }
     }
 }

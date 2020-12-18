@@ -137,8 +137,9 @@ impl ffi::MasterConfiguration {
             level: self.level().into(),
             reconnection_strategy: strategy,
             response_timeout: Timeout::from_duration(self.response_timeout()).unwrap(),
-            tx_buffer_size: self.tx_buffer_size as usize,
-            rx_buffer_size: self.rx_buffer_size as usize,
+            tx_buffer_size: self.tx_buffer_size() as usize,
+            rx_buffer_size: self.rx_buffer_size() as usize,
+            bubble_framing_errors: self.bubble_framing_errors(),
         })
     }
 }
