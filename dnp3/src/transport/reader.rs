@@ -120,15 +120,12 @@ impl TransportReader {
     }
 
     pub(crate) fn pop_response(&mut self, level: DecodeLogLevel) -> Option<TransportResponse> {
-        let log = self.log_fragment();
-        let data = self.parse(false, log, level)?;
+        let data = self.parse(false, true, level)?;
 
         match data {
             ParsedTransportData::Fragment(info, fragment) => match fragment.to_response() {
                 Err(err) => {
-                    if log {
-                        log::error!("response error: {}", err);
-                    }
+                    log::error!("response error: {}", err);
                     None
                 }
                 Ok(response) => Some(TransportResponse::Response(info.source, response)),

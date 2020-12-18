@@ -15,11 +15,7 @@ pub(crate) struct MockReader {
 }
 
 impl MockReader {
-    pub(crate) fn master(
-        _: EndpointAddress,
-        rx_buffer_size: usize,
-        _bubble_framing_errors: bool,
-    ) -> Self {
+    pub(crate) fn master(_: EndpointAddress, rx_buffer_size: usize) -> Self {
         Self::new(rx_buffer_size)
     }
 
@@ -27,7 +23,6 @@ impl MockReader {
         _: EndpointAddress,
         _self_address: Feature,
         rx_buffer_size: usize,
-        _bubble_framing_errors: bool,
     ) -> Self {
         Self::new(rx_buffer_size)
     }
