@@ -623,15 +623,6 @@ impl AssociationMap {
         self.priority.retain(|x| *x != address);
     }
 
-    /*
-    pub(crate) fn get(&self, address: EndpointAddress) -> Result<&Association, NoAssociation> {
-        match self.map.get(&address) {
-            Some(x) => Ok(x),
-            None => Err(NoAssociation { address }),
-        }
-    }
-     */
-
     pub(crate) fn get_mut(
         &mut self,
         address: EndpointAddress,

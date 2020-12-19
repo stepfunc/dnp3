@@ -117,6 +117,7 @@ pub fn define(
         )?
         .add("tx_buffer_size", Type::Uint16, doc("TX buffer size").details("Should be at least 249"))?
         .add("rx_buffer_size", Type::Uint16, doc("RX buffer size").details("Should be at least 2048"))?
+        .add("bubble_framing_errors", Type::Bool, "Close connection when a framing error occurs")?
         .doc("Master configuration")?
         .build()?;
 

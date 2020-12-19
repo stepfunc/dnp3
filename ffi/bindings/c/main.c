@@ -258,6 +258,7 @@ int main()
         .response_timeout = 5000,
         .rx_buffer_size = 2048,
         .tx_buffer_size = 2048,
+        .bubble_framing_errors = false,
     };
     client_state_listener_t listener =
     {
