@@ -163,7 +163,7 @@ impl ReadTask {
             }
             ReadTask::PeriodicPoll(poll) => {
                 if let Some(association) = association {
-                    log::warn!("Poll {} failed", poll.id);
+                    tracing::warn!("Poll {} failed", poll.id);
                     association.complete_poll(poll.id);
                 }
             }

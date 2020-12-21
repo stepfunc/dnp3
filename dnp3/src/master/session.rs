@@ -49,7 +49,7 @@ impl MasterSession {
         user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
     ) -> Self {
         let tx_buffer_size = if tx_buffer_size < Self::MIN_TX_BUFFER_SIZE {
-            log::warn!("Minimum TX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", Self::MIN_TX_BUFFER_SIZE, tx_buffer_size);
+            tracing::warn!("Minimum TX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", Self::MIN_TX_BUFFER_SIZE, tx_buffer_size);
             Self::MIN_TX_BUFFER_SIZE
         } else {
             tx_buffer_size
@@ -294,7 +294,7 @@ impl MasterSession {
             loop {
                 crate::tokio::select! {
                     _ = crate::tokio::time::delay_until(deadline) => {
-                        log::warn!("no response within timeout: {}", self.timeout);
+                        tracing::warn!("no response within timeout: {}", self.timeout);
                         task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
                         return Err(TaskError::ResponseTimeout);
                     }
@@ -378,7 +378,7 @@ impl MasterSession {
         }
 
         if source != destination {
-            log::warn!(
+            tracing::warn!(
                 "Received response from {} while expecting response from {}",
                 source,
                 destination
@@ -387,7 +387,7 @@ impl MasterSession {
         }
 
         if response.header.control.seq != seq {
-            log::warn!(
+            tracing::warn!(
                 "unexpected sequence number is response: {}",
                 response.header.control.seq.value()
             );
@@ -453,7 +453,7 @@ impl MasterSession {
             loop {
                 crate::tokio::select! {
                     _ = crate::tokio::time::delay_until(deadline) => {
-                            log::warn!("no response within timeout: {}", self.timeout);
+                            tracing::warn!("no response within timeout: {}", self.timeout);
                             return Err(TaskError::ResponseTimeout);
                     }
                     x = reader.read(io) => {
@@ -509,7 +509,7 @@ impl MasterSession {
         }
 
         if source != destination {
-            log::warn!(
+            tracing::warn!(
                 "Received response from {} while expecting response from {}",
                 source,
                 destination
@@ -518,7 +518,7 @@ impl MasterSession {
         }
 
         if response.header.control.seq != seq {
-            log::warn!(
+            tracing::warn!(
                 "response with seq: {} doesn't match expected seq: {}",
                 response.header.control.seq.value(),
                 seq.value()
@@ -576,7 +576,7 @@ impl MasterSession {
             self.handle_unsolicited(source, &response, io, writer)
                 .await?;
         } else {
-            log::warn!(
+            tracing::warn!(
                 "unexpected response with sequence: {}",
                 response.header.control.seq.value()
             )
@@ -598,7 +598,7 @@ impl MasterSession {
         let association = match self.associations.get_mut(source).ok() {
             Some(x) => x,
             None => {
-                log::warn!(
+                tracing::warn!(
                     "received unsolicited response from unknown address: {}",
                     source
                 );
@@ -696,7 +696,7 @@ impl MasterSession {
         T: AsyncRead + AsyncWrite + Unpin,
     {
         // Send link status request
-        log::info!("Sending link status request (for {})", destination);
+        tracing::info!("Sending link status request (for {})", destination);
         writer
             .write_link_status_request(io, destination.wrap())
             .await?;
@@ -705,7 +705,7 @@ impl MasterSession {
             // Wait for something on the link
             crate::tokio::select! {
                 _ = crate::tokio::time::delay_until(self.timeout.deadline_from_now()) => {
-                    log::warn!("no response within timeout: {}", self.timeout);
+                    tracing::warn!("no response within timeout: {}", self.timeout);
                     return Err(TaskError::ResponseTimeout);
                 }
                 x = reader.read(io) => {

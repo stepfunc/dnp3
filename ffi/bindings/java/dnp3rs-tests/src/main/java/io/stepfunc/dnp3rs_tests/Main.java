@@ -14,7 +14,7 @@ class TestLogger implements Logger {
 
     @Override
     public void onMessage(LogLevel level, String message) {
-        System.out.println(level + ": " + message);
+        System.out.print(message);
     }
 }
 
@@ -138,10 +138,19 @@ class TestTimeProvider implements TimeProvider
 }
 
 public class Main {
+
+    static LoggingConfiguration getLoggingConfig() {
+        LoggingConfiguration config = new LoggingConfiguration();
+        config.level = LogLevel.INFO;
+        config.printLevel = true;
+        config.printModuleInfo = false;
+        config.timeFormat = TimeFormat.SYSTEM;
+        return config;
+    }
+
     public static void main(String[] args) {
         // Setup logging
-        Logging.setLogLevel(LogLevel.INFO);
-        Logging.setHandler(new TestLogger());
+        Logging.configure(getLoggingConfig(), new TestLogger());
 
         // Create the tokio runtime
         RuntimeConfig runtimeConfig = new RuntimeConfig();

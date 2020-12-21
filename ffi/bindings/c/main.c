@@ -16,8 +16,8 @@ void print_variation(variation_t variation)
 
 // Logger callback
 void on_log_message(log_level_t level, const char* msg, void* arg)
-{
-    printf("%s: %s\n", LogLevel_to_string(level), msg);
+{    
+    printf("%s\n", msg);
 }
 
 // ClientState listener callback
@@ -234,8 +234,13 @@ int main()
         .on_message = &on_log_message,
         .ctx = NULL,
     };
-    logging_set_log_level(LogLevel_Info);
-    logging_set_callback(logger);
+    logging_configuration_t config = {
+        .level = LogLevel_Info,
+        .print_level = true,
+        .print_module_info = false,
+        .time_format = TimeFormat_System,
+    };
+    configure_logging(config, logger);
 
     // Create runtime
     runtime_config_t runtime_config =

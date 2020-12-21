@@ -82,7 +82,7 @@ impl Assembler {
         // FIR always clears the state
         if header.fir {
             if let InternalState::Running(info, _, size) = self.state {
-                log::warn!(
+                tracing::warn!(
                     "transport: received FIR - dropping {} assembled bytes from {}",
                     size,
                     info.source
@@ -95,7 +95,7 @@ impl Assembler {
             if header.fir && header.fin {
                 self.append(info, header, 0, payload);
             } else {
-                log::warn!(
+                tracing::warn!(
                     "ignoring broadcast frame with transport header fir: {} and fin: {}",
                     header.fir,
                     header.fin
@@ -112,7 +112,7 @@ impl Assembler {
             InternalState::Empty => {
                 // ignore non-FIR segments if there was no previous frame
                 if !header.fir {
-                    log::warn!(
+                    tracing::warn!(
                         "transport: ignoring non-FIR segment from {} with no previous FIR",
                         info.source
                     );
@@ -122,12 +122,12 @@ impl Assembler {
             }
             InternalState::Running(previous_info, previous_header, length) => {
                 if header.seq.value() != previous_header.seq.next() {
-                    log::warn!("transport: conflicting addresses, previous segment with {:?}, but received {:?}", previous_info, info);
+                    tracing::warn!("transport: conflicting addresses, previous segment with {:?}, but received {:?}", previous_info, info);
                     self.state = InternalState::Empty;
                     return AssemblyState::ReadMore;
                 }
                 if info != previous_info {
-                    log::warn!("transport: conflicting addresses, previous segment with {:?}, but received {:?}", previous_info, info);
+                    tracing::warn!("transport: conflicting addresses, previous segment with {:?}, but received {:?}", previous_info, info);
                     self.state = InternalState::Empty;
                     return AssemblyState::ReadMore;
                 }
@@ -147,7 +147,7 @@ impl Assembler {
             .expect("accumulated length is greater than the buffer size");
         match cursor.write_slice(data) {
             Err(_) => {
-                log::warn!(
+                tracing::warn!(
                     "transport buffer overflow with {} bytes to write",
                     data.len()
                 );

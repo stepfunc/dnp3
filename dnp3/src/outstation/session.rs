@@ -124,6 +124,12 @@ pub(crate) struct SessionConfig {
     unsolicited_retry_delay: std::time::Duration,
 }
 
+pub(crate) struct SessionParameters {
+    max_read_headers_per_request: u16,
+    sol_tx_buffer_size: BufferSize,
+    unsol_tx_buffer_size: BufferSize,
+}
+
 impl From<OutstationConfig> for SessionConfig {
     fn from(config: OutstationConfig) -> Self {
         SessionConfig {
@@ -135,6 +141,16 @@ impl From<OutstationConfig> for SessionConfig {
             unsolicited: config.features.unsolicited,
             max_unsolicited_retries: config.max_unsolicited_retries,
             unsolicited_retry_delay: config.unsolicited_retry_delay,
+        }
+    }
+}
+
+impl From<OutstationConfig> for SessionParameters {
+    fn from(x: OutstationConfig) -> Self {
+        SessionParameters {
+            max_read_headers_per_request: x.max_read_headers_per_request,
+            sol_tx_buffer_size: x.solicited_buffer_size,
+            unsol_tx_buffer_size: x.unsolicited_buffer_size,
         }
     }
 }
@@ -222,14 +238,10 @@ enum ConfirmAction {
 }
 
 impl OutstationSession {
-    // TODO
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         receiver: Receiver<OutstationMessage>,
         config: SessionConfig,
-        max_read_headers_per_request: u16,
-        sol_tx_buffer_size: BufferSize,
-        unsol_tx_buffer_size: BufferSize,
+        param: SessionParameters,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
@@ -237,9 +249,9 @@ impl OutstationSession {
         Self {
             receiver,
             config,
-            sol_tx_buffer: sol_tx_buffer_size.create_buffer(),
-            unsol_tx_buffer: unsol_tx_buffer_size.create_buffer(),
-            state: SessionState::new(max_read_headers_per_request),
+            sol_tx_buffer: param.sol_tx_buffer_size.create_buffer(),
+            unsol_tx_buffer: param.unsol_tx_buffer_size.create_buffer(),
+            state: SessionState::new(param.max_read_headers_per_request),
             application,
             info: information,
             control_handler,
@@ -554,12 +566,12 @@ impl OutstationSession {
                         UnsolicitedResult::Confirmed,
                     ))
                 } else {
-                    log::warn!("ignoring unsolicited confirm with wrong sequence number ({}) while expecting ({})", seq.value(), uns_ecsn.value());
+                    tracing::warn!("ignoring unsolicited confirm with wrong sequence number ({}) while expecting ({})", seq.value(), uns_ecsn.value());
                     Ok(UnsolicitedWaitResult::ReadNext)
                 }
             }
             FragmentType::SolicitedConfirm(_) => {
-                log::warn!("ignoring solicited confirm while waiting for unsolicited confirm");
+                tracing::warn!("ignoring solicited confirm while waiting for unsolicited confirm");
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::Broadcast(mode) => {
@@ -773,14 +785,14 @@ impl OutstationSession {
                 None
             }
             FragmentType::SolicitedConfirm(seq) => {
-                log::warn!(
+                tracing::warn!(
                     "ignoring solicited CONFIRM from idle state with seq: {}",
                     seq.value()
                 );
                 None
             }
             FragmentType::UnsolicitedConfirm(seq) => {
-                log::warn!(
+                tracing::warn!(
                     "ignoring unsolicited CONFIRM from idle state with seq: {}",
                     seq.value()
                 );
@@ -887,7 +899,7 @@ impl OutstationSession {
             }
 
             _ => {
-                log::warn!("unsupported function code: {:?}", function);
+                tracing::warn!("unsupported function code: {:?}", function);
                 Some(self.write_empty_solicited_response(seq, IIN2::NO_FUNC_CODE_SUPPORT))
             }
         }
@@ -901,7 +913,7 @@ impl OutstationSession {
         if object_headers.is_empty() {
             IIN2::default()
         } else {
-            log::warn!("Ignoring object headers in {:?} request", function);
+            tracing::warn!("Ignoring object headers in {:?} request", function);
             IIN2::PARAMETER_ERROR
         }
     }
@@ -916,7 +928,7 @@ impl OutstationSession {
                         if index == 7 {
                             // restart IIN
                             if value {
-                                log::warn!("cannot write IIN 1.7 to TRUE");
+                                tracing::warn!("cannot write IIN 1.7 to TRUE");
                                 iin2 |= IIN2::PARAMETER_ERROR;
                             } else {
                                 // clear the restart bit
@@ -924,13 +936,17 @@ impl OutstationSession {
                                 self.info.clear_restart_iin();
                             }
                         } else {
-                            log::warn!("ignoring write of IIN index {} to value {}", index, value);
+                            tracing::warn!(
+                                "ignoring write of IIN index {} to value {}",
+                                index,
+                                value
+                            );
                             iin2 |= IIN2::PARAMETER_ERROR;
                         }
                     }
                 }
                 _ => {
-                    log::warn!(
+                    tracing::warn!(
                         "WRITE not supported with qualifier: {} and variation: {}",
                         header.details.qualifier(),
                         header.variation
@@ -1007,7 +1023,7 @@ impl OutstationSession {
     ) -> usize {
         let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
-                log::warn!(
+                tracing::warn!(
                     "ignoring control request containing non-control object header {} - {}",
                     err.variation,
                     err.qualifier
@@ -1056,7 +1072,7 @@ impl OutstationSession {
         }
 
         if self.config.unsolicited.is_disabled() {
-            log::warn!("received {} unsolicited request, but unsolicited support is disabled by configuration", to_string(enable));
+            tracing::warn!("received {} unsolicited request, but unsolicited support is disabled by configuration", to_string(enable));
             return self.write_empty_solicited_response(seq, IIN2::NO_FUNC_CODE_SUPPORT);
         }
 
@@ -1074,7 +1090,7 @@ impl OutstationSession {
                     self.state.enabled_unsolicited_classes.class3 = enable;
                 }
                 _ => {
-                    log::warn!("received {} unsolicited request for unsupported qualifier ({}) and variation ({})", to_string(enable), header.details.qualifier(), header.variation);
+                    tracing::warn!("received {} unsolicited request for unsupported qualifier ({}) and variation ({})", to_string(enable), header.details.qualifier(), header.variation);
                     iin2 |= IIN2::NO_FUNC_CODE_SUPPORT;
                 }
             }
@@ -1090,7 +1106,7 @@ impl OutstationSession {
     ) {
         let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
-                log::warn!(
+                tracing::warn!(
                     "ignoring control request containing non-control object header {} - {}",
                     err.variation,
                     err.qualifier
@@ -1114,7 +1130,7 @@ impl OutstationSession {
     ) -> usize {
         let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
-                log::warn!(
+                tracing::warn!(
                     "ignoring select request containing non-control object header {} - {}",
                     err.variation,
                     err.qualifier
@@ -1161,7 +1177,7 @@ impl OutstationSession {
     ) -> usize {
         let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
-                log::warn!(
+                tracing::warn!(
                     "ignoring OPERATE request containing non-control object header {} - {}",
                     err.variation,
                     err.qualifier
@@ -1240,7 +1256,7 @@ impl OutstationSession {
         request: Request,
     ) -> BroadcastAction {
         if self.config.broadcast.is_disabled() {
-            log::warn!(
+            tracing::warn!(
                 "ignoring broadcast request (broadcast support disabled): {:?}",
                 request.header.function
             );
@@ -1250,7 +1266,7 @@ impl OutstationSession {
         let objects = match request.objects {
             Ok(x) => x,
             Err(err) => {
-                log::warn!(
+                tracing::warn!(
                     "ignoring broadcast message with bad object headers: {}",
                     err
                 );
@@ -1264,7 +1280,7 @@ impl OutstationSession {
                 BroadcastAction::Processed
             }
             _ => {
-                log::warn!(
+                tracing::warn!(
                     "unsupported broadcast function: {:?}",
                     request.header.function
                 );
@@ -1403,13 +1419,13 @@ impl OutstationSession {
                 } else {
                     self.info
                         .wrong_solicited_confirm_seq(ecsn, request.header.control.seq);
-                    log::warn!("received solicited confirm with wrong sequence number, expected: {} received: {}", ecsn.value(), seq.value());
+                    tracing::warn!("received solicited confirm with wrong sequence number, expected: {} received: {}", ecsn.value(), seq.value());
                     ConfirmAction::ContinueWait
                 }
             }
             FragmentType::UnsolicitedConfirm(seq) => {
                 self.info.unexpected_confirm(true, seq);
-                log::warn!(
+                tracing::warn!(
                     "ignoring unsolicited CONFIRM while waiting for solicited confirm, seq: {}",
                     seq.value()
                 );

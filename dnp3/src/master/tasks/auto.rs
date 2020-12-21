@@ -51,7 +51,7 @@ impl AutoTask {
         objects: HeaderCollection,
     ) -> Option<NonReadTask> {
         if !objects.is_empty() {
-            log::warn!("ignoring object headers in reply to {}", self.description());
+            tracing::warn!("ignoring object headers in reply to {}", self.description());
         }
 
         match &self {

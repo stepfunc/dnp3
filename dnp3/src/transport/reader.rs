@@ -106,7 +106,7 @@ impl TransportReader {
             ParsedTransportData::Fragment(info, fragment) => match fragment.to_response() {
                 Err(err) => {
                     if log {
-                        log::error!("response error: {}", err);
+                        tracing::error!("response error: {}", err);
                     }
                     None
                 }
@@ -130,7 +130,7 @@ impl TransportReader {
             ParsedTransportData::Fragment(info, fragment) => match fragment.to_request() {
                 Err(err) => {
                     if log {
-                        log::error!("request error: {}", err);
+                        tracing::error!("request error: {}", err);
                     }
                     None
                 }
@@ -160,7 +160,7 @@ impl TransportReader {
                 let parsed = ParsedFragment::parse(level.receive(), fragment.data).ok()?;
                 if let Err(err) = parsed.objects {
                     if log {
-                        log::warn!("error parsing object headers: {}", err);
+                        tracing::warn!("error parsing object headers: {}", err);
                     }
                 }
                 Some(ParsedTransportData::Fragment(fragment.info, parsed))

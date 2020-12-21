@@ -21,7 +21,7 @@ pub(crate) fn create_master_transport_layer(
     rx_buffer_size: usize,
 ) -> (TransportReader, TransportWriter) {
     let rx_buffer_size = if rx_buffer_size < MasterSession::MIN_RX_BUFFER_SIZE {
-        log::warn!("Minimum RX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", MasterSession::MIN_RX_BUFFER_SIZE, rx_buffer_size);
+        tracing::warn!("Minimum RX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", MasterSession::MIN_RX_BUFFER_SIZE, rx_buffer_size);
         MasterSession::MIN_RX_BUFFER_SIZE
     } else {
         rx_buffer_size

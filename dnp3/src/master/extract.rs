@@ -56,7 +56,7 @@ pub(crate) fn extract_measurements(
         };
 
         if !handled {
-            log::warn!(
+            tracing::warn!(
                 "Ignored header variation: {} qualifier: {:?}",
                 &header.variation,
                 &header.details.qualifier()

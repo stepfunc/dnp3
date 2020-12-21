@@ -80,13 +80,13 @@ where
             match (self.connect_fn)().await {
                 Err(err) => {
                     let delay = self.back_off.on_failure();
-                    log::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
+                    tracing::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
                     self.listener
                         .update(ClientState::WaitAfterFailedConnect(delay));
                     self.session.delay_for(delay).await?;
                 }
                 Ok(mut socket) => {
-                    log::info!("connected");
+                    tracing::info!("connected");
                     self.back_off.on_success();
                     self.listener.update(ClientState::Connected);
                     match self
@@ -100,7 +100,11 @@ where
                         }
                         RunError::Link(err) => {
                             let delay = self.back_off.min_delay();
-                            log::warn!("{} - waiting {} ms to reconnect", err, delay.as_millis());
+                            tracing::warn!(
+                                "{} - waiting {} ms to reconnect",
+                                err,
+                                delay.as_millis()
+                            );
                             self.listener
                                 .update(ClientState::WaitAfterDisconnect(delay));
                             self.session.delay_for(delay).await?;

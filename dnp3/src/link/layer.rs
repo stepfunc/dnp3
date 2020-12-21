@@ -109,7 +109,7 @@ impl Layer {
         let source: EndpointAddress = match header.source {
             AnyAddress::Endpoint(x) => x,
             _ => {
-                log::warn!(
+                tracing::warn!(
                     "ignoring frame from disallowed source address: {}",
                     header.source
                 );
@@ -123,7 +123,7 @@ impl Layer {
                 if x == self.local_address {
                     None
                 } else {
-                    log::warn!("ignoring frame sent to address: {}", x);
+                    tracing::warn!("ignoring frame sent to address: {}", x);
                     return (None, None);
                 }
             }
@@ -132,17 +132,17 @@ impl Layer {
                     // just pretend like it was sent to us
                     None
                 } else {
-                    log::warn!("ignoring frame sent to self address");
+                    tracing::warn!("ignoring frame sent to self address");
                     return (None, None);
                 }
             }
             AnyAddress::Reserved(x) => {
-                log::warn!("ignoring frame sent to reserved address: {}", x);
+                tracing::warn!("ignoring frame sent to reserved address: {}", x);
                 return (None, None);
             }
             AnyAddress::Broadcast(mode) => match self.endpoint_type {
                 EndpointType::Master => {
-                    log::warn!("ignoring broadcast frame sent to master");
+                    tracing::warn!("ignoring broadcast frame sent to master");
                     return (None, None);
                 }
                 EndpointType::Outstation => Some(mode),
@@ -157,7 +157,7 @@ impl Layer {
                     None,
                 ),
                 _ => {
-                    log::warn!(
+                    tracing::warn!(
                         "ignoring broadcast frame with function: {:?}",
                         header.control.func
                     );
@@ -177,7 +177,9 @@ impl Layer {
             }
             Function::PriConfirmedUserData => match self.secondary_state {
                 SecondaryState::NotReset => {
-                    log::info!("ignoring confirmed user data while secondary state is not reset");
+                    tracing::info!(
+                        "ignoring confirmed user data while secondary state is not reset"
+                    );
                     (None, None)
                 }
                 SecondaryState::Reset(expected) => {
@@ -188,7 +190,7 @@ impl Layer {
                             None,
                         )
                     } else {
-                        log::info!("ignoring confirmed user data with non-matching fcb");
+                        tracing::info!("ignoring confirmed user data with non-matching fcb");
                         (None, None)
                     }
                 }
@@ -210,7 +212,7 @@ impl Layer {
                 None,
             ),
             function => {
-                log::warn!("ignoring frame with function code: {:?}", function);
+                tracing::warn!("ignoring frame with function code: {:?}", function);
                 (None, None)
             }
         }
