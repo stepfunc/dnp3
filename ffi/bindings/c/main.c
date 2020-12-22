@@ -17,7 +17,7 @@ void print_variation(variation_t variation)
 // Logger callback
 void on_log_message(log_level_t level, const char* msg, void* arg)
 {    
-    printf("%s\n", msg);
+    printf("%s", msg);
 }
 
 // ClientState listener callback
@@ -239,6 +239,7 @@ int main()
         .print_level = true,
         .print_module_info = false,
         .time_format = TimeFormat_System,
+        .output_format = LogOutputFormat_Json,
     };
     configure_logging(config, logger);
 

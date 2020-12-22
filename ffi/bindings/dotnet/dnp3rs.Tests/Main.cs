@@ -151,7 +151,7 @@ class MainClass
     private static async Task MainAsync()
     {        
         Logging.Configure(
-            new LoggingConfiguration { Level = LogLevel.Info, PrintLevel = true, PrintModuleInfo = false, TimeFormat = TimeFormat.System },
+            new LoggingConfiguration { Level = LogLevel.Info, PrintLevel = true, PrintModuleInfo = false, TimeFormat = TimeFormat.System, OutputFormat = LogOutputFormat.Json },
             new TestLogger()
         );
 

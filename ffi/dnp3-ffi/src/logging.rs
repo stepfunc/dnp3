@@ -50,15 +50,37 @@ fn adapter(
 
 impl ffi::LoggingConfiguration {
     fn build(&self) -> Box<dyn tracing::Subscriber + Send + Sync> {
+        let level: tracing::Level = self.level().into();
+
+        // these don't change the default type of the builder
         let builder = tracing_subscriber::fmt()
+            .with_max_level(level)
             .with_level(self.print_level)
             .with_target(self.print_module_info)
             .with_writer(ThreadLocalMakeWriter);
 
         match self.time_format() {
-            ffi::TimeFormat::None => Box::new(builder.without_time().finish()),
-            ffi::TimeFormat::RFC3339 => Box::new(builder.with_timer(ChronoUtc::default()).finish()),
-            ffi::TimeFormat::System => Box::new(builder.with_timer(SystemTime::default()).finish()),
+            ffi::TimeFormat::None => {
+                let builder = builder.without_time();
+                match self.output_format() {
+                    ffi::LogOutputFormat::Text => Box::new(builder.finish()),
+                    ffi::LogOutputFormat::JSON => Box::new(builder.json().finish()),
+                }
+            }
+            ffi::TimeFormat::RFC3339 => {
+                let builder = builder.with_timer(ChronoUtc::default());
+                match self.output_format() {
+                    ffi::LogOutputFormat::Text => Box::new(builder.finish()),
+                    ffi::LogOutputFormat::JSON => Box::new(builder.json().finish()),
+                }
+            }
+            ffi::TimeFormat::System => {
+                let builder = builder.with_timer(SystemTime::default());
+                match self.output_format() {
+                    ffi::LogOutputFormat::Text => Box::new(builder.finish()),
+                    ffi::LogOutputFormat::JSON => Box::new(builder.json().finish()),
+                }
+            }
         }
     }
 }
@@ -111,6 +133,18 @@ impl From<tracing::Level> for ffi::LogLevel {
             tracing::Level::INFO => ffi::LogLevel::Info,
             tracing::Level::WARN => ffi::LogLevel::Warn,
             tracing::Level::ERROR => ffi::LogLevel::Error,
+        }
+    }
+}
+
+impl From<ffi::LogLevel> for tracing::Level {
+    fn from(level: ffi::LogLevel) -> Self {
+        match level {
+            ffi::LogLevel::Debug => tracing::Level::DEBUG,
+            ffi::LogLevel::Trace => tracing::Level::TRACE,
+            ffi::LogLevel::Info => tracing::Level::INFO,
+            ffi::LogLevel::Warn => tracing::Level::WARN,
+            ffi::LogLevel::Error => tracing::Level::ERROR,
         }
     }
 }

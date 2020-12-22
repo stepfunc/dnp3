@@ -27,10 +27,22 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError
         .doc("Describes if and how the time will be formatted in log messages")?
         .build()?;
 
+    let log_output_format_enum = lib
+        .define_native_enum("LogOutputFormat")?
+        .push("Text", "A simple text-based format")?
+        .push("JSON", "Output formatted as JSON")?
+        .doc("Describes how each log event is formatted")?
+        .build()?;
+
     let logging_config_struct = lib.declare_native_struct("LoggingConfiguration")?;
     let logging_config_struct = lib
         .define_native_struct(&logging_config_struct)?
         .add("level", Type::Enum(log_level_enum.clone()), "logging level")?
+        .add(
+            "output_format",
+            Type::Enum(log_output_format_enum),
+            "output formatting options",
+        )?
         .add(
             "time_format",
             Type::Enum(time_format_enum),
