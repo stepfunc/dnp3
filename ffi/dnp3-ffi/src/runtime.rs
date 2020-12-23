@@ -95,7 +95,7 @@ pub(crate) unsafe fn runtime_add_master_serial(
 
     let (future, handle) = create_master_serial_client(
         config,
-        path.to_string_lossy().to_string(),
+        &path.to_string_lossy().to_string(),
         serial_params.into(),
         listener.into_listener(),
     );

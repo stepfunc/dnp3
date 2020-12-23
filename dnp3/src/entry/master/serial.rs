@@ -17,24 +17,14 @@ use tracing::Instrument;
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
-pub fn spawn_master_serial_client<P: Into<PathBuf>>(
+pub fn spawn_master_serial_client(
     config: MasterConfiguration,
-    path: P,
+    path: &str,
     serial_settings: SerialPortSettings,
     listener: Listener<ClientState>,
 ) -> MasterHandle {
-    let path = path.into();
-    let (mut task, handle) = MasterTask::new(
-        move || std::future::ready(Serial::from_path(path.as_path(), &serial_settings)),
-        config,
-        listener,
-    );
-    crate::tokio::spawn(async move {
-        task.run()
-            // TODO - make the 'device' parameter a string representation of the port
-            .instrument(tracing::trace_span!("MasterSerial", "device" = "TODO"))
-            .await
-    });
+    let (future, handle) = create_master_serial_client(config, path, serial_settings, listener);
+    crate::tokio::spawn(future);
     handle
 }
 
@@ -46,17 +36,25 @@ pub fn spawn_master_serial_client<P: Into<PathBuf>>(
 /// **Note**: This function is required instead of `spawn` when using a runtime to directly spawn
 /// tasks instead of within the context of a runtime, e.g. in applications that cannot use
 /// `[tokio::main]` such as C language bindings.
-pub fn create_master_serial_client<P: Into<PathBuf>>(
+pub fn create_master_serial_client(
     config: MasterConfiguration,
-    path: P,
+    path: &str,
     serial_settings: SerialPortSettings,
     listener: Listener<ClientState>,
 ) -> (impl Future<Output = ()> + 'static, MasterHandle) {
-    let path = path.into();
+
+    let string_path = path.to_owned();
+    let path = PathBuf::from(path);
     let (mut task, handle) = MasterTask::new(
         move || std::future::ready(Serial::from_path(path.as_path(), &serial_settings)),
         config,
         listener,
     );
-    (async move { task.run().await }, handle)
+    let future = async move {
+        task
+            .run()
+            .instrument(tracing::info_span!("MasterSerial", "port" = ?string_path))
+            .await
+    };
+    (future, handle)
 }
