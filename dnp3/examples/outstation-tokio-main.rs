@@ -34,10 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = OutstationConfig::new(outstation_address, master_address);
     config.log_level = DecodeLogLevel::ObjectValues;
 
-    let (_tx, rx) = tokio::sync::mpsc::channel(10);
-
     let (mut task, handle) = OutstationTask::create(
-        rx,
         config,
         get_database_config(),
         DefaultOutstationApplication::create(),
@@ -45,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         DefaultControlHandler::with_status(CommandStatus::Success),
     );
 
-    handle.transaction(|db| {
+    handle.database.transaction(|db| {
         for i in 0..10 {
             db.add(i, Some(EventClass::Class1), AnalogConfig::default());
             db.update(
@@ -61,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await
             .unwrap();
         loop {
-            let (mut socket, _) = listener.accept().await.unwrap();
+            let (mut socket, _addr) = listener.accept().await.unwrap();
 
             let _ = task.run(&mut socket).await;
         }
@@ -73,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         tokio::time::delay_for(Duration::from_secs(5)).await;
-        handle.transaction(|db| {
+        handle.database.transaction(|db| {
             db.update(
                 7,
                 &Analog::new(value, Flags::new(0x01), Time::synchronized(1)),

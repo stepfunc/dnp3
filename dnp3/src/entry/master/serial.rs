@@ -42,7 +42,6 @@ pub fn create_master_serial_client(
     serial_settings: SerialPortSettings,
     listener: Listener<ClientState>,
 ) -> (impl Future<Output = ()> + 'static, MasterHandle) {
-
     let string_path = path.to_owned();
     let path = PathBuf::from(path);
     let (mut task, handle) = MasterTask::new(
@@ -51,8 +50,7 @@ pub fn create_master_serial_client(
         listener,
     );
     let future = async move {
-        task
-            .run()
+        task.run()
             .instrument(tracing::info_span!("MasterSerial", "port" = ?string_path))
             .await
     };

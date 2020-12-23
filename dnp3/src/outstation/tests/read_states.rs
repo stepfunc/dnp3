@@ -38,7 +38,7 @@ fn empty_read_yields_empty_response() {
 fn can_read_and_confirm_events() {
     let mut harness = new_harness(get_default_config());
 
-    harness.database.transaction(create_binary_and_event);
+    harness.handle.database.transaction(create_binary_and_event);
 
     harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
@@ -50,7 +50,7 @@ fn can_read_and_confirm_events() {
 fn ignores_confirm_with_wrong_seq() {
     let mut harness = new_harness(get_default_config());
 
-    harness.database.transaction(create_binary_and_event);
+    harness.handle.database.transaction(create_binary_and_event);
 
     harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
@@ -62,7 +62,7 @@ fn ignores_confirm_with_wrong_seq() {
 fn ignores_unsolicited_confirm_with_correct_seq() {
     let mut harness = new_harness(get_default_config());
 
-    harness.database.transaction(create_binary_and_event);
+    harness.handle.database.transaction(create_binary_and_event);
 
     harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
@@ -74,7 +74,7 @@ fn ignores_unsolicited_confirm_with_correct_seq() {
 fn confirm_can_time_out() {
     let mut harness = new_harness(get_default_config());
 
-    harness.database.transaction(create_binary_and_event);
+    harness.handle.database.transaction(create_binary_and_event);
 
     harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
@@ -87,7 +87,7 @@ fn confirm_can_time_out() {
 fn sol_confirm_wait_goes_back_to_idle_with_new_request() {
     let mut harness = new_harness(get_default_config());
 
-    harness.database.transaction(create_binary_and_event);
+    harness.handle.database.transaction(create_binary_and_event);
     harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
     // start a new request

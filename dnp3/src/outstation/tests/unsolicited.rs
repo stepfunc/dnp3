@@ -118,7 +118,7 @@ fn data_unsolicited_can_be_confirmed() {
     confirm_null_unsolicited(&mut harness);
     enable_unsolicited(&mut harness);
 
-    generate_binary_event(&mut harness.database);
+    generate_binary_event(&mut harness.handle.database);
     harness.expect_response(UNSOL_G2V1_SEQ1);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
     harness.send(UNS_CONFIRM_SEQ_1);
@@ -131,7 +131,7 @@ fn defers_read_during_unsol_confirm_wait() {
     confirm_null_unsolicited(&mut harness);
     enable_unsolicited(&mut harness);
 
-    generate_binary_event(&mut harness.database);
+    generate_binary_event(&mut harness.handle.database);
     harness.expect_response(UNSOL_G2V1_SEQ1);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
     // send a read which will be deferred
@@ -151,7 +151,7 @@ fn handles_non_read_during_unsolicited_confirm_wait() {
     confirm_null_unsolicited(&mut harness);
     enable_unsolicited(&mut harness);
 
-    generate_binary_event(&mut harness.database);
+    generate_binary_event(&mut harness.handle.database);
     harness.expect_response(UNSOL_G2V1_SEQ1);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
     // send a delay measurement request while still in unsolicited confirm wait

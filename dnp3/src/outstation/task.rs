@@ -5,7 +5,7 @@ use crate::outstation::session::OutstationSession;
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::io::IOStream;
-use crate::util::task::{Receiver, RunError};
+use crate::util::task::{Receiver, RunError, Shutdown};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum OutstationMessage {
@@ -19,16 +19,30 @@ pub struct OutstationTask {
     database: DatabaseHandle,
 }
 
+pub struct OutstationHandle {
+    pub database: DatabaseHandle,
+    sender: crate::tokio::sync::mpsc::Sender<OutstationMessage>,
+}
+
+impl OutstationHandle {
+    pub async fn set_decode_log_level(&mut self, level: DecodeLogLevel) -> Result<(), Shutdown> {
+        self.sender
+            .send(OutstationMessage::SetDecodeLogLevel(level))
+            .await?;
+        Ok(())
+    }
+}
+
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
     pub fn create(
-        receiver: crate::tokio::sync::mpsc::Receiver<OutstationMessage>,
         config: OutstationConfig,
         database: DatabaseConfig,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
-    ) -> (Self, DatabaseHandle) {
+    ) -> (Self, OutstationHandle) {
+        let (tx, rx) = crate::tokio::sync::mpsc::channel(10); // TODO - should this be parameterized?
         let handle = DatabaseHandle::new(database);
         let (reader, writer) = crate::transport::create_outstation_transport_layer(
             config.outstation_address,
@@ -38,7 +52,7 @@ impl OutstationTask {
         );
         let task = Self {
             session: OutstationSession::new(
-                Receiver::new(receiver),
+                Receiver::new(rx),
                 config.into(),
                 config.into(),
                 application,
@@ -49,7 +63,13 @@ impl OutstationTask {
             writer,
             database: handle.clone(),
         };
-        (task, handle)
+        (
+            task,
+            OutstationHandle {
+                database: handle,
+                sender: tx,
+            },
+        )
     }
 
     /// run the outstation task asynchronously until a `LinkError` occurs

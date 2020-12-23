@@ -2,8 +2,8 @@ use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
 use crate::outstation::config::{Feature, OutstationConfig};
-use crate::outstation::database::{DatabaseConfig, DatabaseHandle, EventBufferConfig};
-use crate::outstation::task::{OutstationMessage, OutstationTask};
+use crate::outstation::database::{DatabaseConfig, EventBufferConfig};
+use crate::outstation::task::{OutstationHandle, OutstationTask};
 use crate::outstation::tests::harness::{
     ApplicationData, Event, EventHandle, MockControlHandler, MockOutstationApplication,
     MockOutstationInformation,
@@ -33,11 +33,10 @@ pub(crate) struct OutstationTestHarness<T>
 where
     T: std::future::Future<Output = Result<(), RunError>>,
 {
-    pub(crate) database: DatabaseHandle,
+    pub(crate) handle: OutstationHandle,
     io: io::Handle,
     task: Spawn<T>,
     events: EventHandle,
-    sender: crate::tokio::sync::mpsc::Sender<OutstationMessage>,
     pub(crate) application_data: Arc<Mutex<ApplicationData>>,
 }
 
@@ -129,10 +128,7 @@ fn new_harness_impl(
     let mut db_config = DatabaseConfig::default();
     db_config.events = EventBufferConfig::all_types(5);
 
-    let (tx, rx) = crate::tokio::sync::mpsc::channel(10);
-
-    let (task, database) = OutstationTask::create(
-        rx,
+    let (task, handle) = OutstationTask::create(
         config,
         db_config,
         application,
@@ -153,11 +149,10 @@ fn new_harness_impl(
     let (mut io, io_handle) = io::mock();
 
     OutstationTestHarness {
-        database,
+        handle,
         io: io_handle,
         task: spawn(async move { task.run(&mut io).await }),
         events,
-        sender: tx,
         application_data: data,
     }
 }

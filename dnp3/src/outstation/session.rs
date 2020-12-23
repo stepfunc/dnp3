@@ -738,6 +738,7 @@ impl OutstationSession {
     fn handle_message(&mut self, message: OutstationMessage) {
         match message {
             OutstationMessage::SetDecodeLogLevel(level) => {
+                tracing::info!("set decode log level: {:?}", level);
                 self.config.level = level;
             }
         }
