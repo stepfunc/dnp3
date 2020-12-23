@@ -84,6 +84,7 @@ pub struct OutstationConfig {
     pub solicited_buffer_size: BufferSize,
     pub unsolicited_buffer_size: BufferSize,
     pub rx_buffer_size: BufferSize,
+    pub bubble_framing_errors: bool,
     pub log_level: DecodeLogLevel,
     pub confirm_timeout: std::time::Duration,
     pub select_timeout: std::time::Duration,
@@ -91,6 +92,7 @@ pub struct OutstationConfig {
     pub max_unsolicited_retries: Option<usize>,
     pub unsolicited_retry_delay: std::time::Duration,
     pub max_read_headers_per_request: u16,
+    pub keep_alive_timeout: Option<std::time::Duration>,
 }
 
 impl Feature {
@@ -118,6 +120,7 @@ impl OutstationConfig {
             solicited_buffer_size: BufferSize::default(),
             unsolicited_buffer_size: BufferSize::default(),
             rx_buffer_size: BufferSize::default(),
+            bubble_framing_errors: false,
             log_level: DecodeLogLevel::Nothing,
             confirm_timeout: Self::DEFAULT_CONFIRM_TIMEOUT,
             select_timeout: Self::DEFAULT_SELECT_TIMEOUT,
@@ -125,6 +128,7 @@ impl OutstationConfig {
             max_unsolicited_retries: None,
             unsolicited_retry_delay: Self::DEFAULT_UNSOLICITED_RETRY_DELAY,
             max_read_headers_per_request: DatabaseConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
+            keep_alive_timeout: Some(std::time::Duration::from_secs(60)),
         }
     }
 }

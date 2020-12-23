@@ -18,6 +18,7 @@ pub(crate) type InnerReaderType = crate::transport::mock::reader::MockReader;
 pub(crate) struct TransportReader {
     logged: bool,
     inner: InnerReaderType,
+    bubble_framing_errors: bool,
 }
 
 pub(crate) struct RequestGuard<'a> {
@@ -53,10 +54,15 @@ impl<'a> Drop for RequestGuard<'a> {
 }
 
 impl TransportReader {
-    pub(crate) fn master(address: EndpointAddress, rx_buffer_size: usize) -> Self {
+    pub(crate) fn master(
+        address: EndpointAddress,
+        rx_buffer_size: usize,
+        bubble_framing_errors: bool,
+    ) -> Self {
         Self {
             logged: false,
             inner: InnerReaderType::master(address, rx_buffer_size),
+            bubble_framing_errors,
         }
     }
 
@@ -64,10 +70,12 @@ impl TransportReader {
         address: EndpointAddress,
         self_address: Feature,
         rx_buffer_size: usize,
+        bubble_framing_errors: bool,
     ) -> Self {
         Self {
             logged: false,
             inner: InnerReaderType::outstation(address, self_address, rx_buffer_size),
+            bubble_framing_errors,
         }
     }
 
@@ -80,7 +88,20 @@ impl TransportReader {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        self.inner.read(io).await
+        loop {
+            let result = self.inner.read(io).await;
+
+            if self.bubble_framing_errors {
+                return result;
+            } else {
+                match result {
+                    Ok(()) => return Ok(()),
+                    Err(LinkError::IO(err)) => return Err(LinkError::IO(err)),
+                    Err(LinkError::BadFrame(_)) => continue, // Keep reading
+                    Err(LinkError::BadLogic(_)) => continue, // Keep reading
+                }
+            }
+        }
     }
 
     pub(crate) fn reset(&mut self) {
@@ -99,15 +120,12 @@ impl TransportReader {
     }
 
     pub(crate) fn pop_response(&mut self, level: DecodeLogLevel) -> Option<TransportResponse> {
-        let log = self.log_fragment();
-        let data = self.parse(false, log, level)?;
+        let data = self.parse(false, true, level)?;
 
         match data {
             ParsedTransportData::Fragment(info, fragment) => match fragment.to_response() {
                 Err(err) => {
-                    if log {
-                        tracing::error!("response error: {}", err);
-                    }
+                    tracing::error!("response error: {}", err);
                     None
                 }
                 Ok(response) => Some(TransportResponse::Response(info.source, response)),

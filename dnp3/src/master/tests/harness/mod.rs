@@ -31,6 +31,7 @@ pub(crate) fn create_association(
     let (mut reader, mut writer) = create_master_transport_layer(
         EndpointAddress::from(1).unwrap(),
         MasterSession::MIN_RX_BUFFER_SIZE,
+        false,
     );
 
     reader

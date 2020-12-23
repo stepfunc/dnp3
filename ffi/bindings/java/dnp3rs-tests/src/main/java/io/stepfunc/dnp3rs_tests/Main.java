@@ -168,6 +168,7 @@ public class Main {
             masterConfig.responseTimeout = Duration.ofSeconds(5);
             masterConfig.rxBufferSize = ushort(2048);
             masterConfig.txBufferSize = ushort(2048);
+            masterConfig.bubbleFramingErrors = false;
 
             Master master = runtime.addMasterTcp(
                     masterConfig,

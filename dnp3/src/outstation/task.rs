@@ -34,6 +34,7 @@ impl OutstationTask {
             config.outstation_address,
             config.features.self_address,
             config.rx_buffer_size,
+            config.bubble_framing_errors,
         );
         let task = Self {
             session: OutstationSession::new(

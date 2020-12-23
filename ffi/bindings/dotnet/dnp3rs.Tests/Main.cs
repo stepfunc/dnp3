@@ -170,6 +170,7 @@ class MainClass
                     ResponseTimeout = TimeSpan.FromSeconds(5),
                     RxBufferSize = 2048,
                     TxBufferSize = 2048,
+                    BubbleFramingErrors = false,
                 },
                 "127.0.0.1:20000",
                 new TestListener()
