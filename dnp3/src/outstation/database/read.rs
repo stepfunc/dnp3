@@ -64,7 +64,7 @@ impl ReadHeader {
     pub(crate) fn get(header: &ObjectHeader) -> Option<ReadHeader> {
         let res = Self::get_impl(&header.details);
         if res.is_none() {
-            log::warn!(
+            tracing::warn!(
                 "{} - {} not supported in READ requests",
                 header.variation,
                 header.details.qualifier()

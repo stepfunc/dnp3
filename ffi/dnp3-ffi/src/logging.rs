@@ -1,48 +1,151 @@
 use crate::ffi;
 use dnp3::prelude::master::*;
-use log::{Level, LevelFilter, Log, Metadata, Record};
 use std::ffi::CString;
+use tracing::span::{Attributes, Record};
+use tracing::{Event, Id, Metadata};
+use tracing_subscriber::fmt::time::{ChronoUtc, SystemTime};
+use tracing_subscriber::fmt::MakeWriter;
 
-pub fn logging_set_callback(handler: ffi::Logger) {
-    log::set_boxed_logger(Box::new(LoggerAdapter { handler })).unwrap();
+thread_local! {
+   pub static LOG_BUFFER: std::cell::RefCell<Vec<u8>> = std::cell::RefCell::new(Vec::new());
 }
 
-pub fn logging_set_log_level(level: ffi::LogLevel) {
-    let level = match level {
-        ffi::LogLevel::Error => LevelFilter::Error,
-        ffi::LogLevel::Warn => LevelFilter::Warn,
-        ffi::LogLevel::Info => LevelFilter::Info,
-        ffi::LogLevel::Debug => LevelFilter::Debug,
-        ffi::LogLevel::Trace => LevelFilter::Trace,
-    };
-
-    log::set_max_level(level);
+pub fn configure_logging(config: ffi::LoggingConfiguration, handler: ffi::Logger) {
+    tracing::subscriber::set_global_default(adapter(config, handler))
+        .expect("unable to install tracing subscriber");
 }
 
-struct LoggerAdapter {
-    handler: ffi::Logger,
+struct ThreadLocalBufferWriter;
+
+struct ThreadLocalMakeWriter;
+
+impl MakeWriter for ThreadLocalMakeWriter {
+    type Writer = ThreadLocalBufferWriter;
+
+    fn make_writer(&self) -> Self::Writer {
+        ThreadLocalBufferWriter
+    }
 }
 
-impl Log for LoggerAdapter {
-    fn enabled(&self, _metadata: &Metadata) -> bool {
-        true
+impl std::io::Write for ThreadLocalBufferWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        LOG_BUFFER.with(|vec| vec.borrow_mut().extend_from_slice(buf));
+        Ok(buf.len())
     }
 
-    fn log(&self, record: &Record) {
-        if let Ok(message) = CString::new(format!("{}", record.args())) {
-            let level = match record.level() {
-                Level::Error => ffi::LogLevel::Error,
-                Level::Warn => ffi::LogLevel::Warn,
-                Level::Info => ffi::LogLevel::Info,
-                Level::Debug => ffi::LogLevel::Debug,
-                Level::Trace => ffi::LogLevel::Trace,
-            };
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
 
-            self.handler.on_message(level, &message);
+fn adapter(
+    config: ffi::LoggingConfiguration,
+    handler: ffi::Logger,
+) -> impl tracing::Subscriber + Send + Sync + 'static {
+    Adapter {
+        handler,
+        inner: config.build(),
+    }
+}
+
+impl ffi::LoggingConfiguration {
+    fn build(&self) -> Box<dyn tracing::Subscriber + Send + Sync> {
+        let level: tracing::Level = self.level().into();
+
+        let builder = tracing_subscriber::fmt()
+            .with_max_level(level)
+            .with_level(self.print_level)
+            .with_target(self.print_module_info)
+            .with_writer(ThreadLocalMakeWriter);
+
+        match self.time_format() {
+            ffi::TimeFormat::None => {
+                let builder = builder.without_time();
+                match self.output_format() {
+                    ffi::LogOutputFormat::Text => Box::new(builder.finish()),
+                    ffi::LogOutputFormat::JSON => Box::new(builder.json().finish()),
+                }
+            }
+            ffi::TimeFormat::RFC3339 => {
+                let builder = builder.with_timer(ChronoUtc::default());
+                match self.output_format() {
+                    ffi::LogOutputFormat::Text => Box::new(builder.finish()),
+                    ffi::LogOutputFormat::JSON => Box::new(builder.json().finish()),
+                }
+            }
+            ffi::TimeFormat::System => {
+                let builder = builder.with_timer(SystemTime::default());
+                match self.output_format() {
+                    ffi::LogOutputFormat::Text => Box::new(builder.finish()),
+                    ffi::LogOutputFormat::JSON => Box::new(builder.json().finish()),
+                }
+            }
         }
     }
+}
 
-    fn flush(&self) {}
+struct Adapter {
+    handler: ffi::Logger,
+    inner: Box<dyn tracing::Subscriber + Send + Sync + 'static>,
+}
+
+impl tracing::Subscriber for Adapter {
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        self.inner.enabled(metadata)
+    }
+
+    fn new_span(&self, span: &Attributes<'_>) -> Id {
+        self.inner.new_span(span)
+    }
+
+    fn record(&self, span: &Id, values: &Record<'_>) {
+        self.inner.record(span, values)
+    }
+
+    fn record_follows_from(&self, span: &Id, follows: &Id) {
+        self.inner.record_follows_from(span, follows)
+    }
+
+    fn event(&self, event: &Event<'_>) {
+        self.inner.event(event);
+        if let Ok(string) = LOG_BUFFER.with(|vec| CString::new(vec.borrow().as_slice())) {
+            self.handler
+                .on_message((*event.metadata().level()).into(), &string);
+        }
+        LOG_BUFFER.with(|vec| vec.borrow_mut().clear())
+    }
+
+    fn enter(&self, span: &Id) {
+        self.inner.enter(span)
+    }
+
+    fn exit(&self, span: &Id) {
+        self.inner.exit(span)
+    }
+}
+
+impl From<tracing::Level> for ffi::LogLevel {
+    fn from(level: tracing::Level) -> Self {
+        match level {
+            tracing::Level::DEBUG => ffi::LogLevel::Debug,
+            tracing::Level::TRACE => ffi::LogLevel::Trace,
+            tracing::Level::INFO => ffi::LogLevel::Info,
+            tracing::Level::WARN => ffi::LogLevel::Warn,
+            tracing::Level::ERROR => ffi::LogLevel::Error,
+        }
+    }
+}
+
+impl From<ffi::LogLevel> for tracing::Level {
+    fn from(level: ffi::LogLevel) -> Self {
+        match level {
+            ffi::LogLevel::Debug => tracing::Level::DEBUG,
+            ffi::LogLevel::Trace => tracing::Level::TRACE,
+            ffi::LogLevel::Info => tracing::Level::INFO,
+            ffi::LogLevel::Warn => tracing::Level::WARN,
+            ffi::LogLevel::Error => tracing::Level::ERROR,
+        }
+    }
 }
 
 impl From<ffi::DecodeLogLevel> for DecodeLogLevel {

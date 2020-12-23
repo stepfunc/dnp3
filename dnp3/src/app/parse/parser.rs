@@ -223,7 +223,7 @@ impl<'a> ParsedFragment<'a> {
         let result = Self::parse_no_logging(fragment);
         if let Ok(fragment) = &result {
             if let Some(view) = fragment.display_view(settings) {
-                log::info!("{}", view);
+                tracing::info!("{}", view);
             }
         }
         result
@@ -378,7 +378,7 @@ impl std::fmt::Display for ParsedFragmentDisplay<'_> {
                     }
                 }
                 // log the original error after any valid headers that preceded it
-                log::warn!("{}", err);
+                tracing::warn!("{}", err);
             }
         }
 

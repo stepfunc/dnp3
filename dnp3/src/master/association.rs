@@ -359,7 +359,7 @@ impl Association {
 
     pub(crate) fn on_restart_iin_observed(&mut self) {
         if self.auto_tasks.clear_restart_iin.is_idle() {
-            log::warn!("device restart detected (address == {})", self.address);
+            tracing::warn!("device restart detected (address == {})", self.address);
             self.auto_tasks.on_restart_iin();
             self.startup_integrity_done = false;
         }
@@ -381,7 +381,7 @@ impl Association {
     }
 
     pub(crate) fn on_integrity_scan_failure(&mut self) {
-        log::warn!("startup integrity scan failed");
+        tracing::warn!("startup integrity scan failed");
         self.auto_tasks.integrity_scan.failure(&self.config);
     }
 
@@ -390,13 +390,13 @@ impl Association {
     }
 
     pub(crate) fn on_event_scan_failure(&mut self) {
-        log::warn!("automatic event scan failed");
+        tracing::warn!("automatic event scan failed");
         self.auto_tasks.event_scan.failure(&self.config);
     }
 
     pub(crate) fn on_clear_restart_iin_response(&mut self, iin: IIN) {
         if iin.iin1.get_device_restart() {
-            log::warn!("device failed to clear restart IIN bit");
+            tracing::warn!("device failed to clear restart IIN bit");
             self.auto_tasks.clear_restart_iin.failure(&self.config);
         } else {
             self.auto_tasks.clear_restart_iin.done();
@@ -404,7 +404,7 @@ impl Association {
     }
 
     pub(crate) fn on_clear_restart_iin_failure(&mut self) {
-        log::warn!("device failed to clear restart IIN bit");
+        tracing::warn!("device failed to clear restart IIN bit");
         self.auto_tasks.clear_restart_iin.failure(&self.config);
     }
 
@@ -413,7 +413,7 @@ impl Association {
     }
 
     pub(crate) fn on_time_sync_failure(&mut self, err: TimeSyncError) {
-        log::warn!("auto time sync failed: {}", err);
+        tracing::warn!("auto time sync failed: {}", err);
         self.auto_tasks.time_sync.failure(&self.config);
     }
 
@@ -422,7 +422,7 @@ impl Association {
     }
 
     pub(crate) fn on_enable_unsolicited_failure(&mut self) {
-        log::warn!("device failed to enable unsolicited responses");
+        tracing::warn!("device failed to enable unsolicited responses");
         self.auto_tasks.enabled_unsolicited.failure(&self.config);
     }
 
@@ -431,7 +431,7 @@ impl Association {
     }
 
     pub(crate) fn on_disable_unsolicited_failure(&mut self) {
-        log::warn!("device failed to disable unsolicited responses");
+        tracing::warn!("device failed to disable unsolicited responses");
         self.auto_tasks.disable_unsolicited.failure(&self.config);
     }
 
@@ -460,7 +460,7 @@ impl Association {
 
             // Ignore repeat
             if last_frag == Some(new_frag) {
-                log::warn!("Ignoring duplicate unsolicited response");
+                tracing::warn!("Ignoring duplicate unsolicited response");
                 return true; // still want to send confirmation if requested
             }
 
@@ -474,7 +474,7 @@ impl Association {
 
             true
         } else {
-            log::warn!(
+            tracing::warn!(
                 "ignoring unsolicited response received before the end of the startup procedure"
             );
             false

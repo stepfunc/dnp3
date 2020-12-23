@@ -7,7 +7,10 @@ use std::time::Duration;
 
 /// example of using the master API synchronously from outside the Tokio runtime
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    colog::init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_target(false)
+        .init();
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
@@ -69,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         3u16,
                     ),
                 )) {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "evt" => {
@@ -79,28 +82,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Err(err) =
                     runtime.block_on(association.perform_time_sync(TimeSyncProcedure::LAN))
                 {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "nts" => {
                 if let Err(err) =
                     runtime.block_on(association.perform_time_sync(TimeSyncProcedure::NonLAN))
                 {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "crt" => {
                 if let Err(err) = runtime.block_on(association.cold_restart()) {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "wrt" => {
                 if let Err(err) = runtime.block_on(association.warm_restart()) {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "lsr" => {
-                log::info!("{:?}", runtime.block_on(association.check_link_status()));
+                tracing::info!("{:?}", runtime.block_on(association.check_link_status()));
             }
             s => println!("unknown command: {}", s),
         }

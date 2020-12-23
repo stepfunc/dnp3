@@ -7,7 +7,10 @@ use tokio_util::codec::{FramedRead, LinesCodec};
 /// example of using the master API asynchronously from within the Tokio runtime
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    colog::init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_target(false)
+        .init();
 
     // spawn the master onto another task
     let mut master = spawn_master_serial_client(
@@ -60,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .read(ReadRequest::all_objects(Variation::Group40Var0))
                     .await
                 {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "rmo" => {
@@ -71,7 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ]))
                     .await
                 {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "cmd" => {
@@ -85,13 +88,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     )
                     .await
                 {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "evt" => poll.demand().await,
             "lts" => {
                 if let Err(err) = association.perform_time_sync(TimeSyncProcedure::LAN).await {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "nts" => {
@@ -99,21 +102,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .perform_time_sync(TimeSyncProcedure::NonLAN)
                     .await
                 {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "crt" => {
                 if let Err(err) = association.cold_restart().await {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "wrt" => {
                 if let Err(err) = association.warm_restart().await {
-                    log::warn!("error: {}", err);
+                    tracing::warn!("error: {}", err);
                 }
             }
             "lsr" => {
-                log::info!("{:?}", association.check_link_status().await);
+                tracing::info!("{:?}", association.check_link_status().await);
             }
             s => println!("unknown command: {}", s),
         }

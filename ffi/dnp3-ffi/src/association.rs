@@ -67,11 +67,11 @@ pub unsafe fn association_add_poll(
             let poll = Box::new(Poll::new(association.runtime.clone(), handle));
             Box::into_raw(poll)
         } else {
-            log::warn!("Poll creation failure");
+            tracing::warn!("Poll creation failure");
             std::ptr::null_mut()
         }
     } else {
-        log::warn!("Tried calling 'association_add_poll' from within a tokio thread");
+        tracing::warn!("Tried calling 'association_add_poll' from within a tokio thread");
         std::ptr::null_mut()
     }
 }

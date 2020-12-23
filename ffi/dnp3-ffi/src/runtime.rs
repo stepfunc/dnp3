@@ -32,7 +32,7 @@ pub(crate) unsafe fn runtime_new(
     match result {
         Ok(r) => Box::into_raw(Box::new(r)),
         Err(_) => {
-            //log::error!("Unable to build runtime: {}", err);
+            //tracing::error!("Unable to build runtime: {}", err);
             null_mut()
         }
     }
@@ -119,7 +119,7 @@ impl ffi::MasterConfiguration {
         let address = match EndpointAddress::from(self.address()) {
             Ok(x) => x,
             Err(err) => {
-                log::warn!(
+                tracing::warn!(
                     "special addresses may not be used for the master address: {}",
                     err.address
                 );

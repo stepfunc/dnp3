@@ -23,7 +23,10 @@ fn get_database_config() -> DatabaseConfig {
 /// example of using the outstation API asynchronously from within the Tokio runtime
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    colog::init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_target(false)
+        .init();
 
     let outstation_address = EndpointAddress::from(1024)?;
     let master_address = EndpointAddress::from(1)?;
@@ -43,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     handle.transaction(|db| {
-        for i in 0..1000 {
+        for i in 0..10 {
             db.add(i, Some(EventClass::Class1), AnalogConfig::default());
             db.update(
                 i,

@@ -80,7 +80,7 @@ impl Reader {
                             return Ok(());
                         }
                     }
-                    [] => log::warn!("received link data frame with no payload"),
+                    [] => tracing::warn!("received link data frame with no payload"),
                 },
                 FrameType::LinkStatusRequest => {
                     self.pending_link_layer_message = Some(LinkLayerMessage {

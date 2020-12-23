@@ -41,31 +41,31 @@ impl SelectState {
 
         // check the sequence number
         if self.seq.next() != seq.value() {
-            log::warn!("received OPERATE with non-consecutive sequence number");
+            tracing::warn!("received OPERATE with non-consecutive sequence number");
             return Err(CommandStatus::NoSelect);
         }
 
         // check the frame_id to ensure there was no requests in between the SELECT and OPERATE
         if self.frame_id.wrapping_add(1) != frame_id {
-            log::warn!("received OPERATE without prior SELECT");
+            tracing::warn!("received OPERATE without prior SELECT");
             return Err(CommandStatus::NoSelect);
         }
 
         // check the object hash
         if self.object_hash != object_hash {
-            log::warn!("received OPERATE with different header than SELECT");
+            tracing::warn!("received OPERATE with different header than SELECT");
             return Err(CommandStatus::NoSelect);
         }
 
         // check the time last
         match elapsed {
             None => {
-                log::error!("current time is less than time of SELECT, clock error?");
+                tracing::error!("current time is less than time of SELECT, clock error?");
                 return Err(CommandStatus::Timeout);
             }
             Some(elapsed) => {
                 if elapsed > timeout {
-                    log::warn!("received valid OPERATE after SELECT timeout");
+                    tracing::warn!("received valid OPERATE after SELECT timeout");
                     return Err(CommandStatus::Timeout);
                 }
             }

@@ -10,6 +10,7 @@ pub use tokio_serial::Parity;
 /// Serial port settings
 pub use tokio_serial::SerialPortSettings;
 pub use tokio_serial::StopBits;
+use tracing::Instrument;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.
@@ -28,7 +29,12 @@ pub fn spawn_master_serial_client<P: Into<PathBuf>>(
         config,
         listener,
     );
-    crate::tokio::spawn(async move { task.run().await });
+    crate::tokio::spawn(async move {
+        task.run()
+            // TODO - make the 'device' parameter a string representation of the port
+            .instrument(tracing::trace_span!("MasterSerial", "device" = "TODO"))
+            .await
+    });
     handle
 }
 

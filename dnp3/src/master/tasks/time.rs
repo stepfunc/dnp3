@@ -142,7 +142,7 @@ impl TimeSyncTask {
             Some(x) => x,
             None => {
                 // This should NEVER happen. `crate::tokio::time::Instant` is guaranteed to be monotonic and nondecreasing.
-                log::error!("clock rollback detected while synchronizing outstation");
+                tracing::error!("clock rollback detected while synchronizing outstation");
                 self.report_error(association, TimeSyncError::ClockRollback);
                 return None;
             }
@@ -170,7 +170,7 @@ impl TimeSyncTask {
         let delay_ms = match delay_ms {
             Some(x) => x,
             None => {
-                log::warn!("received unexpected header(s) in response to delay measure");
+                tracing::warn!("received unexpected header(s) in response to delay measure");
                 self.report_error(association, TaskError::UnexpectedResponseHeaders.into());
                 return None;
             }
@@ -181,7 +181,7 @@ impl TimeSyncTask {
             match interval.checked_sub(Duration::from_millis(delay_ms as u64)) {
                 Some(x) => (x / 2),
                 None => {
-                    log::warn!("outstation time delay is larger than the response delay");
+                    tracing::warn!("outstation time delay is larger than the response delay");
                     self.report_error(association, TimeSyncError::BadOutstationTimeDelay(delay_ms));
                     return None;
                 }
@@ -190,7 +190,7 @@ impl TimeSyncTask {
         let time = match association.get_system_time() {
             Some(time) => time,
             None => {
-                log::warn!("system time not available");
+                tracing::warn!("system time not available");
                 self.report_error(association, TimeSyncError::SystemTimeNotAvailable);
                 return None;
             }
@@ -198,7 +198,7 @@ impl TimeSyncTask {
 
         let timestamp = match Self::get_timestamp(time, propagation_delay) {
             Err(err) => {
-                log::error!("{}", err);
+                tracing::error!("{}", err);
                 self.report_error(association, err);
                 return None;
             }

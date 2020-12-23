@@ -36,7 +36,7 @@ pub unsafe fn master_add_association(
     let address = match EndpointAddress::from(address) {
         Ok(x) => x,
         Err(err) => {
-            log::warn!(
+            tracing::warn!(
                 "special addresses may not be used for the master address: {}",
                 err.address
             );
@@ -83,11 +83,11 @@ pub unsafe fn master_add_association(
             };
             Box::into_raw(Box::new(association))
         } else {
-            log::warn!("Associate creation failure");
+            tracing::warn!("Associate creation failure");
             std::ptr::null_mut()
         }
     } else {
-        log::warn!("Tried calling 'master_add_association' from within a tokio thread");
+        tracing::warn!("Tried calling 'master_add_association' from within a tokio thread");
         std::ptr::null_mut()
     }
 }
@@ -111,7 +111,7 @@ pub unsafe fn master_get_decode_log_level(master: *mut Master) -> ffi::DecodeLog
             }
         }
     } else {
-        log::warn!("Tried calling 'master_get_decode_log_level' from within a tokio thread");
+        tracing::warn!("Tried calling 'master_get_decode_log_level' from within a tokio thread");
     }
 
     ffi::DecodeLogLevel::Nothing

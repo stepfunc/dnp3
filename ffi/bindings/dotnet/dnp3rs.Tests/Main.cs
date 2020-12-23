@@ -9,7 +9,7 @@ class MainClass
     {
         public void OnMessage(LogLevel level, string message)
         {
-            Console.WriteLine($"{level}: {message}");
+            Console.WriteLine($"{message}");
         }
     }
 
@@ -149,9 +149,11 @@ class MainClass
     }
 
     private static async Task MainAsync()
-    {
-        Logging.SetLogLevel(LogLevel.Info);
-        Logging.SetHandler(new TestLogger());
+    {        
+        Logging.Configure(
+            new LoggingConfiguration { Level = LogLevel.Info, PrintLevel = true, PrintModuleInfo = false, TimeFormat = TimeFormat.System, OutputFormat = LogOutputFormat.Json },
+            new TestLogger()
+        );
 
         using (var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 }))
         {
