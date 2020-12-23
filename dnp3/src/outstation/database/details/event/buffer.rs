@@ -429,7 +429,7 @@ impl EventBuffer {
             return Err(InsertError::TypeMaxIsZero);
         }
 
-        let ret = if T::get_type_count(&self.total.types) == max.into() {
+        let ret = if T::get_type_count(&self.total.types) == max as usize {
             if let Some(record) = self.events.remove_first(T::is_type) {
                 T::decrement_type(&mut self.total.types);
                 self.total.classes.decrement(record.class);

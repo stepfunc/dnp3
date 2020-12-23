@@ -3,6 +3,7 @@ use crate::master::handle::{Listener, MasterConfiguration, MasterHandle};
 use crate::tokio::net::TcpStream;
 use std::future::Future;
 use std::net::SocketAddr;
+use tracing::Instrument;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.
@@ -19,7 +20,11 @@ pub fn spawn_master_tcp_client(
         config,
         listener,
     );
-    crate::tokio::spawn(async move { task.run().await });
+    crate::tokio::spawn(async move {
+        task.run()
+            .instrument(tracing::info_span!("Master - TCPClient", "endpoint"= ?endpoint))
+            .await
+    });
     handle
 }
 

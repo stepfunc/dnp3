@@ -20,6 +20,7 @@ use crate::util::io::IOStream;
 use crate::util::task::{RunError, Shutdown};
 use std::ops::Add;
 use std::time::Duration;
+use tracing::Instrument;
 
 pub(crate) struct MasterSession {
     level: DecodeLogLevel,
@@ -92,7 +93,13 @@ impl MasterSession {
     {
         loop {
             let result = match self.get_next_task() {
-                Next::Now(task) => self.run_task(io, task, writer, reader).await,
+                Next::Now(task) => {
+                    let id = task.details.get_id();
+                    let address = task.address.raw_value();
+                    self.run_task(io, task, writer, reader)
+                        .instrument(tracing::info_span!("Task", "type" = ?id, "dest" = address))
+                        .await
+                }
                 Next::NotBefore(time) => self.idle_until(time, io, writer, reader).await,
                 Next::None => self.idle_forever(io, writer, reader).await,
             };

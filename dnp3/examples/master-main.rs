@@ -7,8 +7,10 @@ use std::time::Duration;
 
 /// example of using the master API synchronously from outside the Tokio runtime
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    std::env::set_var("RUST_LOG", "INFO");
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_target(false)
+        .init();
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 

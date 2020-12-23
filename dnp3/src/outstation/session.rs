@@ -36,6 +36,7 @@ use crate::outstation::control::select::SelectState;
 use crate::outstation::deferred::DeferredRead;
 use crate::outstation::task::OutstationMessage;
 use crate::util::task::{Receiver, RunError, Shutdown};
+use tracing::Instrument;
 
 #[derive(Copy, Clone)]
 enum Timeout {
@@ -508,6 +509,10 @@ impl OutstationSession {
         loop {
             match self
                 .wait_for_unsolicited_confirm(uns_ecsn, deadline, io, reader, writer, database)
+                .instrument(tracing::info_span!(
+                    "UnsolConfirmWait",
+                    "seq" = uns_ecsn.value()
+                ))
                 .await?
             {
                 UnsolicitedWaitResult::ReadNext => {
@@ -566,12 +571,15 @@ impl OutstationSession {
                         UnsolicitedResult::Confirmed,
                     ))
                 } else {
-                    tracing::warn!("ignoring unsolicited confirm with wrong sequence number ({}) while expecting ({})", seq.value(), uns_ecsn.value());
+                    tracing::warn!(
+                        "ignoring unsolicited confirm with wrong sequence number ({})",
+                        seq.value()
+                    );
                     Ok(UnsolicitedWaitResult::ReadNext)
                 }
             }
             FragmentType::SolicitedConfirm(_) => {
-                tracing::warn!("ignoring solicited confirm while waiting for unsolicited confirm");
+                tracing::warn!("ignoring solicited confirm");
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::Broadcast(mode) => {
@@ -607,12 +615,14 @@ impl OutstationSession {
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::NewRead(hash, headers) => {
+                tracing::info_span!("deferring READ request");
                 self.state
                     .deferred_read
                     .set(hash, request.header.control.seq, info, headers);
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::RepeatRead(hash, _, headers) => {
+                tracing::info_span!("deferring READ request");
                 self.state
                     .deferred_read
                     .set(hash, request.header.control.seq, info, headers);
@@ -696,6 +706,7 @@ impl OutstationSession {
         T: IOStream,
     {
         if let Some(x) = self.state.deferred_read.select(database) {
+            tracing::info!("handling deferred READ request");
             let (length, series) = self.write_read_response(database, true, x.seq, x.iin2);
             self.state.last_valid_request =
                 Some(LastValidRequest::new(x.seq, x.hash, Some(length), series));
@@ -703,6 +714,10 @@ impl OutstationSession {
             if let Some(series) = series {
                 // enter the solicited confirm wait state
                 self.sol_confirm_wait(io, reader, writer, database, series)
+                    .instrument(tracing::info_span!(
+                        "SolConfirmWait",
+                        "ecsn" = series.ecsn.value()
+                    ))
                     .await?;
             }
         }
@@ -735,6 +750,10 @@ impl OutstationSession {
                     drop(guard);
                     // enter the solicited confirm wait state
                     self.sol_confirm_wait(io, reader, writer, database, series)
+                        .instrument(tracing::info_span!(
+                            "SolConfirmWait",
+                            "ecsn" = series.ecsn.value()
+                        ))
                         .await?;
                 }
             }
@@ -1334,10 +1353,12 @@ impl OutstationSession {
                     }
                 }
                 Confirm::Timeout => {
+                    tracing::warn!("confirm timeout");
                     database.reset();
                     return Ok(());
                 }
                 Confirm::NewRequest => {
+                    tracing::info!("aborting solicited response due to new request");
                     database.reset();
                     return Ok(());
                 }
@@ -1419,16 +1440,16 @@ impl OutstationSession {
                 } else {
                     self.info
                         .wrong_solicited_confirm_seq(ecsn, request.header.control.seq);
-                    tracing::warn!("received solicited confirm with wrong sequence number, expected: {} received: {}", ecsn.value(), seq.value());
+                    tracing::warn!(
+                        "ignoring confirm with wrong sequence number: {}",
+                        seq.value()
+                    );
                     ConfirmAction::ContinueWait
                 }
             }
             FragmentType::UnsolicitedConfirm(seq) => {
                 self.info.unexpected_confirm(true, seq);
-                tracing::warn!(
-                    "ignoring unsolicited CONFIRM while waiting for solicited confirm, seq: {}",
-                    seq.value()
-                );
+                tracing::warn!("ignoring unsolicited confirm with seq: {}", seq.value());
                 ConfirmAction::ContinueWait
             }
         }

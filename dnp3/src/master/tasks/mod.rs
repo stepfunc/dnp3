@@ -47,6 +47,12 @@ pub(crate) enum Task {
     LinkStatus(Promise<Result<LinkStatusResult, TaskError>>),
 }
 
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub(crate) enum TaskId {
+    LinkStatus,
+    Function(FunctionCode),
+}
+
 impl Task {
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
         match self {
@@ -66,6 +72,14 @@ impl Task {
         }
 
         Some(self)
+    }
+
+    pub(crate) fn get_id(&self) -> TaskId {
+        match self {
+            Task::LinkStatus(_) => TaskId::LinkStatus,
+            Task::Read(_) => TaskId::Function(FunctionCode::Read),
+            Task::NonRead(t) => TaskId::Function(t.function()),
+        }
     }
 }
 

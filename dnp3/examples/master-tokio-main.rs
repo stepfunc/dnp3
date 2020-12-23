@@ -9,8 +9,10 @@ use tokio_util::codec::{FramedRead, LinesCodec};
 /// example of using the master API asynchronously from within the Tokio runtime
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    std::env::set_var("RUST_LOG", "INFO");
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_target(false)
+        .init();
 
     // spawn the master onto another task
     let mut master = spawn_master_tcp_client(

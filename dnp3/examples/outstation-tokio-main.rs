@@ -23,8 +23,10 @@ fn get_database_config() -> DatabaseConfig {
 /// example of using the outstation API asynchronously from within the Tokio runtime
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    std::env::set_var("RUST_LOG", "INFO");
-    tracing_subscriber::fmt().with_target(false).init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_target(false)
+        .init();
 
     let outstation_address = EndpointAddress::from(1024)?;
     let master_address = EndpointAddress::from(1)?;

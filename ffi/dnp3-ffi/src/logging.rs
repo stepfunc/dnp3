@@ -52,7 +52,6 @@ impl ffi::LoggingConfiguration {
     fn build(&self) -> Box<dyn tracing::Subscriber + Send + Sync> {
         let level: tracing::Level = self.level().into();
 
-        // these don't change the default type of the builder
         let builder = tracing_subscriber::fmt()
             .with_max_level(level)
             .with_level(self.print_level)
