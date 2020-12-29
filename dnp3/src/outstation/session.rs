@@ -34,8 +34,8 @@ use crate::app::gen::all::AllObjectsVariation;
 use crate::master::request::EventClasses;
 use crate::outstation::control::select::SelectState;
 use crate::outstation::deferred::DeferredRead;
-use crate::outstation::task::OutstationMessage;
-use crate::util::task::{Receiver, Shutdown};
+use crate::outstation::task::{ConfigurationChange, IOType, OutstationMessage};
+use crate::util::task::{Receiver, RunError, Shutdown};
 use tracing::Instrument;
 
 #[derive(Copy, Clone)]
@@ -241,21 +241,27 @@ enum ConfirmAction {
     ContinueWait,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum SessionError {
-    Link(LinkError),
-    Shutdown,
+#[derive(Debug)]
+pub(crate) enum SessionError {
+    Run(RunError),
+    NewSession(IOType),
+}
+
+impl From<RunError> for SessionError {
+    fn from(x: RunError) -> Self {
+        SessionError::Run(x)
+    }
 }
 
 impl From<LinkError> for SessionError {
-    fn from(x: LinkError) -> Self {
-        Self::Link(x)
+    fn from(err: LinkError) -> Self {
+        SessionError::Run(err.into())
     }
 }
 
 impl From<Shutdown> for SessionError {
-    fn from(_: Shutdown) -> Self {
-        SessionError::Shutdown
+    fn from(x: Shutdown) -> Self {
+        SessionError::Run(x.into())
     }
 }
 
@@ -285,18 +291,29 @@ impl OutstationSession {
         }
     }
 
+    pub(crate) async fn wait_for_io(&mut self) -> Result<IOType, Shutdown> {
+        loop {
+            match self.receiver.next().await? {
+                OutstationMessage::Configuration(change) => self.handle_config_change(change),
+                OutstationMessage::NewSession(io) => return Ok(io),
+            }
+        }
+    }
+
     pub(crate) async fn run<T>(
         &mut self,
         io: &mut T,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), SessionError>
+    ) -> SessionError
     where
         T: IOStream,
     {
         loop {
-            self.run_idle_state(io, reader, writer, database).await?;
+            if let Err(err) = self.run_idle_state(io, reader, writer, database).await {
+                return err;
+            }
         }
     }
 
@@ -730,7 +747,7 @@ impl OutstationSession {
     async fn sleep_until(
         &mut self,
         instant: Option<crate::tokio::time::Instant>,
-    ) -> Result<(), Shutdown> {
+    ) -> Result<(), SessionError> {
         async fn sleep_only(instant: Option<crate::tokio::time::Instant>) {
             match instant {
                 Some(x) => crate::tokio::time::delay_until(x).await,
@@ -747,15 +764,25 @@ impl OutstationSession {
                         return Ok(());
                  }
                  message = self.receiver.next() => {
-                     self.handle_message(message?);
+                     self.handle_message(message?)?;
                  }
             }
         }
     }
 
-    fn handle_message(&mut self, message: OutstationMessage) {
+    fn handle_message(&mut self, message: OutstationMessage) -> Result<(), SessionError> {
         match message {
-            OutstationMessage::SetDecodeLogLevel(level) => {
+            OutstationMessage::NewSession(io) => Err(SessionError::NewSession(io)),
+            OutstationMessage::Configuration(change) => {
+                self.handle_config_change(change);
+                Ok(())
+            }
+        }
+    }
+
+    fn handle_config_change(&mut self, message: ConfigurationChange) {
+        match message {
+            ConfigurationChange::SetDecodeLogLevel(level) => {
                 tracing::info!("set decode log level: {:?}", level);
                 self.config.level = level;
             }

@@ -1,3 +1,5 @@
+use crate::link::error::LinkError;
+
 /// Indicates that a task shutdown has been requested
 #[derive(Copy, Clone, Debug)]
 pub struct Shutdown;
@@ -22,5 +24,23 @@ impl<T> Receiver<T> {
 impl From<crate::tokio::sync::oneshot::error::RecvError> for Shutdown {
     fn from(_: crate::tokio::sync::oneshot::error::RecvError) -> Self {
         Shutdown
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum RunError {
+    Link(LinkError),
+    Shutdown,
+}
+
+impl From<LinkError> for RunError {
+    fn from(err: LinkError) -> Self {
+        RunError::Link(err)
+    }
+}
+
+impl From<Shutdown> for RunError {
+    fn from(_: Shutdown) -> Self {
+        RunError::Shutdown
     }
 }

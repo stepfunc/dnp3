@@ -40,14 +40,14 @@ fn generate_binary_event(handle: &mut DatabaseHandle) {
 
 fn enable_unsolicited<T>(harness: &mut OutstationTestHarness<T>)
 where
-    T: std::future::Future<Output = Result<(), SessionError>>,
+    T: std::future::Future<Output = SessionError>,
 {
     harness.test_request_response(ENABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0);
 }
 
 fn confirm_null_unsolicited<T>(harness: &mut OutstationTestHarness<T>)
 where
-    T: std::future::Future<Output = Result<(), SessionError>>,
+    T: std::future::Future<Output = SessionError>,
 {
     harness.expect_response(NULL_UNSOL_SEQ_0);
     harness.send(UNS_CONFIRM_SEQ_0);

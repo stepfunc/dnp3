@@ -2,6 +2,7 @@ use dnp3::app::enums::CommandStatus;
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::parse::DecodeLogLevel;
+use dnp3::entry::outstation::{AnyAddress, TCPServer};
 use dnp3::entry::EndpointAddress;
 use dnp3::outstation::config::OutstationConfig;
 use dnp3::outstation::database::config::*;
@@ -34,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = OutstationConfig::new(outstation_address, master_address);
     config.log_level = DecodeLogLevel::ObjectValues;
 
-    let (mut task, handle) = OutstationTask::create(
+    let (task, handle) = OutstationTask::create(
         config,
         get_database_config(),
         DefaultOutstationApplication::create(),
@@ -53,18 +54,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let listen_task = async move {
-        let mut listener = tokio::net::TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), 20000))
-            .await
-            .unwrap();
-        loop {
-            let (mut socket, _addr) = listener.accept().await.unwrap();
+    let listener = tokio::net::TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), 20000))
+        .await
+        .unwrap();
 
-            let _ = task.run(&mut socket).await;
-        }
-    };
+    let mut server = TCPServer::new();
+    server.bind(task, handle.clone(), AnyAddress::create());
 
-    tokio::spawn(listen_task);
+    tokio::spawn(async move { server.run(listener).await });
 
     let mut value = 0.0;
 
