@@ -9,7 +9,8 @@ use crate::outstation::tests::harness::{
     MockOutstationInformation,
 };
 use crate::tokio::test::*;
-use crate::util::task::RunError;
+
+use crate::outstation::session::SessionError;
 use std::sync::{Arc, Mutex};
 
 pub(crate) fn get_default_config() -> OutstationConfig {
@@ -31,7 +32,7 @@ pub(crate) fn get_default_unsolicited_config() -> OutstationConfig {
 
 pub(crate) struct OutstationTestHarness<T>
 where
-    T: std::future::Future<Output = Result<(), RunError>>,
+    T: std::future::Future<Output = Result<(), SessionError>>,
 {
     pub(crate) handle: OutstationHandle,
     io: io::Handle,
@@ -42,7 +43,7 @@ where
 
 impl<T> OutstationTestHarness<T>
 where
-    T: std::future::Future<Output = Result<(), RunError>>,
+    T: std::future::Future<Output = Result<(), SessionError>>,
 {
     pub(crate) fn poll_pending(&mut self) {
         assert_pending!(self.task.poll());
@@ -106,21 +107,21 @@ where
 
 pub(crate) fn new_harness(
     config: OutstationConfig,
-) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), RunError>>> {
+) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), SessionError>>> {
     new_harness_impl(config, None)
 }
 
 pub(crate) fn new_harness_for_broadcast(
     config: OutstationConfig,
     broadcast: BroadcastConfirmMode,
-) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), RunError>>> {
+) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), SessionError>>> {
     new_harness_impl(config, Some(broadcast))
 }
 
 fn new_harness_impl(
     config: OutstationConfig,
     broadcast: Option<BroadcastConfirmMode>,
-) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), RunError>>> {
+) -> OutstationTestHarness<impl std::future::Future<Output = Result<(), SessionError>>> {
     let events = EventHandle::new();
 
     let (data, application) = MockOutstationApplication::new(events.clone());

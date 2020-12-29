@@ -17,7 +17,8 @@ use crate::tokio::time::Instant;
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::io::IOStream;
-use crate::util::task::{RunError, Shutdown};
+
+use crate::util::task::Shutdown;
 use std::ops::Add;
 use std::time::Duration;
 use tracing::Instrument;
@@ -34,6 +35,24 @@ enum ReadResponseAction {
     Ignore,
     ReadNext,
     Complete,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum RunError {
+    Link(LinkError),
+    Shutdown,
+}
+
+impl From<LinkError> for RunError {
+    fn from(err: LinkError) -> Self {
+        RunError::Link(err)
+    }
+}
+
+impl From<Shutdown> for RunError {
+    fn from(_: Shutdown) -> Self {
+        RunError::Shutdown
+    }
 }
 
 impl MasterSession {

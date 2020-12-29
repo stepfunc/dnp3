@@ -35,7 +35,7 @@ use crate::master::request::EventClasses;
 use crate::outstation::control::select::SelectState;
 use crate::outstation::deferred::DeferredRead;
 use crate::outstation::task::OutstationMessage;
-use crate::util::task::{Receiver, RunError, Shutdown};
+use crate::util::task::{Receiver, Shutdown};
 use tracing::Instrument;
 
 #[derive(Copy, Clone)]
@@ -241,6 +241,24 @@ enum ConfirmAction {
     ContinueWait,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum SessionError {
+    Link(LinkError),
+    Shutdown,
+}
+
+impl From<LinkError> for SessionError {
+    fn from(x: LinkError) -> Self {
+        Self::Link(x)
+    }
+}
+
+impl From<Shutdown> for SessionError {
+    fn from(_: Shutdown) -> Self {
+        SessionError::Shutdown
+    }
+}
+
 impl OutstationSession {
     pub(crate) fn new(
         receiver: Receiver<OutstationMessage>,
@@ -273,7 +291,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), RunError>
+    ) -> Result<(), SessionError>
     where
         T: IOStream,
     {
@@ -326,7 +344,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), RunError>
+    ) -> Result<(), SessionError>
     where
         T: IOStream,
     {
@@ -377,7 +395,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<crate::tokio::time::Instant>, RunError>
+    ) -> Result<Option<crate::tokio::time::Instant>, SessionError>
     where
         T: IOStream,
     {
@@ -444,7 +462,7 @@ impl OutstationSession {
         &mut self,
         io: &mut T,
         writer: &mut TransportWriter,
-    ) -> Result<(), RunError>
+    ) -> Result<(), SessionError>
     where
         T: IOStream,
     {
@@ -470,7 +488,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<UnsolicitedResult, RunError>
+    ) -> Result<UnsolicitedResult, SessionError>
     where
         T: IOStream,
     {
@@ -486,7 +504,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<UnsolicitedResult>, RunError>
+    ) -> Result<Option<UnsolicitedResult>, SessionError>
     where
         T: IOStream,
     {
@@ -538,7 +556,7 @@ impl OutstationSession {
         io: &mut T,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
-    ) -> Result<UnsolicitedResult, RunError>
+    ) -> Result<UnsolicitedResult, SessionError>
     where
         T: IOStream,
     {
@@ -590,7 +608,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<UnsolicitedWaitResult, RunError>
+    ) -> Result<UnsolicitedWaitResult, SessionError>
     where
         T: IOStream,
     {
@@ -691,7 +709,7 @@ impl OutstationSession {
         io: &mut T,
         reader: &mut TransportReader,
         deadline: crate::tokio::time::Instant,
-    ) -> Result<Timeout, RunError>
+    ) -> Result<Timeout, SessionError>
     where
         T: IOStream,
     {
@@ -750,7 +768,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), RunError>
+    ) -> Result<(), SessionError>
     where
         T: IOStream,
     {
@@ -780,7 +798,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), RunError>
+    ) -> Result<(), SessionError>
     where
         T: IOStream,
     {
@@ -1378,7 +1396,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
         mut series: ResponseSeries,
-    ) -> Result<(), RunError>
+    ) -> Result<(), SessionError>
     where
         T: IOStream,
     {
@@ -1427,7 +1445,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         ecsn: Sequence,
-    ) -> Result<Confirm, RunError>
+    ) -> Result<Confirm, SessionError>
     where
         T: IOStream,
     {

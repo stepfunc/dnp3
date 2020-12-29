@@ -21,7 +21,7 @@ use xxhash_rust::xxh64::xxh64;
 
 use crate::entry::EndpointAddress;
 pub use crate::master::poll::PollHandle;
-use crate::util::task::RunError;
+use crate::master::session::RunError;
 
 #[derive(Copy, Clone)]
 pub struct Configuration {

@@ -1,9 +1,9 @@
 use crate::link::header::{FrameInfo, FrameType};
-use crate::master::session::MasterSession;
+use crate::master::session::{MasterSession, RunError};
 use crate::prelude::master::*;
 use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
-use crate::util::task::RunError;
+
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

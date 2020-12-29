@@ -1,11 +1,11 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::outstation::config::*;
 use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
-use crate::outstation::session::OutstationSession;
+use crate::outstation::session::{OutstationSession, SessionError};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::io::IOStream;
-use crate::util::task::{Receiver, RunError, Shutdown};
+use crate::util::task::{Receiver, Shutdown};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum OutstationMessage {
@@ -72,8 +72,8 @@ impl OutstationTask {
         )
     }
 
-    /// run the outstation task asynchronously until a `LinkError` occurs
-    pub async fn run<T>(&mut self, io: &mut T) -> Result<(), RunError>
+    /// run the outstation task asynchronously until a `SessionError` occurs
+    pub async fn run<T>(&mut self, io: &mut T) -> Result<(), SessionError>
     where
         T: IOStream,
     {
