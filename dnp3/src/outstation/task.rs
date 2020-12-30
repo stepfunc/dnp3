@@ -125,21 +125,21 @@ impl OutstationTask {
 
     /// run the outstation task asynchronously until a shutdown is requested
     pub(crate) async fn run(&mut self) {
-        let mut io = None;
+        let mut session = None;
 
         loop {
-            match io.take() {
+            match session.take() {
                 None => match self.session.wait_for_io().await {
                     Err(_) => return,
-                    Ok(x) => {
-                        io.replace(x);
+                    Ok(s) => {
+                        session.replace(s);
                     }
                 },
-                Some(session) => {
-                    let id = session.id;
+                Some(s) => {
+                    let id = s.id;
 
                     let result = self
-                        .run_one_session(session.io)
+                        .run_one_session(s.io)
                         .instrument(tracing::info_span!("Session", "id" = id))
                         .await;
 
@@ -148,8 +148,8 @@ impl OutstationTask {
                         SessionError::Run(RunError::Link(_)) => {
                             // TODO - reset the session
                         }
-                        SessionError::NewSession(x) => {
-                            io.replace(x);
+                        SessionError::NewSession(s) => {
+                            session.replace(s);
                         }
                     }
                 }
