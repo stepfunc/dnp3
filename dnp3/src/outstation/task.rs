@@ -7,7 +7,6 @@ use crate::transport::{TransportReader, TransportWriter};
 use crate::util::io::IOStream;
 use crate::util::task::{Receiver, RunError, Shutdown};
 
-use std::collections::VecDeque;
 use tracing::Instrument;
 
 pub(crate) enum ConfigurationChange {
@@ -126,13 +125,15 @@ impl OutstationTask {
 
     /// run the outstation task asynchronously until a shutdown is requested
     pub(crate) async fn run(&mut self) {
-        let mut vec = VecDeque::with_capacity(1);
+        let mut io = None;
 
         loop {
-            match vec.pop_front() {
+            match io.take() {
                 None => match self.session.wait_for_io().await {
                     Err(_) => return,
-                    Ok(io) => vec.push_back(io),
+                    Ok(x) => {
+                        io.replace(x);
+                    }
                 },
                 Some(session) => {
                     let id = session.id;
@@ -147,8 +148,8 @@ impl OutstationTask {
                         SessionError::Run(RunError::Link(_)) => {
                             // TODO - reset the session
                         }
-                        SessionError::NewSession(session) => {
-                            vec.push_back(session);
+                        SessionError::NewSession(x) => {
+                            io.replace(x);
                         }
                     }
                 }
