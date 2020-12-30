@@ -6,7 +6,9 @@ use crate::outstation::traits::{ControlHandler, OutstationApplication, Outstatio
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::io::IOStream;
 use crate::util::task::{Receiver, RunError, Shutdown};
+
 use std::collections::VecDeque;
+use tracing::Instrument;
 
 pub(crate) enum ConfigurationChange {
     SetDecodeLogLevel(DecodeLogLevel),
@@ -18,9 +20,27 @@ impl From<ConfigurationChange> for OutstationMessage {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct NewSession {
+    pub(crate) id: u64,
+    pub(crate) io: IOType,
+}
+
+impl From<NewSession> for OutstationMessage {
+    fn from(x: NewSession) -> Self {
+        OutstationMessage::NewSession(x)
+    }
+}
+
+impl NewSession {
+    pub(crate) fn new(id: u64, io: IOType) -> Self {
+        Self { id, io }
+    }
+}
+
 pub(crate) enum OutstationMessage {
     Configuration(ConfigurationChange),
-    NewSession(IOType),
+    NewSession(NewSession),
 }
 
 #[derive(Debug)]
@@ -49,8 +69,8 @@ impl OutstationHandle {
         Ok(())
     }
 
-    pub(crate) async fn new_io(&mut self, io: IOType) -> Result<(), Shutdown> {
-        self.sender.send(OutstationMessage::NewSession(io)).await?;
+    pub(crate) async fn new_io(&mut self, id: u64, io: IOType) -> Result<(), Shutdown> {
+        self.sender.send(NewSession::new(id, io).into()).await?;
         Ok(())
     }
 }
@@ -114,17 +134,21 @@ impl OutstationTask {
                     Err(_) => return,
                     Ok(io) => vec.push_back(io),
                 },
-                Some(io) => {
-                    match self.run_one_session(io).await {
+                Some(session) => {
+                    let id = session.id;
+
+                    let result = self
+                        .run_one_session(session.io)
+                        .instrument(tracing::info_span!("Session", "id" = id))
+                        .await;
+
+                    match result {
                         SessionError::Run(RunError::Shutdown) => return,
-                        SessionError::Run(RunError::Link(err)) => {
+                        SessionError::Run(RunError::Link(_)) => {
                             // TODO - reset the session
-                            tracing::warn!("{}", err);
                         }
-                        SessionError::NewSession(io) => {
-                            println!("new io!");
-                            tracing::info!("session closed - new connection");
-                            vec.push_back(io);
+                        SessionError::NewSession(session) => {
+                            vec.push_back(session);
                         }
                     }
                 }
@@ -133,9 +157,21 @@ impl OutstationTask {
     }
 
     async fn run_one_session(&mut self, io: IOType) -> SessionError {
-        match io {
+        let err = match io {
             IOType::TCPStream(mut stream) => self.run_io(&mut stream).await,
-        }
+        };
+        match &err {
+            SessionError::Run(RunError::Shutdown) => {
+                tracing::info!("received shutdown");
+            }
+            SessionError::Run(RunError::Link(err)) => {
+                tracing::warn!("link error: {}", err);
+            }
+            SessionError::NewSession(session) => {
+                tracing::info!("closing for new connection: {}", session.id)
+            }
+        };
+        err
     }
 
     #[cfg(test)]

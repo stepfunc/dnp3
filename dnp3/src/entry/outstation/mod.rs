@@ -1,27 +1,24 @@
 use crate::outstation::task::{IOType, OutstationHandle, OutstationTask};
 
+pub mod filters;
+
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Priority {
-    value: Option<usize>,
+pub struct Match {
+    value: Option<u32>,
+}
+
+impl Match {
+    pub fn yes(value: u32) -> Self {
+        Self { value: Some(value) }
+    }
+
+    pub fn no() -> Self {
+        Self { value: None }
+    }
 }
 
 pub trait AddressFilter: Send {
-    fn matches(&self, address: &std::net::SocketAddr) -> Option<usize>;
-}
-
-#[derive(Copy, Clone)]
-pub struct AnyAddress;
-
-impl AddressFilter for AnyAddress {
-    fn matches(&self, _: &std::net::SocketAddr) -> Option<usize> {
-        Some(0)
-    }
-}
-
-impl AnyAddress {
-    pub fn create() -> Box<dyn AddressFilter> {
-        Box::new(AnyAddress)
-    }
+    fn matches(&self, address: &std::net::SocketAddr) -> Match;
 }
 
 struct Outstation {
@@ -63,14 +60,19 @@ impl TCPServer {
     }
 
     pub async fn run(&mut self, mut listener: crate::tokio::net::TcpListener) {
+        let mut connection_id: u64 = 0;
         loop {
             match listener.accept().await {
                 Ok((stream, addr)) => {
+                    let id = connection_id;
+                    connection_id = connection_id.wrapping_add(1);
+
                     tracing::info!("accepted connection from: {}", addr);
 
                     let best = self
                         .outstations
                         .iter_mut()
+                        .filter(|x| x.filter.matches(&addr).value.is_some())
                         .max_by_key(|x| x.filter.matches(&addr));
 
                     match best {
@@ -78,7 +80,7 @@ impl TCPServer {
                             tracing::warn!("no matching outstation for: {}", addr)
                         }
                         Some(x) => {
-                            let _ = x.handle.new_io(IOType::TCPStream(stream)).await;
+                            let _ = x.handle.new_io(id, IOType::TCPStream(stream)).await;
                         }
                     }
                 }

@@ -34,7 +34,7 @@ use crate::app::gen::all::AllObjectsVariation;
 use crate::master::request::EventClasses;
 use crate::outstation::control::select::SelectState;
 use crate::outstation::deferred::DeferredRead;
-use crate::outstation::task::{ConfigurationChange, IOType, OutstationMessage};
+use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
 use crate::util::task::{Receiver, RunError, Shutdown};
 use tracing::Instrument;
 
@@ -244,7 +244,7 @@ enum ConfirmAction {
 #[derive(Debug)]
 pub(crate) enum SessionError {
     Run(RunError),
-    NewSession(IOType),
+    NewSession(NewSession),
 }
 
 impl From<RunError> for SessionError {
@@ -291,11 +291,11 @@ impl OutstationSession {
         }
     }
 
-    pub(crate) async fn wait_for_io(&mut self) -> Result<IOType, Shutdown> {
+    pub(crate) async fn wait_for_io(&mut self) -> Result<NewSession, Shutdown> {
         loop {
             match self.receiver.next().await? {
                 OutstationMessage::Configuration(change) => self.handle_config_change(change),
-                OutstationMessage::NewSession(io) => return Ok(io),
+                OutstationMessage::NewSession(session) => return Ok(session),
             }
         }
     }
@@ -398,7 +398,8 @@ impl OutstationSession {
             _ = database.wait_for_change() => {
                 // wake for unsolicited here
             }
-            _ = self.sleep_until(deadline) => {
+            res = self.sleep_until(deadline) => {
+                res?
                 // just wake up
             }
         }
@@ -763,16 +764,16 @@ impl OutstationSession {
                  _ = sleep_only(instant) => {
                         return Ok(());
                  }
-                 message = self.receiver.next() => {
-                     self.handle_message(message?)?;
+                 res = self.handle_next_message() => {
+                     res?;
                  }
             }
         }
     }
 
-    fn handle_message(&mut self, message: OutstationMessage) -> Result<(), SessionError> {
-        match message {
-            OutstationMessage::NewSession(io) => Err(SessionError::NewSession(io)),
+    async fn handle_next_message(&mut self) -> Result<(), SessionError> {
+        match self.receiver.next().await? {
+            OutstationMessage::NewSession(session) => Err(SessionError::NewSession(session)),
             OutstationMessage::Configuration(change) => {
                 self.handle_config_change(change);
                 Ok(())
