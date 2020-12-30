@@ -13,7 +13,6 @@ use dnp3::outstation::task::OutstationTask;
 use dnp3::outstation::traits::{
     DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
 };
-use std::net::Ipv4Addr;
 use std::time::Duration;
 
 fn get_database_config() -> DatabaseConfig {
@@ -55,14 +54,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let listener = tokio::net::TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), 20000))
-        .await
-        .unwrap();
+    let mut server = TCPServer::bind("127.0.0.1:20000".parse()?).await?;
 
-    let mut server = TCPServer::new();
-    server.bind(task, handle.clone(), any_address(0));
+    server.add(task, handle.clone(), any_address(0));
 
-    tokio::spawn(async move { server.run(listener).await });
+    tokio::spawn(async move { server.run().await });
 
     let mut value = 0.0;
 

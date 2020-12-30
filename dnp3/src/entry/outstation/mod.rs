@@ -1,4 +1,5 @@
 use crate::outstation::task::{IOType, OutstationHandle, OutstationTask};
+use tracing::Instrument;
 
 pub mod filters;
 
@@ -28,29 +29,34 @@ struct Outstation {
 }
 
 pub struct TCPServer {
+    local: std::net::SocketAddr,
+    listener: crate::tokio::net::TcpListener,
     outstations: Vec<Outstation>,
 }
 
-impl Default for TCPServer {
-    fn default() -> Self {
-        Self {
-            outstations: Vec::new(),
-        }
-    }
-}
-
 impl TCPServer {
-    pub fn new() -> Self {
-        Self::default()
+    pub async fn bind(address: std::net::SocketAddr) -> Result<Self, crate::tokio::io::Error> {
+        let listener = crate::tokio::net::TcpListener::bind(address).await?;
+        Ok(Self {
+            local: address,
+            listener,
+            outstations: Vec::new(),
+        })
     }
 
-    pub fn bind(
+    pub fn add(
         &mut self,
         mut task: OutstationTask,
         handle: OutstationHandle,
         filter: Box<dyn AddressFilter>,
     ) {
-        let join_handle = crate::tokio::spawn(async move { task.run().await });
+        let endpoint = self.local;
+        let join_handle = crate::tokio::spawn(async move {
+            task.run()
+                .instrument(tracing::info_span!("TCPServer", "local" = ?endpoint))
+                .await
+        });
+
         let outstation = Outstation {
             filter,
             handle,
@@ -59,10 +65,19 @@ impl TCPServer {
         self.outstations.push(outstation);
     }
 
-    pub async fn run(&mut self, mut listener: crate::tokio::net::TcpListener) {
+    pub async fn run(&mut self) {
+        let local = self.local;
+        self.run_inner()
+            .instrument(tracing::info_span!("TCPServer", "listen" = ?local))
+            .await
+    }
+
+    async fn run_inner(&mut self) {
+        tracing::info!("accepting connections");
+
         let mut connection_id: u64 = 0;
         loop {
-            match listener.accept().await {
+            match self.listener.accept().await {
                 Ok((stream, addr)) => {
                     let id = connection_id;
                     connection_id = connection_id.wrapping_add(1);
