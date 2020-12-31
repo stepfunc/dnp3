@@ -294,6 +294,7 @@ impl OutstationSession {
     pub(crate) async fn wait_for_io(&mut self) -> Result<NewSession, Shutdown> {
         loop {
             match self.receiver.next().await? {
+                OutstationMessage::Shutdown => return Err(Shutdown),
                 OutstationMessage::Configuration(change) => self.handle_config_change(change),
                 OutstationMessage::NewSession(session) => return Ok(session),
             }
@@ -773,6 +774,7 @@ impl OutstationSession {
 
     async fn handle_next_message(&mut self) -> Result<(), SessionError> {
         match self.receiver.next().await? {
+            OutstationMessage::Shutdown => Err(Shutdown.into()),
             OutstationMessage::NewSession(session) => Err(SessionError::NewSession(session)),
             OutstationMessage::Configuration(change) => {
                 self.handle_config_change(change);

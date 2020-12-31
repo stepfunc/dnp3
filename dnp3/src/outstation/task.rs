@@ -38,6 +38,7 @@ impl NewSession {
 }
 
 pub(crate) enum OutstationMessage {
+    Shutdown,
     Configuration(ConfigurationChange),
     NewSession(NewSession),
 }
@@ -70,6 +71,11 @@ impl OutstationHandle {
 
     pub(crate) async fn new_io(&mut self, id: u64, io: IOType) -> Result<(), Shutdown> {
         self.sender.send(NewSession::new(id, io).into()).await?;
+        Ok(())
+    }
+
+    pub(crate) async fn shutdown(&mut self) -> Result<(), Shutdown> {
+        self.sender.send(OutstationMessage::Shutdown).await?;
         Ok(())
     }
 }

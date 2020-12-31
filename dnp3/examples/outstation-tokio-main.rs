@@ -58,7 +58,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // spawn the outstation and the server
     tokio::spawn(server.add_outstation(task, handle.clone(), any_address(0)));
-    tokio::spawn(server.build());
+    let (_server_handle, server) = server.build();
+    tokio::spawn(server);
 
     let mut value = 0.0;
 

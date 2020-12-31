@@ -1,6 +1,7 @@
 use crate::entry::outstation::AddressFilter;
 use crate::outstation::task::{IOType, OutstationHandle, OutstationTask};
 
+use crate::util::task::Shutdown;
 use tracing::Instrument;
 
 struct Outstation {
@@ -9,15 +10,22 @@ struct Outstation {
 }
 
 pub struct TCPServer {
+    connection_id: u64,
     local: std::net::SocketAddr,
     listener: crate::tokio::net::TcpListener,
     outstations: Vec<Outstation>,
+}
+
+/// Handle to a running server. Dropping the handle, shuts down the server.
+pub struct ServerHandle {
+    _tx: crate::tokio::sync::oneshot::Sender<()>,
 }
 
 impl TCPServer {
     pub async fn bind(address: std::net::SocketAddr) -> Result<Self, crate::tokio::io::Error> {
         let listener = crate::tokio::net::TcpListener::bind(address).await?;
         Ok(Self {
+            connection_id: 0,
             local: address,
             listener,
             outstations: Vec::new(),
@@ -41,44 +49,86 @@ impl TCPServer {
         }
     }
 
-    pub async fn build(mut self) {
-        let local = self.local;
-        self.run()
-            .instrument(tracing::info_span!("TCPServer", "listen" = ?local))
-            .await
+    pub fn build(mut self) -> (ServerHandle, impl std::future::Future<Output = Shutdown>) {
+        let (tx, rx) = crate::tokio::sync::oneshot::channel();
+
+        let task = async move {
+            let local = self.local;
+            self.run(rx)
+                .instrument(tracing::info_span!("TCPServer", "listen" = ?local))
+                .await
+        };
+
+        let handle = ServerHandle { _tx: tx };
+
+        (handle, task)
     }
 
-    async fn run(&mut self) {
+    async fn run(&mut self, rx: crate::tokio::sync::oneshot::Receiver<()>) -> Shutdown {
         tracing::info!("accepting connections");
 
-        let mut connection_id: u64 = 0;
+        crate::tokio::select! {
+             _ = self.accept_loop() => {
+
+             }
+             _ = rx => {
+
+             }
+        }
+
+        tracing::info!("shutting down outstations");
+
+        for x in self.outstations.iter_mut() {
+            // best effort to shutdown outstations before exiting
+            let _ = x.handle.shutdown().await;
+        }
+
+        tracing::info!("shutdown");
+
+        Shutdown
+    }
+
+    async fn accept_loop(&mut self) -> Result<(), Shutdown> {
         loop {
-            match self.listener.accept().await {
-                Ok((stream, addr)) => {
-                    let id = connection_id;
-                    connection_id = connection_id.wrapping_add(1);
+            self.accept_one().await?;
+        }
+    }
 
-                    tracing::info!("accepted connection from: {}", addr);
+    async fn accept_one(&mut self) -> Result<(), Shutdown> {
+        match self.listener.accept().await {
+            Ok((stream, addr)) => {
+                self.process_connection(stream, addr).await;
+                Ok(())
+            }
+            Err(err) => {
+                tracing::error!("{}", err);
+                Err(Shutdown)
+            }
+        }
+    }
 
-                    let best = self
-                        .outstations
-                        .iter_mut()
-                        .filter(|x| x.filter.matches(&addr).value.is_some())
-                        .max_by_key(|x| x.filter.matches(&addr));
+    async fn process_connection(
+        &mut self,
+        stream: crate::tokio::net::TcpStream,
+        addr: std::net::SocketAddr,
+    ) {
+        let id = self.connection_id;
+        self.connection_id = self.connection_id.wrapping_add(1);
 
-                    match best {
-                        None => {
-                            tracing::warn!("no matching outstation for: {}", addr)
-                        }
-                        Some(x) => {
-                            let _ = x.handle.new_io(id, IOType::TCPStream(stream)).await;
-                        }
-                    }
-                }
-                Err(err) => {
-                    tracing::error!("{}", err);
-                    return;
-                }
+        tracing::info!("accepted connection from: {}", addr);
+
+        let best = self
+            .outstations
+            .iter_mut()
+            .filter(|x| x.filter.matches(&addr).value.is_some())
+            .max_by_key(|x| x.filter.matches(&addr));
+
+        match best {
+            None => {
+                tracing::warn!("no matching outstation for: {}", addr)
+            }
+            Some(x) => {
+                let _ = x.handle.new_io(id, IOType::TCPStream(stream)).await;
             }
         }
     }
