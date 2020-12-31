@@ -2,8 +2,8 @@ use dnp3::app::enums::CommandStatus;
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::parse::DecodeLogLevel;
-use dnp3::entry::outstation::filters::any_address;
-use dnp3::entry::outstation::TCPServer;
+use dnp3::entry::outstation::any_address;
+use dnp3::entry::outstation::tcp::TCPServer;
 use dnp3::entry::EndpointAddress;
 use dnp3::outstation::config::OutstationConfig;
 use dnp3::outstation::database::config::*;
@@ -56,9 +56,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut server = TCPServer::bind("127.0.0.1:20000".parse()?).await?;
 
-    server.add(task, handle.clone(), any_address(0));
-
-    tokio::spawn(async move { server.run().await });
+    // spawn the outstation and the server
+    tokio::spawn(server.add_outstation(task, handle.clone(), any_address(0)));
+    tokio::spawn(server.build());
 
     let mut value = 0.0;
 

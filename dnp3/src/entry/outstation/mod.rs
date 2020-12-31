@@ -1,7 +1,4 @@
-use crate::outstation::task::{IOType, OutstationHandle, OutstationTask};
-use tracing::Instrument;
-
-pub mod filters;
+pub mod tcp;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Match {
@@ -22,88 +19,40 @@ pub trait AddressFilter: Send {
     fn matches(&self, address: &std::net::SocketAddr) -> Match;
 }
 
-struct Outstation {
-    filter: Box<dyn AddressFilter>,
-    handle: OutstationHandle,
-    _join_handle: crate::tokio::task::JoinHandle<()>,
+pub fn any_address(priority: u32) -> Box<dyn AddressFilter> {
+    Box::new(AnyAddress { priority })
 }
 
-pub struct TCPServer {
-    local: std::net::SocketAddr,
-    listener: crate::tokio::net::TcpListener,
-    outstations: Vec<Outstation>,
+pub fn exact_match_v4(address: std::net::Ipv4Addr, priority: u32) -> Box<dyn AddressFilter> {
+    Box::new(ExactMatchV4 { address, priority })
 }
 
-impl TCPServer {
-    pub async fn bind(address: std::net::SocketAddr) -> Result<Self, crate::tokio::io::Error> {
-        let listener = crate::tokio::net::TcpListener::bind(address).await?;
-        Ok(Self {
-            local: address,
-            listener,
-            outstations: Vec::new(),
-        })
+struct AnyAddress {
+    priority: u32,
+}
+
+struct ExactMatchV4 {
+    address: std::net::Ipv4Addr,
+    priority: u32,
+}
+
+impl AddressFilter for AnyAddress {
+    fn matches(&self, _: &std::net::SocketAddr) -> Match {
+        Match::yes(self.priority)
     }
+}
 
-    pub fn add(
-        &mut self,
-        mut task: OutstationTask,
-        handle: OutstationHandle,
-        filter: Box<dyn AddressFilter>,
-    ) {
-        let endpoint = self.local;
-        let join_handle = crate::tokio::spawn(async move {
-            task.run()
-                .instrument(tracing::info_span!("TCPServer", "local" = ?endpoint))
-                .await
-        });
-
-        let outstation = Outstation {
-            filter,
-            handle,
-            _join_handle: join_handle,
-        };
-        self.outstations.push(outstation);
-    }
-
-    pub async fn run(&mut self) {
-        let local = self.local;
-        self.run_inner()
-            .instrument(tracing::info_span!("TCPServer", "listen" = ?local))
-            .await
-    }
-
-    async fn run_inner(&mut self) {
-        tracing::info!("accepting connections");
-
-        let mut connection_id: u64 = 0;
-        loop {
-            match self.listener.accept().await {
-                Ok((stream, addr)) => {
-                    let id = connection_id;
-                    connection_id = connection_id.wrapping_add(1);
-
-                    tracing::info!("accepted connection from: {}", addr);
-
-                    let best = self
-                        .outstations
-                        .iter_mut()
-                        .filter(|x| x.filter.matches(&addr).value.is_some())
-                        .max_by_key(|x| x.filter.matches(&addr));
-
-                    match best {
-                        None => {
-                            tracing::warn!("no matching outstation for: {}", addr)
-                        }
-                        Some(x) => {
-                            let _ = x.handle.new_io(id, IOType::TCPStream(stream)).await;
-                        }
-                    }
-                }
-                Err(err) => {
-                    tracing::error!("{}", err);
-                    return;
+impl AddressFilter for ExactMatchV4 {
+    fn matches(&self, address: &std::net::SocketAddr) -> Match {
+        match *address {
+            std::net::SocketAddr::V4(x) => {
+                if self.address == *x.ip() {
+                    Match::yes(self.priority)
+                } else {
+                    Match::no()
                 }
             }
+            _ => Match::no(),
         }
     }
 }
