@@ -4,7 +4,7 @@ use crate::app::measurement::{Binary, Time};
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::config::BinaryConfig;
 use crate::outstation::database::{Add, DatabaseHandle, EventClass, Update, UpdateOptions};
-use crate::util::task::RunError;
+use crate::outstation::session::SessionError;
 
 const fn uns_confirm(seq: u8) -> u8 {
     0b1101_0000 | seq
@@ -40,14 +40,14 @@ fn generate_binary_event(handle: &mut DatabaseHandle) {
 
 fn enable_unsolicited<T>(harness: &mut OutstationTestHarness<T>)
 where
-    T: std::future::Future<Output = Result<(), RunError>>,
+    T: std::future::Future<Output = SessionError>,
 {
     harness.test_request_response(ENABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0);
 }
 
 fn confirm_null_unsolicited<T>(harness: &mut OutstationTestHarness<T>)
 where
-    T: std::future::Future<Output = Result<(), RunError>>,
+    T: std::future::Future<Output = SessionError>,
 {
     harness.expect_response(NULL_UNSOL_SEQ_0);
     harness.send(UNS_CONFIRM_SEQ_0);
@@ -118,7 +118,7 @@ fn data_unsolicited_can_be_confirmed() {
     confirm_null_unsolicited(&mut harness);
     enable_unsolicited(&mut harness);
 
-    generate_binary_event(&mut harness.database);
+    generate_binary_event(&mut harness.handle.database);
     harness.expect_response(UNSOL_G2V1_SEQ1);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
     harness.send(UNS_CONFIRM_SEQ_1);
@@ -131,7 +131,7 @@ fn defers_read_during_unsol_confirm_wait() {
     confirm_null_unsolicited(&mut harness);
     enable_unsolicited(&mut harness);
 
-    generate_binary_event(&mut harness.database);
+    generate_binary_event(&mut harness.handle.database);
     harness.expect_response(UNSOL_G2V1_SEQ1);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
     // send a read which will be deferred
@@ -151,7 +151,7 @@ fn handles_non_read_during_unsolicited_confirm_wait() {
     confirm_null_unsolicited(&mut harness);
     enable_unsolicited(&mut harness);
 
-    generate_binary_event(&mut harness.database);
+    generate_binary_event(&mut harness.handle.database);
     harness.expect_response(UNSOL_G2V1_SEQ1);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
     // send a delay measurement request while still in unsolicited confirm wait

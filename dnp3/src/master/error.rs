@@ -4,10 +4,11 @@ use crate::app::parse::error::ObjectParseError;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::master::association::NoAssociation;
+use crate::master::session::RunError;
 use crate::tokio::sync::mpsc::error::SendError;
 use crate::tokio::sync::oneshot::error::RecvError;
 use crate::util::cursor::WriteError;
-use crate::util::task::{RunError, Shutdown};
+use crate::util::task::Shutdown;
 use std::error::Error;
 
 /// Errors that can occur when adding an association

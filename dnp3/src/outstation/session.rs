@@ -34,7 +34,7 @@ use crate::app::gen::all::AllObjectsVariation;
 use crate::master::request::EventClasses;
 use crate::outstation::control::select::SelectState;
 use crate::outstation::deferred::DeferredRead;
-use crate::outstation::task::OutstationMessage;
+use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
 use crate::util::task::{Receiver, RunError, Shutdown};
 use tracing::Instrument;
 
@@ -241,6 +241,30 @@ enum ConfirmAction {
     ContinueWait,
 }
 
+#[derive(Debug)]
+pub(crate) enum SessionError {
+    Run(RunError),
+    NewSession(NewSession),
+}
+
+impl From<RunError> for SessionError {
+    fn from(x: RunError) -> Self {
+        SessionError::Run(x)
+    }
+}
+
+impl From<LinkError> for SessionError {
+    fn from(err: LinkError) -> Self {
+        SessionError::Run(err.into())
+    }
+}
+
+impl From<Shutdown> for SessionError {
+    fn from(x: Shutdown) -> Self {
+        SessionError::Run(x.into())
+    }
+}
+
 impl OutstationSession {
     pub(crate) fn new(
         receiver: Receiver<OutstationMessage>,
@@ -267,18 +291,30 @@ impl OutstationSession {
         }
     }
 
+    pub(crate) async fn wait_for_io(&mut self) -> Result<NewSession, Shutdown> {
+        loop {
+            match self.receiver.next().await? {
+                OutstationMessage::Shutdown => return Err(Shutdown),
+                OutstationMessage::Configuration(change) => self.handle_config_change(change),
+                OutstationMessage::NewSession(session) => return Ok(session),
+            }
+        }
+    }
+
     pub(crate) async fn run<T>(
         &mut self,
         io: &mut T,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), RunError>
+    ) -> SessionError
     where
         T: IOStream,
     {
         loop {
-            self.run_idle_state(io, reader, writer, database).await?;
+            if let Err(err) = self.run_idle_state(io, reader, writer, database).await {
+                return err;
+            }
         }
     }
 
@@ -326,7 +362,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), RunError>
+    ) -> Result<(), SessionError>
     where
         T: IOStream,
     {
@@ -363,7 +399,8 @@ impl OutstationSession {
             _ = database.wait_for_change() => {
                 // wake for unsolicited here
             }
-            _ = self.sleep_until(deadline) => {
+            res = self.sleep_until(deadline) => {
+                res?
                 // just wake up
             }
         }
@@ -377,7 +414,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<crate::tokio::time::Instant>, RunError>
+    ) -> Result<Option<crate::tokio::time::Instant>, SessionError>
     where
         T: IOStream,
     {
@@ -444,7 +481,7 @@ impl OutstationSession {
         &mut self,
         io: &mut T,
         writer: &mut TransportWriter,
-    ) -> Result<(), RunError>
+    ) -> Result<(), SessionError>
     where
         T: IOStream,
     {
@@ -470,7 +507,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<UnsolicitedResult, RunError>
+    ) -> Result<UnsolicitedResult, SessionError>
     where
         T: IOStream,
     {
@@ -486,7 +523,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<UnsolicitedResult>, RunError>
+    ) -> Result<Option<UnsolicitedResult>, SessionError>
     where
         T: IOStream,
     {
@@ -538,7 +575,7 @@ impl OutstationSession {
         io: &mut T,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
-    ) -> Result<UnsolicitedResult, RunError>
+    ) -> Result<UnsolicitedResult, SessionError>
     where
         T: IOStream,
     {
@@ -590,7 +627,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<UnsolicitedWaitResult, RunError>
+    ) -> Result<UnsolicitedWaitResult, SessionError>
     where
         T: IOStream,
     {
@@ -691,7 +728,7 @@ impl OutstationSession {
         io: &mut T,
         reader: &mut TransportReader,
         deadline: crate::tokio::time::Instant,
-    ) -> Result<Timeout, RunError>
+    ) -> Result<Timeout, SessionError>
     where
         T: IOStream,
     {
@@ -712,7 +749,7 @@ impl OutstationSession {
     async fn sleep_until(
         &mut self,
         instant: Option<crate::tokio::time::Instant>,
-    ) -> Result<(), Shutdown> {
+    ) -> Result<(), SessionError> {
         async fn sleep_only(instant: Option<crate::tokio::time::Instant>) {
             match instant {
                 Some(x) => crate::tokio::time::delay_until(x).await,
@@ -728,16 +765,28 @@ impl OutstationSession {
                  _ = sleep_only(instant) => {
                         return Ok(());
                  }
-                 message = self.receiver.next() => {
-                     self.handle_message(message?);
+                 res = self.handle_next_message() => {
+                     res?;
                  }
             }
         }
     }
 
-    fn handle_message(&mut self, message: OutstationMessage) {
+    async fn handle_next_message(&mut self) -> Result<(), SessionError> {
+        match self.receiver.next().await? {
+            OutstationMessage::Shutdown => Err(Shutdown.into()),
+            OutstationMessage::NewSession(session) => Err(SessionError::NewSession(session)),
+            OutstationMessage::Configuration(change) => {
+                self.handle_config_change(change);
+                Ok(())
+            }
+        }
+    }
+
+    fn handle_config_change(&mut self, message: ConfigurationChange) {
         match message {
-            OutstationMessage::SetDecodeLogLevel(level) => {
+            ConfigurationChange::SetDecodeLogLevel(level) => {
+                tracing::info!("set decode log level: {:?}", level);
                 self.config.level = level;
             }
         }
@@ -749,7 +798,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), RunError>
+    ) -> Result<(), SessionError>
     where
         T: IOStream,
     {
@@ -779,7 +828,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), RunError>
+    ) -> Result<(), SessionError>
     where
         T: IOStream,
     {
@@ -1377,7 +1426,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
         mut series: ResponseSeries,
-    ) -> Result<(), RunError>
+    ) -> Result<(), SessionError>
     where
         T: IOStream,
     {
@@ -1426,7 +1475,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         ecsn: Sequence,
-    ) -> Result<Confirm, RunError>
+    ) -> Result<Confirm, SessionError>
     where
         T: IOStream,
     {

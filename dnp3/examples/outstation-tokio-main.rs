@@ -2,6 +2,8 @@ use dnp3::app::enums::CommandStatus;
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::parse::DecodeLogLevel;
+use dnp3::entry::outstation::any_address;
+use dnp3::entry::outstation::tcp::TCPServer;
 use dnp3::entry::EndpointAddress;
 use dnp3::outstation::config::OutstationConfig;
 use dnp3::outstation::database::config::*;
@@ -11,7 +13,6 @@ use dnp3::outstation::task::OutstationTask;
 use dnp3::outstation::traits::{
     DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
 };
-use std::net::Ipv4Addr;
 use std::time::Duration;
 
 fn get_database_config() -> DatabaseConfig {
@@ -34,10 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = OutstationConfig::new(outstation_address, master_address);
     config.log_level = DecodeLogLevel::ObjectValues;
 
-    let (_tx, rx) = tokio::sync::mpsc::channel(10);
-
-    let (mut task, handle) = OutstationTask::create(
-        rx,
+    let (task, handle) = OutstationTask::create(
         config,
         get_database_config(),
         DefaultOutstationApplication::create(),
@@ -45,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         DefaultControlHandler::with_status(CommandStatus::Success),
     );
 
-    handle.transaction(|db| {
+    handle.database.transaction(|db| {
         for i in 0..10 {
             db.add(i, Some(EventClass::Class1), AnalogConfig::default());
             db.update(
@@ -56,24 +54,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let listen_task = async move {
-        let mut listener = tokio::net::TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), 20000))
-            .await
-            .unwrap();
-        loop {
-            let (mut socket, _) = listener.accept().await.unwrap();
+    let mut server = TCPServer::bind("127.0.0.1:20000".parse()?).await?;
 
-            let _ = task.run(&mut socket).await;
-        }
-    };
-
-    tokio::spawn(listen_task);
+    // spawn the outstation and the server
+    tokio::spawn(server.add_outstation(task, handle.clone(), any_address(0)));
+    let (_server_handle, server) = server.build();
+    tokio::spawn(server);
 
     let mut value = 0.0;
 
     loop {
         tokio::time::delay_for(Duration::from_secs(5)).await;
-        handle.transaction(|db| {
+        handle.database.transaction(|db| {
             db.update(
                 7,
                 &Analog::new(value, Flags::new(0x01), Time::synchronized(1)),
