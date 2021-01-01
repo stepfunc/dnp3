@@ -48,7 +48,7 @@ pub(crate) enum IOType {
     TCPStream(crate::tokio::net::TcpStream),
 }
 
-pub struct OutstationTask {
+pub(crate) struct OutstationTask {
     session: OutstationSession,
     reader: TransportReader,
     writer: TransportWriter,
@@ -82,7 +82,7 @@ impl OutstationHandle {
 
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
-    pub fn create(
+    pub(crate) fn create(
         config: OutstationConfig,
         database: DatabaseConfig,
         application: Box<dyn OutstationApplication>,

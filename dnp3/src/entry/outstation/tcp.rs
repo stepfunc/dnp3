@@ -1,6 +1,9 @@
 use crate::entry::outstation::AddressFilter;
 use crate::outstation::task::{IOType, OutstationHandle, OutstationTask};
 
+use crate::outstation::config::OutstationConfig;
+use crate::outstation::database::DatabaseConfig;
+use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::util::task::Shutdown;
 use tracing::Instrument;
 
@@ -34,19 +37,32 @@ impl TCPServer {
 
     pub fn add_outstation(
         &mut self,
-        mut task: OutstationTask,
-        handle: OutstationHandle,
+        config: OutstationConfig,
+        database: DatabaseConfig,
+        application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
+        control_handler: Box<dyn ControlHandler>,
         filter: Box<dyn AddressFilter>,
-    ) -> impl std::future::Future<Output = ()> {
-        let outstation = Outstation { filter, handle };
+    ) -> (OutstationHandle, impl std::future::Future<Output = ()>) {
+        let (mut task, handle) =
+            OutstationTask::create(config, database, application, information, control_handler);
+
+        let outstation = Outstation {
+            filter,
+            handle: handle.clone(),
+        };
         self.outstations.push(outstation);
 
         let endpoint = self.local;
-        async move {
+        let address = config.outstation_address.raw_value();
+        let future = async move {
             task.run()
-                .instrument(tracing::info_span!("TCPServer", "local" = ?endpoint))
+                .instrument(
+                    tracing::info_span!("Outstation", "listen" = ?endpoint, "addr" = address),
+                )
                 .await
-        }
+        };
+        (handle, future)
     }
 
     pub fn build(mut self) -> (ServerHandle, impl std::future::Future<Output = Shutdown>) {
@@ -115,7 +131,7 @@ impl TCPServer {
         let id = self.connection_id;
         self.connection_id = self.connection_id.wrapping_add(1);
 
-        tracing::info!("accepted connection from: {}", addr);
+        tracing::info!("accepted connection {} from: {}", id, addr);
 
         let best = self
             .outstations

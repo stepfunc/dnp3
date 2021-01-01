@@ -9,7 +9,6 @@ use dnp3::outstation::config::OutstationConfig;
 use dnp3::outstation::database::config::*;
 use dnp3::outstation::database::EventClass;
 use dnp3::outstation::database::{Add, DatabaseConfig, Update, UpdateOptions};
-use dnp3::outstation::task::OutstationTask;
 use dnp3::outstation::traits::{
     DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
 };
@@ -21,6 +20,14 @@ fn get_database_config() -> DatabaseConfig {
     config
 }
 
+fn get_outstation_config() -> OutstationConfig {
+    let outstation_address = EndpointAddress::from(1024).unwrap();
+    let master_address = EndpointAddress::from(1).unwrap();
+    let mut config = OutstationConfig::new(outstation_address, master_address);
+    config.log_level = DecodeLogLevel::ObjectValues;
+    config
+}
+
 /// example of using the outstation API asynchronously from within the Tokio runtime
 #[tokio::main(threaded_scheduler)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,20 +36,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(false)
         .init();
 
-    let outstation_address = EndpointAddress::from(1024)?;
-    let master_address = EndpointAddress::from(1)?;
+    let mut server = TCPServer::bind("127.0.0.1:20000".parse()?).await?;
 
-    let mut config = OutstationConfig::new(outstation_address, master_address);
-    config.log_level = DecodeLogLevel::ObjectValues;
-
-    let (task, handle) = OutstationTask::create(
-        config,
+    let (handle, outstation) = server.add_outstation(
+        get_outstation_config(),
         get_database_config(),
         DefaultOutstationApplication::create(),
         DefaultOutstationInformation::create(),
         DefaultControlHandler::with_status(CommandStatus::Success),
+        any_address(0),
     );
 
+    // setup the outstation's database before we spawn it
     handle.database.transaction(|db| {
         for i in 0..10 {
             db.add(i, Some(EventClass::Class1), AnalogConfig::default());
@@ -54,11 +59,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let mut server = TCPServer::bind("127.0.0.1:20000".parse()?).await?;
+    // dropping the ServerHandle shuts down the server AND the outstation
+    let (_server_handle, server) = server.build();
 
     // spawn the outstation and the server
-    tokio::spawn(server.add_outstation(task, handle.clone(), any_address(0)));
-    let (_server_handle, server) = server.build();
+    tokio::spawn(outstation);
     tokio::spawn(server);
 
     let mut value = 0.0;

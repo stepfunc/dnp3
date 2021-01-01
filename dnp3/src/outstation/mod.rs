@@ -2,9 +2,6 @@
 pub mod config;
 /// database API to add/remove/update values
 pub mod database;
-/// async outstation task API that can be run on arbitrary I/O types
-/// implementing `AsyncRead` + `AsyncWrite` + `Unpin`
-pub mod task;
 /// user-facing traits used to receive dynamic callbacks from the outstation
 pub mod traits;
 
@@ -14,6 +11,9 @@ pub(crate) mod control;
 pub(crate) mod deferred;
 /// outstation session
 pub(crate) mod session;
+/// async outstation task API that can be run on arbitrary I/O types
+/// implementing `AsyncRead` + `AsyncWrite` + `Unpin`
+pub(crate) mod task;
 
 #[cfg(test)]
 mod tests;
