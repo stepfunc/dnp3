@@ -151,7 +151,10 @@ impl TCPServer {
 
         tracing::info!("accepted connection {} from: {}", id, addr);
 
-        let first_match = self.outstations.iter_mut().find(|x| x.filter.matches(addr));
+        let first_match = self
+            .outstations
+            .iter_mut()
+            .find(|x| x.filter.matches(addr.ip()));
 
         match first_match {
             None => {

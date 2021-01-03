@@ -3,12 +3,12 @@ pub mod tcp;
 #[derive(Clone, Debug, PartialEq)]
 pub enum AddressFilter {
     Any,
-    Exact(std::net::SocketAddr),
-    AnyOf(std::collections::HashSet<std::net::SocketAddr>),
+    Exact(std::net::IpAddr),
+    AnyOf(std::collections::HashSet<std::net::IpAddr>),
 }
 
 impl AddressFilter {
-    pub(crate) fn matches(&self, addr: std::net::SocketAddr) -> bool {
+    pub(crate) fn matches(&self, addr: std::net::IpAddr) -> bool {
         match self {
             AddressFilter::Any => true,
             AddressFilter::Exact(x) => *x == addr,
