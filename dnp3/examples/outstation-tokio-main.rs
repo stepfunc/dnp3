@@ -2,8 +2,8 @@ use dnp3::app::enums::CommandStatus;
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::parse::DecodeLogLevel;
-use dnp3::entry::outstation::any_address;
 use dnp3::entry::outstation::tcp::TCPServer;
+use dnp3::entry::outstation::AddressFilter;
 use dnp3::entry::EndpointAddress;
 use dnp3::outstation::config::OutstationConfig;
 use dnp3::outstation::database::config::*;
@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(false)
         .init();
 
-    let mut server = TCPServer::bind("127.0.0.1:20000".parse()?).await?;
+    let mut server = TCPServer::new("127.0.0.1:20000".parse()?);
 
     let (handle, outstation) = server.add_outstation(
         get_outstation_config(),
@@ -44,8 +44,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         DefaultOutstationApplication::create(),
         DefaultOutstationInformation::create(),
         DefaultControlHandler::with_status(CommandStatus::Success),
-        any_address(0),
-    );
+        AddressFilter::Any,
+    )?;
 
     // setup the outstation's database before we spawn it
     handle.database.transaction(|db| {
@@ -60,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // dropping the ServerHandle shuts down the server AND the outstation
-    let (_server_handle, server) = server.build();
+    let (_server_handle, server) = server.bind().await?;
 
     // spawn the outstation and the server
     tokio::spawn(outstation);

@@ -1,4 +1,4 @@
-use crate::entry::outstation::AddressFilter;
+use crate::entry::outstation::{AddressFilter, FilterError};
 use crate::outstation::task::{IOType, OutstationHandle, OutstationTask};
 
 use crate::outstation::config::OutstationConfig;
@@ -8,14 +8,13 @@ use crate::util::task::Shutdown;
 use tracing::Instrument;
 
 struct Outstation {
-    filter: Box<dyn AddressFilter>,
+    filter: AddressFilter,
     handle: OutstationHandle,
 }
 
 pub struct TCPServer {
     connection_id: u64,
-    local: std::net::SocketAddr,
-    listener: crate::tokio::net::TcpListener,
+    address: std::net::SocketAddr,
     outstations: Vec<Outstation>,
 }
 
@@ -25,14 +24,12 @@ pub struct ServerHandle {
 }
 
 impl TCPServer {
-    pub async fn bind(address: std::net::SocketAddr) -> Result<Self, crate::tokio::io::Error> {
-        let listener = crate::tokio::net::TcpListener::bind(address).await?;
-        Ok(Self {
+    pub fn new(address: std::net::SocketAddr) -> Self {
+        Self {
             connection_id: 0,
-            local: address,
-            listener,
+            address,
             outstations: Vec::new(),
-        })
+        }
     }
 
     pub fn add_outstation(
@@ -42,8 +39,14 @@ impl TCPServer {
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
-        filter: Box<dyn AddressFilter>,
-    ) -> (OutstationHandle, impl std::future::Future<Output = ()>) {
+        filter: AddressFilter,
+    ) -> Result<(OutstationHandle, impl std::future::Future<Output = ()>), FilterError> {
+        for item in self.outstations.iter() {
+            if filter.conflicts_with(&item.filter) {
+                return Err(FilterError::Conflict);
+            }
+        }
+
         let (mut task, handle) =
             OutstationTask::create(config, database, application, information, control_handler);
 
@@ -53,7 +56,7 @@ impl TCPServer {
         };
         self.outstations.push(outstation);
 
-        let endpoint = self.local;
+        let endpoint = self.address;
         let address = config.outstation_address.raw_value();
         let future = async move {
             task.run()
@@ -62,29 +65,38 @@ impl TCPServer {
                 )
                 .await
         };
-        (handle, future)
+        Ok((handle, future))
     }
 
-    pub fn build(mut self) -> (ServerHandle, impl std::future::Future<Output = Shutdown>) {
+    pub async fn bind(
+        mut self,
+    ) -> Result<(ServerHandle, impl std::future::Future<Output = Shutdown>), crate::tokio::io::Error>
+    {
+        let listener = crate::tokio::net::TcpListener::bind(self.address).await?;
+
         let (tx, rx) = crate::tokio::sync::oneshot::channel();
 
         let task = async move {
-            let local = self.local;
-            self.run(rx)
+            let local = self.address;
+            self.run(listener, rx)
                 .instrument(tracing::info_span!("TCPServer", "listen" = ?local))
                 .await
         };
 
         let handle = ServerHandle { _tx: tx };
 
-        (handle, task)
+        Ok((handle, task))
     }
 
-    async fn run(&mut self, rx: crate::tokio::sync::oneshot::Receiver<()>) -> Shutdown {
+    async fn run(
+        &mut self,
+        listener: crate::tokio::net::TcpListener,
+        rx: crate::tokio::sync::oneshot::Receiver<()>,
+    ) -> Shutdown {
         tracing::info!("accepting connections");
 
         crate::tokio::select! {
-             _ = self.accept_loop() => {
+             _ = self.accept_loop(listener) => {
 
              }
              _ = rx => {
@@ -104,14 +116,20 @@ impl TCPServer {
         Shutdown
     }
 
-    async fn accept_loop(&mut self) -> Result<(), Shutdown> {
+    async fn accept_loop(
+        &mut self,
+        mut listener: crate::tokio::net::TcpListener,
+    ) -> Result<(), Shutdown> {
         loop {
-            self.accept_one().await?;
+            self.accept_one(&mut listener).await?;
         }
     }
 
-    async fn accept_one(&mut self) -> Result<(), Shutdown> {
-        match self.listener.accept().await {
+    async fn accept_one(
+        &mut self,
+        listener: &mut crate::tokio::net::TcpListener,
+    ) -> Result<(), Shutdown> {
+        match listener.accept().await {
             Ok((stream, addr)) => {
                 self.process_connection(stream, addr).await;
                 Ok(())
@@ -133,13 +151,9 @@ impl TCPServer {
 
         tracing::info!("accepted connection {} from: {}", id, addr);
 
-        let best = self
-            .outstations
-            .iter_mut()
-            .filter(|x| x.filter.matches(&addr).value.is_some())
-            .max_by_key(|x| x.filter.matches(&addr));
+        let first_match = self.outstations.iter_mut().find(|x| x.filter.matches(addr));
 
-        match best {
+        match first_match {
             None => {
                 tracing::warn!("no matching outstation for: {}", addr)
             }
