@@ -127,9 +127,16 @@ impl ffi::MasterConfiguration {
             }
         };
 
-        let strategy = RetryStrategy::new(
-            self.reconnection_strategy().min_delay(),
-            self.reconnection_strategy.max_delay(),
+        let strategy = ReconnectStrategy::new(
+            RetryStrategy::new(
+                self.reconnection_strategy().min_delay(),
+                self.reconnection_strategy().max_delay(),
+            ),
+            if self.reconnection_delay() != Duration::from_millis(0) {
+                Some(self.reconnection_delay())
+            } else {
+                None
+            },
         );
 
         Some(MasterConfiguration {

@@ -167,6 +167,7 @@ class MainClass
                         MinDelay = TimeSpan.FromMilliseconds(100),
                         MaxDelay = TimeSpan.FromSeconds(5),
                     },
+                    ReconnectionDelay = TimeSpan.Zero,
                     ResponseTimeout = TimeSpan.FromSeconds(5),
                     RxBufferSize = 2048,
                     TxBufferSize = 2048,

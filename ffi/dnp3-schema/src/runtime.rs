@@ -109,7 +109,8 @@ pub fn define(
     let master_config = lib.define_native_struct(&master_config)?
         .add("address", Type::Uint16, "Local DNP3 data-link address")?
         .add("level", Type::Enum(decode_log_level_enum), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
-        .add("reconnection_strategy", Type::Struct(retry_strategy.clone()), "Reconnection strategy to use")?
+        .add("reconnection_strategy", Type::Struct(retry_strategy.clone()), "Reconnection retry strategy to use")?
+        .add("reconnection_delay", Type::Duration(DurationMapping::Milliseconds), doc("Optional reconnection delay when a connection is lost.").details("A value of 0 means no delay."))?
         .add(
             "response_timeout",
             Type::Duration(DurationMapping::Milliseconds),
