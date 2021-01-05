@@ -173,7 +173,7 @@ public class Main {
 
             Master master = runtime.addMasterTcp(
                     masterConfig,
-                    "127.0.0.1:20000",
+                    new EndpointList("127.0.0.1:20000"),
                     new TestListener()
             );
 
