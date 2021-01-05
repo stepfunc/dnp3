@@ -33,10 +33,14 @@ pub(crate) struct RuntimeHandle {
 }
 
 impl RuntimeHandle {
-    pub(crate) fn require(&self) -> std::sync::Arc<tokio::runtime::Runtime> {
+    pub(crate) fn unwrap(&self) -> std::sync::Arc<tokio::runtime::Runtime> {
         self.inner
             .upgrade()
-            .expect("cannot use RuntimeHandle, Runtime has been destroyed")
+            .expect("Runtime has been destroyed, RuntimeHandle is invalid")
+    }
+
+    pub(crate) fn get(&self) -> Option<std::sync::Arc<tokio::runtime::Runtime>> {
+        self.inner.upgrade()
     }
 }
 

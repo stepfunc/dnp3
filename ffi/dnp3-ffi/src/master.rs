@@ -74,7 +74,7 @@ pub unsafe fn master_add_association(
     if tokio::runtime::Handle::try_current().is_err() {
         if let Ok(handle) = master
             .runtime
-            .require()
+            .unwrap()
             .block_on(
                 master
                     .handle
@@ -100,7 +100,7 @@ pub unsafe fn master_set_decode_log_level(master: *mut Master, level: ffi::Decod
     if let Some(master) = master.as_mut() {
         master
             .runtime
-            .require()
+            .unwrap()
             .spawn(master.handle.set_decode_log_level(level.into()));
     }
 }
@@ -110,7 +110,7 @@ pub unsafe fn master_get_decode_log_level(master: *mut Master) -> ffi::DecodeLog
         if let Some(master) = master.as_mut() {
             if let Ok(level) = master
                 .runtime
-                .require()
+                .unwrap()
                 .block_on(master.handle.get_decode_log_level())
             {
                 return level.into();

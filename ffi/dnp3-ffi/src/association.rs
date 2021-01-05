@@ -16,10 +16,9 @@ pub struct Association {
 pub unsafe fn association_destroy(association: *mut Association) {
     if !association.is_null() {
         let association = Box::from_raw(association);
-        association
-            .runtime
-            .require()
-            .spawn(association.handle.remove());
+        if let Some(rt) = association.runtime.get() {
+            rt.spawn(association.handle.remove());
+        }
     }
 }
 
@@ -36,14 +35,16 @@ impl Poll {
 
 pub unsafe fn poll_demand(poll: *mut Poll) {
     if let Some(poll) = poll.as_mut() {
-        poll.runtime.require().spawn(poll.handle.demand());
+        poll.runtime.unwrap().spawn(poll.handle.demand());
     }
 }
 
 pub unsafe fn poll_destroy(poll: *mut Poll) {
     if !poll.is_null() {
         let poll = Box::from_raw(poll);
-        poll.runtime.require().spawn(poll.handle.remove());
+        if let Some(rt) = poll.runtime.get() {
+            rt.spawn(poll.handle.remove());
+        }
     }
 }
 
@@ -65,7 +66,7 @@ pub unsafe fn association_add_poll(
     if tokio::runtime::Handle::try_current().is_err() {
         if let Ok(handle) = association
             .runtime
-            .require()
+            .unwrap()
             .block_on(association.handle.add_poll(request.build(), period))
         {
             let poll = Box::new(Poll::new(association.runtime.clone(), handle));
@@ -103,7 +104,7 @@ pub unsafe fn association_read(
 
     let handle = &mut association.handle;
     let req = request.build();
-    association.runtime.require().spawn(async move {
+    association.runtime.unwrap().spawn(async move {
         let result = match handle.read(req).await {
             Ok(_) => ffi::ReadResult::Success,
             Err(_) => ffi::ReadResult::TaskError,
@@ -142,7 +143,7 @@ pub unsafe fn association_operate(
 
     let handle = &mut association.handle;
     let cmd = command.clone();
-    association.runtime.require().spawn(async move {
+    association.runtime.unwrap().spawn(async move {
         let result = match handle.operate(mode, cmd.build()).await {
             Ok(_) => ffi::CommandResult::Success,
             Err(CommandError::Task(_)) => ffi::CommandResult::TaskError,
@@ -185,7 +186,7 @@ pub unsafe fn association_perform_time_sync(
     };
 
     let handle = &mut association.handle;
-    association.runtime.require().spawn(async move {
+    association.runtime.unwrap().spawn(async move {
         let result = match handle.perform_time_sync(mode).await {
             Ok(_) => ffi::TimeSyncResult::Success,
             Err(TimeSyncError::Task(_)) => ffi::TimeSyncResult::TaskError,
@@ -219,7 +220,7 @@ pub unsafe fn association_cold_restart(
     };
 
     let handle = &mut association.handle;
-    association.runtime.require().spawn(async move {
+    association.runtime.unwrap().spawn(async move {
         let result = match handle.cold_restart().await {
             Ok(value) => ffi::RestartResult::new_success(value),
             Err(_) => ffi::RestartResult::error(),
@@ -242,7 +243,7 @@ pub unsafe fn association_warm_restart(
     };
 
     let handle = &mut association.handle;
-    association.runtime.require().spawn(async move {
+    association.runtime.unwrap().spawn(async move {
         let result = match handle.warm_restart().await {
             Ok(value) => ffi::RestartResult::new_success(value),
             Err(_) => ffi::RestartResult::error(),
@@ -265,7 +266,7 @@ pub unsafe fn association_check_link_status(
     };
 
     let handle = &mut association.handle;
-    association.runtime.require().spawn(async move {
+    association.runtime.unwrap().spawn(async move {
         let result = match handle.check_link_status().await {
             Ok(LinkStatusResult::Success) => ffi::LinkStatusResult::Success,
             Ok(LinkStatusResult::UnexpectedResponse) => ffi::LinkStatusResult::UnexpectedResponse,
