@@ -18,7 +18,7 @@
 //! use std::time::Duration;
 //!
 //! // example of using the master API asynchronously from within the Tokio runtime
-//! #[tokio::main(threaded_scheduler)]
+//! #[tokio::main(flavor = "multi_thread")]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
 //!     // spawn the master onto another task
@@ -42,7 +42,7 @@
 //!     // In a real application, use the handle to make requests. Measurement data
 //!     // comes back via the handler specified when creating the association. See
 //!     // the provided examples for more control.
-//!     tokio::time::delay_for(Duration::from_secs(60)).await;
+//!     tokio::time::sleep(Duration::from_secs(60)).await;
 //!     Ok(())
 //! }
 //! ```
