@@ -33,6 +33,7 @@ where
 {
     connect_fn: F,
     back_off: ExponentialBackOff,
+    reconnect_delay: Option<Duration>,
     session: MasterSession,
     reader: TransportReader,
     writer: TransportWriter,
@@ -64,7 +65,8 @@ where
         );
         let task = Self {
             connect_fn,
-            back_off: ExponentialBackOff::new(config.reconnection_strategy),
+            back_off: ExponentialBackOff::new(config.reconnection_strategy.retry_strategy),
+            reconnect_delay: config.reconnection_strategy.reconnect_delay,
             session,
             reader,
             writer,
@@ -102,15 +104,13 @@ where
                             return Err(Shutdown);
                         }
                         RunError::Link(err) => {
-                            let delay = self.back_off.min_delay();
-                            tracing::warn!(
-                                "{} - waiting {} ms to reconnect",
-                                err,
-                                delay.as_millis()
-                            );
-                            self.listener
-                                .update(ClientState::WaitAfterDisconnect(delay));
-                            self.session.delay_for(delay).await?;
+                            tracing::warn!("connection lost - {}", err);
+                            if let Some(delay) = self.reconnect_delay {
+                                tracing::warn!("waiting {} ms to reconnect", delay.as_millis());
+                                self.listener
+                                    .update(ClientState::WaitAfterDisconnect(delay));
+                                self.session.delay_for(delay).await?;
+                            }
                         }
                     }
                 }

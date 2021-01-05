@@ -165,6 +165,7 @@ public class Main {
             masterConfig.address = ushort(1);
             masterConfig.level = DecodeLogLevel.OBJECT_VALUES;
             masterConfig.reconnectionStrategy = retryStrategy;
+            masterConfig.reconnectionDelay = Duration.ZERO;
             masterConfig.responseTimeout = Duration.ofSeconds(5);
             masterConfig.rxBufferSize = ushort(2048);
             masterConfig.txBufferSize = ushort(2048);

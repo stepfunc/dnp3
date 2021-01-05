@@ -261,6 +261,7 @@ int main()
         .address = 1,
         .level = DecodeLogLevel_ObjectValues,
         .reconnection_strategy = retry_strategy,
+        .reconnection_delay = 0,
         .response_timeout = 5000,
         .rx_buffer_size = 2048,
         .tx_buffer_size = 2048,

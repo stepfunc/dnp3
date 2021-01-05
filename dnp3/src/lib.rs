@@ -26,7 +26,7 @@
 //!         MasterConfiguration::new(
 //!             EndpointAddress::from(1)?,
 //!             DecodeLogLevel::ObjectValues,
-//!             RetryStrategy::default(),
+//!             ReconnectStrategy::default(),
 //!             Timeout::from_secs(1)?,
 //!         ),
 //!         SocketAddr::from_str("127.0.0.1:20000")?,

@@ -3,7 +3,7 @@ use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
 use crate::app::parse::DecodeLogLevel;
-use crate::app::retry::RetryStrategy;
+use crate::app::retry::ReconnectStrategy;
 use crate::app::timeout::Timeout;
 use crate::app::types::LinkStatusResult;
 use crate::app::types::Timestamp;
@@ -44,7 +44,7 @@ pub struct MasterConfiguration {
     /// Decode-level for DNP3 objects
     pub level: DecodeLogLevel,
     /// Reconnection strategy
-    pub reconnection_strategy: RetryStrategy,
+    pub reconnection_strategy: ReconnectStrategy,
     /// Response timeout
     pub response_timeout: Timeout,
     /// TX buffer size
@@ -64,7 +64,7 @@ impl MasterConfiguration {
     pub fn new(
         address: EndpointAddress,
         level: DecodeLogLevel,
-        reconnection_strategy: RetryStrategy,
+        reconnection_strategy: ReconnectStrategy,
         response_timeout: Timeout,
     ) -> Self {
         Self {

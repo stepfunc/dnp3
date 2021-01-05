@@ -1,5 +1,37 @@
 use std::time::Duration;
 
+/// Reconnection strategy
+#[derive(Copy, Clone, Debug)]
+pub struct ReconnectStrategy {
+    /// Retry strategy when used between attempts to
+    /// establish a connection
+    pub retry_strategy: RetryStrategy,
+    /// Optional delay to wait before attempting a new connection
+    /// when an existing connection is lost
+    pub reconnect_delay: Option<Duration>,
+}
+
+impl ReconnectStrategy {
+    pub fn new(retry_strategy: RetryStrategy, reconnect_delay: Option<Duration>) -> Self {
+        Self {
+            retry_strategy,
+            reconnect_delay,
+        }
+    }
+}
+
+impl From<RetryStrategy> for ReconnectStrategy {
+    fn from(from: RetryStrategy) -> Self {
+        Self::new(from, None)
+    }
+}
+
+impl Default for ReconnectStrategy {
+    fn default() -> Self {
+        Self::new(RetryStrategy::default(), None)
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct RetryStrategy {
     pub(crate) min_delay: Duration,
@@ -54,9 +86,5 @@ impl ExponentialBackOff {
                 self.strategy.min_delay
             }
         }
-    }
-
-    pub(crate) fn min_delay(&self) -> Duration {
-        self.strategy.min_delay
     }
 }
