@@ -126,9 +126,9 @@ pub fn define(
     let add_master_tcp_fn = lib
         .declare_native_function("runtime_add_master_tcp")?
         .param("runtime", Type::ClassRef(runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
-        .param("config", Type::Struct(master_config), "Master configuration")?
+        .param("config", Type::Struct(master_config.clone()), "Master configuration")?
         .param("endpoint", Type::String, "IP address or DNS name and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\".")?
-        .param("listener", Type::Interface(client_state_listener), "Client connection listener to receive updates on the status of the connection")?
+        .param("listener", Type::Interface(client_state_listener.clone()), "Client connection listener to receive updates on the status of the connection")?
         .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occured"))?
         .doc(
             doc("Add a master TCP connection")
@@ -136,7 +136,6 @@ pub fn define(
         )?
         .build()?;
 
-    /* TODO
     let serial_params = define_serial_params(lib)?;
 
     let add_master_serial_fn = lib
@@ -152,7 +151,6 @@ pub fn define(
             .details("The returned master must be gracefully shutdown with {class:Master.[destructor]} when done.")
         )?
         .build()?;
-     */
 
     // Declare the object-oriented class
     let _runtime_class = lib
@@ -160,14 +158,13 @@ pub fn define(
         .constructor(&new_fn)?
         .destructor(&destroy_fn)?
         .method("AddMasterTcp", &add_master_tcp_fn)?
-        // TODO - .method("AddMasterSerial", &add_master_serial_fn)?
+        .method("AddMasterSerial", &add_master_serial_fn)?
         .doc("Event-queue based runtime handle")?
         .build()?;
 
     Ok((retry_strategy, master_class))
 }
 
-/*
 fn define_serial_params(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
     let data_bits = lib
         .define_native_enum("DataBits")?
@@ -231,4 +228,3 @@ fn define_serial_params(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
         .doc(doc("Serial port settings").details("Used by {class:Runtime.AddMasterSerial()}."))?
         .build()
 }
- */

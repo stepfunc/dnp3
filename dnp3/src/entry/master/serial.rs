@@ -1,15 +1,12 @@
 use crate::entry::master::{ClientState, MasterTask};
 use crate::master::handle::{Listener, MasterConfiguration, MasterHandle};
 use std::future::Future;
-use std::path::PathBuf;
-use tokio_serial::Serial;
 
-pub use tokio_serial::DataBits;
-pub use tokio_serial::FlowControl;
-pub use tokio_serial::Parity;
-/// Serial port settings
-pub use tokio_serial::SerialPortSettings;
-pub use tokio_serial::StopBits;
+// re-export these from the serial crate
+pub use tokio_one_serial::Settings as SerialSettings;
+pub use tokio_one_serial::{DataBits, FlowControl, Parity, StopBits};
+
+use tokio_one_serial::Settings;
 use tracing::Instrument;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
@@ -20,7 +17,7 @@ use tracing::Instrument;
 pub fn spawn_master_serial_client(
     config: MasterConfiguration,
     path: &str,
-    serial_settings: SerialPortSettings,
+    serial_settings: SerialSettings,
     listener: Listener<ClientState>,
 ) -> MasterHandle {
     let (future, handle) = create_master_serial_client(config, path, serial_settings, listener);
@@ -39,19 +36,19 @@ pub fn spawn_master_serial_client(
 pub fn create_master_serial_client(
     config: MasterConfiguration,
     path: &str,
-    serial_settings: SerialPortSettings,
+    settings: Settings,
     listener: Listener<ClientState>,
 ) -> (impl Future<Output = ()> + 'static, MasterHandle) {
     let string_path = path.to_owned();
-    let path = PathBuf::from(path);
+    let log_path = path.to_owned();
     let (mut task, handle) = MasterTask::new(
-        move || std::future::ready(Serial::from_path(path.as_path(), &serial_settings)),
+        move || std::future::ready(tokio_one_serial::open(string_path.as_str(), settings)),
         config,
         listener,
     );
     let future = async move {
         task.run()
-            .instrument(tracing::info_span!("MasterSerial", "port" = ?string_path))
+            .instrument(tracing::info_span!("MasterSerial", "port" = ?log_path))
             .await
     };
     (future, handle)

@@ -11,7 +11,7 @@ use std::io::Error;
 use std::time::Duration;
 
 /// entry points for creating and spawning serial-based master tasks
-// pub mod serial;
+pub mod serial;
 /// entry points for creating and spawning TCP-based master tasks
 pub mod tcp;
 

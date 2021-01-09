@@ -7,6 +7,9 @@ use std::net::SocketAddr;
 use std::ptr::null_mut;
 use std::str::FromStr;
 
+use dnp3::entry::master::serial::{
+    create_master_serial_client, DataBits, FlowControl, Parity, StopBits,
+};
 use dnp3::entry::EndpointAddress;
 
 pub struct Runtime {
@@ -110,10 +113,8 @@ pub(crate) unsafe fn runtime_add_master_tcp(
     }
 }
 
-/* TODO
-
 pub(crate) unsafe fn runtime_add_master_serial(
-    runtime: *mut tokio::runtime::Runtime,
+    runtime: *mut crate::runtime::Runtime,
     config: ffi::MasterConfiguration,
     path: &CStr,
     serial_params: ffi::SerialPortSettings,
@@ -134,10 +135,10 @@ pub(crate) unsafe fn runtime_add_master_serial(
     );
 
     if let Some(runtime) = runtime.as_ref() {
-        runtime.spawn(future);
+        runtime.inner.spawn(future);
 
         let master = Master {
-            runtime: runtime.handle().clone(),
+            runtime: runtime.handle(),
             handle,
         };
 
@@ -146,7 +147,6 @@ pub(crate) unsafe fn runtime_add_master_serial(
         std::ptr::null_mut()
     }
 }
- */
 
 impl ffi::MasterConfiguration {
     fn into(self) -> Option<MasterConfiguration> {
@@ -201,8 +201,7 @@ impl ClientStateListenerAdapter {
     }
 }
 
-/*
-impl From<ffi::SerialPortSettings> for SerialPortSettings {
+impl From<ffi::SerialPortSettings> for dnp3::entry::master::serial::SerialSettings {
     fn from(from: ffi::SerialPortSettings) -> Self {
         Self {
             baud_rate: from.baud_rate(),
@@ -226,8 +225,6 @@ impl From<ffi::SerialPortSettings> for SerialPortSettings {
                 ffi::StopBits::One => StopBits::One,
                 ffi::StopBits::Two => StopBits::Two,
             },
-            timeout: Duration::from_millis(1),
         }
     }
 }
-*/
