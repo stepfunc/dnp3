@@ -173,7 +173,7 @@ class MainClass
                     TxBufferSize = 2048,
                     BubbleFramingErrors = false,
                 },
-                "127.0.0.1:20000",
+                new EndpointList("127.0.0.1:20000"),
                 new TestListener()
             );
 

@@ -3,9 +3,7 @@ use crate::*;
 use dnp3::app::retry::RetryStrategy;
 use dnp3::prelude::master::*;
 use std::ffi::CStr;
-use std::net::SocketAddr;
 use std::ptr::null_mut;
-use std::str::FromStr;
 use std::time::Duration;
 
 use dnp3::entry::EndpointAddress;
@@ -47,7 +45,7 @@ pub(crate) unsafe fn runtime_destroy(runtime: *mut tokio::runtime::Runtime) {
 pub(crate) unsafe fn runtime_add_master_tcp(
     runtime: *mut tokio::runtime::Runtime,
     config: ffi::MasterConfiguration,
-    endpoint: &CStr,
+    endpoints: *const EndpointList,
     listener: ffi::ClientStateListener,
 ) -> *mut Master {
     let config = if let Some(config) = config.into() {
@@ -56,14 +54,15 @@ pub(crate) unsafe fn runtime_add_master_tcp(
         return std::ptr::null_mut();
     };
 
-    let endpoint = if let Ok(endpoint) = SocketAddr::from_str(&endpoint.to_string_lossy()) {
-        endpoint
+    let endpoints = if let Some(endpoints) = endpoints.as_ref() {
+        endpoints
     } else {
         return std::ptr::null_mut();
     };
     let listener = ClientStateListenerAdapter::new(listener);
 
-    let (future, handle) = create_master_tcp_client(config, endpoint, listener.into_listener());
+    let (future, handle) =
+        create_master_tcp_client(config, endpoints.clone(), listener.into_listener());
 
     if let Some(runtime) = runtime.as_ref() {
         runtime.spawn(future);
@@ -111,6 +110,24 @@ pub(crate) unsafe fn runtime_add_master_serial(
         Box::into_raw(Box::new(master))
     } else {
         std::ptr::null_mut()
+    }
+}
+
+pub type EndpointList = dnp3::entry::master::tcp::EndpointList;
+
+pub(crate) unsafe fn endpoint_list_new(main_endpoint: &CStr) -> *mut EndpointList {
+    Box::into_raw(Box::new(EndpointList::single(
+        main_endpoint.to_string_lossy().to_string(),
+    )))
+}
+
+pub(crate) unsafe fn endpoint_list_destroy(list: *mut EndpointList) {
+    Box::from_raw(list);
+}
+
+pub(crate) unsafe fn endpoint_list_add(list: *mut EndpointList, endpoint: &CStr) {
+    if let Some(list) = list.as_mut() {
+        list.add(endpoint.to_string_lossy().to_string());
     }
 }
 

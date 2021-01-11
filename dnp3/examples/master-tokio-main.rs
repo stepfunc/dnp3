@@ -1,7 +1,5 @@
 use dnp3::entry::EndpointAddress;
 use dnp3::prelude::master::*;
-use std::net::SocketAddr;
-use std::str::FromStr;
 use std::time::Duration;
 use tokio::stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
@@ -22,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ReconnectStrategy::default(),
             Timeout::from_secs(1)?,
         ),
-        SocketAddr::from_str("127.0.0.1:20000")?,
+        EndpointList::new("127.0.0.1:20000".to_owned(), &[]),
         Listener::None,
     );
 
