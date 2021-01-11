@@ -306,7 +306,7 @@ mod tests {
 
         let mut writer = RangeWriter::new();
 
-        let g1v1 = StaticBinaryVariation::Group1Var1.get_write_info();
+        let g1v1 = StaticBinaryVariation::Group1Var1.get_write_info(&binary(false));
 
         fn is_odd(index: u16) -> bool {
             index % 2 == 1
@@ -353,7 +353,8 @@ mod tests {
             }
         }
 
-        let g3v1 = StaticDoubleBitBinaryVariation::Group3Var1.get_write_info();
+        let g3v1 = StaticDoubleBitBinaryVariation::Group3Var1
+            .get_write_info(&double_bit(DoubleBit::DeterminedOff));
 
         for index in 1..=5 {
             let value = double_bit(db_modulo(index));
@@ -388,7 +389,7 @@ mod tests {
         let mut cursor = WriteCursor::new(buffer.as_mut());
         let mut writer = RangeWriter::new();
 
-        let g1v2 = StaticBinaryVariation::Group1Var2.get_write_info();
+        let g1v2 = StaticBinaryVariation::Group1Var2.get_write_info(&binary(false));
 
         writer.write(&mut cursor, 2, &binary(true), g1v2).unwrap();
         writer.write(&mut cursor, 2, &binary(true), g1v2).unwrap();
@@ -412,7 +413,7 @@ mod tests {
         let mut cursor = WriteCursor::new(buffer.as_mut());
         let mut writer = RangeWriter::new();
 
-        let g1v2 = StaticBinaryVariation::Group1Var2.get_write_info();
+        let g1v2 = StaticBinaryVariation::Group1Var2.get_write_info(&binary(false));
 
         writer.write(&mut cursor, 1, &binary(true), g1v2).unwrap();
         writer.write(&mut cursor, 3, &binary(true), g1v2).unwrap();

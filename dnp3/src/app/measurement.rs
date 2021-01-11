@@ -259,3 +259,38 @@ impl AnalogOutputStatus {
         }
     }
 }
+
+#[allow(missing_copy_implementations)]
+#[derive(Clone, PartialEq, Debug)]
+pub struct OctetString {
+    /// buffer for the value
+    value: [u8; Self::MAX_SIZE],
+    /// Actual length
+    len: u8,
+}
+
+impl OctetString {
+    const MAX_SIZE: usize = 255;
+
+    pub fn new(value: &[u8]) -> Self {
+        let len = std::cmp::min(value.len(), Self::MAX_SIZE);
+        let mut result = Self {
+            value: [0u8; 255],
+            len: len as u8,
+        };
+        result.value[..len].copy_from_slice(&value[..len]);
+        result
+    }
+
+    pub fn value(&self) -> &[u8] {
+        &self.value[..self.len() as usize]
+    }
+
+    pub fn len(&self) -> u8 {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}

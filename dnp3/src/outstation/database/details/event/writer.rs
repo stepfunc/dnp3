@@ -45,6 +45,7 @@ pub(crate) enum HeaderType {
     FrozenCounter(EventFrozenCounterVariation),
     Analog(EventAnalogVariation),
     AnalogOutputStatus(EventAnalogOutputStatusVariation),
+    OctetString(EventOctetStringVariation),
 }
 
 #[derive(Copy, Clone)]
@@ -201,7 +202,7 @@ impl EventWriter {
                 }
             }
 
-            let (group, var) = variation.get_group_var();
+            let (group, var) = variation.get_group_var(event);
             let count_pos = Self::write_event_header(cursor, group, var)?;
             variation.write(cursor, event, index, time).map(|_| ())?;
             Ok(count_pos)
@@ -302,6 +303,19 @@ impl Writable for AnalogOutputStatus {
 
     fn get_time(&self) -> Option<Time> {
         self.time
+    }
+}
+
+impl Writable for OctetString {
+    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
+        match header {
+            HeaderType::OctetString(var) => Some(*var),
+            _ => None,
+        }
+    }
+
+    fn get_time(&self) -> Option<Time> {
+        None
     }
 }
 

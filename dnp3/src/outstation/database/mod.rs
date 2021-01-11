@@ -11,7 +11,7 @@ use crate::app::parse::parser::HeaderCollection;
 use crate::util::cursor::WriteCursor;
 
 use config::*;
-use details::range::static_db::{Deadband, FlagsDetector, PointConfig};
+use details::range::static_db::{Deadband, FlagsDetector, OctetStringDetector, PointConfig};
 
 use crate::master::request::EventClasses;
 use crate::outstation::database::read::ReadHeader;
@@ -49,9 +49,12 @@ pub struct ClassZeroConfig {
     pub frozen_counter: bool,
     pub analog: bool,
     pub analog_output_status: bool,
+    /// For conformance, this should be `false`
+    pub octet_strings: bool,
 }
 
 impl ClassZeroConfig {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         binary: bool,
         double_bit_binary: bool,
@@ -60,6 +63,7 @@ impl ClassZeroConfig {
         frozen_counter: bool,
         analog: bool,
         analog_output_status: bool,
+        octet_strings: bool,
     ) -> Self {
         ClassZeroConfig {
             binary,
@@ -69,6 +73,7 @@ impl ClassZeroConfig {
             frozen_counter,
             analog,
             analog_output_status,
+            octet_strings,
         }
     }
 }
@@ -83,6 +88,7 @@ impl Default for ClassZeroConfig {
             frozen_counter: true,
             analog: true,
             analog_output_status: true,
+            octet_strings: false,
         }
     }
 }
@@ -106,12 +112,14 @@ pub struct EventBufferConfig {
     pub max_analog: u16,
     /// maximum number of analog output status events (g42)
     pub max_analog_output_status: u16,
+    /// maximum number of octet string events (g111)
+    pub max_octet_string: u16,
 }
 
 impl EventBufferConfig {
     /// initialize with the same maximum values for all types
     pub fn all_types(max: u16) -> Self {
-        Self::new(max, max, max, max, max, max, max)
+        Self::new(max, max, max, max, max, max, max, max)
     }
 
     /// initialize the configuration to support no events
@@ -120,6 +128,7 @@ impl EventBufferConfig {
     }
 
     /// create a configuration specifying the max for each type individually
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         max_binary: u16,
         max_double_binary: u16,
@@ -128,6 +137,7 @@ impl EventBufferConfig {
         max_frozen_counter: u16,
         max_analog: u16,
         max_analog_output_status: u16,
+        max_octet_string: u16,
     ) -> Self {
         Self {
             max_binary,
@@ -137,6 +147,7 @@ impl EventBufferConfig {
             max_frozen_counter,
             max_analog,
             max_analog_output_status,
+            max_octet_string,
         }
     }
 
@@ -394,6 +405,12 @@ impl Update<AnalogOutputStatus> for Database {
     }
 }
 
+impl Update<OctetString> for Database {
+    fn update(&mut self, index: u16, value: &OctetString, options: UpdateOptions) -> bool {
+        self.inner.update(value, index, options)
+    }
+}
+
 impl Add<BinaryConfig> for Database {
     fn add(&mut self, index: u16, class: Option<EventClass>, config: BinaryConfig) -> bool {
         let config =
@@ -489,6 +506,18 @@ impl Add<AnalogOutputStatusConfig> for Database {
     }
 }
 
+impl Add<OctetStringConfig> for Database {
+    fn add(&mut self, index: u16, class: Option<EventClass>, _config: OctetStringConfig) -> bool {
+        let config = PointConfig::<OctetString>::new(
+            class,
+            OctetStringDetector,
+            StaticOctetStringVariation,
+            EventOctetStringVariation,
+        );
+        self.inner.add(index, config)
+    }
+}
+
 impl Remove<Binary> for Database {
     fn remove(&mut self, index: u16) -> bool {
         self.inner.remove::<Binary>(index)
@@ -528,5 +557,11 @@ impl Remove<Analog> for Database {
 impl Remove<AnalogOutputStatus> for Database {
     fn remove(&mut self, index: u16) -> bool {
         self.inner.remove::<AnalogOutputStatus>(index)
+    }
+}
+
+impl Remove<OctetString> for Database {
+    fn remove(&mut self, index: u16) -> bool {
+        self.inner.remove::<OctetString>(index)
     }
 }

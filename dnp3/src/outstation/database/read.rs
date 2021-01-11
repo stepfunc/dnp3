@@ -21,6 +21,7 @@ pub(crate) enum StaticReadHeader {
         Option<StaticAnalogOutputStatusVariation>,
         Option<IndexRange>,
     ),
+    OctetString(Option<IndexRange>),
 }
 
 #[derive(Copy, Clone)]
@@ -37,6 +38,7 @@ pub(crate) enum EventReadHeader {
     FrozenCounter(Option<EventFrozenCounterVariation>, Option<usize>),
     Analog(Option<EventAnalogVariation>, Option<usize>),
     AnalogOutputStatus(Option<EventAnalogOutputStatusVariation>, Option<usize>),
+    OctetString(Option<usize>),
 }
 
 /// Enum representation of all header types that can be in a READ request
@@ -437,16 +439,19 @@ impl ReadHeader {
             // group 80
             AllObjectsVariation::Group80Var1 => None,
             // group 110
-            AllObjectsVariation::Group110Var0 => None,
-            AllObjectsVariation::Group111Var0 => None,
+            AllObjectsVariation::Group110Var0 => Some(StaticReadHeader::OctetString(None).into()),
+            // group 111
+            AllObjectsVariation::Group111Var0 => Some(EventReadHeader::OctetString(None).into()),
         }
     }
 
     fn from_count(_header: &CountVariation) -> Option<ReadHeader> {
+        // TODO: implement this
         None
     }
 
     fn from_range(_header: &RangedVariation) -> Option<ReadHeader> {
+        // TODO: implement this
         None
     }
 }

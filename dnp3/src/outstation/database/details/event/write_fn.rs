@@ -1,4 +1,4 @@
-use crate::app::measurement::{Binary, DoubleBitBinary, Time, ToVariation, WireFlags};
+use crate::app::measurement::{Binary, DoubleBitBinary, OctetString, Time, ToVariation, WireFlags};
 use crate::app::parse::traits::FixedSize;
 use crate::app::variations::{Group2Var3, Group4Var3};
 use crate::util::cursor::{WriteCursor, WriteError};
@@ -72,6 +72,16 @@ where
     let variation = event.to_cto_variation(difference as u16); // difference in range [0, u16::max]
 
     write_prefixed(cursor, &variation, index).map(|_| Continue::Ok)
+}
+
+pub(crate) fn write_octet_string(
+    cursor: &mut WriteCursor,
+    event: &OctetString,
+    index: u16,
+) -> Result<Continue, WriteError> {
+    cursor.write_u16_le(index)?;
+    cursor.write(&event.value())?;
+    Ok(Continue::Ok)
 }
 
 impl ToVariationCTO<Group2Var3> for Binary {
