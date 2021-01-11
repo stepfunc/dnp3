@@ -1,8 +1,6 @@
 use dnp3::entry::EndpointAddress;
 use dnp3::prelude::master::*;
 use std::io::BufRead;
-use std::net::SocketAddr;
-use std::str::FromStr;
 use std::time::Duration;
 
 /// example of using the master API synchronously from outside the Tokio runtime
@@ -19,10 +17,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         MasterConfiguration::new(
             EndpointAddress::from(1)?,
             DecodeLogLevel::ObjectValues,
-            RetryStrategy::default(),
+            ReconnectStrategy::default(),
             Timeout::from_secs(1)?,
         ),
-        SocketAddr::from_str("127.0.0.1:20000")?,
+        EndpointList::single("127.0.0.1:20000".to_owned()),
         Listener::None,
     );
 

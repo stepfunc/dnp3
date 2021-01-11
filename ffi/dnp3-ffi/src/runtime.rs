@@ -3,9 +3,8 @@ use crate::*;
 use dnp3::app::retry::RetryStrategy;
 use dnp3::prelude::master::*;
 use std::ffi::CStr;
-use std::net::SocketAddr;
 use std::ptr::null_mut;
-use std::str::FromStr;
+use std::time::Duration;
 
 use dnp3::entry::master::serial::{
     create_master_serial_client, DataBits, FlowControl, Parity, StopBits,
@@ -81,7 +80,7 @@ pub(crate) unsafe fn runtime_destroy(runtime: *mut crate::runtime::Runtime) {
 pub(crate) unsafe fn runtime_add_master_tcp(
     runtime: *mut crate::runtime::Runtime,
     config: ffi::MasterConfiguration,
-    endpoint: &CStr,
+    endpoints: *const EndpointList,
     listener: ffi::ClientStateListener,
 ) -> *mut Master {
     let config = if let Some(config) = config.into() {
@@ -90,14 +89,15 @@ pub(crate) unsafe fn runtime_add_master_tcp(
         return std::ptr::null_mut();
     };
 
-    let endpoint = if let Ok(endpoint) = SocketAddr::from_str(&endpoint.to_string_lossy()) {
-        endpoint
+    let endpoints = if let Some(endpoints) = endpoints.as_ref() {
+        endpoints
     } else {
         return std::ptr::null_mut();
     };
     let listener = ClientStateListenerAdapter::new(listener);
 
-    let (future, handle) = create_master_tcp_client(config, endpoint, listener.into_listener());
+    let (future, handle) =
+        create_master_tcp_client(config, endpoints.clone(), listener.into_listener());
 
     if let Some(runtime) = runtime.as_ref() {
         runtime.inner.spawn(future);
@@ -148,6 +148,24 @@ pub(crate) unsafe fn runtime_add_master_serial(
     }
 }
 
+pub type EndpointList = dnp3::entry::master::tcp::EndpointList;
+
+pub(crate) unsafe fn endpoint_list_new(main_endpoint: &CStr) -> *mut EndpointList {
+    Box::into_raw(Box::new(EndpointList::single(
+        main_endpoint.to_string_lossy().to_string(),
+    )))
+}
+
+pub(crate) unsafe fn endpoint_list_destroy(list: *mut EndpointList) {
+    Box::from_raw(list);
+}
+
+pub(crate) unsafe fn endpoint_list_add(list: *mut EndpointList, endpoint: &CStr) {
+    if let Some(list) = list.as_mut() {
+        list.add(endpoint.to_string_lossy().to_string());
+    }
+}
+
 impl ffi::MasterConfiguration {
     fn into(self) -> Option<MasterConfiguration> {
         let address = match EndpointAddress::from(self.address()) {
@@ -161,9 +179,16 @@ impl ffi::MasterConfiguration {
             }
         };
 
-        let strategy = RetryStrategy::new(
-            self.reconnection_strategy().min_delay(),
-            self.reconnection_strategy.max_delay(),
+        let strategy = ReconnectStrategy::new(
+            RetryStrategy::new(
+                self.reconnection_strategy().min_delay(),
+                self.reconnection_strategy().max_delay(),
+            ),
+            if self.reconnection_delay() != Duration::from_millis(0) {
+                Some(self.reconnection_delay())
+            } else {
+                None
+            },
         );
 
         Some(MasterConfiguration {

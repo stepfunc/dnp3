@@ -166,6 +166,7 @@ public class Main {
             masterConfig.address = ushort(1);
             masterConfig.level = DecodeLogLevel.OBJECT_VALUES;
             masterConfig.reconnectionStrategy = retryStrategy;
+            masterConfig.reconnectionDelay = Duration.ZERO;
             masterConfig.responseTimeout = Duration.ofSeconds(5);
             masterConfig.rxBufferSize = ushort(2048);
             masterConfig.txBufferSize = ushort(2048);
@@ -173,7 +174,7 @@ public class Main {
 
             Master master = runtime.addMasterTcp(
                     masterConfig,
-                    "127.0.0.1:20000",
+                    new EndpointList("127.0.0.1:20000"),
                     new TestListener()
             );
 

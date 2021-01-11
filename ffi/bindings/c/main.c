@@ -261,11 +261,13 @@ int main()
         .address = 1,
         .level = DecodeLogLevel_ObjectValues,
         .reconnection_strategy = retry_strategy,
+        .reconnection_delay = 0,
         .response_timeout = 5000,
         .rx_buffer_size = 2048,
         .tx_buffer_size = 2048,
         .bubble_framing_errors = false,
     };
+    endpoint_list_t* endpoints = endpoint_list_new("127.0.0.1:20000");
     client_state_listener_t listener =
     {
         .on_change = &client_state_on_change,
@@ -274,9 +276,10 @@ int main()
     master_t* master = runtime_add_master_tcp(
         runtime,
         master_config,
-        "127.0.0.1:20000",
+        endpoints,
         listener
     );
+    endpoint_list_destroy(endpoints);
 
     // Create the association
     read_handler_t read_handler =

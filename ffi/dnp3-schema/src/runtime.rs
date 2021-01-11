@@ -1,3 +1,4 @@
+use class::ClassHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
@@ -109,7 +110,8 @@ pub fn define(
     let master_config = lib.define_native_struct(&master_config)?
         .add("address", Type::Uint16, "Local DNP3 data-link address")?
         .add("level", Type::Enum(decode_log_level_enum), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
-        .add("reconnection_strategy", Type::Struct(retry_strategy.clone()), "Reconnection strategy to use")?
+        .add("reconnection_strategy", Type::Struct(retry_strategy.clone()), "Reconnection retry strategy to use")?
+        .add("reconnection_delay", Type::Duration(DurationMapping::Milliseconds), doc("Optional reconnection delay when a connection is lost.").details("A value of 0 means no delay."))?
         .add(
             "response_timeout",
             Type::Duration(DurationMapping::Milliseconds),
@@ -123,11 +125,13 @@ pub fn define(
 
     let master_class = lib.declare_class("Master")?;
 
+    let endpoint_list = define_endpoint_list(lib)?;
+
     let add_master_tcp_fn = lib
         .declare_native_function("runtime_add_master_tcp")?
         .param("runtime", Type::ClassRef(runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
         .param("config", Type::Struct(master_config.clone()), "Master configuration")?
-        .param("endpoint", Type::String, "IP address or DNS name and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\".")?
+        .param("endpoints", Type::ClassRef(endpoint_list.declaration()), "List of IP endpoints.")?
         .param("listener", Type::Interface(client_state_listener.clone()), "Client connection listener to receive updates on the status of the connection")?
         .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occured"))?
         .doc(
@@ -163,6 +167,43 @@ pub fn define(
         .build()?;
 
     Ok((retry_strategy, master_class))
+}
+
+fn define_endpoint_list(lib: &mut LibraryBuilder) -> Result<ClassHandle, BindingError> {
+    let endpoint_list_class = lib.declare_class("EndpointList")?;
+
+    let endpoint_list_new = lib.declare_native_function("endpoint_list_new")?
+        .param("main_endpoint", Type::String, "Main endpoint")?
+        .return_type(ReturnType::new(Type::ClassRef(endpoint_list_class.clone()), "New endpoint list"))?
+        .doc(doc("Create a new list of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
+        .build()?;
+
+    let endpoint_list_destroy = lib
+        .declare_native_function("endpoint_list_destroy")?
+        .param(
+            "list",
+            Type::ClassRef(endpoint_list_class.clone()),
+            "Endpoint list to destroy",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Delete a previously allocated endpoint list.")?
+        .build()?;
+
+    let endpoint_list_add = lib.declare_native_function("endpoint_list_add")?
+        .param("list", Type::ClassRef(endpoint_list_class.clone()), "Endpoint list to modify")?
+        .param("endpoint", Type::String, "Endpoint to add to the list")?
+        .return_type(ReturnType::void())?
+        .doc(doc(".").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
+        .build()?;
+
+    let endpoint_list_class = lib.define_class(&endpoint_list_class)?
+        .constructor(&endpoint_list_new)?
+        .destructor(&endpoint_list_destroy)?
+        .method("Add", &endpoint_list_add)?
+        .doc(doc("List of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
+        .build()?;
+
+    Ok(endpoint_list_class)
 }
 
 fn define_serial_params(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
