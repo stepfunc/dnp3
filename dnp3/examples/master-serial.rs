@@ -1,12 +1,15 @@
+/*
 use dnp3::entry::EndpointAddress;
 use dnp3::prelude::master::*;
 use std::time::Duration;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
+ */
 
 /// example of using the master API asynchronously from within the Tokio runtime
-#[tokio::main(threaded_scheduler)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /* TODO
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_target(false)
@@ -121,4 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             s => println!("unknown command: {}", s),
         }
     }
+     */
+
+    Ok(())
 }

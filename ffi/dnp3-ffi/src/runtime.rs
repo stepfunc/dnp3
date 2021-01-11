@@ -6,44 +6,79 @@ use std::ffi::CStr;
 use std::ptr::null_mut;
 use std::time::Duration;
 
+use dnp3::entry::master::serial::{
+    create_master_serial_client, DataBits, FlowControl, Parity, StopBits,
+};
 use dnp3::entry::EndpointAddress;
-pub use tokio::runtime::Runtime;
+
+pub struct Runtime {
+    pub(crate) inner: std::sync::Arc<tokio::runtime::Runtime>,
+}
+
+impl Runtime {
+    fn new(inner: tokio::runtime::Runtime) -> Self {
+        Self {
+            inner: std::sync::Arc::new(inner),
+        }
+    }
+
+    pub(crate) fn handle(&self) -> RuntimeHandle {
+        RuntimeHandle {
+            inner: std::sync::Arc::downgrade(&self.inner),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct RuntimeHandle {
+    inner: std::sync::Weak<tokio::runtime::Runtime>,
+}
+
+impl RuntimeHandle {
+    pub(crate) fn unwrap(&self) -> std::sync::Arc<tokio::runtime::Runtime> {
+        self.inner
+            .upgrade()
+            .expect("Runtime has been destroyed, RuntimeHandle is invalid")
+    }
+
+    pub(crate) fn get(&self) -> Option<std::sync::Arc<tokio::runtime::Runtime>> {
+        self.inner.upgrade()
+    }
+}
 
 fn build_runtime<F>(f: F) -> std::result::Result<tokio::runtime::Runtime, std::io::Error>
 where
     F: Fn(&mut tokio::runtime::Builder) -> &mut tokio::runtime::Builder,
 {
-    f(tokio::runtime::Builder::new()
-        .enable_all()
-        .threaded_scheduler())
-    .build()
+    let mut builder = tokio::runtime::Builder::new_multi_thread();
+    f(&mut builder).enable_all().build()
 }
 
 pub(crate) unsafe fn runtime_new(
     config: Option<&ffi::RuntimeConfig>,
-) -> *mut tokio::runtime::Runtime {
+) -> *mut crate::runtime::Runtime {
     let result = match config {
         None => build_runtime(|r| r),
-        Some(x) => build_runtime(|r| r.core_threads(x.num_core_threads as usize)),
+        Some(x) => build_runtime(|r| r.worker_threads(x.num_core_threads as usize)),
     };
 
     match result {
-        Ok(r) => Box::into_raw(Box::new(r)),
-        Err(_) => {
-            //tracing::error!("Unable to build runtime: {}", err);
+        Ok(r) => Box::into_raw(Box::new(Runtime::new(r))),
+        Err(err) => {
+            tracing::error!("Unable to build runtime: {}", err);
             null_mut()
         }
     }
 }
 
-pub(crate) unsafe fn runtime_destroy(runtime: *mut tokio::runtime::Runtime) {
+pub(crate) unsafe fn runtime_destroy(runtime: *mut crate::runtime::Runtime) {
     if !runtime.is_null() {
         Box::from_raw(runtime);
     };
 }
 
 pub(crate) unsafe fn runtime_add_master_tcp(
-    runtime: *mut tokio::runtime::Runtime,
+    runtime: *mut crate::runtime::Runtime,
     config: ffi::MasterConfiguration,
     endpoints: *const EndpointList,
     listener: ffi::ClientStateListener,
@@ -65,10 +100,10 @@ pub(crate) unsafe fn runtime_add_master_tcp(
         create_master_tcp_client(config, endpoints.clone(), listener.into_listener());
 
     if let Some(runtime) = runtime.as_ref() {
-        runtime.spawn(future);
+        runtime.inner.spawn(future);
 
         let master = Master {
-            runtime: runtime.handle().clone(),
+            runtime: runtime.handle(),
             handle,
         };
 
@@ -79,7 +114,7 @@ pub(crate) unsafe fn runtime_add_master_tcp(
 }
 
 pub(crate) unsafe fn runtime_add_master_serial(
-    runtime: *mut tokio::runtime::Runtime,
+    runtime: *mut crate::runtime::Runtime,
     config: ffi::MasterConfiguration,
     path: &CStr,
     serial_params: ffi::SerialPortSettings,
@@ -100,10 +135,10 @@ pub(crate) unsafe fn runtime_add_master_serial(
     );
 
     if let Some(runtime) = runtime.as_ref() {
-        runtime.spawn(future);
+        runtime.inner.spawn(future);
 
         let master = Master {
-            runtime: runtime.handle().clone(),
+            runtime: runtime.handle(),
             handle,
         };
 
@@ -191,7 +226,7 @@ impl ClientStateListenerAdapter {
     }
 }
 
-impl From<ffi::SerialPortSettings> for SerialPortSettings {
+impl From<ffi::SerialPortSettings> for dnp3::entry::master::serial::SerialSettings {
     fn from(from: ffi::SerialPortSettings) -> Self {
         Self {
             baud_rate: from.baud_rate(),
@@ -215,7 +250,6 @@ impl From<ffi::SerialPortSettings> for SerialPortSettings {
                 ffi::StopBits::One => StopBits::One,
                 ffi::StopBits::Two => StopBits::Two,
             },
-            timeout: Duration::from_millis(1),
         }
     }
 }

@@ -29,7 +29,7 @@ fn get_outstation_config() -> OutstationConfig {
 }
 
 /// example of using the outstation API asynchronously from within the Tokio runtime
-#[tokio::main(threaded_scheduler)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
@@ -69,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut value = 0.0;
 
     loop {
-        tokio::time::delay_for(Duration::from_secs(5)).await;
+        tokio::time::sleep(Duration::from_secs(5)).await;
         handle.database.transaction(|db| {
             db.update(
                 7,

@@ -11,8 +11,8 @@ use dnp3::master::handle::{AssociationHandler, MasterHandle, ReadHandler};
 use dnp3::master::request::{Classes, EventClasses, TimeSyncProcedure};
 
 pub struct Master {
-    pub runtime: tokio::runtime::Handle,
-    pub handle: MasterHandle,
+    pub(crate) runtime: crate::runtime::RuntimeHandle,
+    pub(crate) handle: MasterHandle,
 }
 
 pub unsafe fn master_destroy(master: *mut Master) {
@@ -72,11 +72,15 @@ pub unsafe fn master_add_association(
     };
 
     if tokio::runtime::Handle::try_current().is_err() {
-        if let Ok(handle) = master.runtime.block_on(master.handle.add_association(
-            address,
-            config,
-            Box::new(handler),
-        )) {
+        if let Ok(handle) = master
+            .runtime
+            .unwrap()
+            .block_on(
+                master
+                    .handle
+                    .add_association(address, config, Box::new(handler)),
+            )
+        {
             let association = Association {
                 runtime: master.runtime.clone(),
                 handle,
@@ -96,6 +100,7 @@ pub unsafe fn master_set_decode_log_level(master: *mut Master, level: ffi::Decod
     if let Some(master) = master.as_mut() {
         master
             .runtime
+            .unwrap()
             .spawn(master.handle.set_decode_log_level(level.into()));
     }
 }
@@ -105,6 +110,7 @@ pub unsafe fn master_get_decode_log_level(master: *mut Master) -> ffi::DecodeLog
         if let Some(master) = master.as_mut() {
             if let Ok(level) = master
                 .runtime
+                .unwrap()
                 .block_on(master.handle.get_decode_log_level())
             {
                 return level.into();

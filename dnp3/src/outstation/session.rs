@@ -752,7 +752,7 @@ impl OutstationSession {
     ) -> Result<(), SessionError> {
         async fn sleep_only(instant: Option<crate::tokio::time::Instant>) {
             match instant {
-                Some(x) => crate::tokio::time::delay_until(x).await,
+                Some(x) => crate::tokio::time::sleep_until(x).await,
                 None => {
                     // sleep forever
                     crate::util::future::forever().await;

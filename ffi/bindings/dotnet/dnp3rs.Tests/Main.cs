@@ -9,7 +9,7 @@ class MainClass
     {
         public void OnMessage(LogLevel level, string message)
         {
-            Console.WriteLine($"{message}");
+            Console.Write($"{message}");
         }
     }
 
@@ -151,7 +151,7 @@ class MainClass
     private static async Task MainAsync()
     {        
         Logging.Configure(
-            new LoggingConfiguration { Level = LogLevel.Info, PrintLevel = true, PrintModuleInfo = false, TimeFormat = TimeFormat.System, OutputFormat = LogOutputFormat.Json },
+            new LoggingConfiguration { Level = LogLevel.Info, PrintLevel = true, PrintModuleInfo = false, TimeFormat = TimeFormat.System, OutputFormat = LogOutputFormat.Text },
             new TestLogger()
         );
 

@@ -145,6 +145,7 @@ public class Main {
         config.printLevel = true;
         config.printModuleInfo = false;
         config.timeFormat = TimeFormat.SYSTEM;
+        config.outputFormat = LogOutputFormat.TEXT;
         return config;
     }
 

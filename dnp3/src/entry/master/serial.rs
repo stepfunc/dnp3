@@ -6,15 +6,13 @@ use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
 use crate::util::task::Shutdown;
 use std::future::Future;
-use std::path::PathBuf;
+
+// re-export these from the serial crate
+pub use tokio_one_serial::Settings as SerialSettings;
+pub use tokio_one_serial::{DataBits, FlowControl, Parity, StopBits};
+
 use std::time::Duration;
-pub use tokio_serial::DataBits;
-pub use tokio_serial::FlowControl;
-pub use tokio_serial::Parity;
-use tokio_serial::Serial;
-/// Serial port settings
-pub use tokio_serial::SerialPortSettings;
-pub use tokio_serial::StopBits;
+
 use tracing::Instrument;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
@@ -25,7 +23,7 @@ use tracing::Instrument;
 pub fn spawn_master_serial_client(
     config: MasterConfiguration,
     path: &str,
-    serial_settings: SerialPortSettings,
+    serial_settings: SerialSettings,
     listener: Listener<ClientState>,
 ) -> MasterHandle {
     let (future, handle) = create_master_serial_client(config, path, serial_settings, listener);
@@ -44,23 +42,22 @@ pub fn spawn_master_serial_client(
 pub fn create_master_serial_client(
     config: MasterConfiguration,
     path: &str,
-    serial_settings: SerialPortSettings,
+    settings: SerialSettings,
     listener: Listener<ClientState>,
 ) -> (impl Future<Output = ()> + 'static, MasterHandle) {
-    let string_path = path.to_owned();
-    let path = PathBuf::from(path);
-    let (mut task, handle) = MasterTask::new(path, serial_settings, config, listener);
+    let log_path = path.to_owned();
+    let (mut task, handle) = MasterTask::new(path, settings, config, listener);
     let future = async move {
         task.run()
-            .instrument(tracing::info_span!("MasterSerial", "port" = ?string_path))
+            .instrument(tracing::info_span!("MasterSerial", "port" = ?log_path))
             .await
     };
     (future, handle)
 }
 
 struct MasterTask {
-    path: PathBuf,
-    serial_settings: SerialPortSettings,
+    path: String,
+    serial_settings: SerialSettings,
     back_off: ExponentialBackOff,
     reconnect_delay: Option<Duration>,
     session: MasterSession,
@@ -71,8 +68,8 @@ struct MasterTask {
 
 impl MasterTask {
     fn new(
-        path: PathBuf,
-        serial_settings: SerialPortSettings,
+        path: &str,
+        serial_settings: SerialSettings,
         config: MasterConfiguration,
         listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
@@ -89,7 +86,7 @@ impl MasterTask {
             config.bubble_framing_errors,
         );
         let task = Self {
-            path,
+            path: path.to_string(),
             serial_settings,
             back_off: ExponentialBackOff::new(config.reconnection_strategy.retry_strategy),
             reconnect_delay: config.reconnection_strategy.reconnect_delay,
@@ -108,7 +105,7 @@ impl MasterTask {
     async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
             self.listener.update(ClientState::Connecting);
-            match Serial::from_path(self.path.as_path(), &self.serial_settings) {
+            match tokio_one_serial::open(self.path.as_str(), self.serial_settings) {
                 Err(err) => {
                     let delay = self.back_off.on_failure();
                     tracing::warn!("{} - waiting {} ms to retry", err, delay.as_millis());

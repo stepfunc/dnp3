@@ -93,7 +93,7 @@ impl MasterSession {
                 result = self.process_message(false) => {
                    result?;
                 }
-                _ = crate::tokio::time::delay_until(deadline) => {
+                _ = crate::tokio::time::sleep_until(deadline) => {
                    return Ok(());
                 }
             }
@@ -195,7 +195,7 @@ impl MasterSession {
                         None => return Ok(())
                    }
                 }
-                _ = crate::tokio::time::delay_until(instant) => {
+                _ = crate::tokio::time::sleep_until(instant) => {
                    return Ok(());
                 }
             }
@@ -319,7 +319,7 @@ impl MasterSession {
 
             loop {
                 crate::tokio::select! {
-                    _ = crate::tokio::time::delay_until(deadline) => {
+                    _ = crate::tokio::time::sleep_until(deadline) => {
                         tracing::warn!("no response within timeout: {}", self.timeout);
                         task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
                         return Err(TaskError::ResponseTimeout);
@@ -478,7 +478,7 @@ impl MasterSession {
 
             loop {
                 crate::tokio::select! {
-                    _ = crate::tokio::time::delay_until(deadline) => {
+                    _ = crate::tokio::time::sleep_until(deadline) => {
                             tracing::warn!("no response within timeout: {}", self.timeout);
                             return Err(TaskError::ResponseTimeout);
                     }
@@ -730,7 +730,7 @@ impl MasterSession {
         loop {
             // Wait for something on the link
             crate::tokio::select! {
-                _ = crate::tokio::time::delay_until(self.timeout.deadline_from_now()) => {
+                _ = crate::tokio::time::sleep_until(self.timeout.deadline_from_now()) => {
                     tracing::warn!("no response within timeout: {}", self.timeout);
                     return Err(TaskError::ResponseTimeout);
                 }
