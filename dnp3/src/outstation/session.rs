@@ -697,6 +697,14 @@ impl OutstationSession {
                     length,
                     None,
                 ));
+
+                // Cancel unsolicited series if it's a DISABLE_UNSOLICITED
+                if request.header.function == FunctionCode::DisableUnsolicited {
+                    return Ok(UnsolicitedWaitResult::Complete(
+                        UnsolicitedResult::ReturnToIdle,
+                    ));
+                }
+
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::NewRead(hash, headers) => {
