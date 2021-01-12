@@ -1,4 +1,4 @@
-use crate::app::measurement::{Binary, DoubleBitBinary, OctetString, Time, ToVariation, WireFlags};
+use crate::app::measurement::{Binary, DoubleBitBinary, Time, ToVariation, WireFlags};
 use crate::app::parse::traits::FixedSize;
 use crate::app::variations::{Group2Var3, Group4Var3};
 use crate::util::cursor::{WriteCursor, WriteError};
@@ -76,11 +76,11 @@ where
 
 pub(crate) fn write_octet_string(
     cursor: &mut WriteCursor,
-    event: &OctetString,
+    event: &[u8],
     index: u16,
 ) -> Result<Continue, WriteError> {
     cursor.write_u16_le(index)?;
-    cursor.write(&event.value())?;
+    cursor.write(&event)?;
     Ok(Continue::Ok)
 }
 

@@ -4,7 +4,6 @@ use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
 use crate::app::types::Timestamp;
 use crate::app::variations::{Group51Var1, Group51Var2};
 use crate::outstation::database::config::*;
-use crate::outstation::database::details::event::traits::BaseEvent;
 use crate::outstation::database::details::event::traits::EventVariation;
 use crate::outstation::database::details::event::write_fn::Continue;
 use crate::util::cursor::{WriteCursor, WriteError};
@@ -59,7 +58,9 @@ pub(crate) struct EventWriter {
     state: State,
 }
 
-pub(crate) trait Writable: Sized + BaseEvent {
+pub(crate) trait Writable: Sized {
+    type EventVariation: PartialEq + EventVariation<Self>;
+
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation>;
 
     fn get_time(&self) -> Option<Time>;
@@ -216,6 +217,8 @@ impl EventWriter {
 }
 
 impl Writable for Binary {
+    type EventVariation = EventBinaryVariation;
+
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::Binary(var) => Some(*var),
@@ -229,6 +232,8 @@ impl Writable for Binary {
 }
 
 impl Writable for DoubleBitBinary {
+    type EventVariation = EventDoubleBitBinaryVariation;
+
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::DoubleBitBinary(var) => Some(*var),
@@ -242,6 +247,8 @@ impl Writable for DoubleBitBinary {
 }
 
 impl Writable for BinaryOutputStatus {
+    type EventVariation = EventBinaryOutputStatusVariation;
+
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::BinaryOutputStatus(var) => Some(*var),
@@ -255,6 +262,8 @@ impl Writable for BinaryOutputStatus {
 }
 
 impl Writable for Counter {
+    type EventVariation = EventCounterVariation;
+
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::Counter(var) => Some(*var),
@@ -268,6 +277,8 @@ impl Writable for Counter {
 }
 
 impl Writable for FrozenCounter {
+    type EventVariation = EventFrozenCounterVariation;
+
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::FrozenCounter(var) => Some(*var),
@@ -281,6 +292,8 @@ impl Writable for FrozenCounter {
 }
 
 impl Writable for Analog {
+    type EventVariation = EventAnalogVariation;
+
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::Analog(var) => Some(*var),
@@ -294,6 +307,8 @@ impl Writable for Analog {
 }
 
 impl Writable for AnalogOutputStatus {
+    type EventVariation = EventAnalogOutputStatusVariation;
+
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::AnalogOutputStatus(var) => Some(*var),
@@ -306,7 +321,9 @@ impl Writable for AnalogOutputStatus {
     }
 }
 
-impl Writable for OctetString {
+impl Writable for Box<[u8]> {
+    type EventVariation = EventOctetStringVariation;
+
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
             HeaderType::OctetString(var) => Some(*var),

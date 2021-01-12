@@ -293,4 +293,8 @@ impl OctetString {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    pub(crate) fn as_boxed_slice(&self) -> Box<[u8]> {
+        self.value().into()
+    }
 }

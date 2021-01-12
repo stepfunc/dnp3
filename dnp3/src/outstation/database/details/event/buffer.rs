@@ -1,5 +1,4 @@
 use super::list::VecList;
-use super::traits::BaseEvent;
 use super::writer::EventWriter;
 use crate::app::measurement;
 use crate::master::request::EventClasses;
@@ -277,9 +276,6 @@ where
     }
 }
 
-// TODO: Should we box the OctetString event here to avoid the enum size being 256 bytes?
-// Keeping the clippy warning active until we decide.
-//#[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq)]
 enum Event {
     Binary(measurement::Binary, Variation<EventBinaryVariation>),
@@ -301,10 +297,7 @@ enum Event {
         measurement::AnalogOutputStatus,
         Variation<EventAnalogOutputStatusVariation>,
     ),
-    OctetString(
-        measurement::OctetString,
-        Variation<EventOctetStringVariation>,
-    ),
+    OctetString(Box<[u8]>, Variation<EventOctetStringVariation>),
 }
 
 impl Event {
@@ -371,7 +364,9 @@ impl EventRecord {
     */
 }
 
-pub(crate) trait Insertable: BaseEvent {
+pub(crate) trait Insertable: Sized {
+    type EventVariation: Copy;
+
     fn get_max(config: &EventBufferConfig) -> u16;
     fn get_type_count(counter: &TypeCounter) -> usize;
     fn is_type(record: &EventRecord) -> bool;
@@ -622,6 +617,8 @@ impl EventBuffer {
 }
 
 impl Insertable for measurement::Binary {
+    type EventVariation = EventBinaryVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_binary
     }
@@ -666,6 +663,8 @@ impl Insertable for measurement::Binary {
 }
 
 impl Insertable for measurement::DoubleBitBinary {
+    type EventVariation = EventDoubleBitBinaryVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_double_binary
     }
@@ -710,6 +709,8 @@ impl Insertable for measurement::DoubleBitBinary {
 }
 
 impl Insertable for measurement::BinaryOutputStatus {
+    type EventVariation = EventBinaryOutputStatusVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_binary_output_status
     }
@@ -754,6 +755,8 @@ impl Insertable for measurement::BinaryOutputStatus {
 }
 
 impl Insertable for measurement::Counter {
+    type EventVariation = EventCounterVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_counter
     }
@@ -798,6 +801,8 @@ impl Insertable for measurement::Counter {
 }
 
 impl Insertable for measurement::FrozenCounter {
+    type EventVariation = EventFrozenCounterVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_frozen_counter
     }
@@ -842,6 +847,8 @@ impl Insertable for measurement::FrozenCounter {
 }
 
 impl Insertable for measurement::Analog {
+    type EventVariation = EventAnalogVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_analog
     }
@@ -886,6 +893,8 @@ impl Insertable for measurement::Analog {
 }
 
 impl Insertable for measurement::AnalogOutputStatus {
+    type EventVariation = EventAnalogOutputStatusVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_analog_output_status
     }
@@ -930,6 +939,8 @@ impl Insertable for measurement::AnalogOutputStatus {
 }
 
 impl Insertable for measurement::OctetString {
+    type EventVariation = EventOctetStringVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_octet_string
     }
@@ -959,7 +970,7 @@ impl Insertable for measurement::OctetString {
         EventRecord::new(
             index,
             class,
-            Event::OctetString(self.clone(), Variation::new(default_variation)),
+            Event::OctetString(self.as_boxed_slice(), Variation::new(default_variation)),
         )
     }
 

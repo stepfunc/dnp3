@@ -24,41 +24,10 @@ pub(crate) trait EventVariation<T> {
     }
 }
 
-pub(crate) trait BaseEvent: Sized {
-    type EventVariation: Copy + PartialEq + EventVariation<Self>;
-}
-
-impl BaseEvent for Binary {
-    type EventVariation = EventBinaryVariation;
-}
-
-impl BaseEvent for DoubleBitBinary {
-    type EventVariation = EventDoubleBitBinaryVariation;
-}
-
-impl BaseEvent for BinaryOutputStatus {
-    type EventVariation = EventBinaryOutputStatusVariation;
-}
-
-impl BaseEvent for Counter {
-    type EventVariation = EventCounterVariation;
-}
-
-impl BaseEvent for FrozenCounter {
-    type EventVariation = EventFrozenCounterVariation;
-}
-
-impl BaseEvent for Analog {
-    type EventVariation = EventAnalogVariation;
-}
-
-impl BaseEvent for AnalogOutputStatus {
-    type EventVariation = EventAnalogOutputStatusVariation;
-}
-
-impl BaseEvent for OctetString {
-    type EventVariation = EventOctetStringVariation;
-}
+/*pub(crate) trait BaseEvent: Sized {
+    type EventType;
+    type EventVariation: Copy + PartialEq + EventVariation<Self::EventType>;
+}*/
 
 impl EventVariation<Binary> for EventBinaryVariation {
     fn write(
@@ -326,11 +295,11 @@ impl EventVariation<AnalogOutputStatus> for EventAnalogOutputStatusVariation {
     }
 }
 
-impl EventVariation<OctetString> for EventOctetStringVariation {
+impl EventVariation<Box<[u8]>> for EventOctetStringVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
-        event: &OctetString,
+        event: &Box<[u8]>,
         index: u16,
         _cto: Time,
     ) -> Result<Continue, WriteError> {
@@ -341,7 +310,7 @@ impl EventVariation<OctetString> for EventOctetStringVariation {
         HeaderType::OctetString(*self)
     }
 
-    fn get_group_var(&self, event: &OctetString) -> (u8, u8) {
-        (111, event.len())
+    fn get_group_var(&self, event: &Box<[u8]>) -> (u8, u8) {
+        (111, event.len() as u8)
     }
 }
