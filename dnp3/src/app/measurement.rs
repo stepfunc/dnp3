@@ -298,3 +298,23 @@ impl OctetString {
         self.value().into()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_octet_string_greater_size() {
+        let octet_string = OctetString::new(&[0; 500]);
+        assert_eq!(255, octet_string.len());
+    }
+
+    #[test]
+    fn octet_string_methods() {
+        let octet_string = OctetString::new(&[0, 1, 2, 3, 4]);
+        assert_eq!(5, octet_string.len());
+        assert!(!octet_string.is_empty());
+        assert_eq!(&[0, 1, 2, 3, 4], octet_string.value());
+        assert_eq!(&[0, 1, 2, 3, 4], &*octet_string.as_boxed_slice());
+    }
+}

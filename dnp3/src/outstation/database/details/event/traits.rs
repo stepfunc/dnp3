@@ -24,11 +24,6 @@ pub(crate) trait EventVariation<T> {
     }
 }
 
-/*pub(crate) trait BaseEvent: Sized {
-    type EventType;
-    type EventVariation: Copy + PartialEq + EventVariation<Self::EventType>;
-}*/
-
 impl EventVariation<Binary> for EventBinaryVariation {
     fn write(
         &self,
