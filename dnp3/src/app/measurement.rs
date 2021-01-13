@@ -260,43 +260,71 @@ impl AnalogOutputStatus {
     }
 }
 
+/// Octet string point type corresponding to groups 110 and 111
+///
+/// Octet strings can only hold from 1 to 255 octets. Zero-length
+/// octet strings are prohibited by the standard.
+///
+/// The default value is `[0x00]`, corresponding to an empty
+/// C-style string.
 #[allow(missing_copy_implementations)]
 #[derive(Clone, PartialEq, Debug)]
 pub struct OctetString {
-    /// buffer for the value
     value: [u8; Self::MAX_SIZE],
-    /// Actual length
     len: u8,
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl OctetString {
     const MAX_SIZE: usize = 255;
 
-    pub fn new(value: &[u8]) -> Self {
-        let len = std::cmp::min(value.len(), Self::MAX_SIZE);
+    /// Creates a new octet string.
+    ///
+    /// The `value` parameter must have a length of [1, 255],
+    /// otherwise it will return an error.
+    pub fn new(value: &[u8]) -> Result<Self, OctetStringError> {
+        let len = value.len();
+        if len == 0 {
+            return Err(OctetStringError::ZeroLength);
+        }
+
+        if len > 255 {
+            return Err(OctetStringError::MoreThan255Octets);
+        }
+
         let mut result = Self {
             value: [0u8; 255],
             len: len as u8,
         };
-        result.value[..len].copy_from_slice(&value[..len]);
-        result
+        result.value[..len].copy_from_slice(value);
+        Ok(result)
     }
 
+    /// Returns the value of the octet string
     pub fn value(&self) -> &[u8] {
         &self.value[..self.len() as usize]
     }
 
+    /// Returns the length of the octet string
     pub fn len(&self) -> u8 {
         self.len
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
+    /// Allocates a new slice with the exact size of the string
+    /// and copies the content to it.
     pub(crate) fn as_boxed_slice(&self) -> Box<[u8]> {
         self.value().into()
     }
+}
+
+/// Errors when creating an octet string
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum OctetStringError {
+    /// Zero-length octet strings are explicitely disallowed
+    /// by the standard.
+    ZeroLength,
+    /// Octet strings can only hold up to 255 octets.
+    MoreThan255Octets,
 }
 
 #[cfg(test)]
@@ -304,17 +332,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_octet_string_greater_size() {
-        let octet_string = OctetString::new(&[0; 500]);
-        assert_eq!(255, octet_string.len());
+    fn octet_string_methods() {
+        let octet_string = OctetString::new(&[0, 1, 2, 3, 4]).unwrap();
+        assert_eq!(5, octet_string.len());
+        assert_eq!(&[0, 1, 2, 3, 4], octet_string.value());
+        assert_eq!(&[0, 1, 2, 3, 4], &*octet_string.as_boxed_slice());
     }
 
     #[test]
-    fn octet_string_methods() {
-        let octet_string = OctetString::new(&[0, 1, 2, 3, 4]);
-        assert_eq!(5, octet_string.len());
-        assert!(!octet_string.is_empty());
-        assert_eq!(&[0, 1, 2, 3, 4], octet_string.value());
-        assert_eq!(&[0, 1, 2, 3, 4], &*octet_string.as_boxed_slice());
+    fn new_octet_string_zero_length() {
+        assert_eq!(Err(OctetStringError::ZeroLength), OctetString::new(&[]));
+    }
+
+    #[test]
+    fn new_octet_string_greater_size() {
+        assert_eq!(
+            Err(OctetStringError::MoreThan255Octets),
+            OctetString::new(&[0; 500])
+        );
+    }
+
+    #[test]
+    fn octet_string_default_value() {
+        assert_eq!(&[0x00], OctetString::default().value());
     }
 }

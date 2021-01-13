@@ -793,7 +793,7 @@ impl Default for AnalogOutputStatus {
 
 impl Default for OctetString {
     fn default() -> Self {
-        Self::new(&[])
+        Self::new(&[0x00]).unwrap()
     }
 }
 
