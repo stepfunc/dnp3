@@ -74,6 +74,16 @@ where
     write_prefixed(cursor, &variation, index).map(|_| Continue::Ok)
 }
 
+pub(crate) fn write_octet_string(
+    cursor: &mut WriteCursor,
+    event: &[u8],
+    index: u16,
+) -> Result<Continue, WriteError> {
+    cursor.write_u16_le(index)?;
+    cursor.write(&event)?;
+    Ok(Continue::Ok)
+}
+
 impl ToVariationCTO<Group2Var3> for Binary {
     fn get_time(&self) -> Option<Time> {
         self.time

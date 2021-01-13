@@ -1,5 +1,4 @@
 use super::list::VecList;
-use super::traits::BaseEvent;
 use super::writer::EventWriter;
 use crate::app::measurement;
 use crate::master::request::EventClasses;
@@ -148,6 +147,7 @@ pub(crate) struct TypeCounter {
     num_frozen_counter: Count,
     num_analog: Count,
     num_analog_output_status: Count,
+    num_octet_string: Count,
 }
 
 impl TypeCounter {
@@ -160,6 +160,7 @@ impl TypeCounter {
             num_frozen_counter: Count::new(),
             num_analog: Count::new(),
             num_analog_output_status: Count::new(),
+            num_octet_string: Count::new(),
         }
     }
 
@@ -171,6 +172,7 @@ impl TypeCounter {
         self.num_frozen_counter.zero();
         self.num_analog.zero();
         self.num_analog_output_status.zero();
+        self.num_octet_string.zero();
     }
 
     fn increment(&mut self, event: &Event) {
@@ -195,6 +197,7 @@ impl TypeCounter {
             Event::FrozenCounter(_, _) => op(&mut self.num_frozen_counter),
             Event::Analog(_, _) => op(&mut self.num_analog),
             Event::AnalogOutputStatus(_, _) => op(&mut self.num_analog_output_status),
+            Event::OctetString(_, _) => op(&mut self.num_octet_string),
         }
     }
 
@@ -211,6 +214,7 @@ impl TypeCounter {
             num_analog_output_status: self
                 .num_analog_output_status
                 .subtract(&other.num_analog_output_status),
+            num_octet_string: self.num_octet_string.subtract(&other.num_octet_string),
         }
     }
 }
@@ -293,6 +297,7 @@ enum Event {
         measurement::AnalogOutputStatus,
         Variation<EventAnalogOutputStatusVariation>,
     ),
+    OctetString(Box<[u8]>, Variation<EventOctetStringVariation>),
 }
 
 impl Event {
@@ -305,6 +310,7 @@ impl Event {
             Event::FrozenCounter(_, v) => v.select_default(),
             Event::Analog(_, v) => v.select_default(),
             Event::AnalogOutputStatus(_, v) => v.select_default(),
+            Event::OctetString(_, v) => v.select_default(),
         }
     }
 
@@ -322,6 +328,7 @@ impl Event {
             Event::FrozenCounter(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
             Event::Analog(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
             Event::AnalogOutputStatus(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
+            Event::OctetString(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
         }
     }
 }
@@ -357,7 +364,9 @@ impl EventRecord {
     */
 }
 
-pub(crate) trait Insertable: BaseEvent {
+pub(crate) trait Insertable: Sized {
+    type EventVariation: Copy;
+
     fn get_max(config: &EventBufferConfig) -> u16;
     fn get_type_count(counter: &TypeCounter) -> usize;
     fn is_type(record: &EventRecord) -> bool;
@@ -478,6 +487,9 @@ impl EventBuffer {
             }
             EventReadHeader::AnalogOutputStatus(v, limit) => {
                 self.select_by_type::<measurement::AnalogOutputStatus>(v, limit)
+            }
+            EventReadHeader::OctetString(limit) => {
+                self.select_by_type::<measurement::OctetString>(None, limit)
             }
         }
     }
@@ -605,6 +617,8 @@ impl EventBuffer {
 }
 
 impl Insertable for measurement::Binary {
+    type EventVariation = EventBinaryVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_binary
     }
@@ -649,6 +663,8 @@ impl Insertable for measurement::Binary {
 }
 
 impl Insertable for measurement::DoubleBitBinary {
+    type EventVariation = EventDoubleBitBinaryVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_double_binary
     }
@@ -693,6 +709,8 @@ impl Insertable for measurement::DoubleBitBinary {
 }
 
 impl Insertable for measurement::BinaryOutputStatus {
+    type EventVariation = EventBinaryOutputStatusVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_binary_output_status
     }
@@ -737,6 +755,8 @@ impl Insertable for measurement::BinaryOutputStatus {
 }
 
 impl Insertable for measurement::Counter {
+    type EventVariation = EventCounterVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_counter
     }
@@ -781,6 +801,8 @@ impl Insertable for measurement::Counter {
 }
 
 impl Insertable for measurement::FrozenCounter {
+    type EventVariation = EventFrozenCounterVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_frozen_counter
     }
@@ -825,6 +847,8 @@ impl Insertable for measurement::FrozenCounter {
 }
 
 impl Insertable for measurement::Analog {
+    type EventVariation = EventAnalogVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_analog
     }
@@ -869,6 +893,8 @@ impl Insertable for measurement::Analog {
 }
 
 impl Insertable for measurement::AnalogOutputStatus {
+    type EventVariation = EventAnalogOutputStatusVariation;
+
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_analog_output_status
     }
@@ -878,7 +904,7 @@ impl Insertable for measurement::AnalogOutputStatus {
     }
 
     fn is_type(record: &EventRecord) -> bool {
-        std::matches!(record.event, Event::BinaryOutputStatus(_, _))
+        std::matches!(record.event, Event::AnalogOutputStatus(_, _))
     }
 
     fn decrement_type(counter: &mut TypeCounter) {
@@ -904,6 +930,52 @@ impl Insertable for measurement::AnalogOutputStatus {
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
         if let Event::AnalogOutputStatus(_, v) = &record.event {
+            v.selected.set(variation);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Insertable for measurement::OctetString {
+    type EventVariation = EventOctetStringVariation;
+
+    fn get_max(config: &EventBufferConfig) -> u16 {
+        config.max_octet_string
+    }
+
+    fn get_type_count(counter: &TypeCounter) -> usize {
+        counter.num_octet_string.get()
+    }
+
+    fn is_type(record: &EventRecord) -> bool {
+        std::matches!(record.event, Event::OctetString(_, _))
+    }
+
+    fn decrement_type(counter: &mut TypeCounter) {
+        counter.num_octet_string.decrement();
+    }
+
+    fn increment_type(counter: &mut TypeCounter) {
+        counter.num_octet_string.increment();
+    }
+
+    fn create_event_record(
+        &self,
+        index: u16,
+        class: EventClass,
+        default_variation: EventOctetStringVariation,
+    ) -> EventRecord {
+        EventRecord::new(
+            index,
+            class,
+            Event::OctetString(self.as_boxed_slice(), Variation::new(default_variation)),
+        )
+    }
+
+    fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
+        if let Event::OctetString(_, v) = &record.event {
             v.selected.set(variation);
             true
         } else {

@@ -7,6 +7,8 @@ use crate::outstation::database::details::event::write_fn::{
 use crate::outstation::database::details::event::writer::HeaderType;
 use crate::util::cursor::{WriteCursor, WriteError};
 
+use super::write_fn::write_octet_string;
+
 pub(crate) trait EventVariation<T> {
     fn write(
         &self,
@@ -16,42 +18,10 @@ pub(crate) trait EventVariation<T> {
         cto: Time,
     ) -> Result<Continue, WriteError>;
     fn wrap(&self) -> HeaderType;
-    fn get_group_var(&self) -> (u8, u8);
+    fn get_group_var(&self, event: &T) -> (u8, u8);
     fn uses_cto(&self) -> bool {
         false
     }
-}
-
-pub(crate) trait BaseEvent: Sized {
-    type EventVariation: Copy + PartialEq + EventVariation<Self>;
-}
-
-impl BaseEvent for Binary {
-    type EventVariation = EventBinaryVariation;
-}
-
-impl BaseEvent for DoubleBitBinary {
-    type EventVariation = EventDoubleBitBinaryVariation;
-}
-
-impl BaseEvent for BinaryOutputStatus {
-    type EventVariation = EventBinaryOutputStatusVariation;
-}
-
-impl BaseEvent for Counter {
-    type EventVariation = EventCounterVariation;
-}
-
-impl BaseEvent for FrozenCounter {
-    type EventVariation = EventFrozenCounterVariation;
-}
-
-impl BaseEvent for Analog {
-    type EventVariation = EventAnalogVariation;
-}
-
-impl BaseEvent for AnalogOutputStatus {
-    type EventVariation = EventAnalogOutputStatusVariation;
 }
 
 impl EventVariation<Binary> for EventBinaryVariation {
@@ -73,7 +43,7 @@ impl EventVariation<Binary> for EventBinaryVariation {
         HeaderType::Binary(*self)
     }
 
-    fn get_group_var(&self) -> (u8, u8) {
+    fn get_group_var(&self, _event: &Binary) -> (u8, u8) {
         match self {
             Self::Group2Var1 => (2, 1),
             Self::Group2Var2 => (2, 2),
@@ -108,7 +78,7 @@ impl EventVariation<BinaryOutputStatus> for EventBinaryOutputStatusVariation {
         HeaderType::BinaryOutputStatus(*self)
     }
 
-    fn get_group_var(&self) -> (u8, u8) {
+    fn get_group_var(&self, _event: &BinaryOutputStatus) -> (u8, u8) {
         match self {
             Self::Group11Var1 => (11, 1),
             Self::Group11Var2 => (11, 2),
@@ -139,7 +109,7 @@ impl EventVariation<DoubleBitBinary> for EventDoubleBitBinaryVariation {
         HeaderType::DoubleBitBinary(*self)
     }
 
-    fn get_group_var(&self) -> (u8, u8) {
+    fn get_group_var(&self, _event: &DoubleBitBinary) -> (u8, u8) {
         match self {
             Self::Group4Var1 => (4, 1),
             Self::Group4Var2 => (4, 2),
@@ -180,7 +150,7 @@ impl EventVariation<Counter> for EventCounterVariation {
         HeaderType::Counter(*self)
     }
 
-    fn get_group_var(&self) -> (u8, u8) {
+    fn get_group_var(&self, _event: &Counter) -> (u8, u8) {
         match self {
             Self::Group22Var1 => (22, 1),
             Self::Group22Var2 => (22, 2),
@@ -218,7 +188,7 @@ impl EventVariation<FrozenCounter> for EventFrozenCounterVariation {
         HeaderType::FrozenCounter(*self)
     }
 
-    fn get_group_var(&self) -> (u8, u8) {
+    fn get_group_var(&self, _event: &FrozenCounter) -> (u8, u8) {
         match self {
             Self::Group23Var1 => (23, 1),
             Self::Group23Var2 => (23, 2),
@@ -252,7 +222,7 @@ impl EventVariation<Analog> for EventAnalogVariation {
         HeaderType::Analog(*self)
     }
 
-    fn get_group_var(&self) -> (u8, u8) {
+    fn get_group_var(&self, _event: &Analog) -> (u8, u8) {
         match self {
             Self::Group32Var1 => (32, 1),
             Self::Group32Var2 => (32, 2),
@@ -306,7 +276,7 @@ impl EventVariation<AnalogOutputStatus> for EventAnalogOutputStatusVariation {
         HeaderType::AnalogOutputStatus(*self)
     }
 
-    fn get_group_var(&self) -> (u8, u8) {
+    fn get_group_var(&self, _event: &AnalogOutputStatus) -> (u8, u8) {
         match self {
             Self::Group42Var1 => (42, 1),
             Self::Group42Var2 => (42, 2),
@@ -317,5 +287,25 @@ impl EventVariation<AnalogOutputStatus> for EventAnalogOutputStatusVariation {
             Self::Group42Var7 => (42, 7),
             Self::Group42Var8 => (42, 8),
         }
+    }
+}
+
+impl EventVariation<Box<[u8]>> for EventOctetStringVariation {
+    fn write(
+        &self,
+        cursor: &mut WriteCursor,
+        event: &Box<[u8]>,
+        index: u16,
+        _cto: Time,
+    ) -> Result<Continue, WriteError> {
+        write_octet_string(cursor, event, index)
+    }
+
+    fn wrap(&self) -> HeaderType {
+        HeaderType::OctetString(*self)
+    }
+
+    fn get_group_var(&self, event: &Box<[u8]>) -> (u8, u8) {
+        (111, event.len() as u8)
     }
 }

@@ -72,6 +72,7 @@ pub(crate) enum SpecificVariation {
     FrozenCounter(Option<StaticFrozenCounterVariation>),
     Analog(Option<StaticAnalogVariation>),
     AnalogOutputStatus(Option<StaticAnalogOutputStatusVariation>),
+    OctetString,
 }
 
 impl SpecificVariation {
@@ -237,6 +238,7 @@ pub(crate) struct StaticDatabase {
     frozen_counter: PointMap<FrozenCounter>,
     analog: PointMap<Analog>,
     analog_output_status: PointMap<AnalogOutputStatus>,
+    octet_strings: PointMap<OctetString>,
 }
 
 impl Default for StaticDatabase {
@@ -262,6 +264,7 @@ impl StaticDatabase {
             frozen_counter: PointMap::empty(),
             analog: PointMap::empty(),
             analog_output_status: PointMap::empty(),
+            octet_strings: PointMap::empty(),
         }
     }
     /*
@@ -387,6 +390,9 @@ impl StaticDatabase {
             SpecificVariation::AnalogOutputStatus(var) => {
                 self.write_typed_range::<AnalogOutputStatus>(cursor, range.range, var)
             }
+            SpecificVariation::OctetString => {
+                self.write_typed_range::<OctetString>(cursor, range.range, None)
+            }
         }
     }
 
@@ -405,7 +411,7 @@ impl StaticDatabase {
             let info = variation
                 .unwrap_or(item.config.s_var)
                 .promote(&item.selected)
-                .get_write_info();
+                .get_write_info(&item.selected);
 
             if writer.write(cursor, *index, &item.selected, info).is_err() {
                 // ran out of space, tell calling code to resume at this index
@@ -440,6 +446,7 @@ impl StaticDatabase {
             StaticReadHeader::AnalogOutputStatus(variation, range) => {
                 self.select_by_type::<AnalogOutputStatus>(variation, range)
             }
+            StaticReadHeader::OctetString(range) => self.select_by_type::<OctetString>(None, range),
         }
     }
 
@@ -507,6 +514,7 @@ impl StaticDatabase {
             | self.select_class_zero_type::<FrozenCounter>()
             | self.select_class_zero_type::<Analog>()
             | self.select_class_zero_type::<AnalogOutputStatus>()
+            | self.select_class_zero_type::<OctetString>()
     }
 }
 
@@ -517,6 +525,8 @@ where
 {
     deadband: N,
 }
+
+pub(crate) struct OctetStringDetector;
 
 impl<N> Deadband<N>
 where
@@ -590,6 +600,12 @@ where
         }
 
         self.exceeded(new.value(), old.value())
+    }
+}
+
+impl EventDetector<OctetString> for OctetStringDetector {
+    fn is_event(&self, new: &OctetString, old: &OctetString) -> bool {
+        new.value() != old.value()
     }
 }
 
@@ -712,6 +728,23 @@ impl Updatable for AnalogOutputStatus {
     }
 }
 
+impl Updatable for OctetString {
+    type StaticVariation = StaticOctetStringVariation;
+    type Detector = OctetStringDetector;
+
+    fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
+        &mut maps.octet_strings
+    }
+
+    fn wrap(range: IndexRange, _variation: Option<Self::StaticVariation>) -> VariationRange {
+        SpecificVariation::OctetString.with(range)
+    }
+
+    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
+        config.octet_strings
+    }
+}
+
 impl Default for Binary {
     fn default() -> Self {
         Self::new(false, Flags::RESTART, Time::not_synchronized(0))
@@ -755,6 +788,12 @@ impl Default for Analog {
 impl Default for AnalogOutputStatus {
     fn default() -> Self {
         Self::new(0.0, Flags::RESTART, Time::not_synchronized(0))
+    }
+}
+
+impl Default for OctetString {
+    fn default() -> Self {
+        Self::new(&[])
     }
 }
 

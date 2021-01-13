@@ -58,6 +58,10 @@ pub enum EventAnalogOutputStatusVariation {
     Group42Var8,
 }
 
+// This is always g111vX
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct EventOctetStringVariation;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum StaticBinaryVariation {
     Group1Var1,
@@ -112,6 +116,10 @@ pub enum StaticAnalogOutputStatusVariation {
     Group40Var4,
 }
 
+// This is always g110vX
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct StaticOctetStringVariation;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct BinaryConfig {
     pub s_var: StaticBinaryVariation,
@@ -157,6 +165,9 @@ pub struct AnalogOutputStatusConfig {
     pub e_var: EventAnalogOutputStatusVariation,
     pub deadband: f64,
 }
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct OctetStringConfig;
 
 impl BinaryConfig {
     pub fn new(s_var: StaticBinaryVariation, e_var: EventBinaryVariation) -> Self {

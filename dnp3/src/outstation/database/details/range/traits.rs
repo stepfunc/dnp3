@@ -43,6 +43,16 @@ fn double_bit_type<T>(variation: Variation, func: fn(&T) -> DoubleBit) -> WriteI
     }
 }
 
+fn octet_string(value: &OctetString) -> WriteInfo<OctetString> {
+    fn write(cursor: &mut WriteCursor, value: &OctetString) -> Result<(), WriteError> {
+        cursor.write(value.value())
+    }
+    WriteInfo {
+        variation: Variation::Group110(value.len()),
+        write_type: WriteType::Fixed(write),
+    }
+}
+
 #[derive(Copy, Clone)]
 pub(crate) enum WriteType<T> {
     Fixed(FixedWriteFn<T>),
@@ -64,7 +74,7 @@ pub(crate) trait StaticVariation<T>: Copy + PartialEq {
         *self
     }
 
-    fn get_write_info(&self) -> WriteInfo<T>;
+    fn get_write_info(&self, value: &T) -> WriteInfo<T>;
 }
 
 impl StaticVariation<Binary> for StaticBinaryVariation {
@@ -80,7 +90,7 @@ impl StaticVariation<Binary> for StaticBinaryVariation {
         }
     }
 
-    fn get_write_info(&self) -> WriteInfo<Binary> {
+    fn get_write_info(&self, _value: &Binary) -> WriteInfo<Binary> {
         match self {
             Self::Group1Var1 => bit_type(Variation::Group1Var1, |v| v.value),
             Self::Group1Var2 => fixed_type::<Binary, Group1Var2>(),
@@ -101,7 +111,7 @@ impl StaticVariation<DoubleBitBinary> for StaticDoubleBitBinaryVariation {
         }
     }
 
-    fn get_write_info(&self) -> WriteInfo<DoubleBitBinary> {
+    fn get_write_info(&self, _value: &DoubleBitBinary) -> WriteInfo<DoubleBitBinary> {
         match self {
             Self::Group3Var1 => double_bit_type(Variation::Group3Var1, |v| v.value),
             Self::Group3Var2 => fixed_type::<DoubleBitBinary, Group3Var2>(),
@@ -122,7 +132,7 @@ impl StaticVariation<BinaryOutputStatus> for StaticBinaryOutputStatusVariation {
         }
     }
 
-    fn get_write_info(&self) -> WriteInfo<BinaryOutputStatus> {
+    fn get_write_info(&self, _value: &BinaryOutputStatus) -> WriteInfo<BinaryOutputStatus> {
         match self {
             Self::Group10Var1 => bit_type(Variation::Group10Var1, |v| v.value),
             Self::Group10Var2 => fixed_type::<BinaryOutputStatus, Group10Var2>(),
@@ -131,7 +141,7 @@ impl StaticVariation<BinaryOutputStatus> for StaticBinaryOutputStatusVariation {
 }
 
 impl StaticVariation<Counter> for StaticCounterVariation {
-    fn get_write_info(&self) -> WriteInfo<Counter> {
+    fn get_write_info(&self, _value: &Counter) -> WriteInfo<Counter> {
         match self {
             StaticCounterVariation::Group20Var1 => fixed_type::<Counter, Group20Var1>(),
             StaticCounterVariation::Group20Var2 => fixed_type::<Counter, Group20Var2>(),
@@ -142,7 +152,7 @@ impl StaticVariation<Counter> for StaticCounterVariation {
 }
 
 impl StaticVariation<FrozenCounter> for StaticFrozenCounterVariation {
-    fn get_write_info(&self) -> WriteInfo<FrozenCounter> {
+    fn get_write_info(&self, _value: &FrozenCounter) -> WriteInfo<FrozenCounter> {
         match self {
             StaticFrozenCounterVariation::Group21Var1 => fixed_type::<FrozenCounter, Group21Var1>(),
             StaticFrozenCounterVariation::Group21Var2 => fixed_type::<FrozenCounter, Group21Var2>(),
@@ -157,7 +167,7 @@ impl StaticVariation<FrozenCounter> for StaticFrozenCounterVariation {
 }
 
 impl StaticVariation<Analog> for StaticAnalogVariation {
-    fn get_write_info(&self) -> WriteInfo<Analog> {
+    fn get_write_info(&self, _value: &Analog) -> WriteInfo<Analog> {
         match self {
             StaticAnalogVariation::Group30Var1 => fixed_type::<Analog, Group30Var1>(),
             StaticAnalogVariation::Group30Var2 => fixed_type::<Analog, Group30Var2>(),
@@ -170,7 +180,7 @@ impl StaticVariation<Analog> for StaticAnalogVariation {
 }
 
 impl StaticVariation<AnalogOutputStatus> for StaticAnalogOutputStatusVariation {
-    fn get_write_info(&self) -> WriteInfo<AnalogOutputStatus> {
+    fn get_write_info(&self, _value: &AnalogOutputStatus) -> WriteInfo<AnalogOutputStatus> {
         match self {
             StaticAnalogOutputStatusVariation::Group40Var1 => {
                 fixed_type::<AnalogOutputStatus, Group40Var1>()
@@ -185,5 +195,11 @@ impl StaticVariation<AnalogOutputStatus> for StaticAnalogOutputStatusVariation {
                 fixed_type::<AnalogOutputStatus, Group40Var4>()
             }
         }
+    }
+}
+
+impl StaticVariation<OctetString> for StaticOctetStringVariation {
+    fn get_write_info(&self, value: &OctetString) -> WriteInfo<OctetString> {
+        octet_string(value)
     }
 }
