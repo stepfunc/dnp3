@@ -44,6 +44,9 @@ fn config() -> TestConfig {
     }
 }
 
+// the ports used... the number of ports determines the number of parallel entries
+const PORT_RANGE: std::ops::Range<u16> = 50000..50019;
+
 pub fn criterion_benchmark(c: &mut Criterion) {
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
@@ -55,15 +58,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .build()
         .unwrap();
 
-    let mut pair = runtime.block_on(Pair::spawn(20000, config()));
+    let mut harness = runtime.block_on(TestHarness::create(PORT_RANGE, config()));
 
-    runtime.block_on(pair.wait_for_null_unsolicited());
+    runtime.block_on(harness.wait_for_startup());
 
     c.bench_function("outstation", |b| {
         b.iter(|| {
-            pair.update_values();
-
-            runtime.block_on(pair.wait_for_update());
+            runtime.block_on(harness.run_iteration());
         })
     });
 }
@@ -77,6 +78,36 @@ struct TestConfig {
     master_level: DecodeLogLevel,
     num_values: usize,
     max_index: u16,
+}
+
+struct TestHarness {
+    pairs: Vec<Pair>,
+}
+
+impl TestHarness {
+    async fn create(ports: std::ops::Range<u16>, config: TestConfig) -> Self {
+        let mut pairs = Vec::new();
+        for port in ports {
+            pairs.push(Pair::spawn(port, config).await)
+        }
+        Self { pairs }
+    }
+
+    async fn wait_for_startup(&mut self) {
+        for pair in &mut self.pairs {
+            pair.wait_for_null_unsolicited().await;
+        }
+    }
+
+    async fn run_iteration(&mut self) {
+        for pair in &mut self.pairs {
+            pair.update_values();
+        }
+
+        for pair in &mut self.pairs {
+            pair.wait_for_update().await;
+        }
+    }
 }
 
 struct Pair {
