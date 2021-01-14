@@ -8,6 +8,9 @@ Cargo.lock
 
 dnp3/codegen/target
 
+# this is where criterion puts the benchmark report
+dnp3/target
+
 # Cargo config
 /.cargo/config.toml
 

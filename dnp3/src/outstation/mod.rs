@@ -15,5 +15,7 @@ pub(crate) mod session;
 /// implementing `AsyncRead` + `AsyncWrite` + `Unpin`
 pub(crate) mod task;
 
+pub use task::OutstationHandle;
+
 #[cfg(test)]
 mod tests;

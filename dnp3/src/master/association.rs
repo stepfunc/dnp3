@@ -49,7 +49,7 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub fn none(auto_tasks_retry_strategy: RetryStrategy) -> Self {
+    pub fn quiet(auto_tasks_retry_strategy: RetryStrategy) -> Self {
         Self {
             disable_unsol_classes: EventClasses::none(),
             enable_unsol_classes: EventClasses::none(),

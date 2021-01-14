@@ -89,6 +89,13 @@ impl Binary {
             time: Some(time),
         }
     }
+
+    pub fn normalize(self) -> Self {
+        Self {
+            flags: Flags::new(self.get_wire_flags()),
+            ..self
+        }
+    }
 }
 
 /// Measurement type corresponding to groups 3 and 4
