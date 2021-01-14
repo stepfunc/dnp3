@@ -206,7 +206,7 @@ pub struct UpdateOptions {
 
 impl UpdateOptions {
     /// fully specify custom UpdateOptions
-    pub fn new(update_static: bool, event_mode: EventMode) -> Self {
+    pub const fn new(update_static: bool, event_mode: EventMode) -> Self {
         Self {
             update_static,
             event_mode,
