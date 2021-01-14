@@ -292,7 +292,7 @@ impl DatabaseHandle {
         F: FnMut(&mut Database) -> R,
     {
         let ret = func(&mut self.inner.lock().unwrap());
-        self.notify.notify_waiters();
+        self.notify.notify_one();
         ret
     }
 
