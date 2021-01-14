@@ -45,7 +45,31 @@ fn config() -> TestConfig {
 }
 
 // the ports used... the number of ports determines the number of parallel entries
-const PORT_RANGE: std::ops::Range<u16> = 50000..50019;
+const PORT_RANGE_16: std::ops::Range<u16> = 50000..50016;
+
+struct TestInstance {
+    runtime: tokio::runtime::Runtime,
+    harness: TestHarness,
+}
+
+impl TestInstance {
+    fn create(ports: std::ops::Range<u16>) -> Self {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let mut harness = runtime.block_on(TestHarness::create(ports, config()));
+
+        runtime.block_on(harness.wait_for_startup());
+
+        Self { runtime, harness }
+    }
+
+    fn run_iteration(&mut self) {
+        self.runtime.block_on(self.harness.run_iteration());
+    }
+}
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     tracing_subscriber::fmt()
@@ -53,18 +77,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .with_target(false)
         .init();
 
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
-    let mut harness = runtime.block_on(TestHarness::create(PORT_RANGE, config()));
-
-    runtime.block_on(harness.wait_for_startup());
-
-    c.bench_function("outstation", |b| {
+    let mut instance = TestInstance::create(PORT_RANGE_16);
+    c.bench_function("16 sessions", |b| {
         b.iter(|| {
-            runtime.block_on(harness.run_iteration());
+            instance.run_iteration();
         })
     });
 }
