@@ -37,10 +37,10 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// If supported, return Some(RestartDelay) indicating how long the restart
     /// will take to complete
     ///
-    /// returning None, will cause the outstation to return IIN.2 FUNCTION_NOT_SUPPORTED
+    /// returning None, will cause the outstation to return IIN2.0 NO_FUNC_CODE_SUPPORT
     ///
     /// The outstation will not automatically restart. It is the responsibility of the user
-    /// application to handle this request and take the appropriate acton.
+    /// application to handle this request and take the appropriate action.
     fn cold_restart(&mut self) -> Option<RestartDelay> {
         None
     }
@@ -50,10 +50,10 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// If supported, return Some(RestartDelay) indicating how long the restart
     /// will take to complete
     ///
-    /// returning None, will cause the outstation to return IIN.2 FUNCTION_NOT_SUPPORTED
+    /// returning None, will cause the outstation to return IIN2.0 NO_FUNC_CODE_SUPPORT
     ///
     /// The outstation will not automatically restart. It is the responsibility of the user
-    /// application to handle this request and take the appropriate acton.
+    /// application to handle this request and take the appropriate action.
     fn warm_restart(&mut self) -> Option<RestartDelay> {
         None
     }

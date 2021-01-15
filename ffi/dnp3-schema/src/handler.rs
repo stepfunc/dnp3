@@ -5,21 +5,13 @@ use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::NativeStructHandle;
 use oo_bindgen::*;
 
+use crate::shared::SharedDefinitions;
+
 pub fn define(
     lib: &mut LibraryBuilder,
     variation_enum: NativeEnumHandle,
+    shared_def: &SharedDefinitions,
 ) -> Result<InterfaceHandle, BindingError> {
-    let control = lib.declare_native_struct("Control")?;
-    let control = lib
-        .define_native_struct(&control)?
-        .add("fir", Type::Bool, "First fragment in the message")?
-        .add("fin", Type::Bool, "Final fragment of the message")?
-        .add("con", Type::Bool, "Requires confirmation")?
-        .add("uns", Type::Bool, "Unsolicited response")?
-        .add("seq", Type::Uint8, "Sequence number")?
-        .doc("APDU Control field")?
-        .build()?;
-
     let response_function = lib
         .define_native_enum("ResponseFunction")?
         .push("Response", "Solicited response")?
@@ -34,7 +26,7 @@ pub fn define(
         .define_native_struct(&response_header)?
         .add(
             "control",
-            Type::Struct(control),
+            Type::Struct(shared_def.control_struct.clone()),
             "Application control field",
         )?
         .add("func", Type::Enum(response_function), "Response type")?

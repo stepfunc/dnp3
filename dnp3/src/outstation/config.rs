@@ -23,7 +23,7 @@ impl BufferSize {
         Buffer::new(self.size)
     }
 
-    pub(crate) fn value(&self) -> usize {
+    pub fn value(&self) -> usize {
         self.size
     }
 

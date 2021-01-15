@@ -4,6 +4,7 @@ pub mod config;
 pub mod database;
 /// user-facing traits used to receive dynamic callbacks from the outstation
 pub mod traits;
+pub use task::OutstationHandle;
 
 /// functionality for processing control requests
 pub(crate) mod control;

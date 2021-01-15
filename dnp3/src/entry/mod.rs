@@ -34,7 +34,7 @@ impl EndpointAddress {
         EndpointAddress { address }
     }
 
-    pub(crate) fn raw_value(&self) -> u16 {
+    pub fn raw_value(&self) -> u16 {
         self.address
     }
 
