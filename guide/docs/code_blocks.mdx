@@ -1,0 +1,59 @@
+---
+id: code
+title: Code Blocks
+sidebar_label: Code Blocks
+slug: /code
+---
+
+Hello world!
+
+```rust
+// This is some text
+{{#include ../examples/rust/main.rs:test}}
+```
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+// This is some extra text
+{{#include ../examples/rust/main.rs:test}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+// This is some extra text
+{{#include ../examples/c/main.c:test}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+// This is some extra text
+{{#include ../examples/java/Main.java:test}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+// This is some extra text
+{{#include ../examples/dotnet/Main.cs:test}}
+```
+
+</TabItem>
+</Tabs>

@@ -1,0 +1,28 @@
+---
+id: dnp3
+title: DNP3
+sidebar_label: DNP3
+slug: /dnp3
+---
+
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
+DNP3 (IEEE-1815) is the most common SCADA protocol in North America. It is primarily used in electric power 
+to monitor and control field assets. DNP3 differs from simple request / response protocols such as Modbus in important ways:
+
+* DNP3 makes efficient use by bandwidth by transferring only points that have changed since the last request or in a purely event-driven *unsolicited* mode.
+* Events may be time-tagged at the source of the measurement to millisecond accuracy.
+* Measurement *variations* are specified to avoid the ad hoc nature of how non-16-bit values are encoded in multiple Modbus registers. For example, analog
+values in DNP3 may be exchanged as signed 16-bit integers, signed 32-bit integers, single precision floats, or double precision floats.
+* DNP3 is not purely request-response and is quite complex.
+
+## The Standard
+
+The standard may be purchased from the [DNP3 Users Group](https://dnp.org) or [IEEE](https://standards.ieee.org/standard/1815-2012.html). If you plan to develop
+or deploy a product that uses DNP3, a copy of the standard will be indispensable. We recommend that you join the user group to obtain a copy of the standard as
+this provides access to a wealth of additional documents and a forum.
+
+<div style={{textAlign: 'center'}}>
+<img alt="DNP3 logo" src={useBaseUrl('img/dnp_logo.jpg')} />
+</div>
+
