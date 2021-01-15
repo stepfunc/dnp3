@@ -33,45 +33,41 @@ module.exports = {
       style: 'dark',
       links: [
         {
-          title: 'Docs',
+          title: 'DNP3',
           items: [
             {
-              label: 'Style Guide',
-              to: 'docs/',
+              label: 'User Group',
+              to: 'https://dnp.org',
             },
             {
-              label: 'Second Doc',
-              to: 'docs/doc2/',
+              label: 'IEEE 1815-2012',
+              to: 'https://standards.ieee.org/standard/1815-2012.html',
             },
           ],
         },
         {
-          title: 'Community',
+          title: 'Library',
           items: [
             {
-              label: 'Stack Overflow',
+              label: 'Github',
               href: 'https://stackoverflow.com/questions/tagged/docusaurus',
             },
             {
-              label: 'Discord',
-              href: 'https://discordapp.com/invite/docusaurus',
-            },
-            {
-              label: 'Twitter',
-              href: 'https://twitter.com/docusaurus',
+              label: 'Homepage',
+              href: 'https://stepfunc.io/products/libraries/dnp3/',
             },
           ],
         },
         {
-          title: 'More',
+          title: 'Step Function I/O',
           items: [
             {
-              label: 'Blog',
-              to: 'blog',
+              label: 'Products',
+              href: 'https://stepfunc.io/products/',
             },
             {
-              label: 'GitHub',
-              href: 'https://github.com/facebook/docusaurus',
+              label: 'Blog',
+              to: 'https://stepfunc.io/blog/',
             },
           ],
         },
