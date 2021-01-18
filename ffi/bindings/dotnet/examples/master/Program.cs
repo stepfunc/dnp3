@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using dnp3rs;
@@ -146,8 +146,8 @@ class MainClass
     }
 
     public static void Main(string[] args)
-    {   
-            MainAsync().GetAwaiter().GetResult();
+    {
+        MainAsync().GetAwaiter().GetResult();
     }
 
     private static async Task MainAsync()
@@ -155,7 +155,8 @@ class MainClass
 
         // ANCHOR: logging_init
         Logging.Configure(
-            new LoggingConfiguration {
+            new LoggingConfiguration
+            {
                 Level = LogLevel.Info,
                 PrintLevel = true,
                 PrintModuleInfo = false,
@@ -234,7 +235,7 @@ class MainClass
             var poll = association.AddPoll(pollRequest, TimeSpan.FromSeconds(5));
 
             while (true)
-            {              
+            {
                 switch (await GetInputAsync())
                 {
                     case "x":
@@ -270,7 +271,8 @@ class MainClass
                         {
                             var command = new Command();
                             command.AddU16g12v1(3,
-                                new G12v1 {
+                                new G12v1
+                                {
                                     Code = new ControlCode
                                     {
                                         Tcc = TripCloseCode.Nul,
