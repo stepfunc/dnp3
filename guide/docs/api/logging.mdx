@@ -1,0 +1,54 @@
+---
+id: logging
+title: Logging
+sidebar_label: Logging
+slug: /api/logging
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+// This is some text
+{{#include ../../../dnp3/examples/master_main.rs:logging}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+// callback which will receive log messages
+{{#include ../../../ffi/bindings/c/main.c:logging_callback}}
+
+// During program initialization:
+
+{{#include ../../../ffi/bindings/c/main.c:logging_init}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+// This is some extra text
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../../../ffi/bindings/dotnet/dnp3rs.Tests/Main.cs:logging_interface}
+```
+
+</TabItem>
+</Tabs>

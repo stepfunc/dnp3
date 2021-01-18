@@ -5,10 +5,12 @@ use std::time::Duration;
 
 /// example of using the master API synchronously from outside the Tokio runtime
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // ANCHOR: logging
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_target(false)
         .init();
+    // ANCHOR_END: logging
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
 

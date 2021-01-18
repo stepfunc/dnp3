@@ -14,11 +14,13 @@ void print_variation(variation_t variation)
     printf(Variation_to_string(variation));
 }
 
-// Logger callback
+// Logging callback
+// ANCHOR: logging_callback
 void on_log_message(log_level_t level, const char* msg, void* arg)
 {    
     printf("%s", msg);
 }
+// ANCHOR_END: logging_callback
 
 // ClientState listener callback
 void client_state_on_change(client_state_t state, void* arg)
@@ -229,6 +231,7 @@ time_provider_timestamp_t get_time(void* arg)
 int main()
 {
     // Setup logging
+    // ANCHOR: logging_init
     logger_t logger =
     {
         .on_message = &on_log_message,
@@ -242,6 +245,7 @@ int main()
         .output_format = LogOutputFormat_Json,
     };
     configure_logging(config, logger);
+    // ANCHOR_END: logging_init
 
     // Create runtime
     runtime_config_t runtime_config =

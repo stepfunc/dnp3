@@ -5,6 +5,11 @@ sidebar_label: Tables
 slug: /tables
 ---
 
+```rust
+// This is some text
+{{#include ../dnp3/examples/master-main.rs:init_logging}}
+```
+
 The default table rending in Docusaurus looks pretty good
 
 | group        | variation        | function | qualifier                          |

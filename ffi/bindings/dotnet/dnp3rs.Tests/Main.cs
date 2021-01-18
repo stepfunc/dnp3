@@ -5,6 +5,7 @@ using dnp3rs;
 
 class MainClass
 {
+    // ANCHOR: logging_interface
     class TestLogger : ILogger
     {
         public void OnMessage(LogLevel level, string message)
@@ -12,6 +13,7 @@ class MainClass
             Console.Write($"{message}");
         }
     }
+    // ANCHOR_END: logging_interface
 
     class TestListener : IClientStateListener
     {
@@ -149,11 +151,20 @@ class MainClass
     }
 
     private static async Task MainAsync()
-    {        
+    {
+
+        // ANCHOR: logging_init
         Logging.Configure(
-            new LoggingConfiguration { Level = LogLevel.Info, PrintLevel = true, PrintModuleInfo = false, TimeFormat = TimeFormat.System, OutputFormat = LogOutputFormat.Text },
+            new LoggingConfiguration {
+                Level = LogLevel.Info,
+                PrintLevel = true,
+                PrintModuleInfo = false,
+                TimeFormat = TimeFormat.System,
+                OutputFormat = LogOutputFormat.Text
+            },
             new TestLogger()
         );
+        // ANCHOR_END: logging_init
 
         using (var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 }))
         {
