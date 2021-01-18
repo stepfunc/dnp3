@@ -41,8 +41,11 @@ function findSample(filename, anchor) {
     }
 
     let result = '';
-    lines.flatMap((line) => {
-        result += line.substring(min_num_whitespaces) + "\n";
+    lines.flatMap((line, index) => {
+        result += line.substring(min_num_whitespaces);
+        if(index + 1 != lines.length) {
+            result += "\n";
+        }
     });
     return result;
 }
@@ -51,7 +54,7 @@ const RE_PARENS = new RegExp(''
     + '\{\{\\s*'                   // link opening parens and whitespace
     + '\#([a-zA-Z0-9_]+)'          // link type
     + '\\s+'                       // separating whitespace
-    + '([a-zA-Z0-9\s_.\-:/\\\+]+)' // link target path and space separated properties
+    + '([a-zA-Z0-9\s_.\\-:/\\\+]+)' // link target path and space separated properties
     + '\\s*\}\}'                   // whitespace and link closing parens"
 , 'g');
 
@@ -74,17 +77,17 @@ module.exports = function codeSample(options = {}) {
                     const [filepath, anchor] = match[2].split(':');
 
                     // Copy everything before the tag
-                    result += node.value.substr(current_idx, match.index);
+                    result += node.value.substr(current_idx, match.index - current_idx);
 
                     // Copy the modified text
                     result += findSample(path.resolve(file.path, '../' + filepath), anchor);
 
                     // Update the current index
-                    current_idx += match.index + match[0].length
+                    current_idx = match.index + match[0].length;
                 }
             }
 
-            result += node.value.substr(current_idx, node.value.length);
+            result += node.value.substr(current_idx, node.value.length - current_idx);
 
             node.value = result;
         }
