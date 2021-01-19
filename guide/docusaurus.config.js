@@ -1,7 +1,7 @@
 const remarkPlugin = require('./plugins/remark');
 
 module.exports = {
-  title: 'DNP3 library',
+  title: 'DNP3 Library',
   tagline: 'Pretty sure we don\'t need this page, just the docs',
   url: 'https://your-docusaurus-test-site.com',
   baseUrl: '/',

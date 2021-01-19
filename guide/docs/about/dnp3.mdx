@@ -16,13 +16,45 @@ to monitor and control field assets. DNP3 differs from simple request / response
 values in DNP3 may be exchanged as signed 16-bit integers, signed 32-bit integers, single precision floats, or double precision floats.
 * DNP3 is not purely request-response and is quite complex.
 
-## The Standard
+## Outstations
 
-If you plan to develop or deploy a product that uses DNP3, a copy of the standard will be indispensable. A copy may be purchased from the
-[DNP3 Users Group](https://dnp.org) or [IEEE](https://standards.ieee.org/standard/1815-2012.html). We recommend that you join the user group to obtain a copy
-of the standard as this provides access to a wealth of additional documents and a forum.
+DNP3 outstations are the field devices that provide measurement data and can control physical hardware. Devices that might implement a DNP3 outstation
+include:
 
-<div style={{textAlign: 'center'}}>
-<img alt="DNP3 logo" src={useBaseUrl('img/dnp_logo.jpg')} />
-</div>
+* Breakers
+* Load-tap changers
+* Capacitor banks
+* Generic A/D devices
 
+When DNP3 is used over TCP/IP, outstations typically act as TCP servers, accepting connections from one or more masters acting as a TCP client.
+
+:::note
+Unlike typical client/server architecture where multiple clients can access the same server, DNP3 statefully buffers event data for a *particular* master.
+This means that if multiple masters will connect to the same TCP endpoint, their IP addresses must be preconfigured so that the outstation knows which
+set of event data to replay to which master.
+:::
+
+### Virtual RTUs
+
+Outstations are also frequently used to transfer measurement and control data from a utility SCADA system to a historian or 3rd party system. These applications are
+sometimes referred to as a virtual remote-terminal unit (RTU), as no separate physical hardware exists for the outstation and it is implemented just as a software
+processor within the SCADA server.
+
+### Data concentrators
+
+Often DNP3 outstations will have no physical I/O of their own, but instead will act as protocol translators or gateways to downstream devices. It is common
+practice to use DNP3 to communicate from control center to substation, but to use less efficient, but simpler, protocols within the substation itself. Translating
+Modbus into DNP3 is common.
+
+## Master stations
+
+Master stations (aka masters) typically communicate with multiple outstations, sometimes over a variety of communication media (TCP, serial, etc). They acquire
+measurement data from the outstations by polling or enabling unsolicited reporting.
+
+Masters are typically software components that run on a full server architecture, and are connected to the larger SCADA system within a utility's control
+center. DNP3 masters are frequently implementing within what the utility industry calls a *front-end processor*: a component that handles protocol/transport
+specific details on behalf of the larger system.
+
+### Third-party system integration
+
+Increasingly, master stations are used to communicate with 3rd party systems providing virtual power plant, load shedding, and DER control.
