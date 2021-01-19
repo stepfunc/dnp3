@@ -14,9 +14,10 @@ void print_variation(variation_t variation)
     printf(Variation_to_string(variation));
 }
 
-// Logging callback
+
 // ANCHOR: logging_callback
-void on_log_message(log_level_t level, const char* msg, void* arg)
+// callback which will receive log messages
+void on_log_message(log_level_t level, const char* msg, void* ctx)
 {    
     printf("%s", msg);
 }
@@ -229,14 +230,18 @@ time_provider_timestamp_t get_time(void* arg)
 }
 
 int main()
-{
-    // Setup logging
+{    
     // ANCHOR: logging_init
+    // define logger callback "interface"
     logger_t logger =
     {
+        // function pointer where log messages will be sent
         .on_message = &on_log_message,
+        // optional context argument applied to all log callbacks
         .ctx = NULL,
     };
+
+    // logging configuration options
     logging_configuration_t config = {
         .level = LogLevel_Info,
         .print_level = true,
@@ -244,6 +249,8 @@ int main()
         .time_format = TimeFormat_System,
         .output_format = LogOutputFormat_Json,
     };
+
+    // initialize logging - may be called only once
     configure_logging(config, logger);
     // ANCHOR_END: logging_init
 

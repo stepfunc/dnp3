@@ -8,6 +8,25 @@ slug: /api/logging
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
+The library provides highly contextual logging using the [tracing](https://crates.io/crates/tracing) crate. Rust users should refer to the
+tracing documentation for details.
+
+The bindings expose a more rigid logging interface with a single callback method to record a message. Configurable options include:
+
+* `LogLevel` which will trigger messages to be generated
+* Inclusion of Rust module or level information as part of the message
+* How and if the time should be printed as part of the message
+* Line or JSON based output
+
+:::note
+The **LogLevel** should be set to **Info** by default. This will result in messages at the Info, Warn, and
+Error level to be logged. The Debug and Trace levels are generally only useful if debugging an issue with the underlying runtime.
+
+Protocol decoding is always logged at the Info level and is configured separately on a per session basis.
+:::
+
+## Configuration
+
 <Tabs
 groupId="language"
 defaultValue="Rust"
@@ -20,18 +39,19 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-// This is some text
 {{#include ../../../dnp3/examples/master_main.rs:logging}}
 ```
+:::note
+[tracing_subscriber](https://crates.io/crates/tracing-subscriber) is just one backend available for capturing trace information. The tracing ecosystem
+is still under active development.
+:::
+
 
 </TabItem>
 <TabItem value="C">
 
 ```c
-// callback which will receive log messages
 {{#include ../../../ffi/bindings/c/main.c:logging_callback}}
-
-// During program initialization:
 
 {{#include ../../../ffi/bindings/c/main.c:logging_init}}
 ```
@@ -40,14 +60,20 @@ values={[
 <TabItem value="Java">
 
 ```java
-// This is some extra text
+{{#include ../../../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:logging_interface}}
+
+{{#include ../../../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:logging_config}}
+
+{{#include ../../../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:logging_init}}
 ```
 
 </TabItem>
 <TabItem value="C#">
 
 ```csharp
-{{#include ../../../ffi/bindings/dotnet/dnp3rs.Tests/Main.cs:logging_interface}
+{{#include ../../../ffi/bindings/dotnet/examples/master/Program.cs:logging_interface}}
+
+{{#include ../../../ffi/bindings/dotnet/examples/master/Program.cs:logging_init}}
 ```
 
 </TabItem>

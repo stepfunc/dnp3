@@ -6,6 +6,7 @@ use std::time::Duration;
 /// example of using the master API synchronously from outside the Tokio runtime
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: logging
+    // initialize logging to the console
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_target(false)

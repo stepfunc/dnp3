@@ -28,6 +28,6 @@
 
     <modules>
         <module>dnp3rs</module>
-        <module>dnp3rs-tests</module>
+        <module>examples</module>
     </modules>
 </project>
