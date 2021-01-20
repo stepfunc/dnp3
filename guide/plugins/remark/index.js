@@ -7,47 +7,51 @@ function findSample(filename, anchor) {
     const start_regex = /ANCHOR:\s*([\w_-]+)/;
     const end_regex = /ANCHOR_END:\s*([\w_-]+)/;
 
-    let found = false;
-    let lines = [];
-    let min_num_whitespaces = null;
-    for (const line of file.split(/\r?\n/)) {
-        if(!found) {
-            const match = line.match(start_regex)
-            if(match && match[1] === anchor) {
-                found = true;
-            }
-        }
-        else {
-            // Check if we found end anchor
-            const match = line.match(end_regex)
-            if(match && match[1] === anchor) {
-                break;
+    if(anchor) {
+        let found = false;
+        let lines = [];
+        let min_num_whitespaces = null;
+        for (const line of file.split(/\r?\n/)) {
+            if(!found) {
+                const match = line.match(start_regex)
+                if(match && match[1] === anchor) {
+                    found = true;
+                }
             }
             else {
-                // Check whitespaces
-                const num_whitespaces = line.match(/([ ]*).*/)[1].length;
-                if(!min_num_whitespaces || num_whitespaces < min_num_whitespaces) {
-                    min_num_whitespaces = num_whitespaces;
+                // Check if we found end anchor
+                const match = line.match(end_regex)
+                if(match && match[1] === anchor) {
+                    break;
                 }
+                else {
+                    // Check whitespaces
+                    const num_whitespaces = line.match(/([ ]*).*/)[1].length;
+                    if(!min_num_whitespaces || num_whitespaces < min_num_whitespaces) {
+                        min_num_whitespaces = num_whitespaces;
+                    }
 
-                // Push the line
-                lines.push(line);
+                    // Push the line
+                    lines.push(line);
+                }
             }
-        }
-    };
+        };
 
-    if(!found) {
-        throw new Error(`Could not find '${anchor}' anchor in ${filename}.`);
+        if(!found) {
+            throw new Error(`Could not find '${anchor}' anchor in ${filename}.`);
+        }
+
+        let result = '';
+        lines.flatMap((line, index) => {
+            result += line.substring(min_num_whitespaces);
+            if(index + 1 != lines.length) {
+                result += "\n";
+            }
+        });
+        return result;
+    } else {
+        return file;
     }
-
-    let result = '';
-    lines.flatMap((line, index) => {
-        result += line.substring(min_num_whitespaces);
-        if(index + 1 != lines.length) {
-            result += "\n";
-        }
-    });
-    return result;
 }
 
 const RE_PARENS = new RegExp(''
