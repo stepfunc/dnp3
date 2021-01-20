@@ -7,6 +7,5 @@ module.exports = {
         'about/license',
     ],
     API: ['api/logging'],
-    Features: ['table'],
   },
 };
