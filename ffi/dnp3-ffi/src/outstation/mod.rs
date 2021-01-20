@@ -1,4 +1,5 @@
 mod adapters;
+mod database;
 mod struct_constructors;
 
 use std::ffi::CStr;
@@ -8,6 +9,8 @@ use dnp3::entry::outstation::tcp::ServerHandle;
 use dnp3::entry::EndpointAddress;
 use dnp3::outstation::config::{BufferSize, Feature, Features, OutstationConfig};
 use dnp3::outstation::database::{ClassZeroConfig, DatabaseConfig, EventBufferConfig};
+
+pub use database::*;
 pub use struct_constructors::*;
 
 use dnp3::outstation::OutstationHandle;
@@ -123,6 +126,17 @@ pub unsafe fn tcpserver_bind(server: *mut TcpServer) {
 pub unsafe fn outstation_destroy(outstation: *mut Outstation) {
     if !outstation.is_null() {
         Box::from_raw(outstation);
+    }
+}
+
+pub unsafe fn outstation_transaction(
+    outstation: *mut Outstation,
+    callback: ffi::OutstationTransaction,
+) {
+    if let Some(outstation) = outstation.as_mut() {
+        outstation.database.transaction(|database| {
+            callback.execute(database as *mut _);
+        });
     }
 }
 

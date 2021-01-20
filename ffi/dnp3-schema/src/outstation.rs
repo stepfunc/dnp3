@@ -11,15 +11,16 @@ pub fn define(
     lib: &mut LibraryBuilder,
     runtime: ClassDeclarationHandle,
     decode_log_level_enum: NativeEnumHandle,
+    database: ClassHandle,
     shared_def: &SharedDefinitions,
 ) -> Result<(), BindingError> {
     // Everything required to create an outstation
-    let outstation = define_outstation(lib)?;
+    let outstation = define_outstation(lib, &database)?;
     let outstation_config = define_outstation_config(lib, decode_log_level_enum)?;
     let database_config = define_database_config(lib)?;
     let outstation_application = define_outstation_application(lib)?;
     let outstation_information = define_outstation_information(lib, shared_def)?;
-    let control_handler = define_control_handler(lib, shared_def)?;
+    let control_handler = define_control_handler(lib, &database, shared_def)?;
     let address_filter = define_address_filter(lib)?;
 
     // Define the TCP server
@@ -83,7 +84,25 @@ pub fn define(
     Ok(())
 }
 
-fn define_outstation(lib: &mut LibraryBuilder) -> Result<ClassHandle, BindingError> {
+fn define_outstation(
+    lib: &mut LibraryBuilder,
+    database: &ClassHandle,
+) -> Result<ClassHandle, BindingError> {
+    let transaction_interface = lib
+        .define_one_time_callback("OutstationTransaction", "Outstation transaction interface")?
+        .callback(
+            "execute",
+            "Execute the transaction with the provided database",
+        )?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::void())?
+        .build()?
+        .build()?;
+
     let outstation = lib.declare_class("Outstation")?;
 
     let outstation_destroy_fn = lib.declare_native_function("outstation_destroy")?
@@ -92,8 +111,25 @@ fn define_outstation(lib: &mut LibraryBuilder) -> Result<ClassHandle, BindingErr
         .doc(doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:TCPServer.[destructor]} will properly shutdown the outstation."))?
         .build()?;
 
+    let outstation_transaction_fn = lib
+        .declare_native_function("outstation_transaction")?
+        .param(
+            "outstation",
+            Type::ClassRef(outstation.clone()),
+            "Outstation",
+        )?
+        .param(
+            "callback",
+            Type::OneTimeCallback(transaction_interface),
+            "Method to execute as a transaction",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Execute transaction to modify the internal database of the outstation")?
+        .build()?;
+
     lib.define_class(&outstation)?
         .destructor(&outstation_destroy_fn)?
+        .method("transaction", &outstation_transaction_fn)?
         .doc(doc("Outstation handle").details("Use this handle to modify the internal database."))?
         .build()
 }
@@ -541,6 +577,7 @@ fn define_outstation_information(
 
 fn define_control_handler(
     lib: &mut LibraryBuilder,
+    database: &ClassHandle,
     shared_def: &SharedDefinitions,
 ) -> Result<InterfaceHandle, BindingError> {
     let command_status = define_command_status(lib)?;
@@ -574,14 +611,14 @@ fn define_control_handler(
             .details("Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal."))?
             .param("control", Type::Struct(shared_def.g12v1_struct.clone()), "Received CROB")?
             .param("index", Type::Uint16, "Index of the point")?
-            // TODO: Add the database
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
             .build()?
         .callback("operate_g12v1", "Operate a control point")?
             .param("control", Type::Struct(shared_def.g12v1_struct.clone()), "Received CROB")?
             .param("index", Type::Uint16, "Index of the point")?
             .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            // TODO: Add the database
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
             .build()?
         .callback("select_g41v1", doc("Select an analog output, but do not operate")
@@ -589,14 +626,14 @@ fn define_control_handler(
             .details("Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal."))?
             .param("control", Type::Sint32, "Received analog output value")?
             .param("index", Type::Uint16, "Index of the point")?
-            // TODO: Add the database
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
             .build()?
         .callback("operate_g41v1", "Operate a control point")?
             .param("control", Type::Sint32, "Received analog output value")?
             .param("index", Type::Uint16, "Index of the point")?
             .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            // TODO: Add the database
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
             .build()?
         .callback("select_g41v2", doc("Select an analog output, but do not operate")
@@ -604,14 +641,14 @@ fn define_control_handler(
             .details("Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal."))?
             .param("value", Type::Sint16, "Received analog output value")?
             .param("index", Type::Uint16, "Index of the point")?
-            // TODO: Add the database
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
             .build()?
         .callback("operate_g41v2", "Operate a control point")?
             .param("value", Type::Sint16, "Received analog output value")?
             .param("index", Type::Uint16, "Index of the point")?
             .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            // TODO: Add the database
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
             .build()?
         .callback("select_g41v3", doc("Select an analog output, but do not operate")
@@ -619,14 +656,14 @@ fn define_control_handler(
             .details("Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal."))?
             .param("value", Type::Float, "Received analog output value")?
             .param("index", Type::Uint16, "Index of the point")?
-            // TODO: Add the database
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
             .build()?
         .callback("operate_g41v3", "Operate a control point")?
             .param("value", Type::Float, "Received analog output value")?
             .param("index", Type::Uint16, "Index of the point")?
             .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            // TODO: Add the database
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
             .build()?
         .callback("select_g41v4", doc("Select an analog output, but do not operate")
@@ -634,14 +671,14 @@ fn define_control_handler(
             .details("Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal."))?
             .param("value", Type::Double, "Received analog output value")?
             .param("index", Type::Uint16, "Index of the point")?
-            // TODO: Add the database
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
             .build()?
         .callback("operate_g41v4", "Operate a control point")?
             .param("value", Type::Double, "Received analog output value")?
             .param("index", Type::Uint16, "Index of the point")?
             .param("op_type", Type::Enum(operate_type), "Operate type")?
-            // TODO: Add the database
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status), "Command status"))?
             .build()?
         .destroy_callback("on_destroy")?

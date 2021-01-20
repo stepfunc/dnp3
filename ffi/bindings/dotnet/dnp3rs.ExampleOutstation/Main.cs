@@ -64,25 +64,40 @@ class ExampleOutstation
 
         public void EndFragment() { }
 
-        public CommandStatus SelectG12v1(G12v1 control, ushort index) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG12v1(G12v1 control, ushort index, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus OperateG12v1(G12v1 control, ushort index, OperateType opType) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG12v1(G12v1 control, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus SelectG41v1(int control, ushort index) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v1(int control, ushort index, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus OperateG41v1(int control, ushort index, OperateType opType) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v1(int control, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus SelectG41v2(short value, ushort index) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v2(short value, ushort index, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus OperateG41v2(short value, ushort index, OperateType opType) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v2(short value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus SelectG41v3(float value, ushort index) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v3(float value, ushort index, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus OperateG41v3(float value, ushort index, OperateType opType) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v3(float value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus SelectG41v4(double value, ushort index) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v4(double value, ushort index, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus OperateG41v4(double value, ushort index, OperateType opType) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v4(double value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+    }
+
+    class OutstationTransaction : IOutstationTransaction
+    {
+        readonly Action<Database> action;
+
+        public OutstationTransaction(Action<Database> action)
+        {
+            this.action = action;
+        }
+
+        public void Execute(Database database)
+        {
+            this.action.Invoke(database);
+        }
     }
 
     public static void Main(string[] args)
@@ -104,13 +119,41 @@ class ExampleOutstation
                 var config = OutstationConfig.DefaultConfig(1024, 1);
                 config.LogLevel = DecodeLogLevel.ObjectValues;
                 var database = DatabaseConfig.DefaultConfig();
+                database.Events.MaxAnalog = 10;
                 var application = new TestOutstationApplication();
                 var information = new TestOutstationInformation();
                 var controlHandler = new TestControlHandler();
                 var addressFilter = AddressFilter.Any();
                 var outstation = server.AddOutstation(config, database, application, information, controlHandler, addressFilter);
 
+                outstation.Transaction(new OutstationTransaction((db) =>
+                {
+                    for(int i = 0; i < 10; i++)
+                    {
+                        db.AddAnalog((ushort)i, EventClass.Class1, new AnalogConfig
+                        {
+                            StaticVariation = StaticAnalogVariation.Group30Var1,
+                            EventVariation = EventAnalogVariation.Group32Var1,
+                            Deadband = 0.0,
+                        });
+
+                        db.UpdateAnalog(new Analog
+                        {
+                            Index = (ushort)i,
+                            Value = 10.0,
+                            Flags = new Flags { Value = 0x00 },
+                            Time = new Timestamp
+                            {
+                                Quality = TimeQuality.Synchronized,
+                                Value = 0
+                            },
+                        }, UpdateOptions.DefaultOptions());
+                    }
+                }));
+
                 server.Bind();
+
+                var value = 0.0;
 
                 while (true)
                 {
@@ -118,6 +161,25 @@ class ExampleOutstation
                     {
                         case "x":
                             return;
+                        case "b":
+                            {
+                                outstation.Transaction(new OutstationTransaction((db) =>
+                                {
+                                    db.UpdateAnalog(new Analog
+                                    {
+                                        Index = 7,
+                                        Value = value,
+                                        Flags = new Flags { Value = 0x00 },
+                                        Time = new Timestamp
+                                        {
+                                            Quality = TimeQuality.Synchronized,
+                                            Value = 0
+                                        },
+                                    }, UpdateOptions.DefaultOptions());
+                                }));
+                                value++;
+                                break;
+                            }
                         default:
                             Console.WriteLine("Unknown command");
                             break;

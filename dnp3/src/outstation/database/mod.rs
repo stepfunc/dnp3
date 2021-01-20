@@ -17,7 +17,7 @@ use crate::master::request::EventClasses;
 use crate::outstation::database::read::ReadHeader;
 use std::sync::{Arc, Mutex};
 
-/// Controls how are events are processed when updating values in the database
+/// Controls how events are processed when updating values in the database
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum EventMode {
     /// Detect events in a type dependent fashion. This is the default mode that should be used.

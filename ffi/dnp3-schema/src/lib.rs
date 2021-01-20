@@ -1,6 +1,7 @@
 use oo_bindgen::*;
 
 mod association;
+mod database;
 mod handler;
 mod logging;
 mod master;
@@ -228,7 +229,14 @@ pub fn build_lib() -> Result<Library, BindingError> {
     association::define(&mut builder, association_class, request, &shared_def)?;
 
     // Outstation stuff
-    outstation::define(&mut builder, runtime, decode_log_level_enum, &shared_def)?;
+    let database = database::define(&mut builder, &shared_def)?;
+    outstation::define(
+        &mut builder,
+        runtime,
+        decode_log_level_enum,
+        database,
+        &shared_def,
+    )?;
 
     builder.build()
 }

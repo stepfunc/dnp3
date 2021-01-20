@@ -106,10 +106,10 @@ impl ControlSupport<Group12Var1> for ffi::ControlHandler {
         &mut self,
         control: Group12Var1,
         index: u16,
-        _database: &mut Database,
+        database: &mut Database,
     ) -> CommandStatus {
         // TODO: pass database
-        ffi::ControlHandler::select_g12v1(self, control.into(), index)
+        ffi::ControlHandler::select_g12v1(self, control.into(), index, database as *mut _)
             .map(|e| e.into())
             .unwrap_or(CommandStatus::NotSupported)
     }
@@ -119,12 +119,18 @@ impl ControlSupport<Group12Var1> for ffi::ControlHandler {
         control: Group12Var1,
         index: u16,
         op_type: OperateType,
-        _database: &mut Database,
+        database: &mut Database,
     ) -> CommandStatus {
         // TODO: pass database
-        ffi::ControlHandler::operate_g12v1(self, control.into(), index, op_type.into())
-            .map(|e| e.into())
-            .unwrap_or(CommandStatus::NotSupported)
+        ffi::ControlHandler::operate_g12v1(
+            self,
+            control.into(),
+            index,
+            op_type.into(),
+            database as *mut _,
+        )
+        .map(|e| e.into())
+        .unwrap_or(CommandStatus::NotSupported)
     }
 }
 
@@ -133,10 +139,10 @@ impl ControlSupport<Group41Var1> for ffi::ControlHandler {
         &mut self,
         control: Group41Var1,
         index: u16,
-        _database: &mut Database,
+        database: &mut Database,
     ) -> CommandStatus {
         // TODO: pass database
-        ffi::ControlHandler::select_g41v1(self, control.value, index)
+        ffi::ControlHandler::select_g41v1(self, control.value, index, database as *mut _)
             .map(|e| e.into())
             .unwrap_or(CommandStatus::NotSupported)
     }
@@ -146,12 +152,18 @@ impl ControlSupport<Group41Var1> for ffi::ControlHandler {
         control: Group41Var1,
         index: u16,
         op_type: OperateType,
-        _database: &mut Database,
+        database: &mut Database,
     ) -> CommandStatus {
         // TODO: pass database
-        ffi::ControlHandler::operate_g41v1(self, control.value, index, op_type.into())
-            .map(|e| e.into())
-            .unwrap_or(CommandStatus::NotSupported)
+        ffi::ControlHandler::operate_g41v1(
+            self,
+            control.value,
+            index,
+            op_type.into(),
+            database as *mut _,
+        )
+        .map(|e| e.into())
+        .unwrap_or(CommandStatus::NotSupported)
     }
 }
 
@@ -160,10 +172,10 @@ impl ControlSupport<Group41Var2> for ffi::ControlHandler {
         &mut self,
         control: Group41Var2,
         index: u16,
-        _database: &mut Database,
+        database: &mut Database,
     ) -> CommandStatus {
         // TODO: pass database
-        ffi::ControlHandler::select_g41v2(self, control.value, index)
+        ffi::ControlHandler::select_g41v2(self, control.value, index, database as *mut _)
             .map(|e| e.into())
             .unwrap_or(CommandStatus::NotSupported)
     }
@@ -173,12 +185,18 @@ impl ControlSupport<Group41Var2> for ffi::ControlHandler {
         control: Group41Var2,
         index: u16,
         op_type: OperateType,
-        _database: &mut Database,
+        database: &mut Database,
     ) -> CommandStatus {
         // TODO: pass database
-        ffi::ControlHandler::operate_g41v2(self, control.value, index, op_type.into())
-            .map(|e| e.into())
-            .unwrap_or(CommandStatus::NotSupported)
+        ffi::ControlHandler::operate_g41v2(
+            self,
+            control.value,
+            index,
+            op_type.into(),
+            database as *mut _,
+        )
+        .map(|e| e.into())
+        .unwrap_or(CommandStatus::NotSupported)
     }
 }
 
@@ -187,10 +205,10 @@ impl ControlSupport<Group41Var3> for ffi::ControlHandler {
         &mut self,
         control: Group41Var3,
         index: u16,
-        _database: &mut Database,
+        database: &mut Database,
     ) -> CommandStatus {
         // TODO: pass database
-        ffi::ControlHandler::select_g41v3(self, control.value, index)
+        ffi::ControlHandler::select_g41v3(self, control.value, index, database as *mut _)
             .map(|e| e.into())
             .unwrap_or(CommandStatus::NotSupported)
     }
@@ -200,12 +218,18 @@ impl ControlSupport<Group41Var3> for ffi::ControlHandler {
         control: Group41Var3,
         index: u16,
         op_type: OperateType,
-        _database: &mut Database,
+        database: &mut Database,
     ) -> CommandStatus {
         // TODO: pass database
-        ffi::ControlHandler::operate_g41v3(self, control.value, index, op_type.into())
-            .map(|e| e.into())
-            .unwrap_or(CommandStatus::NotSupported)
+        ffi::ControlHandler::operate_g41v3(
+            self,
+            control.value,
+            index,
+            op_type.into(),
+            database as *mut _,
+        )
+        .map(|e| e.into())
+        .unwrap_or(CommandStatus::NotSupported)
     }
 }
 
@@ -214,10 +238,10 @@ impl ControlSupport<Group41Var4> for ffi::ControlHandler {
         &mut self,
         control: Group41Var4,
         index: u16,
-        _database: &mut Database,
+        database: &mut Database,
     ) -> CommandStatus {
         // TODO: pass database
-        ffi::ControlHandler::select_g41v4(self, control.value, index)
+        ffi::ControlHandler::select_g41v4(self, control.value, index, database as *mut _)
             .map(|e| e.into())
             .unwrap_or(CommandStatus::NotSupported)
     }
@@ -227,12 +251,18 @@ impl ControlSupport<Group41Var4> for ffi::ControlHandler {
         control: Group41Var4,
         index: u16,
         op_type: OperateType,
-        _database: &mut Database,
+        database: &mut Database,
     ) -> CommandStatus {
         // TODO: pass database
-        ffi::ControlHandler::operate_g41v4(self, control.value, index, op_type.into())
-            .map(|e| e.into())
-            .unwrap_or(CommandStatus::NotSupported)
+        ffi::ControlHandler::operate_g41v4(
+            self,
+            control.value,
+            index,
+            op_type.into(),
+            database as *mut _,
+        )
+        .map(|e| e.into())
+        .unwrap_or(CommandStatus::NotSupported)
     }
 }
 
