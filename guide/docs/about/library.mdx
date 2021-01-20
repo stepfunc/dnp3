@@ -16,22 +16,22 @@ You can read more about our approach to binding generation in this [blog post](h
 
 ## Design goals
 
-* The library is *memory-safe*, and many potential defects are eliminated at compile-time including buffer overflows,
-use-after free, and dangling pointers. You can read more about Rust and our approach to secure software engineering on [our website](https://stepfunc.io/about/why-rust/).
+* The library is memory-safe, and many potential defects are eliminated at compile-time including buffer overflows, use-after free, and dangling pointers.
+You can read more about Rust and our approach to secure software engineering on [our website](https://stepfunc.io/about/why-rust/).
 * CPU and memory efficiency:
   * Heap allocations are avoided whenever possible
-  * Parsing is zero-copy and never allocates (Rust/C)
-  * Thousands of concurrent communication sessions can execute on a single server.
+  * Parsing is zero-copy and never allocates
+  * Thousands of concurrent communication sessions can execute on a single server
 * Provides a high-level API that makes writing DNP3 conformant applications easy, and non-comformant applications possible.
 * Seamless interoperability with non-Rust applications via Rust's FFI.
 
 ## Non-goals
 
 * This library is not meant for implementing DNP3 outstations on microcontrollers. The library supports platforms and architectures supported by Rust
-and the [Tokio](https://tokio.rs/) Runtime. This generally means major operating systems.
-* Uncommon and/or unsound features are not implemented. Secure authentication version v2 or v5 will never be implemented in this library and we discourage
+and the [Tokio](https://tokio.rs/) Runtime. This generally means major operating systems with first class support for x86/x64 and 64-bit ARM.
+* Uncommon and/or unsound protocol features are not implemented. Secure authentication version v2 or v5 will never be implemented in this library and we discourage
 others from using them in production environments. TLS is always a better choice when IP communications is available. Secure authentication version 6 *may*
-be implemented in the future.
+be implemented in the future if the design proves to be sound.
 
 ## Interoperability
 
@@ -58,9 +58,32 @@ features and features that do not belong to a subset level are already supported
 | self-address support      |  4    |
 | Octet strings (g110/111)  |  n/a  |
 
-## Licensing
+### Future Support
 
-```
-{{#include ../../../../dnp3/LICENSE.txt}}
-```
+We plan to add support for a number of features in future releases including:
 
+1. Transport Layer Security - We are currently working with the [Rustls](https://github.com/ctz/rustls) library to fully support non-web applications in the
+library. This is a high-priority item for a subsequent release.
+2. Device attributes (group 0)
+3. AO/BO command events (groups 13 & 43)
+4. Analog input deadbands (group 34)
+
+The library will be level 4 compliant when items 2-4 have been completed.
+
+## Compliance Testing
+
+The DNP3 User Group publishes official compliance test procedures for outstations. The procedures validate all of the level 2 functionality. Procedures
+for level 3 are currently in the works.
+
+
+We have an internal implementation of these test procedures that we automatically run against the outstation implementation. These procedures augment our
+own unit and integration tests to ensure compliance to the standard.
+
+:::note
+The DNP User Group does not certify libraries as conformant, only outstation devices. Should you wish to put your outstation product through conformance
+testing, Step Function I/O can assist you this process as a services engagement.
+:::
+
+:::danger
+TODO - Link to the test procedures
+:::
