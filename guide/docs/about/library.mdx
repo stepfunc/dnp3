@@ -27,23 +27,36 @@ use-after free, and dangling pointers. You can read more about Rust and our appr
 
 ## Non-goals
 
-* It is not a general purpose library for implementing DNP3 outstations on microcontrollers. The library supports platforms and architectures supported by Rust
-and the [Tokio](https://tokio.rs/) Runtime.
-* The library does not implement some uncommon or dangerous DNP3 features. Namely, secure authentication version 2/5, will never be implemented in this library
-and we discourage others from using them in production environments. TLS is always a better choice when IP communications is available. Secure authentication
-version 6 *may* be implemented in the future.
+* This library is not meant for implementing DNP3 outstations on microcontrollers. The library supports platforms and architectures supported by Rust
+and the [Tokio](https://tokio.rs/) Runtime. This generally means major operating systems.
+* Uncommon and/or unsound features are not implemented. Secure authentication version v2 or v5 will never be implemented in this library and we discourage
+others from using them in production environments. TLS is always a better choice when IP communications is available. Secure authentication version 6 *may*
+be implemented in the future.
 
 ## Interoperability
 
 DNP3 defines four subset levels for the purpose of interoperability:
 
-* `Level 1` - The *minimum* feature set that a device must implement to be DNP3 compliant. The functionality is quite basic, intended for a small field device.
+* `Level 1` - The minimum features that a master or outstation must implement to be DNP3 compliant. The functionality is quite basic, intended for a small field device.
 * `Level 2` - Adds a number of function codes and objects to support a small RTU or data concentrator.
 * `Level 3` - Adds additional function codes and objects to support more complex RTUs/concentrators, must notably adding enable/disable of unsolicited reporting.
 * `Level 4` - Adds additional less-commonly used features including floating point analog variations, double-bit binary inputs, and device attributes.
 * Other features are defined which do not belong to any subset level such as file transfer, datasets, and secure authentication.
 
-This library is a subset **Level 3** compliant implementation, both master and outstation. It also implements a number of additional protocol features:
+
+### Current Support: Level 3
+
+The library is currently level 3 compliant for the both master and outstation. It will be made level 4 compliant in a future release. A number of level 4
+features and features that do not belong to a subset level are already supported:
+
+| Feature                   | Level |
+|---------------------------|:-----:|
+| Double-bit Binary Inputs  |  4    |
+| Floating-point AI/AO      |  4    |
+| BO/AO events              |  4    |
+| LAN time-synchronization  |  4    |
+| self-address support      |  4    |
+| Octet strings (g110/111)  |  n/a  |
 
 ## Licensing
 
