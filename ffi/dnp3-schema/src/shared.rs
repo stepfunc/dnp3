@@ -87,34 +87,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     // ======
     let flags_struct = declare_flags_struct(lib)?;
 
-    let time_quality_enum = lib
-        .define_native_enum("TimeQuality")?
-        .push(
-            "Synchronized",
-            "The timestamp is UTC synchronized at the remote device",
-        )?
-        .push(
-            "NotSynchronized",
-            "The device indicates the timestamp may be not be synchronized",
-        )?
-        .push(
-            "Invalid",
-            "Timestamp is not valid, ignore the value and use a local timestamp",
-        )?
-        .doc("Timestamp quality")?
-        .build()?;
-
-    let timestamp_struct = lib.declare_native_struct("Timestamp")?;
-    let timestamp_struct = lib
-        .define_native_struct(&timestamp_struct)?
-        .add("value", Type::Uint64, "Timestamp value")?
-        .add(
-            "quality",
-            Type::Enum(time_quality_enum),
-            "Timestamp quality",
-        )?
-        .doc("Timestamp value")?
-        .build()?;
+    let timestamp_struct = declare_timestamp_struct(lib)?;
 
     let double_bit_enum = lib
         .define_native_enum("DoubleBit")?
@@ -220,7 +193,7 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
             Type::StructRef(flags_struct.declaration()),
             "Flags byte to check",
         )?
-        .param("flag", Type::Enum(flag_enum), "Flag to check")?
+        .param("flag", Type::Enum(flag_enum.clone()), "Flag to check")?
         .return_type(ReturnType::new(
             Type::Bool,
             "true if flag is set, false otherwise",
@@ -228,11 +201,104 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
         .doc("Check if a particular flag is set in the flags byte")?
         .build()?;
 
+    let flags_set_fn = lib
+        .declare_native_function("flags_set")?
+        .param(
+            "flags",
+            Type::StructRef(flags_struct.declaration()),
+            "Flags to modify",
+        )?
+        .param("flag", Type::Enum(flag_enum), "Flag to modify")?
+        .param("value", Type::Bool, "Value to set the flag to")?
+        .return_type(ReturnType::new(
+            Type::Struct(flags_struct.clone()),
+            "New modified flag",
+        ))?
+        .doc("Create a new flags byte with a modified flag")?
+        .build()?;
+
     lib.define_struct(&flags_struct)?
         .method("IsSet", &flags_is_set_fn)?
+        .method("Set", &flags_set_fn)?
         .build();
 
     Ok(flags_struct)
+}
+
+fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
+    let time_quality_enum = lib
+        .define_native_enum("TimeQuality")?
+        .push(
+            "Synchronized",
+            "The timestamp is UTC synchronized at the remote device",
+        )?
+        .push(
+            "NotSynchronized",
+            "The device indicates the timestamp may be not be synchronized",
+        )?
+        .push(
+            "Invalid",
+            "Timestamp is not valid, ignore the value and use a local timestamp",
+        )?
+        .doc("Timestamp quality")?
+        .build()?;
+
+    let timestamp_struct = lib.declare_native_struct("Timestamp")?;
+    let timestamp_struct = lib
+        .define_native_struct(&timestamp_struct)?
+        .add("value", Type::Uint64, "Timestamp value")?
+        .add(
+            "quality",
+            Type::Enum(time_quality_enum),
+            "Timestamp quality",
+        )?
+        .doc("Timestamp value")?
+        .build()?;
+
+    let timestamp_invalid_fn = lib
+        .declare_native_function("timestamp_invalid")?
+        .return_type(ReturnType::new(
+            Type::Struct(timestamp_struct.clone()),
+            "Invalid timestamp",
+        ))?
+        .doc("Creates an invalid timestamp struct")?
+        .build()?;
+
+    let timestamp_synchronized_fn = lib
+        .declare_native_function("timestamp_synchronized")?
+        .param(
+            "value",
+            Type::Uint64,
+            "Timestamp value in milliseconds since EPOCH",
+        )?
+        .return_type(ReturnType::new(
+            Type::Struct(timestamp_struct.clone()),
+            "Synchronized timestamp",
+        ))?
+        .doc("Creates a synchronized timestamp struct")?
+        .build()?;
+
+    let timestamp_not_synchronized_fn = lib
+        .declare_native_function("timestamp_not_synchronized")?
+        .param(
+            "value",
+            Type::Uint64,
+            "Timestamp value in milliseconds since EPOCH",
+        )?
+        .return_type(ReturnType::new(
+            Type::Struct(timestamp_struct.clone()),
+            "Not synchronized timestamp",
+        ))?
+        .doc("Creates a not synchronized timestamp struct")?
+        .build()?;
+
+    lib.define_struct(&timestamp_struct)?
+        .static_method("invalid_timestamp", &timestamp_invalid_fn)?
+        .static_method("synchronized_timestamp", &timestamp_synchronized_fn)?
+        .static_method("not_synchronized_timestamp", &timestamp_not_synchronized_fn)?
+        .build();
+
+    Ok(timestamp_struct)
 }
 
 fn build_iterator(

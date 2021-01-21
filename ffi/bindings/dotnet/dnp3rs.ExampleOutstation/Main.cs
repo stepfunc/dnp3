@@ -119,41 +119,121 @@ class ExampleOutstation
                 var config = OutstationConfig.DefaultConfig(1024, 1);
                 config.LogLevel = DecodeLogLevel.ObjectValues;
                 var database = DatabaseConfig.DefaultConfig();
-                database.Events.MaxAnalog = 10;
+                database.Events = EventBufferConfig.AllTypes(10);
                 var application = new TestOutstationApplication();
                 var information = new TestOutstationInformation();
                 var controlHandler = new TestControlHandler();
                 var addressFilter = AddressFilter.Any();
                 var outstation = server.AddOutstation(config, database, application, information, controlHandler, addressFilter);
 
+                // Setup initial points
                 outstation.Transaction(new OutstationTransaction((db) =>
                 {
-                    for(int i = 0; i < 10; i++)
+                    for(ushort i = 0; i < 10; i++)
                     {
-                        db.AddAnalog((ushort)i, EventClass.Class1, new AnalogConfig
+                        db.AddBinary(i, EventClass.Class1, new BinaryConfig
                         {
-                            StaticVariation = StaticAnalogVariation.Group30Var1,
-                            EventVariation = EventAnalogVariation.Group32Var1,
+                            StaticVariation = StaticBinaryVariation.Group1Var2,
+                            EventVariation = EventBinaryVariation.Group2Var2,
+                        });
+                        db.AddDoubleBitBinary(i, EventClass.Class1, new DoubleBitBinaryConfig
+                        {
+                            StaticVariation = StaticDoubleBitBinaryVariation.Group3Var2,
+                            EventVariation = EventDoubleBitBinaryVariation.Group4Var2,
+                        });
+                        db.AddBinaryOutputStatus(i, EventClass.Class1, new BinaryOutputStatusConfig
+                        {
+                            StaticVariation = StaticBinaryOutputStatusVariation.Group10Var2,
+                            EventVariation = EventBinaryOutputStatusVariation.Group11Var2,
+                        });
+                        db.AddCounter(i, EventClass.Class1, new CounterConfig
+                        {
+                            StaticVariation = StaticCounterVariation.Group20Var1,
+                            EventVariation = EventCounterVariation.Group22Var1,
+                            Deadband = 0,
+                        });
+                        db.AddFrozenCounter(i, EventClass.Class1, new FrozenCounterConfig
+                        {
+                            StaticVariation = StaticFrozenCounterVariation.Group21Var5,
+                            EventVariation = EventFrozenCounterVariation.Group23Var5,
+                            Deadband = 0,
+                        });
+                        db.AddAnalog(i, EventClass.Class1, new AnalogConfig
+                        {
+                            StaticVariation = StaticAnalogVariation.Group30Var6,
+                            EventVariation = EventAnalogVariation.Group32Var8,
+                            Deadband = 0.0,
+                        });
+                        db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig
+                        {
+                            StaticVariation = StaticAnalogOutputStatusVariation.Group40Var4,
+                            EventVariation = EventAnalogOutputStatusVariation.Group42Var8,
                             Deadband = 0.0,
                         });
 
+                        var flags = new Flags { Value = 0x00 }.Set(Flag.Restart, true);
+                        db.UpdateBinary(new Binary
+                        {
+                            Index = i,
+                            Value = false,
+                            Flags = flags,
+                            Time = Timestamp.InvalidTimestamp(),
+                        }, UpdateOptions.DefaultOptions());
+                        db.UpdateDoubleBitBinary(new DoubleBitBinary
+                        {
+                            Index = i,
+                            Value = DoubleBit.Indeterminate,
+                            Flags = flags,
+                            Time = Timestamp.InvalidTimestamp(),
+                        }, UpdateOptions.DefaultOptions());
+                        db.UpdateBinaryOutputStatus(new BinaryOutputStatus
+                        {
+                            Index = i,
+                            Value = false,
+                            Flags = flags,
+                            Time = Timestamp.InvalidTimestamp(),
+                        }, UpdateOptions.DefaultOptions());
+                        db.UpdateCounter(new Counter
+                        {
+                            Index = i,
+                            Value = 0,
+                            Flags = flags,
+                            Time = Timestamp.InvalidTimestamp(),
+                        }, UpdateOptions.DefaultOptions());
+                        db.UpdateFrozenCounter(new FrozenCounter
+                        {
+                            Index = i,
+                            Value = 0,
+                            Flags = flags,
+                            Time = Timestamp.InvalidTimestamp(),
+                        }, UpdateOptions.DefaultOptions());
                         db.UpdateAnalog(new Analog
                         {
-                            Index = (ushort)i,
-                            Value = 10.0,
-                            Flags = new Flags { Value = 0x00 },
-                            Time = new Timestamp
-                            {
-                                Quality = TimeQuality.Synchronized,
-                                Value = 0
-                            },
+                            Index = i,
+                            Value = 0.0,
+                            Flags = flags,
+                            Time = Timestamp.InvalidTimestamp(),
+                        }, UpdateOptions.DefaultOptions());
+                        db.UpdateAnalogOutputStatus(new AnalogOutputStatus
+                        {
+                            Index = i,
+                            Value = 0.0,
+                            Flags = flags,
+                            Time = Timestamp.InvalidTimestamp(),
                         }, UpdateOptions.DefaultOptions());
                     }
                 }));
 
+                // Start the outstation
                 server.Bind();
 
-                var value = 0.0;
+                var binaryValue = false;
+                var doubleBitBinaryValue = DoubleBit.DeterminedOff;
+                var binaryOutputStatusValue = false;
+                var counterValue = (uint)0;
+                var frozenCounterValue = (uint)0;
+                var analogValue = 0.0;
+                var analogOutputStatusValue = 0.0;
 
                 while (true)
                 {
@@ -161,23 +241,105 @@ class ExampleOutstation
                     {
                         case "x":
                             return;
-                        case "b":
+                        case "bi":
+                            {
+                                outstation.Transaction(new OutstationTransaction((db) =>
+                                {
+                                    binaryValue = !binaryValue;
+                                    db.UpdateBinary(new Binary
+                                    {
+                                        Index = 7,
+                                        Value = binaryValue,
+                                        Flags = new Flags { Value = 0x00 }.Set(Flag.Online, true),
+                                        Time = Timestamp.SynchronizedTimestamp(0),
+                                    }, UpdateOptions.DefaultOptions());
+                                }));
+                                break;
+                            }
+                        case "dbbi":
+                            {
+                                outstation.Transaction(new OutstationTransaction((db) =>
+                                {
+                                    doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DeterminedOff ? DoubleBit.DeterminedOn : DoubleBit.DeterminedOff;
+                                    db.UpdateDoubleBitBinary(new DoubleBitBinary
+                                    {
+                                        Index = 7,
+                                        Value = doubleBitBinaryValue,
+                                        Flags = new Flags { Value = 0x00 }.Set(Flag.Online, true),
+                                        Time = Timestamp.SynchronizedTimestamp(0),
+                                    }, UpdateOptions.DefaultOptions());
+                                }));
+                                break;
+                            }
+                        case "bos":
+                            {
+                                outstation.Transaction(new OutstationTransaction((db) =>
+                                {
+                                    binaryOutputStatusValue = !binaryOutputStatusValue;
+                                    db.UpdateBinaryOutputStatus(new BinaryOutputStatus
+                                    {
+                                        Index = 7,
+                                        Value = binaryOutputStatusValue,
+                                        Flags = new Flags { Value = 0x00 }.Set(Flag.Online, true),
+                                        Time = Timestamp.SynchronizedTimestamp(0),
+                                    }, UpdateOptions.DefaultOptions());
+                                }));
+                                break;
+                            }
+                        case "co":
+                            {
+                                outstation.Transaction(new OutstationTransaction((db) =>
+                                {
+                                    db.UpdateCounter(new Counter
+                                    {
+                                        Index = 7,
+                                        Value = ++counterValue,
+                                        Flags = new Flags { Value = 0x00 }.Set(Flag.Online, true),
+                                        Time = Timestamp.SynchronizedTimestamp(0),
+                                    }, UpdateOptions.DefaultOptions());
+                                }));
+                                break;
+                            }
+                        case "fco":
+                            {
+                                outstation.Transaction(new OutstationTransaction((db) =>
+                                {
+                                    db.UpdateFrozenCounter(new FrozenCounter
+                                    {
+                                        Index = 7,
+                                        Value = ++frozenCounterValue,
+                                        Flags = new Flags { Value = 0x00 }.Set(Flag.Online, true),
+                                        Time = Timestamp.SynchronizedTimestamp(0),
+                                    }, UpdateOptions.DefaultOptions());
+                                }));
+                                break;
+                            }
+                        case "ai":
                             {
                                 outstation.Transaction(new OutstationTransaction((db) =>
                                 {
                                     db.UpdateAnalog(new Analog
                                     {
                                         Index = 7,
-                                        Value = value,
-                                        Flags = new Flags { Value = 0x00 },
-                                        Time = new Timestamp
-                                        {
-                                            Quality = TimeQuality.Synchronized,
-                                            Value = 0
-                                        },
+                                        Value = ++analogValue,
+                                        Flags = new Flags { Value = 0x00 }.Set(Flag.Online, true),
+                                        Time = Timestamp.SynchronizedTimestamp(0),
                                     }, UpdateOptions.DefaultOptions());
                                 }));
-                                value++;
+                                break;
+                            }
+                        case "aos":
+                            {
+                                outstation.Transaction(new OutstationTransaction((db) =>
+                                {
+                                    db.UpdateAnalogOutputStatus(new AnalogOutputStatus
+                                    {
+                                        Index = 7,
+                                        Value = ++analogOutputStatusValue,
+                                        Flags = new Flags { Value = 0x00 }.Set(Flag.Online, true),
+                                        Time = Timestamp.SynchronizedTimestamp(0),
+                                    }, UpdateOptions.DefaultOptions());
+                                }));
                                 break;
                             }
                         default:

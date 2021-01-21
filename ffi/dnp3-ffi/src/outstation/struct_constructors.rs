@@ -96,6 +96,30 @@ pub unsafe fn address_filter_destroy(address_filter: *mut AddressFilter) {
     }
 }
 
+pub fn timestamp_invalid() -> ffi::Timestamp {
+    ffi::TimestampFields {
+        value: 0,
+        quality: ffi::TimeQuality::Invalid,
+    }
+    .into()
+}
+
+pub fn timestamp_synchronized(value: u64) -> ffi::Timestamp {
+    ffi::TimestampFields {
+        value,
+        quality: ffi::TimeQuality::Synchronized,
+    }
+    .into()
+}
+
+pub fn timestamp_not_synchronized(value: u64) -> ffi::Timestamp {
+    ffi::TimestampFields {
+        value,
+        quality: ffi::TimeQuality::NotSynchronized,
+    }
+    .into()
+}
+
 impl From<Features> for ffi::OutstationFeatures {
     fn from(from: Features) -> Self {
         ffi::OutstationFeaturesFields {

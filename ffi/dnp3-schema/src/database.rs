@@ -642,11 +642,7 @@ pub fn define(
             Type::Struct(shared_def.analog_output_status_point.clone()),
             "New value of the point",
         )?
-        .param(
-            "options",
-            Type::Struct(update_options),
-            "Update options",
-        )?
+        .param("options", Type::Struct(update_options), "Update options")?
         .return_type(ReturnType::void())?
         .doc("Update a Analog Output Status point")?
         .build()?;
