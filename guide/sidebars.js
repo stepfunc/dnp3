@@ -7,5 +7,11 @@ module.exports = {
         'about/license',
     ],
     API: ['api/logging'],
+    Examples: [
+        'examples/summary',
+        {
+            Rust: ['examples/rust/tcp_master', 'examples/rust/tcp_outstation'],
+        }
+    ],
   },
 };

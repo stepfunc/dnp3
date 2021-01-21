@@ -4,9 +4,15 @@ use std::time::Duration;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
-/// example of using the master API asynchronously from within the Tokio runtime
+/*
+  Example of using the master API from within the Tokio runtime.
+  The program initializes a master and then enters a loop reading console input
+  allowing the user to perform common tasks interactively.
+*/
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+    // initialize logging
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_target(false)
