@@ -222,7 +222,7 @@ validity or enforceability of the remaining provisions.
 7.9. Assignment
 
 Developer shall not assign this Agreement, or any right, or delegate any performance
-hereunder without Company’s prior written consent, and any such action in violation of
+hereunder without Company's prior written consent, and any such action in violation of
 the foregoing shall be void. Company may freely assign this Agreement.
 
 
