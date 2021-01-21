@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
 
-    // create
+    // create the master task and the handle that will be used to control it
     let (future, mut master) = create_master_tcp_client(
         MasterConfiguration::new(
             EndpointAddress::from(1)?,
