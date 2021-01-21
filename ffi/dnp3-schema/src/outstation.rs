@@ -15,7 +15,7 @@ pub fn define(
     shared_def: &SharedDefinitions,
 ) -> Result<(), BindingError> {
     // Everything required to create an outstation
-    let outstation = define_outstation(lib, &database)?;
+    let outstation = define_outstation(lib, decode_log_level_enum.clone(), &database)?;
     let outstation_config = define_outstation_config(lib, decode_log_level_enum)?;
     let database_config = define_database_config(lib)?;
     let outstation_application = define_outstation_application(lib)?;
@@ -86,6 +86,7 @@ pub fn define(
 
 fn define_outstation(
     lib: &mut LibraryBuilder,
+    decode_log_level_enum: NativeEnumHandle,
     database: &ClassHandle,
 ) -> Result<ClassHandle, BindingError> {
     let transaction_interface = lib
@@ -127,9 +128,26 @@ fn define_outstation(
         .doc("Execute transaction to modify the internal database of the outstation")?
         .build()?;
 
+    let outstation_set_decode_log_level_fn = lib
+        .declare_native_function("outstation_set_decode_log_level")?
+        .param(
+            "outstation",
+            Type::ClassRef(outstation.clone()),
+            "Outstation",
+        )?
+        .param(
+            "level",
+            Type::Enum(decode_log_level_enum),
+            "Decode log level",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Set decoding log level")?
+        .build()?;
+
     lib.define_class(&outstation)?
         .destructor(&outstation_destroy_fn)?
         .method("transaction", &outstation_transaction_fn)?
+        .method("set_decode_log_level", &outstation_set_decode_log_level_fn)?
         .doc(doc("Outstation handle").details("Use this handle to modify the internal database."))?
         .build()
 }

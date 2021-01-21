@@ -23,7 +23,10 @@ pub struct TcpServer {
     handle: Option<ServerHandle>,
 }
 
-pub type Outstation = OutstationHandle;
+pub struct Outstation {
+    handle: OutstationHandle,
+    runtime: RuntimeHandle,
+}
 
 pub unsafe fn tcpserver_new(runtime: *mut Runtime, address: &CStr) -> *mut TcpServer {
     let runtime = match runtime.as_ref() {
@@ -95,7 +98,10 @@ pub unsafe fn tcpserver_add_outstation(
         Err(_) => return std::ptr::null_mut(),
     };
 
-    Box::into_raw(Box::new(outstation))
+    Box::into_raw(Box::new(Outstation {
+        handle: outstation,
+        runtime: server.runtime.clone(),
+    }))
 }
 
 pub unsafe fn tcpserver_bind(server: *mut TcpServer) {
@@ -134,9 +140,20 @@ pub unsafe fn outstation_transaction(
     callback: ffi::OutstationTransaction,
 ) {
     if let Some(outstation) = outstation.as_mut() {
-        outstation.database.transaction(|database| {
+        outstation.handle.database.transaction(|database| {
             callback.execute(database as *mut _);
         });
+    }
+}
+
+pub unsafe fn outstation_set_decode_log_level(
+    outstation: *mut Outstation,
+    level: ffi::DecodeLogLevel,
+) {
+    if let Some(outstation) = outstation.as_mut() {
+        if let Some(runtime) = outstation.runtime.get() {
+            runtime.spawn(outstation.handle.set_decode_log_level(level.into()));
+        }
     }
 }
 
