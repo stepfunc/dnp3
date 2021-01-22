@@ -1,0 +1,59 @@
+---
+id: interop
+title: Interoperability
+sidebar_label: Interoperability
+slug: /interop
+---
+
+DNP3 defines four subset levels for the purpose of interoperability:
+
+* `Level 1` - The minimum features that a master or outstation must implement to be DNP3 compliant. The functionality is quite basic, intended for a small field device.
+* `Level 2` - Adds a number of function codes and objects to support a small RTU or data concentrator.
+* `Level 3` - Adds additional function codes and objects to support more complex RTUs/concentrators, must notably adding enable/disable of unsolicited reporting.
+* `Level 4` - Adds additional less-commonly used features including floating point analog variations, double-bit binary inputs, and device attributes.
+* Other features are defined which do not belong to any subset level such as file transfer, datasets, and secure authentication.
+
+
+### Current Support: Level 3
+
+The library is currently level 3 compliant for the both master and outstation. It will be made level 4 compliant in a future release. A number of level 4
+features and features that do not belong to a subset level are already supported:
+
+| Feature                   | Level |
+|---------------------------|:-----:|
+| Double-bit Binary Inputs  |  4    |
+| Floating-point AI/AO      |  4    |
+| BO/AO events              |  4    |
+| LAN time-synchronization  |  4    |
+| self-address support      |  4    |
+| Octet strings (g110/111)  |  n/a  |
+
+### Future Support
+
+We plan to add support for a number of features in future releases including:
+
+1. Transport Layer Security - We are currently working with the [Rustls](https://github.com/ctz/rustls) library to fully support non-web applications in the
+library. This is a high-priority item for a subsequent release.
+2. Device attributes (group 0)
+3. AO/BO command events (groups 13 & 43)
+4. Analog input deadbands (group 34)
+
+The library will be level 4 compliant when items 2-4 have been completed.
+
+## Compliance Testing
+
+The DNP3 User Group publishes official compliance test procedures for outstations. The procedures validate all of the level 2 functionality. Procedures
+for level 3 are currently in the works.
+
+
+We have an internal implementation of these test procedures that we automatically run against the outstation implementation. These procedures augment our
+own unit and integration tests to ensure compliance to the standard.
+
+:::note
+The DNP User Group does not certify libraries as conformant, only outstation devices. Should you wish to put your outstation product through conformance
+testing, Step Function I/O can assist you with this process as a services engagement.
+:::
+
+:::danger
+TODO - Link to the test procedures
+:::
