@@ -4,6 +4,7 @@ module.exports = {
         'about/guide',
         'about/dnp3',
         'about/library',
+        'about/versioning',
         'about/license',
     ],
     API: [
