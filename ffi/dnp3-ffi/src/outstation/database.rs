@@ -2,7 +2,7 @@ use crate::ffi;
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::{
     Analog, AnalogOutputStatus, Binary, BinaryOutputStatus, Counter, DoubleBitBinary,
-    FrozenCounter, Time,
+    FrozenCounter, OctetString, Time,
 };
 use dnp3::app::types::{DoubleBit, Timestamp};
 use dnp3::outstation::database::config::{
@@ -10,9 +10,9 @@ use dnp3::outstation::database::config::{
     DoubleBitBinaryConfig, EventAnalogOutputStatusVariation, EventAnalogVariation,
     EventBinaryOutputStatusVariation, EventBinaryVariation, EventCounterVariation,
     EventDoubleBitBinaryVariation, EventFrozenCounterVariation, FrozenCounterConfig,
-    StaticAnalogOutputStatusVariation, StaticAnalogVariation, StaticBinaryOutputStatusVariation,
-    StaticBinaryVariation, StaticCounterVariation, StaticDoubleBitBinaryVariation,
-    StaticFrozenCounterVariation,
+    OctetStringConfig, StaticAnalogOutputStatusVariation, StaticAnalogVariation,
+    StaticBinaryOutputStatusVariation, StaticBinaryVariation, StaticCounterVariation,
+    StaticDoubleBitBinaryVariation, StaticFrozenCounterVariation,
 };
 use dnp3::outstation::database::{Add, EventClass, EventMode, Remove, Update, UpdateOptions};
 
@@ -227,12 +227,73 @@ pub unsafe fn database_update_analog_output_status(
     }
 }
 
+pub unsafe fn database_add_octet_string(
+    database: *mut Database,
+    index: u16,
+    point_class: ffi::EventClass,
+) {
+    if let Some(database) = database.as_mut() {
+        database.add(index, point_class.into(), OctetStringConfig);
+    }
+}
+
+pub unsafe fn database_remove_octet_string(database: *mut Database, index: u16) {
+    if let Some(database) = database.as_mut() {
+        Remove::<OctetString>::remove(database, index);
+    }
+}
+
+pub unsafe fn database_update_octet_string(
+    database: *mut Database,
+    index: u16,
+    value: *mut OctetStringValue,
+    options: ffi::UpdateOptions,
+) {
+    if let Some(database) = database.as_mut() {
+        if let Some(value) = value.as_ref() {
+            if let Some(value) = value.into() {
+                database.update(index, &value, options.into());
+            }
+        }
+    }
+}
+
 pub fn update_options_default() -> ffi::UpdateOptions {
     ffi::UpdateOptionsFields {
         update_static: true,
         event_mode: ffi::EventMode::Detect,
     }
     .into()
+}
+
+pub struct OctetStringValue {
+    inner: Vec<u8>,
+}
+
+impl OctetStringValue {
+    fn new() -> Self {
+        Self { inner: Vec::new() }
+    }
+
+    fn into(&self) -> Option<OctetString> {
+        OctetString::new(&self.inner).ok()
+    }
+}
+
+pub unsafe fn octet_string_new() -> *mut OctetStringValue {
+    Box::into_raw(Box::new(OctetStringValue::new()))
+}
+
+pub unsafe fn octet_string_destroy(octet_string: *mut OctetStringValue) {
+    if !octet_string.is_null() {
+        Box::from_raw(octet_string);
+    }
+}
+
+pub unsafe fn octet_string_add(octet_string: *mut OctetStringValue, value: u8) {
+    if let Some(octet_string) = octet_string.as_mut() {
+        octet_string.inner.push(value);
+    }
 }
 
 impl From<ffi::EventClass> for Option<EventClass> {

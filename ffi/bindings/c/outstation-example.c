@@ -207,6 +207,8 @@ void outstation_transaction_startup(database_t* db, void* context)
         };
         database_add_analog_output_status(db, i, EventClass_Class1, analog_output_status_config);
 
+        database_add_octet_string(db, i, EventClass_Class1);
+
         // Set initial values
         flags_t flags =
         {
@@ -390,6 +392,21 @@ void analog_output_status_transaction(database_t* db, void* context)
     database_update_analog_output_status(db, value, update_options_default());
 }
 
+void octet_string_transaction(database_t* db, void* context)
+{
+    octet_string_value_t* octet_string = octet_string_new();
+    octet_string_add(octet_string, 0x48); // H
+    octet_string_add(octet_string, 0x65); // e
+    octet_string_add(octet_string, 0x6C); // l
+    octet_string_add(octet_string, 0x6C); // l
+    octet_string_add(octet_string, 0x6F); // o
+    octet_string_add(octet_string, 0x00); // \0
+
+    database_update_octet_string(db, 7, octet_string, update_options_default());
+
+    octet_string_destroy(octet_string);
+}
+
 int main()
 {
     // Setup logging
@@ -558,6 +575,15 @@ int main()
             outstation_transaction_t transaction =
             {
                 .execute = &analog_output_status_transaction,
+                .ctx = &database_points,
+            };
+            outstation_transaction(outstation, transaction);
+        }
+        else if(strcmp(cbuf, "os\n") == 0)
+        {
+            outstation_transaction_t transaction =
+            {
+                .execute = &octet_string_transaction,
                 .ctx = &database_points,
             };
             outstation_transaction(outstation, transaction);

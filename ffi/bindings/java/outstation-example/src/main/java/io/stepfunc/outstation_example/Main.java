@@ -1,13 +1,14 @@
 package io.stepfunc.outstation_example;
 
-import io.stepfunc.dnp3rs.*;
 import io.stepfunc.dnp3rs.Runtime;
+import io.stepfunc.dnp3rs.*;
 import org.joou.UByte;
 import org.joou.UShort;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.joou.Unsigned.*;
@@ -238,6 +239,8 @@ public class Main {
                     analogOutputStatusConfig.deadband = 0.0;
                     db.addAnalogOutputStatus(ushort(i), EventClass.CLASS1, analogOutputStatusConfig);
 
+                    db.addOctetString(ushort(i), EventClass.CLASS1);
+
                     Flags flags = new Flags();
                     flags.value = ubyte(0x00);
                     flags = flags.set(Flag.RESTART, true);
@@ -410,6 +413,23 @@ public class Main {
                                 value.flags = onlineFlags;
                                 value.time = Timestamp.synchronizedTimestamp(ulong(0));
                                 db.updateAnalogOutputStatus(value, UpdateOptions.defaultOptions());
+                            });
+                            break;
+                        }
+                        case "os":
+                        {
+                            outstation.transaction((db) -> {
+                                // Some Friday poetry:
+                                // Arrays.asList requires an array of Object,
+                                // Arrays.stream does not overload for byte[], how abject.
+                                // Java is poop
+                                // So excuse me for that for loop
+                                List<UByte> octetString = new ArrayList<>();
+                                for(byte octet : "Hello".getBytes(StandardCharsets.US_ASCII)) {
+                                    octetString.add(ubyte(octet));
+                                }
+
+                                db.updateOctetString(ushort(7), octetString, UpdateOptions.defaultOptions());
                             });
                             break;
                         }

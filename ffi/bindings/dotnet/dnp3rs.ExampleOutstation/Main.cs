@@ -170,6 +170,7 @@ class ExampleOutstation
                             EventVariation = EventAnalogOutputStatusVariation.Group42Var8,
                             Deadband = 0.0,
                         });
+                        db.AddOctetString(i, EventClass.Class1);
 
                         var flags = new Flags { Value = 0x00 }.Set(Flag.Restart, true);
                         db.UpdateBinary(new Binary
@@ -339,6 +340,14 @@ class ExampleOutstation
                                         Flags = new Flags { Value = 0x00 }.Set(Flag.Online, true),
                                         Time = Timestamp.SynchronizedTimestamp(0),
                                     }, UpdateOptions.DefaultOptions());
+                                }));
+                                break;
+                            }
+                        case "os":
+                            {
+                                outstation.Transaction(new OutstationTransaction((db) =>
+                                {
+                                    db.UpdateOctetString(7, System.Text.Encoding.ASCII.GetBytes("Hello"), UpdateOptions.DefaultOptions());
                                 }));
                                 break;
                             }

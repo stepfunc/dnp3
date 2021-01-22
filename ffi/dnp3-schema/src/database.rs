@@ -118,7 +118,7 @@ pub fn define(
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
         .return_type(ReturnType::void())?
-        .doc("Remove a new Binary Input point")?
+        .doc("Remove a Binary Input point")?
         .build()?;
 
     let binary_update_fn = lib
@@ -199,7 +199,7 @@ pub fn define(
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
         .return_type(ReturnType::void())?
-        .doc("Remove a new Double-Bit Binary Input point")?
+        .doc("Remove a Double-Bit Binary Input point")?
         .build()?;
 
     let double_bit_binary_update_fn = lib
@@ -273,7 +273,7 @@ pub fn define(
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
         .return_type(ReturnType::void())?
-        .doc("Remove a new Binary Output Status point")?
+        .doc("Remove a Binary Output Status point")?
         .build()?;
 
     let binary_output_status_update_fn = lib
@@ -348,7 +348,7 @@ pub fn define(
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
         .return_type(ReturnType::void())?
-        .doc("Remove a new Counter point")?
+        .doc("Remove a Counter point")?
         .build()?;
 
     let counter_update_fn = lib
@@ -435,7 +435,7 @@ pub fn define(
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
         .return_type(ReturnType::void())?
-        .doc("Remove a new Frozen Counter point")?
+        .doc("Remove a Frozen Counter point")?
         .build()?;
 
     let frozen_counter_update_fn = lib
@@ -534,7 +534,7 @@ pub fn define(
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
         .return_type(ReturnType::void())?
-        .doc("Remove a new Analog point")?
+        .doc("Remove an Analog point")?
         .build()?;
 
     let analog_update_fn = lib
@@ -616,7 +616,11 @@ pub fn define(
         .declare_native_function("database_add_analog_output_status")?
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
-        .param("point_class", Type::Enum(event_class), "Event class")?
+        .param(
+            "point_class",
+            Type::Enum(event_class.clone()),
+            "Event class",
+        )?
         .param(
             "config",
             Type::Struct(analog_output_status_config),
@@ -631,7 +635,7 @@ pub fn define(
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
         .return_type(ReturnType::void())?
-        .doc("Remove a new Analog Output Status point")?
+        .doc("Remove an Analog Output Status point")?
         .build()?;
 
     let analog_output_status_update_fn = lib
@@ -642,9 +646,85 @@ pub fn define(
             Type::Struct(shared_def.analog_output_status_point.clone()),
             "New value of the point",
         )?
-        .param("options", Type::Struct(update_options), "Update options")?
+        .param(
+            "options",
+            Type::Struct(update_options.clone()),
+            "Update options",
+        )?
         .return_type(ReturnType::void())?
         .doc("Update a Analog Output Status point")?
+        .build()?;
+
+    // Octet String
+    let octet_string_class = lib.declare_class("OctetStringValue")?;
+
+    let octet_string_new_fn = lib
+        .declare_native_function("octet_string_new")?
+        .return_type(ReturnType::new(
+            Type::ClassRef(octet_string_class.clone()),
+            "Empty octet string",
+        ))?
+        .doc("Create a new octet string")?
+        .build()?;
+
+    let octet_string_destroy_fn = lib
+        .declare_native_function("octet_string_destroy")?
+        .param(
+            "octet_string",
+            Type::ClassRef(octet_string_class.clone()),
+            "Octet String to destroy",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Deallocate an octet string")?
+        .build()?;
+
+    let octet_string_add_fn = lib
+        .declare_native_function("octet_string_add")?
+        .param(
+            "octet_string",
+            Type::ClassRef(octet_string_class),
+            "Octet String to modify",
+        )?
+        .param("value", Type::Uint8, "Byte to add")?
+        .return_type(ReturnType::void())?
+        .doc("Create a new octet string")?
+        .build()?;
+
+    let octet_string_collection = lib.define_collection(
+        &octet_string_new_fn,
+        &octet_string_destroy_fn,
+        &octet_string_add_fn,
+    )?;
+
+    let octet_string_add_fn = lib
+        .declare_native_function("database_add_octet_string")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param("point_class", Type::Enum(event_class), "Event class")?
+        .return_type(ReturnType::void())?
+        .doc("Add a new Octet String point")?
+        .build()?;
+
+    let octet_string_remove_fn = lib
+        .declare_native_function("database_remove_octet_string")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .return_type(ReturnType::void())?
+        .doc("Remove an Octet String point")?
+        .build()?;
+
+    let octet_string_update_fn = lib
+        .declare_native_function("database_update_octet_string")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the octet string")?
+        .param(
+            "value",
+            Type::Collection(octet_string_collection),
+            "New value of the point",
+        )?
+        .param("options", Type::Struct(update_options), "Update options")?
+        .return_type(ReturnType::void())?
+        .doc("Update an Octet String point")?
         .build()?;
 
     let database = lib
@@ -682,6 +762,9 @@ pub fn define(
             "update_analog_output_status",
             &analog_output_status_update_fn,
         )?
+        .method("add_octet_string", &octet_string_add_fn)?
+        .method("remove_octet_string", &octet_string_remove_fn)?
+        .method("update_octet_string", &octet_string_update_fn)?
         .doc(
             doc("Internal database access")
                 .warning("This object is only valid within the transaction."),
