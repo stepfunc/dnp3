@@ -49,7 +49,7 @@ pub fn create_master_serial_client(
     let (mut task, handle) = MasterTask::new(path, settings, config, listener);
     let future = async move {
         task.run()
-            .instrument(tracing::info_span!("MasterSerial", "port" = ?log_path))
+            .instrument(tracing::info_span!("DNP3-Master-Serial", "port" = ?log_path))
             .await
     };
     (future, handle)

@@ -41,11 +41,6 @@ values={[
 ```rust
 {{#include ../../../dnp3/examples/master_main.rs:logging}}
 ```
-:::note
-[tracing_subscriber](https://crates.io/crates/tracing-subscriber) is just one backend available for capturing trace information. The tracing ecosystem
-is still under active development.
-:::
-
 
 </TabItem>
 <TabItem value="C">
@@ -78,3 +73,24 @@ is still under active development.
 
 </TabItem>
 </Tabs>
+
+:::note
+The bindings use the [tracing_subscriber](https://crates.io/crates/tracing-subscriber) crate internally. Rust users may pick which tracing backend they want to
+use.
+:::
+
+## Example Output
+
+The logs provide a wealth of contextual metadata. This allows the user to:
+
+* Determine which communication session produced the message
+* Understand what state the software was in when the event occurred
+
+```
+INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}: connected to 127.0.0.1:20000
+INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP TX - ctrl: [fir: true fin: true con: false uns: false seq: 0] func: DisableUnsolicited ... (len = 9)
+INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP RX - ctrl: [fir: true fin: true con: true uns: true seq: 0] func: UnsolicitedResponse iin1: [DEVICE_RESTART] iin2: [] ... (len = 0)
+WARN DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: device restart detected (address == 1024)
+INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP TX - ctrl: [fir: true fin: true con: false uns: true seq: 0] func: Confirm ... (len = 0)
+INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP RX - ctrl: [fir: true fin: true con: false uns: false seq: 0] func: Response iin1: [DEVICE_RESTART] iin2: [] ... (len = 0)
+```

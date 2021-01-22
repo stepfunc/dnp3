@@ -61,7 +61,7 @@ impl TCPServer {
         let future = async move {
             task.run()
                 .instrument(
-                    tracing::info_span!("Outstation", "listen" = ?endpoint, "addr" = address),
+                    tracing::info_span!("DNP3-Outstation-TCP", "listen" = ?endpoint, "addr" = address),
                 )
                 .await
         };
