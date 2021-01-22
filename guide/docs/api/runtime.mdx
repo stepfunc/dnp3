@@ -8,7 +8,7 @@ slug: /api/runtime
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Rust's asynchronous programming model is a form of [cooperative multi-tasking](https://docs.rs/tokio/1.0.2/tokio/task/index.html). Once a task reaches
+Rust's asynchronous programming model is a form of [cooperative multitasking](https://docs.rs/tokio/1.0.2/tokio/task/index.html). Once a task reaches
 a point where it would normally block (e.g. reading from a socket), execution is instead released back to an executor so that another task may run. A pool of
 worker threads inside the executor can efficiently execute thousands of asynchronous tasks concurrently without the overhead of per-task call stacks or
 thread context-switching.
@@ -18,15 +18,16 @@ state machines that are just as efficient as what could be written by hand. Alth
 the compiler, it does not include a default runtime on which to execute the asynchronous programs. Instead, users are free to pick the runtime as an
 external library.
 
-The DNP3 library runs on top of the [Tokio](https://tokio.rs/) runtime which provides a state-of-the-art work stealing scheduler and platform-agnostic
+The DNP3 library runs on top of the [Tokio](https://tokio.rs/) runtime which provides a state-of-the-art scheduler and platform-agnostic
 networking APIs. Under the hood, an efficient OS-specific mechanism is used, e.g. *epoll* on Linux or *IOCP* on Windows. Tokio
-is a modern evolution of libraries like [libuev (C)](https://libuv.org/) and [ASIO (C++)](https://think-async.com/Asio/). It leverages Rust's thread and
-memory safety to make asynchronous programs that are not only blazing fast, but also highly reliable.
+is a modern evolution of libraries like [libuv (C)](https://libuv.org/) and [ASIO (C++)](https://think-async.com/Asio/). It leverages Rust's thread and
+memory safety to make asynchronous programs that are not only incredibly fast, but also correct.  It is particularly hard to write correct asynchronous
+software in C/C++ because of the need to manually reason about object lifetimes in callbacks.
 
 ## Lifetime
 
 A `Runtime` must be created before any communication can take place. It is a shared resource for multiple communication sessions. It is typically created just
-after initializing logging and is the last component to shutdown. Shutting down a `Runtime` will stop all of the communication sessions that were created with it.
+after initializing logging and is the last component to be shut down. Shutting down a `Runtime` will stop all of the communication sessions that were created with it.
 
 :::note
 Rust users may even share the runtime with other libraries that also use Tokio. The bindings currently do not allow for runtime sharing, but it may be possible
@@ -74,7 +75,7 @@ values={[
 }
 ```
 :::note
-Prefer try-with-resources syntax as Runtime implements *java.lang.AutoCloseable*.
+Prefer try-with-resources syntax in Java as Runtime implements *java.lang.AutoCloseable*.
 :::
 
 </TabItem>
@@ -88,7 +89,7 @@ Prefer try-with-resources syntax as Runtime implements *java.lang.AutoCloseable*
 ```
 
 :::note
-Prefer using statements as Runtime implements *System.IDisposable*.
+Prefer using statements in C# as Runtime implements *System.IDisposable*.
 :::
 
 
@@ -96,6 +97,21 @@ Prefer using statements as Runtime implements *System.IDisposable*.
 </Tabs>
 
 :::tip
-When using any of the bindings, setting the number of runtime threads to `0` will default to the number of system cores.
+When using any of the bindings, setting the number of runtime threads to `0` will default to the number of system cores. This
+is a safe default that will lead to good multi-core utilization.
+:::
+
+## Callbacks
+
+Callbacks from the library to user code are invoked from the runtime's thread pool. This means that blocking during a callback will make an entire thread
+unavailable for task execution. If all of the thread-pool threads are blocked, no communication sessions will be able to execute.
+
+Applications should try to avoid blocking whenever possible. For example, when a log message is received via a callback, a synchronous call to write the message
+to a file will block a thread. If this is occurring frequently on all of the pool threads, it can cause poor throughput or even task starvation. Applications
+should defer blocking calls to dedicated worker threads, e.g. a user-managed thread that writes log messages to file.
+
+:::tip
+In cases where some blocking is unavoidable, it can be useful to set the number of worker threads to a multiple of the number of system cores,
+e.g. 2x or 3x the number of system cores.
 :::
 

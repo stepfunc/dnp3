@@ -94,3 +94,25 @@ WARN DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsol
 INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP TX - ctrl: [fir: true fin: true con: false uns: true seq: 0] func: Confirm ... (len = 0)
 INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP RX - ctrl: [fir: true fin: true con: false uns: false seq: 0] func: Response iin1: [DEVICE_RESTART] iin2: [] ... (len = 0)
 ```
+
+## Protocol Decoding
+
+Protocol decoding can be configured on a per-communication channel basis, e.g. all of the traffic on a TCP socket or a serial port. The user specifies the
+`DecodeLogLevel` when creating a master or outstation instance which controls what level of decoding (including none) will take place. Refer to language
+specific API documentation for the meaning of each enumeration value. The decoding can even show the value of individual fields within objects:
+
+```
+APP TX - ctrl: [fir: true fin: true con: false uns: false seq: 1] func: Write ... (len = 6)
+g80v1 : Internal Indications - Packed Format - 1-byte start/stop - [7, 7]
+index: 7 false
+```
+
+:::note
+Protocol decoding is always output at the *Info* log level, but it can be changed dynamically at runtime using
+:::
+
+:::info
+Protocol decoding can be extremely verbose in a production system.
+:::
+
+
