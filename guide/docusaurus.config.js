@@ -1,7 +1,7 @@
 const remarkPlugin = require('./plugins/remark');
 
 module.exports = {
-  title: 'DNP3 Library',
+  title: 'DNP3 <version>',
   tagline: 'Pretty sure we don\'t need this page, just the docs',
   url: 'https://your-docusaurus-test-site.com',
   baseUrl: '/',
@@ -15,7 +15,7 @@ module.exports = {
       additionalLanguages: ['rust', 'java', 'csharp'],
     },
     navbar: {
-      title: 'DNP3',
+      title: 'DNP3 <version>',
       logo: {
         alt: 'Logo',
         src: 'img/logo.svg',
