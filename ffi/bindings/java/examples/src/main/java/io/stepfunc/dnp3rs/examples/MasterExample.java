@@ -160,10 +160,12 @@ public class MasterExample {
         Logging.configure(getLoggingConfig(), new ConsoleLogger());
         // ANCHOR_END: logging_init
 
+        // ANCHOR: runtime
         // Create the Tokio runtime
         RuntimeConfig runtimeConfig = new RuntimeConfig();
         runtimeConfig.numCoreThreads = ushort(4);
         try (Runtime runtime = new Runtime(runtimeConfig)) {
+        // ANCHOR_END: runtime
             run(runtime);
         } catch (Exception ex) {
             System.out.println(ex.getMessage());

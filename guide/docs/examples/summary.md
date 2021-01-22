@@ -1,6 +1,6 @@
 ---
 id: summary
-title: About the Examples
+title: Example Programs
 sidebar_label: About
 slug: /examples/summary
 ---

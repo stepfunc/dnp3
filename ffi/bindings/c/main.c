@@ -254,12 +254,14 @@ int main()
     configure_logging(config, logger);
     // ANCHOR_END: logging_init
 
-    // Create runtime
+    // ANCHOR: runtime_init
+    // create the runtime
     runtime_config_t runtime_config =
     {
         .num_core_threads = 4,
     };
     runtime_t* runtime = runtime_new(&runtime_config);
+    // ANCHOR_END: runtime_init
 
     // Create the master
     retry_strategy_t retry_strategy =
@@ -496,7 +498,9 @@ cleanup:
     poll_destroy(poll);
     association_destroy(association);
     master_destroy(master);
+    // ANCHOR: runtime_destroy
     runtime_destroy(runtime);
+    // ANCHOR_END: runtime_destroy
 
     return 0;
 }

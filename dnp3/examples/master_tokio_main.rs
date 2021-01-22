@@ -9,8 +9,10 @@ use tokio_util::codec::{FramedRead, LinesCodec};
   The program initializes a master and then enters a loop reading console input
   allowing the user to perform common tasks interactively.
 */
+// ANCHOR: runtime_init
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+// ANCHOR_END: runtime_init
 
     // initialize logging
     tracing_subscriber::fmt()
