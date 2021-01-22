@@ -1,0 +1,36 @@
+---
+id: runtime
+title: Runtime
+sidebar_label: Runtime
+slug: /api/runtime
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Rust's asynchronous programming model is a form of [cooperative multi-tasking](https://docs.rs/tokio/1.0.2/tokio/task/index.html). Once a task reaches
+a point where it would normally block (e.g. reading from a socket), execution is instead released back to an executor so that another task may run. A pool of worker threads inside the
+executor can efficiently execute thousands of asynchronous tasks without the overhead of per-task call stacks or thread context-switching.
+
+Rust supports asynchronous programming using *async* functions and *async/await* syntax. The Rust compiler transforms synchronous-looking code into
+state machines that are just as efficient as what could be written by hand. Although Rust has this capability built into
+the compiler, it does not include a default runtime on which to execute the asynchronous programs. Instead, users are free to pick the runtime as an
+external library.
+
+The DNP3 library runs on top of the [Tokio Runtime](https://tokio.rs/) which provides a state-of-the-art work stealing scheduler and platform-agnostic
+networking APIs. Under the hood, an efficient OS-specific mechanism is used, e.g. *epoll* on Linux or *IOCP* on Windows. Tokio
+is a modern evolution of libraries like [libuev (C)](https://libuv.org/) and [ASIO (C++)](https://think-async.com/Asio/). It leverages Rust's thread and
+memory safety to make asynchronous programs that are not only blazing fast, but also highly reliable.
+
+## Lifetime
+
+
+A `Runtime` must be created before any communication can take place. It is a shared resource for multiple communication sessions. It is typically created just
+after initializing logging and is the last component to shutdown.
+
+:::note
+Rust users may even share the runtime with other libraries that also use Tokio. The bindings currently do not allow for runtime sharing, but it may be possible
+in a future release.
+:::
+
+

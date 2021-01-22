@@ -6,7 +6,10 @@ module.exports = {
         'about/library',
         'about/license',
     ],
-    API: ['api/logging'],
+    API: [
+        'api/logging',
+        'api/runtime',
+    ],
     Examples: [
         'examples/summary',
         {
