@@ -3,7 +3,7 @@ module.exports = {
     About: [
         'about/guide',
         'about/dnp3',
-        'about/library',
+        'about/features',
         'about/interop',
         'about/versioning',
         'about/license',
