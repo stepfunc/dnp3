@@ -1,5 +1,5 @@
 use crate::app::types::DoubleBit;
-use crate::util::bit::{BitMask, Bitfield};
+use crate::util::bit::{bits, BitMask, Bitfield};
 use std::fmt::Formatter;
 
 /// Flags as defined in the specification where each bit has meaning.
@@ -27,9 +27,19 @@ impl Flags {
         self.value.bit_0()
     }
 
+    /// sets the `ONLINE` bit to a value
+    pub fn set_online(&mut self, value: bool) {
+        *self = self.with_bits_set_to(bits::BIT_0, value);
+    }
+
     /// test a `Flags` struct to see if the `RESTART` bit is set
     pub fn restart(self) -> bool {
         self.value.bit_1()
+    }
+
+    /// sets the `RESTART` bit to a value
+    pub fn set_restart(&mut self, value: bool) {
+        *self = self.with_bits_set_to(bits::BIT_1, value);
     }
 
     /// test a `Flags` struct to see if the `COMM_LOST` bit is set
@@ -37,9 +47,19 @@ impl Flags {
         self.value.bit_2()
     }
 
+    /// sets the `COMM_LOST` bit to a value
+    pub fn set_comm_lost(&mut self, value: bool) {
+        *self = self.with_bits_set_to(bits::BIT_2, value);
+    }
+
     /// test a `Flags` struct to see if the `REMOTE_FORCED` bit is set
     pub fn remote_forced(self) -> bool {
         self.value.bit_3()
+    }
+
+    /// sets the `REMOTE_FORCED` bit to a value
+    pub fn set_remote_forced(&mut self, value: bool) {
+        *self = self.with_bits_set_to(bits::BIT_3, value);
     }
 
     /// test a `Flags` struct to see if the `LOCAL_FORCED` bit is set
@@ -47,9 +67,19 @@ impl Flags {
         self.value.bit_4()
     }
 
+    /// sets the `LOCAL_FORCED` bit to a value
+    pub fn set_local_forced(&mut self, value: bool) {
+        *self = self.with_bits_set_to(bits::BIT_4, value);
+    }
+
     /// test a `Flags` struct to see if the `CHATTER_FILTER` bit is set
     pub fn chatter_filter(self) -> bool {
         self.value.bit_5()
+    }
+
+    /// sets the `CHATTER_FILTER` bit to a value
+    pub fn set_chatter_filter(&mut self, value: bool) {
+        *self = self.with_bits_set_to(bits::BIT_5, value);
     }
 
     /// test a `Flags` struct to see if the `ROLLOVER` bit is set
@@ -57,9 +87,19 @@ impl Flags {
         self.value.bit_5()
     }
 
+    /// sets the `ROLLOVER` bit to a value
+    pub fn set_rollover(&mut self, value: bool) {
+        *self = self.with_bits_set_to(bits::BIT_5, value);
+    }
+
     /// test a `Flags` struct to see if the `DISCONTINUITY` bit is set
     pub fn discontinuity(self) -> bool {
         self.value.bit_6()
+    }
+
+    /// sets the `DISCONTINUITY` bit to a value
+    pub fn set_discontinuity(&mut self, value: bool) {
+        *self = self.with_bits_set_to(bits::BIT_6, value);
     }
 
     /// test a `Flags` struct to see if the `OVER_RANGE` bit is set
@@ -67,9 +107,19 @@ impl Flags {
         self.value.bit_5()
     }
 
+    /// sets the `OVER_RANGE` bit to a value
+    pub fn set_over_range(&mut self, value: bool) {
+        *self = self.with_bits_set_to(bits::BIT_5, value);
+    }
+
     /// test a `Flags` struct to see if the `REFERENCE_ERR` bit is set
     pub fn reference_err(self) -> bool {
         self.value.bit_6()
+    }
+
+    /// sets the `REFERENCE_ERR` bit to a value
+    pub fn set_reference_err(&mut self, value: bool) {
+        *self = self.with_bits_set_to(bits::BIT_6, value);
     }
 
     pub(crate) fn bit5(self) -> bool {

@@ -1,4 +1,4 @@
-package io.stepfunc.dnp3rs_tests;
+package io.stepfunc.master_example;
 
 import io.stepfunc.dnp3rs.*;
 import io.stepfunc.dnp3rs.Runtime;

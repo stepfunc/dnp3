@@ -28,6 +28,7 @@
 
     <modules>
         <module>dnp3rs</module>
-        <module>dnp3rs-tests</module>
+        <module>master-example</module>
+        <module>outstation-example</module>
     </modules>
 </project>

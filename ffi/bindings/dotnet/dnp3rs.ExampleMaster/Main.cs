@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using dnp3rs;
 
-class MainClass
+class ExampleMaster
 {
     class TestLogger : ILogger
     {
