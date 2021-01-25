@@ -9,11 +9,10 @@ use dnp3::entry::outstation::tcp::ServerHandle;
 use dnp3::entry::EndpointAddress;
 use dnp3::outstation::config::{BufferSize, Feature, Features, OutstationConfig};
 use dnp3::outstation::database::{ClassZeroConfig, DatabaseConfig, EventBufferConfig};
+use dnp3::outstation::task::OutstationHandle;
 
 pub use database::*;
 pub use struct_constructors::*;
-
-use dnp3::outstation::OutstationHandle;
 
 use crate::{ffi, Runtime, RuntimeHandle};
 
