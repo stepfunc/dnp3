@@ -7,11 +7,11 @@ set(CMAKE_PREFIX_PATH ${CMAKE_CURRENT_LIST_DIR}/generated/cmake)
 find_package(dnp3rs REQUIRED)
 
 # Master example
-add_executable(master_example master-example.c)
+add_executable(master_example master_example.c)
 target_link_libraries(master_example PRIVATE dnp3rs)
 
 # Outstation example
-add_executable(outstation_example outstation-example.c)
+add_executable(outstation_example outstation_example.c)
 target_link_libraries(outstation_example PRIVATE dnp3rs)
 
 # Copy the DLL after build
