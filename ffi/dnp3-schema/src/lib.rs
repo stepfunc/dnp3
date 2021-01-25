@@ -1,11 +1,14 @@
 use oo_bindgen::*;
 
 mod association;
+mod database;
 mod handler;
 mod logging;
 mod master;
+mod outstation;
 mod request;
 mod runtime;
+mod shared;
 
 pub fn build_lib() -> Result<Library, BindingError> {
     let mut builder = LibraryBuilder::new("dnp3rs", Version::parse("0.1.0").unwrap());
@@ -207,19 +210,33 @@ pub fn build_lib() -> Result<Library, BindingError> {
         .collect(),
     )?;
 
+    // Shared stuff
     let decode_log_level_enum = logging::define(&mut builder)?;
+    let shared_def = shared::define(&mut builder)?;
+
+    // Master stuff
     let (request, variation_enum) = request::define(&mut builder)?;
-    let read_handler = handler::define(&mut builder, variation_enum)?;
-    let (retry_strategy, master_class) =
+    let read_handler = handler::define(&mut builder, variation_enum, &shared_def)?;
+    let (runtime, retry_strategy, master_class) =
         runtime::define(&mut builder, decode_log_level_enum.clone())?;
     let association_class = master::define(
         &mut builder,
         master_class,
         read_handler,
-        decode_log_level_enum,
+        decode_log_level_enum.clone(),
         retry_strategy,
     )?;
-    association::define(&mut builder, association_class, request)?;
+    association::define(&mut builder, association_class, request, &shared_def)?;
+
+    // Outstation stuff
+    let database = database::define(&mut builder, &shared_def)?;
+    outstation::define(
+        &mut builder,
+        runtime,
+        decode_log_level_enum,
+        database,
+        &shared_def,
+    )?;
 
     builder.build()
 }

@@ -12,7 +12,7 @@ use tokio_util::codec::{FramedRead, LinesCodec};
 // ANCHOR: runtime_init
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-// ANCHOR_END: runtime_init
+    // ANCHOR_END: runtime_init
 
     // initialize logging
     tracing_subscriber::fmt()
