@@ -84,7 +84,7 @@ module.exports = function codeSample(options = {}) {
                     result += node.value.substr(current_idx, match.index - current_idx);
 
                     // Copy the modified text
-                    result += findSample(path.resolve(file.path, '../' + filepath), anchor);
+                    result += findSample(path.resolve(__dirname, '../../', filepath), anchor);
 
                     // Update the current index
                     current_idx = match.index + match[0].length;
