@@ -36,14 +36,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(false)
         .init();
 
+    //
     let mut server = TCPServer::new("127.0.0.1:20000".parse()?);
 
     let (handle, outstation) = server.add_outstation(
         get_outstation_config(),
         get_database_config(),
+        // customizable trait that controls outstation behavior
         DefaultOutstationApplication::create(),
+        // customizable trait to receive events about what the outstation is doing
         DefaultOutstationInformation::create(),
-        DefaultControlHandler::with_status(CommandStatus::Success),
+        // customizable trait to process control requests from the master
+        DefaultControlHandler::with_status(CommandStatus::NotSupported),
+        // filter that controls what IP address(es) may connect to this outstation instance
         AddressFilter::Any,
     )?;
 

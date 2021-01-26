@@ -8,7 +8,15 @@ slug: /api/outstation/create
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Outstations may be created using an instance of a `Runtime`.
+Outstations may be created once an instance of a `Runtime` is available. The exact process for creating an outstation is slightly different
+depending on the physical layer, e.g. TCP vs serial, although most of the configuration options and callback interfaces are the same. The next subsection
+covers all of the common configuration and interfaces used to create an outstation that don't depend on the physical layer.
+
+## Common Configuration
+
+## TCP Server
+
+One or more outstation instances may be associated with a TCP server.
 
 <Tabs
 groupId="language"
