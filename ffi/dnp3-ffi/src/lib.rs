@@ -1,10 +1,11 @@
-#![allow(clippy::clippy::missing_safety_doc)]
+#![allow(clippy::clippy::missing_safety_doc, clippy::useless_conversion)]
 
 mod association;
 mod command;
 mod handler;
 mod logging;
 mod master;
+mod outstation;
 mod request;
 mod runtime;
 
@@ -15,6 +16,7 @@ pub use command::*;
 pub use handler::*;
 pub use logging::*;
 pub use master::*;
+pub use outstation::*;
 pub use request::*;
 pub use runtime::*;
 

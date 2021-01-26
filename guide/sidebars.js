@@ -11,6 +11,9 @@ module.exports = {
     API: [
         'api/logging',
         'api/runtime',
+        {
+            Outstation: ['api/outstation/create']
+        }
     ],
     Examples: [
         'examples/summary',

@@ -14,11 +14,13 @@ use tokio_util::codec::{FramedRead, LinesCodec};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 // ANCHOR_END: runtime_init
 
+    // ANCHOR: logging
     // initialize logging
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_target(false)
         .init();
+    // ANCHOR_END: logging
 
     // spawn the master onto another task
     let mut master = spawn_master_tcp_client(

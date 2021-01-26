@@ -411,6 +411,27 @@ pub unsafe fn flags_is_set(flags: Option<&ffi::Flags>, flag: ffi::Flag) -> bool 
     }
 }
 
+pub unsafe fn flags_set(flags: Option<&ffi::Flags>, flag: ffi::Flag, value: bool) -> ffi::Flags {
+    if let Some(flags) = flags {
+        let mut flags = Flags::new(flags.value);
+        match flag {
+            ffi::Flag::Online => flags.set_online(value),
+            ffi::Flag::Restart => flags.set_restart(value),
+            ffi::Flag::CommLost => flags.set_comm_lost(value),
+            ffi::Flag::RemoteForced => flags.set_remote_forced(value),
+            ffi::Flag::LocalForced => flags.set_local_forced(value),
+            ffi::Flag::ChatterFilter => flags.set_chatter_filter(value),
+            ffi::Flag::Rollover => flags.set_rollover(value),
+            ffi::Flag::Discontinuity => flags.set_discontinuity(value),
+            ffi::Flag::OverRange => flags.set_over_range(value),
+            ffi::Flag::ReferenceErr => flags.set_reference_err(value),
+        }
+        ffi::Flags { value: flags.value }
+    } else {
+        ffi::Flags { value: 0x00 }
+    }
+}
+
 impl From<Option<Time>> for ffi::Timestamp {
     fn from(time: Option<Time>) -> ffi::Timestamp {
         ffi::TimestampFields {

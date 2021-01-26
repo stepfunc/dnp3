@@ -8,7 +8,14 @@ use oo_bindgen::*;
 pub fn define(
     lib: &mut LibraryBuilder,
     decode_log_level_enum: NativeEnumHandle,
-) -> Result<(NativeStructHandle, ClassDeclarationHandle), BindingError> {
+) -> Result<
+    (
+        ClassDeclarationHandle,
+        NativeStructHandle,
+        ClassDeclarationHandle,
+    ),
+    BindingError,
+> {
     // Forward declare the class
     let runtime_class = lib.declare_class("Runtime")?;
 
@@ -166,7 +173,7 @@ pub fn define(
         .doc("Event-queue based runtime handle")?
         .build()?;
 
-    Ok((retry_strategy, master_class))
+    Ok((runtime_class, retry_strategy, master_class))
 }
 
 fn define_endpoint_list(lib: &mut LibraryBuilder) -> Result<ClassHandle, BindingError> {
