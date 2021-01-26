@@ -20,3 +20,11 @@ code that configures the logging ...
 
 These blocks of code are pulled from the example programs and used as snippets in this guide. This ensures that all of the snippets
 that you encounter when reading the documentation are always syntactically valid as they extracted from working programs.
+
+
+```mermaid
+graph TD
+A[Client] --> B[Load Balancer]
+B --> C[Server1]
+B --> D[Server2]
+```

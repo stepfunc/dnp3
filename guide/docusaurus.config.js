@@ -1,4 +1,5 @@
-const remarkPlugin = require('./plugins/remark');
+const samplePlugin = require('./plugins/sample');
+const mermaidPlugin = require('./plugins/mermaid');
 
 module.exports = {
   title: 'DNP3 <version>',
@@ -82,7 +83,8 @@ module.exports = {
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
           remarkPlugins: [
-            remarkPlugin,
+            samplePlugin,
+            mermaidPlugin,
           ],
         },
         theme: {
