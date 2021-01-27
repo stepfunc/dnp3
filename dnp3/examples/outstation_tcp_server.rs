@@ -7,18 +7,12 @@ use dnp3::entry::outstation::AddressFilter;
 use dnp3::entry::EndpointAddress;
 use dnp3::outstation::config::OutstationConfig;
 use dnp3::outstation::database::config::*;
-use dnp3::outstation::database::EventClass;
-use dnp3::outstation::database::{Add, DatabaseConfig, Update, UpdateOptions};
+use dnp3::outstation::database::{Add, Update, UpdateOptions};
+use dnp3::outstation::database::{EventBufferConfig, EventClass};
 use dnp3::outstation::traits::{
     DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
 };
 use std::time::Duration;
-
-fn get_database_config() -> DatabaseConfig {
-    let mut config = DatabaseConfig::default();
-    config.events.max_analog = 10;
-    config
-}
 
 fn get_outstation_config() -> OutstationConfig {
     // ANCHOR: outstation_config
@@ -38,7 +32,6 @@ fn get_outstation_config() -> OutstationConfig {
 /// example of using the outstation API asynchronously from within the Tokio runtime
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_target(false)
@@ -48,7 +41,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (handle, outstation) = server.add_outstation(
         get_outstation_config(),
-        get_database_config(),
+        // event buffer space for 100 analog events
+        EventBufferConfig::new(0, 0, 0, 0, 0, 100, 0, 0),
         // customizable trait that controls outstation behavior
         DefaultOutstationApplication::create(),
         // customizable trait to receive events about what the outstation is doing

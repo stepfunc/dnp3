@@ -1,6 +1,6 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
-use crate::outstation::database::DatabaseConfig;
+use crate::outstation::database::ClassZeroConfig;
 use crate::util::buffer::Buffer;
 
 /// Validated buffer size for use in the outstation
@@ -93,6 +93,15 @@ pub struct OutstationConfig {
     pub unsolicited_retry_delay: std::time::Duration,
     pub max_read_headers_per_request: u16,
     pub keep_alive_timeout: Option<std::time::Duration>,
+    /// Maximum number of headers that will be processed
+    /// in a READ request. Internally, this controls the size of a
+    /// pre-allocated buffer used to process requests. A minimum
+    /// value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced.
+    /// Requesting more than this number will result in the PARAMETER_ERROR
+    /// IIN bit being set in the response.
+    pub max_read_request_headers: Option<u16>,
+    /// controls responses to class 0 READ requests
+    pub class_zero: ClassZeroConfig,
 }
 
 impl Feature {
@@ -106,6 +115,7 @@ impl Feature {
 }
 
 impl OutstationConfig {
+    pub const DEFAULT_MAX_READ_REQUEST_HEADERS: u16 = 64;
     pub const DEFAULT_CONFIRM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
     pub const DEFAULT_SELECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
     pub const DEFAULT_UNSOLICITED_RETRY_DELAY: std::time::Duration =
@@ -127,8 +137,10 @@ impl OutstationConfig {
             features: Features::default(),
             max_unsolicited_retries: None,
             unsolicited_retry_delay: Self::DEFAULT_UNSOLICITED_RETRY_DELAY,
-            max_read_headers_per_request: DatabaseConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
+            max_read_headers_per_request: Self::DEFAULT_MAX_READ_REQUEST_HEADERS,
             keep_alive_timeout: Some(std::time::Duration::from_secs(60)),
+            max_read_request_headers: None,
+            class_zero: ClassZeroConfig::default(),
         }
     }
 }

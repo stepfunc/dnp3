@@ -8,7 +8,7 @@ use std::time::Duration;
 use dnp3::entry::outstation::tcp::ServerHandle;
 use dnp3::entry::EndpointAddress;
 use dnp3::outstation::config::{BufferSize, Feature, Features, OutstationConfig};
-use dnp3::outstation::database::{ClassZeroConfig, DatabaseConfig, EventBufferConfig};
+use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::task::OutstationHandle;
 
 pub use database::*;
@@ -56,7 +56,7 @@ pub unsafe fn tcpserver_destroy(server: *mut TcpServer) {
 pub unsafe fn tcpserver_add_outstation(
     server: *mut TcpServer,
     config: ffi::OutstationConfig,
-    database: ffi::DatabaseConfig,
+    event_config: ffi::EventBufferConfig,
     application: ffi::OutstationApplication,
     information: ffi::OutstationInformation,
     control_handler: ffi::ControlHandler,
@@ -84,7 +84,7 @@ pub unsafe fn tcpserver_add_outstation(
 
     let outstation = match server_handle.add_outstation(
         config,
-        database.into(),
+        event_config.into(),
         Box::new(application),
         Box::new(information),
         Box::new(control_handler),
@@ -203,6 +203,8 @@ fn convert_outstation_config(config: ffi::OutstationConfig) -> Option<Outstation
         unsolicited_retry_delay: config.unsolicited_retry_delay(),
         max_read_headers_per_request: config.max_read_headers_per_request(),
         keep_alive_timeout,
+        class_zero: config.class_zero.into(),
+        max_read_request_headers: Some(config.max_read_request_headers),
     })
 }
 
@@ -223,18 +225,8 @@ impl From<&ffi::OutstationFeatures> for Features {
     }
 }
 
-impl From<ffi::DatabaseConfig> for DatabaseConfig {
-    fn from(from: ffi::DatabaseConfig) -> Self {
-        DatabaseConfig {
-            max_read_request_headers: Some(from.max_read_request_headers()),
-            class_zero: from.class_zero().into(),
-            events: from.events().into(),
-        }
-    }
-}
-
-impl From<&ffi::ClassZeroConfig> for ClassZeroConfig {
-    fn from(from: &ffi::ClassZeroConfig) -> Self {
+impl From<ffi::ClassZeroConfig> for ClassZeroConfig {
+    fn from(from: ffi::ClassZeroConfig) -> Self {
         ClassZeroConfig {
             binary: from.binary(),
             double_bit_binary: from.double_bit_binary(),
@@ -248,8 +240,8 @@ impl From<&ffi::ClassZeroConfig> for ClassZeroConfig {
     }
 }
 
-impl From<&ffi::EventBufferConfig> for EventBufferConfig {
-    fn from(from: &ffi::EventBufferConfig) -> Self {
+impl From<ffi::EventBufferConfig> for EventBufferConfig {
+    fn from(from: ffi::EventBufferConfig) -> Self {
         EventBufferConfig {
             max_binary: from.max_binary(),
             max_double_binary: from.max_double_bit_binary(),

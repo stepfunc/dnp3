@@ -2,7 +2,7 @@ use crate::app::parse::DecodeLogLevel;
 use crate::entry::EndpointAddress;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
 use crate::outstation::config::{Feature, OutstationConfig};
-use crate::outstation::database::{DatabaseConfig, EventBufferConfig};
+use crate::outstation::database::EventBufferConfig;
 use crate::outstation::task::{OutstationHandle, OutstationTask};
 use crate::outstation::tests::harness::{
     ApplicationData, Event, EventHandle, MockControlHandler, MockOutstationApplication,
@@ -126,12 +126,9 @@ fn new_harness_impl(
 
     let (data, application) = MockOutstationApplication::new(events.clone());
 
-    let mut db_config = DatabaseConfig::default();
-    db_config.events = EventBufferConfig::all_types(5);
-
     let (task, handle) = OutstationTask::create(
         config,
-        db_config,
+        EventBufferConfig::all_types(5),
         application,
         MockOutstationInformation::new(events.clone()),
         MockControlHandler::new(events.clone()),

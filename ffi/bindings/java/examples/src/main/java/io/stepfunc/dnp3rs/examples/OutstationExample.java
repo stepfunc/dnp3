@@ -199,13 +199,11 @@ public class OutstationExample {
             config.logLevel = DecodeLogLevel.OBJECT_VALUES;
             // ANCHOR_END: outstation_config
 
-            DatabaseConfig database = DatabaseConfig.defaultConfig();
-            database.events = EventBufferConfig.allTypes(ushort(10));
             TestApplication application = new TestApplication();
             TestOutstationInformation information = new TestOutstationInformation();
             TestControlHandler controlHandler = new TestControlHandler();
             AddressFilter addressFilter = AddressFilter.any();
-            Outstation outstation = server.addOutstation(config, database, application, information, controlHandler, addressFilter);
+            Outstation outstation = server.addOutstation(config, EventBufferConfig.allTypes(ushort(10)), application, information, controlHandler, addressFilter);
 
             // Setup initial points
             outstation.transaction((db) -> {

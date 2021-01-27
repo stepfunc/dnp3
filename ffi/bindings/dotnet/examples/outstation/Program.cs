@@ -127,14 +127,12 @@ class ExampleOutstation
                 // override the default decode log level
                 config.LogLevel = DecodeLogLevel.ObjectValues;
                 // ANCHOR_END: outstation_config
-
-                var database = DatabaseConfig.DefaultConfig();
-                database.Events = EventBufferConfig.AllTypes(10);
+                                
                 var application = new TestOutstationApplication();
                 var information = new TestOutstationInformation();
                 var controlHandler = new TestControlHandler();
                 var addressFilter = AddressFilter.Any();
-                var outstation = server.AddOutstation(config, database, application, information, controlHandler, addressFilter);
+                var outstation = server.AddOutstation(config, EventBufferConfig.AllTypes(10), application, information, controlHandler, addressFilter);
 
                 // Setup initial points
                 outstation.Transaction(new OutstationTransaction((db) =>

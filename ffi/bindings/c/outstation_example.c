@@ -443,10 +443,7 @@ int main()
     );
     // override the default decode log level
     config.log_level = DecodeLogLevel_ObjectValues;
-    // ANCHOR_END: outstation_config
-
-    database_config_t database = database_config_default();
-    database.events = event_buffer_config_all_types(10);
+    // ANCHOR_END: outstation_config    
 
     outstation_application_t application =
     {
@@ -493,7 +490,7 @@ int main()
         .ctx = NULL,
     };
     address_filter_t* address_filter = address_filter_any();
-    outstation_t* outstation = tcpserver_add_outstation(server, config, database, application, information, control_handler, address_filter);
+    outstation_t* outstation = tcpserver_add_outstation(server, config, event_buffer_config_all_types(10), application, information, control_handler, address_filter);
     address_filter_destroy(address_filter);
 
     // Setup initial points

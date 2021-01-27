@@ -42,14 +42,22 @@ pub enum EventClass {
 /// Controls which types are reported during a class 0 READ
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ClassZeroConfig {
+    /// If true, Binary Inputs are reported in Class 0 READ requests
     pub binary: bool,
+    /// If true, Double-bit Binary Inputs are reported in Class 0 READ requests
     pub double_bit_binary: bool,
+    /// If true, Binary Output Status points are reported in Class 0 READ requests
     pub binary_output_status: bool,
+    /// If true, Counters are reported in Class 0 READ requests
     pub counter: bool,
+    /// If true, Frozen Counters are reported in Class 0 READ requests
     pub frozen_counter: bool,
+    /// If true, Analog Inputs are reported in Class 0 READ requests
     pub analog: bool,
+    /// If true, Analog Output Status points are reported in Class 0 READ requests
     pub analog_output_status: bool,
-    /// For conformance, this should be `false`
+    /// If true, Octet Strings are reported in Class 0 READ requests
+    /// This field defaults to `false` for conformance to the standard
     pub octet_strings: bool,
 }
 
@@ -173,37 +181,6 @@ pub(crate) struct ResponseInfo {
      */
 }
 
-/// Configuration of the database
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct DatabaseConfig {
-    /// Maximum number of headers that will be processed
-    /// in a READ request. Internally, this controls the size of a
-    /// pre-allocated buffer used to process requests. A minimum
-    /// value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced.
-    /// Requesting more than this number will result in the PARAMETER_ERROR
-    /// IIN bit being set in the response.
-    pub max_read_request_headers: Option<u16>,
-    /// controls responses to class 0 reads
-    pub class_zero: ClassZeroConfig,
-    /// event buffer parameters
-    pub events: EventBufferConfig,
-}
-
-impl Default for DatabaseConfig {
-    fn default() -> Self {
-        Self {
-            max_read_request_headers: None,
-            class_zero: ClassZeroConfig::default(),
-            events: EventBufferConfig::no_events(),
-        }
-    }
-}
-
-impl DatabaseConfig {
-    /// minimum that may be configured for 'max_read_request_headers', also the default.
-    pub const DEFAULT_MAX_READ_REQUEST_HEADERS: u16 = 64;
-}
-
 /// Options that control how the update is performed. 99% of the time
 /// the default() method should be used to initialize this struct. Very
 /// few applications need to use the other options.
@@ -282,9 +259,17 @@ pub struct Database {
 
 impl Database {
     /// Create a database by specified how it will buffer events
-    pub(crate) fn new(config: DatabaseConfig) -> Self {
+    pub(crate) fn new(
+        max_read_selection: Option<u16>,
+        class_zero_config: ClassZeroConfig,
+        config: EventBufferConfig,
+    ) -> Self {
         Self {
-            inner: crate::outstation::database::details::database::Database::new(config),
+            inner: crate::outstation::database::details::database::Database::new(
+                max_read_selection,
+                class_zero_config,
+                config,
+            ),
         }
     }
 }
@@ -311,9 +296,17 @@ impl DatabaseHandle {
         self.notify.notified().await
     }
 
-    pub(crate) fn new(config: DatabaseConfig) -> Self {
+    pub(crate) fn new(
+        max_read_selection: Option<u16>,
+        class_zero_config: ClassZeroConfig,
+        event_config: EventBufferConfig,
+    ) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(Database::new(config))),
+            inner: Arc::new(Mutex::new(Database::new(
+                max_read_selection,
+                class_zero_config,
+                event_config,
+            ))),
             notify: Arc::new(crate::tokio::sync::Notify::new()),
         }
     }
