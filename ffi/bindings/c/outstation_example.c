@@ -432,8 +432,19 @@ int main()
     runtime_t* runtime = runtime_new(&runtime_config);
 
     tcp_server_t* server = tcpserver_new(runtime, "127.0.0.1:20000");
-    outstation_config_t config = outstation_config_default(1024, 1);
+
+    // ANCHOR: outstation_config
+    // create an outstation configuration with default values
+    outstation_config_t config = outstation_config_default(
+        // outstation address
+        1024,
+        // master address
+        1
+    );
+    // override the default decode log level
     config.log_level = DecodeLogLevel_ObjectValues;
+    // ANCHOR_END: outstation_config
+
     database_config_t database = database_config_default();
     database.events = event_buffer_config_all_types(10);
 

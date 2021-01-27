@@ -187,8 +187,18 @@ public class OutstationExample {
         try(Runtime runtime = new Runtime(runtimeConfig)) {
             TcpServer server = new TcpServer(runtime, "127.0.0.1:20000");
 
-            OutstationConfig config = OutstationConfig.defaultConfig(ushort(1024), ushort(1));
+            // ANCHOR: outstation_config
+            // create an outstation configuration with default values
+            OutstationConfig config = OutstationConfig.defaultConfig(
+                // outstation address
+                ushort(1024),
+                // master address
+                ushort(1)
+            );
+            // override the default decode log level
             config.logLevel = DecodeLogLevel.OBJECT_VALUES;
+            // ANCHOR_END: outstation_config
+
             DatabaseConfig database = DatabaseConfig.defaultConfig();
             database.events = EventBufferConfig.allTypes(ushort(10));
             TestApplication application = new TestApplication();

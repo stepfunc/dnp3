@@ -21,22 +21,29 @@ fn get_database_config() -> DatabaseConfig {
 }
 
 fn get_outstation_config() -> OutstationConfig {
-    let outstation_address = EndpointAddress::from(1024).unwrap();
-    let master_address = EndpointAddress::from(1).unwrap();
-    let mut config = OutstationConfig::new(outstation_address, master_address);
+    // ANCHOR: outstation_config
+    // create an outstation configuration with default values
+    let mut config = OutstationConfig::new(
+        // outstation address
+        EndpointAddress::from(1024).unwrap(),
+        // master address
+        EndpointAddress::from(1).unwrap(),
+    );
+    // override the default decode log level
     config.log_level = DecodeLogLevel::ObjectValues;
+    // ANCHOR_END: outstation_config
     config
 }
 
 /// example of using the outstation API asynchronously from within the Tokio runtime
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_target(false)
         .init();
 
-    //
     let mut server = TCPServer::new("127.0.0.1:20000".parse()?);
 
     let (handle, outstation) = server.add_outstation(

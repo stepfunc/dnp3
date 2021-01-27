@@ -9,14 +9,18 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 Outstations may be created once an instance of a `Runtime` is available. The exact process for creating an outstation is slightly different
-depending on the physical layer, e.g. TCP vs serial, although most of the configuration options and callback interfaces are the same. The next subsection
-covers all of the common configuration and interfaces used to create an outstation that don't depend on the physical layer.
+depending on the physical layer, e.g. TCP vs serial, although most of the configuration options and callback interfaces are the same.
 
-## Common Configuration
+## Common Components
 
-## TCP Server
+This section describes the common configuration that must be supplied to create an outstation, regardless of which physical layer is used. Transport
+specific configuration is covered in the next section.
 
-One or more outstation instances may be associated with a TCP server.
+### OutstationConfig
+
+The `OutstationConfig` structure contains parameters that modify the behavior of the outstation. Refer to the generated API documentation for the meaning of
+each field. All of the fields, with the exception of the master and outstation link addresses, have default values. This does not mean that these defaults will
+function well for all use cases. The timeout parameters, for example, may need to be adjusted for higher latency links.
 
 <Tabs
 groupId="language"
@@ -30,30 +34,38 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-
+{{#include ../dnp3/examples/outstation_tcp_server.rs:outstation_config}}
 ```
 
 </TabItem>
 <TabItem value="C">
 
 ```c
-
+{{#include ../ffi/bindings/c/outstation_example.c:outstation_config}}
 ```
 
 </TabItem>
 <TabItem value="Java">
 
 ```java
-
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/OutstationExample.java:outstation_config}}
 ```
 
 </TabItem>
 <TabItem value="C#">
 
 ```csharp
-
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:outstation_config}}
 ```
 
 </TabItem>
 </Tabs>
+
+
+
+## TCP Server
+
+One or more outstation instances may be associated with a TCP server.
+
+
 

@@ -116,8 +116,18 @@ class ExampleOutstation
         {
             using (var server = new TcpServer(runtime, "127.0.0.1:20000"))
             {
-                var config = OutstationConfig.DefaultConfig(1024, 1);
+                // ANCHOR: outstation_config
+                // create an outstation configuration with default values
+                var config = OutstationConfig.DefaultConfig(
+                    // outstation address
+                    1024,
+                    // master address
+                    1
+                );
+                // override the default decode log level
                 config.LogLevel = DecodeLogLevel.ObjectValues;
+                // ANCHOR_END: outstation_config
+
                 var database = DatabaseConfig.DefaultConfig();
                 database.Events = EventBufferConfig.AllTypes(10);
                 var application = new TestOutstationApplication();

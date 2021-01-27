@@ -70,14 +70,14 @@ center. DNP3 masters are frequently implementing within what the utility industr
 specific details on behalf of the larger system.
 
 ```mermaid
-graph LR
+graph TD
 subgraph Control Center
 A[HMI] --- B[(Database)]
 B --- C[FEP]
 end
 
-C --DNP3/TCP --- D[Substation]
-C --DNP3/TCP --- E[Pole-top IED]
+C --DNP3/TCP + fiber --- D[Substation]
+C --DNP3/TCP + cellular ---- E[Pole-top IED]
 C -.DNP3/serial radio.- F[Substation]
 ```
 
