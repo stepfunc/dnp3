@@ -17,7 +17,7 @@ pub fn define(
     // Everything required to create an outstation
     let outstation = define_outstation(lib, decode_log_level_enum.clone(), &database)?;
     let outstation_config = define_outstation_config(lib, decode_log_level_enum)?;
-    let database_config = define_database_config(lib)?;
+    let event_buffer_config = define_event_buffer_config(lib)?;
     let outstation_application = define_outstation_application(lib)?;
     let outstation_information = define_outstation_information(lib, shared_def)?;
     let control_handler = define_control_handler(lib, &database, shared_def)?;
@@ -54,7 +54,7 @@ pub fn define(
     let tcp_server_add_outstation_fn = lib.declare_native_function("tcpserver_add_outstation")?
         .param("server", Type::ClassRef(tcp_server.clone()), "TCP server to add the outstation to")?
         .param("config", Type::Struct(outstation_config), "Outstation configuration")?
-        .param("database", Type::Struct(database_config), "Database configuration")?
+        .param("event_config", Type::Struct(event_buffer_config), "Event buffer configuration")?
         .param("application", Type::Interface(outstation_application), "Outstation application callbacks")?
         .param("information", Type::Interface(outstation_information), "Outstation information callbacks")?
         .param("control_handler", Type::Interface(control_handler), "Outstation control handler")?
@@ -156,6 +156,62 @@ fn define_outstation_config(
     lib: &mut LibraryBuilder,
     decode_log_level_enum: NativeEnumHandle,
 ) -> Result<NativeStructHandle, BindingError> {
+    let class_zero_config = lib.declare_native_struct("ClassZeroConfig")?;
+    let class_zero_config = lib
+        .define_native_struct(&class_zero_config)?
+        .add(
+            "binary",
+            Type::Bool,
+            "Include Binary Inputs in Class 0 reads",
+        )?
+        .add(
+            "double_bit_binary",
+            Type::Bool,
+            "Include Double-Bit Binary Inputs in Class 0 reads",
+        )?
+        .add(
+            "binary_output_status",
+            Type::Bool,
+            "Include Binary Output Status in Class 0 reads",
+        )?
+        .add("counter", Type::Bool, "Include Counters in Class 0 reads")?
+        .add(
+            "frozen_counter",
+            Type::Bool,
+            "Include Frozen Counters in Class 0 reads",
+        )?
+        .add(
+            "analog",
+            Type::Bool,
+            "Include Analog Inputs in Class 0 reads",
+        )?
+        .add(
+            "analog_output_status",
+            Type::Bool,
+            "Include Analog Output Status in Class 0 reads",
+        )?
+        .add(
+            "octet_strings",
+            Type::Bool,
+            doc("Include Binary Inputs in Class 0 reads")
+                .warning("For conformance, this should be false."),
+        )?
+        .doc("Controls which types are reported during a Class 0 read.")?
+        .build()?;
+
+    let class_zero_default_fn = lib
+        .declare_native_function("class_zero_config_default")?
+        .return_type(ReturnType::new(
+            Type::Struct(class_zero_config.clone()),
+            "Default Class 0 configuration",
+        ))?
+        .doc("Create default Class 0 configuration")?
+        .build()?;
+
+    lib.define_struct(&class_zero_config)?
+        .static_method("default_config", &class_zero_default_fn)?
+        .build();
+
     let features = lib.declare_native_struct("OutstationFeatures")?;
     let features = lib
         .define_native_struct(&features)?
@@ -248,6 +304,8 @@ fn define_outstation_config(
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the master")
                 .details("A value of zero means no automatic keep-alives."),
         )?
+        .add("max_read_request_headers", Type::Uint16, doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
+        .add("class_zero", Type::Struct(class_zero_config), "Controls responses to Class 0 reads")?
         .doc("Outstation configuration")?
         .build()?;
 
@@ -273,63 +331,9 @@ fn define_outstation_config(
     Ok(outstation_config)
 }
 
-fn define_database_config(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
-    let class_zero_config = lib.declare_native_struct("ClassZeroConfig")?;
-    let class_zero_config = lib
-        .define_native_struct(&class_zero_config)?
-        .add(
-            "binary",
-            Type::Bool,
-            "Include Binary Inputs in Class 0 reads",
-        )?
-        .add(
-            "double_bit_binary",
-            Type::Bool,
-            "Include Double-Bit Binary Inputs in Class 0 reads",
-        )?
-        .add(
-            "binary_output_status",
-            Type::Bool,
-            "Include Binary Output Status in Class 0 reads",
-        )?
-        .add("counter", Type::Bool, "Include Counters in Class 0 reads")?
-        .add(
-            "frozen_counter",
-            Type::Bool,
-            "Include Frozen Counters in Class 0 reads",
-        )?
-        .add(
-            "analog",
-            Type::Bool,
-            "Include Analog Inputs in Class 0 reads",
-        )?
-        .add(
-            "analog_output_status",
-            Type::Bool,
-            "Include Analog Output Status in Class 0 reads",
-        )?
-        .add(
-            "octet_strings",
-            Type::Bool,
-            doc("Include Binary Inputs in Class 0 reads")
-                .warning("For conformance, this should be false."),
-        )?
-        .doc("Controls which types are reported during a Class 0 read.")?
-        .build()?;
-
-    let class_zero_default_fn = lib
-        .declare_native_function("class_zero_config_default")?
-        .return_type(ReturnType::new(
-            Type::Struct(class_zero_config.clone()),
-            "Default Class 0 configuration",
-        ))?
-        .doc("Create default Class 0 configuration")?
-        .build()?;
-
-    lib.define_struct(&class_zero_config)?
-        .static_method("default_config", &class_zero_default_fn)?
-        .build();
-
+fn define_event_buffer_config(
+    lib: &mut LibraryBuilder,
+) -> Result<NativeStructHandle, BindingError> {
     let event_buffer_config = lib.declare_native_struct("EventBufferConfig")?;
     let event_buffer_config = lib
         .define_native_struct(&event_buffer_config)?
@@ -403,28 +407,7 @@ fn define_database_config(lib: &mut LibraryBuilder) -> Result<NativeStructHandle
         .static_method("no_events", &event_buffer_config_no_events)?
         .build();
 
-    let database_config = lib.declare_native_struct("DatabaseConfig")?;
-    let database_config = lib.define_native_struct(&database_config)?
-        .add("max_read_request_headers", Type::Uint16, doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
-        .add("class_zero", Type::Struct(class_zero_config), "Controls responses to Class 0 reads")?
-        .add("events", Type::Struct(event_buffer_config), "Event buffer parameters")?
-        .doc("Configuration of the database")?
-        .build()?;
-
-    let database_config_default_fn = lib
-        .declare_native_function("database_config_default")?
-        .return_type(ReturnType::new(
-            Type::Struct(database_config.clone()),
-            "Default database configuration",
-        ))?
-        .doc("Create a default database configuration")?
-        .build()?;
-
-    lib.define_struct(&database_config)?
-        .static_method("default_config", &database_config_default_fn)?
-        .build();
-
-    Ok(database_config)
+    Ok(event_buffer_config)
 }
 
 fn define_outstation_application(

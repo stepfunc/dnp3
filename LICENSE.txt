@@ -1,36 +1,46 @@
 ﻿LICENSE AGREEMENT
 
-BY DOWNLOADING THE LICENSED SOFTWARE FROM THE DEVELOPMENT PLATFORM, DEVELOPER IS AGREEING TO BE BOUND BY THE TERMS OF 
-THIS LICENSE AGREEMENT (THIS “AGREEMENT”). THEREFORE, IT IS IMPORTANT THAT YOU READ THIS AGREEMENT BEFORE DOWNLOADING 
-THE SOFTWARE. IF DEVELOPER DOES NOT AGREE TO THE TERMS OF THIS AGREEMENT, THEN DEVELOPER MAY NOT DOWNLOAD OR USE THE 
-LICENSED SOFTWARE. IF YOU ARE DOWNLOADING THIS LICENSED SOFTWARE ON BEHALF OF AN ENTITY OR OTHER PERSON, THEN YOU 
-REPRESENT THAT YOU ARE AUTHORIZED TO BIND SUCH ENTITY OR OTHER PERSON TO THE TERMS OF THIS AGREEMENT.
+BY DOWNLOADING THE LICENSED SOFTWARE FROM THE DEVELOPMENT PLATFORM, DEVELOPER
+IS AGREEING TO BE BOUND BY THE TERMS OF THIS LICENSE AGREEMENT (THIS "AGREEMENT").
+THEREFORE, IT IS IMPORTANT THAT YOU READ THIS AGREEMENT BEFORE DOWNLOADING THE
+SOFTWARE. IF DEVELOPER DOES NOT AGREE TO THE TERMS OF THIS AGREEMENT, THEN
+DEVELOPER MAY NOT DOWNLOAD OR USE THE LICENSED SOFTWARE. IF YOU ARE DOWNLOADING
+THIS LICENSED SOFTWARE ON BEHALF OF AN ENTITY OR OTHER PERSON, THEN YOU REPRESENT
+THAT YOU ARE AUTHORIZED TO BIND SUCH ENTITY OR OTHER PERSON TO THE TERMS OF THIS
+AGREEMENT.
 
-This Agreement sets forth the terms and conditions under which the parties agree that Developer may use the Licensed 
-Software for the non-commercial and non-production Purpose defined in this Agreement. 
+This Agreement sets forth the terms and conditions under which the parties agree
+that Developer may use the Licensed Software for the non-commercial and
+non-production Purpose defined in this Agreement.
 
-NOW, THEREFORE, in consideration of the premises and obligations contained herein, it is agreed as follows:
+NOW, THEREFORE, in consideration of the premises and obligations contained herein,
+it is agreed as follows:
 
 1. DEFINITIONS
 
-1.1. “Developer Application” shall mean Developer’s actual or potential software or hardware and related documentation 
-with which the Developer is considering integrating with the Licensed Software.
+1.1. "Developer Application" shall mean Developer's actual or potential software
+or hardware and related documentation with which the Developer is considering
+integrating with the Licensed Software.
 
-1.2. “Developer” shall mean the person or entity downloading the Licensed Software or on whose behalf the Licensed 
-Software is downloaded.
+1.2. "Developer" shall mean the person or entity downloading the Licensed Software
+or on whose behalf the Licensed Software is downloaded.
 
-1.3. “Development Platform” shall mean GitHub (github.com) or other software development platform identified by Company
-where the Licensed Software can be downloaded.
+1.3. "Development Platform" shall mean GitHub (github.com) or other software
+development platform identified by Company where the Licensed Software can be
+downloaded.
 
-1.4. “Effective Date” shall mean the date that the Licensed Software is downloaded from the Development Platform.
+1.4. "Effective Date" shall mean the date that the Licensed Software is downloaded
+from the Development Platform.
 
-1.5. “Licensed Software” shall mean the Company proprietary software product, in both source and object code, that
-Developer downloads from the Development Platform that performs a communication function.
+1.5. "Licensed Software" shall mean the Company proprietary software product, in
+both source and object code, that Developer downloads from the Development Platform
+that performs a communication function.
 
-1.6. “Purpose” shall mean the effort to integrate the Licensed Software with the Developer Application(s) for
-non-commercial and non-production purposes, including, without limitation, evaluation, research, teaching and training.
+1.6. "Purpose" shall mean the effort to integrate the Licensed Software with the
+Developer Application(s) for non-commercial and non-production purposes, including,
+without limitation, evaluation, research, teaching and training.
 
-1.7. Step Function I/O LLC (“Company”) is the developer of the Licensed Software.
+1.7. Step Function I/O LLC ("Company") is the developer of the Licensed Software.
 
 2. LICENSE
 
@@ -40,28 +50,33 @@ The Licensed Software is downloaded from the Development Platform.
 
 2.2. License Grant
 
-Company grants Developer a personal, perpetual, revocable, limited, non-exclusive, non-sublicensable,
-non-transferable license to access, use, download and/or install the Licensed Software only for use in accordance with
-the Purpose, and subject to all the terms of this Agreement. Company reserves the right at any time to alter features
-or other characteristics of any version of the Licensed Software. Unless and until the parties enter into a subsequent
-agreement under Section ‎2.4 that provides to the contrary, Developer shall not distribute or sublicense any portion of
-the Licensed Software. Developer may not publish or disseminate any benchmarking results of Licensed Software
-performance.
+Company grants Developer a personal, perpetual, revocable, limited, non-exclusive,
+non-sublicensable, non-transferable license to access, use, download and/or install
+the Licensed Software only for use in accordance with the Purpose, and subject to
+all the terms of this Agreement. Company reserves the right at any time to alter
+features or other characteristics of any version of the Licensed Software. Unless
+and until the parties enter into a subsequent agreement under Section 2.4 that
+provides to the contrary, Developer shall not distribute or sublicense any portion
+of the Licensed Software. Developer may not publish or disseminate any benchmarking
+results of Licensed Software performance.
 
 2.3. Non-Commercial and Non-Production Use
 
-For clarity, the Purpose excludes commercial use and use in production.
-Accordingly, Developer may not use the Licensed Software in any manner that, directly or indirectly, generates revenue
-or any other form of compensation or consideration. Additionally, the Licensed Software may not be used in a production
-environment and may only be used in non-production environments such as testing, teaching, training and research/development
-environments. A production environment would be where the Licensed Software is operated by end users and relied upon for
-organization or commercial operations. If Developer would like to use the Licensed Software for commercial and production
-purposes, then Developer may order such a license from Company in accordance Section ‎2.4.
+For clarity, the Purpose excludes commercial use and use in production. Accordingly,
+Developer may not use the Licensed Software in any manner that, directly or indirectly,
+generates revenue or any other form of compensation or consideration. Additionally, the
+Licensed Software may not be used in a production environment and may only be used in
+non-production environments such as testing, teaching, training and research/development
+environments. A production environment would be where the Licensed Software is operated
+by end users and relied upon for organization or commercial operations. If Developer
+would like to use the Licensed Software for commercial and production purposes, then
+Developer may order such a license from Company in accordance Section 2.4.
 
 2.4. Commercial License
 
-If Developer wants to use the Licensed Software for commercial and production purposes, then Developer needs to contact
-Company as provided below. Company has no obligation to enter into a commercial and production agreement with any Developer.
+If Developer wants to use the Licensed Software for commercial and production purposes,
+then Developer needs to contact Company as provided below. Company has no obligation
+to enter into a commercial and production agreement with any Developer.
 
 info@stepfunc.io
 
@@ -71,98 +86,117 @@ https://stepfunc.io/contact
 
 2.5. Company Support
 
-This license does not entitle Developer to receive from Company support, telephone assistance, or
-enhancements or updates to the Licensed Software, which Company may provide in its discretion. Developer may submit
-tickets and feedback via the Development Platform. Company will make reasonable efforts to respond to such tickets and
-feedback, but has no obligation to do so, and may cancel such support at any time.
+This license does not entitle Developer to receive from Company support, telephone
+assistance, or enhancements or updates to the Licensed Software, which Company may
+provide in its discretion. Developer may submit tickets and feedback via the Development
+Platform. Company will make reasonable efforts to respond to such tickets and feedback,
+but has no obligation to do so, and may cancel such support at any time.
 
 3. OWNERSHIP
 
 3.1. Company Retains Title to Licensed Software
 
 Except for the license granted herein, Developer is not granted any
-rights to patents, copyrights, trade secrets, trade names, trademarks (whether registered or unregistered) or any other
-rights or licenses (the “Intellectual Property Rights”) with respect to the Licensed Software. Company retains all right,
-title and ownership interests in the Licensed Software, including, without limitation, all Intellectual Property Rights therein.
+rights to patents, copyrights, trade secrets, trade names, trademarks (whether
+registered or unregistered) or any other rights or licenses (the "Intellectual
+Property Rights") with respect to the Licensed Software. Company retains all right,
+title and ownership interests in the Licensed Software, including, without
+limitation, all Intellectual Property Rights therein.
  
 3.2. Feedback
 
-Any feedback provided by Developer pertaining to the Licensed Software shall be non-confidential and Company may use and
-exploit such feedback freely, without any obligation of notice or compensation to Developer.
+Any feedback provided by Developer pertaining to the Licensed Software shall be
+non-confidential and Company may use and exploit such feedback freely, without
+any obligation of notice or compensation to Developer.
 
 4. TERM AND TERMINATION
 
 4.1. Term and Termination of Agreement
 
-This Agreement commences on its Effective Date and ends if terminated as hereinafter provided. This Agreement will
-automatically terminate if Developer materially breaches this Agreement, including, without limitation, by a violation
-of the non-commercial and non-production use restrictions in Section ‎2.3.
+This Agreement commences on its Effective Date and ends if terminated as
+hereinafter provided. This Agreement will automatically terminate if Developer
+materially breaches this Agreement, including, without limitation, by a violation
+of the non-commercial and non-production use restrictions in Section 2.3.
 
 4.2. Obligations on Termination
 
-All rights and licenses granted under this Agreement to Developer shall terminate upon
-termination of this Agreement. Developer shall cease making any use of the applicable Licensed Software or other material
-provided by Company in connection therewith and destroy them and all copies and modifications thereof, and also including
-any copies of code embedded in the Developer Application, and any related materials in its possession. Developer shall
-certify in writing to Company that no further use of such Licensed Software or any copies, modifications or other
+All rights and licenses granted under this Agreement to Developer shall terminate
+upon termination of this Agreement. Developer shall cease making any use of the
+applicable Licensed Software or other material provided by Company in connection
+therewith and destroy them and all copies and modifications thereof, and also
+including any copies of code embedded in the Developer Application, and any related
+materials in its possession. Developer shall certify in writing to Company that no
+further use of such Licensed Software or any copies, modifications or other
 derivative works of any and all portions thereof is being made by Developer.
 
 4.3. Survival
 
-Any provisions of this Agreement that, in order to fulfill the purposes of such provisions, need to survive the termination
-or expiration of this Agreement, shall be deemed to survive for as long as necessary to fulfill such purposes.
+Any provisions of this Agreement that, in order to fulfill the purposes of such
+provisions, need to survive the termination or expiration of this Agreement,
+shall be deemed to survive for as long as necessary to fulfill such purposes.
 
 5. WARRANTY DISCLAIMER
 
-THE LICENSED SOFTWARE IS PROVIDED ONLY ON AN “AS IS” BASIS. COMPANY MAKES NO OTHER EXPRESS WARRANTIES, WRITTEN OR ORAL,
-AND ALL OTHER WARRANTIES ARE SPECIFICALLY EXCLUDED, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTY OF MERCHANTABILITY,
-FITNESS FOR PARTICULAR PURPOSE, OR NONINFRINGEMENT, AND ANY OTHER WARRANTY ARISING BY STATUTE, OPERATION OF LAW, COURSE
-OF DEALING OR PERFORMANCE OR USAGE OF TRADE.
+THE LICENSED SOFTWARE IS PROVIDED ONLY ON AN "AS IS" BASIS. COMPANY MAKES NO OTHER
+EXPRESS WARRANTIES, WRITTEN OR ORAL, AND ALL OTHER WARRANTIES ARE SPECIFICALLY
+EXCLUDED, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTY OF MERCHANTABILITY,
+FITNESS FOR PARTICULAR PURPOSE, OR NONINFRINGEMENT, AND ANY OTHER WARRANTY ARISING
+BY STATUTE, OPERATION OF LAW, COURSE OF DEALING OR PERFORMANCE OR USAGE OF TRADE.
 
 6. LIMITATIONS OF LIABILITY AND INDEMNITIES
 
 6.1. Limits of Liability
 
-COMPANY SHALL HAVE NO LIABILITY TO DEVELOPER FOR ANY SPECIAL, CONSEQUENTIAL, EXEMPLARY, INCIDENTAL OR INDIRECT DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, LOSS OF PROFITS, REVENUES, DATA AND/OR USE) ARISING OUT OF OR IN CONNECTION HEREWITH OR
-THE USE OR PERFORMANCE OF THE LICENSED SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY THEREOF. THE AGGREGATE LIABILITY OF
-COMPANY UNDER THIS AGREEMENT SHALL NOT EXCEED $10. DEVELOPER SHALL NOT BRING ANY CLAIM ARISING HEREUNDER MORE THAN
-TWELVE (12) MONTHS AFTER SUCH CLAIM HAS ACCRUED.
+COMPANY SHALL HAVE NO LIABILITY TO DEVELOPER FOR ANY SPECIAL, CONSEQUENTIAL,
+EXEMPLARY, INCIDENTAL OR INDIRECT DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+LOSS OF PROFITS, REVENUES, DATA AND/OR USE) ARISING OUT OF OR IN CONNECTION
+HEREWITH OR THE USE OR PERFORMANCE OF THE LICENSED SOFTWARE, EVEN IF ADVISED
+OF THE POSSIBILITY THEREOF. THE AGGREGATE LIABILITY OF COMPANY UNDER THIS
+AGREEMENT SHALL NOT EXCEED $10. DEVELOPER SHALL NOT BRING ANY CLAIM ARISING
+HEREUNDER MORE THAN TWELVE (12) MONTHS AFTER SUCH CLAIM HAS ACCRUED.
 
 6.2. Developer Indemnity
 
-Developer shall indemnify, defend and hold Company harmless from all losses, costs, liabilities
-and expenses incurred by Company which arise out of any claim (except claims that the Licensed Software infringes the
-intellectual property of a third party) that arise out of Developer’s acts or omissions provided (i) Company has notified
-Developer promptly in writing of any such claims (provided that any delay shall not reduce Developer’s indemnity obligations
-except to the extent that the delay prejudices Developer’s ability to defend the claim); (ii) Developer shall have sole
-control of the defense of such claims and all negotiations for their settlement and compromise; and (iii) Company shall
-reasonably cooperate with Developer in the defense or settlement of such claims, at Developer’s expense.
+Developer shall indemnify, defend and hold Company harmless from all losses,
+costs, liabilities and expenses incurred by Company which arise out of any
+claim (except claims that the Licensed Software infringes the intellectual
+property of a third party) that arise out of Developer’s acts or omissions
+provided (i) Company has notified Developer promptly in writing of any such
+claims (provided that any delay shall not reduce Developer’s indemnity obligations
+except to the extent that the delay prejudices Developer’s ability to defend the
+claim); (ii) Developer shall have sole control of the defense of such claims and
+all negotiations for their settlement and compromise; and (iii) Company shall
+reasonably cooperate with Developer in the defense or settlement of such claims,
+at Developer’s expense.
 
 7. GENERAL
 
 7.1. Entire Agreement
 
-The terms contained herein constitute the entire agreement between the parties with respect to the subject matter hereof
-and shall supersede all prior communications and agreements, either oral or written.
+The terms contained herein constitute the entire agreement between the parties
+with respect to the subject matter hereof and shall supersede all prior
+communications and agreements, either oral or written.
  
 7.2. Equitable Relief
 
-Company may, without limiting its other rights and remedies, be entitled to equitable relief, including but not limited
-to injunctive relief for a breach or anticipated breach of this Agreement.
+Company may, without limiting its other rights and remedies, be entitled to
+equitable relief, including but not limited to injunctive relief for a breach or
+anticipated breach of this Agreement.
 
 7.3. Compliance with Laws
 
-Developer shall comply with all applicable law and will obtain all authorizations required
-by U.S. export control laws and all related regulations if applicable.
+Developer shall comply with all applicable law and will obtain all authorizations
+required by U.S. export control laws and all related regulations if applicable.
 
 7.4. Governing Law; Jurisdiction
 
 This Agreement shall be governed by the laws of the State of Oregon, excluding its
-conflict of law rules. The parties will submit all disputes which arise under this Agreement to state or federal courts
-located in  Deschutes County, Oregon.  The parties acknowledge that the aforesaid courts will have exclusive jurisdiction
-over this Agreement and specifically waive any claims they may have which involve jurisdiction or venue, including, but
-not limited to, lack of personal jurisdiction or forum non conveniens.
+conflict of law rules. The parties will submit all disputes which arise under this
+Agreement to state or federal courts located in Deschutes County, Oregon. The parties
+acknowledge that the aforesaid courts will have exclusive jurisdiction over this
+Agreement and specifically waive any claims they may have which involve jurisdiction
+or venue, including, but not limited to, lack of personal jurisdiction or forum non
+conveniens.
 
 7.5. Notices
 
@@ -170,9 +204,10 @@ Notices shall be deemed to have been received upon verified receipt.
 
 7.6. No Waiver
 
-No modification or amendment hereto, nor any waiver of any rights, shall be effective unless assented to in writing by
-the party to be charged. The waiver of any breach or default will not constitute a waiver of (i) any other right or remedy
-hereunder, or (ii) any subsequent breach or default.
+No modification or amendment hereto, nor any waiver of any rights, shall be effective
+unless assented to in writing by the party to be charged. The waiver of any breach or
+default will not constitute a waiver of (i) any other right or remedy hereunder, or (ii)
+any subsequent breach or default.
 
 7.7. Independent Contractors
 
@@ -180,12 +215,14 @@ The parties shall act as independent contractors for all purposes hereunder.
 
 7.8. Separability
 
-If any provision hereof shall be held illegal or unenforceable, such provision shall be deemed separable from the
-remaining provisions and shall in no way affect or impair the validity or enforceability of the remaining provisions.
+If any provision hereof shall be held illegal or unenforceable, such provision shall be
+deemed separable from the remaining provisions and shall in no way affect or impair the
+validity or enforceability of the remaining provisions.
 
 7.9. Assignment
 
-Developer shall not assign this Agreement, or any right, or delegate any performance hereunder without Company’s prior
-written consent, and any such action in violation of the foregoing shall be void. Company may freely assign this Agreement.
+Developer shall not assign this Agreement, or any right, or delegate any performance
+hereunder without Company's prior written consent, and any such action in violation of
+the foregoing shall be void. Company may freely assign this Agreement.
 
 

@@ -1,6 +1,6 @@
 use crate::app::parse::DecodeLogLevel;
 use crate::outstation::config::*;
-use crate::outstation::database::{DatabaseConfig, DatabaseHandle};
+use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
 use crate::outstation::session::{OutstationSession, SessionError};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::transport::{TransportReader, TransportWriter};
@@ -84,13 +84,17 @@ impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
     pub(crate) fn create(
         config: OutstationConfig,
-        database: DatabaseConfig,
+        event_config: EventBufferConfig,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
     ) -> (Self, OutstationHandle) {
         let (tx, rx) = crate::tokio::sync::mpsc::channel(10); // TODO - should this be parameterized?
-        let handle = DatabaseHandle::new(database);
+        let handle = DatabaseHandle::new(
+            config.max_read_request_headers,
+            config.class_zero,
+            event_config,
+        );
         let (reader, writer) = crate::transport::create_outstation_transport_layer(
             config.outstation_address,
             config.features.self_address,

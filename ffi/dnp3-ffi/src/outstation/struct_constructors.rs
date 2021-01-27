@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use dnp3::entry::EndpointAddress;
 use dnp3::outstation::config::{Feature, Features, OutstationConfig};
-use dnp3::outstation::database::{ClassZeroConfig, DatabaseConfig, EventBufferConfig};
+use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::traits::RestartDelay;
 
 use crate::ffi;
@@ -22,10 +22,6 @@ pub fn event_buffer_config_all_types(max: u16) -> ffi::EventBufferConfig {
 
 pub fn event_buffer_config_no_events() -> ffi::EventBufferConfig {
     EventBufferConfig::no_events().into()
-}
-
-pub fn database_config_default() -> ffi::DatabaseConfig {
-    DatabaseConfig::default().into()
 }
 
 pub fn outstation_config_default(
@@ -163,19 +159,6 @@ impl From<EventBufferConfig> for ffi::EventBufferConfig {
     }
 }
 
-impl From<DatabaseConfig> for ffi::DatabaseConfig {
-    fn from(from: DatabaseConfig) -> Self {
-        ffi::DatabaseConfigFields {
-            max_read_request_headers: from
-                .max_read_request_headers
-                .unwrap_or(DatabaseConfig::DEFAULT_MAX_READ_REQUEST_HEADERS),
-            class_zero: from.class_zero.into(),
-            events: from.events.into(),
-        }
-        .into()
-    }
-}
-
 impl From<OutstationConfig> for ffi::OutstationConfig {
     fn from(from: OutstationConfig) -> Self {
         ffi::OutstationConfigFields {
@@ -198,6 +181,10 @@ impl From<OutstationConfig> for ffi::OutstationConfig {
             keep_alive_timeout: from
                 .keep_alive_timeout
                 .unwrap_or_else(|| Duration::from_secs(0)),
+            max_read_request_headers: from
+                .max_read_request_headers
+                .unwrap_or(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS),
+            class_zero: from.class_zero.into(),
         }
         .into()
     }

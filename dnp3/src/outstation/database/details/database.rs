@@ -5,7 +5,9 @@ use crate::outstation::database::details::range::static_db::{
     PointConfig, StaticDatabase, Updatable,
 };
 use crate::outstation::database::read::ReadHeader;
-use crate::outstation::database::{DatabaseConfig, ResponseInfo, UpdateOptions};
+use crate::outstation::database::{
+    ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateOptions,
+};
 use crate::util::cursor::WriteCursor;
 
 pub(crate) struct Database {
@@ -14,10 +16,14 @@ pub(crate) struct Database {
 }
 
 impl Database {
-    pub(crate) fn new(config: DatabaseConfig) -> Self {
+    pub(crate) fn new(
+        max_read_selection: Option<u16>,
+        class_zero_config: ClassZeroConfig,
+        config: EventBufferConfig,
+    ) -> Self {
         Self {
-            static_db: StaticDatabase::new(config.max_read_request_headers, config.class_zero),
-            event_buffer: EventBuffer::new(config.events),
+            static_db: StaticDatabase::new(max_read_selection, class_zero_config),
+            event_buffer: EventBuffer::new(config),
         }
     }
 

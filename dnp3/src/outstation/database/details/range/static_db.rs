@@ -8,10 +8,9 @@ use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 use crate::app::header::IIN2;
+use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::read::StaticReadHeader;
-use crate::outstation::database::{
-    ClassZeroConfig, DatabaseConfig, EventClass, EventMode, UpdateOptions,
-};
+use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
 use std::collections::{BTreeMap, Bound, VecDeque};
 use std::ops::RangeBounds;
 
@@ -248,15 +247,15 @@ impl Default for StaticDatabase {
 }
 
 impl StaticDatabase {
-    pub(crate) fn new(max_selection: Option<u16>, class_zero: ClassZeroConfig) -> Self {
+    pub(crate) fn new(max_read_selection: Option<u16>, class_zero: ClassZeroConfig) -> Self {
         // don't allow values smaller than the default
-        let max_selection = max_selection
-            .map(|x| x.max(DatabaseConfig::DEFAULT_MAX_READ_REQUEST_HEADERS))
-            .unwrap_or(DatabaseConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
+        let max_read_selection = max_read_selection
+            .map(|x| x.max(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS))
+            .unwrap_or(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
 
         Self {
             class_zero,
-            selected: SelectionQueue::new(max_selection),
+            selected: SelectionQueue::new(max_read_selection),
             binary: PointMap::empty(),
             double_bit_binary: PointMap::empty(),
             binary_output_status: PointMap::empty(),

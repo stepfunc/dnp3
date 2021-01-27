@@ -1,0 +1,118 @@
+---
+id: logging
+title: Logging
+sidebar_label: Logging
+slug: /api/logging
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+The library provides highly contextual logging using the [tracing](https://crates.io/crates/tracing) crate. Rust users should refer to the
+tracing documentation for details.
+
+The bindings expose a more rigid logging interface with a single callback method to record a message. Configurable options include:
+
+* `LogLevel` which will trigger messages to be generated
+* Inclusion of Rust module or level information as part of the message
+* How and if the time should be printed as part of the message
+* Line or JSON based output
+
+:::note
+The LogLevel should be set to Info by default which will cause Info, Warn, and Error messages to be recorded. The Debug and Trace levels are
+generally only useful if debugging an issue with the underlying runtime.
+
+Protocol decoding is always logged at the Info level and is configured separately on a per session basis.
+:::
+
+## Configuration
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master_tcp_client.rs:logging}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:logging_callback}}
+
+{{#include ../ffi/bindings/c/master_example.c:logging_init}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:logging_interface}}
+
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:logging_config}}
+
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:logging_init}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:logging_interface}}
+
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:logging_init}}
+```
+
+</TabItem>
+</Tabs>
+
+:::note
+The bindings use the [tracing_subscriber](https://crates.io/crates/tracing-subscriber) crate internally. Rust users may pick which tracing backend they want to
+use.
+:::
+
+## Example Output
+
+The logs provide a wealth of contextual metadata. This allows the user to:
+
+* Determine which communication session produced the message
+* Understand what state the software was in when the event occurred
+
+```
+INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}: connected to 127.0.0.1:20000
+INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP TX - ctrl: [fir: true fin: true con: false uns: false seq: 0] func: DisableUnsolicited ... (len = 9)
+INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP RX - ctrl: [fir: true fin: true con: true uns: true seq: 0] func: UnsolicitedResponse iin1: [DEVICE_RESTART] iin2: [] ... (len = 0)
+WARN DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: device restart detected (address == 1024)
+INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP TX - ctrl: [fir: true fin: true con: false uns: true seq: 0] func: Confirm ... (len = 0)
+INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP RX - ctrl: [fir: true fin: true con: false uns: false seq: 0] func: Response iin1: [DEVICE_RESTART] iin2: [] ... (len = 0)
+```
+
+## Protocol Decoding
+
+Protocol decoding can be configured on a per-communication channel basis, e.g. all of the traffic on a TCP socket or a serial port. The user specifies the
+`DecodeLogLevel` when creating a master or outstation instance which controls what level of decoding (including none) will take place. Refer to language
+specific API documentation for the meaning of each enumeration value. The decoding can even show the value of individual fields within objects:
+
+```
+APP TX - ctrl: [fir: true fin: true con: false uns: false seq: 1] func: Write ... (len = 6)
+g80v1 : Internal Indications - Packed Format - 1-byte start/stop - [7, 7]
+index: 7 false
+```
+
+:::note
+Protocol decoding is always output at the *Info* log level, but it can be changed dynamically at runtime using
+:::
+
+:::info
+Protocol decoding can be extremely verbose in a production system.
+:::
+
+

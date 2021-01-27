@@ -28,7 +28,6 @@
 
     <modules>
         <module>dnp3rs</module>
-        <module>master-example</module>
-        <module>outstation-example</module>
+        <module>examples</module>
     </modules>
 </project>

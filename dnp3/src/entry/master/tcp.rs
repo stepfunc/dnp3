@@ -124,7 +124,7 @@ pub fn create_master_tcp_client(
     let (mut task, handle) = MasterTask::new(endpoints, config, listener);
     let future = async move {
         task.run()
-            .instrument(tracing::info_span!("Master - TCPClient", "endpoint" = ?main_addr))
+            .instrument(tracing::info_span!("DNP3-Master-TCP", "endpoint" = ?main_addr))
             .await
     };
     (future, handle)

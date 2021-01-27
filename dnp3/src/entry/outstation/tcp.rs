@@ -2,7 +2,7 @@ use crate::entry::outstation::{AddressFilter, FilterError};
 use crate::outstation::task::{IOType, OutstationHandle, OutstationTask};
 
 use crate::outstation::config::OutstationConfig;
-use crate::outstation::database::DatabaseConfig;
+use crate::outstation::database::EventBufferConfig;
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::util::task::Shutdown;
 use tracing::Instrument;
@@ -35,7 +35,7 @@ impl TCPServer {
     pub fn add_outstation(
         &mut self,
         config: OutstationConfig,
-        database: DatabaseConfig,
+        event_config: EventBufferConfig,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
@@ -47,8 +47,13 @@ impl TCPServer {
             }
         }
 
-        let (mut task, handle) =
-            OutstationTask::create(config, database, application, information, control_handler);
+        let (mut task, handle) = OutstationTask::create(
+            config,
+            event_config,
+            application,
+            information,
+            control_handler,
+        );
 
         let outstation = Outstation {
             filter,
@@ -61,7 +66,7 @@ impl TCPServer {
         let future = async move {
             task.run()
                 .instrument(
-                    tracing::info_span!("Outstation", "listen" = ?endpoint, "addr" = address),
+                    tracing::info_span!("DNP3-Outstation-TCP", "listen" = ?endpoint, "addr" = address),
                 )
                 .await
         };

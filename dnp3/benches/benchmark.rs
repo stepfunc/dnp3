@@ -4,7 +4,7 @@ use dnp3::app::measurement::{
     FrozenCounter, Time,
 };
 use dnp3::outstation::database::{
-    Add, Database, DatabaseConfig, EventBufferConfig, EventClass, EventMode, Update, UpdateOptions,
+    Add, Database, EventBufferConfig, EventClass, EventMode, Update, UpdateOptions,
 };
 
 use dnp3::app::flags::Flags;
@@ -176,7 +176,7 @@ impl Pair {
         let (outstation, task) = server
             .add_outstation(
                 Self::get_outstation_config(config.outstation_level),
-                Self::get_database_config(),
+                EventBufferConfig::all_types(100),
                 DefaultOutstationApplication::create(),
                 DefaultOutstationInformation::create(),
                 DefaultControlHandler::create(),
@@ -285,12 +285,6 @@ impl Pair {
     fn get_outstation_config(level: DecodeLogLevel) -> OutstationConfig {
         let mut config = OutstationConfig::new(Self::outstation_address(), Self::master_address());
         config.log_level = level;
-        config
-    }
-
-    fn get_database_config() -> DatabaseConfig {
-        let mut config = DatabaseConfig::default();
-        config.events = EventBufferConfig::all_types(100);
         config
     }
 }
