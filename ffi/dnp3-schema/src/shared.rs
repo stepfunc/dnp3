@@ -1,3 +1,4 @@
+use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::doc;
 use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::native_enum::NativeEnumHandle;
@@ -6,6 +7,7 @@ use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
 
 pub struct SharedDefinitions {
+    pub runtime_class: ClassDeclarationHandle,
     pub decode_log_level: NativeEnumHandle,
     pub serial_port_settings: NativeStructHandle,
     pub link_error_mode: NativeEnumHandle,
@@ -150,6 +152,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     )?;
 
     Ok(SharedDefinitions {
+        runtime_class: crate::runtime::define(lib)?,
         decode_log_level: crate::logging::define(lib)?,
         retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_params(lib)?,
@@ -202,7 +205,7 @@ fn define_link_error_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, 
     lib
         .define_native_enum("LinkErrorMode")?
         .push("Discard", "Framing errors are discarded. The link-layer parser is reset on any error, and the parser begins scanning for 0x0564. This is always the behavior for serial ports.")?
-        .push("Close", "Framing errors are bubbled up to calling code, closing the session. Suitable for physica layers that provide error correction like TCP.")?
+        .push("Close", "Framing errors are bubbled up to calling code, closing the session. Suitable for physical layers that provide error correction like TCP.")?
         .doc("Controls how errors in parsed link-layer frames are handled. This behavior is configurable for physical layers with built-in error correction like TCP as the connection might be through a terminal server.")?
         .build()
 }
@@ -267,7 +270,7 @@ fn define_serial_params(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
             StructElementType::Enum(stop_bits, Some("One".to_string())),
             "Number of bits to use to signal the end of a character",
         )?
-        .doc(doc("Serial port settings").details("Used by {class:Runtime.AddMasterSerial()}."))?
+        .doc("Serial port settings")?
         .build()
 }
 

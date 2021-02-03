@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use class::{ClassDeclarationHandle, ClassHandle};
+use class::ClassHandle;
 use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
@@ -11,7 +11,6 @@ use crate::shared::SharedDefinitions;
 
 pub fn define(
     lib: &mut LibraryBuilder,
-    runtime: ClassDeclarationHandle,
     database: ClassHandle,
     shared_def: &SharedDefinitions,
 ) -> Result<(), BindingError> {
@@ -31,7 +30,7 @@ pub fn define(
         .declare_native_function("tcpserver_new")?
         .param(
             "runtime",
-            Type::ClassRef(runtime),
+            Type::ClassRef(shared_def.runtime_class.clone()),
             "Runtime to execute the server on",
         )?
         .param(
