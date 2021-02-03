@@ -216,8 +216,7 @@ pub fn build_lib() -> Result<Library, BindingError> {
 
     // Master stuff
     let request = request::define(&mut builder, &shared_def)?;
-    let read_handler = handler::define(&mut builder, &shared_def)?;
-    let association_class = master::define(&mut builder, &shared_def, read_handler)?;
+    let association_class = master::define(&mut builder, &shared_def)?;
     association::define(&mut builder, association_class, request, &shared_def)?;
 
     // outstation stuff

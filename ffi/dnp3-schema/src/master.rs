@@ -10,8 +10,9 @@ use oo_bindgen::*;
 pub fn define(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
-    read_handler: InterfaceHandle,
 ) -> Result<ClassDeclarationHandle, BindingError> {
+    let read_handler = crate::handler::define(lib, shared)?;
+
     let endpoint_list = define_endpoint_list(lib)?;
 
     let master_config = define_master_config(lib, shared)?;
