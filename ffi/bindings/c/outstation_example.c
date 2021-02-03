@@ -210,74 +210,64 @@ void outstation_transaction_startup(database_t* db, void* context)
         database_add_octet_string(db, i, EventClass_Class1);
 
         // Set initial values
-        flags_t flags =
-        {
-            .value = 0x00,
-        };
+        flags_t flags = flags_init(0x00);
         flags = flags_set(&flags, Flag_Restart, true);
 
-        binary_t binary_value =
-        {
-            .index = i,
-            .value = false,
-            .flags = flags,
-            .time = timestamp_invalid(),
-        };
-        database_update_binary(db, binary_value, update_options_default());
+        binary_t binary_value = binary_init(
+            i,
+            false,
+            flags,
+            timestamp_invalid()
+        );
+        database_update_binary(db, binary_value, update_options_init());
 
-        double_bit_binary_t double_bit_binary_value =
-        {
-            .index = i,
-            .value = DoubleBit_DeterminedOff,
-            .flags = flags,
-            .time = timestamp_invalid(),
-        };
-        database_update_double_bit_binary(db, double_bit_binary_value, update_options_default());
+        double_bit_binary_t double_bit_binary_value = double_bit_binary_init(
+            i,
+            DoubleBit_DeterminedOff,
+            flags,
+            timestamp_invalid()
+        );
+        database_update_double_bit_binary(db, double_bit_binary_value, update_options_init());
 
-        binary_output_status_t binary_output_status_value =
-        {
-            .index = i,
-            .value = false,
-            .flags = flags,
-            .time = timestamp_invalid(),
-        };
-        database_update_binary_output_status(db, binary_output_status_value, update_options_default());
+        binary_output_status_t binary_output_status_value = binary_output_status_init(
+            i,
+            false,
+            flags,
+            timestamp_invalid()
+        );
+        database_update_binary_output_status(db, binary_output_status_value, update_options_init());
 
-        counter_t counter_value =
-        {
-            .index = i,
-            .value = 0,
-            .flags = flags,
-            .time = timestamp_invalid(),
-        };
-        database_update_counter(db, counter_value, update_options_default());
+        counter_t counter_value = counter_init(
+            i,
+            0,
+            flags,
+            timestamp_invalid()
+        );
+        database_update_counter(db, counter_value, update_options_init());
 
-        frozen_counter_t frozen_counter_value =
-        {
-            .index = i,
-            .value = 0,
-            .flags = flags,
-            .time = timestamp_invalid(),
-        };
-        database_update_frozen_counter(db, frozen_counter_value, update_options_default());
+        frozen_counter_t frozen_counter_value = frozen_counter_init(
+            i,
+            0,
+            flags,
+            timestamp_invalid()
+        );
+        database_update_frozen_counter(db, frozen_counter_value, update_options_init());
 
-        analog_t analog_value =
-        {
-            .index = i,
-            .value = 0.0,
-            .flags = flags,
-            .time = timestamp_invalid(),
-        };
-        database_update_analog(db, analog_value, update_options_default());
+        analog_t analog_value = analog_init(
+            i,
+            0.0,
+            flags,
+            timestamp_invalid()
+        );
+        database_update_analog(db, analog_value, update_options_init());
 
-        analog_output_status_t analog_output_status_value =
-        {
-            .index = i,
-            .value = 0.0,
-            .flags = flags,
-            .time = timestamp_invalid(),
-        };
-        database_update_analog_output_status(db, analog_output_status_value, update_options_default());
+        analog_output_status_t analog_output_status_value = analog_output_status_init(
+            i,
+            0.0,
+            flags,
+            timestamp_invalid()
+        );
+        database_update_analog_output_status(db, analog_output_status_value, update_options_init());
     }
 }
 
@@ -294,11 +284,7 @@ typedef struct database_points_t
 
 flags_t online_flag()
 {
-    flags_t result =
-    {
-        .value = 0x00,
-    };
-
+    flags_t result = flags_init(0x00);
     return flags_set(&result, Flag_Online, true);
 }
 
@@ -306,90 +292,83 @@ void binary_transaction(database_t* db, void* context)
 {
     ((database_points_t*)context)->binaryValue = !((database_points_t*)context)->binaryValue;
 
-    binary_t value =
-    {
-        .index = 7,
-        .value = ((database_points_t*)context)->binaryValue,
-        .flags = online_flag(),
-        .time = timestamp_synchronized(0),
-    };
-    database_update_binary(db, value, update_options_default());
+    binary_t value = binary_init(
+        7,
+        ((database_points_t*)context)->binaryValue,
+        online_flag(),
+        timestamp_synchronized(0)
+    );
+    database_update_binary(db, value, update_options_init());
 }
 
 void double_bit_binary_transaction(database_t* db, void* context)
 {
     ((database_points_t*)context)->doubleBitBinaryValue = ((database_points_t*)context)->doubleBitBinaryValue == DoubleBit_DeterminedOff ? DoubleBit_DeterminedOn : DoubleBit_DeterminedOff;
 
-    double_bit_binary_t value =
-    {
-        .index = 7,
-        .value = ((database_points_t*)context)->doubleBitBinaryValue,
-        .flags = online_flag(),
-        .time = timestamp_synchronized(0),
-    };
-    database_update_double_bit_binary(db, value, update_options_default());
+    double_bit_binary_t value = double_bit_binary_init(
+        7,
+        ((database_points_t*)context)->doubleBitBinaryValue,
+        online_flag(),
+        timestamp_synchronized(0)
+    );
+    database_update_double_bit_binary(db, value, update_options_init());
 }
 
 void binary_output_status_transaction(database_t* db, void* context)
 {
     ((database_points_t*)context)->binaryOutputStatusValue = !((database_points_t*)context)->binaryOutputStatusValue;
 
-    binary_output_status_t value =
-    {
-        .index = 7,
-        .value = ((database_points_t*)context)->binaryOutputStatusValue,
-        .flags = online_flag(),
-        .time = timestamp_synchronized(0),
-    };
-    database_update_binary_output_status(db, value, update_options_default());
+    binary_output_status_t value = binary_output_status_init(
+        7,
+        ((database_points_t*)context)->binaryOutputStatusValue,
+        online_flag(),
+        timestamp_synchronized(0)
+    );
+    database_update_binary_output_status(db, value, update_options_init());
 }
 
 void counter_transaction(database_t* db, void* context)
 {
-    counter_t value =
-    {
-        .index = 7,
-        .value = ++((database_points_t*)context)->counterValue,
-        .flags = online_flag(),
-        .time = timestamp_synchronized(0),
-    };
-    database_update_counter(db, value, update_options_default());
+    counter_t value = counter_init(
+        7,
+        ++((database_points_t*)context)->counterValue,
+        online_flag(),
+        timestamp_synchronized(0)
+    );
+    database_update_counter(db, value, update_options_init());
 }
 
 void frozen_counter_transaction(database_t* db, void* context)
 {
-    frozen_counter_t value =
-    {
-        .index = 7,
-        .value = ++((database_points_t*)context)->frozenCounterValue,
-        .flags = online_flag(),
-        .time = timestamp_synchronized(0),
-    };
-    database_update_frozen_counter(db, value, update_options_default());
+    frozen_counter_t value = frozen_counter_init(
+        7,
+        ++((database_points_t*)context)->frozenCounterValue,
+        online_flag(),
+        timestamp_synchronized(0)
+    );
+    database_update_frozen_counter(db, value, update_options_init());
 }
 
 void analog_transaction(database_t* db, void* context)
 {
-    analog_t value =
-    {
-        .index = 7,
-        .value = ++((database_points_t*)context)->analogValue,
-        .flags = online_flag(),
-        .time = timestamp_synchronized(0),
-    };
-    database_update_analog(db, value, update_options_default());
+    analog_t value = analog_init(
+        7,
+        ++((database_points_t*)context)->analogValue,
+        online_flag(),
+        timestamp_synchronized(0)
+    );
+    database_update_analog(db, value, update_options_init());
 }
 
 void analog_output_status_transaction(database_t* db, void* context)
 {
-    analog_output_status_t value =
-    {
-        .index = 7,
-        .value = ++((database_points_t*)context)->analogOutputStatusValue,
-        .flags = online_flag(),
-        .time = timestamp_synchronized(0),
-    };
-    database_update_analog_output_status(db, value, update_options_default());
+    analog_output_status_t value = analog_output_status_init(
+        7,
+        ++((database_points_t*)context)->analogOutputStatusValue,
+        online_flag(),
+        timestamp_synchronized(0)
+    );
+    database_update_analog_output_status(db, value, update_options_init());
 }
 
 void octet_string_transaction(database_t* db, void* context)
@@ -402,7 +381,7 @@ void octet_string_transaction(database_t* db, void* context)
     octet_string_add(octet_string, 0x6F); // o
     octet_string_add(octet_string, 0x00); // \0
 
-    database_update_octet_string(db, 7, octet_string, update_options_default());
+    database_update_octet_string(db, 7, octet_string, update_options_init());
 
     octet_string_destroy(octet_string);
 }
@@ -429,13 +408,13 @@ int main()
     {
         .num_core_threads = 4,
     };
-    runtime_t* runtime = runtime_new(&runtime_config);
+    runtime_t* runtime = runtime_new(runtime_config);
 
     tcp_server_t* server = tcpserver_new(runtime, "127.0.0.1:20000");
 
     // ANCHOR: outstation_config
     // create an outstation configuration with default values
-    outstation_config_t config = outstation_config_default(
+    outstation_config_t config = outstation_config_init(
         // outstation address
         1024,
         // master address
@@ -443,7 +422,7 @@ int main()
     );
     // override the default decode log level
     config.log_level = DecodeLogLevel_ObjectValues;
-    // ANCHOR_END: outstation_config    
+    // ANCHOR_END: outstation_config
 
     outstation_application_t application =
     {

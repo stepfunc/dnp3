@@ -1,5 +1,6 @@
 use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
+use oo_bindgen::native_struct::StructElementType;
 use oo_bindgen::*;
 
 pub fn define(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
@@ -37,25 +38,29 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError
     let logging_config_struct = lib.declare_native_struct("LoggingConfiguration")?;
     let logging_config_struct = lib
         .define_native_struct(&logging_config_struct)?
-        .add("level", Type::Enum(log_level_enum.clone()), "logging level")?
+        .add(
+            "level",
+            StructElementType::Enum(log_level_enum.clone(), Some("Info".to_string())),
+            "logging level",
+        )?
         .add(
             "output_format",
-            Type::Enum(log_output_format_enum),
+            StructElementType::Enum(log_output_format_enum, Some("Text".to_string())),
             "output formatting options",
         )?
         .add(
             "time_format",
-            Type::Enum(time_format_enum),
+            StructElementType::Enum(time_format_enum, Some("System".to_string())),
             "optional time format",
         )?
         .add(
             "print_level",
-            Type::Bool,
+            StructElementType::Bool(Some(true)),
             "optionally print the log level as part to the message string",
         )?
         .add(
             "print_module_info",
-            Type::Bool,
+            StructElementType::Bool(Some(false)),
             "optionally print the underlying Rust module information to the message string",
         )?
         .doc("Logging configuration options")?

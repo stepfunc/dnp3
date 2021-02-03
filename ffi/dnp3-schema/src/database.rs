@@ -1,5 +1,6 @@
 use class::ClassHandle;
 use oo_bindgen::native_function::*;
+use oo_bindgen::native_struct::StructElementType;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
@@ -39,33 +40,19 @@ pub fn define(
         .define_native_struct(&update_options)?
         .add(
             "update_static",
-            Type::Bool,
+            StructElementType::Bool(Some(true)),
             "Optionnaly bypass updating the static database (the current value)",
         )?
         .add(
             "event_mode",
-            Type::Enum(event_mode),
+            StructElementType::Enum(event_mode, Some("Detect".to_string())),
             "Determines how/if an event is produced",
         )?
         .doc(
-            doc("Options that control how the update is performed.").details(
-                "99% of the time, {struct:UpdateOptions.default_options()} should be used.",
-            ),
+            doc("Options that control how the update is performed.")
+                .details("99% of the time, the default value should be used."),
         )?
         .build()?;
-
-    let update_options_default_fn = lib
-        .declare_native_function("update_options_default")?
-        .return_type(ReturnType::new(
-            Type::Struct(update_options.clone()),
-            "Default {struct:UpdateOptions}",
-        ))?
-        .doc("Create the default {struct:UpdateOptions}")?
-        .build()?;
-
-    lib.define_struct(&update_options)?
-        .static_method("default_options", &update_options_default_fn)?
-        .build();
 
     // Binary Input
     let binary_static_variation = lib
@@ -88,12 +75,12 @@ pub fn define(
         .define_native_struct(&binary_config)?
         .add(
             "static_variation",
-            Type::Enum(binary_static_variation),
+            StructElementType::Enum(binary_static_variation, Some("Group1Var1".to_string())),
             "Default static variation",
         )?
         .add(
             "event_variation",
-            Type::Enum(binary_event_variation),
+            StructElementType::Enum(binary_event_variation, Some("Group2Var1".to_string())),
             "Default event variation",
         )?
         .doc("Binary Input configuration")?
@@ -165,12 +152,18 @@ pub fn define(
         .define_native_struct(&double_bit_binary_config)?
         .add(
             "static_variation",
-            Type::Enum(double_bit_binary_static_variation),
+            StructElementType::Enum(
+                double_bit_binary_static_variation,
+                Some("Group3Var1".to_string()),
+            ),
             "Default static variation",
         )?
         .add(
             "event_variation",
-            Type::Enum(double_bit_binary_event_variation),
+            StructElementType::Enum(
+                double_bit_binary_event_variation,
+                Some("Group4Var1".to_string()),
+            ),
             "Default event variation",
         )?
         .doc("Double-Bit Binary Input configuration")?
@@ -239,12 +232,18 @@ pub fn define(
         .define_native_struct(&binary_output_status_config)?
         .add(
             "static_variation",
-            Type::Enum(binary_output_status_static_variation),
+            StructElementType::Enum(
+                binary_output_status_static_variation,
+                Some("Group10Var1".to_string()),
+            ),
             "Default static variation",
         )?
         .add(
             "event_variation",
-            Type::Enum(binary_output_status_event_variation),
+            StructElementType::Enum(
+                binary_output_status_event_variation,
+                Some("Group11Var2".to_string()),
+            ),
             "Default event variation",
         )?
         .doc("Binary Output Status configuration")?
@@ -317,15 +316,19 @@ pub fn define(
         .define_native_struct(&counter_config)?
         .add(
             "static_variation",
-            Type::Enum(counter_static_variation),
+            StructElementType::Enum(counter_static_variation, Some("Group20Var1".to_string())),
             "Default static variation",
         )?
         .add(
             "event_variation",
-            Type::Enum(counter_event_variation),
+            StructElementType::Enum(counter_event_variation, Some("Group22Var1".to_string())),
             "Default event variation",
         )?
-        .add("deadband", Type::Uint32, "Deadband value")?
+        .add(
+            "deadband",
+            StructElementType::Uint32(Some(0)),
+            "Deadband value",
+        )?
         .doc("Counter configuration")?
         .build()?;
 
@@ -400,15 +403,25 @@ pub fn define(
         .define_native_struct(&frozen_counter_config)?
         .add(
             "static_variation",
-            Type::Enum(frozen_counter_static_variation),
+            StructElementType::Enum(
+                frozen_counter_static_variation,
+                Some("Group21Var1".to_string()),
+            ),
             "Default static variation",
         )?
         .add(
             "event_variation",
-            Type::Enum(frozen_counter_event_variation),
+            StructElementType::Enum(
+                frozen_counter_event_variation,
+                Some("Group23Var1".to_string()),
+            ),
             "Default event variation",
         )?
-        .add("deadband", Type::Uint32, "Deadband value")?
+        .add(
+            "deadband",
+            StructElementType::Uint32(Some(0)),
+            "Deadband value",
+        )?
         .doc("Frozen Counter configuration")?
         .build()?;
 
@@ -503,15 +516,19 @@ pub fn define(
         .define_native_struct(&analog_config)?
         .add(
             "static_variation",
-            Type::Enum(analog_static_variation),
+            StructElementType::Enum(analog_static_variation, Some("Group30Var1".to_string())),
             "Default static variation",
         )?
         .add(
             "event_variation",
-            Type::Enum(analog_event_variation),
+            StructElementType::Enum(analog_event_variation, Some("Group32Var1".to_string())),
             "Default event variation",
         )?
-        .add("deadband", Type::Double, "Deadband value")?
+        .add(
+            "deadband",
+            StructElementType::Double(Some(0.0)),
+            "Deadband value",
+        )?
         .doc("Analog configuration")?
         .build()?;
 
@@ -600,15 +617,25 @@ pub fn define(
         .define_native_struct(&analog_output_status_config)?
         .add(
             "static_variation",
-            Type::Enum(analog_output_status_static_variation),
+            StructElementType::Enum(
+                analog_output_status_static_variation,
+                Some("Group40Var1".to_string()),
+            ),
             "Default static variation",
         )?
         .add(
             "event_variation",
-            Type::Enum(analog_output_status_event_variation),
+            StructElementType::Enum(
+                analog_output_status_event_variation,
+                Some("Group42Var1".to_string()),
+            ),
             "Default event variation",
         )?
-        .add("deadband", Type::Double, "Deadband value")?
+        .add(
+            "deadband",
+            StructElementType::Double(Some(0.0)),
+            "Deadband value",
+        )?
         .doc("Analog Output Status configuration")?
         .build()?;
 

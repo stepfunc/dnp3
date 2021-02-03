@@ -189,7 +189,7 @@ public class OutstationExample {
 
             // ANCHOR: outstation_config
             // create an outstation configuration with default values
-            OutstationConfig config = OutstationConfig.defaultConfig(
+            OutstationConfig config = new OutstationConfig(
                 // outstation address
                 ushort(1024),
                 // master address
@@ -249,58 +249,28 @@ public class OutstationExample {
 
                     db.addOctetString(ushort(i), EventClass.CLASS1);
 
-                    Flags flags = new Flags();
-                    flags.value = ubyte(0x00);
-                    flags = flags.set(Flag.RESTART, true);
+                    Flags flags = new Flags(ubyte(0x00)).set(Flag.RESTART, true);
 
-                    Binary binaryPoint = new Binary();
-                    binaryPoint.index = ushort(i);
-                    binaryPoint.value = false;
-                    binaryPoint.flags = flags;
-                    binaryPoint.time = Timestamp.invalidTimestamp();
-                    db.updateBinary(binaryPoint, UpdateOptions.defaultOptions());
+                    Binary binaryPoint = new Binary(ushort(i), false, flags, Timestamp.invalidTimestamp());
+                    db.updateBinary(binaryPoint, new UpdateOptions());
 
-                    DoubleBitBinary doubleBitBinaryPoint = new DoubleBitBinary();
-                    doubleBitBinaryPoint.index = ushort(i);
-                    doubleBitBinaryPoint.value = DoubleBit.INDETERMINATE;
-                    doubleBitBinaryPoint.flags = flags;
-                    doubleBitBinaryPoint.time = Timestamp.invalidTimestamp();
-                    db.updateDoubleBitBinary(doubleBitBinaryPoint, UpdateOptions.defaultOptions());
+                    DoubleBitBinary doubleBitBinaryPoint = new DoubleBitBinary(ushort(i), DoubleBit.INDETERMINATE, flags, Timestamp.invalidTimestamp());
+                    db.updateDoubleBitBinary(doubleBitBinaryPoint, new UpdateOptions());
 
-                    BinaryOutputStatus binaryOutputStatusPoint = new BinaryOutputStatus();
-                    binaryOutputStatusPoint.index = ushort(i);
-                    binaryOutputStatusPoint.value = false;
-                    binaryOutputStatusPoint.flags = flags;
-                    binaryOutputStatusPoint.time = Timestamp.invalidTimestamp();
-                    db.updateBinaryOutputStatus(binaryOutputStatusPoint, UpdateOptions.defaultOptions());
+                    BinaryOutputStatus binaryOutputStatusPoint = new BinaryOutputStatus(ushort(i), false, flags, Timestamp.invalidTimestamp());
+                    db.updateBinaryOutputStatus(binaryOutputStatusPoint, new UpdateOptions());
 
-                    Counter counterPoint = new Counter();
-                    counterPoint.index = ushort(i);
-                    counterPoint.value = uint(0);
-                    counterPoint.flags = flags;
-                    counterPoint.time = Timestamp.invalidTimestamp();
-                    db.updateCounter(counterPoint, UpdateOptions.defaultOptions());
+                    Counter counterPoint = new Counter(ushort(i), uint(0), flags, Timestamp.invalidTimestamp());
+                    db.updateCounter(counterPoint, new UpdateOptions());
 
-                    FrozenCounter frozenCounterPoint = new FrozenCounter();
-                    frozenCounterPoint.index = ushort(i);
-                    frozenCounterPoint.value = uint(0);
-                    frozenCounterPoint.flags = flags;
-                    frozenCounterPoint.time = Timestamp.invalidTimestamp();
-                    db.updateFrozenCounter(frozenCounterPoint, UpdateOptions.defaultOptions());
+                    FrozenCounter frozenCounterPoint = new FrozenCounter(ushort(i), uint(0), flags, Timestamp.invalidTimestamp());
+                    db.updateFrozenCounter(frozenCounterPoint, new UpdateOptions());
 
-                    Analog analogPoint = new Analog();
-                    analogPoint.index = ushort(i);
-                    analogPoint.value = 0.0;
-                    analogPoint.flags = flags;
-                    analogPoint.time = Timestamp.invalidTimestamp();
-                    db.updateAnalog(analogPoint, UpdateOptions.defaultOptions());
+                    Analog analogPoint = new Analog(ushort(i), 0.0, flags, Timestamp.invalidTimestamp());
+                    db.updateAnalog(analogPoint, new UpdateOptions());
 
-                    AnalogOutputStatus analogOutputStatusPoint = new AnalogOutputStatus();
-                    analogOutputStatusPoint.index = ushort(i);
-                    analogOutputStatusPoint.value = 0.0;
-                    analogOutputStatusPoint.flags = flags;
-                    analogOutputStatusPoint.time = Timestamp.invalidTimestamp();
-                    db.updateAnalogOutputStatus(analogOutputStatusPoint, UpdateOptions.defaultOptions());
+                    AnalogOutputStatus analogOutputStatusPoint = new AnalogOutputStatus(ushort(i), 0.0, flags, Timestamp.invalidTimestamp());
+                    db.updateAnalogOutputStatus(analogOutputStatusPoint, new UpdateOptions());
                 }
             });
 
@@ -314,9 +284,7 @@ public class OutstationExample {
             long frozenCounterValue = 0;
             double analogValue = 0.0;
             double analogOutputStatusValue = 0.0;
-            Flags tmpFlags = new Flags();
-            tmpFlags.value = ubyte(0x00);
-            final Flags onlineFlags = tmpFlags.set(Flag.ONLINE, true);
+            Flags onlineFlags = new Flags(ubyte(0x00)).set(Flag.ONLINE, true);
 
             // Handle user input
             try {
@@ -331,12 +299,8 @@ public class OutstationExample {
                             binaryValue = !binaryValue;
                             final boolean pointValue = binaryValue;
                             outstation.transaction((db) -> {
-                                Binary value = new Binary();
-                                value.index = ushort(7);
-                                value.value = pointValue;
-                                value.flags = onlineFlags;
-                                value.time = Timestamp.synchronizedTimestamp(ulong(0));
-                                db.updateBinary(value, UpdateOptions.defaultOptions());
+                                Binary value = new Binary(ushort(7), pointValue, onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
+                                db.updateBinary(value, new UpdateOptions());
                             });
                             break;
                         }
@@ -345,12 +309,8 @@ public class OutstationExample {
                             doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DETERMINED_OFF ? DoubleBit.DETERMINED_ON : DoubleBit.DETERMINED_OFF;
                             final DoubleBit pointValue = doubleBitBinaryValue;
                             outstation.transaction((db) -> {
-                                DoubleBitBinary value = new DoubleBitBinary();
-                                value.index = ushort(7);
-                                value.value = pointValue;
-                                value.flags = onlineFlags;
-                                value.time = Timestamp.synchronizedTimestamp(ulong(0));
-                                db.updateDoubleBitBinary(value, UpdateOptions.defaultOptions());
+                                DoubleBitBinary value = new DoubleBitBinary(ushort(7), pointValue, onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
+                                db.updateDoubleBitBinary(value, new UpdateOptions());
                             });
                             break;
                         }
@@ -359,12 +319,8 @@ public class OutstationExample {
                             binaryOutputStatusValue = !binaryOutputStatusValue;
                             final boolean pointValue = binaryOutputStatusValue;
                             outstation.transaction((db) -> {
-                                BinaryOutputStatus value = new BinaryOutputStatus();
-                                value.index = ushort(7);
-                                value.value = pointValue;
-                                value.flags = onlineFlags;
-                                value.time = Timestamp.synchronizedTimestamp(ulong(0));
-                                db.updateBinaryOutputStatus(value, UpdateOptions.defaultOptions());
+                                BinaryOutputStatus value = new BinaryOutputStatus(ushort(7), pointValue, onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
+                                db.updateBinaryOutputStatus(value, new UpdateOptions());
                             });
                             break;
                         }
@@ -373,12 +329,8 @@ public class OutstationExample {
                             counterValue = ++counterValue;
                             final long pointValue = counterValue;
                             outstation.transaction((db) -> {
-                                Counter value = new Counter();
-                                value.index = ushort(7);
-                                value.value = uint(pointValue);
-                                value.flags = onlineFlags;
-                                value.time = Timestamp.synchronizedTimestamp(ulong(0));
-                                db.updateCounter(value, UpdateOptions.defaultOptions());
+                                Counter value = new Counter(ushort(7), uint(pointValue), onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
+                                db.updateCounter(value, new UpdateOptions());
                             });
                             break;
                         }
@@ -387,12 +339,8 @@ public class OutstationExample {
                             frozenCounterValue = ++frozenCounterValue;
                             final long pointValue = frozenCounterValue;
                             outstation.transaction((db) -> {
-                                FrozenCounter value = new FrozenCounter();
-                                value.index = ushort(7);
-                                value.value = uint(pointValue);
-                                value.flags = onlineFlags;
-                                value.time = Timestamp.synchronizedTimestamp(ulong(0));
-                                db.updateFrozenCounter(value, UpdateOptions.defaultOptions());
+                                FrozenCounter value = new FrozenCounter(ushort(7), uint(pointValue), onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
+                                db.updateFrozenCounter(value, new UpdateOptions());
                             });
                             break;
                         }
@@ -401,12 +349,8 @@ public class OutstationExample {
                             analogValue = ++analogValue;
                             final double pointValue = analogValue;
                             outstation.transaction((db) -> {
-                                Analog value = new Analog();
-                                value.index = ushort(7);
-                                value.value = pointValue;
-                                value.flags = onlineFlags;
-                                value.time = Timestamp.synchronizedTimestamp(ulong(0));
-                                db.updateAnalog(value, UpdateOptions.defaultOptions());
+                                Analog value = new Analog(ushort(7), pointValue, onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
+                                db.updateAnalog(value, new UpdateOptions());
                             });
                             break;
                         }
@@ -415,12 +359,8 @@ public class OutstationExample {
                             analogOutputStatusValue = ++analogOutputStatusValue;
                             final double pointValue = analogOutputStatusValue;
                             outstation.transaction((db) -> {
-                                AnalogOutputStatus value = new AnalogOutputStatus();
-                                value.index = ushort(7);
-                                value.value = pointValue;
-                                value.flags = onlineFlags;
-                                value.time = Timestamp.synchronizedTimestamp(ulong(0));
-                                db.updateAnalogOutputStatus(value, UpdateOptions.defaultOptions());
+                                AnalogOutputStatus value = new AnalogOutputStatus(ushort(7), pointValue, onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
+                                db.updateAnalogOutputStatus(value, new UpdateOptions());
                             });
                             break;
                         }
@@ -437,7 +377,7 @@ public class OutstationExample {
                                     octetString.add(ubyte(octet));
                                 }
 
-                                db.updateOctetString(ushort(7), octetString, UpdateOptions.defaultOptions());
+                                db.updateOctetString(ushort(7), octetString, new UpdateOptions());
                             });
                             break;
                         }

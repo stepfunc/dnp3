@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use class::{ClassDeclarationHandle, ClassHandle};
 use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::native_enum::*;
@@ -161,82 +163,68 @@ fn define_outstation_config(
         .define_native_struct(&class_zero_config)?
         .add(
             "binary",
-            Type::Bool,
+            StructElementType::Bool(Some(true)),
             "Include Binary Inputs in Class 0 reads",
         )?
         .add(
             "double_bit_binary",
-            Type::Bool,
+            StructElementType::Bool(Some(true)),
             "Include Double-Bit Binary Inputs in Class 0 reads",
         )?
         .add(
             "binary_output_status",
-            Type::Bool,
+            StructElementType::Bool(Some(true)),
             "Include Binary Output Status in Class 0 reads",
         )?
-        .add("counter", Type::Bool, "Include Counters in Class 0 reads")?
+        .add(
+            "counter",
+            StructElementType::Bool(Some(true)),
+            "Include Counters in Class 0 reads",
+        )?
         .add(
             "frozen_counter",
-            Type::Bool,
+            StructElementType::Bool(Some(true)),
             "Include Frozen Counters in Class 0 reads",
         )?
         .add(
             "analog",
-            Type::Bool,
+            StructElementType::Bool(Some(true)),
             "Include Analog Inputs in Class 0 reads",
         )?
         .add(
             "analog_output_status",
-            Type::Bool,
+            StructElementType::Bool(Some(true)),
             "Include Analog Output Status in Class 0 reads",
         )?
         .add(
             "octet_strings",
-            Type::Bool,
+            StructElementType::Bool(Some(false)),
             doc("Include Binary Inputs in Class 0 reads")
                 .warning("For conformance, this should be false."),
         )?
         .doc("Controls which types are reported during a Class 0 read.")?
         .build()?;
 
-    let class_zero_default_fn = lib
-        .declare_native_function("class_zero_config_default")?
-        .return_type(ReturnType::new(
-            Type::Struct(class_zero_config.clone()),
-            "Default Class 0 configuration",
-        ))?
-        .doc("Create default Class 0 configuration")?
-        .build()?;
-
-    lib.define_struct(&class_zero_config)?
-        .static_method("default_config", &class_zero_default_fn)?
-        .build();
-
     let features = lib.declare_native_struct("OutstationFeatures")?;
     let features = lib
         .define_native_struct(&features)?
-        .add("self_address", Type::Bool, "Respond to the self address")?
-        .add("broadcast", Type::Bool, "Process valid broadcast messages")?
+        .add(
+            "self_address",
+            StructElementType::Bool(Some(false)),
+            "Respond to the self address",
+        )?
+        .add(
+            "broadcast",
+            StructElementType::Bool(Some(true)),
+            "Process valid broadcast messages",
+        )?
         .add(
             "unsolicited",
-            Type::Bool,
+            StructElementType::Bool(Some(true)),
             "Respond to enable/disable unsolicited response and produce unsolicited responses",
         )?
         .doc("Optional outstation features that can be enabled or disabled")?
         .build()?;
-
-    let outstation_features_default_fn = lib
-        .declare_native_function("outstation_features_default")?
-        .return_type(ReturnType::new(
-            Type::Struct(features.clone()),
-            "Default outstation features",
-        ))?
-        .doc("Create default outstation features")?
-        .build()?;
-
-    lib.define_struct(&features)?
-        .static_method("default_features", &outstation_features_default_fn)?
-        .build();
 
     let outstation_config = lib.declare_native_struct("OutstationConfig")?;
     let outstation_config = lib
@@ -249,84 +237,65 @@ fn define_outstation_config(
         .add("master_address", Type::Uint16, "Link-layer master address")?
         .add(
             "solicited_buffer_size",
-            Type::Uint16,
+            StructElementType::Uint16(Some(2048)),
             doc("Solicited response buffer size").details("Must be at least 249 bytes"),
         )?
         .add(
             "unsolicited_buffer_size",
-            Type::Uint16,
+            StructElementType::Uint16(Some(2048)),
             doc("Unsolicited response buffer size").details("Must be at least 249 bytes"),
         )?
         .add(
             "rx_buffer_size",
-            Type::Uint16,
+            StructElementType::Uint16(Some(2048)),
             doc("Receive buffer size").details("Must be at least 249 bytes"),
         )?
         .add(
             "bubble_framing_errors",
-            Type::Bool,
+            StructElementType::Bool(Some(false)),
             "Bubble up data link layer errors",
         )?
         .add(
             "log_level",
-            Type::Enum(decode_log_level_enum),
+            StructElementType::Enum(decode_log_level_enum, Some("Nothing".to_string())),
             "Decoding log level",
         )?
         .add(
             "confirm_timeout",
-            Type::Duration(DurationMapping::Milliseconds),
+            StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(5))),
             "Confirmation timeout",
         )?
         .add(
             "select_timeout",
-            Type::Duration(DurationMapping::Milliseconds),
+            StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(5))),
             "Select timeout",
         )?
         .add("features", Type::Struct(features), "Optional features")?
         .add(
             "max_unsolicited_retries",
-            Type::Uint32,
+            StructElementType::Uint32(Some(u32::MAX)),
             "Maximum number of unsolicited retries",
         )?
         .add(
             "unsolicited_retry_delay",
-            Type::Duration(DurationMapping::Milliseconds),
+            StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(5))),
             "Delay to wait before retrying an unsolicited response",
         )?
         .add(
             "max_read_headers_per_request",
-            Type::Uint16,
+            StructElementType::Uint16(Some(64)),
             "Maximum number of read headers per request",
         )?
         .add(
             "keep_alive_timeout",
-            Type::Duration(DurationMapping::Milliseconds),
+            StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(60))),
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the master")
                 .details("A value of zero means no automatic keep-alives."),
         )?
-        .add("max_read_request_headers", Type::Uint16, doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
+        .add("max_read_request_headers", StructElementType::Uint16(Some(64)), doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
         .add("class_zero", Type::Struct(class_zero_config), "Controls responses to Class 0 reads")?
         .doc("Outstation configuration")?
         .build()?;
-
-    let outstation_config_default_fn = lib
-        .declare_native_function("outstation_config_default")?
-        .param(
-            "outstation_address",
-            Type::Uint16,
-            "Link-layer outstation address",
-        )?
-        .param("master_address", Type::Uint16, "Link-layer master address")?
-        .return_type(ReturnType::new(
-            Type::Struct(outstation_config.clone()),
-            "Default outstation config",
-        ))?
-        .doc("Create a default outstation config")?
-        .build()?;
-
-    lib.define_struct(&outstation_config)?
-        .static_method("default_config", &outstation_config_default_fn)?
-        .build();
 
     Ok(outstation_config)
 }
