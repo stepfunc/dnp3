@@ -19,7 +19,8 @@ use crate::{ffi, Runtime, RuntimeHandle};
 pub struct TcpServer {
     runtime: RuntimeHandle,
     server: Option<dnp3::entry::outstation::tcp::TCPServer>,
-    handle: Option<ServerHandle>,
+    // hold onto the underlying handle to keep the server alive
+    _handle: Option<ServerHandle>,
 }
 
 pub struct Outstation {
@@ -43,7 +44,7 @@ pub unsafe fn tcpserver_new(runtime: *mut Runtime, address: &CStr) -> *mut TcpSe
     Box::into_raw(Box::new(TcpServer {
         runtime: runtime.handle(),
         server: Some(server),
-        handle: None,
+        _handle: None,
     }))
 }
 
@@ -125,7 +126,7 @@ pub unsafe fn tcpserver_bind(server: *mut TcpServer) {
     };
 
     runtime.spawn(task);
-    server.handle = Some(handle);
+    server._handle = Some(handle);
 }
 
 pub unsafe fn outstation_destroy(outstation: *mut Outstation) {
