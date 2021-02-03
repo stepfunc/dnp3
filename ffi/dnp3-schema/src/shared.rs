@@ -1,3 +1,4 @@
+use oo_bindgen::doc;
 use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::native_enum::NativeEnumHandle;
 use oo_bindgen::native_function::{ReturnType, Type};
@@ -5,6 +6,7 @@ use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
 
 pub struct SharedDefinitions {
+    pub serial_port_settings: NativeStructHandle,
     pub link_error_mode: NativeEnumHandle,
     pub control_struct: NativeStructHandle,
     pub g12v1_struct: NativeStructHandle,
@@ -153,6 +155,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     )?;
 
     Ok(SharedDefinitions {
+        serial_port_settings: define_serial_params(lib)?,
         link_error_mode,
         control_struct,
         g12v1_struct,
@@ -171,6 +174,70 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         analog_output_status_point,
         analog_output_status_it,
     })
+}
+
+fn define_serial_params(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
+    let data_bits = lib
+        .define_native_enum("DataBits")?
+        .push("Five", "5 bits per character")?
+        .push("Six", "6 bits per character")?
+        .push("Seven", "7 bits per character")?
+        .push("Eight", "8 bits per character")?
+        .doc("Number of bits per character")?
+        .build()?;
+
+    let flow_control = lib
+        .define_native_enum("FlowControl")?
+        .push("None", "No flow control")?
+        .push("Software", "Flow control using XON/XOFF bytes")?
+        .push("Hardware", "Flow control using RTS/CTS signals")?
+        .doc("Flow control modes")?
+        .build()?;
+
+    let parity = lib
+        .define_native_enum("Parity")?
+        .push("None", "No parity bit")?
+        .push("Odd", "Parity bit sets odd number of 1 bits")?
+        .push("Even", "Parity bit sets even number of 1 bits")?
+        .doc("Parity checking modes")?
+        .build()?;
+
+    let stop_bits = lib
+        .define_native_enum("StopBits")?
+        .push("One", "One stop bit")?
+        .push("Two", "Two stop bits")?
+        .doc("Number of stop bits")?
+        .build()?;
+
+    let serial_params = lib.declare_native_struct("SerialPortSettings")?;
+    lib.define_native_struct(&serial_params)?
+        .add(
+            "baud_rate",
+            StructElementType::Uint32(Some(9600)),
+            "Baud rate (in symbols-per-second)",
+        )?
+        .add(
+            "data_bits",
+            StructElementType::Enum(data_bits, Some("Eight".to_string())),
+            "Number of bits used to represent a character sent on the line",
+        )?
+        .add(
+            "flow_control",
+            StructElementType::Enum(flow_control, Some("None".to_string())),
+            "Type of signalling to use for controlling data transfer",
+        )?
+        .add(
+            "parity",
+            StructElementType::Enum(parity, Some("None".to_string())),
+            "Type of parity to use for error checking",
+        )?
+        .add(
+            "stop_bits",
+            StructElementType::Enum(stop_bits, Some("One".to_string())),
+            "Number of bits to use to signal the end of a character",
+        )?
+        .doc(doc("Serial port settings").details("Used by {class:Runtime.AddMasterSerial()}."))?
+        .build()
 }
 
 fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {

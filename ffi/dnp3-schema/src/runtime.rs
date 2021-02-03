@@ -157,14 +157,12 @@ pub fn define(
         )?
         .build()?;
 
-    let serial_params = define_serial_params(lib)?;
-
     let add_master_serial_fn = lib
         .declare_native_function("runtime_add_master_serial")?
         .param("runtime", Type::ClassRef(runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
         .param("config", Type::Struct(master_config), "Master configuration")?
         .param("path", Type::String, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
-        .param("serial_params", Type::Struct(serial_params), "Serial parameters.")?
+        .param("serial_params", Type::Struct(shared.serial_port_settings.clone()), "Serial port settings")?
         .param("listener", Type::Interface(client_state_listener), "Client connection listener to receive updates on the status of the connection")?
         .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occured"))?
         .doc(
@@ -221,68 +219,4 @@ fn define_endpoint_list(lib: &mut LibraryBuilder) -> Result<ClassHandle, Binding
         .build()?;
 
     Ok(endpoint_list_class)
-}
-
-fn define_serial_params(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
-    let data_bits = lib
-        .define_native_enum("DataBits")?
-        .push("Five", "5 bits per character")?
-        .push("Six", "6 bits per character")?
-        .push("Seven", "7 bits per character")?
-        .push("Eight", "8 bits per character")?
-        .doc("Number of bits per character")?
-        .build()?;
-
-    let flow_control = lib
-        .define_native_enum("FlowControl")?
-        .push("None", "No flow control")?
-        .push("Software", "Flow control using XON/XOFF bytes")?
-        .push("Hardware", "Flow control using RTS/CTS signals")?
-        .doc("Flow control modes")?
-        .build()?;
-
-    let parity = lib
-        .define_native_enum("Parity")?
-        .push("None", "No parity bit")?
-        .push("Odd", "Parity bit sets odd number of 1 bits")?
-        .push("Even", "Parity bit sets even number of 1 bits")?
-        .doc("Parity checking modes")?
-        .build()?;
-
-    let stop_bits = lib
-        .define_native_enum("StopBits")?
-        .push("One", "One stop bit")?
-        .push("Two", "Two stop bits")?
-        .doc("Number of stop bits")?
-        .build()?;
-
-    let serial_params = lib.declare_native_struct("SerialPortSettings")?;
-    lib.define_native_struct(&serial_params)?
-        .add(
-            "baud_rate",
-            StructElementType::Uint32(Some(9600)),
-            "Baud rate (in symbols-per-second)",
-        )?
-        .add(
-            "data_bits",
-            StructElementType::Enum(data_bits, Some("Eight".to_string())),
-            "Number of bits used to represent a character sent on the line",
-        )?
-        .add(
-            "flow_control",
-            StructElementType::Enum(flow_control, Some("None".to_string())),
-            "Type of signalling to use for controlling data transfer",
-        )?
-        .add(
-            "parity",
-            StructElementType::Enum(parity, Some("None".to_string())),
-            "Type of parity to use for error checking",
-        )?
-        .add(
-            "stop_bits",
-            StructElementType::Enum(stop_bits, Some("One".to_string())),
-            "Number of bits to use to signal the end of a character",
-        )?
-        .doc(doc("Serial port settings").details("Used by {class:Runtime.AddMasterSerial()}."))?
-        .build()
 }
