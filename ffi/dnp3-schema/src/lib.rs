@@ -9,6 +9,7 @@ mod outstation;
 mod request;
 mod runtime;
 mod shared;
+mod variation;
 
 pub fn build_lib() -> Result<Library, BindingError> {
     let mut builder = LibraryBuilder::new("dnp3rs", Version::parse("0.1.0").unwrap());
@@ -214,8 +215,8 @@ pub fn build_lib() -> Result<Library, BindingError> {
     let shared_def = shared::define(&mut builder)?;
 
     // Master stuff
-    let (request, variation_enum) = request::define(&mut builder)?;
-    let read_handler = handler::define(&mut builder, variation_enum, &shared_def)?;
+    let request = request::define(&mut builder, &shared_def)?;
+    let read_handler = handler::define(&mut builder, &shared_def)?;
     let association_class = master::define(&mut builder, &shared_def, read_handler)?;
     association::define(&mut builder, association_class, request, &shared_def)?;
 

@@ -7,6 +7,7 @@ use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
 
 pub struct SharedDefinitions {
+    pub variation_enum: NativeEnumHandle,
     pub runtime_class: ClassDeclarationHandle,
     pub decode_log_level: NativeEnumHandle,
     pub serial_port_settings: NativeStructHandle,
@@ -152,6 +153,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     )?;
 
     Ok(SharedDefinitions {
+        variation_enum: crate::variation::define(lib)?,
         runtime_class: crate::runtime::define(lib)?,
         decode_log_level: crate::logging::define(lib)?,
         retry_strategy: define_retry_strategy(lib)?,
