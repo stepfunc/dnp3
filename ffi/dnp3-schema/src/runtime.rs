@@ -3,7 +3,6 @@ use std::time::Duration;
 use crate::shared::SharedDefinitions;
 use class::ClassHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
-use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
@@ -11,7 +10,6 @@ use oo_bindgen::*;
 pub fn define(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
-    decode_log_level_enum: NativeEnumHandle,
 ) -> std::result::Result<(ClassDeclarationHandle, ClassDeclarationHandle), BindingError> {
     // Forward declare the class
     let runtime_class = lib.declare_class("Runtime")?;
@@ -95,7 +93,7 @@ pub fn define(
     let master_config = lib.declare_native_struct("MasterConfiguration")?;
     let master_config = lib.define_native_struct(&master_config)?
         .add("address", Type::Uint16, "Local DNP3 data-link address")?
-        .add("level", Type::Enum(decode_log_level_enum), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
+        .add("level", Type::Enum(shared.decode_log_level.clone()), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
         .add("reconnection_strategy", Type::Struct(shared.retry_strategy.clone()), "Reconnection retry strategy to use")?
         .add("reconnection_delay", StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_millis(0))), doc("Optional reconnection delay when a connection is lost.").details("A value of 0 means no delay."))?
         .add(

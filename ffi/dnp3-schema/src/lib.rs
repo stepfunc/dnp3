@@ -211,32 +211,18 @@ pub fn build_lib() -> Result<Library, BindingError> {
     )?;
 
     // Shared stuff
-    let decode_log_level_enum = logging::define(&mut builder)?;
     let shared_def = shared::define(&mut builder)?;
 
     // Master stuff
     let (request, variation_enum) = request::define(&mut builder)?;
     let read_handler = handler::define(&mut builder, variation_enum, &shared_def)?;
-    let (runtime, master_class) =
-        runtime::define(&mut builder, &shared_def, decode_log_level_enum.clone())?;
-    let association_class = master::define(
-        &mut builder,
-        master_class,
-        read_handler,
-        decode_log_level_enum.clone(),
-        shared_def.retry_strategy.clone(),
-    )?;
+    let (runtime, master_class) = runtime::define(&mut builder, &shared_def)?;
+    let association_class = master::define(&mut builder, &shared_def, master_class, read_handler)?;
     association::define(&mut builder, association_class, request, &shared_def)?;
 
     // Outstation stuff
     let database = database::define(&mut builder, &shared_def)?;
-    outstation::define(
-        &mut builder,
-        runtime,
-        decode_log_level_enum,
-        database,
-        &shared_def,
-    )?;
+    outstation::define(&mut builder, runtime, database, &shared_def)?;
 
     builder.build()
 }

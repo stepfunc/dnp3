@@ -12,13 +12,12 @@ use crate::shared::SharedDefinitions;
 pub fn define(
     lib: &mut LibraryBuilder,
     runtime: ClassDeclarationHandle,
-    decode_log_level_enum: NativeEnumHandle,
     database: ClassHandle,
     shared_def: &SharedDefinitions,
 ) -> Result<(), BindingError> {
     // Everything required to create an outstation
-    let outstation = define_outstation(lib, decode_log_level_enum.clone(), &database)?;
-    let outstation_config = define_outstation_config(lib, decode_log_level_enum)?;
+    let outstation = define_outstation(lib, shared_def.decode_log_level.clone(), &database)?;
+    let outstation_config = define_outstation_config(lib, shared_def.decode_log_level.clone())?;
     let event_buffer_config = define_event_buffer_config(lib)?;
     let outstation_application = define_outstation_application(lib)?;
     let outstation_information = define_outstation_information(lib, shared_def)?;

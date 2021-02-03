@@ -1,18 +1,17 @@
 use std::time::Duration;
 
+use crate::shared::SharedDefinitions;
 use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
-use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
 
 pub fn define(
     lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
     master_class: ClassDeclarationHandle,
     read_handler: InterfaceHandle,
-    decode_log_level_enum: NativeEnumHandle,
-    retry_strategy: NativeStructHandle,
 ) -> Result<ClassDeclarationHandle, BindingError> {
     let destroy_fn = lib
         .declare_native_function("master_destroy")?
@@ -77,16 +76,16 @@ pub fn define(
         .add(
             "auto_time_sync",
             StructElementType::Enum(auto_time_sync_enum, Some("None".to_string())),
-            "Automatic time sychronization configuration",
+            "Automatic time synchronization configuration",
         )?
         .add(
             "auto_tasks_retry_strategy",
-            Type::Struct(retry_strategy),
+            Type::Struct(shared.retry_strategy.clone()),
             "Automatic tasks retry strategy",
         )?
         .add("keep_alive_timeout",
             StructElementType::Duration(DurationMapping::Seconds, Some(Duration::from_secs(60))),
-            doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the outstation").details("A value of zero means no automatic keep-alives.")
+            doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the outstation").details("A value of zero means no automatic keep-alive.")
         )?
         .add("auto_integrity_scan_on_buffer_overflow",
         StructElementType::Bool(Some(true)),
@@ -142,7 +141,7 @@ pub fn define(
         )?
         .return_type(ReturnType::new(
             Type::ClassRef(association_class.clone()),
-            "Handle to the created association or NULL if an error occured",
+            "Handle to the created association or NULL if an error occurred",
         ))?
         .doc("Add an association to the master")?
         .build()?;
@@ -156,7 +155,7 @@ pub fn define(
         )?
         .param(
             "level",
-            Type::Enum(decode_log_level_enum.clone()),
+            Type::Enum(shared.decode_log_level.clone()),
             "Decode log level",
         )?
         .return_type(ReturnType::void())?
@@ -171,7 +170,7 @@ pub fn define(
             "Master to modify",
         )?
         .return_type(ReturnType::new(
-            Type::Enum(decode_log_level_enum),
+            Type::Enum(shared.decode_log_level.clone()),
             "Decode log level",
         ))?
         .doc(

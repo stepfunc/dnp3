@@ -6,6 +6,7 @@ use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
 
 pub struct SharedDefinitions {
+    pub decode_log_level: NativeEnumHandle,
     pub serial_port_settings: NativeStructHandle,
     pub link_error_mode: NativeEnumHandle,
     pub retry_strategy: NativeStructHandle,
@@ -149,6 +150,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     )?;
 
     Ok(SharedDefinitions {
+        decode_log_level: crate::logging::define(lib)?,
         retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_params(lib)?,
         link_error_mode: define_link_error_mode(lib)?,
