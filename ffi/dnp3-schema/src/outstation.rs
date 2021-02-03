@@ -11,10 +11,11 @@ use crate::shared::SharedDefinitions;
 
 pub fn define(
     lib: &mut LibraryBuilder,
-    database: ClassHandle,
     shared_def: &SharedDefinitions,
 ) -> Result<(), BindingError> {
     // Everything required to create an outstation
+
+    let database = crate::database::define(lib, shared_def)?;
     let outstation = define_outstation(lib, shared_def.decode_log_level.clone(), &database)?;
     let outstation_config = define_outstation_config(lib, shared_def.decode_log_level.clone())?;
     let event_buffer_config = define_event_buffer_config(lib)?;
