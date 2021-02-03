@@ -15,6 +15,7 @@ pub use database::*;
 pub use struct_constructors::*;
 
 use crate::{ffi, Runtime, RuntimeHandle};
+use dnp3::config::LinkErrorMode;
 
 pub struct TcpServer {
     runtime: RuntimeHandle,
@@ -28,7 +29,7 @@ pub struct Outstation {
     runtime: RuntimeHandle,
 }
 
-pub unsafe fn tcpserver_new(runtime: *mut Runtime, address: &CStr) -> *mut TcpServer {
+pub unsafe fn tcpserver_new(runtime: *mut Runtime, address: &CStr, link_error_mode: ffi::LinkErrorMode) -> *mut TcpServer {
     let runtime = match runtime.as_ref() {
         Some(runtime) => runtime,
         None => return std::ptr::null_mut(),
@@ -39,7 +40,7 @@ pub unsafe fn tcpserver_new(runtime: *mut Runtime, address: &CStr) -> *mut TcpSe
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let server = dnp3::entry::outstation::tcp::TCPServer::new(address);
+    let server = dnp3::entry::outstation::tcp::TCPServer::new(link_error_mode.into(), address);
 
     Box::into_raw(Box::new(TcpServer {
         runtime: runtime.handle(),
@@ -195,7 +196,6 @@ fn convert_outstation_config(config: ffi::OutstationConfig) -> Option<Outstation
         solicited_buffer_size,
         unsolicited_buffer_size,
         rx_buffer_size,
-        bubble_framing_errors: config.bubble_framing_errors(),
         log_level: config.log_level().into(),
         confirm_timeout: config.confirm_timeout(),
         select_timeout: config.select_timeout(),
@@ -252,6 +252,15 @@ impl From<ffi::EventBufferConfig> for EventBufferConfig {
             max_analog: from.max_analog(),
             max_analog_output_status: from.max_analog_output_status(),
             max_octet_string: from.max_octet_string(),
+        }
+    }
+}
+
+impl From<ffi::LinkErrorMode> for LinkErrorMode {
+    fn from(from: ffi::LinkErrorMode) -> Self {
+        match from {
+            ffi::LinkErrorMode::Close => LinkErrorMode::Close,
+            ffi::LinkErrorMode::Discard => LinkErrorMode::Discard,
         }
     }
 }

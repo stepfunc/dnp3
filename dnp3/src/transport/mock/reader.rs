@@ -5,6 +5,7 @@ use crate::outstation::config::Feature;
 use crate::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use crate::transport::{Fragment, FragmentInfo, TransportData};
 use crate::util::buffer::Buffer;
+use crate::config::LinkErrorMode;
 
 pub(crate) struct MockReader {
     num_reads: usize,
@@ -15,11 +16,12 @@ pub(crate) struct MockReader {
 }
 
 impl MockReader {
-    pub(crate) fn master(_: EndpointAddress, rx_buffer_size: usize) -> Self {
+    pub(crate) fn master(_: LinkErrorMode, _: EndpointAddress, rx_buffer_size: usize) -> Self {
         Self::new(rx_buffer_size)
     }
 
     pub(crate) fn outstation(
+        _: LinkErrorMode,
         _: EndpointAddress,
         _self_address: Feature,
         rx_buffer_size: usize,

@@ -11,6 +11,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tracing::Instrument;
+use crate::config::LinkErrorMode;
 
 /// List of IP endpoints
 ///
@@ -98,11 +99,12 @@ impl EndpointList {
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
 pub fn spawn_master_tcp_client(
+    link_error_mode: LinkErrorMode,
     config: MasterConfiguration,
     endpoints: EndpointList,
     listener: Listener<ClientState>,
 ) -> MasterHandle {
-    let (future, handle) = create_master_tcp_client(config, endpoints, listener);
+    let (future, handle) = create_master_tcp_client(link_error_mode, config, endpoints, listener);
     crate::tokio::spawn(future);
     handle
 }
@@ -116,12 +118,13 @@ pub fn spawn_master_tcp_client(
 /// tasks instead of within the context of a runtime, e.g. in applications that cannot use
 /// `[tokio::main]` such as C language bindings.
 pub fn create_master_tcp_client(
+    link_error_mode: LinkErrorMode,
     config: MasterConfiguration,
     endpoints: EndpointList,
     listener: Listener<ClientState>,
 ) -> (impl Future<Output = ()> + 'static, MasterHandle) {
     let main_addr = endpoints.main_addr().to_string();
-    let (mut task, handle) = MasterTask::new(endpoints, config, listener);
+    let (mut task, handle) = MasterTask::new(link_error_mode, endpoints, config, listener);
     let future = async move {
         task.run()
             .instrument(tracing::info_span!("DNP3-Master-TCP", "endpoint" = ?main_addr))
@@ -142,6 +145,7 @@ struct MasterTask {
 
 impl MasterTask {
     fn new(
+        link_error_mode: LinkErrorMode,
         endpoints: EndpointList,
         config: MasterConfiguration,
         listener: Listener<ClientState>,
@@ -154,9 +158,9 @@ impl MasterTask {
             rx,
         );
         let (reader, writer) = crate::transport::create_master_transport_layer(
+            link_error_mode,
             config.address,
             config.rx_buffer_size,
-            config.bubble_framing_errors,
         );
         let task = Self {
             endpoints,

@@ -102,6 +102,8 @@ extern crate assert_matches;
 
 /// application layer types shared by both the master and outstation APIs
 pub mod app;
+/// configuration types not specific to master or outstation
+pub mod config;
 /// entry points for creating and spawning async tasks
 pub mod entry;
 /// types, enums, and traits specific to masters

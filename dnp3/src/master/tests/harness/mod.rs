@@ -8,6 +8,7 @@ use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
+use crate::config::LinkErrorMode;
 
 pub(crate) mod requests;
 
@@ -29,9 +30,9 @@ pub(crate) fn create_association(
     let mut master = MasterHandle::new(tx);
 
     let (mut reader, mut writer) = create_master_transport_layer(
+        LinkErrorMode::Close,
         EndpointAddress::from(1).unwrap(),
         MasterSession::MIN_RX_BUFFER_SIZE,
-        false,
     );
 
     reader

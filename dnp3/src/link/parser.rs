@@ -3,6 +3,7 @@ use crate::link::error::*;
 use crate::link::header::{AnyAddress, ControlField, Header};
 use crate::util::cursor::{ReadCursor, ReadError};
 use crate::util::slice_ext::*;
+use crate::config::LinkErrorMode;
 
 #[derive(Copy, Clone)]
 enum ParseState {
@@ -49,6 +50,7 @@ impl Default for FramePayload {
 }
 
 pub(crate) struct Parser {
+    mode: LinkErrorMode,
     state: ParseState,
 }
 
@@ -71,8 +73,9 @@ impl From<LogicError> for ParseError {
 }
 
 impl Parser {
-    pub(crate) fn new() -> Parser {
+    pub(crate) fn new(mode: LinkErrorMode) -> Parser {
         Parser {
+            mode,
             state: ParseState::FindSync1,
         }
     }
@@ -87,7 +90,30 @@ impl Parser {
         payload: &mut FramePayload,
     ) -> Result<Option<Header>, ParseError> {
         loop {
-            let start = cursor.len();
+            if self.mode == LinkErrorMode::Close {
+                return self.parse_impl(cursor, payload);
+            }
+
+            let res = cursor.transaction(|cur| self.parse_impl(cur, payload));
+
+            match res {
+                Ok(x) => return Ok(x),
+                Err(_) => {
+                    let _ = cursor.read_u8(); // advance one byte
+                    self.reset();
+                    // goto next iteration
+                }
+            }
+        }
+    }
+
+    fn parse_impl(
+        &mut self,
+        cursor: &mut ReadCursor,
+        payload: &mut FramePayload,
+    ) -> Result<Option<Header>, ParseError> {
+        loop {
+            let start = cursor.remaining();
 
             match self.state {
                 ParseState::FindSync1 => self.parse_sync1(cursor)?,
@@ -100,7 +126,7 @@ impl Parser {
                 }
             }
 
-            let end = cursor.len();
+            let end = cursor.remaining();
 
             if start == end {
                 // no progress
@@ -151,7 +177,7 @@ impl Parser {
     }
 
     fn parse_header(&mut self, cursor: &mut ReadCursor) -> Result<(), ParseError> {
-        if cursor.len() < 8 {
+        if cursor.remaining() < 8 {
             return Ok(());
         }
 
@@ -188,7 +214,7 @@ impl Parser {
         cursor: &mut ReadCursor,
         payload: &mut FramePayload,
     ) -> Result<Option<()>, ParseError> {
-        if cursor.len() < trailer_length {
+        if cursor.remaining() < trailer_length {
             return Ok(None);
         }
 
@@ -221,12 +247,6 @@ impl Parser {
     }
 }
 
-impl Default for Parser {
-    fn default() -> Self {
-        Parser::new()
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::super::test_data::*;
@@ -236,14 +256,14 @@ mod test {
         let mut cursor = ReadCursor::new(frame.bytes);
         let mut payload = FramePayload::new();
         let header: Header = parser.parse(&mut cursor, &mut payload).unwrap().unwrap();
-        assert_eq!(cursor.len(), 0);
+        assert_eq!(cursor.remaining(), 0);
         assert_eq!(header, frame.header);
         assert_eq!(payload.get(), frame.payload)
     }
 
     #[test]
     fn catches_bad_start1() {
-        let mut parser = Parser::new();
+        let mut parser = Parser::new(LinkErrorMode::Close);
         let mut cursor = ReadCursor::new(&[0x06]);
         let mut payload = FramePayload::new();
 
@@ -257,7 +277,7 @@ mod test {
 
     #[test]
     fn catches_bad_start2() {
-        let mut parser = Parser::new();
+        let mut parser = Parser::new(LinkErrorMode::Close);
         let mut cursor = ReadCursor::new(&[0x05, 0x65]);
         let mut payload = FramePayload::new();
 
@@ -271,7 +291,7 @@ mod test {
 
     #[test]
     fn catches_bad_length() {
-        let mut parser = Parser::new();
+        let mut parser = Parser::new(LinkErrorMode::Close);
         let mut cursor =
             ReadCursor::new(&[0x05, 0x64, 0x04, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21]);
         let mut payload = FramePayload::new();
@@ -280,12 +300,12 @@ mod test {
             parser.parse(&mut cursor, &mut payload),
             Err(ParseError::BadFrame(FrameError::BadLength(4)))
         );
-        assert_eq!(cursor.len(), 0);
+        assert_eq!(cursor.remaining(), 0);
     }
 
     #[test]
     fn header_parse_catches_bad_crc() {
-        let mut parser = Parser::new();
+        let mut parser = Parser::new(LinkErrorMode::Close);
         let mut cursor =
             ReadCursor::new(&[0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x20]);
         let mut payload = FramePayload::new();
@@ -294,7 +314,7 @@ mod test {
             parser.parse(&mut cursor, &mut payload),
             Err(ParseError::BadFrame(FrameError::BadHeaderCRC))
         );
-        assert_eq!(cursor.len(), 0);
+        assert_eq!(cursor.remaining(), 0);
     }
 
     #[test]
@@ -306,7 +326,7 @@ mod test {
             0x06, 0x9A, 0xFF,
         ];
 
-        let mut parser = Parser::new();
+        let mut parser = Parser::new(LinkErrorMode::Close);
         let mut cursor = ReadCursor::new(&data);
         let mut payload = FramePayload::new();
 
@@ -314,14 +334,31 @@ mod test {
             parser.parse(&mut cursor, &mut payload),
             Err(ParseError::BadFrame(FrameError::BadBodyCRC)),
         );
-        assert_eq!(cursor.len(), 0);
+        assert_eq!(cursor.remaining(), 0);
     }
 
     #[test]
     fn can_parse_multiple_different_frames_sequentially() {
-        let mut parser = Parser::new();
+        let mut parser = Parser::new(LinkErrorMode::Close);
         test_frame_parsing(&mut parser, &RESET_LINK);
         test_frame_parsing(&mut parser, &ACK);
         test_frame_parsing(&mut parser, &CONFIRM_USER_DATA);
     }
+
+    #[test]
+    fn can_consume_leading_garbage_in_discard_mode() {
+        let mut parser = Parser::new(LinkErrorMode::Discard);
+        // -- ------------ leading garbage ------------- valid frame -----------------------------------------------------
+        let data = [0x06, 0x05, 0x07, 0x05, 0x64, 0x05, 0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21];
+        let mut cursor = ReadCursor::new(&data);
+        let mut payload = FramePayload::new();
+
+        // consume leading garbage until we get to the valid frame
+        assert_eq!(
+            parser.parse(&mut cursor, &mut payload),
+            Ok(Some(RESET_LINK.header)),
+        );
+    }
+
+
 }

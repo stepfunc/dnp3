@@ -36,6 +36,11 @@ pub fn define(
             "Runtime to execute the server on",
         )?
         .param(
+        "link_error_mode",
+            Type::Enum(shared_def.link_error_mode.clone()),
+            "Controls how link errors are handled with respect to the TCP session",
+        )?
+        .param(
             "address",
             Type::String,
             "Address to bind the server to e.g. 127.0.0.1:20000",
@@ -249,11 +254,6 @@ fn define_outstation_config(
             "rx_buffer_size",
             StructElementType::Uint16(Some(2048)),
             doc("Receive buffer size").details("Must be at least 249 bytes"),
-        )?
-        .add(
-            "bubble_framing_errors",
-            StructElementType::Bool(Some(false)),
-            "Bubble up data link layer errors",
         )?
         .add(
             "log_level",

@@ -8,6 +8,7 @@ use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::real::assembler::{Assembler, AssemblyState};
 use crate::transport::real::header::Header;
 use crate::transport::{LinkLayerMessage, LinkLayerMessageType, TransportData};
+use crate::config::LinkErrorMode;
 
 pub(crate) struct Reader {
     link: crate::link::layer::Layer,
@@ -16,21 +17,22 @@ pub(crate) struct Reader {
 }
 
 impl Reader {
-    pub(crate) fn master(source: EndpointAddress, max_tx_buffer: usize) -> Self {
+    pub(crate) fn master(link_error_mode: LinkErrorMode, source: EndpointAddress, max_tx_buffer: usize) -> Self {
         Self {
-            link: crate::link::layer::Layer::new(EndpointType::Master, Feature::Disabled, source),
+            link: crate::link::layer::Layer::new(link_error_mode,EndpointType::Master, Feature::Disabled, source),
             assembler: Assembler::new(max_tx_buffer),
             pending_link_layer_message: None,
         }
     }
 
     pub(crate) fn outstation(
+        link_error_mode: LinkErrorMode,
         source: EndpointAddress,
         self_address: Feature,
         max_rx_buffer: usize,
     ) -> Self {
         Self {
-            link: crate::link::layer::Layer::new(EndpointType::Outstation, self_address, source),
+            link: crate::link::layer::Layer::new(link_error_mode,EndpointType::Outstation, self_address, source),
             assembler: Assembler::new(max_rx_buffer),
             pending_link_layer_message: None,
         }

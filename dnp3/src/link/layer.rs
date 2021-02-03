@@ -10,6 +10,7 @@ use crate::tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::link::format::format_header;
 use crate::outstation::config::Feature;
+use crate::config::LinkErrorMode;
 
 enum SecondaryState {
     NotReset,
@@ -38,6 +39,7 @@ impl Reply {
 
 impl Layer {
     pub(crate) fn new(
+        error_mode: LinkErrorMode,
         endpoint_type: EndpointType,
         self_address: Feature,
         local_address: EndpointAddress,
@@ -47,7 +49,7 @@ impl Layer {
             self_address,
             local_address,
             secondary_state: SecondaryState::NotReset,
-            reader: super::reader::Reader::default(),
+            reader: super::reader::Reader::new(error_mode),
             tx_buffer: [0; super::constant::LINK_HEADER_LENGTH],
         }
     }

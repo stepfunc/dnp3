@@ -6,9 +6,11 @@ use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
+use crate::shared::SharedDefinitions;
 
 pub fn define(
     lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
     decode_log_level_enum: NativeEnumHandle,
 ) -> Result<
     (
@@ -145,6 +147,7 @@ pub fn define(
     let add_master_tcp_fn = lib
         .declare_native_function("runtime_add_master_tcp")?
         .param("runtime", Type::ClassRef(runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
+        .param("link_error_mode", Type::Enum(shared.link_error_mode.clone()), "Controls how link errors are handled with respect to the TCP session")?
         .param("config", Type::Struct(master_config.clone()), "Master configuration")?
         .param("endpoints", Type::ClassRef(endpoint_list.declaration()), "List of IP endpoints.")?
         .param("listener", Type::Interface(client_state_listener.clone()), "Client connection listener to receive updates on the status of the connection")?

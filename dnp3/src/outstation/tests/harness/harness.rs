@@ -12,6 +12,7 @@ use crate::tokio::test::*;
 
 use crate::outstation::session::SessionError;
 use std::sync::{Arc, Mutex};
+use crate::config::LinkErrorMode;
 
 pub(crate) fn get_default_config() -> OutstationConfig {
     let mut config = get_default_unsolicited_config();
@@ -127,6 +128,7 @@ fn new_harness_impl(
     let (data, application) = MockOutstationApplication::new(events.clone());
 
     let (task, handle) = OutstationTask::create(
+        LinkErrorMode::Close,
         config,
         EventBufferConfig::all_types(5),
         application,
