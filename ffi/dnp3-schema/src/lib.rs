@@ -217,14 +217,14 @@ pub fn build_lib() -> Result<Library, BindingError> {
     // Master stuff
     let (request, variation_enum) = request::define(&mut builder)?;
     let read_handler = handler::define(&mut builder, variation_enum, &shared_def)?;
-    let (runtime, retry_strategy, master_class) =
+    let (runtime, master_class) =
         runtime::define(&mut builder, &shared_def, decode_log_level_enum.clone())?;
     let association_class = master::define(
         &mut builder,
         master_class,
         read_handler,
         decode_log_level_enum.clone(),
-        retry_strategy,
+        shared_def.retry_strategy.clone(),
     )?;
     association::define(&mut builder, association_class, request, &shared_def)?;
 

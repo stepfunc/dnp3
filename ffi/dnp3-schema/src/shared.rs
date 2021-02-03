@@ -1,13 +1,14 @@
 use oo_bindgen::doc;
 use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::native_enum::NativeEnumHandle;
-use oo_bindgen::native_function::{ReturnType, Type};
+use oo_bindgen::native_function::{DurationMapping, ReturnType, Type};
 use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
 
 pub struct SharedDefinitions {
     pub serial_port_settings: NativeStructHandle,
     pub link_error_mode: NativeEnumHandle,
+    pub retry_strategy: NativeStructHandle,
     pub control_struct: NativeStructHandle,
     pub g12v1_struct: NativeStructHandle,
     pub binary_point: NativeStructHandle,
@@ -27,13 +28,6 @@ pub struct SharedDefinitions {
 }
 
 pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingError> {
-    let link_error_mode = lib
-        .define_native_enum("LinkErrorMode")?
-        .push("Discard", "Framing errors are discarded. The link-layer parser is reset on any error, and the parser begins scanning for 0x0564. This is always the behavior for serial ports.")?
-        .push("Close", "Framing errors are bubbled up to calling code, closing the session. Suitable for physica layers that provide error correction like TCP.")?
-        .doc("Controls how errors in parsed link-layer frames are handled. This behavior is configurable for physical layers with built-in error correction like TCP as the connection might be through a terminal server.")?
-        .build()?;
-
     let control_struct = lib.declare_native_struct("Control")?;
     let control_struct = lib
         .define_native_struct(&control_struct)?
@@ -155,8 +149,9 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     )?;
 
     Ok(SharedDefinitions {
+        retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_params(lib)?,
-        link_error_mode,
+        link_error_mode: define_link_error_mode(lib)?,
         control_struct,
         g12v1_struct,
         binary_point,
@@ -174,6 +169,40 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         analog_output_status_point,
         analog_output_status_it,
     })
+}
+
+fn define_retry_strategy(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
+    let retry_strategy = lib.declare_native_struct("RetryStrategy")?;
+    lib.define_native_struct(&retry_strategy)?
+        .add(
+            "min_delay",
+            StructElementType::Duration(
+                DurationMapping::Milliseconds,
+                Some(std::time::Duration::from_secs(1)),
+            ),
+            "Minimum delay between two retries",
+        )?
+        .add(
+            "max_delay",
+            StructElementType::Duration(
+                DurationMapping::Milliseconds,
+                Some(std::time::Duration::from_secs(10)),
+            ),
+            "Maximum delay between two retries",
+        )?
+        .doc(doc("Retry strategy configuration.").details(
+            "The strategy uses an exponential back-off with a minimum and maximum value.",
+        ))?
+        .build()
+}
+
+fn define_link_error_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
+    lib
+        .define_native_enum("LinkErrorMode")?
+        .push("Discard", "Framing errors are discarded. The link-layer parser is reset on any error, and the parser begins scanning for 0x0564. This is always the behavior for serial ports.")?
+        .push("Close", "Framing errors are bubbled up to calling code, closing the session. Suitable for physica layers that provide error correction like TCP.")?
+        .doc("Controls how errors in parsed link-layer frames are handled. This behavior is configurable for physical layers with built-in error correction like TCP as the connection might be through a terminal server.")?
+        .build()
 }
 
 fn define_serial_params(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {

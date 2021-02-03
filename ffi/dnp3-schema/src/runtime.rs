@@ -12,14 +12,7 @@ pub fn define(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
     decode_log_level_enum: NativeEnumHandle,
-) -> Result<
-    (
-        ClassDeclarationHandle,
-        NativeStructHandle,
-        ClassDeclarationHandle,
-    ),
-    BindingError,
-> {
+) -> std::result::Result<(ClassDeclarationHandle, ClassDeclarationHandle), BindingError> {
     // Forward declare the class
     let runtime_class = lib.declare_class("Runtime")?;
 
@@ -64,30 +57,6 @@ pub fn define(
         )?
         .build()?;
 
-    let retry_strategy = lib.declare_native_struct("RetryStrategy")?;
-    let retry_strategy = lib
-        .define_native_struct(&retry_strategy)?
-        .add(
-            "min_delay",
-            StructElementType::Duration(
-                DurationMapping::Milliseconds,
-                Some(Duration::from_secs(1)),
-            ),
-            "Minimum delay between two retries",
-        )?
-        .add(
-            "max_delay",
-            StructElementType::Duration(
-                DurationMapping::Milliseconds,
-                Some(Duration::from_secs(10)),
-            ),
-            "Maximum delay between two retries",
-        )?
-        .doc(doc("Retry strategy configuration.").details(
-            "The strategy uses an exponential back-off with a minimum and maximum value.",
-        ))?
-        .build()?;
-
     let client_state_enum = lib
         .define_native_enum("ClientState")?
         .push(
@@ -127,7 +96,7 @@ pub fn define(
     let master_config = lib.define_native_struct(&master_config)?
         .add("address", Type::Uint16, "Local DNP3 data-link address")?
         .add("level", Type::Enum(decode_log_level_enum), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
-        .add("reconnection_strategy", Type::Struct(retry_strategy.clone()), "Reconnection retry strategy to use")?
+        .add("reconnection_strategy", Type::Struct(shared.retry_strategy.clone()), "Reconnection retry strategy to use")?
         .add("reconnection_delay", StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_millis(0))), doc("Optional reconnection delay when a connection is lost.").details("A value of 0 means no delay."))?
         .add(
             "response_timeout",
@@ -181,7 +150,7 @@ pub fn define(
         .doc("Event-queue based runtime handle")?
         .build()?;
 
-    Ok((runtime_class, retry_strategy, master_class))
+    Ok((runtime_class, master_class))
 }
 
 fn define_endpoint_list(lib: &mut LibraryBuilder) -> Result<ClassHandle, BindingError> {
