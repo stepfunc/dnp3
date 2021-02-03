@@ -185,7 +185,7 @@ public class OutstationExample {
         RuntimeConfig runtimeConfig = new RuntimeConfig();
         runtimeConfig.numCoreThreads = ushort(4);
         try(Runtime runtime = new Runtime(runtimeConfig)) {
-            TcpServer server = new TcpServer(runtime, "127.0.0.1:20000");
+            TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
 
             // ANCHOR: outstation_config
             // create an outstation configuration with default values

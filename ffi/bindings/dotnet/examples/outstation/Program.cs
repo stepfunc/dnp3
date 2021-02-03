@@ -99,7 +99,7 @@ class ExampleOutstation
 
         using (var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 }))
         {
-            using (var server = new TcpServer(runtime, "127.0.0.1:20000"))
+            using (var server = new TcpServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000"))
             {
                 // ANCHOR: outstation_config
                 // create an outstation configuration with default values

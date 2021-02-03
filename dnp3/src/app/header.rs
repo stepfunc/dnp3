@@ -128,7 +128,7 @@ impl Control {
     }
 
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        Ok(cursor.write_u8(self.to_u8())?)
+        cursor.write_u8(self.to_u8())
     }
 }
 

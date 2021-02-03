@@ -181,6 +181,7 @@ public class MasterExample {
         masterConfig.reconnectionStrategy.maxDelay = Duration.ofSeconds(5);
 
         Master master = runtime.addMasterTcp(
+                LinkErrorMode.CLOSE,
                 masterConfig,
                 new EndpointList("127.0.0.1:20000"),
                 new TestListener()

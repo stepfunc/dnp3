@@ -14,6 +14,7 @@ use dnp3::app::parse::DecodeLogLevel;
 use dnp3::app::retry::{ReconnectStrategy, RetryStrategy};
 use dnp3::app::timeout::Timeout;
 use dnp3::app::types::Timestamp;
+use dnp3::config::LinkErrorMode;
 use dnp3::entry::master::tcp::EndpointList;
 use dnp3::entry::outstation::tcp::{ServerHandle, TCPServer};
 use dnp3::entry::outstation::AddressFilter;
@@ -172,7 +173,8 @@ impl Pair {
     }
 
     async fn spawn_outstation(port: u16, config: TestConfig) -> (ServerHandle, OutstationHandle) {
-        let mut server = TCPServer::new(SocketAddr::new(Self::LOCALHOST, port));
+        let mut server =
+            TCPServer::new(LinkErrorMode::Close, SocketAddr::new(Self::LOCALHOST, port));
         let (outstation, task) = server
             .add_outstation(
                 Self::get_outstation_config(config.outstation_level),
@@ -232,6 +234,7 @@ impl Pair {
         tokio::sync::mpsc::Receiver<usize>,
     ) {
         let mut master = dnp3::entry::master::tcp::spawn_master_tcp_client(
+            LinkErrorMode::Close,
             Self::get_master_config(config.master_level),
             EndpointList::single(format!("127.0.0.1:{}", port)),
             Listener::None,

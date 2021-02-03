@@ -7,6 +7,7 @@ use crate::transport::{TransportReader, TransportWriter};
 use crate::util::io::IOStream;
 use crate::util::task::{Receiver, RunError, Shutdown};
 
+use crate::config::LinkErrorMode;
 use tracing::Instrument;
 
 pub(crate) enum ConfigurationChange {
@@ -83,6 +84,7 @@ impl OutstationHandle {
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
     pub(crate) fn create(
+        link_error_mode: LinkErrorMode,
         config: OutstationConfig,
         event_config: EventBufferConfig,
         application: Box<dyn OutstationApplication>,
@@ -96,10 +98,10 @@ impl OutstationTask {
             event_config,
         );
         let (reader, writer) = crate::transport::create_outstation_transport_layer(
+            link_error_mode,
             config.outstation_address,
             config.features.self_address,
             config.rx_buffer_size,
-            config.bubble_framing_errors,
         );
         let task = Self {
             session: OutstationSession::new(

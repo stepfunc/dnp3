@@ -274,8 +274,9 @@ int main()
         .on_change = &client_state_on_change,
         .ctx = NULL,
     };
-    master_t* master = runtime_add_master_tcp(
+    master_t* master = runtime_add_master_tcp(        
         runtime,
+        LinkErrorMode_Close,
         master_config,
         endpoints,
         listener

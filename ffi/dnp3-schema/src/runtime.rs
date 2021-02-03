@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use crate::shared::SharedDefinitions;
 use class::ClassHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::native_enum::*;
@@ -9,6 +10,7 @@ use oo_bindgen::*;
 
 pub fn define(
     lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
     decode_log_level_enum: NativeEnumHandle,
 ) -> Result<
     (
@@ -134,7 +136,6 @@ pub fn define(
         )?
         .add("tx_buffer_size", StructElementType::Uint16(Some(2048)), doc("TX buffer size").details("Should be at least 249"))?
         .add("rx_buffer_size", StructElementType::Uint16(Some(2048)), doc("RX buffer size").details("Should be at least 2048"))?
-        .add("bubble_framing_errors", StructElementType::Bool(Some(false)), "Close connection when a framing error occurs")?
         .doc("Master configuration")?
         .build()?;
 
@@ -145,6 +146,7 @@ pub fn define(
     let add_master_tcp_fn = lib
         .declare_native_function("runtime_add_master_tcp")?
         .param("runtime", Type::ClassRef(runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
+        .param("link_error_mode", Type::Enum(shared.link_error_mode.clone()), "Controls how link errors are handled with respect to the TCP session")?
         .param("config", Type::Struct(master_config.clone()), "Master configuration")?
         .param("endpoints", Type::ClassRef(endpoint_list.declaration()), "List of IP endpoints.")?
         .param("listener", Type::Interface(client_state_listener.clone()), "Client connection listener to receive updates on the status of the connection")?

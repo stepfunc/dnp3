@@ -175,6 +175,7 @@ class MainClass
     {
 
         var master = runtime.AddMasterTcp(
+            LinkErrorMode.Close,
             new MasterConfiguration(1, DecodeLogLevel.ObjectValues, TimeSpan.FromSeconds(5))
             {
                 ReconnectionStrategy = new RetryStrategy

@@ -1,3 +1,4 @@
+use crate::config::LinkErrorMode;
 use crate::link::error::LinkError;
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
@@ -13,9 +14,9 @@ pub(crate) struct Reader {
 }
 
 impl Reader {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(mode: LinkErrorMode) -> Self {
         Self {
-            parser: Parser::new(),
+            parser: Parser::new(mode),
             begin: 0,
             end: 0,
             buffer: [0; super::constant::MAX_LINK_FRAME_LENGTH],
@@ -49,9 +50,9 @@ impl Reader {
 
             // the readable portion of the buffer
             let mut cursor = ReadCursor::new(&self.buffer[self.begin..self.end]);
-            let start = cursor.len();
+            let start = cursor.remaining();
             let result = self.parser.parse(&mut cursor, payload)?;
-            self.begin += start - cursor.len();
+            self.begin += start - cursor.remaining();
             match result {
                 // complete frame
                 Some(header) => return Ok(header),
@@ -74,11 +75,5 @@ impl Reader {
                 }
             }
         }
-    }
-}
-
-impl Default for Reader {
-    fn default() -> Self {
-        Self::new()
     }
 }

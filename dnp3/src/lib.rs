@@ -22,7 +22,9 @@
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
 //!     // spawn the master onto another task
-//!     let mut master = spawn_master_tcp_client(
+//!     use dnp3::config::LinkErrorMode;
+//! let mut master = spawn_master_tcp_client(
+//!         LinkErrorMode::Close,
 //!         MasterConfiguration::new(
 //!             EndpointAddress::from(1)?,
 //!             DecodeLogLevel::ObjectValues,
@@ -102,6 +104,8 @@ extern crate assert_matches;
 
 /// application layer types shared by both the master and outstation APIs
 pub mod app;
+/// configuration types not specific to master or outstation
+pub mod config;
 /// entry points for creating and spawning async tasks
 pub mod entry;
 /// types, enums, and traits specific to masters

@@ -1,5 +1,6 @@
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::DecodeLogLevel;
+use crate::config::LinkErrorMode;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::outstation::config::Feature;
@@ -18,7 +19,6 @@ pub(crate) type InnerReaderType = crate::transport::mock::reader::MockReader;
 pub(crate) struct TransportReader {
     logged: bool,
     inner: InnerReaderType,
-    bubble_framing_errors: bool,
 }
 
 pub(crate) struct RequestGuard<'a> {
@@ -55,27 +55,30 @@ impl<'a> Drop for RequestGuard<'a> {
 
 impl TransportReader {
     pub(crate) fn master(
+        link_error_mode: LinkErrorMode,
         address: EndpointAddress,
         rx_buffer_size: usize,
-        bubble_framing_errors: bool,
     ) -> Self {
         Self {
             logged: false,
-            inner: InnerReaderType::master(address, rx_buffer_size),
-            bubble_framing_errors,
+            inner: InnerReaderType::master(link_error_mode, address, rx_buffer_size),
         }
     }
 
     pub(crate) fn outstation(
+        link_error_mode: LinkErrorMode,
         address: EndpointAddress,
         self_address: Feature,
         rx_buffer_size: usize,
-        bubble_framing_errors: bool,
     ) -> Self {
         Self {
             logged: false,
-            inner: InnerReaderType::outstation(address, self_address, rx_buffer_size),
-            bubble_framing_errors,
+            inner: InnerReaderType::outstation(
+                link_error_mode,
+                address,
+                self_address,
+                rx_buffer_size,
+            ),
         }
     }
 
@@ -88,20 +91,7 @@ impl TransportReader {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        loop {
-            let result = self.inner.read(io).await;
-
-            if self.bubble_framing_errors {
-                return result;
-            } else {
-                match result {
-                    Ok(()) => return Ok(()),
-                    Err(LinkError::IO(err)) => return Err(LinkError::IO(err)),
-                    Err(LinkError::BadFrame(_)) => continue, // Keep reading
-                    Err(LinkError::BadLogic(_)) => continue, // Keep reading
-                }
-            }
-        }
+        self.inner.read(io).await
     }
 
     pub(crate) fn reset(&mut self) {

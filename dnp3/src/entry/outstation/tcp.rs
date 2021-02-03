@@ -1,6 +1,7 @@
 use crate::entry::outstation::{AddressFilter, FilterError};
 use crate::outstation::task::{IOType, OutstationHandle, OutstationTask};
 
+use crate::config::LinkErrorMode;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::EventBufferConfig;
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
@@ -13,6 +14,7 @@ struct Outstation {
 }
 
 pub struct TCPServer {
+    link_error_mode: LinkErrorMode,
     connection_id: u64,
     address: std::net::SocketAddr,
     outstations: Vec<Outstation>,
@@ -24,8 +26,9 @@ pub struct ServerHandle {
 }
 
 impl TCPServer {
-    pub fn new(address: std::net::SocketAddr) -> Self {
+    pub fn new(link_error_mode: LinkErrorMode, address: std::net::SocketAddr) -> Self {
         Self {
+            link_error_mode,
             connection_id: 0,
             address,
             outstations: Vec::new(),
@@ -48,6 +51,7 @@ impl TCPServer {
         }
 
         let (mut task, handle) = OutstationTask::create(
+            self.link_error_mode,
             config,
             event_config,
             application,

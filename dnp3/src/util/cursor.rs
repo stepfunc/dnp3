@@ -1,49 +1,57 @@
 /// custom read-only cursor
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ReadCursor<'a> {
-    src: &'a [u8],
+    pos: usize,
+    input: &'a [u8],
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ReadError;
 
 impl<'a> ReadCursor<'a> {
-    pub(crate) fn new(src: &'a [u8]) -> ReadCursor {
-        ReadCursor { src }
+    pub(crate) fn new(input: &'a [u8]) -> Self {
+        Self { pos: 0, input }
     }
 
-    pub(crate) fn len(&self) -> usize {
-        self.src.len()
+    pub(crate) fn remaining(&self) -> usize {
+        self.input.len() - self.pos
+    }
+
+    pub(crate) fn transaction<T, R, E>(&mut self, mut read: T) -> Result<R, E>
+    where
+        T: FnMut(&mut ReadCursor) -> Result<R, E>,
+    {
+        let start = self.pos;
+        let result = read(self);
+        // if an error occurs, rollback to the starting position
+        if result.is_err() {
+            self.pos = start;
+        }
+        result
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.src.is_empty()
+        self.remaining() == 0
     }
 
     pub(crate) fn read_all(&mut self) -> &'a [u8] {
-        let ret = self.src;
-        self.src = &[];
+        let ret = &self.input[self.pos..];
+        self.pos += self.remaining();
         ret
     }
 
     pub(crate) fn read_u8(&mut self) -> Result<u8, ReadError> {
-        match self.src {
-            [a, rest @ ..] => {
-                self.src = rest;
-                Ok(*a)
+        match self.input.get(self.pos) {
+            Some(x) => {
+                self.pos += 1;
+                Ok(*x)
             }
-            _ => Err(ReadError),
+            None => Err(ReadError),
         }
     }
 
     pub(crate) fn read_u16_le(&mut self) -> Result<u16, ReadError> {
-        match self.src {
-            [b1, b2, rest @ ..] => {
-                self.src = rest;
-                Ok((*b2 as u16) << 8 | (*b1 as u16))
-            }
-            _ => Err(ReadError),
-        }
+        Ok((self.read_u8()? as u16) | ((self.read_u8()? as u16) << 8))
     }
 
     pub(crate) fn read_i16_le(&mut self) -> Result<i16, ReadError> {
@@ -51,13 +59,7 @@ impl<'a> ReadCursor<'a> {
     }
 
     pub(crate) fn read_u32_le(&mut self) -> Result<u32, ReadError> {
-        match self.src {
-            [b1, b2, b3, b4, rest @ ..] => {
-                self.src = rest;
-                Ok((*b4 as u32) << 24 | (*b3 as u32) << 16 | (*b2 as u32) << 8 | *b1 as u32)
-            }
-            _ => Err(ReadError),
-        }
+        Ok((self.read_u16_le()?) as u32 | ((self.read_u16_le()? as u32) << 16))
     }
 
     pub(crate) fn read_i32_le(&mut self) -> Result<i32, ReadError> {
@@ -65,18 +67,10 @@ impl<'a> ReadCursor<'a> {
     }
 
     pub(crate) fn read_u48_le(&mut self) -> Result<u64, ReadError> {
-        match self.src {
-            [b1, b2, b3, b4, b5, b6, rest @ ..] => {
-                self.src = rest;
-                Ok((*b6 as u64) << 40
-                    | (*b5 as u64) << 32
-                    | (*b4 as u64) << 24
-                    | (*b3 as u64) << 16
-                    | (*b2 as u64) << 8
-                    | *b1 as u64)
-            }
-            _ => Err(ReadError),
-        }
+        let low = self.read_u32_le()?;
+        let high = self.read_u16_le()?;
+
+        Ok((high as u64) << 32 | (low as u64))
     }
 
     pub(crate) fn read_f32_le(&mut self) -> Result<f32, ReadError> {
@@ -92,13 +86,13 @@ impl<'a> ReadCursor<'a> {
     }
 
     pub(crate) fn read_bytes(&mut self, count: usize) -> Result<&'a [u8], ReadError> {
-        match (self.src.get(0..count), self.src.get(count..)) {
-            (Some(first), Some(rest)) => {
-                self.src = rest;
-                Ok(first)
-            }
-            _ => Err(ReadError),
+        if count > self.remaining() {
+            return Err(ReadError);
         }
+
+        let ret = &self.input[self.pos..self.pos + count];
+        self.pos += count;
+        Ok(ret)
     }
 }
 
@@ -268,47 +262,90 @@ impl<'a> WriteCursor<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
 
-    #[test]
-    fn transaction_rolls_back_position_on_failure() {
-        let mut buffer = [0u8; 5];
-        let mut cursor = WriteCursor::new(&mut buffer);
+    mod write {
 
-        cursor.transaction(|cur| cur.write_u16_le(0xCAFE)).unwrap();
+        use super::super::*;
 
-        let result = cursor.transaction(|cur| {
-            cur.write_u16_le(0xDEAD)?;
-            cur.write_u16_le(0xBEEF) // no room for this
-        });
+        #[test]
+        fn transaction_rolls_back_position_on_failure() {
+            let mut buffer = [0u8; 5];
+            let mut cursor = WriteCursor::new(&mut buffer);
 
-        assert_eq!(result, Err(WriteError));
-        assert_eq!(cursor.written(), &[0xFE, 0xCA]);
+            cursor.transaction(|cur| cur.write_u16_le(0xCAFE)).unwrap();
+
+            let result = cursor.transaction(|cur| {
+                cur.write_u16_le(0xDEAD)?;
+                cur.write_u16_le(0xBEEF) // no room for this
+            });
+
+            assert_eq!(result, Err(WriteError));
+            assert_eq!(cursor.written(), &[0xFE, 0xCA]);
+        }
+
+        #[test]
+        fn from_pos_seeks_back_to_original_position_on_success() {
+            let mut buffer = [0u8; 3];
+            let mut cursor = WriteCursor::new(&mut buffer);
+
+            cursor.skip(2).unwrap();
+            cursor.write_u8(0xFF).unwrap();
+
+            cursor.at_pos(0, |cur| cur.write_u16_le(0xCAFE)).unwrap();
+
+            assert_eq!(cursor.written(), &[0xFE, 0xCA, 0xFF]);
+        }
+
+        #[test]
+        fn write_at_seeks_back_to_original_position_on_failure() {
+            let mut buffer = [0u8; 3];
+            let mut cursor = WriteCursor::new(&mut buffer);
+
+            cursor.skip(2).unwrap();
+            cursor.write_u8(0xFF).unwrap();
+
+            assert_eq!(cursor.at_pos(5, |cur| cur.write_u8(0xAA)), Err(WriteError));
+
+            assert_eq!(cursor.written(), &[0x00, 0x00, 0xFF]);
+        }
     }
 
-    #[test]
-    fn from_pos_seeks_back_to_original_position_on_success() {
-        let mut buffer = [0u8; 3];
-        let mut cursor = WriteCursor::new(&mut buffer);
+    mod read {
 
-        cursor.skip(2).unwrap();
-        cursor.write_u8(0xFF).unwrap();
+        use super::super::*;
 
-        cursor.at_pos(0, |cur| cur.write_u16_le(0xCAFE)).unwrap();
+        #[test]
+        fn can_read_u8() {
+            let mut cursor = ReadCursor::new(&[0xCA, 0xFE]);
 
-        assert_eq!(cursor.written(), &[0xFE, 0xCA, 0xFF]);
-    }
+            assert_eq!(cursor.remaining(), 2);
+            assert_eq!(cursor.read_u8().unwrap(), 0xCA);
+            assert_eq!(cursor.remaining(), 1);
+            assert_eq!(cursor.read_u8().unwrap(), 0xFE);
+            assert_eq!(cursor.remaining(), 0);
+            assert!(cursor.read_u8().is_err());
+            assert_eq!(cursor.remaining(), 0);
+        }
 
-    #[test]
-    fn write_at_seeks_back_to_original_position_on_failure() {
-        let mut buffer = [0u8; 3];
-        let mut cursor = WriteCursor::new(&mut buffer);
+        #[test]
+        fn can_read_u16_le() {
+            let mut cursor = ReadCursor::new(&[0xCA, 0xFE]);
+            assert_eq!(cursor.read_u16_le().unwrap(), 0xFECA);
+            assert_eq!(cursor.remaining(), 0);
+        }
 
-        cursor.skip(2).unwrap();
-        cursor.write_u8(0xFF).unwrap();
+        #[test]
+        fn can_read_u32_le() {
+            let mut cursor = ReadCursor::new(&[0xAA, 0xBB, 0xCC, 0xDD]);
+            assert_eq!(cursor.read_u32_le().unwrap(), 0xDDCCBBAA);
+            assert_eq!(cursor.remaining(), 0);
+        }
 
-        assert_eq!(cursor.at_pos(5, |cur| cur.write_u8(0xAA)), Err(WriteError));
-
-        assert_eq!(cursor.written(), &[0x00, 0x00, 0xFF]);
+        #[test]
+        fn can_read_u48_le() {
+            let mut cursor = ReadCursor::new(&[0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]);
+            assert_eq!(cursor.read_u48_le().unwrap(), 0x00FFEEDDCCBBAA);
+            assert_eq!(cursor.remaining(), 0);
+        }
     }
 }

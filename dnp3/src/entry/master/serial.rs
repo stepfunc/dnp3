@@ -13,6 +13,7 @@ pub use tokio_one_serial::{DataBits, FlowControl, Parity, StopBits};
 
 use std::time::Duration;
 
+use crate::config::LinkErrorMode;
 use tracing::Instrument;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
@@ -81,9 +82,10 @@ impl MasterTask {
             rx,
         );
         let (reader, writer) = crate::transport::create_master_transport_layer(
+            // serial ports always discard link parsing errors
+            LinkErrorMode::Discard,
             config.address,
             config.rx_buffer_size,
-            config.bubble_framing_errors,
         );
         let task = Self {
             path: path.to_string(),

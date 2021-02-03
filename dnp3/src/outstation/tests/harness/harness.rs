@@ -10,6 +10,7 @@ use crate::outstation::tests::harness::{
 };
 use crate::tokio::test::*;
 
+use crate::config::LinkErrorMode;
 use crate::outstation::session::SessionError;
 use std::sync::{Arc, Mutex};
 
@@ -127,6 +128,7 @@ fn new_harness_impl(
     let (data, application) = MockOutstationApplication::new(events.clone());
 
     let (task, handle) = OutstationTask::create(
+        LinkErrorMode::Close,
         config,
         EventBufferConfig::all_types(5),
         application,

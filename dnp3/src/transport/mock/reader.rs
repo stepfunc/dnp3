@@ -1,3 +1,4 @@
+use crate::config::LinkErrorMode;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
@@ -15,11 +16,12 @@ pub(crate) struct MockReader {
 }
 
 impl MockReader {
-    pub(crate) fn master(_: EndpointAddress, rx_buffer_size: usize) -> Self {
+    pub(crate) fn master(_: LinkErrorMode, _: EndpointAddress, rx_buffer_size: usize) -> Self {
         Self::new(rx_buffer_size)
     }
 
     pub(crate) fn outstation(
+        _: LinkErrorMode,
         _: EndpointAddress,
         _self_address: Feature,
         rx_buffer_size: usize,
