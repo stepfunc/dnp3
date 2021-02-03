@@ -4,11 +4,11 @@ use crate::prelude::master::*;
 use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
 
+use crate::config::LinkErrorMode;
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
-use crate::config::LinkErrorMode;
 
 pub(crate) mod requests;
 

@@ -1,9 +1,9 @@
+use crate::config::LinkErrorMode;
 use crate::link::constant;
 use crate::link::error::*;
 use crate::link::header::{AnyAddress, ControlField, Header};
 use crate::util::cursor::{ReadCursor, ReadError};
 use crate::util::slice_ext::*;
-use crate::config::LinkErrorMode;
 
 #[derive(Copy, Clone)]
 enum ParseState {
@@ -349,7 +349,10 @@ mod test {
     fn can_consume_leading_garbage_in_discard_mode() {
         let mut parser = Parser::new(LinkErrorMode::Discard);
         // -- ------------ leading garbage ------------- valid frame -----------------------------------------------------
-        let data = [0x06, 0x05, 0x07, 0x05, 0x64, 0x05, 0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04, 0xE9, 0x21];
+        let data = [
+            0x06, 0x05, 0x07, 0x05, 0x64, 0x05, 0x05, 0x64, 0x05, 0xC0, 0x01, 0x00, 0x00, 0x04,
+            0xE9, 0x21,
+        ];
         let mut cursor = ReadCursor::new(&data);
         let mut payload = FramePayload::new();
 
@@ -359,6 +362,4 @@ mod test {
             Ok(Some(RESET_LINK.header)),
         );
     }
-
-
 }

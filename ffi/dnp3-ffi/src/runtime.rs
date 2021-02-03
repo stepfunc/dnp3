@@ -74,6 +74,7 @@ pub(crate) unsafe fn runtime_destroy(runtime: *mut crate::runtime::Runtime) {
 
 pub(crate) unsafe fn runtime_add_master_tcp(
     runtime: *mut crate::runtime::Runtime,
+    link_error_mode: ffi::LinkErrorMode,
     config: ffi::MasterConfiguration,
     endpoints: *const EndpointList,
     listener: ffi::ClientStateListener,
@@ -91,8 +92,12 @@ pub(crate) unsafe fn runtime_add_master_tcp(
     };
     let listener = ClientStateListenerAdapter::new(listener);
 
-    let (future, handle) =
-        create_master_tcp_client(config, endpoints.clone(), listener.into_listener());
+    let (future, handle) = create_master_tcp_client(
+        link_error_mode.into(),
+        config,
+        endpoints.clone(),
+        listener.into_listener(),
+    );
 
     if let Some(runtime) = runtime.as_ref() {
         runtime.inner.spawn(future);
@@ -193,7 +198,6 @@ impl ffi::MasterConfiguration {
             response_timeout: Timeout::from_duration(self.response_timeout()).unwrap(),
             tx_buffer_size: self.tx_buffer_size() as usize,
             rx_buffer_size: self.rx_buffer_size() as usize,
-            bubble_framing_errors: self.bubble_framing_errors(),
         })
     }
 }

@@ -7,8 +7,8 @@ use crate::transport::{TransportReader, TransportWriter};
 use crate::util::io::IOStream;
 use crate::util::task::{Receiver, RunError, Shutdown};
 
-use tracing::Instrument;
 use crate::config::LinkErrorMode;
+use tracing::Instrument;
 
 pub(crate) enum ConfigurationChange {
     SetDecodeLogLevel(DecodeLogLevel),

@@ -13,8 +13,8 @@ pub use tokio_one_serial::{DataBits, FlowControl, Parity, StopBits};
 
 use std::time::Duration;
 
-use tracing::Instrument;
 use crate::config::LinkErrorMode;
+use tracing::Instrument;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.

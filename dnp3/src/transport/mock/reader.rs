@@ -1,3 +1,4 @@
+use crate::config::LinkErrorMode;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
@@ -5,7 +6,6 @@ use crate::outstation::config::Feature;
 use crate::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use crate::transport::{Fragment, FragmentInfo, TransportData};
 use crate::util::buffer::Buffer;
-use crate::config::LinkErrorMode;
 
 pub(crate) struct MockReader {
     num_reads: usize,

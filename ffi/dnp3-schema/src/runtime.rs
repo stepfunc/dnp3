@@ -1,12 +1,12 @@
 use std::time::Duration;
 
+use crate::shared::SharedDefinitions;
 use class::ClassHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
-use crate::shared::SharedDefinitions;
 
 pub fn define(
     lib: &mut LibraryBuilder,
@@ -136,7 +136,6 @@ pub fn define(
         )?
         .add("tx_buffer_size", StructElementType::Uint16(Some(2048)), doc("TX buffer size").details("Should be at least 249"))?
         .add("rx_buffer_size", StructElementType::Uint16(Some(2048)), doc("RX buffer size").details("Should be at least 2048"))?
-        .add("bubble_framing_errors", StructElementType::Bool(Some(false)), "Close connection when a framing error occurs")?
         .doc("Master configuration")?
         .build()?;
 

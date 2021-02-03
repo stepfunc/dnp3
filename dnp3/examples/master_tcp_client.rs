@@ -1,3 +1,4 @@
+use dnp3::config::LinkErrorMode;
 use dnp3::entry::EndpointAddress;
 use dnp3::prelude::master::*;
 use std::time::Duration;
@@ -24,6 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // spawn the master onto another task
     let mut master = spawn_master_tcp_client(
+        LinkErrorMode::Close,
         MasterConfiguration::new(
             EndpointAddress::from(1)?,
             DecodeLogLevel::ObjectValues,

@@ -29,7 +29,11 @@ pub struct Outstation {
     runtime: RuntimeHandle,
 }
 
-pub unsafe fn tcpserver_new(runtime: *mut Runtime, address: &CStr, link_error_mode: ffi::LinkErrorMode) -> *mut TcpServer {
+pub unsafe fn tcpserver_new(
+    runtime: *mut Runtime,
+    link_error_mode: ffi::LinkErrorMode,
+    address: &CStr,
+) -> *mut TcpServer {
     let runtime = match runtime.as_ref() {
         Some(runtime) => runtime,
         None => return std::ptr::null_mut(),

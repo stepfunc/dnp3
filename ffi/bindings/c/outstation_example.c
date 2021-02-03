@@ -399,7 +399,7 @@ int main()
         .print_level = true,
         .print_module_info = false,
         .time_format = TimeFormat_System,
-        .output_format = LogOutputFormat_Json,
+        .output_format = LogOutputFormat_Text,
     };
     configure_logging(log_config, logger);
 
@@ -410,7 +410,7 @@ int main()
     };
     runtime_t* runtime = runtime_new(runtime_config);
 
-    tcp_server_t* server = tcpserver_new(runtime, "127.0.0.1:20000");
+    tcp_server_t* server = tcpserver_new(runtime, LinkErrorMode_Close, "127.0.0.1:20000");
 
     // ANCHOR: outstation_config
     // create an outstation configuration with default values

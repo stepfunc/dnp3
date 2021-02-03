@@ -10,4 +10,3 @@ pub enum LinkErrorMode {
     /// layers that provide error correction like TCP.
     Close,
 }
-

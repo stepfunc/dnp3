@@ -9,7 +9,6 @@ pub(crate) struct ReadCursor<'a> {
 pub(crate) struct ReadError;
 
 impl<'a> ReadCursor<'a> {
-
     pub(crate) fn new(input: &'a [u8]) -> Self {
         Self { pos: 0, input }
     }
@@ -19,8 +18,8 @@ impl<'a> ReadCursor<'a> {
     }
 
     pub(crate) fn transaction<T, R, E>(&mut self, mut read: T) -> Result<R, E>
-        where
-            T: FnMut(&mut ReadCursor) -> Result<R, E>,
+    where
+        T: FnMut(&mut ReadCursor) -> Result<R, E>,
     {
         let start = self.pos;
         let result = read(self);
@@ -47,16 +46,12 @@ impl<'a> ReadCursor<'a> {
                 self.pos += 1;
                 Ok(*x)
             }
-            None => {
-                Err(ReadError)
-            }
+            None => Err(ReadError),
         }
     }
 
     pub(crate) fn read_u16_le(&mut self) -> Result<u16, ReadError> {
-        Ok(
-            (self.read_u8()? as u16) | ((self.read_u8()? as u16) << 8)
-        )
+        Ok((self.read_u8()? as u16) | ((self.read_u8()? as u16) << 8))
     }
 
     pub(crate) fn read_i16_le(&mut self) -> Result<i16, ReadError> {
@@ -64,9 +59,7 @@ impl<'a> ReadCursor<'a> {
     }
 
     pub(crate) fn read_u32_le(&mut self) -> Result<u32, ReadError> {
-        Ok(
-            (self.read_u16_le()?) as u32 | ((self.read_u16_le()? as u32) << 16)
-        )
+        Ok((self.read_u16_le()?) as u32 | ((self.read_u16_le()? as u32) << 16))
     }
 
     pub(crate) fn read_i32_le(&mut self) -> Result<i32, ReadError> {
@@ -77,9 +70,7 @@ impl<'a> ReadCursor<'a> {
         let low = self.read_u32_le()?;
         let high = self.read_u16_le()?;
 
-        Ok(
-            (high as u64) << 32 | (low as u64)
-        )
+        Ok((high as u64) << 32 | (low as u64))
     }
 
     pub(crate) fn read_f32_le(&mut self) -> Result<f32, ReadError> {
@@ -325,7 +316,6 @@ mod test {
 
         #[test]
         fn can_read_u8() {
-
             let mut cursor = ReadCursor::new(&[0xCA, 0xFE]);
 
             assert_eq!(cursor.remaining(), 2);
@@ -339,7 +329,6 @@ mod test {
 
         #[test]
         fn can_read_u16_le() {
-
             let mut cursor = ReadCursor::new(&[0xCA, 0xFE]);
             assert_eq!(cursor.read_u16_le().unwrap(), 0xFECA);
             assert_eq!(cursor.remaining(), 0);
@@ -347,7 +336,6 @@ mod test {
 
         #[test]
         fn can_read_u32_le() {
-
             let mut cursor = ReadCursor::new(&[0xAA, 0xBB, 0xCC, 0xDD]);
             assert_eq!(cursor.read_u32_le().unwrap(), 0xDDCCBBAA);
             assert_eq!(cursor.remaining(), 0);
@@ -355,12 +343,9 @@ mod test {
 
         #[test]
         fn can_read_u48_le() {
-
             let mut cursor = ReadCursor::new(&[0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]);
             assert_eq!(cursor.read_u48_le().unwrap(), 0x00FFEEDDCCBBAA);
             assert_eq!(cursor.remaining(), 0);
         }
-
     }
-
 }

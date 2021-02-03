@@ -1,10 +1,10 @@
+use crate::config::LinkErrorMode;
 use crate::link::error::LinkError;
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
 use crate::tokio::io::{AsyncRead, AsyncReadExt};
 use crate::util::cursor::ReadCursor;
 use std::io::ErrorKind;
-use crate::config::LinkErrorMode;
 
 pub(crate) struct Reader {
     parser: Parser,
@@ -77,4 +77,3 @@ impl Reader {
         }
     }
 }
-

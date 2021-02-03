@@ -8,9 +8,9 @@ use crate::link::header::{
 use crate::link::parser::FramePayload;
 use crate::tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
+use crate::config::LinkErrorMode;
 use crate::link::format::format_header;
 use crate::outstation::config::Feature;
-use crate::config::LinkErrorMode;
 
 enum SecondaryState {
     NotReset,

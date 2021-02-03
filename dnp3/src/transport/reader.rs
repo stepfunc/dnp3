@@ -1,5 +1,6 @@
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::DecodeLogLevel;
+use crate::config::LinkErrorMode;
 use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::outstation::config::Feature;
@@ -7,7 +8,6 @@ use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::{
     FragmentInfo, LinkLayerMessage, TransportData, TransportRequest, TransportResponse,
 };
-use crate::config::LinkErrorMode;
 
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport reader during testing.
@@ -73,7 +73,12 @@ impl TransportReader {
     ) -> Self {
         Self {
             logged: false,
-            inner: InnerReaderType::outstation(link_error_mode, address, self_address, rx_buffer_size),
+            inner: InnerReaderType::outstation(
+                link_error_mode,
+                address,
+                self_address,
+                rx_buffer_size,
+            ),
         }
     }
 

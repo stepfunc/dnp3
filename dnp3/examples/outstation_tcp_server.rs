@@ -2,6 +2,7 @@ use dnp3::app::enums::CommandStatus;
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::parse::DecodeLogLevel;
+use dnp3::config::LinkErrorMode;
 use dnp3::entry::outstation::tcp::TCPServer;
 use dnp3::entry::outstation::AddressFilter;
 use dnp3::entry::EndpointAddress;
@@ -37,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(false)
         .init();
 
-    let mut server = TCPServer::new("127.0.0.1:20000".parse()?);
+    let mut server = TCPServer::new(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
 
     let (handle, outstation) = server.add_outstation(
         get_outstation_config(),

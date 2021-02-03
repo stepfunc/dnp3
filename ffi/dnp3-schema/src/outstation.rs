@@ -36,7 +36,7 @@ pub fn define(
             "Runtime to execute the server on",
         )?
         .param(
-        "link_error_mode",
+            "link_error_mode",
             Type::Enum(shared_def.link_error_mode.clone()),
             "Controls how link errors are handled with respect to the TCP session",
         )?

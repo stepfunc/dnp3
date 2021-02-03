@@ -10,9 +10,9 @@ use crate::outstation::tests::harness::{
 };
 use crate::tokio::test::*;
 
+use crate::config::LinkErrorMode;
 use crate::outstation::session::SessionError;
 use std::sync::{Arc, Mutex};
-use crate::config::LinkErrorMode;
 
 pub(crate) fn get_default_config() -> OutstationConfig {
     let mut config = get_default_unsolicited_config();

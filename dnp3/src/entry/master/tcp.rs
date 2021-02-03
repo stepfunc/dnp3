@@ -1,4 +1,5 @@
 use crate::app::retry::ExponentialBackOff;
+use crate::config::LinkErrorMode;
 use crate::entry::master::ClientState;
 use crate::master::handle::{Listener, MasterConfiguration, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
@@ -11,7 +12,6 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tracing::Instrument;
-use crate::config::LinkErrorMode;
 
 /// List of IP endpoints
 ///
