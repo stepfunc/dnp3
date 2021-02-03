@@ -54,13 +54,8 @@ where
     f(&mut builder).enable_all().build()
 }
 
-pub(crate) unsafe fn runtime_new(
-    config: Option<&ffi::RuntimeConfig>,
-) -> *mut crate::runtime::Runtime {
-    let result = match config {
-        None => build_runtime(|r| r),
-        Some(x) => build_runtime(|r| r.worker_threads(x.num_core_threads as usize)),
-    };
+pub(crate) unsafe fn runtime_new(config: ffi::RuntimeConfig) -> *mut crate::runtime::Runtime {
+    let result = build_runtime(|r| r.worker_threads(config.num_core_threads as usize));
 
     match result {
         Ok(r) => Box::into_raw(Box::new(Runtime::new(r))),

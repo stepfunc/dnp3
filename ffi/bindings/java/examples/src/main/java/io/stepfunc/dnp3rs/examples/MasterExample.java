@@ -174,19 +174,11 @@ public class MasterExample {
 
     private static void run(Runtime runtime) throws Exception {
         // Create the master
-        RetryStrategy retryStrategy = new RetryStrategy();
-        retryStrategy.minDelay = Duration.ofMillis(100);
-        retryStrategy.maxDelay = Duration.ofSeconds(5);
-
-        MasterConfiguration masterConfig = new MasterConfiguration();
+        MasterConfiguration masterConfig = new MasterConfiguration(ushort(1), DecodeLogLevel.OBJECT_VALUES, Duration.ofSeconds(5));
         masterConfig.address = ushort(1);
         masterConfig.level = DecodeLogLevel.OBJECT_VALUES;
-        masterConfig.reconnectionStrategy = retryStrategy;
-        masterConfig.reconnectionDelay = Duration.ZERO;
-        masterConfig.responseTimeout = Duration.ofSeconds(5);
-        masterConfig.rxBufferSize = ushort(2048);
-        masterConfig.txBufferSize = ushort(2048);
-        masterConfig.bubbleFramingErrors = false;
+        masterConfig.reconnectionStrategy.minDelay = Duration.ofMillis(100);
+        masterConfig.reconnectionStrategy.maxDelay = Duration.ofSeconds(5);
 
         Master master = runtime.addMasterTcp(
                 masterConfig,
@@ -195,29 +187,19 @@ public class MasterExample {
         );
 
         // Create the association
-        TestReadHandler readHandler = new TestReadHandler();
-        AssociationConfiguration associationConfiguration = new AssociationConfiguration();
-        associationConfiguration.disableUnsolClasses = new EventClasses();
-        associationConfiguration.disableUnsolClasses.class1 = true;
-        associationConfiguration.disableUnsolClasses.class2 = true;
-        associationConfiguration.disableUnsolClasses.class3 = true;
-        associationConfiguration.enableUnsolClasses = new EventClasses();
-        associationConfiguration.enableUnsolClasses.class1 = true;
-        associationConfiguration.enableUnsolClasses.class2 = true;
-        associationConfiguration.enableUnsolClasses.class3 = true;
-        associationConfiguration.startupIntegrityClasses = Classes.all();
+        AssociationConfiguration associationConfiguration = new AssociationConfiguration(
+                new EventClasses(true, true, true),
+                new EventClasses(true, true, true),
+                Classes.all(),
+                new EventClasses(false, false, false)
+        );
         associationConfiguration.autoTimeSync = AutoTimeSync.LAN;
-        associationConfiguration.autoTasksRetryStrategy = retryStrategy;
+        associationConfiguration.autoTasksRetryStrategy.minDelay = Duration.ofSeconds(1);
+        associationConfiguration.autoTasksRetryStrategy.maxDelay = Duration.ofSeconds(5);
         associationConfiguration.keepAliveTimeout = Duration.ofSeconds(60);
-        associationConfiguration.autoIntegrityScanOnBufferOverflow = true;
-        associationConfiguration.eventScanOnEventsAvailable = new EventClasses();
-        associationConfiguration.eventScanOnEventsAvailable.class1 = false;
-        associationConfiguration.eventScanOnEventsAvailable.class2 = false;
-        associationConfiguration.eventScanOnEventsAvailable.class3 = false;
-        AssociationHandlers associationHandlers = new AssociationHandlers();
-        associationHandlers.integrityHandler = readHandler;
-        associationHandlers.unsolicitedHandler = readHandler;
-        associationHandlers.defaultPollHandler = readHandler;
+
+        TestReadHandler readHandler = new TestReadHandler();
+        AssociationHandlers associationHandlers = new AssociationHandlers(readHandler, readHandler, readHandler);
         Association association = master.addAssociation(
                 ushort(1024),
                 associationConfiguration,
@@ -259,16 +241,7 @@ public class MasterExample {
                 }
                 case "cmd": {
                     Command command = new Command();
-                    G12v1 g12v1 = new G12v1();
-                    ControlCode code = new ControlCode();
-                    code.tcc = TripCloseCode.NUL;
-                    code.clear = false;
-                    code.queue = false;
-                    code.opType = OpType.LATCH_ON;
-                    g12v1.code = code;
-                    g12v1.count = ubyte(1);
-                    g12v1.onTime = uint(1000);
-                    g12v1.offTime = uint(1000);
+                    G12v1 g12v1 = new G12v1(new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON), ubyte(1), uint(1000), uint(1000));
                     command.addU16g12v1(ushort(3), g12v1);
                     CommandResult result = association.operate(CommandMode.SELECT_BEFORE_OPERATE, command).toCompletableFuture().get();
                     System.out.println("Result: " + result);

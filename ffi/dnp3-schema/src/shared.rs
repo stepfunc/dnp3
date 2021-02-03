@@ -1,6 +1,6 @@
 use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::native_function::{ReturnType, Type};
-use oo_bindgen::native_struct::NativeStructHandle;
+use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
 
 pub struct SharedDefinitions {
@@ -59,7 +59,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .define_native_struct(&control_code)?
         .add("tcc", Type::Enum(trip_close_code), "This field is used in conjunction with the `op_type` field to specify a control operation")?
         .add("clear", Type::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
-        .add("queue", Type::Bool, "This field is obsolete and should always be 0")?
+        .add("queue", StructElementType::Bool(Some(false)), "This field is obsolete and should always be 0")?
         .add("op_type", Type::Enum(op_type), "This field is used in conjunction with the `tcc` field to specify a control operation")?
         .doc("CROB ({struct:G12V1}) control code")?
         .build()?;

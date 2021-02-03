@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use class::ClassHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::native_enum::*;
@@ -25,7 +27,7 @@ pub fn define(
         .define_native_struct(&config_struct)?
         .add(
             "num_core_threads",
-            Type::Uint16,
+            StructElementType::Uint16(Some(0)),
             doc("Number of runtime threads to spawn. For a guess of the number of CPU cores, use 0.")
             .details("Even if tons of connections are expected, it is preferred to use a value around the number of CPU cores for better performances. The library uses an efficient thread pool polling mechanism."),
         )?
@@ -37,7 +39,7 @@ pub fn define(
         .declare_native_function("runtime_new")?
         .param(
             "config",
-            Type::StructRef(config_struct.declaration()),
+            Type::Struct(config_struct),
             "Runtime configuration",
         )?
         .return_type(ReturnType::new(
@@ -65,12 +67,18 @@ pub fn define(
         .define_native_struct(&retry_strategy)?
         .add(
             "min_delay",
-            Type::Duration(DurationMapping::Milliseconds),
+            StructElementType::Duration(
+                DurationMapping::Milliseconds,
+                Some(Duration::from_secs(1)),
+            ),
             "Minimum delay between two retries",
         )?
         .add(
             "max_delay",
-            Type::Duration(DurationMapping::Milliseconds),
+            StructElementType::Duration(
+                DurationMapping::Milliseconds,
+                Some(Duration::from_secs(10)),
+            ),
             "Maximum delay between two retries",
         )?
         .doc(doc("Retry strategy configuration.").details(
@@ -118,15 +126,15 @@ pub fn define(
         .add("address", Type::Uint16, "Local DNP3 data-link address")?
         .add("level", Type::Enum(decode_log_level_enum), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
         .add("reconnection_strategy", Type::Struct(retry_strategy.clone()), "Reconnection retry strategy to use")?
-        .add("reconnection_delay", Type::Duration(DurationMapping::Milliseconds), doc("Optional reconnection delay when a connection is lost.").details("A value of 0 means no delay."))?
+        .add("reconnection_delay", StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_millis(0))), doc("Optional reconnection delay when a connection is lost.").details("A value of 0 means no delay."))?
         .add(
             "response_timeout",
             Type::Duration(DurationMapping::Milliseconds),
             "Timeout for receiving a response"
         )?
-        .add("tx_buffer_size", Type::Uint16, doc("TX buffer size").details("Should be at least 249"))?
-        .add("rx_buffer_size", Type::Uint16, doc("RX buffer size").details("Should be at least 2048"))?
-        .add("bubble_framing_errors", Type::Bool, "Close connection when a framing error occurs")?
+        .add("tx_buffer_size", StructElementType::Uint16(Some(2048)), doc("TX buffer size").details("Should be at least 249"))?
+        .add("rx_buffer_size", StructElementType::Uint16(Some(2048)), doc("RX buffer size").details("Should be at least 2048"))?
+        .add("bubble_framing_errors", StructElementType::Bool(Some(false)), "Close connection when a framing error occurs")?
         .doc("Master configuration")?
         .build()?;
 
@@ -250,27 +258,27 @@ fn define_serial_params(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
     lib.define_native_struct(&serial_params)?
         .add(
             "baud_rate",
-            Type::Uint32,
+            StructElementType::Uint32(Some(9600)),
             "Baud rate (in symbols-per-second)",
         )?
         .add(
             "data_bits",
-            Type::Enum(data_bits),
+            StructElementType::Enum(data_bits, Some("Eight".to_string())),
             "Number of bits used to represent a character sent on the line",
         )?
         .add(
             "flow_control",
-            Type::Enum(flow_control),
+            StructElementType::Enum(flow_control, Some("None".to_string())),
             "Type of signalling to use for controlling data transfer",
         )?
         .add(
             "parity",
-            Type::Enum(parity),
+            StructElementType::Enum(parity, Some("None".to_string())),
             "Type of parity to use for error checking",
         )?
         .add(
             "stop_bits",
-            Type::Enum(stop_bits),
+            StructElementType::Enum(stop_bits, Some("One".to_string())),
             "Number of bits to use to signal the end of a character",
         )?
         .doc(doc("Serial port settings").details("Used by {class:Runtime.AddMasterSerial()}."))?

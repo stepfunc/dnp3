@@ -260,26 +260,14 @@ int main()
     {
         .num_core_threads = 4,
     };
-    runtime_t* runtime = runtime_new(&runtime_config);
+    runtime_t* runtime = runtime_new(runtime_config);
     // ANCHOR_END: runtime_init
 
     // Create the master
-    retry_strategy_t retry_strategy =
-    {
-        .min_delay = 100,
-        .max_delay = 5000,
-    };
-    master_configuration_t master_config =
-    {
-        .address = 1,
-        .level = DecodeLogLevel_ObjectValues,
-        .reconnection_strategy = retry_strategy,
-        .reconnection_delay = 0,
-        .response_timeout = 5000,
-        .rx_buffer_size = 2048,
-        .tx_buffer_size = 2048,
-        .bubble_framing_errors = false,
-    };
+    master_configuration_t master_config = master_configuration_init(1, DecodeLogLevel_ObjectValues, 5000);
+    master_config.reconnection_strategy.min_delay = 100;
+    master_config.reconnection_strategy.max_delay = 5000;
+
     endpoint_list_t* endpoints = endpoint_list_new("127.0.0.1:20000");
     client_state_listener_t listener =
     {
@@ -309,38 +297,16 @@ int main()
         .handle_octet_string = &handle_octet_strings,
         .ctx = NULL,
     };
-    association_configuration_t association_config =
-    {
-        .disable_unsol_classes =
-        {
-            .class1 = true,
-            .class2 = true,
-            .class3 = true,
-        },
-        .enable_unsol_classes =
-        {
-            .class1 = true,
-            .class2 = true,
-            .class3 = true,
-        },
-        .startup_integrity_classes = classes_all(),
-        .auto_time_sync = AutoTimeSync_Lan,
-        .auto_tasks_retry_strategy = retry_strategy,
-        .keep_alive_timeout = 60,
-        .auto_integrity_scan_on_buffer_overflow = true,
-        .event_scan_on_events_available =
-        {
-            .class1 = false,
-            .class2 = false,
-            .class3 = false,
-        }
-    };
-    association_handlers_t association_handlers =
-    {
-        .integrity_handler = read_handler,
-        .unsolicited_handler = read_handler,
-        .default_poll_handler = read_handler,
-    };
+    association_configuration_t association_config = association_configuration_init(
+        event_classes_init(true, true, true),
+        event_classes_init(true, true, true),
+        classes_all(),
+        event_classes_init(false, false, false)
+    );
+    association_config.auto_time_sync = AutoTimeSync_Lan;
+    association_config.keep_alive_timeout = 60;
+
+    association_handlers_t association_handlers = association_handlers_init(read_handler, read_handler, read_handler);
     time_provider_t time_provider =
     {
         .get_time = get_time,
@@ -408,19 +374,12 @@ int main()
         else if(strcmp(cbuf, "cmd\n") == 0)
         {
             command_t* command = command_new();
-            g12v1_t g12v1 =
-            {
-                .code =
-                {
-                    .tcc = TripCloseCode_Nul,
-                    .clear = false,
-                    .queue = false,
-                    .op_type = OpType_LatchOn,
-                },
-                .count = 1,
-                .on_time = 1000,
-                .off_time = 1000,
-            };
+            g12v1_t g12v1 = g12v1_init(
+                control_code_init(TripCloseCode_Nul, false, OpType_LatchOn),
+                1,
+                1000,
+                1000
+            );
             command_add_u16_g12v1(command, 3, g12v1);
 
             command_task_callback_t cb =

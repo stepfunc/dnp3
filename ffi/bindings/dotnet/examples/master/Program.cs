@@ -175,20 +175,13 @@ class MainClass
     {
 
         var master = runtime.AddMasterTcp(
-            new MasterConfiguration
+            new MasterConfiguration(1, DecodeLogLevel.ObjectValues, TimeSpan.FromSeconds(5))
             {
-                Address = 1,
-                Level = DecodeLogLevel.ObjectValues,
                 ReconnectionStrategy = new RetryStrategy
                 {
                     MinDelay = TimeSpan.FromMilliseconds(100),
                     MaxDelay = TimeSpan.FromSeconds(5),
                 },
-                ReconnectionDelay = TimeSpan.Zero,
-                ResponseTimeout = TimeSpan.FromSeconds(5),
-                RxBufferSize = 2048,
-                TxBufferSize = 2048,
-                BubbleFramingErrors = false,
             },
             new EndpointList("127.0.0.1:20000"),
             new TestListener()
@@ -197,21 +190,8 @@ class MainClass
         var readHandler = new TestReadHandler();
         var association = master.AddAssociation(
             1024,
-            new AssociationConfiguration
+            new AssociationConfiguration(new EventClasses(true, true, true), new EventClasses(true, true, true), Classes.All(), new EventClasses(false, false, false))
             {
-                DisableUnsolClasses = new EventClasses
-                {
-                    Class1 = true,
-                    Class2 = true,
-                    Class3 = true,
-                },
-                EnableUnsolClasses = new EventClasses
-                {
-                    Class1 = true,
-                    Class2 = true,
-                    Class3 = true,
-                },
-                StartupIntegrityClasses = Classes.All(),
                 AutoTimeSync = AutoTimeSync.Lan,
                 AutoTasksRetryStrategy = new RetryStrategy
                 {
@@ -219,20 +199,8 @@ class MainClass
                     MaxDelay = TimeSpan.FromSeconds(5),
                 },
                 KeepAliveTimeout = TimeSpan.FromSeconds(60),
-                AutoIntegrityScanOnBufferOverflow = true,
-                EventScanOnEventsAvailable = new EventClasses
-                {
-                    Class1 = false,
-                    Class2 = false,
-                    Class3 = false,
-                },
             },
-            new AssociationHandlers
-            {
-                IntegrityHandler = readHandler,
-                UnsolicitedHandler = readHandler,
-                DefaultPollHandler = readHandler,
-            },
+            new AssociationHandlers(readHandler, readHandler, readHandler),
             new TestTimeProvider()
         );
 
@@ -275,21 +243,7 @@ class MainClass
                 case "cmd":
                     {
                         var command = new Command();
-                        command.AddU16g12v1(3,
-                            new G12v1
-                            {
-                                Code = new ControlCode
-                                {
-                                    Tcc = TripCloseCode.Nul,
-                                    Clear = false,
-                                    Queue = false,
-                                    OpType = OpType.LatchOn,
-                                },
-                                Count = 1,
-                                OnTime = 1000,
-                                OffTime = 1000,
-                            }
-                        );
+                        command.AddU16g12v1(3, new G12v1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
                         var result = await association.Operate(CommandMode.SelectBeforeOperate, command);
                         Console.WriteLine($"Result: {result}");
                         break;

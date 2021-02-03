@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::native_enum::*;
@@ -74,7 +76,7 @@ pub fn define(
         )?
         .add(
             "auto_time_sync",
-            Type::Enum(auto_time_sync_enum),
+            StructElementType::Enum(auto_time_sync_enum, Some("None".to_string())),
             "Automatic time sychronization configuration",
         )?
         .add(
@@ -83,11 +85,11 @@ pub fn define(
             "Automatic tasks retry strategy",
         )?
         .add("keep_alive_timeout",
-            Type::Duration(DurationMapping::Seconds),
+            StructElementType::Duration(DurationMapping::Seconds, Some(Duration::from_secs(60))),
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the outstation").details("A value of zero means no automatic keep-alives.")
         )?
         .add("auto_integrity_scan_on_buffer_overflow",
-            Type::Bool,
+        StructElementType::Bool(Some(true)),
             doc("Automatic integrity scan when an EVENT_BUFFER_OVERFLOW is detected")
         )?
         .add("event_scan_on_events_available",
