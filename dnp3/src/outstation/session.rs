@@ -392,7 +392,7 @@ impl OutstationSession {
 
         // wait for an event
         crate::tokio::select! {
-            frame_read = reader.read(io) => {
+            frame_read = reader.read(io, self.config.level) => {
                 // make sure an I/O error didn't occur, ending the session
                 frame_read?;
             }
@@ -635,7 +635,7 @@ impl OutstationSession {
             return Ok(UnsolicitedWaitResult::Timeout);
         }
 
-        let mut guard = reader.pop_request(self.config.level);
+        let mut guard = reader.pop_request();
         let (info, request) = match guard.get() {
             None => return Ok(UnsolicitedWaitResult::ReadNext),
             Some(TransportRequest::Request(info, request)) => {
@@ -741,12 +741,13 @@ impl OutstationSession {
         T: IOStream,
     {
         loop {
+            let decode_level = self.config.level;
             crate::tokio::select! {
                  res = self.sleep_until(Some(deadline)) => {
                      res?;
                      return Ok(Timeout::Yes);
                  }
-                 res = reader.read(io) => {
+                 res = reader.read(io, decode_level) => {
                      res?;
                      return Ok(Timeout::No);
                  }
@@ -840,7 +841,7 @@ impl OutstationSession {
     where
         T: IOStream,
     {
-        let mut guard = reader.pop_request(self.config.level);
+        let mut guard = reader.pop_request();
         match guard.get() {
             Some(TransportRequest::Request(info, request)) => {
                 self.on_link_activity();
@@ -1496,7 +1497,7 @@ impl OutstationSession {
                 }
                 // process data
                 Timeout::No => {
-                    let mut guard = reader.pop_request(self.config.level);
+                    let mut guard = reader.pop_request();
                     match self.expect_sol_confirm(ecsn, &mut guard) {
                         ConfirmAction::ContinueWait => {
                             // we ignored whatever the request was and logged it elsewhere

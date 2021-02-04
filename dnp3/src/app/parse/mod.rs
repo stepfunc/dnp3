@@ -17,6 +17,12 @@ pub enum DecodeLogLevel {
     ObjectValues,
 }
 
+impl DecodeLogLevel {
+    pub(crate) fn enabled(&self) -> bool {
+        *self != Self::Nothing
+    }
+}
+
 pub(crate) mod bit;
 pub(crate) mod count;
 pub(crate) mod parser;

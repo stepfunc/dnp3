@@ -145,14 +145,15 @@ impl MasterSession {
         T: IOStream,
     {
         loop {
+            let decode_level = self.level;
             crate::tokio::select! {
                 result = self.process_message(true) => {
                    // we need to recheck the tasks
                    return Ok(result?);
                 }
-                result = reader.read(io) => {
+                result = reader.read(io, decode_level) => {
                    result?;
-                   match reader.pop_response(self.level) {
+                   match reader.pop_response() {
                         Some(TransportResponse::Response(source, response)) => {
                             self.notify_link_activity(source);
                             return self.handle_fragment_while_idle(io, writer, source, response).await
@@ -179,14 +180,15 @@ impl MasterSession {
         T: IOStream,
     {
         loop {
+            let decode_level = self.level;
             crate::tokio::select! {
                 result = self.process_message(true) => {
                    // we need to recheck the tasks
                    return Ok(result?);
                 }
-                result = reader.read(io) => {
+                result = reader.read(io, decode_level) => {
                    result?;
-                   match reader.pop_response(self.level) {
+                   match reader.pop_response() {
                         Some(TransportResponse::Response(source, response)) => {
                             self.notify_link_activity(source);
                             return self.handle_fragment_while_idle(io, writer, source, response).await
@@ -324,13 +326,13 @@ impl MasterSession {
                         task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
                         return Err(TaskError::ResponseTimeout);
                     }
-                    x = reader.read(io) => {
+                    x = reader.read(io, self.level) => {
                         if let Err(err) = x {
                             task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
                             return Err(err.into());
                         }
 
-                        match reader.pop_response(self.level) {
+                        match reader.pop_response() {
                             Some(TransportResponse::Response(source, response)) => {
                                 self.notify_link_activity(source);
 
@@ -482,9 +484,9 @@ impl MasterSession {
                             tracing::warn!("no response within timeout: {}", self.timeout);
                             return Err(TaskError::ResponseTimeout);
                     }
-                    x = reader.read(io) => {
+                    x = reader.read(io, self.level) => {
                         x?;
-                        match reader.pop_response(self.level) {
+                        match reader.pop_response() {
                             Some(TransportResponse::Response(source, response)) => {
                                 self.notify_link_activity(source);
                                 let action = self.process_read_response(destination, is_first, seq, &task, io, writer, source, response).await?;
@@ -734,9 +736,9 @@ impl MasterSession {
                     tracing::warn!("no response within timeout: {}", self.timeout);
                     return Err(TaskError::ResponseTimeout);
                 }
-                x = reader.read(io) => {
+                x = reader.read(io, self.level) => {
                     x?;
-                    match reader.pop_response(self.level) {
+                    match reader.pop_response() {
                         Some(TransportResponse::Response(source, response)) => {
                             self.notify_link_activity(source);
                             self.handle_fragment_while_idle(io, writer, source, response).await?;

@@ -20,7 +20,6 @@ pub(crate) struct DecodeSettings {
     level: DecodeLogLevel,
 }
 
-#[cfg(test)]
 impl DecodeSettings {
     pub(crate) fn none() -> Self {
         Self {
