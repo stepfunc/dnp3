@@ -133,7 +133,7 @@ class ExampleOutstation
                         db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig());
                         db.AddOctetString(i, EventClass.Class1);
 
-                        var restart = new Flags(0x00).Set(Flag.Restart, true);
+                        var restart = Flags.FromSingleFlag(Flag.Restart);
                         db.UpdateBinary(new Binary(i, false, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
                         db.UpdateDoubleBitBinary(new DoubleBitBinary(i, DoubleBit.Indeterminate, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
                         db.UpdateBinaryOutputStatus(new BinaryOutputStatus(i, false, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());

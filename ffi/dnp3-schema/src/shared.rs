@@ -280,7 +280,11 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
     let flags_struct = lib.declare_native_struct("Flags")?;
     let flags_struct = lib
         .define_native_struct(&flags_struct)?
-        .add("value", Type::Uint8, "Flag byte")?
+        .add(
+            "value",
+            Type::Uint8,
+            "bit-mask representing a set of individual {enum:Flag} values",
+        )?
         .doc("Point flag")?
         .build()?;
 
@@ -297,6 +301,27 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
         .push("OverRange", "The data object's true value exceeds the valid measurement range of the object (only for analog input and output objects)")?
         .push("ReferenceErr", "The measurement process determined that the object's data value might not have the expected level of accuracy (only for analog input and output objects)")?
         .doc("Single bit in point flag")?
+        .build()?;
+
+    let flag_get_mask_fn = lib
+        .declare_native_function("flag_get_mask")?
+        .param(
+            "flag",
+            Type::Enum(flag_enum.clone()),
+            "convert the flag enumeration into a raw bitmask",
+        )?
+        .return_type(ReturnType::Type(Type::Uint8, "raw bitmask".into()))?
+        .doc("convert a flag enum into a raw bitmask")?
+        .build()?;
+
+    let flags_from_single_flag_fn = lib
+        .declare_native_function("flags_from_single_flag")?
+        .param("flag", Type::Enum(flag_enum.clone()), "{enum:Flag} value")?
+        .return_type(ReturnType::Type(
+            Type::Struct(flags_struct.clone()),
+            "constructed {struct:Flags}".into(),
+        ))?
+        .doc("construct a {struct:Flags} from a single {enum:Flag}")?
         .build()?;
 
     let flags_is_set_fn = lib
@@ -333,6 +358,8 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
     lib.define_struct(&flags_struct)?
         .method("IsSet", &flags_is_set_fn)?
         .method("Set", &flags_set_fn)?
+        .static_method("GetFlagMask", &flag_get_mask_fn)?
+        .static_method("FromSingleFlag", &flags_from_single_flag_fn)?
         .build();
 
     Ok(flags_struct)

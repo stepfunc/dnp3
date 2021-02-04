@@ -9,15 +9,23 @@ use std::fmt::Formatter;
 /// correspond to each type.
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Flags {
-    /// underlying value
+    /// underlying bitmask
     pub value: u8,
 }
 
 impl Flags {
-    pub const ONLINE: Flags = Flags::new(0x01);
-    pub const RESTART: Flags = Flags::new(0x02);
+    pub const ONLINE: Flags = Flags::new(bits::BIT_0.value);
+    pub const RESTART: Flags = Flags::new(bits::BIT_1.value);
+    pub const COMM_LOST: Flags = Flags::new(bits::BIT_2.value);
+    pub const REMOTE_FORCED: Flags = Flags::new(bits::BIT_3.value);
+    pub const LOCAL_FORCED: Flags = Flags::new(bits::BIT_4.value);
+    pub const CHATTER_FILTER: Flags = Flags::new(bits::BIT_5.value);
+    pub const ROLL_OVER: Flags = Flags::new(bits::BIT_5.value);
+    pub const OVER_RANGE: Flags = Flags::new(bits::BIT_5.value);
+    pub const DISCONTINUITY: Flags = Flags::new(bits::BIT_6.value);
+    pub const REFERENCE_ERR: Flags = Flags::new(bits::BIT_6.value);
 
-    /// create a `Flags` struct from a `u8`
+    /// create a `Flags` struct from a `u8` bitmask
     pub const fn new(value: u8) -> Self {
         Self { value }
     }

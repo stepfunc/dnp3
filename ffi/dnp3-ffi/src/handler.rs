@@ -391,6 +391,27 @@ pub unsafe fn iin2_is_set(iin2: Option<&ffi::Iin2>, flag: ffi::Iin2Flag) -> bool
     }
 }
 
+pub unsafe fn flag_get_mask(flag: ffi::Flag) -> u8 {
+    match flag {
+        ffi::Flag::Online => Flags::ONLINE.value,
+        ffi::Flag::Restart => Flags::RESTART.value,
+        ffi::Flag::CommLost => Flags::COMM_LOST.value,
+        ffi::Flag::RemoteForced => Flags::REMOTE_FORCED.value,
+        ffi::Flag::LocalForced => Flags::LOCAL_FORCED.value,
+        ffi::Flag::ChatterFilter => Flags::CHATTER_FILTER.value,
+        ffi::Flag::Rollover => Flags::ROLL_OVER.value,
+        ffi::Flag::Discontinuity => Flags::DISCONTINUITY.value,
+        ffi::Flag::OverRange => Flags::OVER_RANGE.value,
+        ffi::Flag::ReferenceErr => Flags::REFERENCE_ERR.value,
+    }
+}
+
+pub unsafe fn flags_from_single_flag(flag: ffi::Flag) -> ffi::Flags {
+    ffi::Flags {
+        value: flag_get_mask(flag),
+    }
+}
+
 pub unsafe fn flags_is_set(flags: Option<&ffi::Flags>, flag: ffi::Flag) -> bool {
     if let Some(flags) = flags {
         let flags = Flags::new(flags.value);
