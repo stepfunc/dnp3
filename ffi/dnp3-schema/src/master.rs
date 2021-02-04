@@ -1,19 +1,51 @@
 use std::time::Duration;
 
+use crate::shared::SharedDefinitions;
 use oo_bindgen::callback::InterfaceHandle;
-use oo_bindgen::class::ClassDeclarationHandle;
-use oo_bindgen::native_enum::*;
+use oo_bindgen::class::ClassHandle;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
 
-pub fn define(
-    lib: &mut LibraryBuilder,
-    master_class: ClassDeclarationHandle,
-    read_handler: InterfaceHandle,
-    decode_log_level_enum: NativeEnumHandle,
-    retry_strategy: NativeStructHandle,
-) -> Result<ClassDeclarationHandle, BindingError> {
+pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<(), BindingError> {
+    let read_handler = crate::handler::define(lib, shared)?;
+
+    let endpoint_list = define_endpoint_list(lib)?;
+
+    let master_config = define_master_config(lib, shared)?;
+
+    let tcp_client_state_listener = define_tcp_client_state_listener(lib)?;
+
+    let master_class = lib.declare_class("Master")?;
+
+    let master_create_tcp_session_fn = lib
+        .declare_native_function("master_create_tcp_session")?
+        .param("runtime", Type::ClassRef(shared.runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
+        .param("link_error_mode", Type::Enum(shared.link_error_mode.clone()), "Controls how link errors are handled with respect to the TCP session")?
+        .param("config", Type::Struct(master_config.clone()), "Master configuration")?
+        .param("endpoints", Type::ClassRef(endpoint_list.declaration()), "List of IP endpoints.")?
+        .param("listener", Type::Interface(tcp_client_state_listener.clone()), "TCP connection listener used to receive updates on the status of the connection")?
+        .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occurred"))?
+        .doc(
+            doc("Create a master TCP session connecting to the specified endpoint(s)")
+                .details("The returned master must be gracefully shutdown with {class:Master.[destructor]} when done.")
+        )?
+        .build()?;
+
+    let master_create_serial_session_fn = lib
+        .declare_native_function("master_create_serial_session")?
+        .param("runtime", Type::ClassRef(shared.runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
+        .param("config", Type::Struct(master_config), "Master configuration")?
+        .param("path", Type::String, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
+        .param("serial_params", Type::Struct(shared.serial_port_settings.clone()), "Serial port settings")?
+        .param("listener", Type::Interface(tcp_client_state_listener), "Client connection listener to receive updates on the status of the connection")?
+        .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occurred"))?
+        .doc(
+            doc("Create a master session on the specified serial port")
+                .details("The returned master must be gracefully shutdown with {class:Master.[destructor]} when done.")
+        )?
+        .build()?;
+
     let destroy_fn = lib
         .declare_native_function("master_destroy")?
         .param(
@@ -28,8 +60,8 @@ pub fn define(
         )?
         .build()?;
 
-    // Association creation
-    let association_class = lib.declare_class("Association")?;
+    // define the association
+    let association_class = crate::association::define(lib, shared)?;
 
     let event_classes = lib.declare_native_struct("EventClasses")?;
     let event_classes = lib
@@ -44,14 +76,14 @@ pub fn define(
 
     let auto_time_sync_enum = lib
         .define_native_enum("AutoTimeSync")?
-        .push("None", "Do not perform automatic timesync")?
+        .push("None", "Do not perform automatic time sync")?
         .push(
             "LAN",
-            "Perform automatic timesync with Record Current Time (0x18) function code",
+            "Perform automatic time sync with Record Current Time (0x18) function code",
         )?
         .push(
             "NonLAN",
-            "Perform automatic timesync with Delay Measurement (0x17) function code",
+            "Perform automatic time sync with Delay Measurement (0x17) function code",
         )?
         .doc("Automatic time synchronization configuration")?
         .build()?;
@@ -77,16 +109,16 @@ pub fn define(
         .add(
             "auto_time_sync",
             StructElementType::Enum(auto_time_sync_enum, Some("None".to_string())),
-            "Automatic time sychronization configuration",
+            "Automatic time synchronization configuration",
         )?
         .add(
             "auto_tasks_retry_strategy",
-            Type::Struct(retry_strategy),
+            Type::Struct(shared.retry_strategy.clone()),
             "Automatic tasks retry strategy",
         )?
         .add("keep_alive_timeout",
             StructElementType::Duration(DurationMapping::Seconds, Some(Duration::from_secs(60))),
-            doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the outstation").details("A value of zero means no automatic keep-alives.")
+            doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the outstation").details("A value of zero means no automatic keep-alive.")
         )?
         .add("auto_integrity_scan_on_buffer_overflow",
         StructElementType::Bool(Some(true)),
@@ -141,8 +173,8 @@ pub fn define(
             "Time provider for the association",
         )?
         .return_type(ReturnType::new(
-            Type::ClassRef(association_class.clone()),
-            "Handle to the created association or NULL if an error occured",
+            Type::ClassRef(association_class),
+            "Handle to the created association or NULL if an error occurred",
         ))?
         .doc("Add an association to the master")?
         .build()?;
@@ -156,7 +188,7 @@ pub fn define(
         )?
         .param(
             "level",
-            Type::Enum(decode_log_level_enum.clone()),
+            Type::Enum(shared.decode_log_level.clone()),
             "Decode log level",
         )?
         .return_type(ReturnType::void())?
@@ -171,7 +203,7 @@ pub fn define(
             "Master to modify",
         )?
         .return_type(ReturnType::new(
-            Type::Enum(decode_log_level_enum),
+            Type::Enum(shared.decode_log_level.clone()),
             "Decode log level",
         ))?
         .doc(
@@ -182,6 +214,8 @@ pub fn define(
 
     lib.define_class(&master_class)?
         .destructor(&destroy_fn)?
+        .static_method("CreateTCPSession", &master_create_tcp_session_fn)?
+        .static_method("CreateSerialSession", &master_create_serial_session_fn)?
         .method("AddAssociation", &add_association_fn)?
         .method("SetDecodeLogLevel", &set_decode_log_level_fn)?
         .method("GetDecodeLogLevel", &get_decode_log_level_fn)?
@@ -192,7 +226,104 @@ pub fn define(
         )?
         .build()?;
 
-    Ok(association_class)
+    Ok(())
+}
+
+fn define_tcp_client_state_listener(
+    lib: &mut LibraryBuilder,
+) -> std::result::Result<InterfaceHandle, BindingError> {
+    let client_state_enum = lib
+        .define_native_enum("ClientState")?
+        .push(
+            "Connecting",
+            "Client is trying to establish a connection to the remote device",
+        )?
+        .push("Connected", "Client is connected to the remote device")?
+        .push(
+            "WaitAfterFailedConnect",
+            "Failed to establish a connection, waiting before retrying",
+        )?
+        .push(
+            "WaitAfterDisconnect",
+            "Client was disconnected, waiting before retrying",
+        )?
+        .push("Shutdown", "Client is shutting down")?
+        .doc(
+            doc("State of the client connection.")
+                .details("Use by the {interface:ClientStateListener}."),
+        )?
+        .build()?;
+
+    lib.define_interface(
+        "ClientStateListener",
+        "Callback for monitoring the client TCP connection state",
+    )?
+    .callback("on_change", "Called when the client state changed")?
+    .param("state", Type::Enum(client_state_enum), "New state")?
+    .return_type(ReturnType::void())?
+    .build()?
+    .destroy_callback("on_destroy")?
+    .build()
+}
+
+fn define_master_config(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> std::result::Result<NativeStructHandle, BindingError> {
+    let master_config = lib.declare_native_struct("MasterConfiguration")?;
+    lib.define_native_struct(&master_config)?
+        .add("address", Type::Uint16, "Local DNP3 data-link address")?
+        .add("level", Type::Enum(shared.decode_log_level.clone()), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
+        .add("reconnection_strategy", Type::Struct(shared.retry_strategy.clone()), "Reconnection retry strategy to use")?
+        .add("reconnection_delay", StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_millis(0))), doc("Optional reconnection delay when a connection is lost.").details("A value of 0 means no delay."))?
+        .add(
+            "response_timeout",
+            Type::Duration(DurationMapping::Milliseconds),
+            "Timeout for receiving a response"
+        )?
+        .add("tx_buffer_size", StructElementType::Uint16(Some(2048)), doc("TX buffer size").details("Should be at least 249"))?
+        .add("rx_buffer_size", StructElementType::Uint16(Some(2048)), doc("RX buffer size").details("Should be at least 2048"))?
+        .doc("Master configuration")?
+        .build()
+}
+
+fn define_endpoint_list(
+    lib: &mut LibraryBuilder,
+) -> std::result::Result<ClassHandle, BindingError> {
+    let endpoint_list_class = lib.declare_class("EndpointList")?;
+
+    let endpoint_list_new = lib.declare_native_function("endpoint_list_new")?
+        .param("main_endpoint", Type::String, "Main endpoint")?
+        .return_type(ReturnType::new(Type::ClassRef(endpoint_list_class.clone()), "New endpoint list"))?
+        .doc(doc("Create a new list of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
+        .build()?;
+
+    let endpoint_list_destroy = lib
+        .declare_native_function("endpoint_list_destroy")?
+        .param(
+            "list",
+            Type::ClassRef(endpoint_list_class.clone()),
+            "Endpoint list to destroy",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Delete a previously allocated endpoint list.")?
+        .build()?;
+
+    let endpoint_list_add = lib.declare_native_function("endpoint_list_add")?
+        .param("list", Type::ClassRef(endpoint_list_class.clone()), "Endpoint list to modify")?
+        .param("endpoint", Type::String, "Endpoint to add to the list")?
+        .return_type(ReturnType::void())?
+        .doc(doc(".").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
+        .build()?;
+
+    let endpoint_list_class = lib.define_class(&endpoint_list_class)?
+        .constructor(&endpoint_list_new)?
+        .destructor(&endpoint_list_destroy)?
+        .method("Add", &endpoint_list_add)?
+        .doc(doc("List of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
+        .build()?;
+
+    Ok(endpoint_list_class)
 }
 
 fn define_time_provider(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {

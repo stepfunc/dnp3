@@ -1,11 +1,18 @@
+use oo_bindgen::class::ClassDeclarationHandle;
+use oo_bindgen::doc;
 use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::native_enum::NativeEnumHandle;
-use oo_bindgen::native_function::{ReturnType, Type};
+use oo_bindgen::native_function::{DurationMapping, ReturnType, Type};
 use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
 
 pub struct SharedDefinitions {
+    pub variation_enum: NativeEnumHandle,
+    pub runtime_class: ClassDeclarationHandle,
+    pub decode_log_level: NativeEnumHandle,
+    pub serial_port_settings: NativeStructHandle,
     pub link_error_mode: NativeEnumHandle,
+    pub retry_strategy: NativeStructHandle,
     pub control_struct: NativeStructHandle,
     pub g12v1_struct: NativeStructHandle,
     pub binary_point: NativeStructHandle,
@@ -25,13 +32,6 @@ pub struct SharedDefinitions {
 }
 
 pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingError> {
-    let link_error_mode = lib
-        .define_native_enum("LinkErrorMode")?
-        .push("Discard", "Framing errors are discarded. The link-layer parser is reset on any error, and the parser begins scanning for 0x0564. This is always the behavior for serial ports.")?
-        .push("Close", "Framing errors are bubbled up to calling code, closing the session. Suitable for physica layers that provide error correction like TCP.")?
-        .doc("Controls how errors in parsed link-layer frames are handled. This behavior is configurable for physical layers with built-in error correction like TCP as the connection might be through a terminal server.")?
-        .build()?;
-
     let control_struct = lib.declare_native_struct("Control")?;
     let control_struct = lib
         .define_native_struct(&control_struct)?
@@ -153,7 +153,12 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     )?;
 
     Ok(SharedDefinitions {
-        link_error_mode,
+        variation_enum: crate::variation::define(lib)?,
+        runtime_class: crate::runtime::define(lib)?,
+        decode_log_level: crate::logging::define(lib)?,
+        retry_strategy: define_retry_strategy(lib)?,
+        serial_port_settings: define_serial_params(lib)?,
+        link_error_mode: define_link_error_mode(lib)?,
         control_struct,
         g12v1_struct,
         binary_point,
@@ -171,6 +176,104 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         analog_output_status_point,
         analog_output_status_it,
     })
+}
+
+fn define_retry_strategy(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
+    let retry_strategy = lib.declare_native_struct("RetryStrategy")?;
+    lib.define_native_struct(&retry_strategy)?
+        .add(
+            "min_delay",
+            StructElementType::Duration(
+                DurationMapping::Milliseconds,
+                Some(std::time::Duration::from_secs(1)),
+            ),
+            "Minimum delay between two retries",
+        )?
+        .add(
+            "max_delay",
+            StructElementType::Duration(
+                DurationMapping::Milliseconds,
+                Some(std::time::Duration::from_secs(10)),
+            ),
+            "Maximum delay between two retries",
+        )?
+        .doc(doc("Retry strategy configuration.").details(
+            "The strategy uses an exponential back-off with a minimum and maximum value.",
+        ))?
+        .build()
+}
+
+fn define_link_error_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
+    lib
+        .define_native_enum("LinkErrorMode")?
+        .push("Discard", "Framing errors are discarded. The link-layer parser is reset on any error, and the parser begins scanning for 0x0564. This is always the behavior for serial ports.")?
+        .push("Close", "Framing errors are bubbled up to calling code, closing the session. Suitable for physical layers that provide error correction like TCP.")?
+        .doc("Controls how errors in parsed link-layer frames are handled. This behavior is configurable for physical layers with built-in error correction like TCP as the connection might be through a terminal server.")?
+        .build()
+}
+
+fn define_serial_params(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
+    let data_bits = lib
+        .define_native_enum("DataBits")?
+        .push("Five", "5 bits per character")?
+        .push("Six", "6 bits per character")?
+        .push("Seven", "7 bits per character")?
+        .push("Eight", "8 bits per character")?
+        .doc("Number of bits per character")?
+        .build()?;
+
+    let flow_control = lib
+        .define_native_enum("FlowControl")?
+        .push("None", "No flow control")?
+        .push("Software", "Flow control using XON/XOFF bytes")?
+        .push("Hardware", "Flow control using RTS/CTS signals")?
+        .doc("Flow control modes")?
+        .build()?;
+
+    let parity = lib
+        .define_native_enum("Parity")?
+        .push("None", "No parity bit")?
+        .push("Odd", "Parity bit sets odd number of 1 bits")?
+        .push("Even", "Parity bit sets even number of 1 bits")?
+        .doc("Parity checking modes")?
+        .build()?;
+
+    let stop_bits = lib
+        .define_native_enum("StopBits")?
+        .push("One", "One stop bit")?
+        .push("Two", "Two stop bits")?
+        .doc("Number of stop bits")?
+        .build()?;
+
+    let serial_params = lib.declare_native_struct("SerialPortSettings")?;
+    lib.define_native_struct(&serial_params)?
+        .add(
+            "baud_rate",
+            StructElementType::Uint32(Some(9600)),
+            "Baud rate (in symbols-per-second)",
+        )?
+        .add(
+            "data_bits",
+            StructElementType::Enum(data_bits, Some("Eight".to_string())),
+            "Number of bits used to represent a character sent on the line",
+        )?
+        .add(
+            "flow_control",
+            StructElementType::Enum(flow_control, Some("None".to_string())),
+            "Type of signalling to use for controlling data transfer",
+        )?
+        .add(
+            "parity",
+            StructElementType::Enum(parity, Some("None".to_string())),
+            "Type of parity to use for error checking",
+        )?
+        .add(
+            "stop_bits",
+            StructElementType::Enum(stop_bits, Some("One".to_string())),
+            "Number of bits to use to signal the end of a character",
+        )?
+        .doc("Serial port settings")?
+        .build()
 }
 
 fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {

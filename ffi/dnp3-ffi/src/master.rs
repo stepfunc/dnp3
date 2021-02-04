@@ -1,18 +1,104 @@
 use std::time::Duration;
 
 use crate::association::Association;
+
 use crate::ffi;
 
-use dnp3::app::retry::RetryStrategy;
+use dnp3::app::retry::{ReconnectStrategy, RetryStrategy};
+use dnp3::app::timeout::Timeout;
 use dnp3::app::types::Timestamp;
+use dnp3::entry::master::serial::{
+    create_master_serial_client, DataBits, FlowControl, Parity, StopBits,
+};
+use dnp3::entry::master::ClientState;
 use dnp3::entry::EndpointAddress;
 use dnp3::master::association::Configuration;
-use dnp3::master::handle::{AssociationHandler, MasterHandle, ReadHandler};
+use dnp3::master::handle::{
+    AssociationHandler, Listener, MasterConfiguration, MasterHandle, ReadHandler,
+};
 use dnp3::master::request::{Classes, EventClasses, TimeSyncProcedure};
+use dnp3::prelude::master::create_master_tcp_client;
+use std::ffi::CStr;
 
 pub struct Master {
     pub(crate) runtime: crate::runtime::RuntimeHandle,
     pub(crate) handle: MasterHandle,
+}
+
+pub(crate) unsafe fn master_create_tcp_session(
+    runtime: *mut crate::runtime::Runtime,
+    link_error_mode: ffi::LinkErrorMode,
+    config: ffi::MasterConfiguration,
+    endpoints: *const crate::EndpointList,
+    listener: ffi::ClientStateListener,
+) -> *mut Master {
+    let config = if let Some(config) = config.into() {
+        config
+    } else {
+        return std::ptr::null_mut();
+    };
+
+    let endpoints = if let Some(endpoints) = endpoints.as_ref() {
+        endpoints
+    } else {
+        return std::ptr::null_mut();
+    };
+    let listener = ClientStateListenerAdapter::new(listener);
+
+    let (future, handle) = create_master_tcp_client(
+        link_error_mode.into(),
+        config,
+        endpoints.clone(),
+        listener.into_listener(),
+    );
+
+    if let Some(runtime) = runtime.as_ref() {
+        runtime.inner.spawn(future);
+
+        let master = Master {
+            runtime: runtime.handle(),
+            handle,
+        };
+
+        Box::into_raw(Box::new(master))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+pub(crate) unsafe fn master_create_serial_session(
+    runtime: *mut crate::runtime::Runtime,
+    config: ffi::MasterConfiguration,
+    path: &CStr,
+    serial_params: ffi::SerialPortSettings,
+    listener: ffi::ClientStateListener,
+) -> *mut Master {
+    let config = if let Some(config) = config.into() {
+        config
+    } else {
+        return std::ptr::null_mut();
+    };
+    let listener = ClientStateListenerAdapter::new(listener);
+
+    let (future, handle) = create_master_serial_client(
+        config,
+        &path.to_string_lossy().to_string(),
+        serial_params.into(),
+        listener.into_listener(),
+    );
+
+    if let Some(runtime) = runtime.as_ref() {
+        runtime.inner.spawn(future);
+
+        let master = Master {
+            runtime: runtime.handle(),
+            handle,
+        };
+
+        Box::into_raw(Box::new(master))
+    } else {
+        std::ptr::null_mut()
+    }
 }
 
 pub unsafe fn master_destroy(master: *mut Master) {
@@ -209,6 +295,111 @@ impl From<ffi::TimeProviderTimestamp> for Option<Timestamp> {
             Some(Timestamp::new(from.value))
         } else {
             None
+        }
+    }
+}
+
+struct ClientStateListenerAdapter {
+    native_cb: ffi::ClientStateListener,
+}
+
+impl ClientStateListenerAdapter {
+    fn new(native_cb: ffi::ClientStateListener) -> Self {
+        Self { native_cb }
+    }
+
+    fn into_listener(self) -> Listener<ClientState> {
+        Listener::BoxedFn(Box::new(move |value| {
+            let value = match value {
+                ClientState::Connecting => ffi::ClientState::Connecting,
+                ClientState::Connected => ffi::ClientState::Connected,
+                ClientState::WaitAfterFailedConnect(_) => ffi::ClientState::WaitAfterFailedConnect,
+                ClientState::WaitAfterDisconnect(_) => ffi::ClientState::WaitAfterDisconnect,
+                ClientState::Shutdown => ffi::ClientState::Shutdown,
+            };
+            self.native_cb.on_change(value);
+        }))
+    }
+}
+
+pub type EndpointList = dnp3::entry::master::tcp::EndpointList;
+
+pub(crate) unsafe fn endpoint_list_new(main_endpoint: &CStr) -> *mut EndpointList {
+    Box::into_raw(Box::new(EndpointList::single(
+        main_endpoint.to_string_lossy().to_string(),
+    )))
+}
+
+pub(crate) unsafe fn endpoint_list_destroy(list: *mut EndpointList) {
+    Box::from_raw(list);
+}
+
+pub(crate) unsafe fn endpoint_list_add(list: *mut EndpointList, endpoint: &CStr) {
+    if let Some(list) = list.as_mut() {
+        list.add(endpoint.to_string_lossy().to_string());
+    }
+}
+
+impl ffi::MasterConfiguration {
+    fn into(self) -> Option<MasterConfiguration> {
+        let address = match EndpointAddress::from(self.address()) {
+            Ok(x) => x,
+            Err(err) => {
+                tracing::warn!(
+                    "special addresses may not be used for the master address: {}",
+                    err.address
+                );
+                return None;
+            }
+        };
+
+        let strategy = ReconnectStrategy::new(
+            RetryStrategy::new(
+                self.reconnection_strategy().min_delay(),
+                self.reconnection_strategy().max_delay(),
+            ),
+            if self.reconnection_delay() != Duration::from_millis(0) {
+                Some(self.reconnection_delay())
+            } else {
+                None
+            },
+        );
+
+        Some(MasterConfiguration {
+            address,
+            level: self.level().into(),
+            reconnection_strategy: strategy,
+            response_timeout: Timeout::from_duration(self.response_timeout()).unwrap(),
+            tx_buffer_size: self.tx_buffer_size() as usize,
+            rx_buffer_size: self.rx_buffer_size() as usize,
+        })
+    }
+}
+
+impl From<ffi::SerialPortSettings> for dnp3::entry::master::serial::SerialSettings {
+    fn from(from: ffi::SerialPortSettings) -> Self {
+        Self {
+            baud_rate: from.baud_rate(),
+            data_bits: match from.data_bits() {
+                ffi::DataBits::Five => DataBits::Five,
+                ffi::DataBits::Six => DataBits::Six,
+                ffi::DataBits::Seven => DataBits::Seven,
+                ffi::DataBits::Eight => DataBits::Eight,
+            },
+            flow_control: match from.flow_control() {
+                ffi::FlowControl::None => FlowControl::None,
+                ffi::FlowControl::Software => FlowControl::Software,
+                ffi::FlowControl::Hardware => FlowControl::Hardware,
+            },
+            parity: match from.parity() {
+                ffi::Parity::None => Parity::None,
+                ffi::Parity::Odd => Parity::Odd,
+                ffi::Parity::Even => Parity::Even,
+            },
+            stop_bits: match from.stop_bits() {
+                ffi::StopBits::One => StopBits::One,
+                ffi::StopBits::Two => StopBits::Two,
+            },
         }
     }
 }

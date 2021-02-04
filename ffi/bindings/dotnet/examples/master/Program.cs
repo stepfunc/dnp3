@@ -174,7 +174,8 @@ class MainClass
     private static async Task MainAsync(Runtime runtime)
     {
 
-        var master = runtime.AddMasterTcp(
+        var master = Master.CreateTcpSession(
+            runtime,
             LinkErrorMode.Close,
             new MasterConfiguration(1, DecodeLogLevel.ObjectValues, TimeSpan.FromSeconds(5))
             {

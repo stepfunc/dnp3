@@ -180,7 +180,8 @@ public class MasterExample {
         masterConfig.reconnectionStrategy.minDelay = Duration.ofMillis(100);
         masterConfig.reconnectionStrategy.maxDelay = Duration.ofSeconds(5);
 
-        Master master = runtime.addMasterTcp(
+        Master master = Master.createTcpSession(
+                runtime,
                 LinkErrorMode.CLOSE,
                 masterConfig,
                 new EndpointList("127.0.0.1:20000"),

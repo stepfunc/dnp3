@@ -1,6 +1,5 @@
 use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::iterator::IteratorHandle;
-use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::NativeStructHandle;
 use oo_bindgen::*;
@@ -9,7 +8,6 @@ use crate::shared::SharedDefinitions;
 
 pub fn define(
     lib: &mut LibraryBuilder,
-    variation_enum: NativeEnumHandle,
     shared_def: &SharedDefinitions,
 ) -> Result<InterfaceHandle, BindingError> {
     let response_function = lib
@@ -52,7 +50,7 @@ pub fn define(
         .define_native_struct(&header_info)?
         .add(
             "variation",
-            Type::Enum(variation_enum),
+            Type::Enum(shared_def.variation_enum.clone()),
             "Group/Variation used in the response",
         )?
         .add(

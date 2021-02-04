@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use class::{ClassDeclarationHandle, ClassHandle};
+use class::ClassHandle;
 use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
@@ -11,14 +11,13 @@ use crate::shared::SharedDefinitions;
 
 pub fn define(
     lib: &mut LibraryBuilder,
-    runtime: ClassDeclarationHandle,
-    decode_log_level_enum: NativeEnumHandle,
-    database: ClassHandle,
     shared_def: &SharedDefinitions,
 ) -> Result<(), BindingError> {
     // Everything required to create an outstation
-    let outstation = define_outstation(lib, decode_log_level_enum.clone(), &database)?;
-    let outstation_config = define_outstation_config(lib, decode_log_level_enum)?;
+
+    let database = crate::database::define(lib, shared_def)?;
+    let outstation = define_outstation(lib, shared_def.decode_log_level.clone(), &database)?;
+    let outstation_config = define_outstation_config(lib, shared_def.decode_log_level.clone())?;
     let event_buffer_config = define_event_buffer_config(lib)?;
     let outstation_application = define_outstation_application(lib)?;
     let outstation_information = define_outstation_information(lib, shared_def)?;
@@ -32,7 +31,7 @@ pub fn define(
         .declare_native_function("tcpserver_new")?
         .param(
             "runtime",
-            Type::ClassRef(runtime),
+            Type::ClassRef(shared_def.runtime_class.clone()),
             "Runtime to execute the server on",
         )?
         .param(

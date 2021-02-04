@@ -6,10 +6,10 @@ use crate::shared::SharedDefinitions;
 
 pub fn define(
     lib: &mut LibraryBuilder,
-    association_class: ClassDeclarationHandle,
-    request_class: ClassHandle,
     shared_def: &SharedDefinitions,
-) -> Result<(), BindingError> {
+) -> Result<ClassDeclarationHandle, BindingError> {
+    let association_class = lib.declare_class("Association")?;
+
     let destroy_fn = lib
         .declare_native_function("association_destroy")?
         .param(
@@ -58,6 +58,8 @@ pub fn define(
         .method("Demand", &poll_demand_fn)?
         .doc("Poll handle to demand executions of polls with {class:Poll.Demand()}.")?
         .build()?;
+
+    let request_class = crate::request::define(lib, &shared_def)?;
 
     let add_poll_fn = lib.declare_native_function("association_add_poll")?
         .param("association", Type::ClassRef(association_class.clone()), "Association to add the poll to")?
@@ -572,7 +574,8 @@ pub fn define(
         .doc("Asynchronously perform a link status check")?
         .build()?;
 
-    lib.define_class(&association_class)?
+    let association_class = lib
+        .define_class(&association_class)?
         .destructor(&destroy_fn)?
         .method("AddPoll", &add_poll_fn)?
         .async_method("Read", &read_fn)?
@@ -584,5 +587,5 @@ pub fn define(
         .doc("Master-outstation association to interact with")?
         .build()?;
 
-    Ok(())
+    Ok(association_class.declaration.clone())
 }
