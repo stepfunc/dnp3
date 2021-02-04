@@ -184,8 +184,7 @@ public class OutstationExample {
                 // outstation address
                 ushort(1024),
                 // master address
-                ushort(1)
-        );
+                ushort(1));
         // override the default decode log level
         config.logLevel = DecodeLogLevel.OBJECT_VALUES;
         // ANCHOR_END: outstation_config
@@ -206,14 +205,9 @@ public class OutstationExample {
 
         final TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
 
-        final Outstation outstation = server.addOutstation(
-                getOutstationConfig(),
-                EventBufferConfig.allTypes(ushort(10)),
-                new TestApplication(),
-                new TestOutstationInformation(),
-                new TestControlHandler(),
-                AddressFilter.any()
-        );
+        final Outstation outstation = server.addOutstation(getOutstationConfig(),
+                EventBufferConfig.allTypes(ushort(10)), new TestApplication(), new TestOutstationInformation(),
+                new TestControlHandler(), AddressFilter.any());
 
         // Setup initial points
         outstation.transaction((db) -> {
@@ -230,13 +224,22 @@ public class OutstationExample {
 
                 Flags restart = Flags.fromSingleFlag(Flag.RESTART);
 
-                db.updateBinary(new Binary(ushort(i), false, restart, Timestamp.invalidTimestamp()), new UpdateOptions());
-                db.updateDoubleBitBinary(new DoubleBitBinary(ushort(i), DoubleBit.INDETERMINATE, restart, Timestamp.invalidTimestamp()), new UpdateOptions());
-                db.updateBinaryOutputStatus(new BinaryOutputStatus(ushort(i), false, restart, Timestamp.invalidTimestamp()), new UpdateOptions());
-                db.updateCounter(new Counter(ushort(i), uint(0), restart, Timestamp.invalidTimestamp()), new UpdateOptions());
-                db.updateFrozenCounter(new FrozenCounter(ushort(i), uint(0), restart, Timestamp.invalidTimestamp()), new UpdateOptions());
+                db.updateBinary(new Binary(ushort(i), false, restart, Timestamp.invalidTimestamp()),
+                        new UpdateOptions());
+                db.updateDoubleBitBinary(
+                        new DoubleBitBinary(ushort(i), DoubleBit.INDETERMINATE, restart, Timestamp.invalidTimestamp()),
+                        new UpdateOptions());
+                db.updateBinaryOutputStatus(
+                        new BinaryOutputStatus(ushort(i), false, restart, Timestamp.invalidTimestamp()),
+                        new UpdateOptions());
+                db.updateCounter(new Counter(ushort(i), uint(0), restart, Timestamp.invalidTimestamp()),
+                        new UpdateOptions());
+                db.updateFrozenCounter(new FrozenCounter(ushort(i), uint(0), restart, Timestamp.invalidTimestamp()),
+                        new UpdateOptions());
                 db.updateAnalog(new Analog(ushort(i), 0.0, restart, Timestamp.invalidTimestamp()), new UpdateOptions());
-                db.updateAnalogOutputStatus(new AnalogOutputStatus(ushort(i), 0.0, restart, Timestamp.invalidTimestamp()), new UpdateOptions());
+                db.updateAnalogOutputStatus(
+                        new AnalogOutputStatus(ushort(i), 0.0, restart, Timestamp.invalidTimestamp()),
+                        new UpdateOptions());
             }
         });
 
@@ -258,90 +261,98 @@ public class OutstationExample {
             while (true) {
                 final String line = reader.readLine();
                 switch (line) {
-                    case "x":
-                        return;
-                    case "bi": {
-                        binaryValue = !binaryValue;
-                        final boolean pointValue = binaryValue;
-                        outstation.transaction((db) -> {
-                            Binary value = new Binary(ushort(7), pointValue, onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
-                            db.updateBinary(value, new UpdateOptions());
-                        });
-                        break;
-                    }
-                    case "dbbi": {
-                        doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DETERMINED_OFF ? DoubleBit.DETERMINED_ON : DoubleBit.DETERMINED_OFF;
-                        final DoubleBit pointValue = doubleBitBinaryValue;
-                        outstation.transaction((db) -> {
-                            DoubleBitBinary value = new DoubleBitBinary(ushort(7), pointValue, onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
-                            db.updateDoubleBitBinary(value, new UpdateOptions());
-                        });
-                        break;
-                    }
-                    case "bos": {
-                        binaryOutputStatusValue = !binaryOutputStatusValue;
-                        final boolean pointValue = binaryOutputStatusValue;
-                        outstation.transaction((db) -> {
-                            BinaryOutputStatus value = new BinaryOutputStatus(ushort(7), pointValue, onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
-                            db.updateBinaryOutputStatus(value, new UpdateOptions());
-                        });
-                        break;
-                    }
-                    case "co": {
-                        counterValue = ++counterValue;
-                        final long pointValue = counterValue;
-                        outstation.transaction((db) -> {
-                            Counter value = new Counter(ushort(7), uint(pointValue), onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
-                            db.updateCounter(value, new UpdateOptions());
-                        });
-                        break;
-                    }
-                    case "fco": {
-                        frozenCounterValue = ++frozenCounterValue;
-                        final long pointValue = frozenCounterValue;
-                        outstation.transaction((db) -> {
-                            FrozenCounter value = new FrozenCounter(ushort(7), uint(pointValue), onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
-                            db.updateFrozenCounter(value, new UpdateOptions());
-                        });
-                        break;
-                    }
-                    case "ai": {
-                        analogValue = ++analogValue;
-                        final double pointValue = analogValue;
-                        outstation.transaction((db) -> {
-                            Analog value = new Analog(ushort(7), pointValue, onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
-                            db.updateAnalog(value, new UpdateOptions());
-                        });
-                        break;
-                    }
-                    case "aos": {
-                        analogOutputStatusValue = ++analogOutputStatusValue;
-                        final double pointValue = analogOutputStatusValue;
-                        outstation.transaction((db) -> {
-                            AnalogOutputStatus value = new AnalogOutputStatus(ushort(7), pointValue, onlineFlags, Timestamp.synchronizedTimestamp(ulong(0)));
-                            db.updateAnalogOutputStatus(value, new UpdateOptions());
-                        });
-                        break;
-                    }
-                    case "os": {
-                        outstation.transaction((db) -> {
-                            // Some Friday poetry:
-                            // Arrays.asList requires an array of Object,
-                            // Arrays.stream does not overload for byte[], how abject.
-                            // Java is poop
-                            // So excuse me for that for loop
-                            List<UByte> octetString = new ArrayList<>();
-                            for (byte octet : "Hello".getBytes(StandardCharsets.US_ASCII)) {
-                                octetString.add(ubyte(octet));
-                            }
+                case "x":
+                    return;
+                case "bi": {
+                    binaryValue = !binaryValue;
+                    final boolean pointValue = binaryValue;
+                    outstation.transaction((db) -> {
+                        Binary value = new Binary(ushort(7), pointValue, onlineFlags,
+                                Timestamp.synchronizedTimestamp(ulong(0)));
+                        db.updateBinary(value, new UpdateOptions());
+                    });
+                    break;
+                }
+                case "dbbi": {
+                    doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DETERMINED_OFF ? DoubleBit.DETERMINED_ON
+                            : DoubleBit.DETERMINED_OFF;
+                    final DoubleBit pointValue = doubleBitBinaryValue;
+                    outstation.transaction((db) -> {
+                        DoubleBitBinary value = new DoubleBitBinary(ushort(7), pointValue, onlineFlags,
+                                Timestamp.synchronizedTimestamp(ulong(0)));
+                        db.updateDoubleBitBinary(value, new UpdateOptions());
+                    });
+                    break;
+                }
+                case "bos": {
+                    binaryOutputStatusValue = !binaryOutputStatusValue;
+                    final boolean pointValue = binaryOutputStatusValue;
+                    outstation.transaction((db) -> {
+                        BinaryOutputStatus value = new BinaryOutputStatus(ushort(7), pointValue, onlineFlags,
+                                Timestamp.synchronizedTimestamp(ulong(0)));
+                        db.updateBinaryOutputStatus(value, new UpdateOptions());
+                    });
+                    break;
+                }
+                case "co": {
+                    counterValue = ++counterValue;
+                    final long pointValue = counterValue;
+                    outstation.transaction((db) -> {
+                        Counter value = new Counter(ushort(7), uint(pointValue), onlineFlags,
+                                Timestamp.synchronizedTimestamp(ulong(0)));
+                        db.updateCounter(value, new UpdateOptions());
+                    });
+                    break;
+                }
+                case "fco": {
+                    frozenCounterValue = ++frozenCounterValue;
+                    final long pointValue = frozenCounterValue;
+                    outstation.transaction((db) -> {
+                        FrozenCounter value = new FrozenCounter(ushort(7), uint(pointValue), onlineFlags,
+                                Timestamp.synchronizedTimestamp(ulong(0)));
+                        db.updateFrozenCounter(value, new UpdateOptions());
+                    });
+                    break;
+                }
+                case "ai": {
+                    analogValue = ++analogValue;
+                    final double pointValue = analogValue;
+                    outstation.transaction((db) -> {
+                        Analog value = new Analog(ushort(7), pointValue, onlineFlags,
+                                Timestamp.synchronizedTimestamp(ulong(0)));
+                        db.updateAnalog(value, new UpdateOptions());
+                    });
+                    break;
+                }
+                case "aos": {
+                    analogOutputStatusValue = ++analogOutputStatusValue;
+                    final double pointValue = analogOutputStatusValue;
+                    outstation.transaction((db) -> {
+                        AnalogOutputStatus value = new AnalogOutputStatus(ushort(7), pointValue, onlineFlags,
+                                Timestamp.synchronizedTimestamp(ulong(0)));
+                        db.updateAnalogOutputStatus(value, new UpdateOptions());
+                    });
+                    break;
+                }
+                case "os": {
+                    outstation.transaction((db) -> {
+                        // Some Friday poetry:
+                        // Arrays.asList requires an array of Object,
+                        // Arrays.stream does not overload for byte[], how abject.
+                        // Java is poop
+                        // So excuse me for that for loop
+                        List<UByte> octetString = new ArrayList<>();
+                        for (byte octet : "Hello".getBytes(StandardCharsets.US_ASCII)) {
+                            octetString.add(ubyte(octet));
+                        }
 
-                            db.updateOctetString(ushort(7), octetString, new UpdateOptions());
-                        });
-                        break;
-                    }
-                    default:
-                        System.out.println("Unknown command");
-                        break;
+                        db.updateOctetString(ushort(7), octetString, new UpdateOptions());
+                    });
+                    break;
+                }
+                default:
+                    System.out.println("Unknown command");
+                    break;
                 }
             }
         } catch (Exception ex) {
