@@ -208,45 +208,14 @@ public class OutstationExample {
             // Setup initial points
             outstation.transaction((db) -> {
                 for(int i = 0; i < 10; i++) {
-                    BinaryConfig binaryConfig = new BinaryConfig();
-                    binaryConfig.staticVariation = StaticBinaryVariation.GROUP1_VAR2;
-                    binaryConfig.eventVariation = EventBinaryVariation.GROUP2_VAR2;
-                    db.addBinary(ushort(i), EventClass.CLASS1, binaryConfig);
 
-                    DoubleBitBinaryConfig doubleBitBinaryConfig = new DoubleBitBinaryConfig();
-                    doubleBitBinaryConfig.staticVariation = StaticDoubleBitBinaryVariation.GROUP3_VAR2;
-                    doubleBitBinaryConfig.eventVariation = EventDoubleBitBinaryVariation.GROUP4_VAR2;
-                    db.addDoubleBitBinary(ushort(i), EventClass.CLASS1, doubleBitBinaryConfig);
-
-                    BinaryOutputStatusConfig binaryOutputStatusConfig = new BinaryOutputStatusConfig();
-                    binaryOutputStatusConfig.staticVariation = StaticBinaryOutputStatusVariation.GROUP10_VAR2;
-                    binaryOutputStatusConfig.eventVariation = EventBinaryOutputStatusVariation.GROUP11_VAR2;
-                    db.addBinaryOutputStatus(ushort(i), EventClass.CLASS1, binaryOutputStatusConfig);
-
-                    CounterConfig counterConfig = new CounterConfig();
-                    counterConfig.staticVariation = StaticCounterVariation.GROUP20_VAR1;
-                    counterConfig.eventVariation = EventCounterVariation.GROUP22_VAR1;
-                    counterConfig.deadband = uint(0);
-                    db.addCounter(ushort(i), EventClass.CLASS1, counterConfig);
-
-                    FrozenCounterConfig frozenCounterConfig = new FrozenCounterConfig();
-                    frozenCounterConfig.staticVariation = StaticFrozenCounterVariation.GROUP21_VAR5;
-                    frozenCounterConfig.eventVariation = EventFrozenCounterVariation.GROUP23_VAR5;
-                    frozenCounterConfig.deadband = uint(0);
-                    db.addFrozenCounter(ushort(i), EventClass.CLASS1, frozenCounterConfig);
-
-                    AnalogConfig analogConfig = new AnalogConfig();
-                    analogConfig.staticVariation = StaticAnalogVariation.GROUP30_VAR6;
-                    analogConfig.eventVariation = EventAnalogVariation.GROUP32_VAR8;
-                    analogConfig.deadband = 0.0;
-                    db.addAnalog(ushort(i), EventClass.CLASS1, analogConfig);
-
-                    AnalogOutputStatusConfig analogOutputStatusConfig = new AnalogOutputStatusConfig();
-                    analogOutputStatusConfig.staticVariation = StaticAnalogOutputStatusVariation.GROUP40_VAR4;
-                    analogOutputStatusConfig.eventVariation = EventAnalogOutputStatusVariation.GROUP42_VAR8;
-                    analogOutputStatusConfig.deadband = 0.0;
-                    db.addAnalogOutputStatus(ushort(i), EventClass.CLASS1, analogOutputStatusConfig);
-
+                    db.addBinary(ushort(i), EventClass.CLASS1, new BinaryConfig());
+                    db.addDoubleBitBinary(ushort(i), EventClass.CLASS1, new DoubleBitBinaryConfig());
+                    db.addBinaryOutputStatus(ushort(i), EventClass.CLASS1, new BinaryOutputStatusConfig());
+                    db.addCounter(ushort(i), EventClass.CLASS1, new CounterConfig());
+                    db.addFrozenCounter(ushort(i), EventClass.CLASS1, new FrozenCounterConfig());
+                    db.addAnalog(ushort(i), EventClass.CLASS1, new AnalogConfig());
+                    db.addAnalogOutputStatus(ushort(i), EventClass.CLASS1, new AnalogOutputStatusConfig());
                     db.addOctetString(ushort(i), EventClass.CLASS1);
 
                     Flags flags = new Flags(ubyte(0x00)).set(Flag.RESTART, true);
