@@ -124,55 +124,23 @@ class ExampleOutstation
                 {
                     for(ushort i = 0; i < 10; i++)
                     {
-                        db.AddBinary(i, EventClass.Class1, new BinaryConfig
-                        {
-                            StaticVariation = StaticBinaryVariation.Group1Var2,
-                            EventVariation = EventBinaryVariation.Group2Var2,
-                        });
-                        db.AddDoubleBitBinary(i, EventClass.Class1, new DoubleBitBinaryConfig
-                        {
-                            StaticVariation = StaticDoubleBitBinaryVariation.Group3Var2,
-                            EventVariation = EventDoubleBitBinaryVariation.Group4Var2,
-                        });
-                        db.AddBinaryOutputStatus(i, EventClass.Class1, new BinaryOutputStatusConfig
-                        {
-                            StaticVariation = StaticBinaryOutputStatusVariation.Group10Var2,
-                            EventVariation = EventBinaryOutputStatusVariation.Group11Var2,
-                        });
-                        db.AddCounter(i, EventClass.Class1, new CounterConfig
-                        {
-                            StaticVariation = StaticCounterVariation.Group20Var1,
-                            EventVariation = EventCounterVariation.Group22Var1,
-                            Deadband = 0,
-                        });
-                        db.AddFrozenCounter(i, EventClass.Class1, new FrozenCounterConfig
-                        {
-                            StaticVariation = StaticFrozenCounterVariation.Group21Var5,
-                            EventVariation = EventFrozenCounterVariation.Group23Var5,
-                            Deadband = 0,
-                        });
-                        db.AddAnalog(i, EventClass.Class1, new AnalogConfig
-                        {
-                            StaticVariation = StaticAnalogVariation.Group30Var6,
-                            EventVariation = EventAnalogVariation.Group32Var8,
-                            Deadband = 0.0,
-                        });
-                        db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig
-                        {
-                            StaticVariation = StaticAnalogOutputStatusVariation.Group40Var4,
-                            EventVariation = EventAnalogOutputStatusVariation.Group42Var8,
-                            Deadband = 0.0,
-                        });
+                        db.AddBinary(i, EventClass.Class1, new BinaryConfig());
+                        db.AddDoubleBitBinary(i, EventClass.Class1, new DoubleBitBinaryConfig());
+                        db.AddBinaryOutputStatus(i, EventClass.Class1, new BinaryOutputStatusConfig());
+                        db.AddCounter(i, EventClass.Class1, new CounterConfig());
+                        db.AddFrozenCounter(i, EventClass.Class1, new FrozenCounterConfig());
+                        db.AddAnalog(i, EventClass.Class1, new AnalogConfig());
+                        db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig());
                         db.AddOctetString(i, EventClass.Class1);
 
-                        var flags = new Flags(0x00).Set(Flag.Restart, true);
-                        db.UpdateBinary(new Binary(i, false, flags, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateDoubleBitBinary(new DoubleBitBinary(i, DoubleBit.Indeterminate, flags, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateBinaryOutputStatus(new BinaryOutputStatus(i, false, flags, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateCounter(new Counter(i, 0, flags, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateFrozenCounter(new FrozenCounter(i, 0, flags, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateAnalog(new Analog(i, 0.0, flags, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateAnalogOutputStatus(new AnalogOutputStatus(i, 0.0, flags, Timestamp.InvalidTimestamp()), new UpdateOptions());
+                        var restart = new Flags(0x00).Set(Flag.Restart, true);
+                        db.UpdateBinary(new Binary(i, false, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
+                        db.UpdateDoubleBitBinary(new DoubleBitBinary(i, DoubleBit.Indeterminate, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
+                        db.UpdateBinaryOutputStatus(new BinaryOutputStatus(i, false, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
+                        db.UpdateCounter(new Counter(i, 0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
+                        db.UpdateFrozenCounter(new FrozenCounter(i, 0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
+                        db.UpdateAnalog(new Analog(i, 0.0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
+                        db.UpdateAnalogOutputStatus(new AnalogOutputStatus(i, 0.0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
                     }
                 }));
 

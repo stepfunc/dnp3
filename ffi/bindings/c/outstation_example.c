@@ -152,61 +152,15 @@ command_status_t operate_g41v4(double control, uint16_t index, operate_type_t op
 void outstation_transaction_startup(database_t* db, void* context)
 {
     for(uint16_t i = 0; i < 10; ++i)
-    {
-        // Create the points
-        binary_config_t binary_config =
-        {
-            .static_variation = StaticBinaryVariation_Group1Var2,
-            .event_variation = EventBinaryVariation_Group2Var2,
-        };
-        database_add_binary(db, i, EventClass_Class1, binary_config);
-
-        double_bit_binary_config_t double_bit_binary_config =
-        {
-            .static_variation = StaticDoubleBitBinaryVariation_Group3Var2,
-            .event_variation = EventDoubleBitBinaryVariation_Group4Var2,
-        };
-        database_add_double_bit_binary(db, i, EventClass_Class1, double_bit_binary_config);
-
-        binary_output_status_config_t binary_output_status_config =
-        {
-            .static_variation = StaticBinaryOutputStatusVariation_Group10Var2,
-            .event_variation = EventBinaryOutputStatusVariation_Group11Var2,
-        };
-        database_add_binary_output_status(db, i, EventClass_Class1, binary_output_status_config);
-
-        counter_config_t counter_config =
-        {
-            .static_variation = StaticCounterVariation_Group20Var1,
-            .event_variation = EventCounterVariation_Group22Var1,
-            .deadband = 0,
-        };
-        database_add_counter(db, i, EventClass_Class1, counter_config);
-
-        frozen_counter_config_t frozen_counter_config =
-        {
-            .static_variation = StaticFrozenCounterVariation_Group21Var5,
-            .event_variation = EventFrozenCounterVariation_Group23Var5,
-            .deadband = 0,
-        };
-        database_add_frozen_counter(db, i, EventClass_Class1, frozen_counter_config);
-
-        analog_config_t analog_config =
-        {
-            .static_variation = StaticAnalogVariation_Group30Var6,
-            .event_variation = EventAnalogVariation_Group32Var8,
-            .deadband = 0.0,
-        };
-        database_add_analog(db, i, EventClass_Class1, analog_config);
-
-        analog_output_status_config_t analog_output_status_config =
-        {
-            .static_variation = StaticAnalogOutputStatusVariation_Group40Var4,
-            .event_variation = EventAnalogOutputStatusVariation_Group42Var8,
-            .deadband = 0.0,
-        };
-        database_add_analog_output_status(db, i, EventClass_Class1, analog_output_status_config);
-
+    {       
+        // initialize each point with default configuration
+        database_add_binary(db, i, EventClass_Class1, binary_config_init());        
+        database_add_double_bit_binary(db, i, EventClass_Class1, double_bit_binary_config_init());        
+        database_add_binary_output_status(db, i, EventClass_Class1, binary_output_status_config_init());        
+        database_add_counter(db, i, EventClass_Class1, counter_config_init());        
+        database_add_frozen_counter(db, i, EventClass_Class1, frozen_counter_config_init());       
+        database_add_analog(db, i, EventClass_Class1, analog_config_init());       
+        database_add_analog_output_status(db, i, EventClass_Class1, analog_output_status_config_init());
         database_add_octet_string(db, i, EventClass_Class1);
 
         // Set initial values
