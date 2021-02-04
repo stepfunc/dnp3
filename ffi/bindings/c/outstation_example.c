@@ -164,13 +164,12 @@ void outstation_transaction_startup(database_t* db, void* context)
         database_add_octet_string(db, i, EventClass_Class1);
 
         // Set initial values
-        flags_t flags = flags_init(0x00);
-        flags = flags_set(&flags, Flag_Restart, true);
+        flags_t restart = flags_from_single_flag(Flag_Restart);        
 
         binary_t binary_value = binary_init(
             i,
             false,
-            flags,
+            restart,
             timestamp_invalid()
         );
         database_update_binary(db, binary_value, update_options_init());
@@ -178,7 +177,7 @@ void outstation_transaction_startup(database_t* db, void* context)
         double_bit_binary_t double_bit_binary_value = double_bit_binary_init(
             i,
             DoubleBit_DeterminedOff,
-            flags,
+            restart,
             timestamp_invalid()
         );
         database_update_double_bit_binary(db, double_bit_binary_value, update_options_init());
@@ -186,7 +185,7 @@ void outstation_transaction_startup(database_t* db, void* context)
         binary_output_status_t binary_output_status_value = binary_output_status_init(
             i,
             false,
-            flags,
+            restart,
             timestamp_invalid()
         );
         database_update_binary_output_status(db, binary_output_status_value, update_options_init());
@@ -194,7 +193,7 @@ void outstation_transaction_startup(database_t* db, void* context)
         counter_t counter_value = counter_init(
             i,
             0,
-            flags,
+            restart,
             timestamp_invalid()
         );
         database_update_counter(db, counter_value, update_options_init());
@@ -202,7 +201,7 @@ void outstation_transaction_startup(database_t* db, void* context)
         frozen_counter_t frozen_counter_value = frozen_counter_init(
             i,
             0,
-            flags,
+            restart,
             timestamp_invalid()
         );
         database_update_frozen_counter(db, frozen_counter_value, update_options_init());
@@ -210,7 +209,7 @@ void outstation_transaction_startup(database_t* db, void* context)
         analog_t analog_value = analog_init(
             i,
             0.0,
-            flags,
+            restart,
             timestamp_invalid()
         );
         database_update_analog(db, analog_value, update_options_init());
@@ -218,7 +217,7 @@ void outstation_transaction_startup(database_t* db, void* context)
         analog_output_status_t analog_output_status_value = analog_output_status_init(
             i,
             0.0,
-            flags,
+            restart,
             timestamp_invalid()
         );
         database_update_analog_output_status(db, analog_output_status_value, update_options_init());
@@ -237,9 +236,8 @@ typedef struct database_points_t
 } database_points_t;
 
 flags_t online_flag()
-{
-    flags_t result = flags_init(0x00);
-    return flags_set(&result, Flag_Online, true);
+{    
+    return flags_from_single_flag(Flag_Online);
 }
 
 void binary_transaction(database_t* db, void* context)
