@@ -171,20 +171,28 @@ class MainClass
         }
     }
 
+    private static MasterConfiguration GetMasterConfig()
+    {
+        // create a default configuration with a master address of "1"
+        return new MasterConfiguration(1)
+        {
+            // override the decode level and reconnect strategy
+            Level = DecodeLogLevel.ObjectValues,
+            ReconnectionStrategy = new RetryStrategy
+            {
+                MinDelay = TimeSpan.FromMilliseconds(100),
+                MaxDelay = TimeSpan.FromSeconds(5),
+            }
+        };
+    }
+
     private static async Task MainAsync(Runtime runtime)
     {
 
         var master = Master.CreateTcpSession(
             runtime,
             LinkErrorMode.Close,
-            new MasterConfiguration(1, DecodeLogLevel.ObjectValues, TimeSpan.FromSeconds(5))
-            {
-                ReconnectionStrategy = new RetryStrategy
-                {
-                    MinDelay = TimeSpan.FromMilliseconds(100),
-                    MaxDelay = TimeSpan.FromSeconds(5),
-                },
-            },
+            GetMasterConfig(),
             new EndpointList("127.0.0.1:20000"),
             new TestListener()
         );

@@ -273,12 +273,12 @@ fn define_master_config(
     let master_config = lib.declare_native_struct("MasterConfiguration")?;
     lib.define_native_struct(&master_config)?
         .add("address", Type::Uint16, "Local DNP3 data-link address")?
-        .add("level", Type::Enum(shared.decode_log_level.clone()), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
+        .add("level", StructElementType::Enum(shared.decode_log_level.clone(), Some("Nothing".to_string())), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
         .add("reconnection_strategy", Type::Struct(shared.retry_strategy.clone()), "Reconnection retry strategy to use")?
         .add("reconnection_delay", StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_millis(0))), doc("Optional reconnection delay when a connection is lost.").details("A value of 0 means no delay."))?
         .add(
             "response_timeout",
-            Type::Duration(DurationMapping::Milliseconds),
+            StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(5))),
             "Timeout for receiving a response"
         )?
         .add("tx_buffer_size", StructElementType::Uint16(Some(2048)), doc("TX buffer size").details("Should be at least 249"))?

@@ -186,8 +186,7 @@ public class MasterExample {
 
   private static void run(Runtime runtime) throws Exception {
     // Create the master
-    MasterConfiguration masterConfig =
-        new MasterConfiguration(ushort(1), DecodeLogLevel.OBJECT_VALUES, Duration.ofSeconds(5));
+    MasterConfiguration masterConfig = new MasterConfiguration(ushort(1));
     masterConfig.address = ushort(1);
     masterConfig.level = DecodeLogLevel.OBJECT_VALUES;
     masterConfig.reconnectionStrategy.minDelay = Duration.ofMillis(100);

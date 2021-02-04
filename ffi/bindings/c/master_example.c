@@ -264,9 +264,10 @@ int main()
     // ANCHOR_END: runtime_init
 
     // Create the master
-    master_configuration_t master_config = master_configuration_init(1, DecodeLogLevel_ObjectValues, 5000);
+    master_configuration_t master_config = master_configuration_init(1);
     master_config.reconnection_strategy.min_delay = 100;
     master_config.reconnection_strategy.max_delay = 5000;
+    master_config.level = DecodeLogLevel_ObjectValues;
 
     endpoint_list_t* endpoints = endpoint_list_new("127.0.0.1:20000");
     client_state_listener_t listener =
