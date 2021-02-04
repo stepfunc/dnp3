@@ -2,15 +2,12 @@ use std::time::Duration;
 
 use crate::shared::SharedDefinitions;
 use oo_bindgen::callback::InterfaceHandle;
-use oo_bindgen::class::{ClassDeclarationHandle, ClassHandle};
+use oo_bindgen::class::ClassHandle;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
 
-pub fn define(
-    lib: &mut LibraryBuilder,
-    shared: &SharedDefinitions,
-) -> Result<ClassDeclarationHandle, BindingError> {
+pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<(), BindingError> {
     let read_handler = crate::handler::define(lib, shared)?;
 
     let endpoint_list = define_endpoint_list(lib)?;
@@ -42,7 +39,7 @@ pub fn define(
         .param("path", Type::String, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
         .param("serial_params", Type::Struct(shared.serial_port_settings.clone()), "Serial port settings")?
         .param("listener", Type::Interface(tcp_client_state_listener), "Client connection listener to receive updates on the status of the connection")?
-        .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occured"))?
+        .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occurred"))?
         .doc(
             doc("Create a master session on the specified serial port")
                 .details("The returned master must be gracefully shutdown with {class:Master.[destructor]} when done.")
@@ -63,8 +60,8 @@ pub fn define(
         )?
         .build()?;
 
-    // Association creation
-    let association_class = lib.declare_class("Association")?;
+    // define the association
+    let association_class = crate::association::define(lib, shared)?;
 
     let event_classes = lib.declare_native_struct("EventClasses")?;
     let event_classes = lib
@@ -79,14 +76,14 @@ pub fn define(
 
     let auto_time_sync_enum = lib
         .define_native_enum("AutoTimeSync")?
-        .push("None", "Do not perform automatic timesync")?
+        .push("None", "Do not perform automatic time sync")?
         .push(
             "LAN",
-            "Perform automatic timesync with Record Current Time (0x18) function code",
+            "Perform automatic time sync with Record Current Time (0x18) function code",
         )?
         .push(
             "NonLAN",
-            "Perform automatic timesync with Delay Measurement (0x17) function code",
+            "Perform automatic time sync with Delay Measurement (0x17) function code",
         )?
         .doc("Automatic time synchronization configuration")?
         .build()?;
@@ -176,7 +173,7 @@ pub fn define(
             "Time provider for the association",
         )?
         .return_type(ReturnType::new(
-            Type::ClassRef(association_class.clone()),
+            Type::ClassRef(association_class),
             "Handle to the created association or NULL if an error occurred",
         ))?
         .doc("Add an association to the master")?
@@ -229,7 +226,7 @@ pub fn define(
         )?
         .build()?;
 
-    Ok(association_class)
+    Ok(())
 }
 
 fn define_tcp_client_state_listener(
