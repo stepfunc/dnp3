@@ -1,5 +1,5 @@
 use crate::app::EndpointType;
-use crate::entry::EndpointAddress;
+use crate::config::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::format::{format_link_status_request, format_unconfirmed_user_data, Payload};
 use crate::link::header::AnyAddress;

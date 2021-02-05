@@ -9,7 +9,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::types::LinkStatusResult;
-use crate::entry::EndpointAddress;
+use crate::config::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::handle::Promise;

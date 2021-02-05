@@ -16,8 +16,8 @@ pub fn define(
     // Everything required to create an outstation
 
     let database = crate::database::define(lib, shared_def)?;
-    let outstation = define_outstation(lib, shared_def.decode_log_level.clone(), &database)?;
-    let outstation_config = define_outstation_config(lib, shared_def.decode_log_level.clone())?;
+    let outstation = define_outstation(lib, shared_def, &database)?;
+    let outstation_config = define_outstation_config(lib, shared_def)?;
     let event_buffer_config = define_event_buffer_config(lib)?;
     let outstation_application = define_outstation_application(lib)?;
     let outstation_information = define_outstation_information(lib, shared_def)?;
@@ -92,7 +92,7 @@ pub fn define(
 
 fn define_outstation(
     lib: &mut LibraryBuilder,
-    decode_log_level_enum: NativeEnumHandle,
+    shared_def: &SharedDefinitions,
     database: &ClassHandle,
 ) -> Result<ClassHandle, BindingError> {
     let transaction_interface = lib
@@ -134,17 +134,17 @@ fn define_outstation(
         .doc("Execute transaction to modify the internal database of the outstation")?
         .build()?;
 
-    let outstation_set_decode_log_level_fn = lib
-        .declare_native_function("outstation_set_decode_log_level")?
+    let outstation_set_decode_level_fn = lib
+        .declare_native_function("outstation_set_decode_level")?
         .param(
             "outstation",
             Type::ClassRef(outstation.clone()),
-            "Outstation",
+            "{class:Outstation} on which to set the decoding level",
         )?
         .param(
             "level",
-            Type::Enum(decode_log_level_enum),
-            "Decode log level",
+            Type::Struct(shared_def.decode_level.clone()),
+            "Decode log",
         )?
         .return_type(ReturnType::void())?
         .doc("Set decoding log level")?
@@ -153,14 +153,14 @@ fn define_outstation(
     lib.define_class(&outstation)?
         .destructor(&outstation_destroy_fn)?
         .method("transaction", &outstation_transaction_fn)?
-        .method("set_decode_log_level", &outstation_set_decode_log_level_fn)?
+        .method("set_decode_level", &outstation_set_decode_level_fn)?
         .doc(doc("Outstation handle").details("Use this handle to modify the internal database."))?
         .build()
 }
 
 fn define_outstation_config(
     lib: &mut LibraryBuilder,
-    decode_log_level_enum: NativeEnumHandle,
+    shared: &SharedDefinitions,
 ) -> Result<NativeStructHandle, BindingError> {
     let class_zero_config = lib.declare_native_struct("ClassZeroConfig")?;
     let class_zero_config = lib
@@ -255,9 +255,9 @@ fn define_outstation_config(
             doc("Receive buffer size").details("Must be at least 249 bytes"),
         )?
         .add(
-            "log_level",
-            StructElementType::Enum(decode_log_level_enum, Some("Nothing".to_string())),
-            "Decoding log level",
+            "decode_level",
+            StructElementType::Struct(shared.decode_level.clone()),
+            "Decoding level",
         )?
         .add(
             "confirm_timeout",

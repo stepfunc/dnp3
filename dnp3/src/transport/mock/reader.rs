@@ -1,5 +1,5 @@
+use crate::config::EndpointAddress;
 use crate::config::LinkErrorMode;
-use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
 use crate::outstation::config::Feature;

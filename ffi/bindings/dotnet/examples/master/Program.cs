@@ -174,16 +174,19 @@ class MainClass
     private static MasterConfiguration GetMasterConfig()
     {
         // create a default configuration with a master address of "1"
-        return new MasterConfiguration(1)
+        var config = new MasterConfiguration(1)
         {
-            // override the decode level and reconnect strategy
-            Level = DecodeLogLevel.ObjectValues,
+            // override the reconnect strategy            
             ReconnectionStrategy = new RetryStrategy
             {
                 MinDelay = TimeSpan.FromMilliseconds(100),
                 MaxDelay = TimeSpan.FromSeconds(5),
             }
         };
+        
+        config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
+
+        return config;
     }
 
     private static async Task MainAsync(Runtime runtime)
@@ -225,12 +228,12 @@ class MainClass
                     return;
                 case "dln":
                     {
-                        master.SetDecodeLogLevel(DecodeLogLevel.Nothing);
+                        master.SetDecodeLevel(new DecodeLevel());
                         break;
                     }
                 case "dlv":
-                    {
-                        master.SetDecodeLogLevel(DecodeLogLevel.ObjectValues);
+                    {                        
+                        master.SetDecodeLevel(new DecodeLevel() { Application = AppDecodeLevel.ObjectValues });
                         break;
                     }
                 case "rao":

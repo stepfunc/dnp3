@@ -360,7 +360,7 @@ mod tests {
     mod non_lan {
 
         use super::*;
-        use crate::entry::EndpointAddress;
+        use crate::config::EndpointAddress;
 
         const OUTSTATION_DELAY_MS: u16 = 100;
         const TOTAL_DELAY_MS: u16 = 200;
@@ -735,7 +735,7 @@ mod tests {
 
     mod lan {
         use super::*;
-        use crate::entry::EndpointAddress;
+        use crate::config::EndpointAddress;
 
         const DELAY_MS: u16 = 200;
 

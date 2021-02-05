@@ -1,5 +1,5 @@
 use crate::app::EndpointType;
-use crate::entry::EndpointAddress;
+use crate::config::EndpointAddress;
 use crate::master::session::MasterSession;
 
 #[cfg(test)]

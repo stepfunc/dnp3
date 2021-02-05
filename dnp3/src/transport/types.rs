@@ -1,5 +1,5 @@
 use crate::app::parse::parser::{Request, Response};
-use crate::entry::EndpointAddress;
+use crate::config::EndpointAddress;
 use crate::link::header::BroadcastConfirmMode;
 
 #[derive(Debug, Copy, Clone)]

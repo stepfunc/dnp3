@@ -1,6 +1,6 @@
 use crate::app::EndpointType;
+use crate::config::EndpointAddress;
 use crate::config::LinkErrorMode;
-use crate::entry::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;

@@ -1,4 +1,3 @@
-use crate::app::parse::DecodeLogLevel;
 use crate::outstation::config::*;
 use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
 use crate::outstation::session::{OutstationSession, SessionError};
@@ -7,11 +6,11 @@ use crate::transport::{TransportReader, TransportWriter};
 use crate::util::io::IOStream;
 use crate::util::task::{Receiver, RunError, Shutdown};
 
-use crate::config::LinkErrorMode;
+use crate::config::{DecodeLevel, LinkErrorMode};
 use tracing::Instrument;
 
 pub(crate) enum ConfigurationChange {
-    SetDecodeLogLevel(DecodeLogLevel),
+    SetDecodeLevel(DecodeLevel),
 }
 
 impl From<ConfigurationChange> for OutstationMessage {
@@ -63,9 +62,9 @@ pub struct OutstationHandle {
 }
 
 impl OutstationHandle {
-    pub async fn set_decode_log_level(&mut self, level: DecodeLogLevel) -> Result<(), Shutdown> {
+    pub async fn set_decode_level(&mut self, decode_level: DecodeLevel) -> Result<(), Shutdown> {
         self.sender
-            .send(ConfigurationChange::SetDecodeLogLevel(level).into())
+            .send(ConfigurationChange::SetDecodeLevel(decode_level).into())
             .await?;
         Ok(())
     }

@@ -1,5 +1,5 @@
-use crate::app::parse::DecodeLogLevel;
-use crate::entry::EndpointAddress;
+use crate::config::DecodeLevel;
+use crate::config::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::PollError;
 use crate::master::error::{AssociationError, TaskError};
@@ -22,9 +22,9 @@ pub(crate) enum MasterMsg {
     /// Remove an association from the master
     RemoveAssociation(EndpointAddress),
     /// Set the decoding level
-    SetDecodeLogLevel(DecodeLogLevel),
+    SetDecodeLevel(DecodeLevel),
     /// Get the decoding level
-    GetDecodeLogLevel(Promise<Result<DecodeLogLevel, Shutdown>>),
+    GetDecodeLevel(Promise<Result<DecodeLevel, Shutdown>>),
 }
 
 pub(crate) struct AssociationMsg {

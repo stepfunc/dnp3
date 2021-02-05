@@ -1,5 +1,5 @@
 use super::function::Function;
-use crate::entry::EndpointAddress;
+use crate::config::EndpointAddress;
 
 pub(crate) mod constants {
     pub(crate) const MASK_DIR: u8 = 0x80;

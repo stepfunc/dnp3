@@ -179,32 +179,32 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .doc("Add an association to the master")?
         .build()?;
 
-    let set_decode_log_level_fn = lib
-        .declare_native_function("master_set_decode_log_level")?
+    let set_decode_level_fn = lib
+        .declare_native_function("master_set_decode_level")?
         .param(
             "master",
             Type::ClassRef(master_class.clone()),
             "Master to modify",
         )?
         .param(
-            "level",
-            Type::Enum(shared.decode_log_level.clone()),
-            "Decode log level",
+            "decode_level",
+            Type::Struct(shared.decode_level.clone()),
+            "Decoding level",
         )?
         .return_type(ReturnType::void())?
         .doc("Set the master decoding level for log messages")?
         .build()?;
 
-    let get_decode_log_level_fn = lib
-        .declare_native_function("master_get_decode_log_level")?
+    let get_decode_level_fn = lib
+        .declare_native_function("master_get_decode_level")?
         .param(
             "master",
             Type::ClassRef(master_class.clone()),
-            "Master to modify",
+            "{class:Master} to get the decode level from",
         )?
         .return_type(ReturnType::new(
-            Type::Enum(shared.decode_log_level.clone()),
-            "Decode log level",
+            Type::Struct(shared.decode_level.clone()),
+            "Decode level",
         ))?
         .doc(
             doc("Get the master decoding level for log messages")
@@ -217,8 +217,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .static_method("CreateTCPSession", &master_create_tcp_session_fn)?
         .static_method("CreateSerialSession", &master_create_serial_session_fn)?
         .method("AddAssociation", &add_association_fn)?
-        .method("SetDecodeLogLevel", &set_decode_log_level_fn)?
-        .method("GetDecodeLogLevel", &get_decode_log_level_fn)?
+        .method("SetDecodeLevel", &set_decode_level_fn)?
+        .method("GetDecodeLevel", &get_decode_level_fn)?
         .doc(
             doc("Master channel of communication")
             .details("To communicate with a particular outstation, you need to add an association with {class:Master.AddAssociation()}.")
@@ -273,7 +273,7 @@ fn define_master_config(
     let master_config = lib.declare_native_struct("MasterConfiguration")?;
     lib.define_native_struct(&master_config)?
         .add("address", Type::Uint16, "Local DNP3 data-link address")?
-        .add("level", StructElementType::Enum(shared.decode_log_level.clone(), Some("Nothing".to_string())), "Decoding log-level for this master. You can modify this later on with {class:Master.SetDecodeLogLevel()}.")?
+        .add("decode_level", StructElementType::Struct(shared.decode_level.clone()), "Decoding level for this master. You can modify this later on with {class:Master.SetDecodeLevel()}.")?
         .add("reconnection_strategy", Type::Struct(shared.retry_strategy.clone()), "Reconnection retry strategy to use")?
         .add("reconnection_delay", StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_millis(0))), doc("Optional reconnection delay when a connection is lost.").details("A value of 0 means no delay."))?
         .add(

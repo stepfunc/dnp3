@@ -1,5 +1,5 @@
 use crate::app::EndpointType;
-use crate::entry::EndpointAddress;
+use crate::config::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::link::header::AnyAddress;
 use crate::tokio::io::{AsyncWrite, AsyncWriteExt};

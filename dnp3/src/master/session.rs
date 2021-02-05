@@ -2,11 +2,11 @@ use crate::app::format::write;
 use crate::app::format::write::start_request;
 use crate::app::header::Control;
 use crate::app::parse::parser::Response;
-use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::app::timeout::Timeout;
 use crate::app::types::LinkStatusResult;
-use crate::entry::EndpointAddress;
+use crate::config::DecodeLevel;
+use crate::config::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
@@ -24,7 +24,7 @@ use std::time::Duration;
 use tracing::Instrument;
 
 pub(crate) struct MasterSession {
-    level: DecodeLogLevel,
+    decode_level: DecodeLevel,
     timeout: Timeout,
     associations: AssociationMap,
     user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
@@ -63,7 +63,7 @@ impl MasterSession {
     pub(crate) const MIN_RX_BUFFER_SIZE: usize = 2048;
 
     pub(crate) fn new(
-        level: DecodeLogLevel,
+        decode_level: DecodeLevel,
         response_timeout: Timeout,
         tx_buffer_size: usize,
         user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
@@ -76,7 +76,7 @@ impl MasterSession {
         };
 
         Self {
-            level,
+            decode_level,
             timeout: response_timeout,
             associations: AssociationMap::new(),
             user_queue,
@@ -145,7 +145,7 @@ impl MasterSession {
         T: IOStream,
     {
         loop {
-            let decode_level = self.level;
+            let decode_level = self.decode_level;
             crate::tokio::select! {
                 result = self.process_message(true) => {
                    // we need to recheck the tasks
@@ -180,7 +180,7 @@ impl MasterSession {
         T: IOStream,
     {
         loop {
-            let decode_level = self.level;
+            let decode_level = self.decode_level;
             crate::tokio::select! {
                 result = self.process_message(true) => {
                    // we need to recheck the tasks
@@ -231,11 +231,11 @@ impl MasterSession {
             MasterMsg::RemoveAssociation(address) => {
                 self.associations.remove(address);
             }
-            MasterMsg::SetDecodeLogLevel(level) => {
-                self.level = level;
+            MasterMsg::SetDecodeLevel(level) => {
+                self.decode_level = level;
             }
-            MasterMsg::GetDecodeLogLevel(promise) => {
-                promise.complete(Ok(self.level));
+            MasterMsg::GetDecodeLevel(promise) => {
+                promise.complete(Ok(self.decode_level));
             }
         }
     }
@@ -326,7 +326,7 @@ impl MasterSession {
                         task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
                         return Err(TaskError::ResponseTimeout);
                     }
-                    x = reader.read(io, self.level) => {
+                    x = reader.read(io, self.decode_level) => {
                         if let Err(err) = x {
                             task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
                             return Err(err.into());
@@ -484,7 +484,7 @@ impl MasterSession {
                             tracing::warn!("no response within timeout: {}", self.timeout);
                             return Err(TaskError::ResponseTimeout);
                     }
-                    x = reader.read(io, self.level) => {
+                    x = reader.read(io, self.decode_level) => {
                         x?;
                         match reader.pop_response() {
                             Some(TransportResponse::Response(source, response)) => {
@@ -663,7 +663,7 @@ impl MasterSession {
         let mut cursor = self.tx_buffer.write_cursor();
         write::confirm_solicited(seq, &mut cursor)?;
         writer
-            .write(io, self.level, destination.wrap(), cursor.written())
+            .write(io, self.decode_level, destination.wrap(), cursor.written())
             .await?;
         Ok(())
     }
@@ -682,7 +682,7 @@ impl MasterSession {
         crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
 
         writer
-            .write(io, self.level, destination.wrap(), cursor.written())
+            .write(io, self.decode_level, destination.wrap(), cursor.written())
             .await?;
         Ok(())
     }
@@ -705,7 +705,7 @@ impl MasterSession {
         let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
         writer
-            .write(io, self.level, address.wrap(), cursor.written())
+            .write(io, self.decode_level, address.wrap(), cursor.written())
             .await?;
         Ok(seq)
     }
@@ -736,7 +736,7 @@ impl MasterSession {
                     tracing::warn!("no response within timeout: {}", self.timeout);
                     return Err(TaskError::ResponseTimeout);
                 }
-                x = reader.read(io, self.level) => {
+                x = reader.read(io, self.decode_level) => {
                     x?;
                     match reader.pop_response() {
                         Some(TransportResponse::Response(source, response)) => {

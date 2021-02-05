@@ -1,7 +1,6 @@
 use crate::app::parse::parser::{DecodeSettings, ParsedFragment};
-use crate::app::parse::DecodeLogLevel;
-use crate::config::LinkErrorMode;
-use crate::entry::EndpointAddress;
+use crate::config::EndpointAddress;
+use crate::config::{AppDecodeLevel, DecodeLevel, LinkErrorMode};
 use crate::link::error::LinkError;
 use crate::outstation::config::Feature;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
@@ -88,19 +87,19 @@ impl TransportReader {
     pub(crate) async fn read<T>(
         &mut self,
         io: &mut T,
-        level: DecodeLogLevel,
+        decode_level: DecodeLevel,
     ) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
         self.inner.read(io).await?;
-        if level.enabled() {
-            self.decode(level);
+        if decode_level.application.enabled() {
+            self.decode(decode_level.application);
         }
         Ok(())
     }
 
-    fn decode(&self, level: DecodeLogLevel) {
+    fn decode(&self, level: AppDecodeLevel) {
         if let Some(TransportData::Fragment(fragment)) = self.inner.peek() {
             match ParsedFragment::parse(level.receive(), fragment.data) {
                 Ok(fragment) => {

@@ -1,5 +1,4 @@
-use crate::app::parse::DecodeLogLevel;
-use crate::entry::EndpointAddress;
+use crate::config::{AppDecodeLevel, EndpointAddress};
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::EventBufferConfig;
@@ -26,7 +25,7 @@ pub(crate) fn get_default_unsolicited_config() -> OutstationConfig {
         EndpointAddress::from(1).unwrap(),
     );
 
-    config.log_level = DecodeLogLevel::ObjectValues;
+    config.decode_level = AppDecodeLevel::ObjectValues.into();
 
     config
 }

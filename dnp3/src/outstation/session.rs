@@ -6,10 +6,9 @@ use crate::app::header::{
 };
 use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
-use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::app::variations::{Group52Var1, Group52Var2};
-use crate::entry::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::{BufferSize, Feature};
@@ -115,7 +114,7 @@ impl LastValidRequest {
 }
 
 pub(crate) struct SessionConfig {
-    level: DecodeLogLevel,
+    decode_level: DecodeLevel,
     master_address: EndpointAddress,
     confirm_timeout: std::time::Duration,
     select_timeout: std::time::Duration,
@@ -135,7 +134,7 @@ pub(crate) struct SessionParameters {
 impl From<OutstationConfig> for SessionConfig {
     fn from(config: OutstationConfig) -> Self {
         SessionConfig {
-            level: config.log_level,
+            decode_level: config.decode_level,
             master_address: config.master_address,
             confirm_timeout: config.confirm_timeout,
             select_timeout: config.select_timeout,
@@ -330,7 +329,7 @@ impl OutstationSession {
         writer
             .write(
                 io,
-                self.config.level,
+                self.config.decode_level,
                 self.config.master_address.wrap(),
                 self.unsol_tx_buffer.get(length).unwrap(),
             )
@@ -349,7 +348,7 @@ impl OutstationSession {
         writer
             .write(
                 io,
-                self.config.level,
+                self.config.decode_level,
                 self.config.master_address.wrap(),
                 self.sol_tx_buffer.get(length).unwrap(),
             )
@@ -392,7 +391,7 @@ impl OutstationSession {
 
         // wait for an event
         crate::tokio::select! {
-            frame_read = reader.read(io, self.config.level) => {
+            frame_read = reader.read(io, self.config.decode_level) => {
                 // make sure an I/O error didn't occur, ending the session
                 frame_read?;
             }
@@ -741,7 +740,7 @@ impl OutstationSession {
         T: IOStream,
     {
         loop {
-            let decode_level = self.config.level;
+            let decode_level = self.config.decode_level;
             crate::tokio::select! {
                  res = self.sleep_until(Some(deadline)) => {
                      res?;
@@ -794,9 +793,9 @@ impl OutstationSession {
 
     fn handle_config_change(&mut self, message: ConfigurationChange) {
         match message {
-            ConfigurationChange::SetDecodeLogLevel(level) => {
-                tracing::info!("set decode log level: {:?}", level);
-                self.config.level = level;
+            ConfigurationChange::SetDecodeLevel(level) => {
+                tracing::info!("decode level changed to: {:?}", level);
+                self.config.decode_level = level;
             }
         }
     }

@@ -8,8 +8,8 @@ use crate::app::parse::error::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::app::parse::DecodeLogLevel;
 use crate::app::variations::Variation;
+use crate::config::AppDecodeLevel;
 use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
 use xxhash_rust::xxh64::xxh64;
@@ -17,19 +17,23 @@ use xxhash_rust::xxh64::xxh64;
 #[derive(Copy, Clone)]
 pub(crate) struct DecodeSettings {
     is_transmit: bool,
-    level: DecodeLogLevel,
+    level: AppDecodeLevel,
 }
 
 impl DecodeSettings {
     pub(crate) fn none() -> Self {
         Self {
             is_transmit: true,
-            level: DecodeLogLevel::Nothing,
+            level: AppDecodeLevel::Nothing,
         }
     }
 }
 
-impl DecodeLogLevel {
+impl AppDecodeLevel {
+    pub(crate) fn enabled(&self) -> bool {
+        *self != Self::Nothing
+    }
+
     pub(crate) fn transmit(self) -> DecodeSettings {
         DecodeSettings {
             is_transmit: true,
@@ -95,20 +99,20 @@ impl<'a> ParsedFragment<'a> {
         settings: DecodeSettings,
     ) -> Option<ParsedFragmentDisplay<'a>> {
         match settings.level {
-            DecodeLogLevel::Nothing => None,
-            DecodeLogLevel::Header => Some(ParsedFragmentDisplay {
+            AppDecodeLevel::Nothing => None,
+            AppDecodeLevel::Header => Some(ParsedFragmentDisplay {
                 is_transmit: settings.is_transmit,
                 format_objects_headers: false,
                 format_object_values: false,
                 fragment: self,
             }),
-            DecodeLogLevel::ObjectHeaders => Some(ParsedFragmentDisplay {
+            AppDecodeLevel::ObjectHeaders => Some(ParsedFragmentDisplay {
                 is_transmit: settings.is_transmit,
                 format_objects_headers: true,
                 format_object_values: false,
                 fragment: self,
             }),
-            DecodeLogLevel::ObjectValues => Some(ParsedFragmentDisplay {
+            AppDecodeLevel::ObjectValues => Some(ParsedFragmentDisplay {
                 is_transmit: settings.is_transmit,
                 format_objects_headers: true,
                 format_object_values: true,
@@ -703,7 +707,7 @@ mod test {
 
     fn test_request_validation_error(input: &[u8], err: RequestValidationError) {
         assert_eq!(
-            ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), input)
+            ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), input)
                 .unwrap()
                 .to_request()
                 .err()
@@ -714,7 +718,7 @@ mod test {
 
     fn test_response_validation_error(input: &[u8], err: ResponseValidationError) {
         assert_eq!(
-            ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), input)
+            ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), input)
                 .unwrap()
                 .to_response()
                 .err()
@@ -747,7 +751,7 @@ mod test {
     #[test]
     fn parses_valid_request() {
         let fragment = &[0xC2, 0x02, 0xAA];
-        let request = ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), fragment)
+        let request = ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), fragment)
             .unwrap()
             .to_request()
             .unwrap();
@@ -773,7 +777,7 @@ mod test {
     #[test]
     fn parses_valid_unsolicited_response() {
         let fragment = &[0b11010010, 0x82, 0xFF, 0xAA, 0x01, 0x02];
-        let response = ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), fragment)
+        let response = ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), fragment)
             .unwrap()
             .to_response()
             .unwrap();
@@ -828,7 +832,7 @@ mod test {
     fn confirms_may_or_may_not_have_uns_set() {
         {
             let request =
-                ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), &[0b11010000, 0x00])
+                ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), &[0b11010000, 0x00])
                     .unwrap()
                     .to_request()
                     .unwrap();
@@ -837,7 +841,7 @@ mod test {
         }
         {
             let request =
-                ParsedFragment::parse(DecodeLogLevel::Nothing.receive(), &[0b11000000, 0x00])
+                ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), &[0b11000000, 0x00])
                     .unwrap()
                     .to_request()
                     .unwrap();

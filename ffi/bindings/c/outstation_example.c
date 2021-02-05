@@ -358,8 +358,8 @@ int main()
 		// master address
 		1
 	);
-	// override the default decode log level
-	config.log_level = DecodeLogLevel_ObjectValues;
+	// override the default application decoding level
+	config.decode_level.application = AppDecodeLevel_ObjectValues;
 	// ANCHOR_END: outstation_config
 
 	outstation_application_t application =

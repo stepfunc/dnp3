@@ -267,7 +267,7 @@ int main()
     master_configuration_t master_config = master_configuration_init(1);
     master_config.reconnection_strategy.min_delay = 100;
     master_config.reconnection_strategy.max_delay = 5000;
-    master_config.level = DecodeLogLevel_ObjectValues;
+    master_config.decode_level.application = AppDecodeLevel_ObjectValues;
 
     endpoint_list_t* endpoints = endpoint_list_new("127.0.0.1:20000");
     client_state_listener_t listener =
@@ -338,11 +338,13 @@ int main()
         }
         else if(strcmp(cbuf, "dln\n") == 0)
         {
-            master_set_decode_log_level(master, DecodeLogLevel_Nothing);
+            master_set_decode_level(master, decode_level_init());
         }
         else if(strcmp(cbuf, "dlv\n") == 0)
         {
-            master_set_decode_log_level(master, DecodeLogLevel_ObjectValues);
+            decode_level_t level = decode_level_init();
+            level.application = AppDecodeLevel_ObjectValues;
+            master_set_decode_level(master, level);
         }
         else if(strcmp(cbuf, "rao\n") == 0)
         {

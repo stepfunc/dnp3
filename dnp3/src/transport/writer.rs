@@ -1,7 +1,6 @@
 use crate::app::parse::parser::ParsedFragment;
-use crate::app::parse::DecodeLogLevel;
 use crate::app::EndpointType;
-use crate::entry::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::AnyAddress;
 use crate::tokio::io::AsyncWrite;
@@ -31,15 +30,15 @@ impl TransportWriter {
     pub(crate) async fn write<W>(
         &mut self,
         io: &mut W,
-        level: DecodeLogLevel,
+        level: DecodeLevel,
         destination: AnyAddress,
         fragment: &[u8],
     ) -> Result<(), LinkError>
     where
         W: AsyncWrite + Unpin,
     {
-        if level != DecodeLogLevel::Nothing {
-            let _ = ParsedFragment::parse(level.transmit(), fragment);
+        if level.application.enabled() {
+            let _ = ParsedFragment::parse(level.application.transmit(), fragment);
         }
         self.inner.write(io, destination, fragment).await
     }

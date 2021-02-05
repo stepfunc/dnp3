@@ -152,7 +152,7 @@ impl MasterTask {
     ) -> (Self, MasterHandle) {
         let (tx, rx) = crate::tokio::sync::mpsc::channel(100); // TODO
         let session = MasterSession::new(
-            config.level,
+            config.decode_level,
             config.response_timeout,
             config.tx_buffer_size,
             rx,
