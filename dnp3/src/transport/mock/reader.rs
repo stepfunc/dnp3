@@ -1,5 +1,5 @@
-use crate::config::EndpointAddress;
 use crate::config::LinkErrorMode;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
 use crate::outstation::config::Feature;
@@ -73,7 +73,7 @@ impl MockReader {
         Some(fragment)
     }
 
-    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    pub(crate) async fn read<T>(&mut self, io: &mut T, _: DecodeLevel) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {

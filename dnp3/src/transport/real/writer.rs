@@ -1,10 +1,11 @@
 use crate::app::EndpointType;
-use crate::config::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::format::{format_link_status_request, format_unconfirmed_user_data, Payload};
 use crate::link::header::AnyAddress;
 use crate::tokio::io::{AsyncWrite, AsyncWriteExt};
-use crate::transport::real::constants::{FIN_MASK, FIR_MASK};
+use crate::transport::real::display::SegmentDisplay;
+use crate::transport::real::header::Header;
 use crate::transport::real::sequence::Sequence;
 use crate::util::cursor::WriteCursor;
 
@@ -16,19 +17,6 @@ pub(crate) struct Writer {
 }
 
 impl Writer {
-    fn get_header(fin: bool, fir: bool, seq: Sequence) -> u8 {
-        let mut acc: u8 = 0;
-
-        if fin {
-            acc |= FIN_MASK;
-        }
-        if fir {
-            acc |= FIR_MASK;
-        }
-
-        acc | seq.value()
-    }
-
     pub(crate) fn new(endpoint_type: EndpointType, local_address: EndpointAddress) -> Self {
         Self {
             endpoint_type,
@@ -45,6 +33,7 @@ impl Writer {
     pub(crate) async fn write<W>(
         &mut self,
         io: &mut W,
+        level: DecodeLevel,
         destination: AnyAddress,
         fragment: &[u8],
     ) -> Result<(), LinkError>
@@ -61,16 +50,20 @@ impl Writer {
 
         for (count, chunk) in chunks.enumerate() {
             let mut cursor = WriteCursor::new(&mut self.buffer);
-            let transport_byte = Self::get_header(count == last, count == 0, self.seq.increment());
+            let header = Header::new(count == last, count == 0, self.seq.increment());
+            let segment = SegmentDisplay::new(header, chunk, level.transport);
             let mark = cursor.position();
             format_unconfirmed_user_data(
                 self.endpoint_type.dir_bit(),
                 destination.value(),
                 self.local_address.raw_value(),
-                Payload::new(transport_byte, chunk),
+                Payload::new(header.to_u8(), chunk),
                 &mut cursor,
             )?;
             let written = cursor.written_since(mark)?;
+            if level.transport.enabled() {
+                tracing::info!("TRANSPORT TX - {}", segment);
+            }
             io.write_all(written).await?;
         }
 

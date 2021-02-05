@@ -1,4 +1,4 @@
-use crate::app::parse::parser::{DecodeSettings, ParsedFragment};
+use crate::app::parse::parser::ParsedFragment;
 use crate::config::EndpointAddress;
 use crate::config::{AppDecodeLevel, DecodeLevel, LinkErrorMode};
 use crate::link::error::LinkError;
@@ -16,7 +16,6 @@ pub(crate) type InnerReaderType = crate::transport::real::reader::Reader;
 pub(crate) type InnerReaderType = crate::transport::mock::reader::MockReader;
 
 pub(crate) struct TransportReader {
-    is_master: bool,
     inner: InnerReaderType,
 }
 
@@ -57,7 +56,6 @@ impl TransportReader {
         rx_buffer_size: usize,
     ) -> Self {
         Self {
-            is_master: true,
             inner: InnerReaderType::master(link_error_mode, address, rx_buffer_size),
         }
     }
@@ -69,7 +67,6 @@ impl TransportReader {
         rx_buffer_size: usize,
     ) -> Self {
         Self {
-            is_master: false,
             inner: InnerReaderType::outstation(
                 link_error_mode,
                 address,
@@ -92,7 +89,7 @@ impl TransportReader {
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
-        self.inner.read(io).await?;
+        self.inner.read(io, decode_level).await?;
         if decode_level.application.enabled() {
             self.decode(decode_level.application);
         }
@@ -101,19 +98,10 @@ impl TransportReader {
 
     fn decode(&self, level: AppDecodeLevel) {
         if let Some(TransportData::Fragment(fragment)) = self.inner.peek() {
-            match ParsedFragment::parse(level.receive(), fragment.data) {
+            match ParsedFragment::parse(fragment.data) {
                 Ok(fragment) => {
-                    if let Err(err) = fragment.objects {
-                        tracing::warn!("error parsing object header: {}", err);
-                    }
-
-                    if self.is_master {
-                        if let Err(err) = fragment.to_response() {
-                            tracing::warn!("bad response: {}", err);
-                        }
-                    } else if let Err(err) = fragment.to_request() {
-                        tracing::warn!("bad request: {}", err);
-                    }
+                    let view = fragment.display(level);
+                    tracing::info!("APP RX - {}", view);
                 }
                 Err(err) => {
                     tracing::warn!("error parsing fragment header: {}", err);
@@ -170,7 +158,7 @@ impl TransportReader {
 
         match transport_data {
             TransportData::Fragment(fragment) => {
-                let parsed = ParsedFragment::parse(DecodeSettings::none(), fragment.data).ok()?;
+                let parsed = ParsedFragment::parse(fragment.data).ok()?;
                 Some(ParsedTransportData::Fragment(fragment.info, parsed))
             }
             TransportData::LinkLayerMessage(msg) => {

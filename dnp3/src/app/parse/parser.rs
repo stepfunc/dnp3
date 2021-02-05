@@ -14,41 +14,6 @@ use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
 use xxhash_rust::xxh64::xxh64;
 
-#[derive(Copy, Clone)]
-pub(crate) struct DecodeSettings {
-    is_transmit: bool,
-    level: AppDecodeLevel,
-}
-
-impl DecodeSettings {
-    pub(crate) fn none() -> Self {
-        Self {
-            is_transmit: true,
-            level: AppDecodeLevel::Nothing,
-        }
-    }
-}
-
-impl AppDecodeLevel {
-    pub(crate) fn enabled(&self) -> bool {
-        *self != Self::Nothing
-    }
-
-    pub(crate) fn transmit(self) -> DecodeSettings {
-        DecodeSettings {
-            is_transmit: true,
-            level: self,
-        }
-    }
-
-    pub(crate) fn receive(self) -> DecodeSettings {
-        DecodeSettings {
-            is_transmit: false,
-            level: self,
-        }
-    }
-}
-
 pub(crate) fn format_count_of_items<T, V>(f: &mut Formatter, iter: T) -> std::fmt::Result
 where
     T: Iterator<Item = V>,
@@ -84,6 +49,7 @@ where
     Ok(())
 }
 
+#[derive(Copy, Clone)]
 pub(crate) struct ParsedFragment<'a> {
     pub(crate) control: Control,
     pub(crate) function: FunctionCode,
@@ -94,30 +60,10 @@ pub(crate) struct ParsedFragment<'a> {
 }
 
 impl<'a> ParsedFragment<'a> {
-    pub(crate) fn display_view(
-        &'a self,
-        settings: DecodeSettings,
-    ) -> Option<ParsedFragmentDisplay<'a>> {
-        match settings.level {
-            AppDecodeLevel::Nothing => None,
-            AppDecodeLevel::Header => Some(ParsedFragmentDisplay {
-                is_transmit: settings.is_transmit,
-                format_objects_headers: false,
-                format_object_values: false,
-                fragment: self,
-            }),
-            AppDecodeLevel::ObjectHeaders => Some(ParsedFragmentDisplay {
-                is_transmit: settings.is_transmit,
-                format_objects_headers: true,
-                format_object_values: false,
-                fragment: self,
-            }),
-            AppDecodeLevel::ObjectValues => Some(ParsedFragmentDisplay {
-                is_transmit: settings.is_transmit,
-                format_objects_headers: true,
-                format_object_values: true,
-                fragment: self,
-            }),
+    pub(crate) fn display(&'a self, level: AppDecodeLevel) -> FragmentDisplay<'a> {
+        FragmentDisplay {
+            level,
+            fragment: *self,
         }
     }
 
@@ -219,17 +165,8 @@ impl<'a> ParsedFragment<'a> {
         Ok(fragment)
     }
 
-    pub(crate) fn parse(
-        settings: DecodeSettings,
-        fragment: &'a [u8],
-    ) -> Result<Self, HeaderParseError> {
-        let result = Self::parse_no_logging(fragment);
-        if let Ok(fragment) = &result {
-            if let Some(view) = fragment.display_view(settings) {
-                tracing::info!("{}", view);
-            }
-        }
-        result
+    pub(crate) fn parse(fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
+        Self::parse_no_logging(fragment)
     }
 }
 
@@ -343,31 +280,23 @@ impl<'a> ObjectHeader<'a> {
     }
 }
 
-pub(crate) struct ParsedFragmentDisplay<'a> {
-    is_transmit: bool,
-    format_objects_headers: bool,
-    format_object_values: bool,
-    fragment: &'a ParsedFragment<'a>,
+pub(crate) struct FragmentDisplay<'a> {
+    level: AppDecodeLevel,
+    fragment: ParsedFragment<'a>,
 }
 
-impl std::fmt::Display for ParsedFragmentDisplay<'_> {
+impl std::fmt::Display for FragmentDisplay<'_> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        // always display the header
-        f.write_str(if self.is_transmit {
-            "APP TX - "
-        } else {
-            "APP RX - "
-        })?;
         self.fragment.format_header(f)?;
 
         match self.fragment.objects {
             Ok(headers) => {
-                if !self.format_objects_headers {
+                if !self.level.object_headers() {
                     return Ok(());
                 }
                 for header in headers.iter() {
                     f.write_str("\n")?;
-                    header.format(self.format_object_values, f)?
+                    header.format(self.level.object_values(), f)?
                 }
             }
             Err(err) => {
@@ -377,7 +306,7 @@ impl std::fmt::Display for ParsedFragmentDisplay<'_> {
                 {
                     if let Ok(header) = result {
                         f.write_str("\n")?;
-                        header.format(self.format_object_values, f)?;
+                        header.format(self.level.object_values(), f)?;
                     }
                 }
                 // log the original error after any valid headers that preceded it
@@ -707,7 +636,7 @@ mod test {
 
     fn test_request_validation_error(input: &[u8], err: RequestValidationError) {
         assert_eq!(
-            ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), input)
+            ParsedFragment::parse(input)
                 .unwrap()
                 .to_request()
                 .err()
@@ -718,7 +647,7 @@ mod test {
 
     fn test_response_validation_error(input: &[u8], err: ResponseValidationError) {
         assert_eq!(
-            ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), input)
+            ParsedFragment::parse(input)
                 .unwrap()
                 .to_response()
                 .err()
@@ -751,7 +680,7 @@ mod test {
     #[test]
     fn parses_valid_request() {
         let fragment = &[0xC2, 0x02, 0xAA];
-        let request = ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), fragment)
+        let request = ParsedFragment::parse(fragment)
             .unwrap()
             .to_request()
             .unwrap();
@@ -777,7 +706,7 @@ mod test {
     #[test]
     fn parses_valid_unsolicited_response() {
         let fragment = &[0b11010010, 0x82, 0xFF, 0xAA, 0x01, 0x02];
-        let response = ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), fragment)
+        let response = ParsedFragment::parse(fragment)
             .unwrap()
             .to_response()
             .unwrap();
@@ -831,20 +760,18 @@ mod test {
     #[test]
     fn confirms_may_or_may_not_have_uns_set() {
         {
-            let request =
-                ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), &[0b11010000, 0x00])
-                    .unwrap()
-                    .to_request()
-                    .unwrap();
+            let request = ParsedFragment::parse(&[0b11010000, 0x00])
+                .unwrap()
+                .to_request()
+                .unwrap();
             assert_eq!(request.header.function, FunctionCode::Confirm);
             assert!(request.header.control.uns);
         }
         {
-            let request =
-                ParsedFragment::parse(AppDecodeLevel::Nothing.receive(), &[0b11000000, 0x00])
-                    .unwrap()
-                    .to_request()
-                    .unwrap();
+            let request = ParsedFragment::parse(&[0b11000000, 0x00])
+                .unwrap()
+                .to_request()
+                .unwrap();
             assert_eq!(request.header.function, FunctionCode::Confirm);
             assert!(!request.header.control.uns);
         }

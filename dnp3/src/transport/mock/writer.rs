@@ -1,5 +1,5 @@
 use crate::app::EndpointType;
-use crate::config::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::AnyAddress;
 use crate::tokio::io::{AsyncWrite, AsyncWriteExt};
@@ -24,6 +24,7 @@ impl MockWriter {
     pub(crate) async fn write<W>(
         &mut self,
         io: &mut W,
+        _: DecodeLevel,
         _: AnyAddress,
         fragment: &[u8],
     ) -> Result<(), LinkError>

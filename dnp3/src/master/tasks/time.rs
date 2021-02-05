@@ -312,7 +312,7 @@ mod tests {
     use super::*;
     use crate::app::format::write::*;
     use crate::app::header::*;
-    use crate::app::parse::parser::{DecodeSettings, ParsedFragment};
+    use crate::app::parse::parser::ParsedFragment;
     use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
     use crate::app::sequence::Sequence;
     use crate::master::tasks::RequestWriter;
@@ -437,7 +437,7 @@ mod tests {
                         .write(cursor)
                         .unwrap();
                     }
-                    let response = ParsedFragment::parse(DecodeSettings::none(), cursor.written())
+                    let response = ParsedFragment::parse(cursor.written())
                         .unwrap()
                         .to_response()
                         .unwrap();

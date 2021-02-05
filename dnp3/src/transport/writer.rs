@@ -1,4 +1,4 @@
-use crate::app::parse::parser::ParsedFragment;
+use crate::app::parse::parser::{FragmentDisplay, ParsedFragment};
 use crate::app::EndpointType;
 use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
@@ -38,9 +38,12 @@ impl TransportWriter {
         W: AsyncWrite + Unpin,
     {
         if level.application.enabled() {
-            let _ = ParsedFragment::parse(level.application.transmit(), fragment);
+            if let Ok(fragment) = ParsedFragment::parse(fragment) {
+                let x: FragmentDisplay = fragment.display(level.application);
+                tracing::info!("APP TX - {}", x);
+            }
         }
-        self.inner.write(io, destination, fragment).await
+        self.inner.write(io, level, destination, fragment).await
     }
 
     pub(crate) async fn write_link_status_request<W>(

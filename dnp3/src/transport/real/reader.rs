@@ -1,12 +1,13 @@
 use crate::app::EndpointType;
-use crate::config::EndpointAddress;
 use crate::config::LinkErrorMode;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;
 use crate::outstation::config::Feature;
 use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::real::assembler::{Assembler, AssemblyState};
+use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::{LinkLayerMessage, LinkLayerMessageType, TransportData};
 
@@ -74,7 +75,7 @@ impl Reader {
         self.assembler.peek().map(TransportData::Fragment)
     }
 
-    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
+    pub(crate) async fn read<T>(&mut self, io: &mut T, level: DecodeLevel) -> Result<(), LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
@@ -90,7 +91,14 @@ impl Reader {
             match info.frame_type {
                 FrameType::Data => match payload.get() {
                     [transport, data @ ..] => {
-                        let header = Header::new(*transport);
+                        let header = Header::from_u8(*transport);
+                        if level.transport.enabled() {
+                            tracing::info!(
+                                "TRANSPORT RX - {}",
+                                SegmentDisplay::new(header, data, level.transport)
+                            );
+                        }
+
                         if let AssemblyState::Complete = self.assembler.assemble(info, header, data)
                         {
                             return Ok(());

@@ -29,6 +29,18 @@ impl DecodeLevel {
     pub fn nothing() -> Self {
         Self::default()
     }
+
+    pub fn new(
+        application: AppDecodeLevel,
+        transport: TransportDecodeLevel,
+        link: LinkDecodeLevel,
+    ) -> Self {
+        DecodeLevel {
+            application,
+            transport,
+            link,
+        }
+    }
 }
 
 impl Default for DecodeLevel {
@@ -145,6 +157,61 @@ impl From<AppDecodeLevel> for DecodeLevel {
             application,
             transport: TransportDecodeLevel::Nothing,
             link: LinkDecodeLevel::Nothing,
+        }
+    }
+}
+
+impl AppDecodeLevel {
+    pub(crate) fn enabled(&self) -> bool {
+        self.header()
+    }
+
+    pub(crate) fn header(&self) -> bool {
+        match self {
+            AppDecodeLevel::Nothing => false,
+            AppDecodeLevel::Header => true,
+            AppDecodeLevel::ObjectHeaders => true,
+            AppDecodeLevel::ObjectValues => true,
+        }
+    }
+
+    pub(crate) fn object_headers(&self) -> bool {
+        match self {
+            AppDecodeLevel::Nothing => false,
+            AppDecodeLevel::Header => false,
+            AppDecodeLevel::ObjectHeaders => true,
+            AppDecodeLevel::ObjectValues => true,
+        }
+    }
+
+    pub(crate) fn object_values(&self) -> bool {
+        match self {
+            AppDecodeLevel::Nothing => false,
+            AppDecodeLevel::Header => false,
+            AppDecodeLevel::ObjectHeaders => false,
+            AppDecodeLevel::ObjectValues => true,
+        }
+    }
+}
+
+impl TransportDecodeLevel {
+    pub(crate) fn enabled(&self) -> bool {
+        self.header_enabled()
+    }
+
+    pub(crate) fn header_enabled(&self) -> bool {
+        match self {
+            TransportDecodeLevel::Nothing => false,
+            TransportDecodeLevel::Header => true,
+            TransportDecodeLevel::Payload => true,
+        }
+    }
+
+    pub(crate) fn payload_enabled(&self) -> bool {
+        match self {
+            TransportDecodeLevel::Nothing => false,
+            TransportDecodeLevel::Header => false,
+            TransportDecodeLevel::Payload => true,
         }
     }
 }
