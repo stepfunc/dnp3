@@ -172,42 +172,68 @@ impl Layer {
         }
 
         match header.control.func {
-            Function::PriUnconfirmedUserData => (
-                Some(FrameInfo::new(source, broadcast, FrameType::Data)),
-                None,
-            ),
+            Function::PriUnconfirmedUserData => {
+                if header.control.fcv {
+                    tracing::warn!("ignoring frame of unconfirmed user data with FCV bit set");
+                    return (None, None);
+                }
+
+                (
+                    Some(FrameInfo::new(source, broadcast, FrameType::Data)),
+                    None,
+                )
+            }
             Function::PriResetLinkStates => {
-                self.secondary_state = SecondaryState::Reset(true); // TODO - does it start true or false
+                if header.control.fcv {
+                    tracing::warn!("ignoring reset link states with FCV bit set");
+                    return (None, None);
+                }
+
+                self.secondary_state = SecondaryState::Reset(true);
                 (None, Some(Reply::new(source, Function::SecAck)))
             }
-            Function::PriConfirmedUserData => match self.secondary_state {
-                SecondaryState::NotReset => {
-                    tracing::info!(
-                        "ignoring confirmed user data while secondary state is not reset"
-                    );
-                    (None, None)
+            Function::PriConfirmedUserData => {
+                if !header.control.fcv {
+                    tracing::warn!("ignoring frame of confirmed user data with FCV bit unset");
+                    return (None, None);
                 }
-                SecondaryState::Reset(expected) => {
-                    if header.control.fcb == expected {
-                        self.secondary_state = SecondaryState::Reset(!expected);
-                        (
-                            Some(FrameInfo::new(source, broadcast, FrameType::Data)),
-                            None,
-                        )
-                    } else {
-                        tracing::info!("ignoring confirmed user data with non-matching fcb");
+
+                match self.secondary_state {
+                    SecondaryState::NotReset => {
+                        tracing::info!(
+                            "ignoring confirmed user data while secondary state is not reset"
+                        );
                         (None, None)
                     }
+                    SecondaryState::Reset(expected) => {
+                        if header.control.fcb == expected {
+                            self.secondary_state = SecondaryState::Reset(!expected);
+                            (
+                                Some(FrameInfo::new(source, broadcast, FrameType::Data)),
+                                Some(Reply::new(source, Function::SecAck)),
+                            )
+                        } else {
+                            tracing::info!("ignoring confirmed user data with non-matching fcb");
+                            (None, Some(Reply::new(source, Function::SecAck)))
+                        }
+                    }
                 }
-            },
-            Function::PriRequestLinkStatus => (
-                Some(FrameInfo::new(
-                    source,
-                    broadcast,
-                    FrameType::LinkStatusRequest,
-                )),
-                Some(Reply::new(source, Function::SecLinkStatus)),
-            ),
+            }
+            Function::PriRequestLinkStatus => {
+                if header.control.fcv {
+                    tracing::warn!("ignoring request link status with FCV bit set");
+                    return (None, None);
+                }
+
+                (
+                    Some(FrameInfo::new(
+                        source,
+                        broadcast,
+                        FrameType::LinkStatusRequest,
+                    )),
+                    Some(Reply::new(source, Function::SecLinkStatus)),
+                )
+            }
             Function::SecLinkStatus => (
                 Some(FrameInfo::new(
                     source,
