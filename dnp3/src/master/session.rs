@@ -726,7 +726,7 @@ impl MasterSession {
         // Send link status request
         tracing::info!("Sending link status request (for {})", destination);
         writer
-            .write_link_status_request(io, destination.wrap())
+            .write_link_status_request(io, self.decode_level, destination.wrap())
             .await?;
 
         loop {

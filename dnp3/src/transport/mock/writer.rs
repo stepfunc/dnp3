@@ -39,6 +39,7 @@ impl MockWriter {
     pub(crate) async fn write_link_status_request<W>(
         &mut self,
         _: &mut W,
+        _: DecodeLevel,
         _: AnyAddress,
     ) -> Result<(), LinkError>
     where

@@ -1,7 +1,9 @@
+use crate::config::LinkDecodeLevel;
 use crate::link::constant;
 use crate::link::crc::{calc_crc, calc_crc_with_0564};
+use crate::link::display::LinkDisplay;
 use crate::link::error::LogicError;
-use crate::link::header::{ControlField, Header};
+use crate::link::header::Header;
 use crate::util::cursor::{WriteCursor, WriteError};
 use crate::util::slice_ext::SliceExtNoPanic;
 
@@ -26,11 +28,22 @@ impl<'a> Payload<'a> {
     }
 }
 
+// A view that we can use for tx logging
+pub(crate) struct FrameData<'a> {
+    pub(crate) frame: &'a [u8],
+    header: Header,
+    payload_only: &'a [u8],
+}
+
+impl<'a> FrameData<'a> {
+    pub(crate) fn to_display(&self, level: LinkDecodeLevel) -> LinkDisplay {
+        LinkDisplay::new(self.header, self.payload_only, level)
+    }
+}
+
 // this can all be statically verified not to panic since the buffer is a constant length
 pub(crate) fn format_header_fixed_size(
-    control: ControlField,
-    destination: u16,
-    source: u16,
+    header: Header,
     buffer: &mut [u8; super::constant::LINK_HEADER_LENGTH],
 ) {
     fn to_le(x: u16) -> (u8, u8) {
@@ -42,11 +55,11 @@ pub(crate) fn format_header_fixed_size(
     buffer[0] = constant::START1;
     buffer[1] = constant::START2;
     buffer[2] = 5;
-    buffer[3] = control.to_u8();
-    let (d1, d2) = to_le(destination);
+    buffer[3] = header.control.to_u8();
+    let (d1, d2) = to_le(header.destination.value());
     buffer[4] = d1;
     buffer[5] = d2;
-    let (s1, s2) = to_le(source);
+    let (s1, s2) = to_le(header.source.value());
     buffer[6] = s1;
     buffer[7] = s2;
     let (c1, c2) = to_le(calc_crc(&buffer[0..8]));
@@ -54,23 +67,18 @@ pub(crate) fn format_header_fixed_size(
     buffer[9] = c2;
 }
 
-pub(crate) struct FormattedFrame<'a> {
-    pub(crate) frame: &'a [u8],
-    pub(crate) _payload_only: &'a [u8],
-}
-
 pub(crate) fn format_header_only<'a>(
     header: Header,
     cursor: &'a mut WriteCursor,
-) -> Result<&'a [u8], WriteError> {
-    format_frame(header, None, cursor).map(|x| x.frame)
+) -> Result<FrameData<'a>, WriteError> {
+    format_frame(header, None, cursor)
 }
 
 pub(crate) fn format_data_frame<'a>(
     header: Header,
     payload: Payload,
     cursor: &'a mut WriteCursor,
-) -> Result<FormattedFrame<'a>, WriteError> {
+) -> Result<FrameData<'a>, WriteError> {
     format_frame(header, Some(payload), cursor)
 }
 
@@ -79,7 +87,7 @@ fn format_frame<'a>(
     header: Header,
     payload: Option<Payload>,
     cursor: &'a mut WriteCursor,
-) -> Result<FormattedFrame<'a>, WriteError> {
+) -> Result<FrameData<'a>, WriteError> {
     fn format_payload(payload: Payload, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         // the first block contains the transport header
         let (first, remainder) = payload
@@ -130,14 +138,16 @@ fn format_frame<'a>(
     match payload {
         Some(payload) => {
             format_payload(payload, cursor)?;
-            Ok(FormattedFrame {
+            Ok(FrameData {
+                header,
                 frame: cursor.written_since(start)?,
-                _payload_only: cursor.written_since(end_header)?,
+                payload_only: cursor.written_since(end_header)?,
             })
         }
-        None => Ok(FormattedFrame {
+        None => Ok(FrameData {
+            header,
             frame: cursor.written_since(start)?,
-            _payload_only: &[],
+            payload_only: &[],
         }),
     }
 }
@@ -151,12 +161,7 @@ mod test {
     #[test]
     fn formats_ack() {
         let mut buffer = [0; constant::LINK_HEADER_LENGTH];
-        format_header_fixed_size(
-            ACK.header.control,
-            ACK.header.destination.value(),
-            ACK.header.source.value(),
-            &mut buffer,
-        );
+        format_header_fixed_size(ACK.header, &mut buffer);
         assert_eq!(buffer, ACK.bytes);
     }
 

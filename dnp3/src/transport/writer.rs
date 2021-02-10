@@ -49,11 +49,14 @@ impl TransportWriter {
     pub(crate) async fn write_link_status_request<W>(
         &mut self,
         io: &mut W,
+        level: DecodeLevel,
         destination: AnyAddress,
     ) -> Result<(), LinkError>
     where
         W: AsyncWrite + Unpin,
     {
-        self.inner.write_link_status_request(io, destination).await
+        self.inner
+            .write_link_status_request(io, level, destination)
+            .await
     }
 }

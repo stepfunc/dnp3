@@ -85,12 +85,7 @@ impl Layer {
     }
 
     fn format_reply(&mut self, header: Header) -> &[u8] {
-        format_header_fixed_size(
-            header.control,
-            header.destination.value(),
-            header.source.value(),
-            &mut self.tx_buffer,
-        );
+        format_header_fixed_size(header, &mut self.tx_buffer);
         &self.tx_buffer
     }
 

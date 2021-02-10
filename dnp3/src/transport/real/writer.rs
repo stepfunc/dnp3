@@ -67,6 +67,9 @@ impl Writer {
                 Payload::new(header.to_u8(), chunk),
                 &mut cursor,
             )?;
+            if level.link.enabled() {
+                tracing::info!("LINK TX - {}", data.to_display(level.link));
+            }
             io.write_all(data.frame).await?;
         }
 
@@ -76,6 +79,7 @@ impl Writer {
     pub(crate) async fn write_link_status_request<W>(
         &mut self,
         io: &mut W,
+        level: DecodeLevel,
         destination: AnyAddress,
     ) -> Result<(), LinkError>
     where
@@ -87,8 +91,12 @@ impl Writer {
             destination,
             self.local_address.wrap(),
         );
+
         let data = format_header_only(header, &mut cursor)?;
-        io.write_all(data).await?;
+        if level.link.enabled() {
+            tracing::info!("LINK TX - {}", data.to_display(level.link));
+        }
+        io.write_all(data.frame).await?;
 
         Ok(())
     }

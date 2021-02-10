@@ -491,7 +491,11 @@ impl OutstationSession {
             }
 
             writer
-                .write_link_status_request(io, self.config.master_address.wrap())
+                .write_link_status_request(
+                    io,
+                    self.config.decode_level,
+                    self.config.master_address.wrap(),
+                )
                 .await?;
 
             self.on_link_activity();
