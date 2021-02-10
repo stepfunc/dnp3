@@ -23,6 +23,8 @@ pub struct DecodeLevel {
     pub transport: TransportDecodeLevel,
     /// Controls link layer decoding
     pub link: LinkDecodeLevel,
+    /// Controls the logging of physical layer read/write
+    pub physical: PhysDecodeLevel,
 }
 
 impl DecodeLevel {
@@ -30,23 +32,17 @@ impl DecodeLevel {
         Self::default()
     }
 
-    pub fn everything() -> Self {
-        Self::new(
-            AppDecodeLevel::ObjectValues,
-            TransportDecodeLevel::Payload,
-            LinkDecodeLevel::Payload,
-        )
-    }
-
     pub fn new(
         application: AppDecodeLevel,
         transport: TransportDecodeLevel,
         link: LinkDecodeLevel,
+        physical: PhysDecodeLevel,
     ) -> Self {
         DecodeLevel {
             application,
             transport,
             link,
+            physical,
         }
     }
 }
@@ -57,6 +53,7 @@ impl Default for DecodeLevel {
             application: AppDecodeLevel::Nothing,
             transport: TransportDecodeLevel::Nothing,
             link: LinkDecodeLevel::Nothing,
+            physical: PhysDecodeLevel::Nothing,
         }
     }
 }
@@ -94,6 +91,17 @@ pub enum LinkDecodeLevel {
     Header,
     /// Decode the header and the raw payload as hexadecimal
     Payload,
+}
+
+/// Controls how data transmitted at the physical layer (TCP, serial, etc) is logged
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum PhysDecodeLevel {
+    /// Log nothing
+    Nothing,
+    /// Log only the length of data that is sent and received
+    Length,
+    /// Log the length and the actual data that is sent and received
+    Data,
 }
 
 /// Represents a validated 16-bit endpoint address for a master or an outstation
@@ -165,6 +173,7 @@ impl From<AppDecodeLevel> for DecodeLevel {
             application,
             transport: TransportDecodeLevel::Nothing,
             link: LinkDecodeLevel::Nothing,
+            physical: PhysDecodeLevel::Nothing,
         }
     }
 }

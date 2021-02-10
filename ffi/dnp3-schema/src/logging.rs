@@ -139,12 +139,27 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingErr
         .doc("Controls how transmitted and received link frames are decoded at the INFO log level")?
         .build()?;
 
+    let phys_decode_level_enum = lib
+        .define_native_enum("PhysDecodeLevel")?
+        .push("Nothing", "Log nothing")?
+        .push(
+            "Length",
+            "Log only the length of data that is sent and received",
+        )?
+        .push(
+            "Data",
+            "Log the length and the actual data that is sent and received",
+        )?
+        .doc("Controls how data transmitted at the physical layer (TCP, serial, etc) is logged")?
+        .build()?;
+
     let decode_level_struct = lib.declare_native_struct("DecodeLevel")?;
     let decode_level_struct = lib.define_native_struct(&decode_level_struct)?
         .add("application", StructElementType::Enum(app_decode_level_enum, Some("Nothing".to_string())), "Controls application fragment decoding")?
         .add("transport", StructElementType::Enum(transport_decode_level_enum, Some("Nothing".to_string())), "Controls transport segment layer decoding")?
         .add("link", StructElementType::Enum(link_decode_level_enum, Some("Nothing".to_string())), "Controls link frame decoding")?
-        .doc("Controls the decoding of transmitted and received data at the application, transport, and link layer")?
+        .add("physical", StructElementType::Enum(phys_decode_level_enum, Some("Nothing".to_string())), "Controls the logging of physical layer read/write")?
+        .doc("Controls the decoding of transmitted and received data at the application, transport, link, and physical layers")?
         .build()?;
 
     Ok(decode_level_struct)

@@ -210,6 +210,7 @@ pub unsafe fn master_get_decode_level(master: *mut Master) -> ffi::DecodeLevel {
         application: ffi::AppDecodeLevel::Nothing,
         transport: ffi::TransportDecodeLevel::Nothing,
         link: ffi::LinkDecodeLevel::Nothing,
+        physical: ffi::PhysDecodeLevel::Nothing,
     }
     .into()
 }

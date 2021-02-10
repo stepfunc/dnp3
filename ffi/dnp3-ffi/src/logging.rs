@@ -1,5 +1,5 @@
 use crate::ffi;
-use dnp3::config::{AppDecodeLevel, LinkDecodeLevel, TransportDecodeLevel};
+use dnp3::config::{AppDecodeLevel, LinkDecodeLevel, PhysDecodeLevel, TransportDecodeLevel};
 use dnp3::prelude::master::*;
 use std::ffi::CString;
 use tracing::span::{Attributes, Record};
@@ -155,6 +155,7 @@ impl From<ffi::DecodeLevel> for DecodeLevel {
             application: from.application().into(),
             transport: from.transport().into(),
             link: from.link().into(),
+            physical: from.physical().into(),
         }
     }
 }
@@ -165,6 +166,7 @@ impl From<DecodeLevel> for ffi::DecodeLevel {
             application: from.application.into(),
             transport: from.transport.into(),
             link: from.link.into(),
+            physical: from.physical.into(),
         }
         .into()
     }
@@ -201,6 +203,16 @@ impl From<ffi::LinkDecodeLevel> for LinkDecodeLevel {
     }
 }
 
+impl From<ffi::PhysDecodeLevel> for PhysDecodeLevel {
+    fn from(from: ffi::PhysDecodeLevel) -> Self {
+        match from {
+            ffi::PhysDecodeLevel::Nothing => Self::Nothing,
+            ffi::PhysDecodeLevel::Length => Self::Length,
+            ffi::PhysDecodeLevel::Data => Self::Data,
+        }
+    }
+}
+
 impl From<AppDecodeLevel> for ffi::AppDecodeLevel {
     fn from(from: AppDecodeLevel) -> Self {
         match from {
@@ -228,6 +240,16 @@ impl From<LinkDecodeLevel> for ffi::LinkDecodeLevel {
             LinkDecodeLevel::Nothing => ffi::LinkDecodeLevel::Nothing,
             LinkDecodeLevel::Header => ffi::LinkDecodeLevel::Header,
             LinkDecodeLevel::Payload => ffi::LinkDecodeLevel::Payload,
+        }
+    }
+}
+
+impl From<PhysDecodeLevel> for ffi::PhysDecodeLevel {
+    fn from(from: PhysDecodeLevel) -> Self {
+        match from {
+            PhysDecodeLevel::Nothing => ffi::PhysDecodeLevel::Nothing,
+            PhysDecodeLevel::Length => ffi::PhysDecodeLevel::Length,
+            PhysDecodeLevel::Data => ffi::PhysDecodeLevel::Data,
         }
     }
 }

@@ -1,8 +1,7 @@
 use dnp3::app::enums::CommandStatus;
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
-use dnp3::config::{AppDecodeLevel, LinkErrorMode};
-use dnp3::config::{DecodeLevel, EndpointAddress, LinkDecodeLevel, TransportDecodeLevel};
+use dnp3::config::{AppDecodeLevel, EndpointAddress, LinkErrorMode};
 use dnp3::entry::outstation::tcp::TCPServer;
 use dnp3::entry::outstation::AddressFilter;
 use dnp3::outstation::config::OutstationConfig;
@@ -23,12 +22,8 @@ fn get_outstation_config() -> OutstationConfig {
         // master address
         EndpointAddress::from(1).unwrap(),
     );
-    // override the default decode log level
-    config.decode_level = DecodeLevel::new(
-        AppDecodeLevel::ObjectValues,
-        TransportDecodeLevel::Nothing,
-        LinkDecodeLevel::Nothing,
-    );
+    // override the default decoding
+    config.decode_level.application = AppDecodeLevel::ObjectValues;
     // ANCHOR_END: outstation_config
     config
 }
