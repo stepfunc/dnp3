@@ -271,13 +271,21 @@ impl<'a> ControlCollection<'a> {
         cursor: &mut WriteCursor,
         transaction: &mut ControlTransaction,
         database: &mut Database,
+        max_controls_per_request: Option<u16>,
     ) -> Result<CommandStatus, WriteError> {
-        let mut error = CommandStatus::Success;
+        let mut num_controls = 0;
+        let mut status = CommandStatus::Success;
         for header in self.iter() {
-            let status = header.select_with_response(cursor, transaction, database)?;
-            error = error.first_error(status);
+            let result = header.select_with_response(
+                cursor,
+                transaction,
+                database,
+                max_controls_per_request,
+                &mut num_controls,
+            )?;
+            status = status.first_error(result);
         }
-        Ok(error)
+        Ok(status)
     }
 
     pub(crate) fn operate_with_response(
@@ -286,20 +294,38 @@ impl<'a> ControlCollection<'a> {
         operate_type: OperateType,
         transaction: &mut ControlTransaction,
         database: &mut Database,
-    ) -> Result<(), WriteError> {
+        max_controls_per_request: Option<u16>,
+    ) -> Result<CommandStatus, WriteError> {
+        let mut num_controls = 0;
+        let mut status = CommandStatus::Success;
         for header in self.iter() {
-            header.operate_with_response(operate_type, cursor, transaction, database)?;
+            let result = header.operate_with_response(
+                operate_type,
+                cursor,
+                transaction,
+                database,
+                max_controls_per_request,
+                &mut num_controls,
+            )?;
+            status = status.first_error(result);
         }
-        Ok(())
+        Ok(status)
     }
 
     pub(crate) fn operate_no_ack(
         &self,
         transaction: &mut ControlTransaction,
         database: &mut Database,
+        max_controls_per_request: Option<u16>,
     ) {
+        let mut num_controls = 0;
         for header in self.iter() {
-            header.operate_no_ack(transaction, database);
+            header.operate_no_ack(
+                transaction,
+                database,
+                max_controls_per_request,
+                &mut num_controls,
+            );
         }
     }
 }
@@ -346,38 +372,90 @@ impl<'a> ControlHeader<'a> {
         cursor: &mut WriteCursor,
         transaction: &mut ControlTransaction,
         database: &mut Database,
+        max_controls_per_request: Option<u16>,
+        num_controls: &mut u16,
     ) -> Result<CommandStatus, WriteError> {
         match self {
-            Self::OneByteGroup12Var1(seq) => {
-                select_header_with_response(cursor, seq, database, transaction)
-            }
-            Self::OneByteGroup41Var1(seq) => {
-                select_header_with_response(cursor, seq, database, transaction)
-            }
-            Self::OneByteGroup41Var2(seq) => {
-                select_header_with_response(cursor, seq, database, transaction)
-            }
-            Self::OneByteGroup41Var3(seq) => {
-                select_header_with_response(cursor, seq, database, transaction)
-            }
-            Self::OneByteGroup41Var4(seq) => {
-                select_header_with_response(cursor, seq, database, transaction)
-            }
-            Self::TwoByteGroup12Var1(seq) => {
-                select_header_with_response(cursor, seq, database, transaction)
-            }
-            Self::TwoByteGroup41Var1(seq) => {
-                select_header_with_response(cursor, seq, database, transaction)
-            }
-            Self::TwoByteGroup41Var2(seq) => {
-                select_header_with_response(cursor, seq, database, transaction)
-            }
-            Self::TwoByteGroup41Var3(seq) => {
-                select_header_with_response(cursor, seq, database, transaction)
-            }
-            Self::TwoByteGroup41Var4(seq) => {
-                select_header_with_response(cursor, seq, database, transaction)
-            }
+            Self::OneByteGroup12Var1(seq) => select_header_with_response(
+                cursor,
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var1(seq) => select_header_with_response(
+                cursor,
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var2(seq) => select_header_with_response(
+                cursor,
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var3(seq) => select_header_with_response(
+                cursor,
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var4(seq) => select_header_with_response(
+                cursor,
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup12Var1(seq) => select_header_with_response(
+                cursor,
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var1(seq) => select_header_with_response(
+                cursor,
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var2(seq) => select_header_with_response(
+                cursor,
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var3(seq) => select_header_with_response(
+                cursor,
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var4(seq) => select_header_with_response(
+                cursor,
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
         }
     }
 
@@ -387,53 +465,181 @@ impl<'a> ControlHeader<'a> {
         cursor: &mut WriteCursor,
         transaction: &mut ControlTransaction,
         database: &mut Database,
-    ) -> Result<(), WriteError> {
+        max_controls_per_request: Option<u16>,
+        num_controls: &mut u16,
+    ) -> Result<CommandStatus, WriteError> {
         match self {
-            Self::OneByteGroup12Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, transaction)
-            }
-            Self::OneByteGroup41Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, transaction)
-            }
-            Self::OneByteGroup41Var2(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, transaction)
-            }
-            Self::OneByteGroup41Var3(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, transaction)
-            }
-            Self::OneByteGroup41Var4(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, transaction)
-            }
-            Self::TwoByteGroup12Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, transaction)
-            }
-            Self::TwoByteGroup41Var1(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, transaction)
-            }
-            Self::TwoByteGroup41Var2(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, transaction)
-            }
-            Self::TwoByteGroup41Var3(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, transaction)
-            }
-            Self::TwoByteGroup41Var4(seq) => {
-                operate_header_with_response(cursor, seq, database, operate_type, transaction)
-            }
+            Self::OneByteGroup12Var1(seq) => operate_header_with_response(
+                cursor,
+                seq,
+                database,
+                operate_type,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var1(seq) => operate_header_with_response(
+                cursor,
+                seq,
+                database,
+                operate_type,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var2(seq) => operate_header_with_response(
+                cursor,
+                seq,
+                database,
+                operate_type,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var3(seq) => operate_header_with_response(
+                cursor,
+                seq,
+                database,
+                operate_type,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var4(seq) => operate_header_with_response(
+                cursor,
+                seq,
+                database,
+                operate_type,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup12Var1(seq) => operate_header_with_response(
+                cursor,
+                seq,
+                database,
+                operate_type,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var1(seq) => operate_header_with_response(
+                cursor,
+                seq,
+                database,
+                operate_type,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var2(seq) => operate_header_with_response(
+                cursor,
+                seq,
+                database,
+                operate_type,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var3(seq) => operate_header_with_response(
+                cursor,
+                seq,
+                database,
+                operate_type,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var4(seq) => operate_header_with_response(
+                cursor,
+                seq,
+                database,
+                operate_type,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
         }
     }
 
-    fn operate_no_ack(&self, transaction: &mut ControlTransaction, database: &mut Database) {
+    fn operate_no_ack(
+        &self,
+        transaction: &mut ControlTransaction,
+        database: &mut Database,
+        max_controls_per_request: Option<u16>,
+        num_controls: &mut u16,
+    ) {
         match self {
-            Self::OneByteGroup12Var1(seq) => operate_header_no_ack(seq, database, transaction),
-            Self::OneByteGroup41Var1(seq) => operate_header_no_ack(seq, database, transaction),
-            Self::OneByteGroup41Var2(seq) => operate_header_no_ack(seq, database, transaction),
-            Self::OneByteGroup41Var3(seq) => operate_header_no_ack(seq, database, transaction),
-            Self::OneByteGroup41Var4(seq) => operate_header_no_ack(seq, database, transaction),
-            Self::TwoByteGroup12Var1(seq) => operate_header_no_ack(seq, database, transaction),
-            Self::TwoByteGroup41Var1(seq) => operate_header_no_ack(seq, database, transaction),
-            Self::TwoByteGroup41Var2(seq) => operate_header_no_ack(seq, database, transaction),
-            Self::TwoByteGroup41Var3(seq) => operate_header_no_ack(seq, database, transaction),
-            Self::TwoByteGroup41Var4(seq) => operate_header_no_ack(seq, database, transaction),
+            Self::OneByteGroup12Var1(seq) => operate_header_no_ack(
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var1(seq) => operate_header_no_ack(
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var2(seq) => operate_header_no_ack(
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var3(seq) => operate_header_no_ack(
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::OneByteGroup41Var4(seq) => operate_header_no_ack(
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup12Var1(seq) => operate_header_no_ack(
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var1(seq) => operate_header_no_ack(
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var2(seq) => operate_header_no_ack(
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var3(seq) => operate_header_no_ack(
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
+            Self::TwoByteGroup41Var4(seq) => operate_header_no_ack(
+                seq,
+                database,
+                transaction,
+                max_controls_per_request,
+                num_controls,
+            ),
         }
     }
 }
@@ -459,6 +665,8 @@ fn select_header_with_response<I, V>(
     seq: &CountSequence<Prefix<I, V>>,
     database: &mut Database,
     transaction: &mut ControlTransaction,
+    max_controls_per_request: Option<u16>,
+    num_controls: &mut u16,
 ) -> Result<CommandStatus, WriteError>
 where
     I: Index,
@@ -467,11 +675,15 @@ where
     let mut writer = PrefixWriter::new();
     let mut ret = CommandStatus::Success;
     for item in seq.iter() {
-        let status = item
-            .value
-            .select(transaction, item.index.widen_to_u16(), database);
+        let status = if max_controls_per_request.map_or(true, |max| *num_controls < max) {
+            item.value
+                .select(transaction, item.index.widen_to_u16(), database)
+        } else {
+            CommandStatus::TooManyOps
+        };
         writer.write(cursor, item.value.with_status(status), item.index)?;
         ret = ret.first_error(status);
+        *num_controls += 1;
     }
     Ok(ret)
 }
@@ -482,38 +694,52 @@ fn operate_header_with_response<I, V>(
     database: &mut Database,
     operate_type: OperateType,
     transaction: &mut ControlTransaction,
-) -> Result<(), WriteError>
+    max_controls_per_request: Option<u16>,
+    num_controls: &mut u16,
+) -> Result<CommandStatus, WriteError>
 where
     I: Index,
     V: FixedSizeVariation + ControlType,
 {
     let mut writer = PrefixWriter::new();
+    let mut ret = CommandStatus::Success;
     for item in seq.iter() {
-        let status = item.value.operate(
-            transaction,
-            item.index.widen_to_u16(),
-            operate_type,
-            database,
-        );
+        let status = if max_controls_per_request.map_or(true, |max| *num_controls < max) {
+            item.value.operate(
+                transaction,
+                item.index.widen_to_u16(),
+                operate_type,
+                database,
+            )
+        } else {
+            CommandStatus::TooManyOps
+        };
         writer.write(cursor, item.value.with_status(status), item.index)?;
+        ret = ret.first_error(status);
+        *num_controls += 1;
     }
-    Ok(())
+    Ok(ret)
 }
 
 fn operate_header_no_ack<I, V>(
     seq: &CountSequence<Prefix<I, V>>,
     database: &mut Database,
     transaction: &mut ControlTransaction,
+    max_controls_per_request: Option<u16>,
+    num_controls: &mut u16,
 ) where
     I: Index,
     V: FixedSizeVariation + ControlType,
 {
     for item in seq.iter() {
-        item.value.operate(
-            transaction,
-            item.index.widen_to_u16(),
-            OperateType::DirectOperateNoAck,
-            database,
-        );
+        if max_controls_per_request.map_or(true, |max| *num_controls < max) {
+            item.value.operate(
+                transaction,
+                item.index.widen_to_u16(),
+                OperateType::DirectOperateNoAck,
+                database,
+            );
+        }
+        *num_controls += 1;
     }
 }

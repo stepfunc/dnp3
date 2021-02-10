@@ -281,17 +281,13 @@ fn define_outstation_config(
             "Delay to wait before retrying an unsolicited response",
         )?
         .add(
-            "max_read_headers_per_request",
-            StructElementType::Uint16(Some(64)),
-            "Maximum number of read headers per request",
-        )?
-        .add(
             "keep_alive_timeout",
             StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(60))),
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the master")
                 .details("A value of zero means no automatic keep-alives."),
         )?
         .add("max_read_request_headers", StructElementType::Uint16(Some(64)), doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
+        .add("max_controls_per_request", StructElementType::Uint16(Some(64)), doc("Maximum number of controls in a single request."))?
         .add("class_zero", Type::Struct(class_zero_config), "Controls responses to Class 0 reads")?
         .doc("Outstation configuration")?
         .build()?;

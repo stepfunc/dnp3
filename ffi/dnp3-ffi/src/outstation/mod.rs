@@ -214,10 +214,10 @@ fn convert_outstation_config(config: ffi::OutstationConfig) -> Option<Outstation
         features: config.features().into(),
         max_unsolicited_retries: Some(config.max_unsolicited_retries() as usize),
         unsolicited_retry_delay: config.unsolicited_retry_delay(),
-        max_read_headers_per_request: config.max_read_headers_per_request(),
         keep_alive_timeout,
         class_zero: config.class_zero.into(),
         max_read_request_headers: Some(config.max_read_request_headers),
+        max_controls_per_request: Some(config.max_controls_per_request),
     })
 }
 
