@@ -30,6 +30,14 @@ impl DecodeLevel {
         Self::default()
     }
 
+    pub fn everything() -> Self {
+        Self::new(
+            AppDecodeLevel::ObjectValues,
+            TransportDecodeLevel::Payload,
+            LinkDecodeLevel::Payload,
+        )
+    }
+
     pub fn new(
         application: AppDecodeLevel,
         transport: TransportDecodeLevel,
@@ -212,6 +220,28 @@ impl TransportDecodeLevel {
             TransportDecodeLevel::Nothing => false,
             TransportDecodeLevel::Header => false,
             TransportDecodeLevel::Payload => true,
+        }
+    }
+}
+
+impl LinkDecodeLevel {
+    pub(crate) fn enabled(&self) -> bool {
+        self.header_enabled()
+    }
+
+    pub(crate) fn header_enabled(&self) -> bool {
+        match self {
+            LinkDecodeLevel::Nothing => false,
+            LinkDecodeLevel::Header => true,
+            LinkDecodeLevel::Payload => true,
+        }
+    }
+
+    pub(crate) fn payload_enabled(&self) -> bool {
+        match self {
+            LinkDecodeLevel::Nothing => false,
+            LinkDecodeLevel::Header => false,
+            LinkDecodeLevel::Payload => true,
         }
     }
 }

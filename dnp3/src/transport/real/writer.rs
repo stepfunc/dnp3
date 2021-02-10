@@ -1,7 +1,7 @@
 use crate::app::EndpointType;
 use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
-use crate::link::format::{format_link_status_request, format_unconfirmed_user_data, Payload};
+use crate::link::format::{format_data_frame, format_header_only, Payload};
 use crate::link::header::AnyAddress;
 use crate::tokio::io::{AsyncWrite, AsyncWriteExt};
 use crate::transport::real::display::SegmentDisplay;
@@ -51,20 +51,23 @@ impl Writer {
         for (count, chunk) in chunks.enumerate() {
             let mut cursor = WriteCursor::new(&mut self.buffer);
             let header = Header::new(count == last, count == 0, self.seq.increment());
-            let segment = SegmentDisplay::new(header, chunk, level.transport);
-            let mark = cursor.position();
-            format_unconfirmed_user_data(
+            if level.transport.enabled() {
+                tracing::info!(
+                    "TRANSPORT TX - {}",
+                    SegmentDisplay::new(header, chunk, level.transport)
+                );
+            }
+            let link_header = crate::link::header::Header::unconfirmed_user_data(
                 self.endpoint_type.dir_bit(),
-                destination.value(),
-                self.local_address.raw_value(),
+                destination,
+                self.local_address.wrap(),
+            );
+            let data = format_data_frame(
+                link_header,
                 Payload::new(header.to_u8(), chunk),
                 &mut cursor,
             )?;
-            let written = cursor.written_since(mark)?;
-            if level.transport.enabled() {
-                tracing::info!("TRANSPORT TX - {}", segment);
-            }
-            io.write_all(written).await?;
+            io.write_all(data.frame).await?;
         }
 
         Ok(())
@@ -79,13 +82,13 @@ impl Writer {
         W: AsyncWrite + Unpin,
     {
         let mut cursor = WriteCursor::new(&mut self.buffer);
-        format_link_status_request(
+        let header = crate::link::header::Header::request_link_status(
             self.endpoint_type.dir_bit(),
-            destination.value(),
-            self.local_address.raw_value(),
-            &mut cursor,
-        )?;
-        io.write_all(cursor.written()).await?;
+            destination,
+            self.local_address.wrap(),
+        );
+        let data = format_header_only(header, &mut cursor)?;
+        io.write_all(data).await?;
 
         Ok(())
     }

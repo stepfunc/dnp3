@@ -86,7 +86,7 @@ impl Reader {
         let mut payload = FramePayload::new();
 
         loop {
-            let info = self.link.read(io, &mut payload).await?;
+            let info = self.link.read(io, level, &mut payload).await?;
 
             match info.frame_type {
                 FrameType::Data => match payload.get() {

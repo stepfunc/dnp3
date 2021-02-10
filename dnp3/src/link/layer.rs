@@ -1,5 +1,5 @@
 use crate::app::EndpointType;
-use crate::config::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::function::Function;
 use crate::link::header::{
@@ -9,7 +9,8 @@ use crate::link::parser::FramePayload;
 use crate::tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::config::LinkErrorMode;
-use crate::link::format::format_header;
+use crate::link::display::LinkDisplay;
+use crate::link::format::format_header_fixed_size;
 use crate::outstation::config::Feature;
 
 enum SecondaryState {
@@ -62,23 +63,32 @@ impl Layer {
     pub(crate) async fn read<T>(
         &mut self,
         io: &mut T,
+        level: DecodeLevel,
         payload: &mut FramePayload,
     ) -> Result<FrameInfo, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
         loop {
-            if let Some(address) = self.read_one(io, payload).await? {
+            if let Some(address) = self.read_one(io, level, payload).await? {
                 return Ok(address);
             }
         }
     }
 
-    fn format_reply(&mut self, reply: Reply) -> &[u8] {
-        format_header(
+    fn get_header(&self, reply: Reply) -> Header {
+        Header::new(
             ControlField::new(self.endpoint_type.dir_bit(), reply.function),
-            reply.address.raw_value(),
-            self.local_address.raw_value(),
+            reply.address.wrap(),
+            self.local_address.wrap(),
+        )
+    }
+
+    fn format_reply(&mut self, header: Header) -> &[u8] {
+        format_header_fixed_size(
+            header.control,
+            header.destination.value(),
+            header.source.value(),
             &mut self.tx_buffer,
         );
         &self.tx_buffer
@@ -87,15 +97,26 @@ impl Layer {
     async fn read_one<T>(
         &mut self,
         io: &mut T,
+        level: DecodeLevel,
         payload: &mut FramePayload,
     ) -> Result<Option<FrameInfo>, LinkError>
     where
         T: AsyncRead + AsyncWrite + Unpin,
     {
         let header = self.reader.read(io, payload).await?;
+        if level.link.enabled() {
+            tracing::info!(
+                "LINK RX - {}",
+                LinkDisplay::new(header, payload.get(), level.link)
+            );
+        }
         let (info, reply) = self.process_header(&header);
         if let Some(reply) = reply {
-            io.write_all(self.format_reply(reply)).await?
+            let header = self.get_header(reply);
+            if level.link.enabled() {
+                tracing::info!("LINK TX - {}", LinkDisplay::new(header, &[], level.link));
+            }
+            io.write_all(self.format_reply(header)).await?
         }
         Ok(info)
     }

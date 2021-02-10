@@ -25,9 +25,9 @@ fn get_outstation_config() -> OutstationConfig {
     );
     // override the default decode log level
     config.decode_level = DecodeLevel::new(
-        AppDecodeLevel::ObjectValues.into(),
+        AppDecodeLevel::ObjectValues,
         TransportDecodeLevel::Header,
-        LinkDecodeLevel::Nothing,
+        LinkDecodeLevel::Payload,
     );
     // ANCHOR_END: outstation_config
     config

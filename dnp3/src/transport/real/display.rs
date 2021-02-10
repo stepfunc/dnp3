@@ -1,8 +1,6 @@
 use crate::config::TransportDecodeLevel;
 use crate::transport::real::header::Header;
 
-use std::fmt::Write;
-
 pub(crate) struct SegmentDisplay<'a> {
     pub(crate) header: Header,
     pub(crate) payload: &'a [u8],
@@ -32,17 +30,7 @@ impl<'a> std::fmt::Display for SegmentDisplay<'a> {
             )?;
         }
         if self.level.payload_enabled() {
-            for chunk in self.payload.chunks(16) {
-                writeln!(f)?;
-                let mut first = true;
-                for byte in chunk {
-                    if !first {
-                        f.write_char(' ')?;
-                    }
-                    first = false;
-                    write!(f, "{:02X?}", byte)?;
-                }
-            }
+            crate::util::decode::format_bytes(f, self.payload)?;
         }
         Ok(())
     }

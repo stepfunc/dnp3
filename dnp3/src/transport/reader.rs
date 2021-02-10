@@ -100,8 +100,7 @@ impl TransportReader {
         if let Some(TransportData::Fragment(fragment)) = self.inner.peek() {
             match ParsedFragment::parse(fragment.data) {
                 Ok(fragment) => {
-                    let view = fragment.display(level);
-                    tracing::info!("APP RX - {}", view);
+                    tracing::info!("APP RX - {}", fragment.display(level));
                 }
                 Err(err) => {
                     tracing::warn!("error parsing fragment header: {}", err);
