@@ -3,10 +3,10 @@ use crate::config::EndpointAddress;
 use crate::config::{AppDecodeLevel, DecodeLevel, LinkErrorMode};
 use crate::link::error::LinkError;
 use crate::outstation::config::Feature;
-use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::{
     FragmentInfo, LinkLayerMessage, TransportData, TransportRequest, TransportResponse,
 };
+use crate::util::io::PhysLayer;
 
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport reader during testing.
@@ -81,14 +81,11 @@ impl TransportReader {
         &mut self.inner
     }
 
-    pub(crate) async fn read<T>(
+    pub(crate) async fn read(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         decode_level: DecodeLevel,
-    ) -> Result<(), LinkError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
+    ) -> Result<(), LinkError> {
         self.inner.read(io, decode_level).await?;
         if decode_level.application.enabled() {
             self.decode(decode_level.application);

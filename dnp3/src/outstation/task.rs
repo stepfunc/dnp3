@@ -3,7 +3,7 @@ use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
 use crate::outstation::session::{OutstationSession, SessionError};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::transport::{TransportReader, TransportWriter};
-use crate::util::io::IOStream;
+use crate::util::io::PhysLayer;
 use crate::util::task::{Receiver, RunError, Shutdown};
 
 use crate::config::{DecodeLevel, LinkErrorMode};
@@ -125,10 +125,7 @@ impl OutstationTask {
     }
 
     /// run the outstation task asynchronously until a `SessionError` occurs
-    pub(crate) async fn run_io<T>(&mut self, io: &mut T) -> SessionError
-    where
-        T: IOStream,
-    {
+    pub(crate) async fn run_io(&mut self, io: &mut PhysLayer) -> SessionError {
         self.session
             .run(io, &mut self.reader, &mut self.writer, &mut self.database)
             .await
@@ -170,7 +167,10 @@ impl OutstationTask {
 
     async fn run_one_session(&mut self, io: IOType) -> SessionError {
         let err = match io {
-            IOType::TCPStream(mut stream) => self.run_io(&mut stream).await,
+            IOType::TCPStream(stream) => {
+                let mut io = PhysLayer::TCP(stream);
+                self.run_io(&mut io).await
+            }
         };
         match &err {
             SessionError::Run(RunError::Shutdown) => {

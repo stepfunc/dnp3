@@ -254,3 +254,25 @@ impl LinkDecodeLevel {
         }
     }
 }
+
+impl PhysDecodeLevel {
+    pub(crate) fn enabled(&self) -> bool {
+        self.length_enabled()
+    }
+
+    pub(crate) fn length_enabled(&self) -> bool {
+        match self {
+            PhysDecodeLevel::Nothing => false,
+            PhysDecodeLevel::Length => true,
+            PhysDecodeLevel::Data => true,
+        }
+    }
+
+    pub(crate) fn data_enabled(&self) -> bool {
+        match self {
+            PhysDecodeLevel::Nothing => false,
+            PhysDecodeLevel::Length => false,
+            PhysDecodeLevel::Data => true,
+        }
+    }
+}

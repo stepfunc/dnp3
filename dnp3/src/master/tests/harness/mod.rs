@@ -5,6 +5,7 @@ use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
 
 use crate::config::{AppDecodeLevel, LinkErrorMode};
+use crate::util::io::PhysLayer;
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -15,7 +16,9 @@ pub(crate) mod requests;
 pub(crate) fn create_association(
     config: Configuration,
 ) -> TestHarness<impl Future<Output = RunError>> {
-    let (mut io, io_handle) = io::mock();
+    let (io, io_handle) = io::mock();
+
+    let mut io = PhysLayer::Mock(io);
 
     let outstation_address = EndpointAddress::from(1024).unwrap();
 

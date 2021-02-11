@@ -3,7 +3,7 @@ use crate::app::EndpointType;
 use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::AnyAddress;
-use crate::tokio::io::AsyncWrite;
+use crate::util::io::PhysLayer;
 
 /// This type definition is used so that we can mock the transport writer during testing.
 /// If Rust eventually allows `async fn` in traits, this could be removed
@@ -27,16 +27,13 @@ impl TransportWriter {
         self.inner.reset()
     }
 
-    pub(crate) async fn write<W>(
+    pub(crate) async fn write(
         &mut self,
-        io: &mut W,
+        io: &mut PhysLayer,
         level: DecodeLevel,
         destination: AnyAddress,
         fragment: &[u8],
-    ) -> Result<(), LinkError>
-    where
-        W: AsyncWrite + Unpin,
-    {
+    ) -> Result<(), LinkError> {
         if level.application.enabled() {
             if let Ok(fragment) = ParsedFragment::parse(fragment) {
                 let x: FragmentDisplay = fragment.display(level.application);
@@ -46,15 +43,12 @@ impl TransportWriter {
         self.inner.write(io, level, destination, fragment).await
     }
 
-    pub(crate) async fn write_link_status_request<W>(
+    pub(crate) async fn write_link_status_request(
         &mut self,
-        io: &mut W,
+        io: &mut PhysLayer,
         level: DecodeLevel,
         destination: AnyAddress,
-    ) -> Result<(), LinkError>
-    where
-        W: AsyncWrite + Unpin,
-    {
+    ) -> Result<(), LinkError> {
         self.inner
             .write_link_status_request(io, level, destination)
             .await

@@ -5,11 +5,11 @@ use crate::link::error::LinkError;
 use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;
 use crate::outstation::config::Feature;
-use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::real::assembler::{Assembler, AssemblyState};
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::{LinkLayerMessage, LinkLayerMessageType, TransportData};
+use crate::util::io::PhysLayer;
 
 pub(crate) struct Reader {
     link: crate::link::layer::Layer,
@@ -75,10 +75,11 @@ impl Reader {
         self.assembler.peek().map(TransportData::Fragment)
     }
 
-    pub(crate) async fn read<T>(&mut self, io: &mut T, level: DecodeLevel) -> Result<(), LinkError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
+    pub(crate) async fn read(
+        &mut self,
+        io: &mut PhysLayer,
+        level: DecodeLevel,
+    ) -> Result<(), LinkError> {
         if self.assembler.peek().is_some() {
             return Ok(());
         }

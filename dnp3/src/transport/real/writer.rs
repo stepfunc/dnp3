@@ -3,11 +3,11 @@ use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::format::{format_data_frame, format_header_only, Payload};
 use crate::link::header::AnyAddress;
-use crate::tokio::io::{AsyncWrite, AsyncWriteExt};
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::real::sequence::Sequence;
 use crate::util::cursor::WriteCursor;
+use crate::util::io::PhysLayer;
 
 pub(crate) struct Writer {
     endpoint_type: EndpointType,
@@ -30,16 +30,13 @@ impl Writer {
         self.seq.reset();
     }
 
-    pub(crate) async fn write<W>(
+    pub(crate) async fn write(
         &mut self,
-        io: &mut W,
+        io: &mut PhysLayer,
         level: DecodeLevel,
         destination: AnyAddress,
         fragment: &[u8],
-    ) -> Result<(), LinkError>
-    where
-        W: AsyncWrite + Unpin,
-    {
+    ) -> Result<(), LinkError> {
         let chunks = fragment.chunks(crate::link::constant::MAX_APP_BYTES_PER_FRAME);
 
         let last = if chunks.len() == 0 {
@@ -67,24 +64,21 @@ impl Writer {
                 Payload::new(header.to_u8(), chunk),
                 &mut cursor,
             )?;
-            if level.link.enabled() {
-                tracing::info!("LINK TX - {}", data.to_display(level.link));
+            if level.link.header_enabled() {
+                tracing::info!("LINK TX - {}", data.to_link_display(level.link));
             }
-            io.write_all(data.frame).await?;
+            io.write(data.frame, level.physical).await?;
         }
 
         Ok(())
     }
 
-    pub(crate) async fn write_link_status_request<W>(
+    pub(crate) async fn write_link_status_request(
         &mut self,
-        io: &mut W,
+        io: &mut PhysLayer,
         level: DecodeLevel,
         destination: AnyAddress,
-    ) -> Result<(), LinkError>
-    where
-        W: AsyncWrite + Unpin,
-    {
+    ) -> Result<(), LinkError> {
         let mut cursor = WriteCursor::new(&mut self.buffer);
         let header = crate::link::header::Header::request_link_status(
             self.endpoint_type.dir_bit(),
@@ -94,9 +88,9 @@ impl Writer {
 
         let data = format_header_only(header, &mut cursor)?;
         if level.link.enabled() {
-            tracing::info!("LINK TX - {}", data.to_display(level.link));
+            tracing::info!("LINK TX - {}", data.to_link_display(level.link));
         }
-        io.write_all(data.frame).await?;
+        io.write(data.frame, level.physical).await?;
 
         Ok(())
     }

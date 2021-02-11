@@ -6,6 +6,7 @@ use crate::master::session::{MasterSession, RunError};
 use crate::tokio::net::TcpStream;
 use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
+use crate::util::io::PhysLayer;
 use crate::util::task::Shutdown;
 use std::collections::VecDeque;
 use std::future::Future;
@@ -195,14 +196,15 @@ impl MasterTask {
                             .update(ClientState::WaitAfterFailedConnect(delay));
                         self.session.delay_for(delay).await?;
                     }
-                    Ok(mut socket) => {
+                    Ok(socket) => {
+                        let mut io = PhysLayer::TCP(socket);
                         tracing::info!("connected to {}", endpoint);
                         self.endpoints.reset();
                         self.back_off.on_success();
                         self.listener.update(ClientState::Connected);
                         match self
                             .session
-                            .run(&mut socket, &mut self.writer, &mut self.reader)
+                            .run(&mut io, &mut self.writer, &mut self.reader)
                             .await
                         {
                             RunError::Shutdown => {

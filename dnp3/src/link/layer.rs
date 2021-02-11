@@ -6,12 +6,12 @@ use crate::link::header::{
     AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, FrameType, Header,
 };
 use crate::link::parser::FramePayload;
-use crate::tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::config::LinkErrorMode;
 use crate::link::display::LinkDisplay;
 use crate::link::format::format_header_fixed_size;
 use crate::outstation::config::Feature;
+use crate::util::io::PhysLayer;
 
 enum SecondaryState {
     NotReset,
@@ -60,15 +60,12 @@ impl Layer {
         self.reader.reset();
     }
 
-    pub(crate) async fn read<T>(
+    pub(crate) async fn read(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         level: DecodeLevel,
         payload: &mut FramePayload,
-    ) -> Result<FrameInfo, LinkError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
+    ) -> Result<FrameInfo, LinkError> {
         loop {
             if let Some(address) = self.read_one(io, level, payload).await? {
                 return Ok(address);
@@ -89,29 +86,20 @@ impl Layer {
         &self.tx_buffer
     }
 
-    async fn read_one<T>(
+    async fn read_one(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         level: DecodeLevel,
         payload: &mut FramePayload,
-    ) -> Result<Option<FrameInfo>, LinkError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
-        let header = self.reader.read(io, payload).await?;
-        if level.link.enabled() {
-            tracing::info!(
-                "LINK RX - {}",
-                LinkDisplay::new(header, payload.get(), level.link)
-            );
-        }
+    ) -> Result<Option<FrameInfo>, LinkError> {
+        let header = self.reader.read(io, payload, level).await?;
         let (info, reply) = self.process_header(&header);
         if let Some(reply) = reply {
             let header = self.get_header(reply);
             if level.link.enabled() {
                 tracing::info!("LINK TX - {}", LinkDisplay::new(header, &[], level.link));
             }
-            io.write_all(self.format_reply(header)).await?
+            io.write(self.format_reply(header), level.physical).await?
         }
         Ok(info)
     }

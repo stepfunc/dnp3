@@ -11,6 +11,7 @@ use crate::tokio::test::*;
 
 use crate::config::LinkErrorMode;
 use crate::outstation::session::SessionError;
+use crate::util::io::PhysLayer;
 use std::sync::{Arc, Mutex};
 
 pub(crate) fn get_default_config() -> OutstationConfig {
@@ -145,7 +146,9 @@ fn new_harness_impl(
             FrameType::Data,
         ));
 
-    let (mut io, io_handle) = io::mock();
+    let (io, io_handle) = io::mock();
+
+    let mut io = PhysLayer::Mock(io);
 
     OutstationTestHarness {
         handle,
