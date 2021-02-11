@@ -1,14 +1,15 @@
 use crate::app::EndpointType;
 use crate::config::LinkErrorMode;
-use crate::entry::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;
 use crate::outstation::config::Feature;
-use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::real::assembler::{Assembler, AssemblyState};
+use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::{LinkLayerMessage, LinkLayerMessageType, TransportData};
+use crate::util::io::PhysLayer;
 
 pub(crate) struct Reader {
     link: crate::link::layer::Layer,
@@ -74,10 +75,11 @@ impl Reader {
         self.assembler.peek().map(TransportData::Fragment)
     }
 
-    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
+    pub(crate) async fn read(
+        &mut self,
+        io: &mut PhysLayer,
+        level: DecodeLevel,
+    ) -> Result<(), LinkError> {
         if self.assembler.peek().is_some() {
             return Ok(());
         }
@@ -85,12 +87,19 @@ impl Reader {
         let mut payload = FramePayload::new();
 
         loop {
-            let info = self.link.read(io, &mut payload).await?;
+            let info = self.link.read(io, level, &mut payload).await?;
 
             match info.frame_type {
                 FrameType::Data => match payload.get() {
                     [transport, data @ ..] => {
-                        let header = Header::new(*transport);
+                        let header = Header::from_u8(*transport);
+                        if level.transport.enabled() {
+                            tracing::info!(
+                                "TRANSPORT RX - {}",
+                                SegmentDisplay::new(header, data, level.transport)
+                            );
+                        }
+
                         if let AssemblyState::Complete = self.assembler.assemble(info, header, data)
                         {
                             return Ok(());

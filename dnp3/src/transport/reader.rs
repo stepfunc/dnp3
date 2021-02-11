@@ -1,13 +1,12 @@
-use crate::app::parse::parser::{DecodeSettings, ParsedFragment};
-use crate::app::parse::DecodeLogLevel;
-use crate::config::LinkErrorMode;
-use crate::entry::EndpointAddress;
+use crate::app::parse::parser::ParsedFragment;
+use crate::config::EndpointAddress;
+use crate::config::{AppDecodeLevel, DecodeLevel, LinkErrorMode};
 use crate::link::error::LinkError;
 use crate::outstation::config::Feature;
-use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::transport::{
     FragmentInfo, LinkLayerMessage, TransportData, TransportRequest, TransportResponse,
 };
+use crate::util::io::PhysLayer;
 
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport reader during testing.
@@ -17,7 +16,6 @@ pub(crate) type InnerReaderType = crate::transport::real::reader::Reader;
 pub(crate) type InnerReaderType = crate::transport::mock::reader::MockReader;
 
 pub(crate) struct TransportReader {
-    is_master: bool,
     inner: InnerReaderType,
 }
 
@@ -58,7 +56,6 @@ impl TransportReader {
         rx_buffer_size: usize,
     ) -> Self {
         Self {
-            is_master: true,
             inner: InnerReaderType::master(link_error_mode, address, rx_buffer_size),
         }
     }
@@ -70,7 +67,6 @@ impl TransportReader {
         rx_buffer_size: usize,
     ) -> Self {
         Self {
-            is_master: false,
             inner: InnerReaderType::outstation(
                 link_error_mode,
                 address,
@@ -85,36 +81,23 @@ impl TransportReader {
         &mut self.inner
     }
 
-    pub(crate) async fn read<T>(
+    pub(crate) async fn read(
         &mut self,
-        io: &mut T,
-        level: DecodeLogLevel,
-    ) -> Result<(), LinkError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
-        self.inner.read(io).await?;
-        if level.enabled() {
-            self.decode(level);
+        io: &mut PhysLayer,
+        decode_level: DecodeLevel,
+    ) -> Result<(), LinkError> {
+        self.inner.read(io, decode_level).await?;
+        if decode_level.application.enabled() {
+            self.decode(decode_level.application);
         }
         Ok(())
     }
 
-    fn decode(&self, level: DecodeLogLevel) {
+    fn decode(&self, level: AppDecodeLevel) {
         if let Some(TransportData::Fragment(fragment)) = self.inner.peek() {
-            match ParsedFragment::parse(level.receive(), fragment.data) {
+            match ParsedFragment::parse(fragment.data) {
                 Ok(fragment) => {
-                    if let Err(err) = fragment.objects {
-                        tracing::warn!("error parsing object header: {}", err);
-                    }
-
-                    if self.is_master {
-                        if let Err(err) = fragment.to_response() {
-                            tracing::warn!("bad response: {}", err);
-                        }
-                    } else if let Err(err) = fragment.to_request() {
-                        tracing::warn!("bad request: {}", err);
-                    }
+                    tracing::info!("APP RX - {}", fragment.display(level));
                 }
                 Err(err) => {
                     tracing::warn!("error parsing fragment header: {}", err);
@@ -171,7 +154,7 @@ impl TransportReader {
 
         match transport_data {
             TransportData::Fragment(fragment) => {
-                let parsed = ParsedFragment::parse(DecodeSettings::none(), fragment.data).ok()?;
+                let parsed = ParsedFragment::parse(fragment.data).ok()?;
                 Some(ParsedTransportData::Fragment(fragment.info, parsed))
             }
             TransportData::LinkLayerMessage(msg) => {

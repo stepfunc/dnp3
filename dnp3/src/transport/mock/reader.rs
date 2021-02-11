@@ -1,11 +1,11 @@
 use crate::config::LinkErrorMode;
-use crate::entry::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
 use crate::outstation::config::Feature;
-use crate::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use crate::transport::{Fragment, FragmentInfo, TransportData};
 use crate::util::buffer::Buffer;
+use crate::util::io::PhysLayer;
 
 pub(crate) struct MockReader {
     num_reads: usize,
@@ -73,17 +73,21 @@ impl MockReader {
         Some(fragment)
     }
 
-    pub(crate) async fn read<T>(&mut self, io: &mut T) -> Result<(), LinkError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
+    pub(crate) async fn read(
+        &mut self,
+        io: &mut PhysLayer,
+        level: DecodeLevel,
+    ) -> Result<(), LinkError> {
         if self.count > 0 {
             return Ok(());
         }
 
         self.num_reads += 1;
         self.count = io
-            .read(self.buffer.get_mut(self.buffer.len()).unwrap())
+            .read(
+                self.buffer.get_mut(self.buffer.len()).unwrap(),
+                level.physical,
+            )
             .await?;
         self.frame_id = self.frame_id.wrapping_add(1);
         Ok(())

@@ -2,21 +2,20 @@ use crate::app::format::write;
 use crate::app::format::write::start_request;
 use crate::app::header::Control;
 use crate::app::parse::parser::Response;
-use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::app::timeout::Timeout;
 use crate::app::types::LinkStatusResult;
-use crate::entry::EndpointAddress;
+use crate::config::DecodeLevel;
+use crate::config::EndpointAddress;
 use crate::link::error::LinkError;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
-use crate::tokio::io::{AsyncRead, AsyncWrite};
 use crate::tokio::time::Instant;
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
-use crate::util::io::IOStream;
+use crate::util::io::PhysLayer;
 
 use crate::util::task::Shutdown;
 use std::ops::Add;
@@ -24,7 +23,7 @@ use std::time::Duration;
 use tracing::Instrument;
 
 pub(crate) struct MasterSession {
-    level: DecodeLogLevel,
+    decode_level: DecodeLevel,
     timeout: Timeout,
     associations: AssociationMap,
     user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
@@ -63,7 +62,7 @@ impl MasterSession {
     pub(crate) const MIN_RX_BUFFER_SIZE: usize = 2048;
 
     pub(crate) fn new(
-        level: DecodeLogLevel,
+        decode_level: DecodeLevel,
         response_timeout: Timeout,
         tx_buffer_size: usize,
         user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
@@ -76,7 +75,7 @@ impl MasterSession {
         };
 
         Self {
-            level,
+            decode_level,
             timeout: response_timeout,
             associations: AssociationMap::new(),
             user_queue,
@@ -101,15 +100,12 @@ impl MasterSession {
     }
 
     /// Run the master until an error or shutdown occurs.
-    pub(crate) async fn run<T>(
+    pub(crate) async fn run(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> RunError
-    where
-        T: IOStream,
-    {
+    ) -> RunError {
         loop {
             let result = match self.get_next_task() {
                 Next::Now(task) => {
@@ -135,17 +131,14 @@ impl MasterSession {
     /// Wait until a message is received or a response is received.
     ///
     /// Returns an error only if shutdown or link layer error occured.
-    async fn idle_forever<T>(
+    async fn idle_forever(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<(), RunError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), RunError> {
         loop {
-            let decode_level = self.level;
+            let decode_level = self.decode_level;
             crate::tokio::select! {
                 result = self.process_message(true) => {
                    // we need to recheck the tasks
@@ -169,18 +162,15 @@ impl MasterSession {
     /// Wait until a message is received, a response is received, or we reach the defined time.
     ///
     /// Returns an error only if shutdown or link layer error occured.
-    async fn idle_until<T>(
+    async fn idle_until(
         &mut self,
         instant: Instant,
-        io: &mut T,
+        io: &mut PhysLayer,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<(), RunError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), RunError> {
         loop {
-            let decode_level = self.level;
+            let decode_level = self.decode_level;
             crate::tokio::select! {
                 result = self.process_message(true) => {
                    // we need to recheck the tasks
@@ -231,11 +221,11 @@ impl MasterSession {
             MasterMsg::RemoveAssociation(address) => {
                 self.associations.remove(address);
             }
-            MasterMsg::SetDecodeLogLevel(level) => {
-                self.level = level;
+            MasterMsg::SetDecodeLevel(level) => {
+                self.decode_level = level;
             }
-            MasterMsg::GetDecodeLogLevel(promise) => {
-                promise.complete(Ok(self.level));
+            MasterMsg::GetDecodeLevel(promise) => {
+                promise.complete(Ok(self.decode_level));
             }
         }
     }
@@ -250,16 +240,13 @@ impl MasterSession {
     /// Run a specific task.
     ///
     /// Returns an error only if shutdown or link layer error occured.
-    async fn run_task<T>(
+    async fn run_task(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         task: AssociationTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<(), RunError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), RunError> {
         let result = match task.details {
             Task::Read(t) => {
                 self.run_read_task(io, task.address, t, writer, reader)
@@ -297,17 +284,14 @@ impl MasterSession {
         }
     }
 
-    async fn run_non_read_task<T>(
+    async fn run_non_read_task(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         destination: EndpointAddress,
         mut task: NonReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<(), TaskError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), TaskError> {
         loop {
             let seq = match self.send_request(io, destination, &task, writer).await {
                 Ok(seq) => seq,
@@ -326,7 +310,7 @@ impl MasterSession {
                         task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
                         return Err(TaskError::ResponseTimeout);
                     }
-                    x = reader.read(io, self.level) => {
+                    x = reader.read(io, self.decode_level) => {
                         if let Err(err) = x {
                             task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
                             return Err(err.into());
@@ -387,18 +371,15 @@ impl MasterSession {
     }
 
     #[allow(clippy::needless_lifetimes)]
-    async fn validate_non_read_response<'a, T>(
+    async fn validate_non_read_response<'a>(
         &mut self,
         destination: EndpointAddress,
         seq: Sequence,
-        io: &mut T,
+        io: &mut PhysLayer,
         writer: &mut TransportWriter,
         source: EndpointAddress,
         response: Response<'a>,
-    ) -> Result<Option<Response<'a>>, TaskError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<Option<Response<'a>>, TaskError> {
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
                 .await?;
@@ -429,17 +410,14 @@ impl MasterSession {
         Ok(Some(response))
     }
 
-    async fn run_read_task<T>(
+    async fn run_read_task(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         destination: EndpointAddress,
         task: ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<(), TaskError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), TaskError> {
         let result = self
             .execute_read_task(io, destination, &task, writer, reader)
             .await;
@@ -460,17 +438,14 @@ impl MasterSession {
         result
     }
 
-    async fn execute_read_task<T>(
+    async fn execute_read_task(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         destination: EndpointAddress,
         task: &ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<(), TaskError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), TaskError> {
         let mut seq = self.send_request(io, destination, task, writer).await?;
         let mut is_first = true;
 
@@ -484,7 +459,7 @@ impl MasterSession {
                             tracing::warn!("no response within timeout: {}", self.timeout);
                             return Err(TaskError::ResponseTimeout);
                     }
-                    x = reader.read(io, self.level) => {
+                    x = reader.read(io, self.decode_level) => {
                         x?;
                         match reader.pop_response() {
                             Some(TransportResponse::Response(source, response)) => {
@@ -516,20 +491,17 @@ impl MasterSession {
     }
 
     #[allow(clippy::too_many_arguments)] // TODO
-    async fn process_read_response<T>(
+    async fn process_read_response(
         &mut self,
         destination: EndpointAddress,
         is_first: bool,
         seq: Sequence,
         task: &ReadTask,
-        io: &mut T,
+        io: &mut PhysLayer,
         writer: &mut TransportWriter,
         source: EndpointAddress,
         response: Response<'_>,
-    ) -> Result<ReadResponseAction, TaskError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<ReadResponseAction, TaskError> {
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
                 .await?;
@@ -590,16 +562,13 @@ impl MasterSession {
 
 // Unsolicited processing
 impl MasterSession {
-    async fn handle_fragment_while_idle<T>(
+    async fn handle_fragment_while_idle(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         writer: &mut TransportWriter,
         source: EndpointAddress,
         response: Response<'_>,
-    ) -> Result<(), RunError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), RunError> {
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
                 .await?;
@@ -613,16 +582,13 @@ impl MasterSession {
         Ok(())
     }
 
-    async fn handle_unsolicited<T>(
+    async fn handle_unsolicited(
         &mut self,
         source: EndpointAddress,
         response: &Response<'_>,
-        io: &mut T,
+        io: &mut PhysLayer,
         writer: &mut TransportWriter,
-    ) -> Result<(), LinkError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), LinkError> {
         let association = match self.associations.get_mut(source).ok() {
             Some(x) => x,
             None => {
@@ -650,52 +616,45 @@ impl MasterSession {
 
 // Sending methods
 impl MasterSession {
-    async fn confirm_solicited<T>(
+    async fn confirm_solicited(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         destination: EndpointAddress,
         seq: Sequence,
         writer: &mut TransportWriter,
-    ) -> Result<(), LinkError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), LinkError> {
         let mut cursor = self.tx_buffer.write_cursor();
         write::confirm_solicited(seq, &mut cursor)?;
         writer
-            .write(io, self.level, destination.wrap(), cursor.written())
+            .write(io, self.decode_level, destination.wrap(), cursor.written())
             .await?;
         Ok(())
     }
 
-    async fn confirm_unsolicited<T>(
+    async fn confirm_unsolicited(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         destination: EndpointAddress,
         seq: Sequence,
         writer: &mut TransportWriter,
-    ) -> Result<(), LinkError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), LinkError> {
         let mut cursor = self.tx_buffer.write_cursor();
         crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
 
         writer
-            .write(io, self.level, destination.wrap(), cursor.written())
+            .write(io, self.decode_level, destination.wrap(), cursor.written())
             .await?;
         Ok(())
     }
 
-    async fn send_request<T, U>(
+    async fn send_request<U>(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         address: EndpointAddress,
         request: &U,
         writer: &mut TransportWriter,
     ) -> Result<Sequence, TaskError>
     where
-        T: IOStream,
         U: RequestWriter,
     {
         // format the request
@@ -705,7 +664,7 @@ impl MasterSession {
         let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
         writer
-            .write(io, self.level, address.wrap(), cursor.written())
+            .write(io, self.decode_level, address.wrap(), cursor.written())
             .await?;
         Ok(seq)
     }
@@ -713,20 +672,17 @@ impl MasterSession {
 
 // Link status stuff
 impl MasterSession {
-    async fn run_link_status_task<T>(
+    async fn run_link_status_task(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         destination: EndpointAddress,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<LinkStatusResult, TaskError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
+    ) -> Result<LinkStatusResult, TaskError> {
         // Send link status request
         tracing::info!("Sending link status request (for {})", destination);
         writer
-            .write_link_status_request(io, destination.wrap())
+            .write_link_status_request(io, self.decode_level, destination.wrap())
             .await?;
 
         loop {
@@ -736,7 +692,7 @@ impl MasterSession {
                     tracing::warn!("no response within timeout: {}", self.timeout);
                     return Err(TaskError::ResponseTimeout);
                 }
-                x = reader.read(io, self.level) => {
+                x = reader.read(io, self.decode_level) => {
                     x?;
                     match reader.pop_response() {
                         Some(TransportResponse::Response(source, response)) => {

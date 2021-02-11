@@ -1,4 +1,5 @@
 mod crc;
+pub(crate) mod display;
 pub(crate) mod error;
 pub(crate) mod format;
 mod function;

@@ -1,8 +1,9 @@
+use crate::config::LinkDecodeLevel;
 use crate::link::constant;
 use crate::link::crc::{calc_crc, calc_crc_with_0564};
+use crate::link::display::LinkDisplay;
 use crate::link::error::LogicError;
-use crate::link::function::Function;
-use crate::link::header::ControlField;
+use crate::link::header::Header;
 use crate::util::cursor::{WriteCursor, WriteError};
 use crate::util::slice_ext::SliceExtNoPanic;
 
@@ -27,10 +28,22 @@ impl<'a> Payload<'a> {
     }
 }
 
-pub(crate) fn format_header(
-    control: ControlField,
-    destination: u16,
-    source: u16,
+// A view that we can use for tx logging
+pub(crate) struct FrameData<'a> {
+    pub(crate) frame: &'a [u8],
+    header: Header,
+    payload_only: &'a [u8],
+}
+
+impl<'a> FrameData<'a> {
+    pub(crate) fn to_link_display(&self, level: LinkDecodeLevel) -> LinkDisplay {
+        LinkDisplay::new(self.header, self.payload_only, level)
+    }
+}
+
+// this can all be statically verified not to panic since the buffer is a constant length
+pub(crate) fn format_header_fixed_size(
+    header: Header,
     buffer: &mut [u8; super::constant::LINK_HEADER_LENGTH],
 ) {
     fn to_le(x: u16) -> (u8, u8) {
@@ -42,11 +55,11 @@ pub(crate) fn format_header(
     buffer[0] = constant::START1;
     buffer[1] = constant::START2;
     buffer[2] = 5;
-    buffer[3] = control.to_u8();
-    let (d1, d2) = to_le(destination);
+    buffer[3] = header.control.to_u8();
+    let (d1, d2) = to_le(header.destination.value());
     buffer[4] = d1;
     buffer[5] = d2;
-    let (s1, s2) = to_le(source);
+    let (s1, s2) = to_le(header.source.value());
     buffer[6] = s1;
     buffer[7] = s2;
     let (c1, c2) = to_le(calc_crc(&buffer[0..8]));
@@ -54,44 +67,27 @@ pub(crate) fn format_header(
     buffer[9] = c2;
 }
 
-pub(crate) fn format_unconfirmed_user_data(
-    is_master: bool,
-    destination: u16,
-    source: u16,
+pub(crate) fn format_header_only<'a>(
+    header: Header,
+    cursor: &'a mut WriteCursor,
+) -> Result<FrameData<'a>, WriteError> {
+    format_frame(header, None, cursor)
+}
+
+pub(crate) fn format_data_frame<'a>(
+    header: Header,
     payload: Payload,
-    cursor: &mut WriteCursor,
-) -> Result<(), WriteError> {
-    format(
-        ControlField::new(is_master, Function::PriUnconfirmedUserData),
-        destination,
-        source,
-        Some(payload),
-        cursor,
-    )
+    cursor: &'a mut WriteCursor,
+) -> Result<FrameData<'a>, WriteError> {
+    format_frame(header, Some(payload), cursor)
 }
 
-pub(crate) fn format_link_status_request(
-    is_master: bool,
-    destination: u16,
-    source: u16,
-    cursor: &mut WriteCursor,
-) -> Result<(), WriteError> {
-    format(
-        ControlField::new(is_master, Function::PriRequestLinkStatus),
-        destination,
-        source,
-        None,
-        cursor,
-    )
-}
-
-fn format(
-    control: ControlField,
-    destination: u16,
-    source: u16,
+// generic frame formatting function
+fn format_frame<'a>(
+    header: Header,
     payload: Option<Payload>,
-    cursor: &mut WriteCursor,
-) -> Result<(), WriteError> {
+    cursor: &'a mut WriteCursor,
+) -> Result<FrameData<'a>, WriteError> {
     fn format_payload(payload: Payload, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         // the first block contains the transport header
         let (first, remainder) = payload
@@ -124,20 +120,35 @@ fn format(
         None => constant::MIN_HEADER_LENGTH_VALUE,
     };
 
+    let start = cursor.position();
+
     cursor.write_u8(constant::START1)?;
     cursor.write_u8(constant::START2)?;
 
     let header_start = cursor.position();
 
     cursor.write_u8(length)?;
-    cursor.write_u8(control.to_u8())?;
-    cursor.write_u16_le(destination)?;
-    cursor.write_u16_le(source)?;
+    cursor.write_u8(header.control.to_u8())?;
+    cursor.write_u16_le(header.destination.value())?;
+    cursor.write_u16_le(header.source.value())?;
     cursor.write_u16_le(calc_crc_with_0564(cursor.written_since(header_start)?))?;
 
+    let end_header = cursor.position();
+
     match payload {
-        Some(payload) => format_payload(payload, cursor),
-        None => Ok(()),
+        Some(payload) => {
+            format_payload(payload, cursor)?;
+            Ok(FrameData {
+                header,
+                frame: cursor.written_since(start)?,
+                payload_only: cursor.written_since(end_header)?,
+            })
+        }
+        None => Ok(FrameData {
+            header,
+            frame: cursor.written_since(start)?,
+            payload_only: &[],
+        }),
     }
 }
 
@@ -150,12 +161,7 @@ mod test {
     #[test]
     fn formats_ack() {
         let mut buffer = [0; constant::LINK_HEADER_LENGTH];
-        format_header(
-            ACK.header.control,
-            ACK.header.destination.value(),
-            ACK.header.source.value(),
-            &mut buffer,
-        );
+        format_header_fixed_size(ACK.header, &mut buffer);
         assert_eq!(buffer, ACK.bytes);
     }
 
@@ -164,10 +170,12 @@ mod test {
         let mut buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
         let mut cursor = WriteCursor::new(&mut buffer);
         let start = cursor.position();
-        format_unconfirmed_user_data(
-            true,
-            UNCONFIRMED_USER_DATA.header.destination.value(),
-            UNCONFIRMED_USER_DATA.header.source.value(),
+        format_data_frame(
+            Header::unconfirmed_user_data(
+                true,
+                UNCONFIRMED_USER_DATA.header.destination,
+                UNCONFIRMED_USER_DATA.header.source,
+            ),
             Payload::new(0xC0, &UNCONFIRMED_USER_DATA.payload[1..]),
             &mut cursor,
         )

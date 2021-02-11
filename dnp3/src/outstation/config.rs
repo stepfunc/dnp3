@@ -1,5 +1,4 @@
-use crate::app::parse::DecodeLogLevel;
-use crate::entry::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::outstation::database::ClassZeroConfig;
 use crate::util::buffer::Buffer;
 
@@ -84,7 +83,7 @@ pub struct OutstationConfig {
     pub solicited_buffer_size: BufferSize,
     pub unsolicited_buffer_size: BufferSize,
     pub rx_buffer_size: BufferSize,
-    pub log_level: DecodeLogLevel,
+    pub decode_level: DecodeLevel,
     pub confirm_timeout: std::time::Duration,
     pub select_timeout: std::time::Duration,
     pub features: Features,
@@ -129,7 +128,7 @@ impl OutstationConfig {
             solicited_buffer_size: BufferSize::default(),
             unsolicited_buffer_size: BufferSize::default(),
             rx_buffer_size: BufferSize::default(),
-            log_level: DecodeLogLevel::Nothing,
+            decode_level: DecodeLevel::nothing(),
             confirm_timeout: Self::DEFAULT_CONFIRM_TIMEOUT,
             select_timeout: Self::DEFAULT_SELECT_TIMEOUT,
             features: Features::default(),

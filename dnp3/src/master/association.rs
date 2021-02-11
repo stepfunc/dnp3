@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, VecDeque};
 use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;
 
-use crate::entry::EndpointAddress;
+use crate::config::EndpointAddress;
 pub use crate::master::poll::PollHandle;
 use crate::master::session::RunError;
 

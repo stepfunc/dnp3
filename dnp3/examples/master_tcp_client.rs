@@ -1,5 +1,5 @@
-use dnp3::config::LinkErrorMode;
-use dnp3::entry::EndpointAddress;
+use dnp3::config::EndpointAddress;
+use dnp3::config::{AppDecodeLevel, LinkErrorMode};
 use dnp3::prelude::master::*;
 use std::time::Duration;
 use tokio_stream::StreamExt;
@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         LinkErrorMode::Close,
         MasterConfiguration::new(
             EndpointAddress::from(1)?,
-            DecodeLogLevel::ObjectValues,
+            AppDecodeLevel::ObjectValues.into(),
             ReconnectStrategy::default(),
             Timeout::from_secs(1)?,
         ),
@@ -58,14 +58,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
             "dln" => {
-                master
-                    .set_decode_log_level(DecodeLogLevel::Nothing)
-                    .await
-                    .ok();
+                master.set_decode_level(DecodeLevel::nothing()).await.ok();
             }
             "dlv" => {
                 master
-                    .set_decode_log_level(DecodeLogLevel::ObjectValues)
+                    .set_decode_level(AppDecodeLevel::ObjectValues.into())
                     .await
                     .ok();
             }

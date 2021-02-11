@@ -16,18 +16,18 @@
 //! use std::net::SocketAddr;
 //! use std::str::FromStr;
 //! use std::time::Duration;
+//! use dnp3::config::{LinkErrorMode, AppDecodeLevel};
 //!
 //! // example of using the master API asynchronously from within the Tokio runtime
 //! #[tokio::main(flavor = "multi_thread")]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
-//!     // spawn the master onto another task
-//!     use dnp3::config::LinkErrorMode;
+//! // spawn the master onto another task
 //! let mut master = spawn_master_tcp_client(
 //!         LinkErrorMode::Close,
 //!         MasterConfiguration::new(
 //!             EndpointAddress::from(1)?,
-//!             DecodeLogLevel::ObjectValues,
+//!             AppDecodeLevel::ObjectValues.into(),
 //!             ReconnectStrategy::default(),
 //!             Timeout::from_secs(1)?,
 //!         ),

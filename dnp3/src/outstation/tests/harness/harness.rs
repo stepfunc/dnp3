@@ -1,5 +1,4 @@
-use crate::app::parse::DecodeLogLevel;
-use crate::entry::EndpointAddress;
+use crate::config::{AppDecodeLevel, EndpointAddress};
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::EventBufferConfig;
@@ -12,6 +11,7 @@ use crate::tokio::test::*;
 
 use crate::config::LinkErrorMode;
 use crate::outstation::session::SessionError;
+use crate::util::io::PhysLayer;
 use std::sync::{Arc, Mutex};
 
 pub(crate) fn get_default_config() -> OutstationConfig {
@@ -26,7 +26,7 @@ pub(crate) fn get_default_unsolicited_config() -> OutstationConfig {
         EndpointAddress::from(1).unwrap(),
     );
 
-    config.log_level = DecodeLogLevel::ObjectValues;
+    config.decode_level = AppDecodeLevel::ObjectValues.into();
 
     config
 }
@@ -146,7 +146,9 @@ fn new_harness_impl(
             FrameType::Data,
         ));
 
-    let (mut io, io_handle) = io::mock();
+    let (io, io_handle) = io::mock();
+
+    let mut io = PhysLayer::Mock(io);
 
     OutstationTestHarness {
         handle,

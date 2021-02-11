@@ -187,10 +187,7 @@ public class MasterExample {
   private static void run(Runtime runtime) throws Exception {
     // Create the master
     MasterConfiguration masterConfig = new MasterConfiguration(ushort(1));
-    masterConfig.address = ushort(1);
-    masterConfig.level = DecodeLogLevel.OBJECT_VALUES;
-    masterConfig.reconnectionStrategy.minDelay = Duration.ofMillis(100);
-    masterConfig.reconnectionStrategy.maxDelay = Duration.ofSeconds(5);
+    masterConfig.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
 
     Master master = Master.createTcpSession(runtime, LinkErrorMode.CLOSE, masterConfig,
         new EndpointList("127.0.0.1:20000"), new TestListener());
@@ -200,8 +197,6 @@ public class MasterExample {
         new EventClasses(true, true, true), new EventClasses(true, true, true), Classes.all(),
         new EventClasses(false, false, false));
     associationConfiguration.autoTimeSync = AutoTimeSync.LAN;
-    associationConfiguration.autoTasksRetryStrategy.minDelay = Duration.ofSeconds(1);
-    associationConfiguration.autoTasksRetryStrategy.maxDelay = Duration.ofSeconds(5);
     associationConfiguration.keepAliveTimeout = Duration.ofSeconds(60);
 
     TestReadHandler readHandler = new TestReadHandler();
@@ -222,10 +217,12 @@ public class MasterExample {
         case "x":
           return;
         case "dln":
-          master.setDecodeLogLevel(DecodeLogLevel.NOTHING);
+          master.setDecodeLevel(new DecodeLevel());
           break;
         case "dlv":
-          master.setDecodeLogLevel(DecodeLogLevel.OBJECT_VALUES);
+          DecodeLevel level = new DecodeLevel();
+          level.application = AppDecodeLevel.OBJECT_VALUES;
+          master.setDecodeLevel(level);
           break;
         case "rao": {
           Request request = new Request();

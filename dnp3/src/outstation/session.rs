@@ -6,10 +6,9 @@ use crate::app::header::{
 };
 use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
-use crate::app::parse::DecodeLogLevel;
 use crate::app::sequence::Sequence;
 use crate::app::variations::{Group52Var1, Group52Var2};
-use crate::entry::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::{BufferSize, Feature};
@@ -26,7 +25,7 @@ use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 
 use crate::outstation::config::OutstationConfig;
-use crate::util::io::IOStream;
+use crate::util::io::PhysLayer;
 use std::borrow::BorrowMut;
 use xxhash_rust::xxh64::xxh64;
 
@@ -115,7 +114,7 @@ impl LastValidRequest {
 }
 
 pub(crate) struct SessionConfig {
-    level: DecodeLogLevel,
+    decode_level: DecodeLevel,
     master_address: EndpointAddress,
     confirm_timeout: std::time::Duration,
     select_timeout: std::time::Duration,
@@ -135,7 +134,7 @@ pub(crate) struct SessionParameters {
 impl From<OutstationConfig> for SessionConfig {
     fn from(config: OutstationConfig) -> Self {
         SessionConfig {
-            level: config.log_level,
+            decode_level: config.decode_level,
             master_address: config.master_address,
             confirm_timeout: config.confirm_timeout,
             select_timeout: config.select_timeout,
@@ -301,16 +300,13 @@ impl OutstationSession {
         }
     }
 
-    pub(crate) async fn run<T>(
+    pub(crate) async fn run(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> SessionError
-    where
-        T: IOStream,
-    {
+    ) -> SessionError {
         loop {
             if let Err(err) = self.run_idle_state(io, reader, writer, database).await {
                 return err;
@@ -318,54 +314,45 @@ impl OutstationSession {
         }
     }
 
-    async fn write_unsolicited<T>(
+    async fn write_unsolicited(
         &self,
-        io: &mut T,
+        io: &mut PhysLayer,
         writer: &mut TransportWriter,
         length: usize,
-    ) -> Result<(), LinkError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), LinkError> {
         writer
             .write(
                 io,
-                self.config.level,
+                self.config.decode_level,
                 self.config.master_address.wrap(),
                 self.unsol_tx_buffer.get(length).unwrap(),
             )
             .await
     }
 
-    async fn write_solicited<T>(
+    async fn write_solicited(
         &self,
-        io: &mut T,
+        io: &mut PhysLayer,
         writer: &mut TransportWriter,
         length: usize,
-    ) -> Result<(), LinkError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), LinkError> {
         writer
             .write(
                 io,
-                self.config.level,
+                self.config.decode_level,
                 self.config.master_address.wrap(),
                 self.sol_tx_buffer.get(length).unwrap(),
             )
             .await
     }
 
-    async fn run_idle_state<T>(
+    async fn run_idle_state(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), SessionError> {
         // handle a request fragment if present
         self.handle_one_request_from_idle(io, reader, writer, database)
             .await?;
@@ -392,7 +379,7 @@ impl OutstationSession {
 
         // wait for an event
         crate::tokio::select! {
-            frame_read = reader.read(io, self.config.level) => {
+            frame_read = reader.read(io, self.config.decode_level) => {
                 // make sure an I/O error didn't occur, ending the session
                 frame_read?;
             }
@@ -408,16 +395,13 @@ impl OutstationSession {
         Ok(())
     }
 
-    async fn check_unsolicited<T>(
+    async fn check_unsolicited(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<crate::tokio::time::Instant>, SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<Option<crate::tokio::time::Instant>, SessionError> {
         if self.config.unsolicited.is_disabled() {
             return Ok(None);
         }
@@ -477,14 +461,11 @@ impl OutstationSession {
         }
     }
 
-    async fn check_link_status<T>(
+    async fn check_link_status(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         writer: &mut TransportWriter,
-    ) -> Result<(), SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), SessionError> {
         if let Some(next) = self.next_link_status {
             // Wait until we need to send the link status
             if next > crate::tokio::time::Instant::now() {
@@ -492,7 +473,11 @@ impl OutstationSession {
             }
 
             writer
-                .write_link_status_request(io, self.config.master_address.wrap())
+                .write_link_status_request(
+                    io,
+                    self.config.decode_level,
+                    self.config.master_address.wrap(),
+                )
                 .await?;
 
             self.on_link_activity();
@@ -501,32 +486,26 @@ impl OutstationSession {
         Ok(())
     }
 
-    async fn perform_null_unsolicited<T>(
+    async fn perform_null_unsolicited(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<UnsolicitedResult, SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<UnsolicitedResult, SessionError> {
         let seq = self.state.unsolicited_seq.increment();
         let length = self.write_null_unsolicited_response(seq);
         self.perform_unsolicited_response_series(database, seq, length, io, reader, writer)
             .await
     }
 
-    async fn maybe_perform_unsolicited<T>(
+    async fn maybe_perform_unsolicited(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<UnsolicitedResult>, SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<Option<UnsolicitedResult>, SessionError> {
         if !self.state.enabled_unsolicited_classes.any() {
             return Ok(None);
         }
@@ -567,18 +546,15 @@ impl OutstationSession {
         Some((seq, cursor.position()))
     }
 
-    async fn perform_unsolicited_response_series<T>(
+    async fn perform_unsolicited_response_series(
         &mut self,
         database: &mut DatabaseHandle,
         uns_ecsn: Sequence,
         length: usize,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
-    ) -> Result<UnsolicitedResult, SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<UnsolicitedResult, SessionError> {
         self.write_unsolicited(io, writer, length).await?;
 
         // enter unsolicited confirm wait state
@@ -619,18 +595,15 @@ impl OutstationSession {
         }
     }
 
-    async fn wait_for_unsolicited_confirm<T>(
+    async fn wait_for_unsolicited_confirm(
         &mut self,
         uns_ecsn: Sequence,
         deadline: crate::tokio::time::Instant,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<UnsolicitedWaitResult, SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<UnsolicitedWaitResult, SessionError> {
         if let Timeout::Yes = self.read_until(io, reader, deadline).await? {
             return Ok(UnsolicitedWaitResult::Timeout);
         }
@@ -731,17 +704,14 @@ impl OutstationSession {
         }
     }
 
-    async fn read_until<T>(
+    async fn read_until(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         deadline: crate::tokio::time::Instant,
-    ) -> Result<Timeout, SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<Timeout, SessionError> {
         loop {
-            let decode_level = self.config.level;
+            let decode_level = self.config.decode_level;
             crate::tokio::select! {
                  res = self.sleep_until(Some(deadline)) => {
                      res?;
@@ -794,23 +764,20 @@ impl OutstationSession {
 
     fn handle_config_change(&mut self, message: ConfigurationChange) {
         match message {
-            ConfigurationChange::SetDecodeLogLevel(level) => {
-                tracing::info!("set decode log level: {:?}", level);
-                self.config.level = level;
+            ConfigurationChange::SetDecodeLevel(level) => {
+                tracing::info!("decode level changed to: {:?}", level);
+                self.config.decode_level = level;
             }
         }
     }
 
-    async fn handle_deferred_read<T>(
+    async fn handle_deferred_read(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), SessionError> {
         if let Some(x) = self.state.deferred_read.select(database) {
             tracing::info!("handling deferred READ request");
             let (length, series) = self.write_read_response(database, true, x.seq, x.iin2);
@@ -831,16 +798,13 @@ impl OutstationSession {
         Ok(())
     }
 
-    async fn handle_one_request_from_idle<T>(
+    async fn handle_one_request_from_idle(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), SessionError> {
         let mut guard = reader.pop_request();
         match guard.get() {
             Some(TransportRequest::Request(info, request)) => {
@@ -1428,17 +1392,14 @@ impl OutstationSession {
         crate::tokio::time::Instant::now() + self.config.unsolicited_retry_delay
     }
 
-    async fn sol_confirm_wait<T>(
+    async fn sol_confirm_wait(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
         mut series: ResponseSeries,
-    ) -> Result<(), SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<(), SessionError> {
         self.info.enter_solicited_confirm_wait(series.ecsn);
 
         loop {
@@ -1478,16 +1439,13 @@ impl OutstationSession {
         }
     }
 
-    async fn wait_for_sol_confirm<T>(
+    async fn wait_for_sol_confirm(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         ecsn: Sequence,
-    ) -> Result<Confirm, SessionError>
-    where
-        T: IOStream,
-    {
+    ) -> Result<Confirm, SessionError> {
         let mut deadline = self.new_confirm_deadline();
         loop {
             match self.read_until(io, reader, deadline).await? {

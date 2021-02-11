@@ -1,5 +1,5 @@
 use crate::app::EndpointType;
-use crate::entry::EndpointAddress;
+use crate::config::EndpointAddress;
 use crate::master::session::MasterSession;
 
 #[cfg(test)]
@@ -13,6 +13,7 @@ mod writer;
 
 use crate::config::LinkErrorMode;
 use crate::outstation::config::Feature;
+
 pub(crate) use reader::*;
 pub(crate) use types::*;
 pub(crate) use writer::*;

@@ -2,13 +2,13 @@ use crate::app::enums::QualifierCode;
 use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
-use crate::app::parse::DecodeLogLevel;
 use crate::app::retry::ReconnectStrategy;
 use crate::app::timeout::Timeout;
 use crate::app::types::LinkStatusResult;
 use crate::app::types::Timestamp;
 use crate::app::variations::Variation;
-use crate::entry::EndpointAddress;
+use crate::config::DecodeLevel;
+use crate::config::EndpointAddress;
 use crate::master::association::{Association, Configuration};
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
@@ -42,7 +42,7 @@ pub struct MasterConfiguration {
     /// Local DNP3 master address
     pub address: EndpointAddress,
     /// Decode-level for DNP3 objects
-    pub level: DecodeLogLevel,
+    pub decode_level: DecodeLevel,
     /// Reconnection strategy
     pub reconnection_strategy: ReconnectStrategy,
     /// Response timeout
@@ -61,13 +61,13 @@ impl MasterConfiguration {
     /// Create a configuration with default buffer sizes
     pub fn new(
         address: EndpointAddress,
-        level: DecodeLogLevel,
+        decode_level: DecodeLevel,
         reconnection_strategy: ReconnectStrategy,
         response_timeout: Timeout,
     ) -> Self {
         Self {
             address,
-            level,
+            decode_level,
             reconnection_strategy,
             response_timeout,
             tx_buffer_size: MasterSession::DEFAULT_TX_BUFFER_SIZE,
@@ -82,16 +82,16 @@ impl MasterHandle {
     }
 
     /// Set the decoding level used by this master
-    pub async fn set_decode_log_level(&mut self, level: DecodeLogLevel) -> Result<(), Shutdown> {
-        self.send_master_message(MasterMsg::SetDecodeLogLevel(level))
+    pub async fn set_decode_level(&mut self, decode_level: DecodeLevel) -> Result<(), Shutdown> {
+        self.send_master_message(MasterMsg::SetDecodeLevel(decode_level))
             .await?;
         Ok(())
     }
 
     /// Get the current decoding level used by this master
-    pub async fn get_decode_log_level(&mut self) -> Result<DecodeLogLevel, Shutdown> {
-        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<DecodeLogLevel, Shutdown>>();
-        self.send_master_message(MasterMsg::GetDecodeLogLevel(Promise::OneShot(tx)))
+    pub async fn get_decode_level(&mut self) -> Result<DecodeLevel, Shutdown> {
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<DecodeLevel, Shutdown>>();
+        self.send_master_message(MasterMsg::GetDecodeLevel(Promise::OneShot(tx)))
             .await?;
         rx.await?
     }

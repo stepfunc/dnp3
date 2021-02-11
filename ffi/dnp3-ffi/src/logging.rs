@@ -1,4 +1,5 @@
 use crate::ffi;
+use dnp3::config::{AppDecodeLevel, LinkDecodeLevel, PhysDecodeLevel, TransportDecodeLevel};
 use dnp3::prelude::master::*;
 use std::ffi::CString;
 use tracing::span::{Attributes, Record};
@@ -148,24 +149,107 @@ impl From<ffi::LogLevel> for tracing::Level {
     }
 }
 
-impl From<ffi::DecodeLogLevel> for DecodeLogLevel {
-    fn from(from: ffi::DecodeLogLevel) -> Self {
-        match from {
-            ffi::DecodeLogLevel::Nothing => DecodeLogLevel::Nothing,
-            ffi::DecodeLogLevel::Header => DecodeLogLevel::Header,
-            ffi::DecodeLogLevel::ObjectHeaders => DecodeLogLevel::ObjectHeaders,
-            ffi::DecodeLogLevel::ObjectValues => DecodeLogLevel::ObjectValues,
+impl From<ffi::DecodeLevel> for DecodeLevel {
+    fn from(from: ffi::DecodeLevel) -> Self {
+        Self {
+            application: from.application().into(),
+            transport: from.transport().into(),
+            link: from.link().into(),
+            physical: from.physical().into(),
         }
     }
 }
 
-impl From<DecodeLogLevel> for ffi::DecodeLogLevel {
-    fn from(from: DecodeLogLevel) -> Self {
+impl From<DecodeLevel> for ffi::DecodeLevel {
+    fn from(from: DecodeLevel) -> Self {
+        ffi::DecodeLevelFields {
+            application: from.application.into(),
+            transport: from.transport.into(),
+            link: from.link.into(),
+            physical: from.physical.into(),
+        }
+        .into()
+    }
+}
+
+impl From<ffi::AppDecodeLevel> for AppDecodeLevel {
+    fn from(from: ffi::AppDecodeLevel) -> Self {
         match from {
-            DecodeLogLevel::Nothing => ffi::DecodeLogLevel::Nothing,
-            DecodeLogLevel::Header => ffi::DecodeLogLevel::Header,
-            DecodeLogLevel::ObjectHeaders => ffi::DecodeLogLevel::ObjectHeaders,
-            DecodeLogLevel::ObjectValues => ffi::DecodeLogLevel::ObjectValues,
+            ffi::AppDecodeLevel::Nothing => Self::Nothing,
+            ffi::AppDecodeLevel::Header => Self::Header,
+            ffi::AppDecodeLevel::ObjectHeaders => Self::ObjectHeaders,
+            ffi::AppDecodeLevel::ObjectValues => Self::ObjectValues,
+        }
+    }
+}
+
+impl From<ffi::TransportDecodeLevel> for TransportDecodeLevel {
+    fn from(from: ffi::TransportDecodeLevel) -> Self {
+        match from {
+            ffi::TransportDecodeLevel::Nothing => Self::Nothing,
+            ffi::TransportDecodeLevel::Header => Self::Header,
+            ffi::TransportDecodeLevel::Payload => Self::Payload,
+        }
+    }
+}
+
+impl From<ffi::LinkDecodeLevel> for LinkDecodeLevel {
+    fn from(from: ffi::LinkDecodeLevel) -> Self {
+        match from {
+            ffi::LinkDecodeLevel::Nothing => Self::Nothing,
+            ffi::LinkDecodeLevel::Header => Self::Header,
+            ffi::LinkDecodeLevel::Payload => Self::Payload,
+        }
+    }
+}
+
+impl From<ffi::PhysDecodeLevel> for PhysDecodeLevel {
+    fn from(from: ffi::PhysDecodeLevel) -> Self {
+        match from {
+            ffi::PhysDecodeLevel::Nothing => Self::Nothing,
+            ffi::PhysDecodeLevel::Length => Self::Length,
+            ffi::PhysDecodeLevel::Data => Self::Data,
+        }
+    }
+}
+
+impl From<AppDecodeLevel> for ffi::AppDecodeLevel {
+    fn from(from: AppDecodeLevel) -> Self {
+        match from {
+            AppDecodeLevel::Nothing => ffi::AppDecodeLevel::Nothing,
+            AppDecodeLevel::Header => ffi::AppDecodeLevel::Header,
+            AppDecodeLevel::ObjectHeaders => ffi::AppDecodeLevel::ObjectHeaders,
+            AppDecodeLevel::ObjectValues => ffi::AppDecodeLevel::ObjectValues,
+        }
+    }
+}
+
+impl From<TransportDecodeLevel> for ffi::TransportDecodeLevel {
+    fn from(from: TransportDecodeLevel) -> Self {
+        match from {
+            TransportDecodeLevel::Nothing => ffi::TransportDecodeLevel::Nothing,
+            TransportDecodeLevel::Header => ffi::TransportDecodeLevel::Header,
+            TransportDecodeLevel::Payload => ffi::TransportDecodeLevel::Payload,
+        }
+    }
+}
+
+impl From<LinkDecodeLevel> for ffi::LinkDecodeLevel {
+    fn from(from: LinkDecodeLevel) -> Self {
+        match from {
+            LinkDecodeLevel::Nothing => ffi::LinkDecodeLevel::Nothing,
+            LinkDecodeLevel::Header => ffi::LinkDecodeLevel::Header,
+            LinkDecodeLevel::Payload => ffi::LinkDecodeLevel::Payload,
+        }
+    }
+}
+
+impl From<PhysDecodeLevel> for ffi::PhysDecodeLevel {
+    fn from(from: PhysDecodeLevel) -> Self {
+        match from {
+            PhysDecodeLevel::Nothing => ffi::PhysDecodeLevel::Nothing,
+            PhysDecodeLevel::Length => ffi::PhysDecodeLevel::Length,
+            PhysDecodeLevel::Data => ffi::PhysDecodeLevel::Data,
         }
     }
 }

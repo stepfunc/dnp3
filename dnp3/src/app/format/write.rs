@@ -114,11 +114,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
 
     #[cfg(test)]
     pub(crate) fn to_parsed(&'a self) -> ParsedFragment<'a> {
-        ParsedFragment::parse(
-            crate::app::parse::parser::DecodeSettings::none(),
-            self.cursor.written(),
-        )
-        .unwrap()
+        ParsedFragment::parse(self.cursor.written()).unwrap()
     }
 }
 

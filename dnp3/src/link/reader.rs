@@ -1,9 +1,10 @@
-use crate::config::LinkErrorMode;
+use crate::config::{DecodeLevel, LinkErrorMode};
+use crate::link::display::LinkDisplay;
 use crate::link::error::LinkError;
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
-use crate::tokio::io::{AsyncRead, AsyncReadExt};
 use crate::util::cursor::ReadCursor;
+use crate::util::io::PhysLayer;
 use std::io::ErrorKind;
 
 pub(crate) struct Reader {
@@ -33,14 +34,12 @@ impl Reader {
     Returns a future that keeps reading until a frame is received or an error is returned
     This future can be dropped without losing any state.
     */
-    pub(crate) async fn read<R>(
+    pub(crate) async fn read(
         &mut self,
-        io: &mut R,
+        io: &mut PhysLayer,
         payload: &mut FramePayload,
-    ) -> Result<Header, LinkError>
-    where
-        R: AsyncRead + Unpin,
-    {
+        level: DecodeLevel,
+    ) -> Result<Header, LinkError> {
         loop {
             // if all bytes are consumed, ensure these are set back to zero
             if self.begin == self.end {
@@ -55,7 +54,15 @@ impl Reader {
             self.begin += start - cursor.remaining();
             match result {
                 // complete frame
-                Some(header) => return Ok(header),
+                Some(header) => {
+                    if level.link.enabled() {
+                        tracing::info!(
+                            "LINK RX - {}",
+                            LinkDisplay::new(header, payload.get(), level.link)
+                        );
+                    }
+                    return Ok(header);
+                }
                 // parser can't make progress without more bytes
                 None => {
                     // if the buffer is full, we need to shift its contents
@@ -66,7 +73,9 @@ impl Reader {
                     }
 
                     // now we can read more data
-                    let count = io.read(&mut self.buffer[self.end..]).await?;
+                    let count = io
+                        .read(&mut self.buffer[self.end..], level.physical)
+                        .await?;
                     if count == 0 {
                         return Err(LinkError::IO(ErrorKind::UnexpectedEof));
                     }

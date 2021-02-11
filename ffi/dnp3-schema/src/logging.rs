@@ -1,9 +1,8 @@
-use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
-use oo_bindgen::native_struct::StructElementType;
+use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::*;
 
-pub fn define(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
+pub fn define(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
     let log_level_enum = lib
         .define_native_enum("LogLevel")?
         .push("Error", "Error log level")?
@@ -109,18 +108,59 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError
         .doc("Provides a static method for configuring logging")?
         .build()?;
 
-    let decode_log_level_enum = lib
-        .define_native_enum("DecodeLogLevel")?
+    let app_decode_level_enum = lib
+        .define_native_enum("AppDecodeLevel")?
         .push("Nothing", "Decode nothing")?
-        .push("Header", "Decode only the application layer header")?
-        .push("ObjectHeaders", "Decode down to the object header values")?
-        .push("ObjectValues", "Decode down to the object values")?
-        .doc(
-            doc("Master decoding log level")
-                .details("Determines how deep the master should decode and log the responses.")
-                .details("Use {class:Master.SetDecodeLogLevel()} to set it."),
+        .push("Header", " Decode the header-only")?
+        .push("ObjectHeaders", "Decode the header and the object headers")?
+        .push(
+            "ObjectValues",
+            "Decode the header, the object headers, and the object values",
         )?
+        .doc("Controls how transmitted and received application-layer fragments are decoded at the INFO log level")?
         .build()?;
 
-    Ok(decode_log_level_enum)
+    let transport_decode_level_enum = lib
+        .define_native_enum("TransportDecodeLevel")?
+        .push("Nothing", "Decode nothing")?
+        .push("Header", " Decode the header")?
+        .push("Payload", "Decode the header and the raw payload as hexadecimal")?
+        .doc("Controls how transmitted and received transport segments are decoded at the INFO log level")?
+        .build()?;
+
+    let link_decode_level_enum = lib
+        .define_native_enum("LinkDecodeLevel")?
+        .push("Nothing", "Decode nothing")?
+        .push("Header", " Decode the header")?
+        .push(
+            "Payload",
+            "Decode the header and the raw payload as hexadecimal",
+        )?
+        .doc("Controls how transmitted and received link frames are decoded at the INFO log level")?
+        .build()?;
+
+    let phys_decode_level_enum = lib
+        .define_native_enum("PhysDecodeLevel")?
+        .push("Nothing", "Log nothing")?
+        .push(
+            "Length",
+            "Log only the length of data that is sent and received",
+        )?
+        .push(
+            "Data",
+            "Log the length and the actual data that is sent and received",
+        )?
+        .doc("Controls how data transmitted at the physical layer (TCP, serial, etc) is logged")?
+        .build()?;
+
+    let decode_level_struct = lib.declare_native_struct("DecodeLevel")?;
+    let decode_level_struct = lib.define_native_struct(&decode_level_struct)?
+        .add("application", StructElementType::Enum(app_decode_level_enum, Some("Nothing".to_string())), "Controls application fragment decoding")?
+        .add("transport", StructElementType::Enum(transport_decode_level_enum, Some("Nothing".to_string())), "Controls transport segment layer decoding")?
+        .add("link", StructElementType::Enum(link_decode_level_enum, Some("Nothing".to_string())), "Controls link frame decoding")?
+        .add("physical", StructElementType::Enum(phys_decode_level_enum, Some("Nothing".to_string())), "Controls the logging of physical layer read/write")?
+        .doc("Controls the decoding of transmitted and received data at the application, transport, link, and physical layers")?
+        .build()?;
+
+    Ok(decode_level_struct)
 }

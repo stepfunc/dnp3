@@ -1,5 +1,5 @@
 use super::function::Function;
-use crate::entry::EndpointAddress;
+use crate::config::EndpointAddress;
 
 pub(crate) mod constants {
     pub(crate) const MASK_DIR: u8 = 0x80;
@@ -157,15 +157,35 @@ pub(crate) struct Header {
 }
 
 impl Header {
-    pub(crate) fn new(
-        control: ControlField,
-        destination: AnyAddress,
-        source: AnyAddress,
-    ) -> Header {
-        Header {
+    pub(crate) fn new(control: ControlField, destination: AnyAddress, source: AnyAddress) -> Self {
+        Self {
             control,
             destination,
             source,
         }
+    }
+
+    pub(crate) fn unconfirmed_user_data(
+        is_master: bool,
+        destination: AnyAddress,
+        source: AnyAddress,
+    ) -> Self {
+        Self::new(
+            ControlField::new(is_master, Function::PriUnconfirmedUserData),
+            destination,
+            source,
+        )
+    }
+
+    pub(crate) fn request_link_status(
+        is_master: bool,
+        destination: AnyAddress,
+        source: AnyAddress,
+    ) -> Self {
+        Self::new(
+            ControlField::new(is_master, Function::PriRequestLinkStatus),
+            destination,
+            source,
+        )
     }
 }

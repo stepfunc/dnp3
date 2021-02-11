@@ -1,16 +1,17 @@
 use crate::app::EndpointType;
-use crate::entry::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::function::Function;
 use crate::link::header::{
     AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, FrameType, Header,
 };
 use crate::link::parser::FramePayload;
-use crate::tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::config::LinkErrorMode;
-use crate::link::format::format_header;
+use crate::link::display::LinkDisplay;
+use crate::link::format::format_header_fixed_size;
 use crate::outstation::config::Feature;
+use crate::util::io::PhysLayer;
 
 enum SecondaryState {
     NotReset,
@@ -59,43 +60,46 @@ impl Layer {
         self.reader.reset();
     }
 
-    pub(crate) async fn read<T>(
+    pub(crate) async fn read(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
+        level: DecodeLevel,
         payload: &mut FramePayload,
-    ) -> Result<FrameInfo, LinkError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
+    ) -> Result<FrameInfo, LinkError> {
         loop {
-            if let Some(address) = self.read_one(io, payload).await? {
+            if let Some(address) = self.read_one(io, level, payload).await? {
                 return Ok(address);
             }
         }
     }
 
-    fn format_reply(&mut self, reply: Reply) -> &[u8] {
-        format_header(
+    fn get_header(&self, reply: Reply) -> Header {
+        Header::new(
             ControlField::new(self.endpoint_type.dir_bit(), reply.function),
-            reply.address.raw_value(),
-            self.local_address.raw_value(),
-            &mut self.tx_buffer,
-        );
+            reply.address.wrap(),
+            self.local_address.wrap(),
+        )
+    }
+
+    fn format_reply(&mut self, header: Header) -> &[u8] {
+        format_header_fixed_size(header, &mut self.tx_buffer);
         &self.tx_buffer
     }
 
-    async fn read_one<T>(
+    async fn read_one(
         &mut self,
-        io: &mut T,
+        io: &mut PhysLayer,
+        level: DecodeLevel,
         payload: &mut FramePayload,
-    ) -> Result<Option<FrameInfo>, LinkError>
-    where
-        T: AsyncRead + AsyncWrite + Unpin,
-    {
-        let header = self.reader.read(io, payload).await?;
+    ) -> Result<Option<FrameInfo>, LinkError> {
+        let header = self.reader.read(io, payload, level).await?;
         let (info, reply) = self.process_header(&header);
         if let Some(reply) = reply {
-            io.write_all(self.format_reply(reply)).await?
+            let header = self.get_header(reply);
+            if level.link.enabled() {
+                tracing::info!("LINK TX - {}", LinkDisplay::new(header, &[], level.link));
+            }
+            io.write(self.format_reply(header), level.physical).await?
         }
         Ok(info)
     }

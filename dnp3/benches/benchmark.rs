@@ -10,15 +10,14 @@ use dnp3::outstation::database::{
 use dnp3::app::flags::Flags;
 use dnp3::app::header::ResponseHeader;
 use dnp3::app::parse::bytes::Bytes;
-use dnp3::app::parse::DecodeLogLevel;
 use dnp3::app::retry::{ReconnectStrategy, RetryStrategy};
 use dnp3::app::timeout::Timeout;
 use dnp3::app::types::Timestamp;
-use dnp3::config::LinkErrorMode;
+use dnp3::config::EndpointAddress;
+use dnp3::config::{DecodeLevel, LinkErrorMode};
 use dnp3::entry::master::tcp::EndpointList;
 use dnp3::entry::outstation::tcp::{ServerHandle, TCPServer};
 use dnp3::entry::outstation::AddressFilter;
-use dnp3::entry::EndpointAddress;
 use dnp3::master::association::Configuration;
 use dnp3::master::handle::{
     AssociationHandler, HeaderInfo, Listener, MasterConfiguration, MasterHandle, ReadHandler,
@@ -38,8 +37,8 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 fn config() -> TestConfig {
     TestConfig {
-        outstation_level: DecodeLogLevel::Nothing,
-        master_level: DecodeLogLevel::Nothing,
+        outstation_level: DecodeLevel::nothing(),
+        master_level: DecodeLevel::nothing(),
         num_values: 100,
         max_index: 10,
     }
@@ -91,8 +90,8 @@ criterion_main!(benches);
 
 #[derive(Copy, Clone)]
 struct TestConfig {
-    outstation_level: DecodeLogLevel,
-    master_level: DecodeLogLevel,
+    outstation_level: DecodeLevel,
+    master_level: DecodeLevel,
     num_values: usize,
     max_index: u16,
 }
@@ -270,7 +269,7 @@ impl Pair {
         EndpointAddress::from(1).unwrap()
     }
 
-    fn get_master_config(level: DecodeLogLevel) -> MasterConfiguration {
+    fn get_master_config(level: DecodeLevel) -> MasterConfiguration {
         MasterConfiguration::new(
             Self::master_address(),
             level,
@@ -285,9 +284,9 @@ impl Pair {
         config
     }
 
-    fn get_outstation_config(level: DecodeLogLevel) -> OutstationConfig {
+    fn get_outstation_config(level: DecodeLevel) -> OutstationConfig {
         let mut config = OutstationConfig::new(Self::outstation_address(), Self::master_address());
-        config.log_level = level;
+        config.decode_level = level;
         config
     }
 }

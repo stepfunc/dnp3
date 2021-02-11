@@ -1,10 +1,9 @@
-use crate::app::parse::parser::ParsedFragment;
-use crate::app::parse::DecodeLogLevel;
+use crate::app::parse::parser::{FragmentDisplay, ParsedFragment};
 use crate::app::EndpointType;
-use crate::entry::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::AnyAddress;
-use crate::tokio::io::AsyncWrite;
+use crate::util::io::PhysLayer;
 
 /// This type definition is used so that we can mock the transport writer during testing.
 /// If Rust eventually allows `async fn` in traits, this could be removed
@@ -28,30 +27,30 @@ impl TransportWriter {
         self.inner.reset()
     }
 
-    pub(crate) async fn write<W>(
+    pub(crate) async fn write(
         &mut self,
-        io: &mut W,
-        level: DecodeLogLevel,
+        io: &mut PhysLayer,
+        level: DecodeLevel,
         destination: AnyAddress,
         fragment: &[u8],
-    ) -> Result<(), LinkError>
-    where
-        W: AsyncWrite + Unpin,
-    {
-        if level != DecodeLogLevel::Nothing {
-            let _ = ParsedFragment::parse(level.transmit(), fragment);
+    ) -> Result<(), LinkError> {
+        if level.application.enabled() {
+            if let Ok(fragment) = ParsedFragment::parse(fragment) {
+                let x: FragmentDisplay = fragment.display(level.application);
+                tracing::info!("APP TX - {}", x);
+            }
         }
-        self.inner.write(io, destination, fragment).await
+        self.inner.write(io, level, destination, fragment).await
     }
 
-    pub(crate) async fn write_link_status_request<W>(
+    pub(crate) async fn write_link_status_request(
         &mut self,
-        io: &mut W,
+        io: &mut PhysLayer,
+        level: DecodeLevel,
         destination: AnyAddress,
-    ) -> Result<(), LinkError>
-    where
-        W: AsyncWrite + Unpin,
-    {
-        self.inner.write_link_status_request(io, destination).await
+    ) -> Result<(), LinkError> {
+        self.inner
+            .write_link_status_request(io, level, destination)
+            .await
     }
 }

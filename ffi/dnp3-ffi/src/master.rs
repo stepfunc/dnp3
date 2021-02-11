@@ -7,11 +7,11 @@ use crate::ffi;
 use dnp3::app::retry::{ReconnectStrategy, RetryStrategy};
 use dnp3::app::timeout::Timeout;
 use dnp3::app::types::Timestamp;
+use dnp3::config::EndpointAddress;
 use dnp3::entry::master::serial::{
     create_master_serial_client, DataBits, FlowControl, Parity, StopBits,
 };
 use dnp3::entry::master::ClientState;
-use dnp3::entry::EndpointAddress;
 use dnp3::master::association::Configuration;
 use dnp3::master::handle::{
     AssociationHandler, Listener, MasterConfiguration, MasterHandle, ReadHandler,
@@ -182,31 +182,37 @@ pub unsafe fn master_add_association(
     }
 }
 
-pub unsafe fn master_set_decode_log_level(master: *mut Master, level: ffi::DecodeLogLevel) {
+pub unsafe fn master_set_decode_level(master: *mut Master, level: ffi::DecodeLevel) {
     if let Some(master) = master.as_mut() {
         master
             .runtime
             .unwrap()
-            .spawn(master.handle.set_decode_log_level(level.into()));
+            .spawn(master.handle.set_decode_level(level.into()));
     }
 }
 
-pub unsafe fn master_get_decode_log_level(master: *mut Master) -> ffi::DecodeLogLevel {
+pub unsafe fn master_get_decode_level(master: *mut Master) -> ffi::DecodeLevel {
     if tokio::runtime::Handle::try_current().is_err() {
         if let Some(master) = master.as_mut() {
             if let Ok(level) = master
                 .runtime
                 .unwrap()
-                .block_on(master.handle.get_decode_log_level())
+                .block_on(master.handle.get_decode_level())
             {
                 return level.into();
             }
         }
     } else {
-        tracing::warn!("Tried calling 'master_get_decode_log_level' from within a tokio thread");
+        tracing::warn!("Tried calling 'master_get_decode_level' from within a tokio thread");
     }
 
-    ffi::DecodeLogLevel::Nothing
+    ffi::DecodeLevelFields {
+        application: ffi::AppDecodeLevel::Nothing,
+        transport: ffi::TransportDecodeLevel::Nothing,
+        link: ffi::LinkDecodeLevel::Nothing,
+        physical: ffi::PhysDecodeLevel::Nothing,
+    }
+    .into()
 }
 
 pub fn classes_all() -> ffi::Classes {
@@ -367,7 +373,7 @@ impl ffi::MasterConfiguration {
 
         Some(MasterConfiguration {
             address,
-            level: self.level().into(),
+            decode_level: self.decode_level().clone().into(),
             reconnection_strategy: strategy,
             response_timeout: Timeout::from_duration(self.response_timeout()).unwrap(),
             tx_buffer_size: self.tx_buffer_size() as usize,

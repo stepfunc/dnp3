@@ -1,8 +1,8 @@
 use crate::app::EndpointType;
-use crate::entry::EndpointAddress;
+use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::AnyAddress;
-use crate::tokio::io::{AsyncWrite, AsyncWriteExt};
+use crate::util::io::PhysLayer;
 
 pub(crate) struct MockWriter {
     num_writes: usize,
@@ -21,28 +21,24 @@ impl MockWriter {
     }
 
     // just write the fragment directly to the I/O
-    pub(crate) async fn write<W>(
+    pub(crate) async fn write(
         &mut self,
-        io: &mut W,
+        io: &mut PhysLayer,
+        level: DecodeLevel,
         _: AnyAddress,
         fragment: &[u8],
-    ) -> Result<(), LinkError>
-    where
-        W: AsyncWrite + Unpin,
-    {
-        io.write(fragment).await?;
+    ) -> Result<(), LinkError> {
+        io.write(fragment, level.physical).await?;
         self.num_writes += 1;
         Ok(())
     }
 
-    pub(crate) async fn write_link_status_request<W>(
+    pub(crate) async fn write_link_status_request(
         &mut self,
-        _: &mut W,
+        _: &mut PhysLayer,
+        _: DecodeLevel,
         _: AnyAddress,
-    ) -> Result<(), LinkError>
-    where
-        W: AsyncWrite + Unpin,
-    {
+    ) -> Result<(), LinkError> {
         // ignore this yet
         Ok(())
     }

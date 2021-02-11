@@ -5,8 +5,8 @@ mod struct_constructors;
 use std::ffi::CStr;
 use std::time::Duration;
 
+use dnp3::config::EndpointAddress;
 use dnp3::entry::outstation::tcp::ServerHandle;
-use dnp3::entry::EndpointAddress;
 use dnp3::outstation::config::{BufferSize, Feature, Features, OutstationConfig};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::task::OutstationHandle;
@@ -151,13 +151,10 @@ pub unsafe fn outstation_transaction(
     }
 }
 
-pub unsafe fn outstation_set_decode_log_level(
-    outstation: *mut Outstation,
-    level: ffi::DecodeLogLevel,
-) {
+pub unsafe fn outstation_set_decode_level(outstation: *mut Outstation, level: ffi::DecodeLevel) {
     if let Some(outstation) = outstation.as_mut() {
         if let Some(runtime) = outstation.runtime.get() {
-            runtime.spawn(outstation.handle.set_decode_log_level(level.into()));
+            runtime.spawn(outstation.handle.set_decode_level(level.into()));
         }
     }
 }
@@ -200,7 +197,7 @@ fn convert_outstation_config(config: ffi::OutstationConfig) -> Option<Outstation
         solicited_buffer_size,
         unsolicited_buffer_size,
         rx_buffer_size,
-        log_level: config.log_level().into(),
+        decode_level: config.decode_level().clone().into(),
         confirm_timeout: config.confirm_timeout(),
         select_timeout: config.select_timeout(),
         features: config.features().into(),
