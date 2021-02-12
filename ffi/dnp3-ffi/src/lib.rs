@@ -1,4 +1,5 @@
 #![allow(
+    unknown_lints,
     clippy::clippy::missing_safety_doc,
     clippy::useless_conversion,
     clippy::upper_case_acronyms
