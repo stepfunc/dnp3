@@ -134,36 +134,36 @@ impl Control {
 
 /// Internal Indications Byte #1
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct IIN1 {
+pub struct Iin1 {
     /// underlying value for IIN1
     pub value: u8,
 }
 
 /// Internal Indications Byte #2
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct IIN2 {
+pub struct Iin2 {
     /// underlying value for IIN2
     pub value: u8,
 }
 
 /// Internal Indications (2 bytes)
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct IIN {
+pub struct Iin {
     /// IIN byte #1
-    pub iin1: IIN1,
+    pub iin1: Iin1,
     /// IIN byte #2
-    pub iin2: IIN2,
+    pub iin2: Iin2,
 }
 
-impl IIN1 {
-    pub const BROADCAST: IIN1 = IIN1::new(BIT_0.value);
-    pub const CLASS_1_EVENTS: IIN1 = IIN1::new(BIT_1.value);
-    pub const CLASS_2_EVENTS: IIN1 = IIN1::new(BIT_2.value);
-    pub const CLASS_3_EVENTS: IIN1 = IIN1::new(BIT_3.value);
-    pub const NEED_TIME: IIN1 = IIN1::new(BIT_5.value);
-    pub const LOCAL_CONTROL: IIN1 = IIN1::new(BIT_5.value);
-    pub const DEVICE_TROUBLE: IIN1 = IIN1::new(BIT_6.value);
-    pub const RESTART: IIN1 = IIN1::new(BIT_7.value);
+impl Iin1 {
+    pub const BROADCAST: Iin1 = Iin1::new(BIT_0.value);
+    pub const CLASS_1_EVENTS: Iin1 = Iin1::new(BIT_1.value);
+    pub const CLASS_2_EVENTS: Iin1 = Iin1::new(BIT_2.value);
+    pub const CLASS_3_EVENTS: Iin1 = Iin1::new(BIT_3.value);
+    pub const NEED_TIME: Iin1 = Iin1::new(BIT_5.value);
+    pub const LOCAL_CONTROL: Iin1 = Iin1::new(BIT_5.value);
+    pub const DEVICE_TROUBLE: Iin1 = Iin1::new(BIT_6.value);
+    pub const RESTART: Iin1 = Iin1::new(BIT_7.value);
 
     /// Construct IIN1 from its underlying value
     pub const fn new(value: u8) -> Self {
@@ -211,33 +211,33 @@ impl IIN1 {
     }
 }
 
-impl Default for IIN1 {
+impl Default for Iin1 {
     fn default() -> Self {
         Self { value: 0 }
     }
 }
 
-impl Add<IIN2> for IIN1 {
-    type Output = IIN;
+impl Add<Iin2> for Iin1 {
+    type Output = Iin;
 
-    fn add(self, rhs: IIN2) -> Self::Output {
-        IIN::new(self, rhs)
+    fn add(self, rhs: Iin2) -> Self::Output {
+        Iin::new(self, rhs)
     }
 }
 
-impl BitOrAssign<IIN1> for IIN1 {
-    fn bitor_assign(&mut self, rhs: IIN1) {
+impl BitOrAssign<Iin1> for Iin1 {
+    fn bitor_assign(&mut self, rhs: Iin1) {
         self.value |= rhs.value
     }
 }
 
-impl IIN2 {
-    pub const NO_FUNC_CODE_SUPPORT: IIN2 = IIN2::new(BIT_0.value);
-    pub const OBJECT_UNKNOWN: IIN2 = IIN2::new(BIT_1.value);
-    pub const PARAMETER_ERROR: IIN2 = IIN2::new(BIT_2.value);
-    pub const EVENT_BUFFER_OVERFLOW: IIN2 = IIN2::new(BIT_3.value);
-    pub const ALREADY_EXECUTING: IIN2 = IIN2::new(BIT_4.value);
-    pub const CONFIG_CORRUPT: IIN2 = IIN2::new(BIT_5.value);
+impl Iin2 {
+    pub const NO_FUNC_CODE_SUPPORT: Iin2 = Iin2::new(BIT_0.value);
+    pub const OBJECT_UNKNOWN: Iin2 = Iin2::new(BIT_1.value);
+    pub const PARAMETER_ERROR: Iin2 = Iin2::new(BIT_2.value);
+    pub const EVENT_BUFFER_OVERFLOW: Iin2 = Iin2::new(BIT_3.value);
+    pub const ALREADY_EXECUTING: Iin2 = Iin2::new(BIT_4.value);
+    pub const CONFIG_CORRUPT: Iin2 = Iin2::new(BIT_5.value);
 
     /// Construct IIN2 from its underlying value
     pub const fn new(value: u8) -> Self {
@@ -285,13 +285,13 @@ impl IIN2 {
     }
 }
 
-impl Default for IIN2 {
+impl Default for Iin2 {
     fn default() -> Self {
         Self { value: 0 }
     }
 }
 
-impl BitOr for IIN1 {
+impl BitOr for Iin1 {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
@@ -301,13 +301,13 @@ impl BitOr for IIN1 {
     }
 }
 
-impl BitOrAssign<IIN2> for IIN2 {
-    fn bitor_assign(&mut self, rhs: IIN2) {
+impl BitOrAssign<Iin2> for Iin2 {
+    fn bitor_assign(&mut self, rhs: Iin2) {
         self.value |= rhs.value;
     }
 }
 
-impl BitOr for IIN2 {
+impl BitOr for Iin2 {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
@@ -317,10 +317,10 @@ impl BitOr for IIN2 {
     }
 }
 
-impl BitOr<IIN2> for IIN {
+impl BitOr<Iin2> for Iin {
     type Output = Self;
 
-    fn bitor(self, rhs: IIN2) -> Self::Output {
+    fn bitor(self, rhs: Iin2) -> Self::Output {
         Self {
             iin1: self.iin1,
             iin2: self.iin2 | rhs,
@@ -328,7 +328,7 @@ impl BitOr<IIN2> for IIN {
     }
 }
 
-impl std::fmt::Display for IIN1 {
+impl std::fmt::Display for Iin1 {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         format_bitfield(
             f,
@@ -348,7 +348,7 @@ impl std::fmt::Display for IIN1 {
     }
 }
 
-impl std::fmt::Display for IIN2 {
+impl std::fmt::Display for Iin2 {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         format_bitfield(
             f,
@@ -368,16 +368,16 @@ impl std::fmt::Display for IIN2 {
     }
 }
 
-impl IIN {
+impl Iin {
     /// construct an IIN from `IIN1` and `IIN2`
-    pub fn new(iin1: IIN1, iin2: IIN2) -> Self {
+    pub fn new(iin1: Iin1, iin2: Iin2) -> Self {
         Self { iin1, iin2 }
     }
 
     pub(crate) fn parse(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(Self {
-            iin1: IIN1::new(cursor.read_u8()?),
-            iin2: IIN2::new(cursor.read_u8()?),
+            iin1: Iin1::new(cursor.read_u8()?),
+            iin2: Iin2::new(cursor.read_u8()?),
         })
     }
 
@@ -394,21 +394,21 @@ impl IIN {
     }
 }
 
-impl Default for IIN {
+impl Default for Iin {
     fn default() -> Self {
-        IIN::new(IIN1::new(0), IIN2::new(0))
+        Iin::new(Iin1::new(0), Iin2::new(0))
     }
 }
 
-impl BitOr for IIN {
-    type Output = IIN;
+impl BitOr for Iin {
+    type Output = Iin;
 
     fn bitor(self, rhs: Self) -> Self::Output {
         Self {
-            iin1: IIN1 {
+            iin1: Iin1 {
                 value: self.iin1.value | rhs.iin1.value,
             },
-            iin2: IIN2 {
+            iin2: Iin2 {
                 value: self.iin2.value | rhs.iin2.value,
             },
         }
@@ -439,7 +439,7 @@ pub struct ResponseHeader {
     /// Function code limited to Response or UnsolicitedResponse
     pub function: ResponseFunction,
     /// internal indications field
-    pub iin: IIN,
+    pub iin: Iin,
 }
 
 impl ResponseFunction {
@@ -482,7 +482,7 @@ impl RequestHeader {
 impl ResponseHeader {
     pub(crate) const LENGTH: usize = 4;
 
-    pub(crate) fn new(control: Control, function: ResponseFunction, iin: IIN) -> Self {
+    pub(crate) fn new(control: Control, function: ResponseFunction, iin: Iin) -> Self {
         Self {
             control,
             function,

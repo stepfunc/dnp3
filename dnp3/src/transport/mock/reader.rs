@@ -5,7 +5,7 @@ use crate::link::header::FrameInfo;
 use crate::outstation::config::Feature;
 use crate::transport::{Fragment, FragmentInfo, TransportData};
 use crate::util::buffer::Buffer;
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 
 pub(crate) struct MockReader {
     num_reads: usize,

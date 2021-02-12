@@ -9,7 +9,7 @@ use crate::transport::real::assembler::{Assembler, AssemblyState};
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::{LinkLayerMessage, LinkLayerMessageType, TransportData};
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 
 pub(crate) struct Reader {
     link: crate::link::layer::Layer,

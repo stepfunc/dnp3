@@ -5,7 +5,7 @@ use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
 
 use crate::config::{AppDecodeLevel, LinkErrorMode};
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

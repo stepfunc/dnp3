@@ -1,7 +1,7 @@
 use crate::ffi;
 use dnp3::app::enums::QualifierCode;
 use dnp3::app::flags::Flags;
-use dnp3::app::header::{ResponseFunction, ResponseHeader, IIN1, IIN2};
+use dnp3::app::header::{ResponseFunction, ResponseHeader, Iin1, Iin2};
 use dnp3::app::measurement::*;
 use dnp3::app::parse::bytes::Bytes;
 use dnp3::app::types::DoubleBit;
@@ -359,7 +359,7 @@ impl From<Flags> for ffi::Flags {
 
 pub unsafe fn iin1_is_set(iin1: Option<&ffi::Iin1>, flag: ffi::Iin1Flag) -> bool {
     if let Some(iin1) = iin1 {
-        let iin1 = IIN1::new(iin1.value);
+        let iin1 = Iin1::new(iin1.value);
         match flag {
             ffi::Iin1Flag::Broadcast => iin1.get_broadcast(),
             ffi::Iin1Flag::Class1Events => iin1.get_class_1_events(),
@@ -377,7 +377,7 @@ pub unsafe fn iin1_is_set(iin1: Option<&ffi::Iin1>, flag: ffi::Iin1Flag) -> bool
 
 pub unsafe fn iin2_is_set(iin2: Option<&ffi::Iin2>, flag: ffi::Iin2Flag) -> bool {
     if let Some(iin1) = iin2 {
-        let iin1 = IIN2::new(iin1.value);
+        let iin1 = Iin2::new(iin1.value);
         match flag {
             ffi::Iin2Flag::NoFuncCodeSupport => iin1.get_no_func_code_support(),
             ffi::Iin2Flag::ObjectUnknown => iin1.get_object_unknown(),

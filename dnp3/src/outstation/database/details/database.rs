@@ -1,4 +1,4 @@
-use crate::app::header::IIN2;
+use crate::app::header::Iin2;
 use crate::master::request::EventClasses;
 use crate::outstation::database::details::event::buffer::EventBuffer;
 use crate::outstation::database::details::range::static_db::{
@@ -36,12 +36,12 @@ impl Database {
         self.event_buffer.clear_written();
     }
 
-    pub(crate) fn select_by_header(&mut self, header: ReadHeader) -> IIN2 {
+    pub(crate) fn select_by_header(&mut self, header: ReadHeader) -> Iin2 {
         match header {
             ReadHeader::Static(header) => self.static_db.select(header),
             ReadHeader::Event(header) => {
                 self.event_buffer.select_by_header(header);
-                IIN2::default()
+                Iin2::default()
             }
         }
     }

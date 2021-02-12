@@ -6,7 +6,7 @@ use crate::outstation::config::Feature;
 use crate::transport::{
     FragmentInfo, LinkLayerMessage, TransportData, TransportRequest, TransportResponse,
 };
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 
 #[cfg(not(test))]
 /// This type definition is used so that we can mock the transport reader during testing.

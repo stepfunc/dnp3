@@ -7,7 +7,7 @@ use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::real::sequence::Sequence;
 use crate::util::cursor::WriteCursor;
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 
 pub(crate) struct Writer {
     endpoint_type: EndpointType,

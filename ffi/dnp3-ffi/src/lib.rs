@@ -1,4 +1,4 @@
-#![allow(clippy::clippy::missing_safety_doc, clippy::useless_conversion)]
+#![allow(clippy::clippy::missing_safety_doc, clippy::useless_conversion, clippy::upper_case_acronyms)]
 
 mod association;
 mod command;

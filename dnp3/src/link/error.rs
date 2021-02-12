@@ -18,8 +18,8 @@ pub enum FrameError {
     UnexpectedStart1(u8),
     UnexpectedStart2(u8),
     BadLength(u8),
-    BadHeaderCRC,
-    BadBodyCRC,
+    BadHeaderCrc,
+    BadBodyCrc,
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -30,7 +30,7 @@ pub enum ParseError {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum LinkError {
-    IO(std::io::ErrorKind),
+    Stdio(std::io::ErrorKind),
     BadFrame(FrameError),
     BadLogic(LogicError),
 }
@@ -38,7 +38,7 @@ pub enum LinkError {
 impl std::fmt::Display for LinkError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            LinkError::IO(kind) => write!(f, "{}", std::io::Error::from(*kind)),
+            LinkError::Stdio(kind) => write!(f, "{}", std::io::Error::from(*kind)),
             LinkError::BadFrame(err) => write!(f, "{}", err),
             LinkError::BadLogic(err) => write!(f, "{}", err),
         }
@@ -48,9 +48,9 @@ impl std::fmt::Display for LinkError {
 impl std::fmt::Display for FrameError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            FrameError::BadBodyCRC => f.write_str("bad CRC value in frame payload"),
+            FrameError::BadBodyCrc => f.write_str("bad CRC value in frame payload"),
             FrameError::BadLength(x) => write!(f, "bad frame length: {}", x),
-            FrameError::BadHeaderCRC => f.write_str("bad CRC value in frame header"),
+            FrameError::BadHeaderCrc => f.write_str("bad CRC value in frame header"),
             FrameError::UnexpectedStart1(x) => write!(f, "bad frame start1: {} != 0x05", x),
             FrameError::UnexpectedStart2(x) => write!(f, "bad frame start1: {} != 0x64", x),
         }
@@ -90,6 +90,6 @@ impl From<WriteError> for LinkError {
 
 impl From<std::io::Error> for LinkError {
     fn from(err: std::io::Error) -> Self {
-        LinkError::IO(err.kind())
+        LinkError::Stdio(err.kind())
     }
 }

@@ -8,7 +8,7 @@ pub(crate) enum Continue {
     NewHeader,
 }
 
-pub(crate) trait ToVariationCTO<V>
+pub(crate) trait ToVariationCto<V>
 where
     V: FixedSize,
 {
@@ -46,7 +46,7 @@ pub(crate) fn write_cto<V, T>(
     cto: Time,
 ) -> Result<Continue, WriteError>
 where
-    T: ToVariationCTO<V>,
+    T: ToVariationCto<V>,
     V: FixedSize,
 {
     let time: Time = event.get_time().into();
@@ -84,7 +84,7 @@ pub(crate) fn write_octet_string(
     Ok(Continue::Ok)
 }
 
-impl ToVariationCTO<Group2Var3> for Binary {
+impl ToVariationCto<Group2Var3> for Binary {
     fn get_time(&self) -> Option<Time> {
         self.time
     }
@@ -97,7 +97,7 @@ impl ToVariationCTO<Group2Var3> for Binary {
     }
 }
 
-impl ToVariationCTO<Group4Var3> for DoubleBitBinary {
+impl ToVariationCto<Group4Var3> for DoubleBitBinary {
     fn get_time(&self) -> Option<Time> {
         self.time
     }

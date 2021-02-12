@@ -14,7 +14,7 @@ pub use tokio_one_serial::{DataBits, FlowControl, Parity, StopBits};
 use std::time::Duration;
 
 use crate::config::LinkErrorMode;
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 use tracing::Instrument;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any

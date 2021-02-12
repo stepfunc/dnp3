@@ -2,7 +2,7 @@ use crate::app::EndpointType;
 use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::AnyAddress;
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 
 pub(crate) struct MockWriter {
     num_writes: usize,

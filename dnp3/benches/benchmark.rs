@@ -16,7 +16,7 @@ use dnp3::app::types::Timestamp;
 use dnp3::config::EndpointAddress;
 use dnp3::config::{DecodeLevel, LinkErrorMode};
 use dnp3::entry::master::tcp::EndpointList;
-use dnp3::entry::outstation::tcp::{ServerHandle, TCPServer};
+use dnp3::entry::outstation::tcp::{ServerHandle, TcpServer};
 use dnp3::entry::outstation::AddressFilter;
 use dnp3::master::association::Configuration;
 use dnp3::master::handle::{
@@ -173,7 +173,7 @@ impl Pair {
 
     async fn spawn_outstation(port: u16, config: TestConfig) -> (ServerHandle, OutstationHandle) {
         let mut server =
-            TCPServer::new(LinkErrorMode::Close, SocketAddr::new(Self::LOCALHOST, port));
+            TcpServer::new(LinkErrorMode::Close, SocketAddr::new(Self::LOCALHOST, port));
         let (outstation, task) = server
             .add_outstation(
                 Self::get_outstation_config(config.outstation_level),

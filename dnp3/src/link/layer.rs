@@ -11,7 +11,7 @@ use crate::config::LinkErrorMode;
 use crate::link::display::LinkDisplay;
 use crate::link::format::format_header_fixed_size;
 use crate::outstation::config::Feature;
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 
 enum SecondaryState {
     NotReset,

@@ -5,7 +5,7 @@ mod details;
 /// read headers
 pub(crate) mod read;
 
-use crate::app::header::IIN2;
+use crate::app::header::Iin2;
 use crate::app::measurement::*;
 use crate::app::parse::parser::HeaderCollection;
 use crate::util::cursor::WriteCursor;
@@ -315,13 +315,13 @@ impl DatabaseHandle {
         self.inner.lock().unwrap().inner.clear_written_events();
     }
 
-    pub(crate) fn select(&mut self, headers: &HeaderCollection) -> IIN2 {
-        let mut iin2 = IIN2::default();
+    pub(crate) fn select(&mut self, headers: &HeaderCollection) -> Iin2 {
+        let mut iin2 = Iin2::default();
         let mut guard = self.inner.lock().unwrap();
         for header in headers.iter() {
             match ReadHeader::get(&header) {
                 None => {
-                    iin2 |= IIN2::NO_FUNC_CODE_SUPPORT;
+                    iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
                 }
                 Some(x) => iin2 |= guard.inner.select_by_header(x),
             }

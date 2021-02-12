@@ -3,7 +3,7 @@ use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::gen::ranged::RangedVariation;
-use crate::app::header::{Control, RequestHeader, ResponseFunction, ResponseHeader, IIN};
+use crate::app::header::{Control, RequestHeader, ResponseFunction, ResponseHeader, Iin};
 use crate::app::parse::error::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
@@ -53,7 +53,7 @@ where
 pub(crate) struct ParsedFragment<'a> {
     pub(crate) control: Control,
     pub(crate) function: FunctionCode,
-    pub(crate) iin: Option<IIN>,
+    pub(crate) iin: Option<Iin>,
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
     pub(crate) raw_fragment: &'a [u8],
     pub(crate) raw_objects: &'a [u8],
@@ -147,8 +147,8 @@ impl<'a> ParsedFragment<'a> {
             Some(x) => x,
         };
         let iin = match function {
-            FunctionCode::Response => Some(IIN::parse(&mut cursor)?),
-            FunctionCode::UnsolicitedResponse => Some(IIN::parse(&mut cursor)?),
+            FunctionCode::Response => Some(Iin::parse(&mut cursor)?),
+            FunctionCode::UnsolicitedResponse => Some(Iin::parse(&mut cursor)?),
             _ => None,
         };
 
@@ -622,7 +622,7 @@ mod test {
 
     use super::*;
     use crate::app::enums::CommandStatus;
-    use crate::app::header::{Control, IIN, IIN1, IIN2};
+    use crate::app::header::{Control, Iin, Iin1, Iin2};
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::error::ResponseValidationError;
     use crate::app::parse::prefix::Prefix;
@@ -719,9 +719,9 @@ mod test {
                 seq: Sequence::new(0x02),
             },
             function: ResponseFunction::UnsolicitedResponse,
-            iin: IIN {
-                iin1: IIN1::new(0xFF),
-                iin2: IIN2::new(0xAA),
+            iin: Iin {
+                iin1: Iin1::new(0xFF),
+                iin2: Iin2::new(0xAA),
             },
         };
 

@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create the association
     let mut config = Configuration::default();
-    config.auto_time_sync = Some(TimeSyncProcedure::LAN);
+    config.auto_time_sync = Some(TimeSyncProcedure::Lan);
     config.keep_alive_timeout = Some(Duration::from_secs(60));
     let mut association = master
         .add_association(EndpointAddress::from(1024)?, config, NullHandler::boxed())
@@ -101,13 +101,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "evt" => poll.demand().await,
             "lts" => {
-                if let Err(err) = association.perform_time_sync(TimeSyncProcedure::LAN).await {
+                if let Err(err) = association.perform_time_sync(TimeSyncProcedure::Lan).await {
                     tracing::warn!("error: {}", err);
                 }
             }
             "nts" => {
                 if let Err(err) = association
-                    .perform_time_sync(TimeSyncProcedure::NonLAN)
+                    .perform_time_sync(TimeSyncProcedure::NonLan)
                     .await
                 {
                     tracing::warn!("error: {}", err);

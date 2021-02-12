@@ -115,7 +115,7 @@ impl RestartTask {
 mod tests {
     use super::*;
     use crate::app::format::write::{start_request, start_response};
-    use crate::app::header::{Control, ResponseFunction, IIN};
+    use crate::app::header::{Control, ResponseFunction, Iin};
     use crate::app::sequence::Sequence;
     use crate::master::tasks::RequestWriter;
     use crate::prelude::master::*;
@@ -156,7 +156,7 @@ mod tests {
         let mut writer = start_response(
             Control::response(Sequence::default(), true, true, false),
             ResponseFunction::Response,
-            IIN::default(),
+            Iin::default(),
             &mut cursor,
         )
         .unwrap();
@@ -202,7 +202,7 @@ mod tests {
         let mut writer = start_response(
             Control::response(Sequence::default(), true, true, false),
             ResponseFunction::Response,
-            IIN::default(),
+            Iin::default(),
             &mut cursor,
         )
         .unwrap();

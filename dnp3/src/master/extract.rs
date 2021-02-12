@@ -79,7 +79,7 @@ mod test {
     use super::*;
     use crate::app::enums::FunctionCode;
     use crate::app::flags::Flags;
-    use crate::app::header::{Control, ResponseFunction, ResponseHeader, IIN};
+    use crate::app::header::{Control, ResponseFunction, ResponseHeader, Iin};
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::types::Timestamp;
@@ -89,7 +89,7 @@ mod test {
         ResponseHeader::new(
             Control::from(0xC0),
             ResponseFunction::Response,
-            IIN::default(),
+            Iin::default(),
         )
     }
 
