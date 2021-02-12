@@ -38,7 +38,7 @@ pub struct AssociationHandle {
 
 /// Master configuration
 #[derive(Copy, Clone, Debug)]
-pub struct MasterConfiguration {
+pub struct MasterConfig {
     /// Local DNP3 master address
     pub address: EndpointAddress,
     /// Decode-level for DNP3 objects
@@ -57,7 +57,7 @@ pub struct MasterConfiguration {
     pub rx_buffer_size: usize,
 }
 
-impl MasterConfiguration {
+impl MasterConfig {
     /// Create a configuration with default buffer sizes
     pub fn new(
         address: EndpointAddress,

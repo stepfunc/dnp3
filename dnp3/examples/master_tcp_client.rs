@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // spawn the master onto another task
     let mut master = spawn_master_tcp_client(
         LinkErrorMode::Close,
-        MasterConfiguration::new(
+        MasterConfig::new(
             EndpointAddress::from(1)?,
             AppDecodeLevel::ObjectValues.into(),
             ReconnectStrategy::default(),

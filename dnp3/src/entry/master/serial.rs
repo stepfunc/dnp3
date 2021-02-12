@@ -1,6 +1,6 @@
 use crate::app::retry::ExponentialBackOff;
 use crate::entry::master::ClientState;
-use crate::master::handle::{Listener, MasterConfiguration, MasterHandle};
+use crate::master::handle::{Listener, MasterConfig, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
 use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
@@ -23,7 +23,7 @@ use tracing::Instrument;
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
 pub fn spawn_master_serial_client(
-    config: MasterConfiguration,
+    config: MasterConfig,
     path: &str,
     serial_settings: SerialSettings,
     listener: Listener<ClientState>,
@@ -42,7 +42,7 @@ pub fn spawn_master_serial_client(
 /// tasks instead of within the context of a runtime, e.g. in applications that cannot use
 /// `[tokio::main]` such as C language bindings.
 pub fn create_master_serial_client(
-    config: MasterConfiguration,
+    config: MasterConfig,
     path: &str,
     settings: SerialSettings,
     listener: Listener<ClientState>,
@@ -72,7 +72,7 @@ impl MasterTask {
     fn new(
         path: &str,
         serial_settings: SerialSettings,
-        config: MasterConfiguration,
+        config: MasterConfig,
         listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
         let (tx, rx) = crate::tokio::sync::mpsc::channel(100); // TODO

@@ -264,7 +264,7 @@ int main()
     // ANCHOR_END: runtime_init
 
     // Create the master
-    master_configuration_t master_config = master_configuration_init(1);
+    master_config_t master_config = master_config_init(1);
     master_config.reconnection_strategy.min_delay = 100;
     master_config.reconnection_strategy.max_delay = 5000;
     master_config.decode_level.application = AppDecodeLevel_ObjectValues;

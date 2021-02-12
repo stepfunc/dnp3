@@ -186,7 +186,7 @@ public class MasterExample {
 
   private static void run(Runtime runtime) throws Exception {
     // Create the master
-    MasterConfiguration masterConfig = new MasterConfiguration(ushort(1));
+    MasterConfig masterConfig = new MasterConfig(ushort(1));
     masterConfig.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
 
     Master master = Master.createTcpSession(runtime, LinkErrorMode.CLOSE, masterConfig,

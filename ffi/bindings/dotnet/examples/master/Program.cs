@@ -171,10 +171,10 @@ class MainClass
         }
     }
 
-    private static MasterConfiguration GetMasterConfig()
+    private static MasterConfig GetMasterConfig()
     {
         // create a default configuration with a master address of "1"
-        var config = new MasterConfiguration(1)
+        var config = new MasterConfig(1)
         {
             // override the reconnect strategy            
             ReconnectionStrategy = new RetryStrategy

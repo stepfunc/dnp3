@@ -270,7 +270,7 @@ fn define_master_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> std::result::Result<NativeStructHandle, BindingError> {
-    let master_config = lib.declare_native_struct("MasterConfiguration")?;
+    let master_config = lib.declare_native_struct("MasterConfig")?;
     lib.define_native_struct(&master_config)?
         .add("address", Type::Uint16, "Local DNP3 data-link address")?
         .add("decode_level", StructElementType::Struct(shared.decode_level.clone()), "Decoding level for this master. You can modify this later on with {class:Master.SetDecodeLevel()}.")?

@@ -20,7 +20,7 @@ use dnp3::entry::outstation::tcp::{ServerHandle, TcpServer};
 use dnp3::entry::outstation::AddressFilter;
 use dnp3::master::association::AssociationConfig;
 use dnp3::master::handle::{
-    AssociationHandler, HeaderInfo, Listener, MasterConfiguration, MasterHandle, ReadHandler,
+    AssociationHandler, HeaderInfo, Listener, MasterConfig, MasterHandle, ReadHandler,
 };
 use dnp3::master::request::EventClasses;
 use dnp3::outstation::config::OutstationConfig;
@@ -269,8 +269,8 @@ impl Pair {
         EndpointAddress::from(1).unwrap()
     }
 
-    fn get_master_config(level: DecodeLevel) -> MasterConfiguration {
-        MasterConfiguration::new(
+    fn get_master_config(level: DecodeLevel) -> MasterConfig {
+        MasterConfig::new(
             Self::master_address(),
             level,
             ReconnectStrategy::default(),
