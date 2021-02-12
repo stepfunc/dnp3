@@ -35,7 +35,7 @@
 //!         Listener::None,
 //!     );
 //!
-//!     let mut association = master.add_association(EndpointAddress::from(1024)?, Configuration::default(), NullHandler::boxed()).await?;
+//!     let mut association = master.add_association(EndpointAddress::from(1024)?, AssociationConfig::default(), NullHandler::boxed()).await?;
 //!     association.add_poll(
 //!         EventClasses::all().to_classes().to_request(),
 //!         Duration::from_secs(5),

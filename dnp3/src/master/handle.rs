@@ -9,7 +9,7 @@ use crate::app::types::Timestamp;
 use crate::app::variations::Variation;
 use crate::config::DecodeLevel;
 use crate::config::EndpointAddress;
-use crate::master::association::{Association, Configuration};
+use crate::master::association::{Association, AssociationConfig};
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
@@ -103,7 +103,7 @@ impl MasterHandle {
     pub async fn add_association(
         &mut self,
         address: EndpointAddress,
-        config: Configuration,
+        config: AssociationConfig,
         handler: Box<dyn AssociationHandler>,
     ) -> Result<AssociationHandle, AssociationError> {
         let association = Association::new(address, config, handler);

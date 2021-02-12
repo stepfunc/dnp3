@@ -24,7 +24,7 @@ pub use crate::master::poll::PollHandle;
 use crate::master::session::RunError;
 
 #[derive(Copy, Clone)]
-pub struct Configuration {
+pub struct AssociationConfig {
     /// The event classes to disable on startup
     pub disable_unsol_classes: EventClasses,
     /// The event classes to enable on startup
@@ -48,7 +48,7 @@ pub struct Configuration {
     pub event_scan_on_events_available: EventClasses,
 }
 
-impl Configuration {
+impl AssociationConfig {
     pub fn quiet(auto_tasks_retry_strategy: RetryStrategy) -> Self {
         Self {
             disable_unsol_classes: EventClasses::none(),
@@ -63,7 +63,7 @@ impl Configuration {
     }
 }
 
-impl Default for Configuration {
+impl Default for AssociationConfig {
     fn default() -> Self {
         Self {
             disable_unsol_classes: EventClasses::all(),
@@ -126,7 +126,7 @@ impl AutoTaskState {
     }
 
     /// The task failed and needs rescheduling
-    fn failure(&mut self, config: &Configuration) {
+    fn failure(&mut self, config: &AssociationConfig) {
         *self = match self {
             Self::Failed(backoff, _) => {
                 let delay = backoff.on_failure();
@@ -173,7 +173,7 @@ impl TaskStates {
         self.enabled_unsolicited.demand();
     }
 
-    fn next(&self, config: &Configuration, association: &Association) -> Next<Task> {
+    fn next(&self, config: &AssociationConfig, association: &Association) -> Next<Task> {
         if self.clear_restart_iin.is_pending() {
             return self
                 .clear_restart_iin
@@ -242,7 +242,7 @@ pub(crate) struct Association {
     request_queue: VecDeque<Task>,
     auto_tasks: TaskStates,
     handler: Box<dyn AssociationHandler>,
-    config: Configuration,
+    config: AssociationConfig,
     polls: PollMap,
     next_link_status: Option<Instant>,
     startup_integrity_done: bool,
@@ -252,7 +252,7 @@ pub(crate) struct Association {
 impl Association {
     pub(crate) fn new(
         address: EndpointAddress,
-        config: Configuration,
+        config: AssociationConfig,
         handler: Box<dyn AssociationHandler>,
     ) -> Self {
         Self {

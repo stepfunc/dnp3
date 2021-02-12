@@ -125,7 +125,7 @@ mod tests {
     fn cold_restart() {
         let mut association = Association::new(
             EndpointAddress::from(1).unwrap(),
-            Configuration::default(),
+            AssociationConfig::default(),
             NullHandler::boxed(),
         );
         let (tx, mut rx) = crate::tokio::sync::oneshot::channel();
@@ -171,7 +171,7 @@ mod tests {
     fn warm_restart() {
         let mut association = Association::new(
             EndpointAddress::from(1).unwrap(),
-            Configuration::default(),
+            AssociationConfig::default(),
             NullHandler::boxed(),
         );
         let (tx, mut rx) = crate::tokio::sync::oneshot::channel();

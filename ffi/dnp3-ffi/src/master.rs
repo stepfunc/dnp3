@@ -12,7 +12,7 @@ use dnp3::entry::master::serial::{
     create_master_serial_client, DataBits, FlowControl, Parity, StopBits,
 };
 use dnp3::entry::master::ClientState;
-use dnp3::master::association::Configuration;
+use dnp3::master::association::AssociationConfig;
 use dnp3::master::handle::{
     AssociationHandler, Listener, MasterConfiguration, MasterHandle, ReadHandler,
 };
@@ -130,7 +130,7 @@ pub unsafe fn master_add_association(
         }
     };
 
-    let config = Configuration {
+    let config = AssociationConfig {
         disable_unsol_classes: convert_event_classes(&config.disable_unsol_classes()),
         enable_unsol_classes: convert_event_classes(&config.enable_unsol_classes()),
         startup_integrity_classes: convert_classes(&config.startup_integrity_classes()),

@@ -603,7 +603,7 @@ mod tests {
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
-                Configuration::default(),
+                AssociationConfig::default(),
                 Box::new(TestHandler::new(system_time)),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
@@ -626,7 +626,7 @@ mod tests {
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
-                Configuration::default(),
+                AssociationConfig::default(),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
@@ -874,7 +874,7 @@ mod tests {
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
-                Configuration::default(),
+                AssociationConfig::default(),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
