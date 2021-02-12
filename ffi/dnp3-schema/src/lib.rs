@@ -1,6 +1,7 @@
 use oo_bindgen::*;
 
 mod association;
+mod constants;
 mod database;
 mod handler;
 mod logging;

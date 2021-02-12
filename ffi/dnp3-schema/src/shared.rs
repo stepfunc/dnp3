@@ -32,6 +32,9 @@ pub struct SharedDefinitions {
 }
 
 pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingError> {
+
+    crate::constants::define(lib)?;
+
     let control_struct = lib.declare_native_struct("Control")?;
     let control_struct = lib
         .define_native_struct(&control_struct)?
@@ -283,84 +286,10 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
         .add(
             "value",
             Type::Uint8,
-            "bit-mask representing a set of individual {enum:Flag} values",
+            "bit-mask representing a set of individual flag bits",
         )?
-        .doc("Point flag")?
+        .doc("Collection of individual flag bits represented by an underlying mask value")?
         .build()?;
-
-    let flag_enum = lib
-        .define_native_enum("Flag")?
-        .push("Online", "Point is online")?
-        .push("Restart", "Point has not been updated from the field since device reset")?
-        .push("CommLost", "Communication failure between the device where the data originates and the reporting device")?
-        .push("RemoteForced", "The data value is overridden in a downstream reporting device")?
-        .push("LocalForced", "The data value is overridden bu the device that reports this flag as set")?
-        .push("ChatterFilter", "The binary data value is presently changing between states at a sufficiently high enough rate to activate a chatter filter (only for single and double-bit binary input objects)")?
-        .push("Rollover", "Counter has rollover (only for counter objects). This flag is obsolete.")?
-        .push("Discontinuity", "The reported counter value cannot be compared against a prior value to obtain the correct count difference (only for counter objects)")?
-        .push("OverRange", "The data object's true value exceeds the valid measurement range of the object (only for analog input and output objects)")?
-        .push("ReferenceErr", "The measurement process determined that the object's data value might not have the expected level of accuracy (only for analog input and output objects)")?
-        .doc("Single bit in point flag")?
-        .build()?;
-
-    let flag_get_mask_fn = lib
-        .declare_native_function("flag_get_mask")?
-        .param(
-            "flag",
-            Type::Enum(flag_enum.clone()),
-            "convert the flag enumeration into a raw bitmask",
-        )?
-        .return_type(ReturnType::Type(Type::Uint8, "raw bitmask".into()))?
-        .doc("convert a flag enum into a raw bitmask")?
-        .build()?;
-
-    let flags_from_single_flag_fn = lib
-        .declare_native_function("flags_from_single_flag")?
-        .param("flag", Type::Enum(flag_enum.clone()), "{enum:Flag} value")?
-        .return_type(ReturnType::Type(
-            Type::Struct(flags_struct.clone()),
-            "constructed {struct:Flags}".into(),
-        ))?
-        .doc("construct a {struct:Flags} from a single {enum:Flag}")?
-        .build()?;
-
-    let flags_is_set_fn = lib
-        .declare_native_function("flags_is_set")?
-        .param(
-            "flags",
-            Type::StructRef(flags_struct.declaration()),
-            "Flags byte to check",
-        )?
-        .param("flag", Type::Enum(flag_enum.clone()), "Flag to check")?
-        .return_type(ReturnType::new(
-            Type::Bool,
-            "true if flag is set, false otherwise",
-        ))?
-        .doc("Check if a particular flag is set in the flags byte")?
-        .build()?;
-
-    let flags_set_fn = lib
-        .declare_native_function("flags_set")?
-        .param(
-            "flags",
-            Type::StructRef(flags_struct.declaration()),
-            "Flags to modify",
-        )?
-        .param("flag", Type::Enum(flag_enum), "Flag to modify")?
-        .param("value", Type::Bool, "Value to set the flag to")?
-        .return_type(ReturnType::new(
-            Type::Struct(flags_struct.clone()),
-            "New modified flag",
-        ))?
-        .doc("Create a new flags byte with a modified flag")?
-        .build()?;
-
-    lib.define_struct(&flags_struct)?
-        .method("IsSet", &flags_is_set_fn)?
-        .method("Set", &flags_set_fn)?
-        .static_method("GetFlagMask", &flag_get_mask_fn)?
-        .static_method("FromSingleFlag", &flags_from_single_flag_fn)?
-        .build();
 
     Ok(flags_struct)
 }

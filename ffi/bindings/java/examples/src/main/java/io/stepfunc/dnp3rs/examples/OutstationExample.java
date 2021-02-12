@@ -231,7 +231,7 @@ public class OutstationExample {
         db.addAnalogOutputStatus(ushort(i), EventClass.CLASS1, new AnalogOutputStatusConfig());
         db.addOctetString(ushort(i), EventClass.CLASS1);
 
-        Flags restart = Flags.fromSingleFlag(Flag.RESTART);
+        Flags restart = new Flags(Flag.RESTART);
 
         db.updateBinary(new Binary(ushort(i), false, restart, Timestamp.invalidTimestamp()),
             new UpdateOptions());
@@ -263,7 +263,7 @@ public class OutstationExample {
     long frozenCounterValue = 0;
     double analogValue = 0.0;
     double analogOutputStatusValue = 0.0;
-    final Flags onlineFlags = Flags.fromSingleFlag(Flag.ONLINE);
+    final Flags onlineFlags = new Flags(Flag.ONLINE);
 
     // Handle user input
     try {
