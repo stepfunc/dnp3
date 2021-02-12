@@ -149,16 +149,10 @@ class MainClass
     public static void Main(string[] args)
     {
         // ANCHOR: logging_init
-        // called once during program initialization
+        // Initialize logging with the default configuration
+        // This may only be called once during program initialization
         Logging.Configure(
-            new LoggingConfiguration
-            {
-                Level = LogLevel.Info,
-                PrintLevel = true,
-                PrintModuleInfo = false,
-                TimeFormat = TimeFormat.System,
-                OutputFormat = LogOutputFormat.Text
-            },
+            new LoggingConfig(),
             new ConsoleLogger()
         );
         // ANCHOR_END: logging_init
