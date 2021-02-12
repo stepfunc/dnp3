@@ -14,7 +14,7 @@ use std::task::Poll;
 pub(crate) mod requests;
 
 pub(crate) fn create_association(
-    config: Configuration,
+    config: AssociationConfig,
 ) -> TestHarness<impl Future<Output = RunError>> {
     let (io, io_handle) = io::mock();
 

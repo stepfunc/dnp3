@@ -327,14 +327,8 @@ int main()
 		.on_message = &on_log_message,
 		.ctx = NULL,
 	};
-	logging_configuration_t log_config = {
-		.level = LogLevel_Info,
-		.print_level = true,
-		.print_module_info = false,
-		.time_format = TimeFormat_System,
-		.output_format = LogOutputFormat_Text,
-	};
-	configure_logging(log_config, logger);
+	// initialize logging with the default configuration
+	configure_logging(logging_config_init(), logger);
 
 	// Create runtime
 	runtime_config_t runtime_config =

@@ -11,7 +11,7 @@ thread_local! {
    pub static LOG_BUFFER: std::cell::RefCell<Vec<u8>> = std::cell::RefCell::new(Vec::new());
 }
 
-pub fn configure_logging(config: ffi::LoggingConfiguration, handler: ffi::Logger) {
+pub fn configure_logging(config: ffi::LoggingConfig, handler: ffi::Logger) {
     tracing::subscriber::set_global_default(adapter(config, handler))
         .expect("unable to install tracing subscriber");
 }
@@ -40,7 +40,7 @@ impl std::io::Write for ThreadLocalBufferWriter {
 }
 
 fn adapter(
-    config: ffi::LoggingConfiguration,
+    config: ffi::LoggingConfig,
     handler: ffi::Logger,
 ) -> impl tracing::Subscriber + Send + Sync + 'static {
     Adapter {
@@ -49,7 +49,7 @@ fn adapter(
     }
 }
 
-impl ffi::LoggingConfiguration {
+impl ffi::LoggingConfig {
     fn build(&self) -> Box<dyn tracing::Subscriber + Send + Sync> {
         let level: tracing::Level = self.level().into();
 

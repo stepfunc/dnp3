@@ -13,7 +13,7 @@ use super::harness::requests::*;
 
 #[test]
 fn master_startup_procedure() {
-    let config = Configuration::default();
+    let config = AssociationConfig::default();
     let mut seq = Sequence::default();
     let mut harness = create_association(config);
 
@@ -35,7 +35,7 @@ fn master_startup_procedure() {
 
 #[test]
 fn master_startup_procedure_skips_unsolicited_if_none() {
-    let mut config = Configuration::default();
+    let mut config = AssociationConfig::default();
     config.startup_integrity_classes = Classes::none();
     let mut seq = Sequence::default();
     let mut harness = create_association(config);
@@ -72,7 +72,7 @@ fn master_startup_procedure_skips_unsolicited_if_none() {
 
 #[test]
 fn master_startup_procedure_skips_integrity_poll_if_none() {
-    let mut config = Configuration::default();
+    let mut config = AssociationConfig::default();
     config.disable_unsol_classes = EventClasses::none();
     config.enable_unsol_classes = EventClasses::none();
     let mut seq = Sequence::default();
@@ -86,7 +86,7 @@ fn master_startup_procedure_skips_integrity_poll_if_none() {
 
 #[test]
 fn clear_restart_iin_is_higher_priority() {
-    let config = Configuration::default();
+    let config = AssociationConfig::default();
     let mut seq = Sequence::default();
     let mut harness = create_association(config);
 
@@ -123,7 +123,7 @@ fn clear_restart_iin_is_higher_priority() {
 
 #[test]
 fn outstation_restart_procedure() {
-    let config = Configuration::default();
+    let config = AssociationConfig::default();
     let mut seq = Sequence::default();
     let mut harness = create_association(config);
 
@@ -152,7 +152,7 @@ fn outstation_restart_procedure() {
 
 #[test]
 fn detect_restart_in_read_response() {
-    let config = Configuration::default();
+    let config = AssociationConfig::default();
     let mut seq = Sequence::default();
     let mut harness = create_association(config);
 
@@ -199,7 +199,7 @@ fn detect_restart_in_read_response() {
 
 #[test]
 fn ignore_unsolicited_response_with_data_before_first_integrity_poll() {
-    let config = Configuration::default();
+    let config = AssociationConfig::default();
     let mut seq = Sequence::default();
     let mut unsol_seq = Sequence::default();
     let mut harness = create_association(config);
@@ -252,7 +252,7 @@ fn ignore_unsolicited_response_with_data_before_first_integrity_poll() {
 
 #[test]
 fn ignore_duplicate_unsolicited_response() {
-    let config = Configuration::default();
+    let config = AssociationConfig::default();
     let mut seq = Sequence::default();
     let mut unsol_seq = Sequence::default();
     let mut harness = create_association(config);
@@ -286,7 +286,7 @@ fn ignore_duplicate_unsolicited_response() {
 
 #[test]
 fn master_startup_retry_procedure() {
-    let mut config = Configuration::default();
+    let mut config = AssociationConfig::default();
     config.auto_tasks_retry_strategy =
         RetryStrategy::new(Duration::from_secs(1), Duration::from_secs(3));
     let mut seq = Sequence::default();

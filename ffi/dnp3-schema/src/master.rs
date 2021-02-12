@@ -88,9 +88,9 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .doc("Automatic time synchronization configuration")?
         .build()?;
 
-    let association_configuration = lib.declare_native_struct("AssociationConfiguration")?;
-    let association_configuration = lib
-        .define_native_struct(&association_configuration)?
+    let association_config = lib.declare_native_struct("AssociationConfig")?;
+    let association_config = lib
+        .define_native_struct(&association_config)?
         .add(
             "disable_unsol_classes",
             Type::Struct(event_classes.clone()),
@@ -126,7 +126,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .add("event_scan_on_events_available",
             Type::Struct(event_classes),
-            doc("Classes to automaticaly send reads when the IIN bit is asserted")
+            doc("Classes to automatically send reads when the IIN bit is asserted")
         )?
         .doc("Association configuration")?
         .build()?;
@@ -159,7 +159,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param(
             "config",
-            Type::Struct(association_configuration),
+            Type::Struct(association_config),
             "Association configuration",
         )?
         .param(
@@ -270,7 +270,7 @@ fn define_master_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> std::result::Result<NativeStructHandle, BindingError> {
-    let master_config = lib.declare_native_struct("MasterConfiguration")?;
+    let master_config = lib.declare_native_struct("MasterConfig")?;
     lib.define_native_struct(&master_config)?
         .add("address", Type::Uint16, "Local DNP3 data-link address")?
         .add("decode_level", StructElementType::Struct(shared.decode_level.clone()), "Decoding level for this master. You can modify this later on with {class:Master.SetDecodeLevel()}.")?

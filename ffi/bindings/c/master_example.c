@@ -241,17 +241,8 @@ int main()
         .ctx = NULL,
     };
 
-    // logging configuration options
-    logging_configuration_t config = {
-        .level = LogLevel_Info,
-        .print_level = true,
-        .print_module_info = false,
-        .time_format = TimeFormat_System,
-        .output_format = LogOutputFormat_Json,
-    };
-
-    // initialize logging - may be called only once
-    configure_logging(config, logger);
+    // initialize logging with the default configuration
+    configure_logging(logging_config_init(), logger);
     // ANCHOR_END: logging_init
 
     // ANCHOR: runtime_init
@@ -264,7 +255,7 @@ int main()
     // ANCHOR_END: runtime_init
 
     // Create the master
-    master_configuration_t master_config = master_configuration_init(1);
+    master_config_t master_config = master_config_init(1);
     master_config.reconnection_strategy.min_delay = 100;
     master_config.reconnection_strategy.max_delay = 5000;
     master_config.decode_level.application = AppDecodeLevel_ObjectValues;
@@ -299,7 +290,7 @@ int main()
         .handle_octet_string = &handle_octet_strings,
         .ctx = NULL,
     };
-    association_configuration_t association_config = association_configuration_init(
+    association_config_t association_config = association_config_init(
         event_classes_init(true, true, true),
         event_classes_init(true, true, true),
         classes_all(),

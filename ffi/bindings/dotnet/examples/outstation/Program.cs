@@ -91,9 +91,10 @@ class ExampleOutstation
     }
 
     private static async Task MainAsync()
-    {        
+    {
+        // Initialize logging with the default configuration
         Logging.Configure(
-            new LoggingConfiguration { Level = LogLevel.Info, PrintLevel = true, PrintModuleInfo = false, TimeFormat = TimeFormat.System, OutputFormat = LogOutputFormat.Text },
+            new LoggingConfig(),
             new TestLogger()
         );
 

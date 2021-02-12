@@ -9,7 +9,7 @@ use super::harness::requests::*;
 
 #[test]
 fn auto_integrity_scan_on_buffer_overflow() {
-    let mut config = Configuration::default();
+    let mut config = AssociationConfig::default();
     config.auto_integrity_scan_on_buffer_overflow = true;
     let mut seq = Sequence::default();
     let mut harness = create_association(config);
@@ -33,7 +33,7 @@ fn auto_integrity_scan_on_buffer_overflow() {
 
 #[test]
 fn auto_integrity_scan_on_buffer_overflow_disabled() {
-    let mut config = Configuration::default();
+    let mut config = AssociationConfig::default();
     config.auto_integrity_scan_on_buffer_overflow = false;
     let mut seq = Sequence::default();
     let mut harness = create_association(config);
@@ -55,7 +55,7 @@ fn auto_integrity_scan_on_buffer_overflow_disabled() {
 
 #[test]
 fn auto_event_class_scan() {
-    let mut config = Configuration::default();
+    let mut config = AssociationConfig::default();
     config.event_scan_on_events_available = EventClasses::all();
     let mut seq = Sequence::default();
     let mut harness = create_association(config);
@@ -93,7 +93,7 @@ fn auto_event_class_scan() {
 
 #[test]
 fn auto_event_class_ignore_one_class_scan() {
-    let mut config = Configuration::default();
+    let mut config = AssociationConfig::default();
     config.event_scan_on_events_available = EventClasses::new(false, true, true);
     let mut seq = Sequence::default();
     let mut harness = create_association(config);
@@ -115,7 +115,7 @@ fn auto_event_class_ignore_one_class_scan() {
 
 #[test]
 fn auto_event_class_scan_disabled() {
-    let mut config = Configuration::default();
+    let mut config = AssociationConfig::default();
     config.event_scan_on_events_available = EventClasses::none();
     let mut seq = Sequence::default();
     let mut harness = create_association(config);

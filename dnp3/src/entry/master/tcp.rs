@@ -1,7 +1,7 @@
 use crate::app::retry::ExponentialBackOff;
 use crate::config::LinkErrorMode;
 use crate::entry::master::ClientState;
-use crate::master::handle::{Listener, MasterConfiguration, MasterHandle};
+use crate::master::handle::{Listener, MasterConfig, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
 use crate::tokio::net::TcpStream;
 use crate::transport::TransportReader;
@@ -101,7 +101,7 @@ impl EndpointList {
 /// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
 pub fn spawn_master_tcp_client(
     link_error_mode: LinkErrorMode,
-    config: MasterConfiguration,
+    config: MasterConfig,
     endpoints: EndpointList,
     listener: Listener<ClientState>,
 ) -> MasterHandle {
@@ -120,7 +120,7 @@ pub fn spawn_master_tcp_client(
 /// `[tokio::main]` such as C language bindings.
 pub fn create_master_tcp_client(
     link_error_mode: LinkErrorMode,
-    config: MasterConfiguration,
+    config: MasterConfig,
     endpoints: EndpointList,
     listener: Listener<ClientState>,
 ) -> (impl Future<Output = ()> + 'static, MasterHandle) {
@@ -148,7 +148,7 @@ impl MasterTask {
     fn new(
         link_error_mode: LinkErrorMode,
         endpoints: EndpointList,
-        config: MasterConfiguration,
+        config: MasterConfig,
         listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
         let (tx, rx) = crate::tokio::sync::mpsc::channel(100); // TODO

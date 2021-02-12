@@ -153,23 +153,11 @@ class TestTimeProvider implements TimeProvider {
 
 public class MasterExample {
 
-  // ANCHOR: logging_config
-  // logging configuration
-  static LoggingConfiguration getLoggingConfig() {
-    LoggingConfiguration config = new LoggingConfiguration();
-    config.level = LogLevel.INFO;
-    config.printLevel = true;
-    config.printModuleInfo = false;
-    config.timeFormat = TimeFormat.SYSTEM;
-    config.outputFormat = LogOutputFormat.TEXT;
-    return config;
-  }
-  // ANCHOR_END: logging_config
-
   public static void main(String[] args) {
     // ANCHOR: logging_init
-    // called once during program initialization
-    Logging.configure(getLoggingConfig(), new ConsoleLogger());
+    // Initialize logging with the default configuration
+    // This may only be called once during program initialization
+    Logging.configure(new LoggingConfig(), new ConsoleLogger());
     // ANCHOR_END: logging_init
 
     // ANCHOR: runtime
@@ -186,23 +174,22 @@ public class MasterExample {
 
   private static void run(Runtime runtime) throws Exception {
     // Create the master
-    MasterConfiguration masterConfig = new MasterConfiguration(ushort(1));
+    MasterConfig masterConfig = new MasterConfig(ushort(1));
     masterConfig.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
 
     Master master = Master.createTcpSession(runtime, LinkErrorMode.CLOSE, masterConfig,
         new EndpointList("127.0.0.1:20000"), new TestListener());
 
     // Create the association
-    AssociationConfiguration associationConfiguration = new AssociationConfiguration(
-        new EventClasses(true, true, true), new EventClasses(true, true, true), Classes.all(),
-        new EventClasses(false, false, false));
-    associationConfiguration.autoTimeSync = AutoTimeSync.LAN;
-    associationConfiguration.keepAliveTimeout = Duration.ofSeconds(60);
+    AssociationConfig associationConfig = new AssociationConfig(new EventClasses(true, true, true),
+        new EventClasses(true, true, true), Classes.all(), new EventClasses(false, false, false));
+    associationConfig.autoTimeSync = AutoTimeSync.LAN;
+    associationConfig.keepAliveTimeout = Duration.ofSeconds(60);
 
     TestReadHandler readHandler = new TestReadHandler();
     AssociationHandlers associationHandlers =
         new AssociationHandlers(readHandler, readHandler, readHandler);
-    Association association = master.addAssociation(ushort(1024), associationConfiguration,
+    Association association = master.addAssociation(ushort(1024), associationConfig,
         associationHandlers, new TestTimeProvider());
 
     // Create a periodic poll

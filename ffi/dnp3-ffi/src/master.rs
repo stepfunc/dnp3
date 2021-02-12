@@ -12,10 +12,8 @@ use dnp3::entry::master::serial::{
     create_master_serial_client, DataBits, FlowControl, Parity, StopBits,
 };
 use dnp3::entry::master::ClientState;
-use dnp3::master::association::Configuration;
-use dnp3::master::handle::{
-    AssociationHandler, Listener, MasterConfiguration, MasterHandle, ReadHandler,
-};
+use dnp3::master::association::AssociationConfig;
+use dnp3::master::handle::{AssociationHandler, Listener, MasterConfig, MasterHandle, ReadHandler};
 use dnp3::master::request::{Classes, EventClasses, TimeSyncProcedure};
 use dnp3::prelude::master::create_master_tcp_client;
 use std::ffi::CStr;
@@ -28,7 +26,7 @@ pub struct Master {
 pub(crate) unsafe fn master_create_tcp_session(
     runtime: *mut crate::runtime::Runtime,
     link_error_mode: ffi::LinkErrorMode,
-    config: ffi::MasterConfiguration,
+    config: ffi::MasterConfig,
     endpoints: *const crate::EndpointList,
     listener: ffi::ClientStateListener,
 ) -> *mut Master {
@@ -68,7 +66,7 @@ pub(crate) unsafe fn master_create_tcp_session(
 
 pub(crate) unsafe fn master_create_serial_session(
     runtime: *mut crate::runtime::Runtime,
-    config: ffi::MasterConfiguration,
+    config: ffi::MasterConfig,
     path: &CStr,
     serial_params: ffi::SerialPortSettings,
     listener: ffi::ClientStateListener,
@@ -110,7 +108,7 @@ pub unsafe fn master_destroy(master: *mut Master) {
 pub unsafe fn master_add_association(
     master: *mut Master,
     address: u16,
-    config: ffi::AssociationConfiguration,
+    config: ffi::AssociationConfig,
     handlers: ffi::AssociationHandlers,
     time_provider: ffi::TimeProvider,
 ) -> *mut Association {
@@ -130,7 +128,7 @@ pub unsafe fn master_add_association(
         }
     };
 
-    let config = Configuration {
+    let config = AssociationConfig {
         disable_unsol_classes: convert_event_classes(&config.disable_unsol_classes()),
         enable_unsol_classes: convert_event_classes(&config.enable_unsol_classes()),
         startup_integrity_classes: convert_classes(&config.startup_integrity_classes()),
@@ -346,8 +344,8 @@ pub(crate) unsafe fn endpoint_list_add(list: *mut EndpointList, endpoint: &CStr)
     }
 }
 
-impl ffi::MasterConfiguration {
-    fn into(self) -> Option<MasterConfiguration> {
+impl ffi::MasterConfig {
+    fn into(self) -> Option<MasterConfig> {
         let address = match EndpointAddress::from(self.address()) {
             Ok(x) => x,
             Err(err) => {
@@ -371,7 +369,7 @@ impl ffi::MasterConfiguration {
             },
         );
 
-        Some(MasterConfiguration {
+        Some(MasterConfig {
             address,
             decode_level: self.decode_level().clone().into(),
             reconnection_strategy: strategy,

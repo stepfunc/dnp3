@@ -9,7 +9,7 @@ use crate::app::types::Timestamp;
 use crate::app::variations::Variation;
 use crate::config::DecodeLevel;
 use crate::config::EndpointAddress;
-use crate::master::association::{Association, Configuration};
+use crate::master::association::{Association, AssociationConfig};
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
@@ -38,7 +38,7 @@ pub struct AssociationHandle {
 
 /// Master configuration
 #[derive(Copy, Clone, Debug)]
-pub struct MasterConfiguration {
+pub struct MasterConfig {
     /// Local DNP3 master address
     pub address: EndpointAddress,
     /// Decode-level for DNP3 objects
@@ -57,7 +57,7 @@ pub struct MasterConfiguration {
     pub rx_buffer_size: usize,
 }
 
-impl MasterConfiguration {
+impl MasterConfig {
     /// Create a configuration with default buffer sizes
     pub fn new(
         address: EndpointAddress,
@@ -103,7 +103,7 @@ impl MasterHandle {
     pub async fn add_association(
         &mut self,
         address: EndpointAddress,
-        config: Configuration,
+        config: AssociationConfig,
         handler: Box<dyn AssociationHandler>,
     ) -> Result<AssociationHandle, AssociationError> {
         let association = Association::new(address, config, handler);

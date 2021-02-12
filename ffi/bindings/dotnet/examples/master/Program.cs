@@ -149,16 +149,10 @@ class MainClass
     public static void Main(string[] args)
     {
         // ANCHOR: logging_init
-        // called once during program initialization
+        // Initialize logging with the default configuration
+        // This may only be called once during program initialization
         Logging.Configure(
-            new LoggingConfiguration
-            {
-                Level = LogLevel.Info,
-                PrintLevel = true,
-                PrintModuleInfo = false,
-                TimeFormat = TimeFormat.System,
-                OutputFormat = LogOutputFormat.Text
-            },
+            new LoggingConfig(),
             new ConsoleLogger()
         );
         // ANCHOR_END: logging_init
@@ -171,10 +165,10 @@ class MainClass
         }
     }
 
-    private static MasterConfiguration GetMasterConfig()
+    private static MasterConfig GetMasterConfig()
     {
         // create a default configuration with a master address of "1"
-        var config = new MasterConfiguration(1)
+        var config = new MasterConfig(1)
         {
             // override the reconnect strategy            
             ReconnectionStrategy = new RetryStrategy
@@ -203,7 +197,7 @@ class MainClass
         var readHandler = new TestReadHandler();
         var association = master.AddAssociation(
             1024,
-            new AssociationConfiguration(new EventClasses(true, true, true), new EventClasses(true, true, true), Classes.All(), new EventClasses(false, false, false))
+            new AssociationConfig(new EventClasses(true, true, true), new EventClasses(true, true, true), Classes.All(), new EventClasses(false, false, false))
             {
                 AutoTimeSync = AutoTimeSync.Lan,
                 AutoTasksRetryStrategy = new RetryStrategy

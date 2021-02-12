@@ -34,7 +34,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingErr
         .doc("Describes how each log event is formatted")?
         .build()?;
 
-    let logging_config_struct = lib.declare_native_struct("LoggingConfiguration")?;
+    let logging_config_struct = lib.declare_native_struct("LoggingConfig")?;
     let logging_config_struct = lib
         .define_native_struct(&logging_config_struct)?
         .add(

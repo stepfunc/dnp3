@@ -176,16 +176,6 @@ class TestControlHandler implements ControlHandler {
 
 public class OutstationExample {
 
-  static LoggingConfiguration getLoggingConfig() {
-    LoggingConfiguration config = new LoggingConfiguration();
-    config.level = LogLevel.INFO;
-    config.printLevel = true;
-    config.printModuleInfo = false;
-    config.timeFormat = TimeFormat.SYSTEM;
-    config.outputFormat = LogOutputFormat.TEXT;
-    return config;
-  }
-
   static OutstationConfig getOutstationConfig() {
     // ANCHOR: outstation_config
     // create an outstation configuration with default values
@@ -202,9 +192,9 @@ public class OutstationExample {
 
   public static void main(String[] args) {
     // Setup logging
-    Logging.configure(getLoggingConfig(), new TestLogger());
+    Logging.configure(new LoggingConfig(), new TestLogger());
 
-    // Create the tokio runtime
+    // Create the Tokio runtime
     try (Runtime runtime = new Runtime(new RuntimeConfig())) {
       run(runtime);
     }
