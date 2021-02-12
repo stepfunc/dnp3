@@ -299,7 +299,7 @@ int main()
         .handle_octet_string = &handle_octet_strings,
         .ctx = NULL,
     };
-    association_configuration_t association_config = association_configuration_init(
+    association_config_t association_config = association_config_init(
         event_classes_init(true, true, true),
         event_classes_init(true, true, true),
         classes_all(),

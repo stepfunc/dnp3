@@ -110,7 +110,7 @@ pub unsafe fn master_destroy(master: *mut Master) {
 pub unsafe fn master_add_association(
     master: *mut Master,
     address: u16,
-    config: ffi::AssociationConfiguration,
+    config: ffi::AssociationConfig,
     handlers: ffi::AssociationHandlers,
     time_provider: ffi::TimeProvider,
 ) -> *mut Association {

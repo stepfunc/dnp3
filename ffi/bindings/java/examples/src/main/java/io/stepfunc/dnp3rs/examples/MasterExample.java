@@ -193,16 +193,15 @@ public class MasterExample {
         new EndpointList("127.0.0.1:20000"), new TestListener());
 
     // Create the association
-    AssociationConfiguration associationConfiguration = new AssociationConfiguration(
-        new EventClasses(true, true, true), new EventClasses(true, true, true), Classes.all(),
-        new EventClasses(false, false, false));
-    associationConfiguration.autoTimeSync = AutoTimeSync.LAN;
-    associationConfiguration.keepAliveTimeout = Duration.ofSeconds(60);
+    AssociationConfig associationConfig = new AssociationConfig(new EventClasses(true, true, true),
+        new EventClasses(true, true, true), Classes.all(), new EventClasses(false, false, false));
+    associationConfig.autoTimeSync = AutoTimeSync.LAN;
+    associationConfig.keepAliveTimeout = Duration.ofSeconds(60);
 
     TestReadHandler readHandler = new TestReadHandler();
     AssociationHandlers associationHandlers =
         new AssociationHandlers(readHandler, readHandler, readHandler);
-    Association association = master.addAssociation(ushort(1024), associationConfiguration,
+    Association association = master.addAssociation(ushort(1024), associationConfig,
         associationHandlers, new TestTimeProvider());
 
     // Create a periodic poll
