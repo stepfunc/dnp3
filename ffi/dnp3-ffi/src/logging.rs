@@ -64,21 +64,21 @@ impl ffi::LoggingConfiguration {
                 let builder = builder.without_time();
                 match self.output_format() {
                     ffi::LogOutputFormat::Text => Box::new(builder.finish()),
-                    ffi::LogOutputFormat::JSON => Box::new(builder.json().finish()),
+                    ffi::LogOutputFormat::Json => Box::new(builder.json().finish()),
                 }
             }
-            ffi::TimeFormat::RFC3339 => {
+            ffi::TimeFormat::Rfc3339 => {
                 let builder = builder.with_timer(ChronoUtc::default());
                 match self.output_format() {
                     ffi::LogOutputFormat::Text => Box::new(builder.finish()),
-                    ffi::LogOutputFormat::JSON => Box::new(builder.json().finish()),
+                    ffi::LogOutputFormat::Json => Box::new(builder.json().finish()),
                 }
             }
             ffi::TimeFormat::System => {
                 let builder = builder.with_timer(SystemTime::default());
                 match self.output_format() {
                     ffi::LogOutputFormat::Text => Box::new(builder.finish()),
-                    ffi::LogOutputFormat::JSON => Box::new(builder.json().finish()),
+                    ffi::LogOutputFormat::Json => Box::new(builder.json().finish()),
                 }
             }
         }

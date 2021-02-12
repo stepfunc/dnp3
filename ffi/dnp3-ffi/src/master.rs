@@ -247,8 +247,8 @@ fn convert_classes(config: &ffi::Classes) -> Classes {
 fn convert_auto_time_sync(config: &ffi::AutoTimeSync) -> Option<TimeSyncProcedure> {
     match config {
         ffi::AutoTimeSync::None => None,
-        ffi::AutoTimeSync::LAN => Some(TimeSyncProcedure::Lan),
-        ffi::AutoTimeSync::NonLAN => Some(TimeSyncProcedure::NonLan),
+        ffi::AutoTimeSync::Lan => Some(TimeSyncProcedure::Lan),
+        ffi::AutoTimeSync::NonLan => Some(TimeSyncProcedure::NonLan),
     }
 }
 

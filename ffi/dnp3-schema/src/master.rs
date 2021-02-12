@@ -78,11 +78,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .define_native_enum("AutoTimeSync")?
         .push("None", "Do not perform automatic time sync")?
         .push(
-            "LAN",
+            "Lan",
             "Perform automatic time sync with Record Current Time (0x18) function code",
         )?
         .push(
-            "NonLAN",
+            "NonLan",
             "Perform automatic time sync with Delay Measurement (0x17) function code",
         )?
         .doc("Automatic time synchronization configuration")?
