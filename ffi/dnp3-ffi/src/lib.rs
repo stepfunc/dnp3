@@ -1,7 +1,4 @@
-#![allow( 
-    clippy::clippy::missing_safety_doc,
-    clippy::useless_conversion,
-)]
+#![allow(clippy::clippy::missing_safety_doc, clippy::useless_conversion)]
 
 mod association;
 mod command;
