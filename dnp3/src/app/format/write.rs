@@ -1,5 +1,5 @@
 use crate::app::enums::{FunctionCode, QualifierCode};
-use crate::app::header::{Control, RequestHeader, ResponseFunction, ResponseHeader, Iin};
+use crate::app::header::{Control, Iin, RequestHeader, ResponseFunction, ResponseHeader};
 #[cfg(test)]
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::traits::{FixedSizeVariation, Index};

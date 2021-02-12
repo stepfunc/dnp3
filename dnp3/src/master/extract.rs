@@ -79,7 +79,7 @@ mod test {
     use super::*;
     use crate::app::enums::FunctionCode;
     use crate::app::flags::Flags;
-    use crate::app::header::{Control, ResponseFunction, ResponseHeader, Iin};
+    use crate::app::header::{Control, Iin, ResponseFunction, ResponseHeader};
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::types::Timestamp;

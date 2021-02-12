@@ -1,5 +1,5 @@
-use oo_bindgen::{LibraryBuilder, BindingError};
 use oo_bindgen::constants::{ConstantValue, Representation};
+use oo_bindgen::{BindingError, LibraryBuilder};
 
 mod bits {
     pub(crate) const BIT_0: u8 = 0b0000_0001;
@@ -12,7 +12,6 @@ mod bits {
 }
 
 pub(crate) fn define(lib: &mut LibraryBuilder) -> Result<(), BindingError> {
-
     use bits::*;
 
     lib.define_constants("Flag")?

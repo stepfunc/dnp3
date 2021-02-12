@@ -115,7 +115,7 @@ impl RestartTask {
 mod tests {
     use super::*;
     use crate::app::format::write::{start_request, start_response};
-    use crate::app::header::{Control, ResponseFunction, Iin};
+    use crate::app::header::{Control, Iin, ResponseFunction};
     use crate::app::sequence::Sequence;
     use crate::master::tasks::RequestWriter;
     use crate::prelude::master::*;

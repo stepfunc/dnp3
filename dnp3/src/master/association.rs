@@ -1,4 +1,4 @@
-use crate::app::header::{ResponseHeader, Iin};
+use crate::app::header::{Iin, ResponseHeader};
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::retry::{ExponentialBackOff, RetryStrategy};
 use crate::app::sequence::Sequence;

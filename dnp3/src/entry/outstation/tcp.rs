@@ -170,7 +170,10 @@ impl TcpServer {
                 tracing::warn!("no matching outstation for: {}", addr)
             }
             Some(x) => {
-                let _ = x.handle.new_io(id, crate::util::phys::PhysLayer::Tcp(stream)).await;
+                let _ = x
+                    .handle
+                    .new_io(id, crate::util::phys::PhysLayer::Tcp(stream))
+                    .await;
             }
         }
     }

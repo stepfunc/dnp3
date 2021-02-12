@@ -3,7 +3,7 @@ use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::gen::ranged::RangedVariation;
-use crate::app::header::{Control, RequestHeader, ResponseFunction, ResponseHeader, Iin};
+use crate::app::header::{Control, Iin, RequestHeader, ResponseFunction, ResponseHeader};
 use crate::app::parse::error::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;

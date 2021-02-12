@@ -2,7 +2,7 @@ use crate::app::enums::{CommandStatus, FunctionCode};
 use crate::app::format::write::start_response;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::header::{
-    Control, RequestHeader, ResponseFunction, ResponseHeader, Iin, Iin1, Iin2,
+    Control, Iin, Iin1, Iin2, RequestHeader, ResponseFunction, ResponseHeader,
 };
 use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};

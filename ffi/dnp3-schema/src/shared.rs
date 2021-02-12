@@ -32,7 +32,6 @@ pub struct SharedDefinitions {
 }
 
 pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingError> {
-
     crate::constants::define(lib)?;
 
     let control_struct = lib.declare_native_struct("Control")?;
