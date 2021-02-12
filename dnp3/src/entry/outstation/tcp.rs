@@ -1,5 +1,5 @@
 use crate::entry::outstation::{AddressFilter, FilterError};
-use crate::outstation::task::{IOType, OutstationHandle, OutstationTask};
+use crate::outstation::task::{OutstationHandle, OutstationTask};
 
 use crate::config::LinkErrorMode;
 use crate::outstation::config::OutstationConfig;
@@ -13,7 +13,7 @@ struct Outstation {
     handle: OutstationHandle,
 }
 
-pub struct TCPServer {
+pub struct TcpServer {
     link_error_mode: LinkErrorMode,
     connection_id: u64,
     address: std::net::SocketAddr,
@@ -25,7 +25,7 @@ pub struct ServerHandle {
     _tx: crate::tokio::sync::oneshot::Sender<()>,
 }
 
-impl TCPServer {
+impl TcpServer {
     pub fn new(link_error_mode: LinkErrorMode, address: std::net::SocketAddr) -> Self {
         Self {
             link_error_mode,
@@ -170,7 +170,10 @@ impl TCPServer {
                 tracing::warn!("no matching outstation for: {}", addr)
             }
             Some(x) => {
-                let _ = x.handle.new_io(id, IOType::TCPStream(stream)).await;
+                let _ = x
+                    .handle
+                    .new_io(id, crate::util::phys::PhysLayer::Tcp(stream))
+                    .await;
             }
         }
     }

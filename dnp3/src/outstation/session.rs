@@ -2,7 +2,7 @@ use crate::app::enums::{CommandStatus, FunctionCode};
 use crate::app::format::write::start_response;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::header::{
-    Control, RequestHeader, ResponseFunction, ResponseHeader, IIN, IIN1, IIN2,
+    Control, Iin, Iin1, Iin2, RequestHeader, ResponseFunction, ResponseHeader,
 };
 use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
@@ -25,7 +25,7 @@ use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 
 use crate::outstation::config::OutstationConfig;
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 use std::borrow::BorrowMut;
 use xxhash_rust::xxh64::xxh64;
 
@@ -525,7 +525,7 @@ impl OutstationSession {
         &mut self,
         database: &mut DatabaseHandle,
     ) -> Option<(Sequence, usize)> {
-        let iin = self.get_response_iin() + IIN2::default();
+        let iin = self.get_response_iin() + Iin2::default();
         let mut cursor = self.unsol_tx_buffer.write_cursor();
         let _ = cursor.skip(ResponseHeader::LENGTH);
 
@@ -896,8 +896,8 @@ impl OutstationSession {
         }
     }
 
-    fn write_empty_solicited_response(&mut self, seq: Sequence, iin2: IIN2) -> usize {
-        let iin = IIN::new(self.get_response_iin(), iin2);
+    fn write_empty_solicited_response(&mut self, seq: Sequence, iin2: Iin2) -> usize {
+        let iin = Iin::new(self.get_response_iin(), iin2);
         let header = ResponseHeader::new(
             Control::response(seq, true, true, false),
             ResponseFunction::Response,
@@ -909,7 +909,7 @@ impl OutstationSession {
     }
 
     fn write_null_unsolicited_response(&mut self, seq: Sequence) -> usize {
-        let iin = IIN::new(self.get_response_iin(), IIN2::default());
+        let iin = Iin::new(self.get_response_iin(), Iin2::default());
         let header = ResponseHeader::new(
             Control::unsolicited_response(seq),
             ResponseFunction::UnsolicitedResponse,
@@ -935,7 +935,7 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
         fir: bool,
         seq: Sequence,
-        iin2: IIN2,
+        iin2: Iin2,
     ) -> (usize, Option<ResponseSeries>) {
         let iin1 = self.get_response_iin();
         let mut cursor = self.sol_tx_buffer.write_cursor();
@@ -995,26 +995,26 @@ impl OutstationSession {
 
             _ => {
                 tracing::warn!("unsupported function code: {:?}", function);
-                Some(self.write_empty_solicited_response(seq, IIN2::NO_FUNC_CODE_SUPPORT))
+                Some(self.write_empty_solicited_response(seq, Iin2::NO_FUNC_CODE_SUPPORT))
             }
         }
     }
 
-    fn get_iin2(function: FunctionCode, object_headers: HeaderCollection) -> IIN2 {
+    fn get_iin2(function: FunctionCode, object_headers: HeaderCollection) -> Iin2 {
         if function.get_function_info().objects_allowed {
-            return IIN2::default();
+            return Iin2::default();
         }
 
         if object_headers.is_empty() {
-            IIN2::default()
+            Iin2::default()
         } else {
             tracing::warn!("Ignoring object headers in {:?} request", function);
-            IIN2::PARAMETER_ERROR
+            Iin2::PARAMETER_ERROR
         }
     }
 
     fn handle_write(&mut self, seq: Sequence, object_headers: HeaderCollection) -> usize {
-        let mut iin2 = IIN2::default();
+        let mut iin2 = Iin2::default();
 
         for header in object_headers.iter() {
             match header.details {
@@ -1024,7 +1024,7 @@ impl OutstationSession {
                             // restart IIN
                             if value {
                                 tracing::warn!("cannot write IIN 1.7 to TRUE");
-                                iin2 |= IIN2::PARAMETER_ERROR;
+                                iin2 |= Iin2::PARAMETER_ERROR;
                             } else {
                                 // clear the restart bit
                                 self.state.restart_iin_asserted = false;
@@ -1036,7 +1036,7 @@ impl OutstationSession {
                                 index,
                                 value
                             );
-                            iin2 |= IIN2::PARAMETER_ERROR;
+                            iin2 |= Iin2::PARAMETER_ERROR;
                         }
                     }
                 }
@@ -1046,7 +1046,7 @@ impl OutstationSession {
                         header.details.qualifier(),
                         header.variation
                     );
-                    iin2 |= IIN2::NO_FUNC_CODE_SUPPORT;
+                    iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
                 }
             }
         }
@@ -1054,7 +1054,7 @@ impl OutstationSession {
         self.write_empty_solicited_response(seq, iin2)
     }
 
-    fn handle_delay_measure(&mut self, seq: Sequence, iin2: IIN2) -> usize {
+    fn handle_delay_measure(&mut self, seq: Sequence, iin2: Iin2) -> usize {
         let iin = self.get_response_iin() + iin2;
 
         let g52v2 = Group52Var2 {
@@ -1074,10 +1074,10 @@ impl OutstationSession {
         cursor.written().len()
     }
 
-    fn handle_restart(&mut self, seq: Sequence, delay: Option<RestartDelay>, iin2: IIN2) -> usize {
+    fn handle_restart(&mut self, seq: Sequence, delay: Option<RestartDelay>, iin2: Iin2) -> usize {
         let delay = match delay {
             None => {
-                return self.write_empty_solicited_response(seq, iin2 | IIN2::NO_FUNC_CODE_SUPPORT)
+                return self.write_empty_solicited_response(seq, iin2 | Iin2::NO_FUNC_CODE_SUPPORT)
             }
             Some(x) => x,
         };
@@ -1123,12 +1123,12 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return self.write_empty_solicited_response(seq, IIN2::PARAMETER_ERROR);
+                return self.write_empty_solicited_response(seq, Iin2::PARAMETER_ERROR);
             }
             Ok(controls) => controls,
         };
 
-        let iin = self.get_response_iin() + IIN2::default();
+        let iin = self.get_response_iin() + Iin2::default();
         let mut cursor = self.sol_tx_buffer.write_cursor();
         ResponseHeader::new(
             Control::single_response(seq),
@@ -1168,10 +1168,10 @@ impl OutstationSession {
 
         if self.config.unsolicited.is_disabled() {
             tracing::warn!("received {} unsolicited request, but unsolicited support is disabled by configuration", to_string(enable));
-            return self.write_empty_solicited_response(seq, IIN2::NO_FUNC_CODE_SUPPORT);
+            return self.write_empty_solicited_response(seq, Iin2::NO_FUNC_CODE_SUPPORT);
         }
 
-        let mut iin2 = IIN2::default();
+        let mut iin2 = Iin2::default();
 
         for header in object_headers.iter() {
             match header.details {
@@ -1186,7 +1186,7 @@ impl OutstationSession {
                 }
                 _ => {
                     tracing::warn!("received {} unsolicited request for unsupported qualifier ({}) and variation ({})", to_string(enable), header.details.qualifier(), header.variation);
-                    iin2 |= IIN2::NO_FUNC_CODE_SUPPORT;
+                    iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
                 }
             }
         }
@@ -1230,12 +1230,12 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return self.write_empty_solicited_response(seq, IIN2::PARAMETER_ERROR);
+                return self.write_empty_solicited_response(seq, Iin2::PARAMETER_ERROR);
             }
             Ok(controls) => controls,
         };
 
-        let iin = self.get_response_iin() + IIN2::default();
+        let iin = self.get_response_iin() + Iin2::default();
         let mut cursor = self.sol_tx_buffer.write_cursor();
         ResponseHeader::new(
             Control::single_response(seq),
@@ -1277,12 +1277,12 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return self.write_empty_solicited_response(seq, IIN2::PARAMETER_ERROR);
+                return self.write_empty_solicited_response(seq, Iin2::PARAMETER_ERROR);
             }
             Ok(controls) => controls,
         };
 
-        let iin = self.get_response_iin() + IIN2::default();
+        let iin = self.get_response_iin() + Iin2::default();
         let mut cursor = self.sol_tx_buffer.write_cursor();
         ResponseHeader::new(
             Control::single_response(seq),
@@ -1326,10 +1326,10 @@ impl OutstationSession {
         cursor.written().len()
     }
 
-    fn get_response_iin(&self) -> IIN1 {
-        let mut iin1 = IIN1::default();
+    fn get_response_iin(&self) -> Iin1 {
+        let mut iin1 = Iin1::default();
         if self.state.restart_iin_asserted {
-            iin1 |= IIN1::RESTART
+            iin1 |= Iin1::RESTART
         }
         iin1
     }
@@ -1416,7 +1416,7 @@ impl OutstationSession {
                     // format the next response in the series
                     series.ecsn.increment();
                     let (length, next) =
-                        self.write_read_response(database, false, series.ecsn, IIN2::default());
+                        self.write_read_response(database, false, series.ecsn, Iin2::default());
                     self.write_solicited(io, writer, length).await?;
                     match next {
                         None => return Ok(()),
@@ -1575,17 +1575,17 @@ impl OutstationSession {
     }
 }
 
-impl From<ObjectParseError> for IIN2 {
+impl From<ObjectParseError> for Iin2 {
     fn from(err: ObjectParseError) -> Self {
         // TODO - review these
         match err {
-            ObjectParseError::InsufficientBytes => IIN2::PARAMETER_ERROR,
-            ObjectParseError::InvalidQualifierForVariation(_, _) => IIN2::NO_FUNC_CODE_SUPPORT,
-            ObjectParseError::InvalidRange(_, _) => IIN2::PARAMETER_ERROR,
-            ObjectParseError::UnknownGroupVariation(_, _) => IIN2::OBJECT_UNKNOWN,
-            ObjectParseError::UnsupportedQualifierCode(_) => IIN2::PARAMETER_ERROR,
-            ObjectParseError::UnknownQualifier(_) => IIN2::PARAMETER_ERROR,
-            ObjectParseError::ZeroLengthOctetData => IIN2::PARAMETER_ERROR,
+            ObjectParseError::InsufficientBytes => Iin2::PARAMETER_ERROR,
+            ObjectParseError::InvalidQualifierForVariation(_, _) => Iin2::NO_FUNC_CODE_SUPPORT,
+            ObjectParseError::InvalidRange(_, _) => Iin2::PARAMETER_ERROR,
+            ObjectParseError::UnknownGroupVariation(_, _) => Iin2::OBJECT_UNKNOWN,
+            ObjectParseError::UnsupportedQualifierCode(_) => Iin2::PARAMETER_ERROR,
+            ObjectParseError::UnknownQualifier(_) => Iin2::PARAMETER_ERROR,
+            ObjectParseError::ZeroLengthOctetData => Iin2::PARAMETER_ERROR,
         }
     }
 }

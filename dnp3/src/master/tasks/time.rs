@@ -28,8 +28,8 @@ pub(crate) struct TimeSyncTask {
 impl TimeSyncProcedure {
     fn get_start_state(&self) -> State {
         match self {
-            TimeSyncProcedure::LAN => State::RecordCurrentTime(None),
-            TimeSyncProcedure::NonLAN => State::MeasureDelay(None),
+            TimeSyncProcedure::Lan => State::RecordCurrentTime(None),
+            TimeSyncProcedure::NonLan => State::MeasureDelay(None),
         }
     }
 }
@@ -422,7 +422,7 @@ mod tests {
                     let writer = start_response(
                         response_control_field(Sequence::default()),
                         ResponseFunction::Response,
-                        IIN::default(),
+                        Iin::default(),
                         &mut cursor,
                     )
                     .unwrap();
@@ -475,7 +475,7 @@ mod tests {
                     let writer = start_response(
                         response_control_field(Sequence::default()),
                         ResponseFunction::Response,
-                        IIN::default(),
+                        Iin::default(),
                         &mut cursor,
                     )
                     .unwrap();
@@ -504,7 +504,7 @@ mod tests {
                     let mut writer = start_response(
                         response_control_field(Sequence::default()),
                         ResponseFunction::Response,
-                        IIN::default(),
+                        Iin::default(),
                         &mut cursor,
                     )
                     .unwrap();
@@ -534,7 +534,7 @@ mod tests {
                     let writer = start_response(
                         response_control_field(Sequence::default()),
                         ResponseFunction::Response,
-                        IIN::new(IIN1::new(0x10), IIN2::new(0x00)),
+                        Iin::new(Iin1::new(0x10), Iin2::new(0x00)),
                         &mut cursor,
                     )
                     .unwrap();
@@ -608,7 +608,7 @@ mod tests {
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
-                TimeSyncProcedure::NonLAN,
+                TimeSyncProcedure::NonLan,
                 Promise::OneShot(tx),
             ));
 
@@ -631,7 +631,7 @@ mod tests {
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
-                TimeSyncProcedure::NonLAN,
+                TimeSyncProcedure::NonLan,
                 Promise::OneShot(tx),
             ));
 
@@ -669,7 +669,7 @@ mod tests {
             let mut writer = start_response(
                 response_control_field(Sequence::default()),
                 ResponseFunction::Response,
-                IIN::default(),
+                Iin::default(),
                 &mut cursor,
             )
             .unwrap();
@@ -723,7 +723,7 @@ mod tests {
             let writer = start_response(
                 Control::request(Sequence::default()),
                 ResponseFunction::Response,
-                IIN::default(),
+                Iin::default(),
                 &mut cursor,
             )
             .unwrap();
@@ -762,7 +762,7 @@ mod tests {
                     let mut writer = start_response(
                         response_control_field(Sequence::default()),
                         ResponseFunction::Response,
-                        IIN::default(),
+                        Iin::default(),
                         &mut cursor,
                     )
                     .unwrap();
@@ -792,7 +792,7 @@ mod tests {
                     let mut writer = start_response(
                         response_control_field(Sequence::default()),
                         ResponseFunction::Response,
-                        IIN::default(),
+                        Iin::default(),
                         &mut cursor,
                     )
                     .unwrap();
@@ -822,7 +822,7 @@ mod tests {
                     let writer = start_response(
                         response_control_field(Sequence::default()),
                         ResponseFunction::Response,
-                        IIN::new(IIN1::new(0x10), IIN2::new(0x00)),
+                        Iin::new(Iin1::new(0x10), Iin2::new(0x00)),
                         &mut cursor,
                     )
                     .unwrap();
@@ -879,7 +879,7 @@ mod tests {
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
-                TimeSyncProcedure::LAN,
+                TimeSyncProcedure::Lan,
                 Promise::OneShot(tx),
             ));
 
@@ -917,7 +917,7 @@ mod tests {
             let writer = start_response(
                 response_control_field(Sequence::default()),
                 ResponseFunction::Response,
-                IIN::default(),
+                Iin::default(),
                 &mut cursor,
             )
             .unwrap();
@@ -961,7 +961,7 @@ mod tests {
             let writer = start_response(
                 Control::request(Sequence::default()),
                 ResponseFunction::Response,
-                IIN::default(),
+                Iin::default(),
                 &mut cursor,
             )
             .unwrap();

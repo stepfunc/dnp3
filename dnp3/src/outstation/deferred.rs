@@ -1,4 +1,4 @@
-use crate::app::header::IIN2;
+use crate::app::header::Iin2;
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::sequence::Sequence;
 use crate::outstation::database::read::ReadHeader;
@@ -10,11 +10,11 @@ pub(crate) struct DeferredInfo {
     pub(crate) hash: u64,
     pub(crate) seq: Sequence,
     pub(crate) info: FragmentInfo,
-    pub(crate) iin2: IIN2,
+    pub(crate) iin2: Iin2,
 }
 
 impl DeferredInfo {
-    fn new(hash: u64, seq: Sequence, info: FragmentInfo, iin2: IIN2) -> Self {
+    fn new(hash: u64, seq: Sequence, info: FragmentInfo, iin2: Iin2) -> Self {
         DeferredInfo {
             hash,
             seq,
@@ -23,7 +23,7 @@ impl DeferredInfo {
         }
     }
 
-    fn merge(&self, iin2: IIN2) -> Self {
+    fn merge(&self, iin2: Iin2) -> Self {
         Self::new(self.hash, self.seq, self.info, self.iin2 | iin2)
     }
 }
@@ -55,7 +55,7 @@ impl DeferredRead {
     ) {
         self.vec.clear();
 
-        let mut iin2 = IIN2::default();
+        let mut iin2 = Iin2::default();
 
         for h in headers.iter() {
             if let Some(r) = ReadHeader::get(&h) {
@@ -70,7 +70,7 @@ impl DeferredRead {
                     )
                 }
             } else {
-                iin2 = IIN2::PARAMETER_ERROR;
+                iin2 = Iin2::PARAMETER_ERROR;
             }
         }
 
@@ -83,7 +83,7 @@ impl DeferredRead {
             Some(x) => {
                 let iin2 = database.transaction(|db| {
                     db.inner.reset();
-                    let mut iin2 = IIN2::default();
+                    let mut iin2 = Iin2::default();
                     for header in self.vec.iter() {
                         iin2 |= db.inner.select_by_header(*header);
                     }

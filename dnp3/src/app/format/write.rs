@@ -1,5 +1,5 @@
 use crate::app::enums::{FunctionCode, QualifierCode};
-use crate::app::header::{Control, RequestHeader, ResponseFunction, ResponseHeader, IIN};
+use crate::app::header::{Control, Iin, RequestHeader, ResponseFunction, ResponseHeader};
 #[cfg(test)]
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
@@ -24,7 +24,7 @@ pub(crate) fn start_request<'a, 'b>(
 pub(crate) fn start_response<'a, 'b>(
     control: Control,
     function: ResponseFunction,
-    iin: IIN,
+    iin: Iin,
     cursor: &'b mut WriteCursor<'a>,
 ) -> Result<HeaderWriter<'a, 'b>, WriteError> {
     let header = ResponseHeader::new(control, function, iin);

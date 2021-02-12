@@ -1,4 +1,4 @@
-use crate::app::header::{ResponseHeader, IIN};
+use crate::app::header::{Iin, ResponseHeader};
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::retry::{ExponentialBackOff, RetryStrategy};
 use crate::app::sequence::Sequence;
@@ -337,7 +337,7 @@ impl Association {
         !self.config.startup_integrity_classes.any() || self.startup_integrity_done
     }
 
-    pub(crate) fn process_iin(&mut self, iin: IIN) {
+    pub(crate) fn process_iin(&mut self, iin: Iin) {
         if iin.iin1.get_device_restart() {
             self.on_restart_iin_observed()
         }
@@ -394,7 +394,7 @@ impl Association {
         self.auto_tasks.event_scan.failure(&self.config);
     }
 
-    pub(crate) fn on_clear_restart_iin_response(&mut self, iin: IIN) {
+    pub(crate) fn on_clear_restart_iin_response(&mut self, iin: Iin) {
         if iin.iin1.get_device_restart() {
             tracing::warn!("device failed to clear restart IIN bit");
             self.auto_tasks.clear_restart_iin.failure(&self.config);
@@ -417,7 +417,7 @@ impl Association {
         self.auto_tasks.time_sync.failure(&self.config);
     }
 
-    pub(crate) fn on_enable_unsolicited_response(&mut self, _iin: IIN) {
+    pub(crate) fn on_enable_unsolicited_response(&mut self, _iin: Iin) {
         self.auto_tasks.enabled_unsolicited.done();
     }
 
@@ -426,7 +426,7 @@ impl Association {
         self.auto_tasks.enabled_unsolicited.failure(&self.config);
     }
 
-    pub(crate) fn on_disable_unsolicited_response(&mut self, _iin: IIN) {
+    pub(crate) fn on_disable_unsolicited_response(&mut self, _iin: Iin) {
         self.auto_tasks.disable_unsolicited.done();
     }
 

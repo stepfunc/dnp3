@@ -1,5 +1,5 @@
 use crate::app::format::write::start_request;
-use crate::app::header::{Control, IIN, IIN1, IIN2};
+use crate::app::header::{Control, Iin, Iin1, Iin2};
 use crate::app::sequence::Sequence;
 use crate::prelude::master::*;
 use crate::util::cursor::WriteCursor;
@@ -20,7 +20,7 @@ fn auto_integrity_scan_on_buffer_overflow() {
     unsol_null_custom_iin(
         &mut harness.io,
         seq,
-        IIN::new(IIN1::new(0x00), IIN2::new(0x08)),
+        Iin::new(Iin1::new(0x00), Iin2::new(0x08)),
     );
     unsol_confirm(&mut harness.io, seq);
     harness.assert_io();
@@ -44,7 +44,7 @@ fn auto_integrity_scan_on_buffer_overflow_disabled() {
     unsol_null_custom_iin(
         &mut harness.io,
         seq,
-        IIN::new(IIN1::new(0x00), IIN2::new(0x08)),
+        Iin::new(Iin1::new(0x00), Iin2::new(0x08)),
     );
     unsol_confirm(&mut harness.io, seq);
     harness.assert_io();
@@ -66,7 +66,7 @@ fn auto_event_class_scan() {
     unsol_null_custom_iin(
         &mut harness.io,
         seq,
-        IIN::new(IIN1::new(0x02), IIN2::new(0x00)), // Class 1 events
+        Iin::new(Iin1::new(0x02), Iin2::new(0x00)), // Class 1 events
     );
     unsol_confirm(&mut harness.io, seq);
     harness.assert_io();
@@ -104,7 +104,7 @@ fn auto_event_class_ignore_one_class_scan() {
     unsol_null_custom_iin(
         &mut harness.io,
         seq,
-        IIN::new(IIN1::new(0x02), IIN2::new(0x00)), // Class 1 events
+        Iin::new(Iin1::new(0x02), Iin2::new(0x00)), // Class 1 events
     );
     unsol_confirm(&mut harness.io, seq);
     harness.assert_io();
@@ -126,7 +126,7 @@ fn auto_event_class_scan_disabled() {
     unsol_null_custom_iin(
         &mut harness.io,
         seq,
-        IIN::new(IIN1::new(0x02), IIN2::new(0x00)), // Class 1 events
+        Iin::new(Iin1::new(0x02), Iin2::new(0x00)), // Class 1 events
     );
     unsol_confirm(&mut harness.io, seq);
     harness.assert_io();

@@ -199,7 +199,7 @@ impl Parser {
 
         let expected_crc = super::crc::calc_crc_with_0564(crc_bytes);
         if crc_value != expected_crc {
-            return Err(FrameError::BadHeaderCRC.into());
+            return Err(FrameError::BadHeaderCrc.into());
         }
 
         let trailer_length = Self::calc_trailer_length(len - 5); // ok b/c len >= 5 above
@@ -235,7 +235,7 @@ impl Parser {
             let calc_crc = super::crc::calc_crc(data);
 
             if crc_value != calc_crc {
-                return Err(FrameError::BadBodyCRC.into());
+                return Err(FrameError::BadBodyCrc.into());
             }
 
             // copy the data and advance the position
@@ -312,7 +312,7 @@ mod test {
 
         assert_eq!(
             parser.parse(&mut cursor, &mut payload),
-            Err(ParseError::BadFrame(FrameError::BadHeaderCRC))
+            Err(ParseError::BadFrame(FrameError::BadHeaderCrc))
         );
         assert_eq!(cursor.remaining(), 0);
     }
@@ -332,7 +332,7 @@ mod test {
 
         assert_eq!(
             parser.parse(&mut cursor, &mut payload),
-            Err(ParseError::BadFrame(FrameError::BadBodyCRC)),
+            Err(ParseError::BadFrame(FrameError::BadBodyCrc)),
         );
         assert_eq!(cursor.remaining(), 0);
     }

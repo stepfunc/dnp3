@@ -400,12 +400,12 @@ pub fn define(
     let timesync_mode = lib
         .define_native_enum("TimeSyncMode")?
         .push(
-            "LAN",
-            "Perform a LAN timesync with Record Current Time (0x18) function code",
+            "Lan",
+            "Perform a LAN time sync with Record Current Time (0x18) function code",
         )?
         .push(
-            "NonLAN",
-            "Perform a non-LAN timesync with Delay Measurement (0x17) function code",
+            "NonLan",
+            "Perform a non-LAN time sync with Delay Measurement (0x17) function code",
         )?
         .doc("Time synchronization mode")?
         .build()?;
@@ -429,8 +429,8 @@ pub fn define(
             "Outstation did not clear the NEED_TIME IIN bit",
         )?
         .push("SystemTimeNotAvailable", "System time not available")?
-        .push("IINError", "Outstation indicated an error")?
-        .doc("Result of a timesync operation")?
+        .push("IinError", "Outstation indicated an error")?
+        .doc("Result of a time sync operation")?
         .build()?;
 
     let timesync_cb = lib

@@ -15,7 +15,7 @@ use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter
 use crate::tokio::time::Instant;
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 
 use crate::util::task::Shutdown;
 use std::ops::Add;

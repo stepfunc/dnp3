@@ -19,7 +19,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingErr
     let time_format_enum = lib
         .define_native_enum("TimeFormat")?
         .push("None", "Don't format the timestamp as part of the message")?
-        .push("RFC3339", "Format the time using RFC 3339")?
+        .push("Rfc3339", "Format the time using RFC 3339")?
         .push(
             "System",
             "Format the time in a human readable format e.g. 'Jun 25 14:27:12.955'",
@@ -30,7 +30,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingErr
     let log_output_format_enum = lib
         .define_native_enum("LogOutputFormat")?
         .push("Text", "A simple text-based format")?
-        .push("JSON", "Output formatted as JSON")?
+        .push("Json", "Output formatted as JSON")?
         .doc("Describes how each log event is formatted")?
         .build()?;
 

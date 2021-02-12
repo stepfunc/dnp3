@@ -7,7 +7,7 @@ use crate::outstation::database::details::range::traits::StaticVariation;
 use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::util::cursor::{WriteCursor, WriteError};
 
-use crate::app::header::IIN2;
+use crate::app::header::Iin2;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::read::StaticReadHeader;
 use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
@@ -421,7 +421,7 @@ impl StaticDatabase {
         Ok(())
     }
 
-    pub(crate) fn select(&mut self, variation: StaticReadHeader) -> IIN2 {
+    pub(crate) fn select(&mut self, variation: StaticReadHeader) -> Iin2 {
         match variation {
             StaticReadHeader::Class0 => self.select_class_zero(),
             StaticReadHeader::Binary(variation, range) => {
@@ -453,7 +453,7 @@ impl StaticDatabase {
         &mut self,
         variation: Option<T::StaticVariation>,
         range: Option<IndexRange>,
-    ) -> IIN2
+    ) -> Iin2
     where
         T: Updatable,
     {
@@ -463,17 +463,17 @@ impl StaticDatabase {
                 if let Some(x) = T::get_map(self).select_all_with_variation(variation) {
                     self.push_selection(x)
                 } else {
-                    IIN2::default()
+                    Iin2::default()
                 }
             }
         }
     }
 
-    fn push_selection(&mut self, range: VariationRange) -> IIN2 {
+    fn push_selection(&mut self, range: VariationRange) -> Iin2 {
         if self.selected.push_back(range) {
-            IIN2::default()
+            Iin2::default()
         } else {
-            IIN2::PARAMETER_ERROR
+            Iin2::PARAMETER_ERROR
         }
     }
 
@@ -484,28 +484,28 @@ impl StaticDatabase {
         T::get_map(self)
     }
 
-    fn select_class_zero_type<T>(&mut self) -> IIN2
+    fn select_class_zero_type<T>(&mut self) -> Iin2
     where
         T: Updatable,
     {
         if T::enabled_class_zero(&self.class_zero) {
             let full_range = match T::get_map(self).select_all() {
-                None => return IIN2::default(),
+                None => return Iin2::default(),
                 Some(x) => x,
             };
 
             if self.selected.push_back(full_range) {
-                IIN2::default()
+                Iin2::default()
             } else {
                 // out of space for read headers
-                IIN2::PARAMETER_ERROR
+                Iin2::PARAMETER_ERROR
             }
         } else {
-            IIN2::default()
+            Iin2::default()
         }
     }
 
-    fn select_class_zero(&mut self) -> IIN2 {
+    fn select_class_zero(&mut self) -> Iin2 {
         self.select_class_zero_type::<Binary>()
             | self.select_class_zero_type::<DoubleBitBinary>()
             | self.select_class_zero_type::<BinaryOutputStatus>()

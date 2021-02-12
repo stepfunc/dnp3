@@ -164,7 +164,7 @@ void outstation_transaction_startup(database_t* db, void* context)
 		database_add_octet_string(db, i, EventClass_Class1);
 
 		// Set initial values
-		flags_t restart = flags_from_single_flag(Flag_Restart);
+		flags_t restart = flags_init(FLAG_RESTART);
 
 		database_update_binary(
 			db,
@@ -221,11 +221,6 @@ typedef struct database_points_t
 	double analogOutputStatusValue;
 } database_points_t;
 
-flags_t online_flag()
-{
-	return flags_from_single_flag(Flag_Online);
-}
-
 void binary_transaction(database_t* db, void* context)
 {
 	((database_points_t*)context)->binaryValue = !((database_points_t*)context)->binaryValue;
@@ -233,7 +228,7 @@ void binary_transaction(database_t* db, void* context)
 	binary_t value = binary_init(
 		7,
 		((database_points_t*)context)->binaryValue,
-		online_flag(),
+		flags_init(FLAG_ONLINE),
 		timestamp_synchronized(0)
 	);
 	database_update_binary(db, value, update_options_init());
@@ -246,7 +241,7 @@ void double_bit_binary_transaction(database_t* db, void* context)
 	double_bit_binary_t value = double_bit_binary_init(
 		7,
 		((database_points_t*)context)->doubleBitBinaryValue,
-		online_flag(),
+		flags_init(FLAG_ONLINE),
 		timestamp_synchronized(0)
 	);
 	database_update_double_bit_binary(db, value, update_options_init());
@@ -259,7 +254,7 @@ void binary_output_status_transaction(database_t* db, void* context)
 	binary_output_status_t value = binary_output_status_init(
 		7,
 		((database_points_t*)context)->binaryOutputStatusValue,
-		online_flag(),
+		flags_init(FLAG_ONLINE),
 		timestamp_synchronized(0)
 	);
 	database_update_binary_output_status(db, value, update_options_init());
@@ -270,7 +265,7 @@ void counter_transaction(database_t* db, void* context)
 	counter_t value = counter_init(
 		7,
 		++((database_points_t*)context)->counterValue,
-		online_flag(),
+		flags_init(FLAG_ONLINE),
 		timestamp_synchronized(0)
 	);
 	database_update_counter(db, value, update_options_init());
@@ -281,7 +276,7 @@ void frozen_counter_transaction(database_t* db, void* context)
 	frozen_counter_t value = frozen_counter_init(
 		7,
 		++((database_points_t*)context)->frozenCounterValue,
-		online_flag(),
+		flags_init(FLAG_ONLINE),
 		timestamp_synchronized(0)
 	);
 	database_update_frozen_counter(db, value, update_options_init());
@@ -292,7 +287,7 @@ void analog_transaction(database_t* db, void* context)
 	analog_t value = analog_init(
 		7,
 		++((database_points_t*)context)->analogValue,
-		online_flag(),
+		flags_init(FLAG_ONLINE),
 		timestamp_synchronized(0)
 	);
 	database_update_analog(db, value, update_options_init());
@@ -303,7 +298,7 @@ void analog_output_status_transaction(database_t* db, void* context)
 	analog_output_status_t value = analog_output_status_init(
 		7,
 		++((database_points_t*)context)->analogOutputStatusValue,
-		online_flag(),
+		flags_init(FLAG_ONLINE),
 		timestamp_synchronized(0)
 	);
 	database_update_analog_output_status(db, value, update_options_init());

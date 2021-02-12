@@ -4,7 +4,7 @@ use crate::link::error::LinkError;
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
 use crate::util::cursor::ReadCursor;
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 use std::io::ErrorKind;
 
 pub(crate) struct Reader {
@@ -77,7 +77,7 @@ impl Reader {
                         .read(&mut self.buffer[self.end..], level.physical)
                         .await?;
                     if count == 0 {
-                        return Err(LinkError::IO(ErrorKind::UnexpectedEof));
+                        return Err(LinkError::Stdio(ErrorKind::UnexpectedEof));
                     }
 
                     self.end += count;

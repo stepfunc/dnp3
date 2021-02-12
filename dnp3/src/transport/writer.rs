@@ -3,7 +3,7 @@ use crate::app::EndpointType;
 use crate::config::{DecodeLevel, EndpointAddress};
 use crate::link::error::LinkError;
 use crate::link::header::AnyAddress;
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 
 /// This type definition is used so that we can mock the transport writer during testing.
 /// If Rust eventually allows `async fn` in traits, this could be removed

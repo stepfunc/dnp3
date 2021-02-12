@@ -19,7 +19,7 @@ use dnp3::config::LinkErrorMode;
 
 pub struct TcpServer {
     runtime: RuntimeHandle,
-    server: Option<dnp3::entry::outstation::tcp::TCPServer>,
+    server: Option<dnp3::entry::outstation::tcp::TcpServer>,
     // hold onto the underlying handle to keep the server alive
     _handle: Option<ServerHandle>,
 }
@@ -44,7 +44,7 @@ pub unsafe fn tcpserver_new(
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let server = dnp3::entry::outstation::tcp::TCPServer::new(link_error_mode.into(), address);
+    let server = dnp3::entry::outstation::tcp::TcpServer::new(link_error_mode.into(), address);
 
     Box::into_raw(Box::new(TcpServer {
         runtime: runtime.handle(),

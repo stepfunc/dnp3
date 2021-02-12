@@ -11,7 +11,7 @@ use crate::tokio::test::*;
 
 use crate::config::LinkErrorMode;
 use crate::outstation::session::SessionError;
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 use std::sync::{Arc, Mutex};
 
 pub(crate) fn get_default_config() -> OutstationConfig {

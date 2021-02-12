@@ -1,5 +1,5 @@
 use crate::app::format::write::{start_request, start_response};
-use crate::app::header::{Control, ResponseFunction, IIN, IIN1, IIN2};
+use crate::app::header::{Control, Iin, Iin1, Iin2, ResponseFunction};
 use crate::app::sequence::Sequence;
 use crate::master::session::RunError;
 use crate::prelude::master::*;
@@ -101,10 +101,10 @@ pub(crate) fn clear_restart_iin(io: &mut io::Handle, seq: Sequence) {
 }
 
 pub(crate) fn empty_response(io: &mut io::Handle, seq: Sequence) {
-    empty_response_custom_iin(io, seq, IIN::default());
+    empty_response_custom_iin(io, seq, Iin::default());
 }
 
-pub(crate) fn empty_response_custom_iin(io: &mut io::Handle, seq: Sequence, iin: IIN) {
+pub(crate) fn empty_response_custom_iin(io: &mut io::Handle, seq: Sequence, iin: Iin) {
     let mut buffer = [0; 4];
     let mut cursor = WriteCursor::new(&mut buffer);
     start_response(
@@ -122,15 +122,15 @@ pub(crate) fn empty_response_custom_iin(io: &mut io::Handle, seq: Sequence, iin:
 
 pub(crate) fn unsol_null(io: &mut io::Handle, seq: Sequence, restart_iin: bool) {
     let iin = if restart_iin {
-        IIN::new(IIN1::new(0x80), IIN2::new(0x00))
+        Iin::new(Iin1::new(0x80), Iin2::new(0x00))
     } else {
-        IIN::default()
+        Iin::default()
     };
 
     unsol_null_custom_iin(io, seq, iin);
 }
 
-pub(crate) fn unsol_null_custom_iin(io: &mut io::Handle, seq: Sequence, iin: IIN) {
+pub(crate) fn unsol_null_custom_iin(io: &mut io::Handle, seq: Sequence, iin: Iin) {
     let mut buffer = [0; 4];
     let mut cursor = WriteCursor::new(&mut buffer);
     start_response(
@@ -159,9 +159,9 @@ pub(crate) fn unsol_confirm(io: &mut io::Handle, seq: Sequence) {
 
 pub(crate) fn unsol_with_data(io: &mut io::Handle, seq: Sequence, data: i16, restart_iin: bool) {
     let iin = if restart_iin {
-        IIN::new(IIN1::new(0x80), IIN2::new(0x00))
+        Iin::new(Iin1::new(0x80), Iin2::new(0x00))
     } else {
-        IIN::default()
+        Iin::default()
     };
 
     let mut buffer = [0; 20];

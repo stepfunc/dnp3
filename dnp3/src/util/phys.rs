@@ -2,8 +2,9 @@ use crate::config::PhysDecodeLevel;
 use crate::tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 // encapsulates all possible physical layers as an enum
+#[derive(Debug)]
 pub(crate) enum PhysLayer {
-    TCP(crate::tokio::net::TcpStream),
+    Tcp(crate::tokio::net::TcpStream),
     Serial(tokio_one_serial::AsyncSerial),
     #[cfg(test)]
     Mock(tokio_mock::mock::test::io::MockIO),
@@ -16,7 +17,7 @@ impl PhysLayer {
         level: PhysDecodeLevel,
     ) -> Result<usize, std::io::Error> {
         let length = match self {
-            Self::TCP(x) => x.read(buffer).await?,
+            Self::Tcp(x) => x.read(buffer).await?,
             Self::Serial(x) => x.read(buffer).await?,
             #[cfg(test)]
             Self::Mock(x) => x.read(buffer).await?,
@@ -41,7 +42,7 @@ impl PhysLayer {
         }
 
         match self {
-            Self::TCP(x) => x.write_all(data).await,
+            Self::Tcp(x) => x.write_all(data).await,
             Self::Serial(x) => x.write_all(data).await,
             #[cfg(test)]
             Self::Mock(x) => x.write_all(data).await,

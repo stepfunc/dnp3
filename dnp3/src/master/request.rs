@@ -19,8 +19,8 @@ pub enum CommandMode {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TimeSyncProcedure {
-    LAN,
-    NonLAN,
+    Lan,
+    NonLan,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

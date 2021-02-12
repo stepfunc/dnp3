@@ -1,5 +1,5 @@
 use crate::app::format::write::start_request;
-use crate::app::header::{Control, IIN, IIN1, IIN2};
+use crate::app::header::{Control, Iin, Iin1, Iin2};
 use crate::app::sequence::Sequence;
 use crate::prelude::master::*;
 use crate::tokio::test::*;
@@ -187,7 +187,7 @@ fn detect_restart_in_read_response() {
     empty_response_custom_iin(
         &mut harness.io,
         seq.increment(),
-        IIN::new(IIN1::new(0x80), IIN2::new(0x00)),
+        Iin::new(Iin1::new(0x80), Iin2::new(0x00)),
     );
     harness.assert_io();
 

@@ -3,7 +3,7 @@ use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
 use crate::outstation::session::{OutstationSession, SessionError};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::transport::{TransportReader, TransportWriter};
-use crate::util::io::PhysLayer;
+use crate::util::phys::PhysLayer;
 use crate::util::task::{Receiver, RunError, Shutdown};
 
 use crate::config::{DecodeLevel, LinkErrorMode};
@@ -22,7 +22,7 @@ impl From<ConfigurationChange> for OutstationMessage {
 #[derive(Debug)]
 pub(crate) struct NewSession {
     pub(crate) id: u64,
-    pub(crate) io: IOType,
+    pub(crate) phys: PhysLayer,
 }
 
 impl From<NewSession> for OutstationMessage {
@@ -32,8 +32,8 @@ impl From<NewSession> for OutstationMessage {
 }
 
 impl NewSession {
-    pub(crate) fn new(id: u64, io: IOType) -> Self {
-        Self { id, io }
+    pub(crate) fn new(id: u64, phys: PhysLayer) -> Self {
+        Self { id, phys }
     }
 }
 
@@ -41,11 +41,6 @@ pub(crate) enum OutstationMessage {
     Shutdown,
     Configuration(ConfigurationChange),
     NewSession(NewSession),
-}
-
-#[derive(Debug)]
-pub(crate) enum IOType {
-    TCPStream(crate::tokio::net::TcpStream),
 }
 
 pub(crate) struct OutstationTask {
@@ -69,8 +64,8 @@ impl OutstationHandle {
         Ok(())
     }
 
-    pub(crate) async fn new_io(&mut self, id: u64, io: IOType) -> Result<(), Shutdown> {
-        self.sender.send(NewSession::new(id, io).into()).await?;
+    pub(crate) async fn new_io(&mut self, id: u64, phys: PhysLayer) -> Result<(), Shutdown> {
+        self.sender.send(NewSession::new(id, phys).into()).await?;
         Ok(())
     }
 
@@ -147,7 +142,7 @@ impl OutstationTask {
                     let id = s.id;
 
                     let result = self
-                        .run_one_session(s.io)
+                        .run_one_session(s.phys)
                         .instrument(tracing::info_span!("Session", "id" = id))
                         .await;
 
@@ -165,13 +160,8 @@ impl OutstationTask {
         }
     }
 
-    async fn run_one_session(&mut self, io: IOType) -> SessionError {
-        let err = match io {
-            IOType::TCPStream(stream) => {
-                let mut io = PhysLayer::TCP(stream);
-                self.run_io(&mut io).await
-            }
-        };
+    async fn run_one_session(&mut self, mut phys: PhysLayer) -> SessionError {
+        let err = self.run_io(&mut phys).await;
         match &err {
             SessionError::Run(RunError::Shutdown) => {
                 tracing::info!("received shutdown");

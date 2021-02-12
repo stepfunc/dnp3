@@ -181,8 +181,8 @@ pub unsafe fn association_perform_time_sync(
     };
 
     let mode = match mode {
-        ffi::TimeSyncMode::LAN => TimeSyncProcedure::LAN,
-        ffi::TimeSyncMode::NonLAN => TimeSyncProcedure::NonLAN,
+        ffi::TimeSyncMode::Lan => TimeSyncProcedure::Lan,
+        ffi::TimeSyncMode::NonLan => TimeSyncProcedure::NonLan,
     };
 
     let handle = &mut association.handle;
@@ -200,7 +200,7 @@ pub unsafe fn association_perform_time_sync(
             Err(TimeSyncError::SystemTimeNotAvailable) => {
                 ffi::TimeSyncResult::SystemTimeNotAvailable
             }
-            Err(TimeSyncError::IINError(_)) => ffi::TimeSyncResult::IINError,
+            Err(TimeSyncError::IinError(_)) => ffi::TimeSyncResult::IinError,
         };
 
         callback.on_complete(result);

@@ -1,7 +1,7 @@
 use crate::ffi;
 use dnp3::app::enums::QualifierCode;
 use dnp3::app::flags::Flags;
-use dnp3::app::header::{ResponseFunction, ResponseHeader, IIN1, IIN2};
+use dnp3::app::header::{Iin1, Iin2, ResponseFunction, ResponseHeader};
 use dnp3::app::measurement::*;
 use dnp3::app::parse::bytes::Bytes;
 use dnp3::app::types::DoubleBit;
@@ -359,7 +359,7 @@ impl From<Flags> for ffi::Flags {
 
 pub unsafe fn iin1_is_set(iin1: Option<&ffi::Iin1>, flag: ffi::Iin1Flag) -> bool {
     if let Some(iin1) = iin1 {
-        let iin1 = IIN1::new(iin1.value);
+        let iin1 = Iin1::new(iin1.value);
         match flag {
             ffi::Iin1Flag::Broadcast => iin1.get_broadcast(),
             ffi::Iin1Flag::Class1Events => iin1.get_class_1_events(),
@@ -377,7 +377,7 @@ pub unsafe fn iin1_is_set(iin1: Option<&ffi::Iin1>, flag: ffi::Iin1Flag) -> bool
 
 pub unsafe fn iin2_is_set(iin2: Option<&ffi::Iin2>, flag: ffi::Iin2Flag) -> bool {
     if let Some(iin1) = iin2 {
-        let iin1 = IIN2::new(iin1.value);
+        let iin1 = Iin2::new(iin1.value);
         match flag {
             ffi::Iin2Flag::NoFuncCodeSupport => iin1.get_no_func_code_support(),
             ffi::Iin2Flag::ObjectUnknown => iin1.get_object_unknown(),
@@ -388,68 +388,6 @@ pub unsafe fn iin2_is_set(iin2: Option<&ffi::Iin2>, flag: ffi::Iin2Flag) -> bool
         }
     } else {
         false
-    }
-}
-
-pub unsafe fn flag_get_mask(flag: ffi::Flag) -> u8 {
-    match flag {
-        ffi::Flag::Online => Flags::ONLINE.value,
-        ffi::Flag::Restart => Flags::RESTART.value,
-        ffi::Flag::CommLost => Flags::COMM_LOST.value,
-        ffi::Flag::RemoteForced => Flags::REMOTE_FORCED.value,
-        ffi::Flag::LocalForced => Flags::LOCAL_FORCED.value,
-        ffi::Flag::ChatterFilter => Flags::CHATTER_FILTER.value,
-        ffi::Flag::Rollover => Flags::ROLL_OVER.value,
-        ffi::Flag::Discontinuity => Flags::DISCONTINUITY.value,
-        ffi::Flag::OverRange => Flags::OVER_RANGE.value,
-        ffi::Flag::ReferenceErr => Flags::REFERENCE_ERR.value,
-    }
-}
-
-pub unsafe fn flags_from_single_flag(flag: ffi::Flag) -> ffi::Flags {
-    ffi::Flags {
-        value: flag_get_mask(flag),
-    }
-}
-
-pub unsafe fn flags_is_set(flags: Option<&ffi::Flags>, flag: ffi::Flag) -> bool {
-    if let Some(flags) = flags {
-        let flags = Flags::new(flags.value);
-        match flag {
-            ffi::Flag::Online => flags.online(),
-            ffi::Flag::Restart => flags.restart(),
-            ffi::Flag::CommLost => flags.comm_lost(),
-            ffi::Flag::RemoteForced => flags.remote_forced(),
-            ffi::Flag::LocalForced => flags.local_forced(),
-            ffi::Flag::ChatterFilter => flags.chatter_filter(),
-            ffi::Flag::Rollover => flags.rollover(),
-            ffi::Flag::Discontinuity => flags.discontinuity(),
-            ffi::Flag::OverRange => flags.over_range(),
-            ffi::Flag::ReferenceErr => flags.reference_err(),
-        }
-    } else {
-        false
-    }
-}
-
-pub unsafe fn flags_set(flags: Option<&ffi::Flags>, flag: ffi::Flag, value: bool) -> ffi::Flags {
-    if let Some(flags) = flags {
-        let mut flags = Flags::new(flags.value);
-        match flag {
-            ffi::Flag::Online => flags.set_online(value),
-            ffi::Flag::Restart => flags.set_restart(value),
-            ffi::Flag::CommLost => flags.set_comm_lost(value),
-            ffi::Flag::RemoteForced => flags.set_remote_forced(value),
-            ffi::Flag::LocalForced => flags.set_local_forced(value),
-            ffi::Flag::ChatterFilter => flags.set_chatter_filter(value),
-            ffi::Flag::Rollover => flags.set_rollover(value),
-            ffi::Flag::Discontinuity => flags.set_discontinuity(value),
-            ffi::Flag::OverRange => flags.set_over_range(value),
-            ffi::Flag::ReferenceErr => flags.set_reference_err(value),
-        }
-        ffi::Flags { value: flags.value }
-    } else {
-        ffi::Flags { value: 0x00 }
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::app::enums::CommandStatus;
-use crate::app::header::{IIN, IIN2};
+use crate::app::header::{Iin, Iin2};
 use crate::app::parse::error::ObjectParseError;
 use crate::config::EndpointAddress;
 use crate::link::error::LinkError;
@@ -85,16 +85,16 @@ pub enum TimeSyncError {
     Overflow,
     StillNeedsTime,
     SystemTimeNotAvailable,
-    IINError(IIN2),
+    IinError(Iin2),
 }
 
 impl TimeSyncError {
-    pub(crate) fn from_iin(iin: IIN) -> Result<(), TimeSyncError> {
+    pub(crate) fn from_iin(iin: Iin) -> Result<(), TimeSyncError> {
         if iin.iin1.get_need_time() {
             return Err(TimeSyncError::StillNeedsTime);
         }
         if iin.has_request_error() {
-            return Err(TimeSyncError::IINError(iin.iin2));
+            return Err(TimeSyncError::IinError(iin.iin2));
         }
         Ok(())
     }
@@ -216,7 +216,7 @@ impl std::fmt::Display for TimeSyncError {
             TimeSyncError::ClockRollback => f.write_str("detected a clock rollback"),
             TimeSyncError::StillNeedsTime => f.write_str("outstation did not clear NEED_TIME bit"),
             TimeSyncError::SystemTimeNotAvailable => f.write_str("system time not available"),
-            TimeSyncError::IINError(iin2) => write!(f, "outstation indicated an error: {}", iin2),
+            TimeSyncError::IinError(iin2) => write!(f, "outstation indicated an error: {}", iin2),
         }
     }
 }
