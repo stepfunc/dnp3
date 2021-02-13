@@ -1,7 +1,7 @@
 use crate::app::retry::ExponentialBackOff;
-use crate::entry::master::ClientState;
 use crate::master::handle::{Listener, MasterConfig, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
+use crate::master::ClientState;
 use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
 use crate::util::task::Shutdown;

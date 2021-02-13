@@ -8,13 +8,11 @@ use dnp3::app::retry::{ReconnectStrategy, RetryStrategy};
 use dnp3::app::timeout::Timeout;
 use dnp3::app::types::Timestamp;
 use dnp3::config::EndpointAddress;
-use dnp3::entry::master::serial::{
-    create_master_serial_client, DataBits, FlowControl, Parity, StopBits,
-};
-use dnp3::entry::master::ClientState;
 use dnp3::master::association::AssociationConfig;
 use dnp3::master::handle::{AssociationHandler, Listener, MasterConfig, MasterHandle, ReadHandler};
 use dnp3::master::request::{Classes, EventClasses, TimeSyncProcedure};
+use dnp3::master::serial::{create_master_serial_client, DataBits, FlowControl, Parity, StopBits};
+use dnp3::master::ClientState;
 use dnp3::prelude::master::create_master_tcp_client;
 use std::ffi::CStr;
 
@@ -326,7 +324,7 @@ impl ClientStateListenerAdapter {
     }
 }
 
-pub type EndpointList = dnp3::entry::master::tcp::EndpointList;
+pub type EndpointList = dnp3::master::tcp::EndpointList;
 
 pub(crate) unsafe fn endpoint_list_new(main_endpoint: &CStr) -> *mut EndpointList {
     Box::into_raw(Box::new(EndpointList::single(
@@ -380,7 +378,7 @@ impl ffi::MasterConfig {
     }
 }
 
-impl From<ffi::SerialPortSettings> for dnp3::entry::master::serial::SerialSettings {
+impl From<ffi::SerialPortSettings> for dnp3::master::serial::SerialSettings {
     fn from(from: ffi::SerialPortSettings) -> Self {
         Self {
             baud_rate: from.baud_rate(),

@@ -106,11 +106,9 @@ extern crate assert_matches;
 pub mod app;
 /// configuration types not specific to master or outstation
 pub mod config;
-/// entry points for creating and spawning async tasks
-pub mod entry;
-/// types, enums, and traits specific to masters
+/// entry points, types, enums, and traits specific to masters
 pub mod master;
-/// types, enums, and traits specific to outstations
+/// entry points, types, enums, and traits specific to outstations
 pub mod outstation;
 /// preludes for master and outstation
 pub mod prelude;

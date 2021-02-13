@@ -15,7 +15,6 @@ use dnp3::app::timeout::Timeout;
 use dnp3::app::types::Timestamp;
 use dnp3::config::EndpointAddress;
 use dnp3::config::{DecodeLevel, LinkErrorMode};
-use dnp3::entry::master::tcp::EndpointList;
 use dnp3::entry::outstation::tcp::{ServerHandle, TcpServer};
 use dnp3::entry::outstation::AddressFilter;
 use dnp3::master::association::AssociationConfig;
@@ -23,6 +22,7 @@ use dnp3::master::handle::{
     AssociationHandler, HeaderInfo, Listener, MasterConfig, MasterHandle, ReadHandler,
 };
 use dnp3::master::request::EventClasses;
+use dnp3::master::tcp::EndpointList;
 use dnp3::outstation::config::OutstationConfig;
 use dnp3::outstation::database::config::{
     AnalogConfig, BinaryConfig, CounterConfig, EventAnalogVariation, EventBinaryVariation,
@@ -232,7 +232,7 @@ impl Pair {
         Measurements,
         tokio::sync::mpsc::Receiver<usize>,
     ) {
-        let mut master = dnp3::entry::master::tcp::spawn_master_tcp_client(
+        let mut master = dnp3::master::tcp::spawn_master_tcp_client(
             LinkErrorMode::Close,
             Self::get_master_config(config.master_level),
             EndpointList::single(format!("127.0.0.1:{}", port)),

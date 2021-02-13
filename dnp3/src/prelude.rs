@@ -5,11 +5,10 @@ pub mod master {
     pub use crate::app::timeout::Timeout;
     pub use crate::app::variations::*;
     pub use crate::config::DecodeLevel;
-    // pub use crate::entry::master::serial::*;
     pub use crate::config::EndpointAddress;
-    pub use crate::entry::master::tcp::*;
-    pub use crate::entry::master::*;
     pub use crate::master::association::*;
     pub use crate::master::handle::*;
     pub use crate::master::request::*;
+    pub use crate::master::tcp::*;
+    pub use crate::master::*;
 }
