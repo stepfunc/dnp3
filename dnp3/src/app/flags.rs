@@ -1,6 +1,7 @@
 use crate::app::types::DoubleBit;
 use crate::util::bit::{bits, BitMask, Bitfield};
 use std::fmt::Formatter;
+use std::ops::{BitOr, BitOrAssign};
 
 /// Flags as defined in the specification where each bit has meaning.
 ///
@@ -14,15 +15,23 @@ pub struct Flags {
 }
 
 impl Flags {
+    /// object value is 'good' / 'valid' / 'nominal'
     pub const ONLINE: Flags = Flags::new(bits::BIT_0.value);
+    /// object value has not been updated since device restart
     pub const RESTART: Flags = Flags::new(bits::BIT_1.value);
+    /// object value represents the last value available before a communication failure occurred
     pub const COMM_LOST: Flags = Flags::new(bits::BIT_2.value);
+    /// object value is overridden in a downstream reporting device
     pub const REMOTE_FORCED: Flags = Flags::new(bits::BIT_3.value);
+    /// object value is overridden by the device reporting this flag
     pub const LOCAL_FORCED: Flags = Flags::new(bits::BIT_4.value);
+    /// object value is changing state rapidly (device dependent meaning)
     pub const CHATTER_FILTER: Flags = Flags::new(bits::BIT_5.value);
-    pub const ROLL_OVER: Flags = Flags::new(bits::BIT_5.value);
+    /// object value exceeds the measurement range of the reported variation
     pub const OVER_RANGE: Flags = Flags::new(bits::BIT_5.value);
+    /// reported counter value cannot be compared against a prior value to obtain the correct count difference
     pub const DISCONTINUITY: Flags = Flags::new(bits::BIT_6.value);
+    /// object value might not have the expected level of accuracy
     pub const REFERENCE_ERR: Flags = Flags::new(bits::BIT_6.value);
 
     /// create a `Flags` struct from a `u8` bitmask
@@ -30,125 +39,35 @@ impl Flags {
         Self { value }
     }
 
-    /// test a `Flags` struct to see if the `ONLINE` bit is set
-    pub fn online(self) -> bool {
-        self.value.bit_0()
+    /// true if all of the flags in 'other' are set in this Flags
+    pub fn is_set(&self, other: Flags) -> bool {
+        (self.value & other.value) == other.value
     }
+}
 
-    /// sets the `ONLINE` bit to a value
-    pub fn set_online(&mut self, value: bool) {
-        *self = self.with_bits_set_to(bits::BIT_0, value);
+impl BitOr<Flags> for Flags {
+    type Output = Flags;
+
+    fn bitor(self, rhs: Flags) -> Self::Output {
+        Flags::new(self.value | rhs.value)
     }
+}
 
-    /// test a `Flags` struct to see if the `RESTART` bit is set
-    pub fn restart(self) -> bool {
-        self.value.bit_1()
+impl BitOrAssign<Flags> for Flags {
+    fn bitor_assign(&mut self, rhs: Flags) {
+        self.value |= rhs.value
     }
+}
 
-    /// sets the `RESTART` bit to a value
-    pub fn set_restart(&mut self, value: bool) {
-        *self = self.with_bits_set_to(bits::BIT_1, value);
-    }
-
-    /// test a `Flags` struct to see if the `COMM_LOST` bit is set
-    pub fn comm_lost(self) -> bool {
-        self.value.bit_2()
-    }
-
-    /// sets the `COMM_LOST` bit to a value
-    pub fn set_comm_lost(&mut self, value: bool) {
-        *self = self.with_bits_set_to(bits::BIT_2, value);
-    }
-
-    /// test a `Flags` struct to see if the `REMOTE_FORCED` bit is set
-    pub fn remote_forced(self) -> bool {
-        self.value.bit_3()
-    }
-
-    /// sets the `REMOTE_FORCED` bit to a value
-    pub fn set_remote_forced(&mut self, value: bool) {
-        *self = self.with_bits_set_to(bits::BIT_3, value);
-    }
-
-    /// test a `Flags` struct to see if the `LOCAL_FORCED` bit is set
-    pub fn local_forced(self) -> bool {
-        self.value.bit_4()
-    }
-
-    /// sets the `LOCAL_FORCED` bit to a value
-    pub fn set_local_forced(&mut self, value: bool) {
-        *self = self.with_bits_set_to(bits::BIT_4, value);
-    }
-
-    /// test a `Flags` struct to see if the `CHATTER_FILTER` bit is set
-    pub fn chatter_filter(self) -> bool {
-        self.value.bit_5()
-    }
-
-    /// sets the `CHATTER_FILTER` bit to a value
-    pub fn set_chatter_filter(&mut self, value: bool) {
-        *self = self.with_bits_set_to(bits::BIT_5, value);
-    }
-
-    /// test a `Flags` struct to see if the `ROLLOVER` bit is set
-    pub fn rollover(self) -> bool {
-        self.value.bit_5()
-    }
-
-    /// sets the `ROLLOVER` bit to a value
-    pub fn set_rollover(&mut self, value: bool) {
-        *self = self.with_bits_set_to(bits::BIT_5, value);
-    }
-
-    /// test a `Flags` struct to see if the `DISCONTINUITY` bit is set
-    pub fn discontinuity(self) -> bool {
-        self.value.bit_6()
-    }
-
-    /// sets the `DISCONTINUITY` bit to a value
-    pub fn set_discontinuity(&mut self, value: bool) {
-        *self = self.with_bits_set_to(bits::BIT_6, value);
-    }
-
-    /// test a `Flags` struct to see if the `OVER_RANGE` bit is set
-    pub fn over_range(self) -> bool {
-        self.value.bit_5()
-    }
-
-    /// sets the `OVER_RANGE` bit to a value
-    pub fn set_over_range(&mut self, value: bool) {
-        *self = self.with_bits_set_to(bits::BIT_5, value);
-    }
-
-    /// test a `Flags` struct to see if the `REFERENCE_ERR` bit is set
-    pub fn reference_err(self) -> bool {
-        self.value.bit_6()
-    }
-
-    /// sets the `REFERENCE_ERR` bit to a value
-    pub fn set_reference_err(&mut self, value: bool) {
-        *self = self.with_bits_set_to(bits::BIT_6, value);
-    }
-
-    pub(crate) fn bit5(self) -> bool {
-        self.value.bit_5()
-    }
-
-    pub(crate) fn bit6(self) -> bool {
-        self.value.bit_6()
-    }
-
-    pub(crate) fn bit7(self) -> bool {
-        self.value.bit_7()
-    }
-
+// some crate only helpers
+impl Flags {
     /// test a `Flags` struct to see if the `STATE` bit is set
-    pub fn state(self) -> bool {
+    pub(crate) fn state(self) -> bool {
         self.value.bit_7()
     }
 
     /// extract the `DoubleBit` value from a flags struct
-    pub fn double_bit_state(self) -> DoubleBit {
+    pub(crate) fn double_bit_state(self) -> DoubleBit {
         DoubleBit::from(self.value.bit_7(), self.value.bit_6())
     }
 
@@ -170,6 +89,24 @@ impl Flags {
 
     pub(crate) fn without(&self, mask: BitMask) -> Flags {
         Flags::new(self.value & !mask.value)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn bit_or_works() {
+        let flags = Flags::ONLINE | Flags::LOCAL_FORCED;
+        assert_eq!(flags.value, 0b0001_0001);
+    }
+
+    #[test]
+    fn bit_or_assign_works() {
+        let mut flags = Flags::ONLINE;
+        flags |= Flags::LOCAL_FORCED;
+        assert_eq!(flags.value, 0b0001_0001);
     }
 }
 
@@ -214,11 +151,11 @@ pub(crate) mod format {
             flags: Flags,
             f: &mut Formatter,
         ) -> std::fmt::Result {
-            self.push(flags.online(), "ONLINE", f)?;
-            self.push(flags.restart(), "RESTART", f)?;
-            self.push(flags.comm_lost(), "COMM_LOST", f)?;
-            self.push(flags.remote_forced(), "REMOTE_FORCED", f)?;
-            self.push(flags.local_forced(), "LOCAL_FORCED", f)?;
+            self.push(flags.is_set(Flags::ONLINE), "ONLINE", f)?;
+            self.push(flags.is_set(Flags::RESTART), "RESTART", f)?;
+            self.push(flags.is_set(Flags::COMM_LOST), "COMM_LOST", f)?;
+            self.push(flags.is_set(Flags::REMOTE_FORCED), "REMOTE_FORCED", f)?;
+            self.push(flags.is_set(Flags::LOCAL_FORCED), "LOCAL_FORCED", f)?;
             Ok(())
         }
 
@@ -228,7 +165,7 @@ pub(crate) mod format {
             f: &mut Formatter,
         ) -> std::fmt::Result {
             self.format_binary_flags_0_to_4(flags, f)?;
-            self.push(flags.chatter_filter(), "CHATTER_FILTER", f)?;
+            self.push(flags.is_set(Flags::CHATTER_FILTER), "CHATTER_FILTER", f)?;
             Ok(())
         }
 
@@ -266,8 +203,8 @@ pub(crate) mod format {
             let mut formatter = FlagFormatter::new();
             FlagFormatter::begin(self.flags, f)?;
             formatter.format_binary_flags_0_to_5(self.flags, f)?;
-            formatter.push(self.flags.bit6(), "RESERVED(6)", f)?;
-            formatter.push(self.flags.state(), "STATE", f)?;
+            formatter.push(self.flags.value.bit_6(), "RESERVED(6)", f)?;
+            formatter.push(self.flags.value.bit_7(), "STATE", f)?;
             FlagFormatter::end(f)
         }
     }
@@ -311,9 +248,9 @@ pub(crate) mod format {
             let mut formatter = FlagFormatter::new();
             FlagFormatter::begin(self.flags, f)?;
             formatter.format_binary_flags_0_to_4(self.flags, f)?;
-            formatter.push(self.flags.bit5(), "RESERVED(5)", f)?;
-            formatter.push(self.flags.bit6(), "RESERVED(6)", f)?;
-            formatter.push(self.flags.state(), "STATE", f)?;
+            formatter.push(self.flags.value.bit_5(), "RESERVED(5)", f)?;
+            formatter.push(self.flags.value.bit_6(), "RESERVED(6)", f)?;
+            formatter.push(self.flags.value.bit_7(), "STATE", f)?;
             FlagFormatter::end(f)
         }
     }
@@ -335,9 +272,9 @@ pub(crate) mod format {
             let mut formatter = FlagFormatter::new();
             FlagFormatter::begin(self.flags, f)?;
             formatter.format_binary_flags_0_to_4(self.flags, f)?;
-            formatter.push(self.flags.rollover(), "ROLLOVER", f)?;
-            formatter.push(self.flags.discontinuity(), "DISCONTINUITY", f)?;
-            formatter.push(self.flags.bit7(), "RESERVED(7)", f)?;
+            formatter.push(self.flags.value.bit_5(), "ROLLOVER", f)?;
+            formatter.push(self.flags.value.bit_6(), "DISCONTINUITY", f)?;
+            formatter.push(self.flags.value.bit_7(), "RESERVED(7)", f)?;
             FlagFormatter::end(f)
         }
     }
@@ -359,9 +296,9 @@ pub(crate) mod format {
             let mut formatter = FlagFormatter::new();
             FlagFormatter::begin(self.flags, f)?;
             formatter.format_binary_flags_0_to_4(self.flags, f)?;
-            formatter.push(self.flags.over_range(), "OVER_RANGE", f)?;
-            formatter.push(self.flags.reference_err(), "REFERENCE_ERR", f)?;
-            formatter.push(self.flags.bit7(), "RESERVED(7)", f)?;
+            formatter.push(self.flags.value.bit_5(), "OVER_RANGE", f)?;
+            formatter.push(self.flags.value.bit_6(), "REFERENCE_ERR", f)?;
+            formatter.push(self.flags.value.bit_7(), "RESERVED(7)", f)?;
             FlagFormatter::end(f)
         }
     }
