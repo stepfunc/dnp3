@@ -1,12 +1,12 @@
+use crate::config::{DecodeLevel, LinkErrorMode};
 use crate::outstation::config::*;
 use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
 use crate::outstation::session::{OutstationSession, SessionError};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
+use crate::outstation::OutstationHandle;
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::phys::PhysLayer;
-use crate::util::task::{Receiver, RunError, Shutdown};
-
-use crate::config::{DecodeLevel, LinkErrorMode};
+use crate::util::task::{Receiver, RunError};
 use tracing::Instrument;
 
 pub(crate) enum ConfigurationChange {
@@ -27,7 +27,7 @@ pub(crate) struct NewSession {
 
 impl From<NewSession> for OutstationMessage {
     fn from(x: NewSession) -> Self {
-        OutstationMessage::NewSession(x)
+        OutstationMessage::ChangeSession(x)
     }
 }
 
@@ -40,7 +40,7 @@ impl NewSession {
 pub(crate) enum OutstationMessage {
     Shutdown,
     Configuration(ConfigurationChange),
-    NewSession(NewSession),
+    ChangeSession(NewSession),
 }
 
 pub(crate) struct OutstationTask {
@@ -48,31 +48,6 @@ pub(crate) struct OutstationTask {
     reader: TransportReader,
     writer: TransportWriter,
     database: DatabaseHandle,
-}
-
-#[derive(Clone)]
-pub struct OutstationHandle {
-    pub database: DatabaseHandle,
-    sender: crate::tokio::sync::mpsc::Sender<OutstationMessage>,
-}
-
-impl OutstationHandle {
-    pub async fn set_decode_level(&mut self, decode_level: DecodeLevel) -> Result<(), Shutdown> {
-        self.sender
-            .send(ConfigurationChange::SetDecodeLevel(decode_level).into())
-            .await?;
-        Ok(())
-    }
-
-    pub(crate) async fn new_io(&mut self, id: u64, phys: PhysLayer) -> Result<(), Shutdown> {
-        self.sender.send(NewSession::new(id, phys).into()).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn shutdown(&mut self) -> Result<(), Shutdown> {
-        self.sender.send(OutstationMessage::Shutdown).await?;
-        Ok(())
-    }
 }
 
 impl OutstationTask {

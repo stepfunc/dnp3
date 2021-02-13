@@ -1,8 +1,9 @@
 use crate::config::{AppDecodeLevel, EndpointAddress};
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
+use crate::outstation::OutstationHandle;
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::EventBufferConfig;
-use crate::outstation::task::{OutstationHandle, OutstationTask};
+use crate::outstation::task::OutstationTask;
 use crate::outstation::tests::harness::{
     ApplicationData, Event, EventHandle, MockControlHandler, MockOutstationApplication,
     MockOutstationInformation,
