@@ -1,6 +1,13 @@
-use dnp3::config::EndpointAddress;
-use dnp3::config::{AppDecodeLevel, LinkErrorMode};
-use dnp3::prelude::master::*;
+use dnp3::app::enums::OpType;
+use dnp3::app::retry::ReconnectStrategy;
+use dnp3::app::timeout::Timeout;
+use dnp3::app::variations::{Group12Var1, Variation};
+use dnp3::config::*;
+use dnp3::master::association::AssociationConfig;
+use dnp3::master::handle::{Listener, MasterConfig, NullHandler};
+use dnp3::master::request::*;
+use dnp3::master::tcp::EndpointList;
+
 use std::time::Duration;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
@@ -24,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR_END: logging
 
     // spawn the master onto another task
-    let mut master = spawn_master_tcp_client(
+    let mut master = dnp3::master::tcp::spawn_master_tcp_client(
         LinkErrorMode::Close,
         MasterConfig::new(
             EndpointAddress::from(1)?,

@@ -1,6 +1,5 @@
 use crate::ffi;
-use dnp3::config::{AppDecodeLevel, LinkDecodeLevel, PhysDecodeLevel, TransportDecodeLevel};
-use dnp3::prelude::master::*;
+use dnp3::config::*;
 use std::ffi::CString;
 use tracing::span::{Attributes, Record};
 use tracing::{Event, Id, Metadata};

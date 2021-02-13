@@ -315,8 +315,8 @@ mod tests {
     use crate::app::parse::parser::ParsedFragment;
     use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
     use crate::app::sequence::Sequence;
+    use crate::master::handle::{AssociationHandler, NullHandler, ReadHandler};
     use crate::master::tasks::RequestWriter;
-    use crate::prelude::master::*;
     use crate::util::cursor::WriteCursor;
     use std::cell::Cell;
     use std::time::SystemTime;
@@ -360,7 +360,10 @@ mod tests {
     mod non_lan {
 
         use super::*;
+        use crate::app::enums::QualifierCode;
+        use crate::app::variations::Group52Var2;
         use crate::config::EndpointAddress;
+        use crate::master::association::AssociationConfig;
 
         const OUTSTATION_DELAY_MS: u16 = 100;
         const TOTAL_DELAY_MS: u16 = 200;
@@ -736,6 +739,7 @@ mod tests {
     mod lan {
         use super::*;
         use crate::config::EndpointAddress;
+        use crate::master::association::AssociationConfig;
 
         const DELAY_MS: u16 = 200;
 

@@ -7,48 +7,6 @@
 //! * Automatic TCP connection management with configurable reconnect strategy
 //! * Scalable performance using Tokio's multi-threaded executor
 //! * Future and callback-based API modes
-//!
-//! # Master example
-//!
-//! ```no_run
-//! use dnp3::prelude::master::*;
-//!
-//! use std::net::SocketAddr;
-//! use std::str::FromStr;
-//! use std::time::Duration;
-//! use dnp3::config::{LinkErrorMode, AppDecodeLevel};
-//!
-//! // example of using the master API asynchronously from within the Tokio runtime
-//! #[tokio::main(flavor = "multi_thread")]
-//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!
-//! // spawn the master onto another task
-//! let mut master = spawn_master_tcp_client(
-//!         LinkErrorMode::Close,
-//!         MasterConfig::new(
-//!             EndpointAddress::from(1)?,
-//!             AppDecodeLevel::ObjectValues.into(),
-//!             ReconnectStrategy::default(),
-//!             Timeout::from_secs(1)?,
-//!         ),
-//!         EndpointList::single("127.0.0.1:20000".to_owned()),
-//!         Listener::None,
-//!     );
-//!
-//!     let mut association = master.add_association(EndpointAddress::from(1024)?, AssociationConfig::default(), NullHandler::boxed()).await?;
-//!     association.add_poll(
-//!         EventClasses::all().to_classes().to_request(),
-//!         Duration::from_secs(5),
-//!     ).await;
-//!
-//!     // In a real application, use the handle to make requests. Measurement data
-//!     // comes back via the handler specified when creating the association. See
-//!     // the provided examples for more control.
-//!     tokio::time::sleep(Duration::from_secs(60)).await;
-//!     Ok(())
-//! }
-//! ```
-//!
 
 #![deny(
 dead_code,
@@ -110,8 +68,6 @@ pub mod config;
 pub mod master;
 /// entry points, types, enums, and traits specific to outstations
 pub mod outstation;
-/// preludes for master and outstation
-pub mod prelude;
 
 pub(crate) mod link;
 #[cfg_attr(test, allow(dead_code))]

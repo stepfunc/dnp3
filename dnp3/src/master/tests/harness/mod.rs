@@ -1,11 +1,16 @@
 use crate::link::header::{FrameInfo, FrameType};
 use crate::master::session::{MasterSession, RunError};
-use crate::prelude::master::*;
 use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
 
-use crate::config::{AppDecodeLevel, LinkErrorMode};
+use crate::config::{AppDecodeLevel, EndpointAddress, LinkErrorMode};
 use crate::util::phys::PhysLayer;
+
+use crate::master::association::AssociationConfig;
+use crate::master::handle::{
+    AssociationHandle, AssociationHandler, HeaderInfo, MasterHandle, ReadHandler,
+};
+
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -26,7 +31,7 @@ pub(crate) fn create_association(
     let (tx, rx) = crate::tokio::sync::mpsc::channel(1);
     let mut runner = MasterSession::new(
         AppDecodeLevel::ObjectValues.into(),
-        Timeout::from_secs(1).unwrap(),
+        crate::app::timeout::Timeout::from_secs(1).unwrap(),
         MasterSession::MIN_TX_BUFFER_SIZE,
         rx,
     );

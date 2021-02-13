@@ -6,12 +6,10 @@ use dnp3::outstation::traits::{
     BroadcastAction, ControlHandler, ControlSupport, OperateType, OutstationApplication,
     OutstationInformation, RestartDelay,
 };
-use dnp3::prelude::master::{
-    CommandStatus, FunctionCode, Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4,
-    OpType, TripCloseCode,
-};
 
 use crate::ffi;
+use dnp3::app::enums::{CommandStatus, FunctionCode, OpType, TripCloseCode};
+use dnp3::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 
 impl OutstationApplication for ffi::OutstationApplication {
     fn get_processing_delay_ms(&self) -> u16 {

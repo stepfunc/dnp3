@@ -13,7 +13,6 @@ use dnp3::master::handle::{AssociationHandler, Listener, MasterConfig, MasterHan
 use dnp3::master::request::{Classes, EventClasses, TimeSyncProcedure};
 use dnp3::master::serial::{create_master_serial_client, DataBits, FlowControl, Parity, StopBits};
 use dnp3::master::ClientState;
-use dnp3::prelude::master::create_master_tcp_client;
 use std::ffi::CStr;
 
 pub struct Master {
@@ -41,7 +40,7 @@ pub(crate) unsafe fn master_create_tcp_session(
     };
     let listener = ClientStateListenerAdapter::new(listener);
 
-    let (future, handle) = create_master_tcp_client(
+    let (future, handle) = dnp3::master::tcp::create_master_tcp_client(
         link_error_mode.into(),
         config,
         endpoints.clone(),

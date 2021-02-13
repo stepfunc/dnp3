@@ -15,8 +15,6 @@ use dnp3::app::timeout::Timeout;
 use dnp3::app::types::Timestamp;
 use dnp3::config::EndpointAddress;
 use dnp3::config::{DecodeLevel, LinkErrorMode};
-use dnp3::entry::outstation::tcp::{ServerHandle, TcpServer};
-use dnp3::entry::outstation::AddressFilter;
 use dnp3::master::association::AssociationConfig;
 use dnp3::master::handle::{
     AssociationHandler, HeaderInfo, Listener, MasterConfig, MasterHandle, ReadHandler,
@@ -28,6 +26,8 @@ use dnp3::outstation::database::config::{
     AnalogConfig, BinaryConfig, CounterConfig, EventAnalogVariation, EventBinaryVariation,
     EventCounterVariation, StaticAnalogVariation, StaticBinaryVariation, StaticCounterVariation,
 };
+use dnp3::outstation::tcp::AddressFilter;
+use dnp3::outstation::tcp::{ServerHandle, TcpServer};
 use dnp3::outstation::traits::{
     DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
 };

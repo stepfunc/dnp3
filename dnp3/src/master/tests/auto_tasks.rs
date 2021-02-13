@@ -1,11 +1,14 @@
 use crate::app::format::write::start_request;
 use crate::app::header::{Control, Iin, Iin1, Iin2};
 use crate::app::sequence::Sequence;
-use crate::prelude::master::*;
 use crate::util::cursor::WriteCursor;
 
 use super::harness::create_association;
 use super::harness::requests::*;
+use crate::app::enums::FunctionCode;
+use crate::app::variations::Variation;
+use crate::master::association::AssociationConfig;
+use crate::master::request::EventClasses;
 
 #[test]
 fn auto_integrity_scan_on_buffer_overflow() {
