@@ -78,8 +78,8 @@ pub(crate) fn extract_measurements(
 mod test {
     use super::*;
     use crate::app::header::{Control, Iin, ResponseFunction, ResponseHeader};
-    use crate::app::parse::bytes::Bytes;
     use crate::app::parse::parser::HeaderCollection;
+    use crate::app::Bytes;
     use crate::app::Flags;
     use crate::app::FunctionCode;
     use crate::app::Timestamp;

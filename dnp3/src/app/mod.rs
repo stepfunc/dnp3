@@ -11,6 +11,7 @@ impl EndpointType {
     }
 }
 
+mod bytes;
 /// publicly exported enumerations defined by the standard
 #[rustfmt::skip]
 mod enums;
@@ -36,6 +37,7 @@ mod types;
 #[rustfmt::skip]
 pub mod variations;
 
+pub use bytes::*;
 pub use enums::*;
 pub use flags::*;
 pub use types::*;

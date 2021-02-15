@@ -622,12 +622,12 @@ mod test {
 
     use super::*;
     use crate::app::header::{Control, Iin, Iin1, Iin2};
-    use crate::app::parse::bytes::Bytes;
     use crate::app::parse::error::ResponseValidationError;
     use crate::app::parse::prefix::Prefix;
     use crate::app::sequence::Sequence;
     use crate::app::types::{DoubleBit, Timestamp};
     use crate::app::variations::*;
+    use crate::app::Bytes;
     use crate::app::CommandStatus;
 
     fn test_parse_error(input: &[u8], func: FunctionCode, err: ObjectParseError) {

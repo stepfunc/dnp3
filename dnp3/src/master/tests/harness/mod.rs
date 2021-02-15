@@ -154,7 +154,7 @@ impl ReadHandler for CountHandler {
     fn handle_octet_string<'a>(
         &mut self,
         _info: HeaderInfo,
-        _iter: &'a mut dyn Iterator<Item = (crate::app::parse::bytes::Bytes<'a>, u16)>,
+        _iter: &'a mut dyn Iterator<Item = (crate::app::Bytes<'a>, u16)>,
     ) {
     }
 }

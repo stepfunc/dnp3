@@ -2,7 +2,7 @@
 pub mod error;
 
 /// bytes handling helpers
-pub mod bytes;
+pub(crate) mod bytes;
 
 pub(crate) mod bit;
 pub(crate) mod count;

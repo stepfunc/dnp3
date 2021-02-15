@@ -1,9 +1,9 @@
 use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
-use crate::app::parse::bytes::Bytes;
 use crate::app::retry::ReconnectStrategy;
 use crate::app::timeout::Timeout;
 use crate::app::variations::Variation;
+use crate::app::Bytes;
 use crate::app::LinkStatusResult;
 use crate::app::QualifierCode;
 use crate::app::Timestamp;
