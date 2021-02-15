@@ -1,3 +1,8 @@
+pub use bytes::*;
+pub use enums::*;
+pub use flags::*;
+pub use types::*;
+
 /// internal enum used all over the place to specify master or outstation
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) enum EndpointType {
@@ -24,7 +29,7 @@ pub mod header;
 /// measurement types, e.g. Binary, Analog, Counter, etc
 pub mod measurement;
 /// application layer parser
-pub mod parse;
+pub(crate) mod parse;
 /// retry strategies
 pub mod retry;
 /// application layer sequence number
@@ -37,12 +42,11 @@ mod types;
 #[rustfmt::skip]
 pub mod variations;
 
-pub use bytes::*;
-pub use enums::*;
-pub use flags::*;
-pub use types::*;
-
 pub(crate) mod format;
+/// errors associated with parsing the application layer
+mod parse_error;
+
+pub use parse_error::*;
 
 #[rustfmt::skip]
 pub(crate) mod gen {

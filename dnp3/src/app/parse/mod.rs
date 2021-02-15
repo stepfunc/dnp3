@@ -1,10 +1,5 @@
-/// errors associated with parsing the application layer
-pub mod error;
-
-/// bytes handling helpers
-pub(crate) mod bytes;
-
 pub(crate) mod bit;
+pub(crate) mod bytes;
 pub(crate) mod count;
 pub(crate) mod parser;
 pub(crate) mod prefix;

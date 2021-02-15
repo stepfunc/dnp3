@@ -3,10 +3,10 @@ use crate::app::gen::count::CountVariation;
 use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::header::{Control, Iin, RequestHeader, ResponseFunction, ResponseHeader};
-use crate::app::parse::error::*;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::parse_error::*;
 use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
 use crate::decode::AppDecodeLevel;
@@ -622,8 +622,8 @@ mod test {
 
     use super::*;
     use crate::app::header::{Control, Iin, Iin1, Iin2};
-    use crate::app::parse::error::ResponseValidationError;
     use crate::app::parse::prefix::Prefix;
+    use crate::app::parse_error::ResponseValidationError;
     use crate::app::sequence::Sequence;
     use crate::app::types::{DoubleBit, Timestamp};
     use crate::app::variations::*;

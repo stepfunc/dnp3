@@ -1,5 +1,5 @@
-use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::traits::FixedSize;
+use crate::app::parse_error::ObjectParseError;
 use crate::app::Bytes;
 use crate::util::cursor::ReadCursor;
 

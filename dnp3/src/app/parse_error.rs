@@ -34,7 +34,7 @@ pub enum ObjectParseError {
 
 /// errors that occur when interpreting a header as a request header
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum RequestValidationError {
+pub enum RequestValidationError {
     /// function code not allowed in requests
     UnexpectedFunction(FunctionCode),
     /// request with either FIR or FIN == 0
