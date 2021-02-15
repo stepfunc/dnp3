@@ -3,6 +3,8 @@ pub use enums::*;
 pub use flags::*;
 pub use header::*;
 pub use retry::*;
+pub use sequence::*;
+pub use timeout::*;
 pub use types::*;
 
 /// internal enum used all over the place to specify master or outstation
@@ -35,9 +37,9 @@ pub(crate) mod parse;
 /// retry strategies
 mod retry;
 /// application layer sequence number
-pub mod sequence;
+mod sequence;
 /// types for handling timeouts
-pub mod timeout;
+mod timeout;
 /// types used in various other application layer objects
 mod types;
 /// public variations

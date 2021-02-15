@@ -1,11 +1,11 @@
 use crate::app::measurement::*;
-use crate::app::timeout::Timeout;
 use crate::app::variations::Variation;
 use crate::app::Bytes;
 use crate::app::LinkStatusResult;
 use crate::app::QualifierCode;
 use crate::app::ReconnectStrategy;
 use crate::app::ResponseHeader;
+use crate::app::Timeout;
 use crate::app::Timestamp;
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;

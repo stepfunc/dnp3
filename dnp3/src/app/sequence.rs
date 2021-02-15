@@ -1,12 +1,45 @@
-use crate::util::sequence::SequenceParams;
-
-#[derive(Copy, Clone)]
-pub struct AppParams;
-impl SequenceParams for AppParams {
-    const NUM_BITS: u8 = 4;
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Sequence {
+    value: u8,
 }
 
-pub type Sequence = crate::util::sequence::Sequence<AppParams>;
+impl Sequence {
+    const MAX_VALUE: u8 = 0b0000_1111;
+
+    pub fn value(&self) -> u8 {
+        self.value
+    }
+
+    fn calc_next(value: u8) -> u8 {
+        if value == Self::MAX_VALUE {
+            0
+        } else {
+            value + 1
+        }
+    }
+
+    pub(crate) fn next(self) -> u8 {
+        Self::calc_next(self.value)
+    }
+
+    pub(crate) fn new(x: u8) -> Self {
+        Self {
+            value: x & Self::MAX_VALUE,
+        }
+    }
+
+    pub(crate) fn increment(&mut self) -> Sequence {
+        let value = self.value;
+        self.value = Self::calc_next(value);
+        Self { value }
+    }
+}
+
+impl Default for Sequence {
+    fn default() -> Self {
+        Self { value: 0 }
+    }
+}
 
 #[cfg(test)]
 mod test {

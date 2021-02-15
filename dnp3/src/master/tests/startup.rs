@@ -1,5 +1,5 @@
 use crate::app::format::write::start_request;
-use crate::app::sequence::Sequence;
+use crate::app::Sequence;
 use crate::app::{Control, Iin, Iin1, Iin2};
 use crate::tokio::test::*;
 use crate::tokio::time;

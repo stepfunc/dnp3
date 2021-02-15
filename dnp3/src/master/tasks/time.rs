@@ -313,7 +313,7 @@ mod tests {
     use crate::app::format::write::*;
     use crate::app::parse::parser::ParsedFragment;
     use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
-    use crate::app::sequence::Sequence;
+    use crate::app::Sequence;
     use crate::app::*;
     use crate::master::handle::{AssociationHandler, NullHandler, ReadHandler};
     use crate::master::tasks::RequestWriter;

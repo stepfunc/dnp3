@@ -1,5 +1,5 @@
 use crate::app::parse::parser::{HeaderCollection, Response};
-use crate::app::sequence::Sequence;
+use crate::app::Sequence;
 use crate::app::Timestamp;
 use crate::app::{ExponentialBackOff, RetryStrategy};
 use crate::app::{Iin, ResponseHeader};

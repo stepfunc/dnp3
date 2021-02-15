@@ -32,7 +32,7 @@ pub(crate) fn create_association(
     let (tx, rx) = crate::tokio::sync::mpsc::channel(1);
     let mut runner = MasterSession::new(
         AppDecodeLevel::ObjectValues.into(),
-        crate::app::timeout::Timeout::from_secs(1).unwrap(),
+        crate::app::Timeout::from_secs(1).unwrap(),
         MasterSession::MIN_TX_BUFFER_SIZE,
         rx,
     );

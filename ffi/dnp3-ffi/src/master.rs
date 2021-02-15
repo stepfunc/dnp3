@@ -4,7 +4,7 @@ use crate::association::Association;
 
 use crate::ffi;
 
-use dnp3::app::timeout::Timeout;
+use dnp3::app::Timeout;
 use dnp3::app::Timestamp;
 use dnp3::app::{ReconnectStrategy, RetryStrategy};
 use dnp3::link::EndpointAddress;
