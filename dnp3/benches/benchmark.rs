@@ -13,8 +13,8 @@ use dnp3::app::parse::bytes::Bytes;
 use dnp3::app::retry::{ReconnectStrategy, RetryStrategy};
 use dnp3::app::timeout::Timeout;
 use dnp3::app::types::Timestamp;
-use dnp3::config::EndpointAddress;
-use dnp3::config::{DecodeLevel, LinkErrorMode};
+use dnp3::decode::EndpointAddress;
+use dnp3::decode::{DecodeLevel, LinkErrorMode};
 use dnp3::master::association::AssociationConfig;
 use dnp3::master::handle::{
     AssociationHandler, HeaderInfo, Listener, MasterConfig, MasterHandle, ReadHandler,

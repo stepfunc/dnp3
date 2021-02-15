@@ -1,5 +1,5 @@
 use crate::ffi;
-use dnp3::config::*;
+use dnp3::decode::*;
 use std::ffi::CString;
 use tracing::span::{Attributes, Record};
 use tracing::{Event, Id, Metadata};

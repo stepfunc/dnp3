@@ -19,7 +19,7 @@ pub(crate) mod task;
 #[cfg(test)]
 mod tests;
 
-use crate::config::DecodeLevel;
+use crate::decode::DecodeLevel;
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
 use crate::util::phys::PhysLayer;

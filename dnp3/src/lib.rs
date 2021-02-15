@@ -61,8 +61,8 @@ extern crate assert_matches;
 
 /// application layer types shared by both the master and outstation APIs
 pub mod app;
-/// configuration types not specific to master or outstation
-pub mod config;
+/// types used to control decoding in the log
+pub mod decode;
 /// types specific to the link-layer
 pub mod link;
 /// entry points, types, enums, and traits specific to masters

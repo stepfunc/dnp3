@@ -1,4 +1,4 @@
-use crate::config::DecodeLevel;
+use crate::decode::DecodeLevel;
 use crate::link::display::LinkDisplay;
 use crate::link::error::LinkError;
 use crate::link::header::Header;

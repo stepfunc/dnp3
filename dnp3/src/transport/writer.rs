@@ -1,6 +1,6 @@
 use crate::app::parse::parser::{FragmentDisplay, ParsedFragment};
 use crate::app::EndpointType;
-use crate::config::DecodeLevel;
+use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::AnyAddress;
 use crate::link::EndpointAddress;

@@ -1,4 +1,4 @@
-use crate::config::DecodeLevel;
+use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
 use crate::link::{EndpointAddress, LinkErrorMode};

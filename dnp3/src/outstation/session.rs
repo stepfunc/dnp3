@@ -8,7 +8,7 @@ use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
 use crate::app::sequence::Sequence;
 use crate::app::variations::{Group52Var1, Group52Var2};
-use crate::config::DecodeLevel;
+use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::{BufferSize, Feature};

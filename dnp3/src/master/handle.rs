@@ -7,7 +7,7 @@ use crate::app::timeout::Timeout;
 use crate::app::types::LinkStatusResult;
 use crate::app::types::Timestamp;
 use crate::app::variations::Variation;
-use crate::config::DecodeLevel;
+use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
 use crate::master::association::{Association, AssociationConfig};
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};

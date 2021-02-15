@@ -5,7 +5,7 @@ use crate::app::parse::parser::Response;
 use crate::app::sequence::Sequence;
 use crate::app::timeout::Timeout;
 use crate::app::types::LinkStatusResult;
-use crate::config::DecodeLevel;
+use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::{AssociationMap, Next};

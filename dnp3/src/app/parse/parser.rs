@@ -9,7 +9,7 @@ use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::Variation;
-use crate::config::AppDecodeLevel;
+use crate::decode::AppDecodeLevel;
 use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
 use xxhash_rust::xxh64::xxh64;

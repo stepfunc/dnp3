@@ -1,5 +1,5 @@
 use crate::app::EndpointType;
-use crate::config::DecodeLevel;
+use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::format::{format_data_frame, format_header_only, Payload};
 use crate::link::header::AnyAddress;

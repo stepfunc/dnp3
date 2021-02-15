@@ -3,7 +3,7 @@ use crate::master::session::{MasterSession, RunError};
 use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
 
-use crate::config::AppDecodeLevel;
+use crate::decode::AppDecodeLevel;
 use crate::util::phys::PhysLayer;
 
 use crate::master::association::AssociationConfig;
