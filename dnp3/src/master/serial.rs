@@ -1,4 +1,4 @@
-use crate::app::retry::ExponentialBackOff;
+use crate::app::ExponentialBackOff;
 use crate::master::handle::{Listener, MasterConfig, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
 use crate::master::ClientState;

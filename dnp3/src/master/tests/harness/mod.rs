@@ -97,9 +97,9 @@ impl AssociationHandler for CountHandler {
 }
 
 impl ReadHandler for CountHandler {
-    fn begin_fragment(&mut self, _header: crate::app::header::ResponseHeader) {}
+    fn begin_fragment(&mut self, _header: crate::app::ResponseHeader) {}
 
-    fn end_fragment(&mut self, _header: crate::app::header::ResponseHeader) {}
+    fn end_fragment(&mut self, _header: crate::app::ResponseHeader) {}
 
     fn handle_binary(
         &mut self,

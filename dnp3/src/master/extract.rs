@@ -1,8 +1,8 @@
 use crate::app::gen::count::CountVariation;
-use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
 use crate::app::variations::*;
+use crate::app::ResponseHeader;
 use crate::master::handle::ReadHandler;
 
 /// Extract measurements from a HeaderCollection, sinking them into
@@ -77,12 +77,8 @@ pub(crate) fn extract_measurements(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::app::header::{Control, Iin, ResponseFunction, ResponseHeader};
     use crate::app::parse::parser::HeaderCollection;
-    use crate::app::Bytes;
-    use crate::app::Flags;
-    use crate::app::FunctionCode;
-    use crate::app::Timestamp;
+    use crate::app::*;
     use crate::master::handle::{HeaderInfo, ReadHandler};
 
     fn header() -> ResponseHeader {

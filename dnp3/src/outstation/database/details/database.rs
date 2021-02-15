@@ -1,4 +1,4 @@
-use crate::app::header::Iin2;
+use crate::app::Iin2;
 use crate::master::request::EventClasses;
 use crate::outstation::database::details::event::buffer::EventBuffer;
 use crate::outstation::database::details::range::static_db::{

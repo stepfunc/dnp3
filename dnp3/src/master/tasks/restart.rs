@@ -115,9 +115,9 @@ impl RestartTask {
 mod tests {
     use super::*;
     use crate::app::format::write::{start_request, start_response};
-    use crate::app::header::{Control, Iin, ResponseFunction};
     use crate::app::sequence::Sequence;
     use crate::app::variations::{Group52Var1, Group52Var2};
+    use crate::app::{Control, Iin, ResponseFunction};
     use crate::link::EndpointAddress;
     use crate::master::association::{Association, AssociationConfig};
     use crate::master::handle::NullHandler;

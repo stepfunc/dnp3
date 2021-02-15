@@ -1,6 +1,8 @@
 pub use bytes::*;
 pub use enums::*;
 pub use flags::*;
+pub use header::*;
+pub use retry::*;
 pub use types::*;
 
 /// internal enum used all over the place to specify master or outstation
@@ -25,13 +27,13 @@ mod extensions;
 /// measurement flags (aka quality) and display implementations
 mod flags;
 /// application layer header types
-pub mod header;
+mod header;
 /// measurement types, e.g. Binary, Analog, Counter, etc
 pub mod measurement;
 /// application layer parser
 pub(crate) mod parse;
 /// retry strategies
-pub mod retry;
+mod retry;
 /// application layer sequence number
 pub mod sequence;
 /// types for handling timeouts

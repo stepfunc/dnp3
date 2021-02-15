@@ -1,6 +1,6 @@
-use dnp3::app::header::{Control, RequestHeader};
 use dnp3::app::sequence::Sequence;
 use dnp3::app::ControlCode;
+use dnp3::app::{Control, RequestHeader};
 use dnp3::outstation::database::Database;
 use dnp3::outstation::traits::{
     BroadcastAction, ControlHandler, ControlSupport, OperateType, OutstationApplication,

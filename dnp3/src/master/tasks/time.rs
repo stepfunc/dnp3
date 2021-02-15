@@ -311,10 +311,10 @@ impl From<std::num::TryFromIntError> for TimeSyncError {
 mod tests {
     use super::*;
     use crate::app::format::write::*;
-    use crate::app::header::*;
     use crate::app::parse::parser::ParsedFragment;
     use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
     use crate::app::sequence::Sequence;
+    use crate::app::*;
     use crate::master::handle::{AssociationHandler, NullHandler, ReadHandler};
     use crate::master::tasks::RequestWriter;
     use crate::util::cursor::WriteCursor;

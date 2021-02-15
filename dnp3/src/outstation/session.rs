@@ -1,13 +1,11 @@
 use crate::app::format::write::start_response;
 use crate::app::gen::ranged::RangedVariation;
-use crate::app::header::{
-    Control, Iin, Iin1, Iin2, RequestHeader, ResponseFunction, ResponseHeader,
-};
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
 use crate::app::sequence::Sequence;
 use crate::app::variations::{Group52Var1, Group52Var2};
 use crate::app::ObjectParseError;
 use crate::app::{CommandStatus, FunctionCode};
+use crate::app::{Control, Iin, Iin1, Iin2, RequestHeader, ResponseFunction, ResponseHeader};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;

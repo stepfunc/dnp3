@@ -1,6 +1,6 @@
 use crate::app::format::write::start_request;
-use crate::app::header::{Control, Iin, Iin1, Iin2};
 use crate::app::sequence::Sequence;
+use crate::app::{Control, Iin, Iin1, Iin2};
 use crate::tokio::test::*;
 use crate::tokio::time;
 use crate::util::cursor::WriteCursor;
@@ -9,9 +9,9 @@ use std::time::Duration;
 
 use super::harness::create_association;
 use super::harness::requests::*;
-use crate::app::retry::RetryStrategy;
 use crate::app::variations::Variation;
 use crate::app::FunctionCode;
+use crate::app::RetryStrategy;
 use crate::master::association::AssociationConfig;
 use crate::master::request::{Classes, EventClasses};
 

@@ -1,6 +1,6 @@
 use crate::app::format::write::start_request;
-use crate::app::header::{Control, Iin, Iin1, Iin2};
 use crate::app::sequence::Sequence;
+use crate::app::{Control, Iin, Iin1, Iin2};
 use crate::util::cursor::WriteCursor;
 
 use super::harness::create_association;

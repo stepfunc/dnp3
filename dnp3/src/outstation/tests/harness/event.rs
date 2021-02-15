@@ -1,6 +1,6 @@
-use crate::app::header::RequestHeader;
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 use crate::app::FunctionCode;
+use crate::app::RequestHeader;
 use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};

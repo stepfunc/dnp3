@@ -5,9 +5,9 @@ mod details;
 /// read headers
 pub(crate) mod read;
 
-use crate::app::header::Iin2;
 use crate::app::measurement::*;
 use crate::app::parse::parser::HeaderCollection;
+use crate::app::Iin2;
 use crate::util::cursor::WriteCursor;
 
 use config::*;

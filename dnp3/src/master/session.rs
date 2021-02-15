@@ -1,9 +1,9 @@
 use crate::app::format::write;
 use crate::app::format::write::start_request;
-use crate::app::header::Control;
 use crate::app::parse::parser::Response;
 use crate::app::sequence::Sequence;
 use crate::app::timeout::Timeout;
+use crate::app::Control;
 use crate::app::LinkStatusResult;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;

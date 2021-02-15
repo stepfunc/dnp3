@@ -1,8 +1,8 @@
-use crate::app::header::{Control, RequestHeader};
 use crate::app::measurement::{Binary, Time};
 use crate::app::Flags;
 use crate::app::FunctionCode;
 use crate::app::Timestamp;
+use crate::app::{Control, RequestHeader};
 use crate::outstation::database::config::BinaryConfig;
 use crate::outstation::database::{Add, Database, EventClass, Update, UpdateOptions};
 use crate::outstation::tests::harness::*;
