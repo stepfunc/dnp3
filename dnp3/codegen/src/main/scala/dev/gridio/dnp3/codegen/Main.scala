@@ -14,7 +14,7 @@ object Main {
     override def lines(implicit indentation: Indentation): Iterator[String] = {
       "use crate::app::parse::traits::{FixedSize, FixedSizeVariation};".eol ++
       "use crate::util::cursor::*;".eol ++
-      "use crate::app::enums::CommandStatus;".eol ++
+      "use crate::app::CommandStatus;".eol ++
       "use crate::app::types::{ControlCode, Timestamp};".eol ++
       "use crate::app::flags::format::*;".eol
     }

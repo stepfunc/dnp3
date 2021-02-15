@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use crate::app::enums::FunctionCode;
 use crate::app::gen::count::CountVariation;
 use crate::app::parse::parser::Response;
+use crate::app::FunctionCode;
 use crate::master::error::TaskError;
 use crate::master::handle::Promise;
 use crate::master::tasks::NonReadTask;

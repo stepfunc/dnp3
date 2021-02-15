@@ -1,6 +1,5 @@
 use std::ops::BitAnd;
 
-use crate::app::enums::CommandStatus;
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::count::CountSequence;
@@ -8,6 +7,7 @@ use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::*;
+use crate::app::CommandStatus;
 use crate::master::error::CommandResponseError;
 use crate::util::cursor::WriteError;
 

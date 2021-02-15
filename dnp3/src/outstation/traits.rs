@@ -1,10 +1,10 @@
-use crate::app::enums::{CommandStatus, FunctionCode};
 use crate::app::header::RequestHeader;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::sequence::Sequence;
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
+use crate::app::{CommandStatus, FunctionCode};
 use crate::outstation::database::Database;
 
 /// Enumeration returned for cold/warm restart

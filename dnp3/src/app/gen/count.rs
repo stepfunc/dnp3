@@ -11,7 +11,7 @@
 //
 
 use crate::app::variations::*;
-use crate::app::enums::QualifierCode;
+use crate::app::QualifierCode;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::*;
 use crate::util::cursor::ReadCursor;

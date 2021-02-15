@@ -1,4 +1,3 @@
-use crate::app::enums::{CommandStatus, FunctionCode};
 use crate::app::format::write::start_response;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::header::{
@@ -8,6 +7,7 @@ use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
 use crate::app::sequence::Sequence;
 use crate::app::variations::{Group52Var1, Group52Var2};
+use crate::app::{CommandStatus, FunctionCode};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;

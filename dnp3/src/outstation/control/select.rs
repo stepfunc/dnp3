@@ -1,5 +1,5 @@
-use crate::app::enums::CommandStatus;
 use crate::app::sequence::Sequence;
+use crate::app::CommandStatus;
 
 /// records when a select occurs
 #[derive(Copy, Clone)]

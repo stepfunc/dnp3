@@ -1,4 +1,3 @@
-use crate::app::enums::QualifierCode;
 use crate::app::header::ResponseHeader;
 use crate::app::measurement::*;
 use crate::app::parse::bytes::Bytes;
@@ -7,6 +6,7 @@ use crate::app::timeout::Timeout;
 use crate::app::types::LinkStatusResult;
 use crate::app::types::Timestamp;
 use crate::app::variations::Variation;
+use crate::app::QualifierCode;
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
 use crate::master::association::{Association, AssociationConfig};

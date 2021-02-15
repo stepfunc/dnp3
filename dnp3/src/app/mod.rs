@@ -13,7 +13,7 @@ impl EndpointType {
 
 /// publicly exported enumerations defined by the standard
 #[rustfmt::skip]
-pub mod enums;
+mod enums;
 /// extension impls for generated types
 mod extensions;
 /// measurement flags (aka quality) and display implementations
@@ -35,6 +35,8 @@ pub mod types;
 /// public variations
 #[rustfmt::skip]
 pub mod variations;
+
+pub use enums::*;
 
 pub(crate) mod format;
 

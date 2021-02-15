@@ -1,5 +1,5 @@
-use crate::app::enums::FunctionCode;
 use crate::app::sequence::Sequence;
+use crate::app::FunctionCode;
 use crate::util::bit::bits::*;
 use crate::util::bit::{format_bitfield, Bitfield};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};

@@ -1,10 +1,10 @@
-use crate::app::enums::{FunctionCode, QualifierCode};
 use crate::app::header::{Control, Iin, RequestHeader, ResponseFunction, ResponseHeader};
 #[cfg(test)]
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
+use crate::app::{FunctionCode, QualifierCode};
 use crate::util::cursor::{WriteCursor, WriteError};
 
 pub(crate) struct HeaderWriter<'a, 'b> {

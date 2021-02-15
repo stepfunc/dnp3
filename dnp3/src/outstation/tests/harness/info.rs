@@ -1,6 +1,6 @@
-use crate::app::enums::FunctionCode;
 use crate::app::header::RequestHeader;
 use crate::app::sequence::Sequence;
+use crate::app::FunctionCode;
 use crate::outstation::tests::harness::{Event, EventHandle};
 use crate::outstation::traits::{BroadcastAction, OutstationInformation};
 

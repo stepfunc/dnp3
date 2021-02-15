@@ -9,9 +9,9 @@ use std::time::Duration;
 
 use super::harness::create_association;
 use super::harness::requests::*;
-use crate::app::enums::FunctionCode;
 use crate::app::retry::RetryStrategy;
 use crate::app::variations::Variation;
+use crate::app::FunctionCode;
 use crate::master::association::AssociationConfig;
 use crate::master::request::{Classes, EventClasses};
 

@@ -12,7 +12,7 @@
 
 use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
 use crate::util::cursor::*;
-use crate::app::enums::CommandStatus;
+use crate::app::CommandStatus;
 use crate::app::types::{ControlCode, Timestamp};
 use crate::app::flags::format::*;
 

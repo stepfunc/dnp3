@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 
-use crate::app::enums::{OpType, QualifierCode, TripCloseCode};
 use crate::app::variations::Variation;
+use crate::app::{OpType, QualifierCode, TripCloseCode};
 use crate::util::cursor::{WriteCursor, WriteError};
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use std::convert::TryFrom;

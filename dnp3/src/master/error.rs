@@ -1,6 +1,6 @@
-use crate::app::enums::CommandStatus;
 use crate::app::header::{Iin, Iin2};
 use crate::app::parse::error::ObjectParseError;
+use crate::app::CommandStatus;
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::NoAssociation;

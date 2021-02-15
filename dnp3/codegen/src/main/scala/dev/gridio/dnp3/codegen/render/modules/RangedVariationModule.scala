@@ -8,7 +8,7 @@ object RangedVariationModule extends Module {
 
   override def lines(implicit indent: Indentation) : Iterator[String] = {
       "use crate::app::variations::*;".eol ++
-      "use crate::app::enums::QualifierCode;".eol ++
+      "use crate::app::QualifierCode;".eol ++
       "use crate::app::parse::range::{RangedSequence, Range};".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
       "use crate::app::parse::parser::*;".eol ++

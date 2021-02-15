@@ -1,6 +1,6 @@
-use crate::app::enums::QualifierCode;
 use crate::app::types::DoubleBit;
 use crate::app::variations::Variation;
+use crate::app::QualifierCode;
 use crate::outstation::database::details::range::traits::{
     FixedWriteFn, ToBit, ToDoubleBit, WriteInfo, WriteType,
 };

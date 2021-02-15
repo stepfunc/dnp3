@@ -1,4 +1,3 @@
-use crate::app::enums::{FunctionCode, QualifierCode};
 use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::prefixed::PrefixedVariation;
@@ -9,6 +8,7 @@ use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::Variation;
+use crate::app::{FunctionCode, QualifierCode};
 use crate::decode::AppDecodeLevel;
 use crate::util::cursor::ReadCursor;
 use std::fmt::{Debug, Formatter};
@@ -621,7 +621,6 @@ impl QualifierCode {
 mod test {
 
     use super::*;
-    use crate::app::enums::CommandStatus;
     use crate::app::header::{Control, Iin, Iin1, Iin2};
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::error::ResponseValidationError;
@@ -629,6 +628,7 @@ mod test {
     use crate::app::sequence::Sequence;
     use crate::app::types::{DoubleBit, Timestamp};
     use crate::app::variations::*;
+    use crate::app::CommandStatus;
 
     fn test_parse_error(input: &[u8], func: FunctionCode, err: ObjectParseError) {
         assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);

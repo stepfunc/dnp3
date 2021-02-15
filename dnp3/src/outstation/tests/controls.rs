@@ -1,5 +1,5 @@
-use crate::app::enums::FunctionCode;
 use crate::app::variations::Group41Var2;
+use crate::app::FunctionCode;
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::Feature;
 use crate::outstation::tests::harness::*;

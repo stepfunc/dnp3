@@ -1,9 +1,9 @@
-use crate::app::enums::FunctionCode;
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::count::CountVariation;
 use crate::app::parse::parser::Response;
 use crate::app::types::Timestamp;
 use crate::app::variations::{Group50Var1, Group50Var3};
+use crate::app::FunctionCode;
 use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::handle::Promise;
@@ -360,8 +360,8 @@ mod tests {
     mod non_lan {
 
         use super::*;
-        use crate::app::enums::QualifierCode;
         use crate::app::variations::Group52Var2;
+        use crate::app::QualifierCode;
         use crate::link::EndpointAddress;
         use crate::master::association::AssociationConfig;
 

@@ -4,11 +4,11 @@ pub(crate) mod read;
 pub(crate) mod restart;
 pub(crate) mod time;
 
-use crate::app::enums::FunctionCode;
 use crate::app::format::write::HeaderWriter;
 use crate::app::header::ResponseHeader;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::types::LinkStatusResult;
+use crate::app::FunctionCode;
 use crate::link::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
