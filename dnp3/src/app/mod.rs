@@ -6,6 +6,12 @@ pub use retry::*;
 pub use sequence::*;
 pub use timeout::*;
 pub use types::*;
+pub use variations::Variation;
+
+/// Types used for making binary and analog output control requests
+pub mod control {
+    pub use super::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
+}
 
 /// internal enum used all over the place to specify master or outstation
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -44,7 +50,7 @@ mod timeout;
 mod types;
 /// public variations
 #[rustfmt::skip]
-pub mod variations;
+pub(crate) mod variations;
 
 pub(crate) mod format;
 /// errors associated with parsing the application layer

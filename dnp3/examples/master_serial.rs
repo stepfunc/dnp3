@@ -1,7 +1,8 @@
-use dnp3::app::variations::{Group12Var1, Variation};
+use dnp3::app::control::Group12Var1;
 use dnp3::app::OpType;
 use dnp3::app::ReconnectStrategy;
 use dnp3::app::Timeout;
+use dnp3::app::Variation;
 use dnp3::decode::*;
 use dnp3::link::EndpointAddress;
 use dnp3::master::association::AssociationConfig;

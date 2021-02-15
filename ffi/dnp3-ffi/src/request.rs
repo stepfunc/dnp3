@@ -1,5 +1,5 @@
 use crate::ffi;
-use dnp3::app::variations::Variation;
+use dnp3::app::Variation;
 use dnp3::master::request::{ReadHeader, ReadRequest};
 
 pub struct Request {
