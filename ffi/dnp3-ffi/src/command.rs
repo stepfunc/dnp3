@@ -1,6 +1,6 @@
 use crate::ffi;
-use dnp3::app::types::ControlCode;
 use dnp3::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
+use dnp3::app::ControlCode;
 use dnp3::app::{OpType, TripCloseCode};
 
 #[derive(Clone)]

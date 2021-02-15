@@ -31,12 +31,13 @@ pub mod sequence;
 /// types for handling timeouts
 pub mod timeout;
 /// types used in various other application layer objects
-pub mod types;
+mod types;
 /// public variations
 #[rustfmt::skip]
 pub mod variations;
 
 pub use enums::*;
+pub use types::*;
 
 pub(crate) mod format;
 

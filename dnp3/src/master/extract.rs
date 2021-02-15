@@ -81,8 +81,8 @@ mod test {
     use crate::app::header::{Control, Iin, ResponseFunction, ResponseHeader};
     use crate::app::parse::bytes::Bytes;
     use crate::app::parse::parser::HeaderCollection;
-    use crate::app::types::Timestamp;
     use crate::app::FunctionCode;
+    use crate::app::Timestamp;
     use crate::master::handle::{HeaderInfo, ReadHandler};
 
     fn header() -> ResponseHeader {

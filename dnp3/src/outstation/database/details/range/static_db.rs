@@ -1,6 +1,6 @@
 use crate::app::flags::Flags;
 use crate::app::measurement::*;
-use crate::app::types::DoubleBit;
+use crate::app::DoubleBit;
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::event::buffer::Insertable;
 use crate::outstation::database::details::range::traits::StaticVariation;

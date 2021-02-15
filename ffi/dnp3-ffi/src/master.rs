@@ -6,7 +6,7 @@ use crate::ffi;
 
 use dnp3::app::retry::{ReconnectStrategy, RetryStrategy};
 use dnp3::app::timeout::Timeout;
-use dnp3::app::types::Timestamp;
+use dnp3::app::Timestamp;
 use dnp3::link::EndpointAddress;
 use dnp3::master::association::AssociationConfig;
 use dnp3::master::handle::{AssociationHandler, Listener, MasterConfig, MasterHandle, ReadHandler};

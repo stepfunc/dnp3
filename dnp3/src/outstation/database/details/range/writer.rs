@@ -1,5 +1,5 @@
-use crate::app::types::DoubleBit;
 use crate::app::variations::Variation;
+use crate::app::DoubleBit;
 use crate::app::QualifierCode;
 use crate::outstation::database::details::range::traits::{
     FixedWriteFn, ToBit, ToDoubleBit, WriteInfo, WriteType,

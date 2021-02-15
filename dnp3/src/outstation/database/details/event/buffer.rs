@@ -990,7 +990,7 @@ mod tests {
     use super::*;
     use crate::app::flags::Flags;
     use crate::app::measurement::*;
-    use crate::app::types::DoubleBit;
+    use crate::app::DoubleBit;
 
     fn insert_events(buffer: &mut EventBuffer) {
         buffer

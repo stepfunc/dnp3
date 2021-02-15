@@ -2,7 +2,7 @@ use crate::app::header::{Iin, ResponseHeader};
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::retry::{ExponentialBackOff, RetryStrategy};
 use crate::app::sequence::Sequence;
-use crate::app::types::Timestamp;
+use crate::app::Timestamp;
 use crate::master::error::{AssociationError, TaskError, TimeSyncError};
 use crate::master::extract::extract_measurements;
 use crate::master::handle::{AssociationHandler, Promise};

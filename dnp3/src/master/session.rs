@@ -4,7 +4,7 @@ use crate::app::header::Control;
 use crate::app::parse::parser::Response;
 use crate::app::sequence::Sequence;
 use crate::app::timeout::Timeout;
-use crate::app::types::LinkStatusResult;
+use crate::app::LinkStatusResult;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;

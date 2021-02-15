@@ -4,7 +4,7 @@ use dnp3::app::measurement::{
     Analog, AnalogOutputStatus, Binary, BinaryOutputStatus, Counter, DoubleBitBinary,
     FrozenCounter, OctetString, Time,
 };
-use dnp3::app::types::{DoubleBit, Timestamp};
+use dnp3::app::{DoubleBit, Timestamp};
 use dnp3::outstation::database::config::{
     AnalogConfig, AnalogOutputStatusConfig, BinaryConfig, BinaryOutputStatusConfig, CounterConfig,
     DoubleBitBinaryConfig, EventAnalogOutputStatusVariation, EventAnalogVariation,
