@@ -988,9 +988,9 @@ impl Insertable for measurement::OctetString {
 mod tests {
 
     use super::*;
-    use crate::app::flags::Flags;
     use crate::app::measurement::*;
     use crate::app::DoubleBit;
+    use crate::app::Flags;
 
     fn insert_events(buffer: &mut EventBuffer) {
         buffer

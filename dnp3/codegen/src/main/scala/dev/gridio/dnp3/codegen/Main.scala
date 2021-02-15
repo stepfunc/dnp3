@@ -16,7 +16,7 @@ object Main {
       "use crate::util::cursor::*;".eol ++
       "use crate::app::CommandStatus;".eol ++
       "use crate::app::types::{ControlCode, Timestamp};".eol ++
-      "use crate::app::flags::format::*;".eol
+      "use crate::app::format::*;".eol
     }
   }
 

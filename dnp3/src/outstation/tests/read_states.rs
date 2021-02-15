@@ -1,6 +1,6 @@
-use crate::app::flags::Flags;
 use crate::app::header::{Control, RequestHeader};
 use crate::app::measurement::{Binary, Time};
+use crate::app::Flags;
 use crate::app::FunctionCode;
 use crate::app::Timestamp;
 use crate::outstation::database::config::BinaryConfig;

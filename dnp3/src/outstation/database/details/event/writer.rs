@@ -339,7 +339,7 @@ impl Writable for Box<[u8]> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::flags::Flags;
+    use crate::app::Flags;
 
     #[test]
     fn can_write_g2v1_x2() {

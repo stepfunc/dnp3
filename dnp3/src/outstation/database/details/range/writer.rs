@@ -286,8 +286,8 @@ fn write_header(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::flags::Flags;
     use crate::app::measurement::{Binary, DoubleBitBinary, Time};
+    use crate::app::Flags;
     use crate::outstation::database::config::*;
     use crate::outstation::database::details::range::traits::StaticVariation;
 

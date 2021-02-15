@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use crate::app::flags::Flags;
 use crate::app::types::{DoubleBit, Timestamp};
+use crate::app::Flags;
 use crate::util::bit::bits::*;
 use crate::util::bit::BitMask;
 

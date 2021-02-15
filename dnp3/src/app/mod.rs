@@ -17,7 +17,7 @@ mod enums;
 /// extension impls for generated types
 mod extensions;
 /// measurement flags (aka quality) and display implementations
-pub mod flags;
+mod flags;
 /// application layer header types
 pub mod header;
 /// measurement types, e.g. Binary, Analog, Counter, etc
@@ -37,6 +37,7 @@ mod types;
 pub mod variations;
 
 pub use enums::*;
+pub use flags::*;
 pub use types::*;
 
 pub(crate) mod format;

@@ -317,7 +317,7 @@ object ConversionsModule extends Module {
 
   override def lines(implicit indentation: Indentation): Iterator[String] = {
     "use crate::app::measurement::*;".eol ++
-    "use crate::app::flags::*;".eol ++
+    "use crate::app::*;".eol ++
     "use crate::app::variations::*;".eol ++
     space ++
     binaryConversions ++

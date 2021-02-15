@@ -7,12 +7,12 @@ use dnp3::outstation::database::{
     Add, Database, EventBufferConfig, EventClass, EventMode, Update, UpdateOptions,
 };
 
-use dnp3::app::flags::Flags;
 use dnp3::app::header::ResponseHeader;
 use dnp3::app::parse::bytes::Bytes;
 use dnp3::app::retry::{ReconnectStrategy, RetryStrategy};
 use dnp3::app::timeout::Timeout;
 use dnp3::app::types::Timestamp;
+use dnp3::app::Flags;
 use dnp3::decode::EndpointAddress;
 use dnp3::decode::{DecodeLevel, LinkErrorMode};
 use dnp3::master::association::AssociationConfig;

@@ -11,7 +11,7 @@
 //
 
 use crate::app::measurement::*;
-use crate::app::flags::*;
+use crate::app::*;
 use crate::app::variations::*;
 
 impl From<Group2Var2> for Binary {

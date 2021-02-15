@@ -1,6 +1,6 @@
-use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::app::CommandStatus;
+use dnp3::app::Flags;
 use dnp3::decode::*;
 use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::config::OutstationConfig;
