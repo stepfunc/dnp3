@@ -1,7 +1,7 @@
-use crate::app::measurement::{Binary, BinaryOutputStatus, DoubleBitBinary, Time};
+use crate::app::measurement::{
+    Binary, BinaryOutputStatus, DoubleBit, DoubleBitBinary, Flags, Time,
+};
 use crate::app::variations::{Group2Var3, Group4Var3};
-use crate::app::DoubleBit;
-use crate::app::Flags;
 
 impl Group2Var3 {
     pub(crate) fn to_measurement(self, cto: Option<Time>) -> Binary {

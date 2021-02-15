@@ -13,6 +13,7 @@
 use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
 use crate::util::cursor::*;
 use crate::app::*;
+use crate::app::measurement::*;
 
 /// all variations supported by the library
 #[derive(Copy, Clone, Debug, PartialEq)]

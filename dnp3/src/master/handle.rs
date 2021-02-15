@@ -1,14 +1,13 @@
 use crate::app::measurement::*;
 use crate::app::variations::Variation;
 use crate::app::Bytes;
-use crate::app::LinkStatusResult;
 use crate::app::QualifierCode;
 use crate::app::ReconnectStrategy;
 use crate::app::ResponseHeader;
 use crate::app::Timeout;
 use crate::app::Timestamp;
 use crate::decode::DecodeLevel;
-use crate::link::EndpointAddress;
+use crate::link::{EndpointAddress, LinkStatusResult};
 use crate::master::association::{Association, AssociationConfig};
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};

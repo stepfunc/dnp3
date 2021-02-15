@@ -1,5 +1,4 @@
-use crate::app::measurement::{Binary, Time};
-use crate::app::Flags;
+use crate::app::measurement::{Binary, Flags, Time};
 use crate::app::FunctionCode;
 use crate::app::Timestamp;
 use crate::app::{Control, RequestHeader};

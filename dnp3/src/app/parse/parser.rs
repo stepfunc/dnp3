@@ -622,10 +622,11 @@ mod test {
 
     use super::*;
     use crate::app::header::{Control, Iin, Iin1, Iin2};
+    use crate::app::measurement::DoubleBit;
     use crate::app::parse::prefix::Prefix;
     use crate::app::parse_error::ResponseValidationError;
     use crate::app::sequence::Sequence;
-    use crate::app::types::{DoubleBit, Timestamp};
+    use crate::app::types::Timestamp;
     use crate::app::variations::*;
     use crate::app::Bytes;
     use crate::app::CommandStatus;

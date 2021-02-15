@@ -1,6 +1,5 @@
 use super::harness::*;
-use crate::app::measurement::{Binary, Time};
-use crate::app::Flags;
+use crate::app::measurement::{Binary, Flags, Time};
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::config::BinaryConfig;
 use crate::outstation::database::{Add, DatabaseHandle, EventClass, Update, UpdateOptions};

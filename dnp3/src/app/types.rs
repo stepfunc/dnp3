@@ -1,21 +1,11 @@
 use std::time::{Duration, SystemTime};
 
+use crate::app::measurement::DoubleBit;
 use crate::app::variations::Variation;
 use crate::app::{OpType, QualifierCode, TripCloseCode};
 use crate::util::cursor::{WriteCursor, WriteError};
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use std::convert::TryFrom;
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum LinkStatusResult {
-    /// The other device responded with a valid `LINK_STATUS`
-    Success,
-    /// There was activity on the link, but it wasn't a `LINK_STATUS`
-    ///
-    /// The link is still alive, but the behaviour of the other device
-    /// is unexpected.
-    UnexpectedResponse,
-}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Timestamp {
@@ -82,14 +72,6 @@ impl std::fmt::Display for Timestamp {
             None => f.write_str(Timestamp::OUT_OF_RANGE),
         }
     }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum DoubleBit {
-    Intermediate,
-    DeterminedOff,
-    DeterminedOn,
-    Indeterminate,
 }
 
 pub(crate) struct BitPair {

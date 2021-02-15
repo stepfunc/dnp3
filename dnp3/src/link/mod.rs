@@ -24,6 +24,18 @@ pub(crate) mod constant {
     pub(crate) const MAX_BLOCK_SIZE_WITH_CRC: usize = MAX_BLOCK_SIZE + CRC_LENGTH;
 }
 
+/// Result of a link status request initiated from the master or outstation API
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum LinkStatusResult {
+    /// The other device responded with a valid `LINK_STATUS` acknowledgement
+    Success,
+    /// There was activity on the link, but it wasn't a `LINK_STATUS`
+    ///
+    /// The link is still alive, but the behaviour of the other device
+    /// is unexpected.
+    UnexpectedResponse,
+}
+
 /// Controls how errors in parsed link-layer frames are handled. This behavior
 /// is configurable for physical layers with built-in error correction like TCP
 /// as the connection might be through a terminal server.

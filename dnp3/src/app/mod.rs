@@ -1,6 +1,5 @@
 pub use bytes::*;
 pub use enums::*;
-pub use flags::*;
 pub use header::*;
 pub use retry::*;
 pub use sequence::*;
@@ -32,8 +31,6 @@ mod bytes;
 mod enums;
 /// extension impls for generated types
 mod extensions;
-/// measurement flags (aka quality) and display implementations
-mod flags;
 /// application layer header types
 mod header;
 /// measurement types, e.g. Binary, Analog, Counter, etc
