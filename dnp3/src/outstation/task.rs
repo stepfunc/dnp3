@@ -1,4 +1,5 @@
-use crate::config::{DecodeLevel, LinkErrorMode};
+use crate::config::DecodeLevel;
+use crate::link::LinkErrorMode;
 use crate::outstation::config::*;
 use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
 use crate::outstation::session::{OutstationSession, SessionError};

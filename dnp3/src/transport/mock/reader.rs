@@ -1,7 +1,7 @@
-use crate::config::LinkErrorMode;
-use crate::config::{DecodeLevel, EndpointAddress};
+use crate::config::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
+use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::outstation::config::Feature;
 use crate::transport::{Fragment, FragmentInfo, TransportData};
 use crate::util::buffer::Buffer;

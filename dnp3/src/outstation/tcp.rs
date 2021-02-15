@@ -1,6 +1,6 @@
 use crate::outstation::task::OutstationTask;
 
-use crate::config::LinkErrorMode;
+use crate::link::LinkErrorMode;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::EventBufferConfig;
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};

@@ -2,6 +2,7 @@ use dnp3::app::enums::CommandStatus;
 use dnp3::app::flags::Flags;
 use dnp3::app::measurement::*;
 use dnp3::config::*;
+use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::config::OutstationConfig;
 use dnp3::outstation::database::config::*;
 use dnp3::outstation::database::{Add, Update, UpdateOptions};

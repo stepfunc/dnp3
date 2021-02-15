@@ -13,7 +13,7 @@ pub use tokio_one_serial::{DataBits, FlowControl, Parity, StopBits};
 
 use std::time::Duration;
 
-use crate::config::LinkErrorMode;
+use crate::link::LinkErrorMode;
 use crate::util::phys::PhysLayer;
 use tracing::Instrument;
 

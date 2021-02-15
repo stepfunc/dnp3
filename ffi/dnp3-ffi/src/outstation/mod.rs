@@ -5,7 +5,7 @@ mod struct_constructors;
 use std::ffi::CStr;
 use std::time::Duration;
 
-use dnp3::config::EndpointAddress;
+use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::config::{BufferSize, Feature, Features, OutstationConfig};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::tcp::ServerHandle;
@@ -15,7 +15,6 @@ pub use database::*;
 pub use struct_constructors::*;
 
 use crate::{ffi, Runtime, RuntimeHandle};
-use dnp3::config::LinkErrorMode;
 
 pub struct TcpServer {
     runtime: RuntimeHandle,

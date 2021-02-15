@@ -1,5 +1,5 @@
 use crate::app::EndpointType;
-use crate::config::{DecodeLevel, EndpointAddress};
+use crate::config::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::function::Function;
 use crate::link::header::{
@@ -7,9 +7,9 @@ use crate::link::header::{
 };
 use crate::link::parser::FramePayload;
 
-use crate::config::LinkErrorMode;
 use crate::link::display::LinkDisplay;
 use crate::link::format::format_header_fixed_size;
+use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::outstation::config::Feature;
 use crate::util::phys::PhysLayer;
 

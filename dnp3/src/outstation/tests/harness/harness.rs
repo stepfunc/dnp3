@@ -1,4 +1,4 @@
-use crate::config::{AppDecodeLevel, EndpointAddress};
+use crate::config::AppDecodeLevel;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::EventBufferConfig;
@@ -10,7 +10,7 @@ use crate::outstation::tests::harness::{
 use crate::outstation::OutstationHandle;
 use crate::tokio::test::*;
 
-use crate::config::LinkErrorMode;
+use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::outstation::session::SessionError;
 use crate::util::phys::PhysLayer;
 use std::sync::{Arc, Mutex};

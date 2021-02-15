@@ -3,7 +3,7 @@ use crate::master::session::{MasterSession, RunError};
 use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
 
-use crate::config::{AppDecodeLevel, EndpointAddress, LinkErrorMode};
+use crate::config::AppDecodeLevel;
 use crate::util::phys::PhysLayer;
 
 use crate::master::association::AssociationConfig;
@@ -11,6 +11,7 @@ use crate::master::handle::{
     AssociationHandle, AssociationHandler, HeaderInfo, MasterHandle, ReadHandler,
 };
 
+use crate::link::{EndpointAddress, LinkErrorMode};
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

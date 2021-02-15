@@ -362,7 +362,7 @@ mod tests {
         use super::*;
         use crate::app::enums::QualifierCode;
         use crate::app::variations::Group52Var2;
-        use crate::config::EndpointAddress;
+        use crate::link::EndpointAddress;
         use crate::master::association::AssociationConfig;
 
         const OUTSTATION_DELAY_MS: u16 = 100;
@@ -738,7 +738,7 @@ mod tests {
 
     mod lan {
         use super::*;
-        use crate::config::EndpointAddress;
+        use crate::link::EndpointAddress;
         use crate::master::association::AssociationConfig;
 
         const DELAY_MS: u16 = 200;

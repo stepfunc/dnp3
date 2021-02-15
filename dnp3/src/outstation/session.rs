@@ -8,7 +8,7 @@ use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
 use crate::app::sequence::Sequence;
 use crate::app::variations::{Group52Var1, Group52Var2};
-use crate::config::{DecodeLevel, EndpointAddress};
+use crate::config::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::{BufferSize, Feature};
@@ -30,6 +30,7 @@ use std::borrow::BorrowMut;
 use xxhash_rust::xxh64::xxh64;
 
 use crate::app::gen::all::AllObjectsVariation;
+use crate::link::EndpointAddress;
 use crate::master::request::EventClasses;
 use crate::outstation::control::select::SelectState;
 use crate::outstation::deferred::DeferredRead;

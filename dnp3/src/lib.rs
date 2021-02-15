@@ -53,7 +53,6 @@ clippy::all
     while_true,
     bare_trait_objects
 )]
-// TODO - remove before release
 #![cfg_attr(test, allow(dead_code))]
 
 #[cfg(test)]
@@ -64,14 +63,13 @@ extern crate assert_matches;
 pub mod app;
 /// configuration types not specific to master or outstation
 pub mod config;
+/// types specific to the link-layer
+pub mod link;
 /// entry points, types, enums, and traits specific to masters
 pub mod master;
 /// entry points, types, enums, and traits specific to outstations
 pub mod outstation;
 
-pub(crate) mod link;
-#[cfg_attr(test, allow(dead_code))]
+pub(crate) mod tokio;
 pub(crate) mod transport;
 pub(crate) mod util;
-
-pub(crate) mod tokio;

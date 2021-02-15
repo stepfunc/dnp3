@@ -1,9 +1,9 @@
 use crate::app::EndpointType;
-use crate::config::LinkErrorMode;
-use crate::config::{DecodeLevel, EndpointAddress};
+use crate::config::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;
+use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::outstation::config::Feature;
 use crate::transport::real::assembler::{Assembler, AssemblyState};
 use crate::transport::real::display::SegmentDisplay;

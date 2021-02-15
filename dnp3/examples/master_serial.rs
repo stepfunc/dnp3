@@ -2,7 +2,8 @@ use dnp3::app::enums::OpType;
 use dnp3::app::retry::ReconnectStrategy;
 use dnp3::app::timeout::Timeout;
 use dnp3::app::variations::{Group12Var1, Variation};
-use dnp3::config::{AppDecodeLevel, DecodeLevel, EndpointAddress};
+use dnp3::config::{AppDecodeLevel, DecodeLevel};
+use dnp3::link::EndpointAddress;
 use dnp3::master::association::AssociationConfig;
 use dnp3::master::handle::{Listener, MasterConfig, NullHandler};
 use dnp3::master::request::{

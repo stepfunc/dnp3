@@ -1,5 +1,5 @@
 use crate::app::retry::ExponentialBackOff;
-use crate::config::LinkErrorMode;
+use crate::link::LinkErrorMode;
 use crate::master::handle::{Listener, MasterConfig, MasterHandle};
 use crate::master::session::{MasterSession, RunError};
 use crate::master::ClientState;
