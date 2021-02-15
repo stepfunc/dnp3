@@ -16,15 +16,30 @@ jobs:
           - stable
           - beta
           - nightly
+        toolchain:
+          - default
+          - musl
+        exclude:
+          - os: windows-latest
+            toolchain: musl
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v1
       - name: Install Rust ${{ matrix.rust }}
+        if: ${{ matrix.toolchain != 'musl' }}
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: ${{ matrix.rust }}
+          override: true
+      - name: Install Rust ${{ matrix.rust }} (musl)
+        if: ${{ matrix.toolchain == 'musl' }}
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          target: x86_64-unknown-linux-musl
           override: true
       - name: Copy Windows config
         if: ${{ runner.os == 'Windows' }}
@@ -34,6 +49,10 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         shell: pwsh
         run: Copy-Item -Path .cargo/config-linux.toml -Destination .cargo/config.toml
+      - name: Copy Linux musl config
+        if: ${{ runner.os == 'Linux' && matrix.toolchain == 'musl' }}
+        shell: pwsh
+        run: Copy-Item -Path .cargo/config-linux-musl.toml -Destination .cargo/config.toml
       - name: Run Rust unit tests
         uses: actions-rs/cargo@v1
         with:
@@ -44,11 +63,13 @@ jobs:
           command: run
           args: --release --bin dnp3-bindings -- --c
       - name: .NET bindings
+        if: ${{ matrix.toolchain != 'musl' }}
         uses: actions-rs/cargo@v1
         with:
           command: run
           args: --release --bin dnp3-bindings -- --dotnet
       - name: Java bindings
+        if: ${{ matrix.toolchain != 'musl' }}
         uses: actions-rs/cargo@v1
         with:
           command: run
@@ -60,7 +81,7 @@ jobs:
           name: ffi-modules
           path: ffi/bindings/c/generated/lib
       - name: Upload compiled Java bindings
-        if: ${{ matrix.rust == 'stable' }}
+        if: ${{ matrix.rust == 'stable' && matrix.toolchain != 'musl' }}
         uses: actions/upload-artifact@v2
         with:
           name: ffi-modules
