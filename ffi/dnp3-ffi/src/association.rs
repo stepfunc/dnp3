@@ -1,10 +1,12 @@
-use crate::command::Command;
-use crate::ffi;
-use crate::request::Request;
+use std::time::Duration;
+
 use dnp3::link::LinkStatusResult;
 use dnp3::master::PollHandle;
 use dnp3::master::*;
-use std::time::Duration;
+
+use crate::command::Command;
+use crate::ffi;
+use crate::request::Request;
 
 pub struct Association {
     pub(crate) runtime: crate::runtime::RuntimeHandle,

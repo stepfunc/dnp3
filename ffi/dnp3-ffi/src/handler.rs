@@ -1,8 +1,9 @@
-use crate::ffi;
 use dnp3::app::measurement::*;
 use dnp3::app::*;
 use dnp3::app::{Iin1, Iin2, ResponseFunction, ResponseHeader};
 use dnp3::master::{HeaderInfo, ReadHandler};
+
+use crate::ffi;
 
 impl ReadHandler for ffi::ReadHandler {
     fn begin_fragment(&mut self, header: ResponseHeader) {

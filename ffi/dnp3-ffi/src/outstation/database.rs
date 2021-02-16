@@ -1,9 +1,9 @@
-use crate::ffi;
 use dnp3::app::measurement::*;
 use dnp3::app::Timestamp;
+pub use dnp3::outstation::database::Database;
 use dnp3::outstation::database::*;
 
-pub use dnp3::outstation::database::Database;
+use crate::ffi;
 
 pub unsafe fn database_add_binary(
     database: *mut Database,

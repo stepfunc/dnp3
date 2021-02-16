@@ -1,20 +1,19 @@
-mod adapters;
-mod database;
-mod struct_constructors;
-
 use std::ffi::CStr;
 use std::time::Duration;
 
+pub use database::*;
 use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::OutstationHandle;
 use dnp3::outstation::{BufferSize, Feature, Features, OutstationConfig};
 use dnp3::tcp::ServerHandle;
-
-pub use database::*;
 pub use struct_constructors::*;
 
 use crate::{ffi, Runtime, RuntimeHandle};
+
+mod adapters;
+mod database;
+mod struct_constructors;
 
 pub struct TcpServer {
     runtime: RuntimeHandle,

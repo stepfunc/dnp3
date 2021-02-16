@@ -1,5 +1,6 @@
-use crate::ffi;
 use dnp3::app::control::*;
+
+use crate::ffi;
 
 #[derive(Clone)]
 enum CommandHeaderElement {

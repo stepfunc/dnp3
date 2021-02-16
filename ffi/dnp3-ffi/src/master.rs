@@ -1,8 +1,5 @@
+use std::ffi::CStr;
 use std::time::Duration;
-
-use crate::association::Association;
-
-use crate::ffi;
 
 use dnp3::app::Timeout;
 use dnp3::app::Timestamp;
@@ -11,7 +8,9 @@ use dnp3::link::EndpointAddress;
 use dnp3::master::*;
 use dnp3::serial::*;
 use dnp3::tcp::ClientState;
-use std::ffi::CStr;
+
+use crate::association::Association;
+use crate::ffi;
 
 pub struct Master {
     pub(crate) runtime: crate::runtime::RuntimeHandle,

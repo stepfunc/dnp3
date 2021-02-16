@@ -1,10 +1,13 @@
-use crate::ffi;
-use dnp3::decode::*;
 use std::ffi::CString;
+
 use tracing::span::{Attributes, Record};
 use tracing::{Event, Id, Metadata};
 use tracing_subscriber::fmt::time::{ChronoUtc, SystemTime};
 use tracing_subscriber::fmt::MakeWriter;
+
+use dnp3::decode::*;
+
+use crate::ffi;
 
 thread_local! {
    pub static LOG_BUFFER: std::cell::RefCell<Vec<u8>> = std::cell::RefCell::new(Vec::new());
