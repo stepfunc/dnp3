@@ -99,8 +99,8 @@ impl Command {
         self.headers.push(header);
     }
 
-    pub(crate) fn build(self) -> dnp3::master::request::CommandHeaders {
-        let mut builder = dnp3::master::request::CommandBuilder::new();
+    pub(crate) fn build(self) -> dnp3::master::CommandHeaders {
+        let mut builder = dnp3::master::CommandBuilder::new();
 
         for header in self.headers {
             match header {

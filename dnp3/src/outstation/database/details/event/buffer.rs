@@ -1,7 +1,7 @@
 use super::list::VecList;
 use super::writer::EventWriter;
 use crate::app::measurement;
-use crate::master::request::EventClasses;
+use crate::master::EventClasses;
 use crate::outstation::database::config::*;
 use crate::outstation::database::read::EventReadHeader;
 use crate::outstation::database::{EventBufferConfig, EventClass};

@@ -4,10 +4,8 @@ use dnp3::app::Timeout;
 use dnp3::app::Variation;
 use dnp3::decode::*;
 use dnp3::link::{EndpointAddress, LinkErrorMode};
-use dnp3::master::association::AssociationConfig;
-use dnp3::master::handle::{Listener, MasterConfig, NullHandler};
-use dnp3::master::request::*;
 use dnp3::master::tcp::EndpointList;
+use dnp3::master::*;
 
 use std::time::Duration;
 use tokio_stream::StreamExt;

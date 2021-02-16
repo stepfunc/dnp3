@@ -24,7 +24,7 @@ use xxhash_rust::xxh64::xxh64;
 
 use crate::app::gen::all::AllObjectsVariation;
 use crate::link::EndpointAddress;
-use crate::master::request::EventClasses;
+use crate::master::EventClasses;
 use crate::outstation::control::select::SelectState;
 use crate::outstation::deferred::DeferredRead;
 use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};

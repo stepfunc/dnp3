@@ -17,7 +17,7 @@ use crate::util::cursor::ReadCursor;
 use crate::app::parse::parser::*;
 use crate::app::parse::bytes::RangedBytesSequence;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
-use crate::master::handle::{ReadHandler, HeaderInfo};
+use crate::master::{ReadHandler, HeaderInfo};
 use crate::app::ObjectParseError;
 
 #[derive(Debug, PartialEq)]

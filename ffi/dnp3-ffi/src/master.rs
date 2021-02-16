@@ -8,11 +8,9 @@ use dnp3::app::Timeout;
 use dnp3::app::Timestamp;
 use dnp3::app::{ReconnectStrategy, RetryStrategy};
 use dnp3::link::EndpointAddress;
-use dnp3::master::association::AssociationConfig;
-use dnp3::master::handle::{AssociationHandler, Listener, MasterConfig, MasterHandle, ReadHandler};
-use dnp3::master::request::{Classes, EventClasses, TimeSyncProcedure};
 use dnp3::master::serial::{create_master_serial_client, DataBits, FlowControl, Parity, StopBits};
 use dnp3::master::ClientState;
+use dnp3::master::*;
 use std::ffi::CStr;
 
 pub struct Master {

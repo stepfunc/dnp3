@@ -1,6 +1,6 @@
 use crate::ffi;
 use dnp3::app::Variation;
-use dnp3::master::request::{ReadHeader, ReadRequest};
+use dnp3::master::{ReadHeader, ReadRequest};
 
 pub struct Request {
     headers: Vec<ReadHeader>,

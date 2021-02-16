@@ -7,7 +7,7 @@ use crate::master::error::{AssociationError, TaskError, TimeSyncError};
 use crate::master::extract::extract_measurements;
 use crate::master::handle::{AssociationHandler, Promise};
 use crate::master::messages::AssociationMsgType;
-use crate::master::poll::{PollMap, PollMsg};
+use crate::master::poll::{PollHandle, PollMap, PollMsg};
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
@@ -20,7 +20,6 @@ use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;
 
 use crate::link::EndpointAddress;
-pub use crate::master::poll::PollHandle;
 use crate::master::session::RunError;
 
 #[derive(Copy, Clone)]

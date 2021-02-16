@@ -12,7 +12,7 @@ use crate::util::cursor::WriteCursor;
 
 use details::range::static_db::{Deadband, FlagsDetector, OctetStringDetector, PointConfig};
 
-use crate::master::request::EventClasses;
+use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
 use std::sync::{Arc, Mutex};
 
