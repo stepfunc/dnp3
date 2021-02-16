@@ -16,7 +16,7 @@ use crate::app::control::{CommandStatus, ControlCode};
 use crate::app::Timestamp;
 use crate::app::measurement::*;
 
-/// all variations supported by the library
+/// All variations supported by the library
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Variation {
     /// Binary Input - Any Variation
@@ -205,10 +205,6 @@ pub enum Variation {
     Group110(u8),
     /// Octet String Event - Sized by variation
     Group111(u8),
-    /// Virtual Terminal Output Block - Sized by variation
-    Group112(u8),
-    /// Virtual Terminal Event Data - Sized by variation
-    Group113(u8),
 }
 
 impl Variation {
@@ -370,8 +366,6 @@ impl Variation {
             },
             110 => Some(Variation::Group110(var)),
             111 => Some(Variation::Group111(var)),
-            112 => Some(Variation::Group112(var)),
-            113 => Some(Variation::Group113(var)),
             _ => None,
         }
     }
@@ -471,8 +465,6 @@ impl Variation {
             Variation::Group80Var1 => (80, 1),
             Variation::Group110(x) => (110, x),
             Variation::Group111(x) => (111, x),
-            Variation::Group112(x) => (112, x),
-            Variation::Group113(x) => (113, x),
         }
     }
     
@@ -571,8 +563,6 @@ impl Variation {
             Variation::Group80Var1 => "Internal Indications - Packed Format",
             Variation::Group110(_) => "Octet String - Sized by variation",
             Variation::Group111(_) => "Octet String Event - Sized by variation",
-            Variation::Group112(_) => "Virtual Terminal Output Block - Sized by variation",
-            Variation::Group113(_) => "Virtual Terminal Event Data - Sized by variation",
         }
     }
 }
