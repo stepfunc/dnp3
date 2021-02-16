@@ -8,8 +8,8 @@ use dnp3::app::Timeout;
 use dnp3::app::Timestamp;
 use dnp3::app::{ReconnectStrategy, RetryStrategy};
 use dnp3::link::EndpointAddress;
-use dnp3::master::serial::{create_master_serial_client, DataBits, FlowControl, Parity, StopBits};
 use dnp3::master::*;
+use dnp3::serial::*;
 use dnp3::tcp::ClientState;
 use std::ffi::CStr;
 
@@ -375,7 +375,7 @@ impl ffi::MasterConfig {
     }
 }
 
-impl From<ffi::SerialPortSettings> for dnp3::master::serial::SerialSettings {
+impl From<ffi::SerialPortSettings> for dnp3::serial::SerialSettings {
     fn from(from: ffi::SerialPortSettings) -> Self {
         Self {
             baud_rate: from.baud_rate(),

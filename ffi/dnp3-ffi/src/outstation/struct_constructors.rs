@@ -135,11 +135,11 @@ impl From<Option<RestartDelay>> for ffi::RestartDelay {
     }
 }
 
-impl From<&AddressFilter> for dnp3::outstation::tcp::AddressFilter {
+impl From<&AddressFilter> for dnp3::tcp::AddressFilter {
     fn from(from: &AddressFilter) -> Self {
         match from {
-            AddressFilter::Any => dnp3::outstation::tcp::AddressFilter::Any,
-            AddressFilter::AnyOf(set) => dnp3::outstation::tcp::AddressFilter::AnyOf(set.clone()),
+            AddressFilter::Any => dnp3::tcp::AddressFilter::Any,
+            AddressFilter::AnyOf(set) => dnp3::tcp::AddressFilter::AnyOf(set.clone()),
         }
     }
 }

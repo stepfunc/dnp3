@@ -7,9 +7,9 @@ use std::time::Duration;
 
 use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
-use dnp3::outstation::tcp::ServerHandle;
 use dnp3::outstation::OutstationHandle;
 use dnp3::outstation::{BufferSize, Feature, Features, OutstationConfig};
+use dnp3::tcp::ServerHandle;
 
 pub use database::*;
 pub use struct_constructors::*;
@@ -18,7 +18,7 @@ use crate::{ffi, Runtime, RuntimeHandle};
 
 pub struct TcpServer {
     runtime: RuntimeHandle,
-    server: Option<dnp3::outstation::tcp::TcpServer>,
+    server: Option<dnp3::tcp::TcpServer>,
     // hold onto the underlying handle to keep the server alive
     _handle: Option<ServerHandle>,
 }
@@ -43,7 +43,7 @@ pub unsafe fn tcpserver_new(
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let server = dnp3::outstation::tcp::TcpServer::new(link_error_mode.into(), address);
+    let server = dnp3::tcp::TcpServer::new(link_error_mode.into(), address);
 
     Box::into_raw(Box::new(TcpServer {
         runtime: runtime.handle(),

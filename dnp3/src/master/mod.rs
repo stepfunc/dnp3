@@ -9,9 +9,6 @@ pub use handle::*;
 pub use poll::PollHandle;
 pub use request::*;
 
-/// entry points for creating and spawning serial-based master tasks
-pub mod serial;
-
 pub(crate) mod convert;
 pub(crate) mod extract;
 pub(crate) mod messages;

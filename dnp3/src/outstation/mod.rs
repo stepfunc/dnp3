@@ -2,12 +2,10 @@
 
 /// database API to add/remove/update values
 pub mod database;
-/// TCP entry points and types
-pub mod tcp;
 
 mod config;
-pub use config::*;
 mod traits;
+pub use config::*;
 pub use traits::*;
 
 /// functionality for processing control requests

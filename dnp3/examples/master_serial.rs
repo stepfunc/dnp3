@@ -1,17 +1,15 @@
 use dnp3::app::control::*;
-use dnp3::app::ReconnectStrategy;
-use dnp3::app::Timeout;
-use dnp3::app::Variation;
+use dnp3::app::*;
 use dnp3::decode::*;
 use dnp3::link::EndpointAddress;
-use dnp3::master::serial::SerialSettings;
 use dnp3::master::*;
+use dnp3::serial::*;
 
 use std::time::Duration;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
-/// example of using the master API asynchronously from within the Tokio runtime
+/// example of using the master from within the Tokio runtime
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
@@ -20,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     // spawn the master onto another task
-    let mut master = dnp3::master::serial::spawn_master_serial_client(
+    let mut master = spawn_master_serial_client(
         MasterConfig::new(
             EndpointAddress::from(1)?,
             AppDecodeLevel::ObjectValues.into(),

@@ -1,5 +1,12 @@
+mod address_filter;
 mod endpoint_list;
 mod master;
+mod outstation;
+
+pub use address_filter::*;
+pub use endpoint_list::*;
+pub use master::*;
+pub use outstation::*;
 
 /// state of TCP client connection
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -10,6 +17,3 @@ pub enum ClientState {
     WaitAfterDisconnect(std::time::Duration),
     Shutdown,
 }
-
-pub use endpoint_list::*;
-pub use master::*;
