@@ -1,7 +1,8 @@
-use crate::app::enums::QualifierCode;
-use crate::app::variations::Variation;
-use crate::util::cursor::*;
 use std::fmt::Display;
+
+use crate::app::variations::Variation;
+use crate::app::QualifierCode;
+use crate::util::cursor::*;
 
 pub(crate) trait FixedSize: Copy + Clone
 where

@@ -4,15 +4,16 @@ import dev.gridio.dnp3.codegen.model._
 import dev.gridio.dnp3.codegen.model.enums.protocol._
 import dev.gridio.dnp3.codegen.render._
 
-object ProtocolEnums extends Module {
+object EnumModule {
+  def application : Module = {
+    new EnumModule(List(FunctionCode, QualifierCode))
+  }
+  def control : Module = {
+    new EnumModule(List(CommandStatus, OpType, TripCloseCode))
+  }
+}
 
-  private def enums : List[EnumModel] = List(
-    FunctionCode,
-    QualifierCode,
-    CommandStatus,
-    OpType,
-    TripCloseCode
-  )
+class EnumModule(enums: List[EnumModel]) extends Module {
 
   private def excludeWriteImpl(model : EnumModel) : Boolean = {
     model match  {

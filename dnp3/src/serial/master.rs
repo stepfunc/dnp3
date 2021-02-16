@@ -1,21 +1,18 @@
-use crate::app::retry::ExponentialBackOff;
-use crate::entry::master::ClientState;
-use crate::master::handle::{Listener, MasterConfig, MasterHandle};
-use crate::master::session::{MasterSession, RunError};
-use crate::transport::TransportReader;
-use crate::transport::TransportWriter;
-use crate::util::task::Shutdown;
 use std::future::Future;
-
-// re-export these from the serial crate
-pub use tokio_one_serial::Settings as SerialSettings;
-pub use tokio_one_serial::{DataBits, FlowControl, Parity, StopBits};
-
 use std::time::Duration;
 
-use crate::config::LinkErrorMode;
-use crate::util::phys::PhysLayer;
 use tracing::Instrument;
+
+use crate::app::ExponentialBackOff;
+use crate::link::LinkErrorMode;
+use crate::master::session::{MasterSession, RunError};
+use crate::master::*;
+use crate::serial::SerialSettings;
+use crate::tcp::ClientState;
+use crate::transport::TransportReader;
+use crate::transport::TransportWriter;
+use crate::util::phys::PhysLayer;
+use crate::util::task::Shutdown;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.

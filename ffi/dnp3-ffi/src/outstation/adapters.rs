@@ -1,15 +1,7 @@
-use dnp3::app::header::{Control, RequestHeader};
-use dnp3::app::sequence::Sequence;
-use dnp3::app::types::ControlCode;
+use dnp3::app::control::*;
+use dnp3::app::*;
 use dnp3::outstation::database::Database;
-use dnp3::outstation::traits::{
-    BroadcastAction, ControlHandler, ControlSupport, OperateType, OutstationApplication,
-    OutstationInformation, RestartDelay,
-};
-use dnp3::prelude::master::{
-    CommandStatus, FunctionCode, Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4,
-    OpType, TripCloseCode,
-};
+use dnp3::outstation::*;
 
 use crate::ffi;
 
@@ -276,8 +268,8 @@ impl From<RequestHeader> for ffi::RequestHeader {
     }
 }
 
-impl From<Control> for ffi::Control {
-    fn from(from: Control) -> Self {
+impl From<ControlField> for ffi::Control {
+    fn from(from: ControlField) -> Self {
         ffi::ControlFields {
             fir: from.fir,
             fin: from.fin,

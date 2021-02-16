@@ -1,6 +1,6 @@
 use crate::app::parse::parser::{Request, Response};
-use crate::config::EndpointAddress;
 use crate::link::header::BroadcastConfirmMode;
+use crate::link::EndpointAddress;
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct FragmentInfo {

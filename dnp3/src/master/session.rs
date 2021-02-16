@@ -1,13 +1,18 @@
+use std::ops::Add;
+use std::time::Duration;
+
+use tracing::Instrument;
+
 use crate::app::format::write;
 use crate::app::format::write::start_request;
-use crate::app::header::Control;
 use crate::app::parse::parser::Response;
-use crate::app::sequence::Sequence;
-use crate::app::timeout::Timeout;
-use crate::app::types::LinkStatusResult;
-use crate::config::DecodeLevel;
-use crate::config::EndpointAddress;
+use crate::app::ControlField;
+use crate::app::Sequence;
+use crate::app::Timeout;
+use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
+use crate::link::EndpointAddress;
+use crate::link::LinkStatusResult;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
@@ -16,11 +21,7 @@ use crate::tokio::time::Instant;
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::phys::PhysLayer;
-
 use crate::util::task::Shutdown;
-use std::ops::Add;
-use std::time::Duration;
-use tracing::Instrument;
 
 pub(crate) struct MasterSession {
     decode_level: DecodeLevel,
@@ -661,7 +662,7 @@ impl MasterSession {
         let association = self.associations.get_mut(address)?;
         let seq = association.increment_seq();
         let mut cursor = self.tx_buffer.write_cursor();
-        let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
+        let mut hw = start_request(ControlField::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
         writer
             .write(io, self.decode_level, address.wrap(), cursor.written())

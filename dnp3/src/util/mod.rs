@@ -4,7 +4,6 @@ pub(crate) mod cursor;
 pub(crate) mod decode;
 pub(crate) mod future;
 pub(crate) mod phys;
-pub(crate) mod sequence;
 pub(crate) mod slice_ext;
 pub(crate) mod task;
 

@@ -1,8 +1,9 @@
 use crate::app::EndpointType;
-use crate::config::{DecodeLevel, EndpointAddress};
+use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::format::{format_data_frame, format_header_only, Payload};
 use crate::link::header::AnyAddress;
+use crate::link::EndpointAddress;
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::real::sequence::Sequence;

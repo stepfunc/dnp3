@@ -1,4 +1,4 @@
-use crate::config::LinkDecodeLevel;
+use crate::decode::LinkDecodeLevel;
 use crate::link::constant;
 use crate::link::crc::{calc_crc, calc_crc_with_0564};
 use crate::link::display::LinkDisplay;
@@ -154,7 +154,6 @@ fn format_frame<'a>(
 
 #[cfg(test)]
 mod test {
-
     use super::super::test_data::*;
     use super::*;
 

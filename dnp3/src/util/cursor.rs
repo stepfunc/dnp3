@@ -264,7 +264,6 @@ impl<'a> WriteCursor<'a> {
 mod test {
 
     mod write {
-
         use super::super::*;
 
         #[test]
@@ -311,7 +310,6 @@ mod test {
     }
 
     mod read {
-
         use super::super::*;
 
         #[test]

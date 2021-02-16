@@ -1,7 +1,7 @@
-use crate::config::LinkErrorMode;
 use crate::link::constant;
 use crate::link::error::*;
 use crate::link::header::{AnyAddress, ControlField, Header};
+use crate::link::LinkErrorMode;
 use crate::util::cursor::{ReadCursor, ReadError};
 use crate::util::slice_ext::*;
 

@@ -1,11 +1,49 @@
-use crate::util::sequence::SequenceParams;
-
-pub(crate) struct TransportParams {}
-impl SequenceParams for TransportParams {
-    const NUM_BITS: u8 = 6; // 2^6 == 64
+#[derive(Copy, Clone)]
+pub(crate) struct Sequence {
+    value: u8,
 }
 
-pub(crate) type Sequence = crate::util::sequence::Sequence<TransportParams>;
+impl Sequence {
+    const MAX_VALUE: u8 = 0b0011_1111;
+
+    pub(crate) fn new(value: u8) -> Self {
+        Self {
+            value: value & Self::MAX_VALUE,
+        }
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.value = 0;
+    }
+
+    pub(crate) fn value(&self) -> u8 {
+        self.value
+    }
+
+    fn calc_next(value: u8) -> u8 {
+        if value == Self::MAX_VALUE {
+            0
+        } else {
+            value + 1
+        }
+    }
+
+    pub(crate) fn next(self) -> u8 {
+        Self::calc_next(self.value)
+    }
+
+    pub(crate) fn increment(&mut self) -> Sequence {
+        let ret = self.value;
+        self.value = Self::calc_next(ret);
+        Self { value: ret }
+    }
+}
+
+impl Default for Sequence {
+    fn default() -> Self {
+        Self { value: 0 }
+    }
+}
 
 #[cfg(test)]
 mod test {

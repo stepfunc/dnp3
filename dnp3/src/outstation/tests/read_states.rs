@@ -1,12 +1,9 @@
-use crate::app::enums::FunctionCode;
-use crate::app::flags::Flags;
-use crate::app::header::{Control, RequestHeader};
-use crate::app::measurement::{Binary, Time};
-use crate::app::types::Timestamp;
-use crate::outstation::database::config::BinaryConfig;
-use crate::outstation::database::{Add, Database, EventClass, Update, UpdateOptions};
-use crate::outstation::tests::harness::*;
 use tokio::time::Duration;
+
+use crate::app::measurement::*;
+use crate::app::*;
+use crate::outstation::database::*;
+use crate::outstation::tests::harness::*;
 
 const EMPTY_READ: &[u8] = &[0xC0, 0x01];
 const READ_CLASS_123: &[u8] = &[0xC0, 0x01, 60, 02, 0x06, 60, 03, 0x06, 60, 04, 0x06];
@@ -93,7 +90,7 @@ fn sol_confirm_wait_goes_back_to_idle_with_new_request() {
     // start a new request
     harness.test_request_response(EMPTY_READ, EMPTY_RESPONSE);
     harness.check_events(&[Event::SolicitedConfirmWaitNewRequest(RequestHeader::new(
-        Control::from(0xC0),
+        ControlField::from(0xC0),
         FunctionCode::Read,
     ))]);
 }

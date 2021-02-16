@@ -1,18 +1,16 @@
-use crate::app::flags::Flags;
+use std::collections::{BTreeMap, Bound, VecDeque};
+use std::ops::RangeBounds;
+
 use crate::app::measurement::*;
-use crate::app::types::DoubleBit;
+use crate::app::Iin2;
+use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::event::buffer::Insertable;
 use crate::outstation::database::details::range::traits::StaticVariation;
 use crate::outstation::database::details::range::writer::RangeWriter;
-use crate::util::cursor::{WriteCursor, WriteError};
-
-use crate::app::header::Iin2;
-use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::read::StaticReadHeader;
 use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
-use std::collections::{BTreeMap, Bound, VecDeque};
-use std::ops::RangeBounds;
+use crate::util::cursor::{WriteCursor, WriteError};
 
 pub(crate) trait EventDetector<T>
 where

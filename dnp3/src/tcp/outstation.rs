@@ -1,18 +1,20 @@
-use crate::entry::outstation::{AddressFilter, FilterError};
-use crate::outstation::task::{OutstationHandle, OutstationTask};
-
-use crate::config::LinkErrorMode;
-use crate::outstation::config::OutstationConfig;
-use crate::outstation::database::EventBufferConfig;
-use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
-use crate::util::task::Shutdown;
 use tracing::Instrument;
+
+use crate::link::LinkErrorMode;
+use crate::outstation::database::EventBufferConfig;
+use crate::outstation::task::OutstationTask;
+use crate::outstation::OutstationHandle;
+use crate::outstation::*;
+use crate::tcp::{AddressFilter, FilterError};
+use crate::util::task::Shutdown;
 
 struct Outstation {
     filter: AddressFilter,
     handle: OutstationHandle,
 }
 
+/// A builder for creating a TCP server with one or more outstation instances
+/// associated with it
 pub struct TcpServer {
     link_error_mode: LinkErrorMode,
     connection_id: u64,
@@ -77,6 +79,27 @@ impl TcpServer {
         Ok((handle, future))
     }
 
+    pub fn spawn_outstation(
+        &mut self,
+        config: OutstationConfig,
+        event_config: EventBufferConfig,
+        application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
+        control_handler: Box<dyn ControlHandler>,
+        filter: AddressFilter,
+    ) -> Result<OutstationHandle, FilterError> {
+        let (handle, future) = self.add_outstation(
+            config,
+            event_config,
+            application,
+            information,
+            control_handler,
+            filter,
+        )?;
+        crate::tokio::spawn(future);
+        Ok(handle)
+    }
+
     pub async fn bind(
         mut self,
     ) -> Result<(ServerHandle, impl std::future::Future<Output = Shutdown>), crate::tokio::io::Error>
@@ -95,6 +118,12 @@ impl TcpServer {
         let handle = ServerHandle { _tx: tx };
 
         Ok((handle, task))
+    }
+
+    pub async fn bind_and_spawn(self) -> Result<ServerHandle, crate::tokio::io::Error> {
+        let (handle, future) = self.bind().await?;
+        crate::tokio::spawn(future);
+        Ok(handle)
     }
 
     async fn run(
@@ -172,7 +201,7 @@ impl TcpServer {
             Some(x) => {
                 let _ = x
                     .handle
-                    .new_io(id, crate::util::phys::PhysLayer::Tcp(stream))
+                    .change_session(id, crate::util::phys::PhysLayer::Tcp(stream))
                     .await;
             }
         }

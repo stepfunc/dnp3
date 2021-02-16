@@ -1,11 +1,13 @@
-use crate::config::{DecodeLevel, LinkErrorMode};
+use std::io::ErrorKind;
+
+use crate::decode::DecodeLevel;
 use crate::link::display::LinkDisplay;
 use crate::link::error::LinkError;
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
+use crate::link::LinkErrorMode;
 use crate::util::cursor::ReadCursor;
 use crate::util::phys::PhysLayer;
-use std::io::ErrorKind;
 
 pub(crate) struct Reader {
     parser: Parser,

@@ -1,4 +1,5 @@
-use crate::config::{DecodeLevel, EndpointAddress};
+use crate::decode::DecodeLevel;
+use crate::link::EndpointAddress;
 use crate::outstation::database::ClassZeroConfig;
 use crate::util::buffer::Buffer;
 

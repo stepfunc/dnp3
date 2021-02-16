@@ -1,19 +1,3 @@
-use crate::link::header::AnyAddress;
-use std::convert::{TryFrom, TryInto};
-
-/// Controls how errors in parsed link-layer frames are handled. This behavior
-/// is configurable for physical layers with built-in error correction like TCP
-/// as the connection might be through a terminal server.
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum LinkErrorMode {
-    /// Framing errors are discarded. The link-layer parser is reset on any error, and the
-    /// parser begins scanning for 0x0564. This is always the behavior for serial ports.
-    Discard,
-    /// Framing errors are bubbled up to calling code, closing the session. Suitable for physical
-    /// layers that provide error correction like TCP.
-    Close,
-}
-
 /// Controls the decoding of transmitted and received data at the application, transport, and link layer
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct DecodeLevel {
@@ -25,37 +9,6 @@ pub struct DecodeLevel {
     pub link: LinkDecodeLevel,
     /// Controls the logging of physical layer read/write
     pub physical: PhysDecodeLevel,
-}
-
-impl DecodeLevel {
-    pub fn nothing() -> Self {
-        Self::default()
-    }
-
-    pub fn new(
-        application: AppDecodeLevel,
-        transport: TransportDecodeLevel,
-        link: LinkDecodeLevel,
-        physical: PhysDecodeLevel,
-    ) -> Self {
-        DecodeLevel {
-            application,
-            transport,
-            link,
-            physical,
-        }
-    }
-}
-
-impl Default for DecodeLevel {
-    fn default() -> Self {
-        Self {
-            application: AppDecodeLevel::Nothing,
-            transport: TransportDecodeLevel::Nothing,
-            link: LinkDecodeLevel::Nothing,
-            physical: PhysDecodeLevel::Nothing,
-        }
-    }
 }
 
 /// Controls how transmitted and received application-layer fragments are decoded at the INFO log level
@@ -104,66 +57,34 @@ pub enum PhysDecodeLevel {
     Data,
 }
 
-/// Represents a validated 16-bit endpoint address for a master or an outstation
-/// Certain special addresses are not allowed by the standard to be used
-/// as endpoint addresses.
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord)]
-pub struct EndpointAddress {
-    address: u16,
-}
-
-/// The specified address is special and may not be used as an EndpointAddress
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct SpecialAddressError {
-    pub address: u16,
-}
-
-impl std::error::Error for SpecialAddressError {}
-
-impl std::fmt::Display for SpecialAddressError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "special address ({}) may not be used as a master or outstation address",
-            self.address
-        )
-    }
-}
-
-impl EndpointAddress {
-    /// try to construct an EndpointAddress from a raw u16
-    pub fn from(value: u16) -> Result<Self, SpecialAddressError> {
-        value.try_into()
+impl DecodeLevel {
+    pub fn nothing() -> Self {
+        Self::default()
     }
 
-    /// get the raw u16 value of the address
-    pub fn raw_value(&self) -> u16 {
-        self.address
-    }
-
-    pub(crate) const fn raw(address: u16) -> EndpointAddress {
-        EndpointAddress { address }
-    }
-
-    pub(crate) fn wrap(&self) -> AnyAddress {
-        AnyAddress::Endpoint(*self)
-    }
-}
-
-impl TryFrom<u16> for EndpointAddress {
-    type Error = SpecialAddressError;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match AnyAddress::from(value) {
-            AnyAddress::Endpoint(x) => Ok(x),
-            _ => Err(SpecialAddressError { address: value }),
+    pub fn new(
+        application: AppDecodeLevel,
+        transport: TransportDecodeLevel,
+        link: LinkDecodeLevel,
+        physical: PhysDecodeLevel,
+    ) -> Self {
+        DecodeLevel {
+            application,
+            transport,
+            link,
+            physical,
         }
     }
 }
 
-impl std::fmt::Display for EndpointAddress {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.address)
+impl Default for DecodeLevel {
+    fn default() -> Self {
+        Self {
+            application: AppDecodeLevel::Nothing,
+            transport: TransportDecodeLevel::Nothing,
+            link: LinkDecodeLevel::Nothing,
+            physical: PhysDecodeLevel::Nothing,
+        }
     }
 }
 

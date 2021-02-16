@@ -1,6 +1,6 @@
-use crate::app::enums::FunctionCode;
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::{HeaderCollection, Response};
+use crate::app::FunctionCode;
 use crate::master::error::{CommandError, CommandResponseError, TaskError};
 use crate::master::handle::Promise;
 use crate::master::request::*;

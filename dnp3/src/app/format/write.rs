@@ -1,10 +1,10 @@
-use crate::app::enums::{FunctionCode, QualifierCode};
-use crate::app::header::{Control, Iin, RequestHeader, ResponseFunction, ResponseHeader};
+use crate::app::header::{ControlField, Iin, RequestHeader, ResponseFunction, ResponseHeader};
 #[cfg(test)]
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
+use crate::app::{FunctionCode, QualifierCode};
 use crate::util::cursor::{WriteCursor, WriteError};
 
 pub(crate) struct HeaderWriter<'a, 'b> {
@@ -12,7 +12,7 @@ pub(crate) struct HeaderWriter<'a, 'b> {
 }
 
 pub(crate) fn start_request<'a, 'b>(
-    control: Control,
+    control: ControlField,
     function: FunctionCode,
     cursor: &'b mut WriteCursor<'a>,
 ) -> Result<HeaderWriter<'a, 'b>, WriteError> {
@@ -22,7 +22,7 @@ pub(crate) fn start_request<'a, 'b>(
 }
 
 pub(crate) fn start_response<'a, 'b>(
-    control: Control,
+    control: ControlField,
     function: ResponseFunction,
     iin: Iin,
     cursor: &'b mut WriteCursor<'a>,
@@ -119,14 +119,19 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
 }
 
 pub(crate) fn confirm_solicited(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-    start_request(Control::request(seq), FunctionCode::Confirm, cursor).map(|_| {})
+    start_request(ControlField::request(seq), FunctionCode::Confirm, cursor).map(|_| {})
 }
 
 pub(crate) fn confirm_unsolicited(
     seq: Sequence,
     cursor: &mut WriteCursor,
 ) -> Result<(), WriteError> {
-    start_request(Control::unsolicited(seq), FunctionCode::Confirm, cursor).map(|_| {})
+    start_request(
+        ControlField::unsolicited(seq),
+        FunctionCode::Confirm,
+        cursor,
+    )
+    .map(|_| {})
 }
 
 impl Variation {
@@ -140,12 +145,13 @@ impl Variation {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use crate::app::sequence::Sequence;
     use crate::util::cursor::WriteCursor;
 
+    use super::*;
+
     fn read_integrity(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        let mut writer = start_request(Control::request(seq), FunctionCode::Read, cursor)?;
+        let mut writer = start_request(ControlField::request(seq), FunctionCode::Read, cursor)?;
         writer.write_all_objects_header(Variation::Group60Var2)?;
         writer.write_all_objects_header(Variation::Group60Var3)?;
         writer.write_all_objects_header(Variation::Group60Var4)?;

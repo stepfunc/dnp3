@@ -1,41 +1,35 @@
-use crate::app::enums::{CommandStatus, FunctionCode};
+use std::borrow::BorrowMut;
+
+use tracing::Instrument;
+use xxhash_rust::xxh64::xxh64;
+
+use crate::app::control::CommandStatus;
 use crate::app::format::write::start_response;
+use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::ranged::RangedVariation;
-use crate::app::header::{
-    Control, Iin, Iin1, Iin2, RequestHeader, ResponseFunction, ResponseHeader,
-};
-use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
-use crate::app::sequence::Sequence;
 use crate::app::variations::{Group52Var1, Group52Var2};
-use crate::config::{DecodeLevel, EndpointAddress};
+use crate::app::*;
+use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
+use crate::link::EndpointAddress;
+use crate::master::EventClasses;
+use crate::outstation::config::OutstationConfig;
 use crate::outstation::config::{BufferSize, Feature};
 use crate::outstation::control::collection::{ControlCollection, ControlTransaction};
+use crate::outstation::control::select::SelectState;
 use crate::outstation::database::{DatabaseHandle, ResponseInfo};
-use crate::outstation::traits::{
-    BroadcastAction, ControlHandler, OperateType, OutstationApplication, OutstationInformation,
-    RestartDelay,
-};
+use crate::outstation::deferred::DeferredRead;
+use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
+use crate::outstation::traits::*;
 use crate::transport::{
     FragmentInfo, RequestGuard, TransportReader, TransportRequest, TransportWriter,
 };
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
-
-use crate::outstation::config::OutstationConfig;
 use crate::util::phys::PhysLayer;
-use std::borrow::BorrowMut;
-use xxhash_rust::xxh64::xxh64;
-
-use crate::app::gen::all::AllObjectsVariation;
-use crate::master::request::EventClasses;
-use crate::outstation::control::select::SelectState;
-use crate::outstation::deferred::DeferredRead;
-use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
 use crate::util::task::{Receiver, RunError, Shutdown};
-use tracing::Instrument;
 
 #[derive(Copy, Clone)]
 enum Timeout {
@@ -295,7 +289,7 @@ impl OutstationSession {
             match self.receiver.next().await? {
                 OutstationMessage::Shutdown => return Err(Shutdown),
                 OutstationMessage::Configuration(change) => self.handle_config_change(change),
-                OutstationMessage::NewSession(session) => return Ok(session),
+                OutstationMessage::ChangeSession(session) => return Ok(session),
             }
         }
     }
@@ -538,7 +532,7 @@ impl OutstationSession {
         let seq = self.state.unsolicited_seq.increment();
 
         let header = ResponseHeader::new(
-            Control::unsolicited_response(seq),
+            ControlField::unsolicited_response(seq),
             ResponseFunction::UnsolicitedResponse,
             iin,
         );
@@ -754,7 +748,7 @@ impl OutstationSession {
     async fn handle_next_message(&mut self) -> Result<(), SessionError> {
         match self.receiver.next().await? {
             OutstationMessage::Shutdown => Err(Shutdown.into()),
-            OutstationMessage::NewSession(session) => Err(SessionError::NewSession(session)),
+            OutstationMessage::ChangeSession(session) => Err(SessionError::NewSession(session)),
             OutstationMessage::Configuration(change) => {
                 self.handle_config_change(change);
                 Ok(())
@@ -899,7 +893,7 @@ impl OutstationSession {
     fn write_empty_solicited_response(&mut self, seq: Sequence, iin2: Iin2) -> usize {
         let iin = Iin::new(self.get_response_iin(), iin2);
         let header = ResponseHeader::new(
-            Control::response(seq, true, true, false),
+            ControlField::response(seq, true, true, false),
             ResponseFunction::Response,
             iin,
         );
@@ -911,7 +905,7 @@ impl OutstationSession {
     fn write_null_unsolicited_response(&mut self, seq: Sequence) -> usize {
         let iin = Iin::new(self.get_response_iin(), Iin2::default());
         let header = ResponseHeader::new(
-            Control::unsolicited_response(seq),
+            ControlField::unsolicited_response(seq),
             ResponseFunction::UnsolicitedResponse,
             iin,
         );
@@ -942,7 +936,7 @@ impl OutstationSession {
         cursor.skip(ResponseHeader::LENGTH).unwrap();
         let info = database.write_response_headers(&mut cursor);
         let header = ResponseHeader::new(
-            Control::response(seq, fir, info.complete, info.need_confirm()),
+            ControlField::response(seq, fir, info.complete, info.need_confirm()),
             ResponseFunction::Response,
             iin1 + iin2,
         );
@@ -1063,7 +1057,7 @@ impl OutstationSession {
 
         let mut cursor = self.sol_tx_buffer.write_cursor();
         let mut writer = start_response(
-            Control::response(seq, true, true, false),
+            ControlField::response(seq, true, true, false),
             ResponseFunction::Response,
             iin,
             &mut cursor,
@@ -1087,7 +1081,7 @@ impl OutstationSession {
         // respond with the delay
         let mut cursor = self.sol_tx_buffer.write_cursor();
         let mut writer = start_response(
-            Control::response(seq, true, true, false),
+            ControlField::response(seq, true, true, false),
             ResponseFunction::Response,
             iin,
             &mut cursor,
@@ -1131,7 +1125,7 @@ impl OutstationSession {
         let iin = self.get_response_iin() + Iin2::default();
         let mut cursor = self.sol_tx_buffer.write_cursor();
         ResponseHeader::new(
-            Control::single_response(seq),
+            ControlField::single_response(seq),
             ResponseFunction::Response,
             iin,
         )
@@ -1238,7 +1232,7 @@ impl OutstationSession {
         let iin = self.get_response_iin() + Iin2::default();
         let mut cursor = self.sol_tx_buffer.write_cursor();
         ResponseHeader::new(
-            Control::single_response(seq),
+            ControlField::single_response(seq),
             ResponseFunction::Response,
             iin,
         )
@@ -1285,7 +1279,7 @@ impl OutstationSession {
         let iin = self.get_response_iin() + Iin2::default();
         let mut cursor = self.sol_tx_buffer.write_cursor();
         ResponseHeader::new(
-            Control::single_response(seq),
+            ControlField::single_response(seq),
             ResponseFunction::Response,
             iin,
         )

@@ -211,8 +211,10 @@ pub(crate) fn define(
         .push("Group80Var1", "Internal Indications - Packed format")?
         .push("Group110", "Octet String")?
         .push("Group111", "Octet String Event")?
+        /*
         .push("Group112", "Virtual Terminal Output Block")?
         .push("Group113", "Virtual Terminal Event Data")?
+         */
         .doc("Group/Variation")?
         .build()
 }

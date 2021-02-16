@@ -1,7 +1,8 @@
-use crate::shared::SharedDefinitions;
 use oo_bindgen::class::ClassHandle;
 use oo_bindgen::native_function::*;
 use oo_bindgen::*;
+
+use crate::shared::SharedDefinitions;
 
 pub fn define(
     lib: &mut LibraryBuilder,

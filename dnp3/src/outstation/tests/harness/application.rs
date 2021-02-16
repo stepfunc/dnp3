@@ -1,6 +1,7 @@
+use std::sync::{Arc, Mutex};
+
 use crate::outstation::tests::harness::{Event, EventHandle};
 use crate::outstation::traits::{OutstationApplication, RestartDelay};
-use std::sync::{Arc, Mutex};
 
 pub(crate) struct MockOutstationApplication {
     events: EventHandle,

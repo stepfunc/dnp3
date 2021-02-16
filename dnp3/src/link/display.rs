@@ -1,4 +1,4 @@
-use crate::config::LinkDecodeLevel;
+use crate::decode::LinkDecodeLevel;
 use crate::link::header::Header;
 
 pub(crate) struct LinkDisplay<'a> {

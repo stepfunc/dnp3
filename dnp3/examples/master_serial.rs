@@ -1,15 +1,18 @@
-/*
-use dnp3::entry::EndpointAddress;
-use dnp3::prelude::master::*;
 use std::time::Duration;
+
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
- */
 
-/// example of using the master API asynchronously from within the Tokio runtime
+use dnp3::app::control::*;
+use dnp3::app::*;
+use dnp3::decode::*;
+use dnp3::link::EndpointAddress;
+use dnp3::master::*;
+use dnp3::serial::*;
+
+/// example of using the master from within the Tokio runtime
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /* TODO
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_target(false)
@@ -17,20 +20,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // spawn the master onto another task
     let mut master = spawn_master_serial_client(
-        MasterConfiguration::new(
+        MasterConfig::new(
             EndpointAddress::from(1)?,
-            DecodeLogLevel::ObjectValues,
+            AppDecodeLevel::ObjectValues.into(),
             ReconnectStrategy::default(),
             Timeout::from_secs(1)?,
         ),
         "/dev/pts/4",
-        SerialPortSettings::default(),
+        SerialSettings::default(),
         Listener::None,
     );
 
     // Create the association
-    let mut config = Configuration::default();
-    config.auto_time_sync = Some(TimeSyncProcedure::LAN);
+    let mut config = AssociationConfig::default();
+    config.auto_time_sync = Some(TimeSyncProcedure::Lan);
     config.keep_alive_timeout = Some(Duration::from_secs(60));
     let mut association = master
         .add_association(EndpointAddress::from(1024)?, config, NullHandler::boxed())
@@ -50,14 +53,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
             "dln" => {
-                master
-                    .set_decode_log_level(DecodeLogLevel::Nothing)
-                    .await
-                    .ok();
+                master.set_decode_level(DecodeLevel::nothing()).await.ok();
             }
             "dlv" => {
                 master
-                    .set_decode_log_level(DecodeLogLevel::ObjectValues)
+                    .set_decode_level(AppDecodeLevel::ObjectValues.into())
                     .await
                     .ok();
             }
@@ -96,13 +96,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "evt" => poll.demand().await,
             "lts" => {
-                if let Err(err) = association.perform_time_sync(TimeSyncProcedure::LAN).await {
+                if let Err(err) = association.perform_time_sync(TimeSyncProcedure::Lan).await {
                     tracing::warn!("error: {}", err);
                 }
             }
             "nts" => {
                 if let Err(err) = association
-                    .perform_time_sync(TimeSyncProcedure::NonLAN)
+                    .perform_time_sync(TimeSyncProcedure::NonLan)
                     .await
                 {
                     tracing::warn!("error: {}", err);
@@ -124,7 +124,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             s => println!("unknown command: {}", s),
         }
     }
-     */
-
-    Ok(())
 }

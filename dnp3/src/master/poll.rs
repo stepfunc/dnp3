@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+use std::time::Duration;
+
 use crate::app::format::write::HeaderWriter;
 use crate::master::association::Next;
 use crate::master::error::PollError;
@@ -6,8 +9,6 @@ use crate::master::request::ReadRequest;
 use crate::tokio::time::Instant;
 use crate::util::cursor::WriteError;
 use crate::util::Smallest;
-use std::collections::BTreeMap;
-use std::time::Duration;
 
 /// Periodic poll representation
 #[derive(Clone)]

@@ -1,10 +1,11 @@
-use crate::app::enums::FunctionCode;
+use tokio::time::Duration;
+
 use crate::app::variations::Group41Var2;
+use crate::app::FunctionCode;
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::Feature;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
-use tokio::time::Duration;
 
 const G41V2_INDEX_7: Control = Control::G41V2(Group41Var2::new(513), 7);
 // select, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS,

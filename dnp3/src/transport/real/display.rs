@@ -1,4 +1,4 @@
-use crate::config::TransportDecodeLevel;
+use crate::decode::TransportDecodeLevel;
 use crate::transport::real::header::Header;
 
 pub(crate) struct SegmentDisplay<'a> {

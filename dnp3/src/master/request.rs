@@ -1,6 +1,6 @@
 use std::ops::BitAnd;
 
-use crate::app::enums::CommandStatus;
+use crate::app::control::CommandStatus;
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::count::CountSequence;

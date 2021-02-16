@@ -1,12 +1,12 @@
+use std::time::Duration;
+
+use dnp3::link::LinkStatusResult;
+use dnp3::master::PollHandle;
+use dnp3::master::*;
+
 use crate::command::Command;
 use crate::ffi;
 use crate::request::Request;
-use dnp3::app::types::LinkStatusResult;
-use dnp3::master::association::PollHandle;
-use dnp3::master::error::{CommandError, CommandResponseError, TimeSyncError};
-use dnp3::master::handle::AssociationHandle;
-use dnp3::master::request::{CommandMode, TimeSyncProcedure};
-use std::time::Duration;
 
 pub struct Association {
     pub(crate) runtime: crate::runtime::RuntimeHandle,

@@ -4,11 +4,6 @@ object Variation {
   case class Id(group: Byte, variation: Byte)
 }
 
-
-
-
-
-
 /**
  * Base trait for DNP3 objects
  */

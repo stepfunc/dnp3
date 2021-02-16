@@ -1,6 +1,12 @@
+pub(crate) use reader::*;
+pub(crate) use types::*;
+pub(crate) use writer::*;
+
 use crate::app::EndpointType;
-use crate::config::EndpointAddress;
+use crate::link::EndpointAddress;
+use crate::link::LinkErrorMode;
 use crate::master::session::MasterSession;
+use crate::outstation::Feature;
 
 #[cfg(test)]
 pub(crate) mod mock;
@@ -10,13 +16,6 @@ pub(crate) mod real;
 mod reader;
 mod types;
 mod writer;
-
-use crate::config::LinkErrorMode;
-use crate::outstation::config::Feature;
-
-pub(crate) use reader::*;
-pub(crate) use types::*;
-pub(crate) use writer::*;
 
 pub(crate) fn create_master_transport_layer(
     link_error_mode: LinkErrorMode,
@@ -40,7 +39,7 @@ pub(crate) fn create_outstation_transport_layer(
     link_error_mode: LinkErrorMode,
     address: EndpointAddress,
     self_address: Feature,
-    rx_buffer_size: crate::outstation::config::BufferSize,
+    rx_buffer_size: crate::outstation::BufferSize,
 ) -> (TransportReader, TransportWriter) {
     (
         TransportReader::outstation(

@@ -1,17 +1,12 @@
-use dnp3::app::enums::CommandStatus;
-use dnp3::app::flags::Flags;
-use dnp3::app::measurement::*;
-use dnp3::config::{AppDecodeLevel, EndpointAddress, LinkErrorMode};
-use dnp3::entry::outstation::tcp::TcpServer;
-use dnp3::entry::outstation::AddressFilter;
-use dnp3::outstation::config::OutstationConfig;
-use dnp3::outstation::database::config::*;
-use dnp3::outstation::database::{Add, Update, UpdateOptions};
-use dnp3::outstation::database::{EventBufferConfig, EventClass};
-use dnp3::outstation::traits::{
-    DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
-};
 use std::time::Duration;
+
+use dnp3::app::control::*;
+use dnp3::app::measurement::*;
+use dnp3::decode::*;
+use dnp3::link::*;
+use dnp3::outstation::database::*;
+use dnp3::outstation::*;
+use dnp3::tcp::*;
 
 fn get_outstation_config() -> OutstationConfig {
     // ANCHOR: outstation_config
@@ -38,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut server = TcpServer::new(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
 
-    let (handle, outstation) = server.add_outstation(
+    let handle = server.spawn_outstation(
         get_outstation_config(),
         // event buffer space for 100 analog events
         EventBufferConfig::new(0, 0, 0, 0, 0, 100, 0, 0),
@@ -65,11 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // dropping the ServerHandle shuts down the server AND the outstation
-    let (_server_handle, server) = server.bind().await?;
-
-    // spawn the outstation and the server
-    tokio::spawn(outstation);
-    tokio::spawn(server);
+    let _server_handle = server.bind_and_spawn().await?;
 
     let mut value = 0.0;
 

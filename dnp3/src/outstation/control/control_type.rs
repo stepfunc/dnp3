@@ -1,10 +1,10 @@
-use crate::app::enums::CommandStatus;
-use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
+use std::fmt::Debug;
+
+use crate::app::control::*;
 use crate::outstation::control::collection::ControlTransaction;
 use crate::outstation::database::Database;
 use crate::outstation::traits::ControlSupport;
 use crate::outstation::traits::OperateType;
-use std::fmt::Debug;
 
 pub(crate) trait ControlType: Debug {
     /// make a copy of this control type with a new status code

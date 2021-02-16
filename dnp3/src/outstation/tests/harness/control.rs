@@ -1,4 +1,4 @@
-use crate::app::enums::CommandStatus;
+use crate::app::control::CommandStatus;
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 use crate::outstation::database::Database;
 use crate::outstation::tests::harness::{Control, Event, EventHandle};

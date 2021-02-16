@@ -1,5 +1,5 @@
-use crate::config::DecodeLevel;
-use crate::config::EndpointAddress;
+use crate::decode::DecodeLevel;
+use crate::link::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::PollError;
 use crate::master::error::{AssociationError, TaskError};

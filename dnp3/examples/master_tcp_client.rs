@@ -1,9 +1,14 @@
-use dnp3::config::EndpointAddress;
-use dnp3::config::{AppDecodeLevel, LinkErrorMode};
-use dnp3::prelude::master::*;
 use std::time::Duration;
+
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
+
+use dnp3::app::control::*;
+use dnp3::app::*;
+use dnp3::decode::*;
+use dnp3::link::*;
+use dnp3::master::*;
+use dnp3::tcp::*;
 
 /*
   Example of using the master API from within the Tokio runtime.

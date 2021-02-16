@@ -1,4 +1,4 @@
-use crate::config::PhysDecodeLevel;
+use crate::decode::PhysDecodeLevel;
 use crate::tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 // encapsulates all possible physical layers as an enum

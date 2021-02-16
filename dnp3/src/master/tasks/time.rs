@@ -1,9 +1,11 @@
-use crate::app::enums::FunctionCode;
+use std::time::Duration;
+
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::count::CountVariation;
 use crate::app::parse::parser::Response;
-use crate::app::types::Timestamp;
 use crate::app::variations::{Group50Var1, Group50Var3};
+use crate::app::FunctionCode;
+use crate::app::Timestamp;
 use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::handle::Promise;
@@ -11,7 +13,6 @@ use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::NonReadTask;
 use crate::tokio::time::Instant;
 use crate::util::cursor::WriteError;
-use std::time::Duration;
 
 enum State {
     MeasureDelay(Option<Instant>),
@@ -309,20 +310,22 @@ impl From<std::num::TryFromIntError> for TimeSyncError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::app::format::write::*;
-    use crate::app::header::*;
-    use crate::app::parse::parser::ParsedFragment;
-    use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
-    use crate::app::sequence::Sequence;
-    use crate::master::tasks::RequestWriter;
-    use crate::prelude::master::*;
-    use crate::util::cursor::WriteCursor;
     use std::cell::Cell;
     use std::time::SystemTime;
 
-    fn response_control_field(seq: Sequence) -> Control {
-        Control::response(seq, true, true, false)
+    use crate::app::format::write::*;
+    use crate::app::parse::parser::ParsedFragment;
+    use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
+    use crate::app::Sequence;
+    use crate::app::*;
+    use crate::master::handle::{AssociationHandler, NullHandler, ReadHandler};
+    use crate::master::tasks::RequestWriter;
+    use crate::util::cursor::WriteCursor;
+
+    use super::*;
+
+    fn response_control_field(seq: Sequence) -> ControlField {
+        ControlField::response(seq, true, true, false)
     }
 
     struct SingleTimestampTestHandler {
@@ -358,9 +361,12 @@ mod tests {
     }
 
     mod non_lan {
+        use crate::app::variations::Group52Var2;
+        use crate::app::QualifierCode;
+        use crate::link::EndpointAddress;
+        use crate::master::association::AssociationConfig;
 
         use super::*;
-        use crate::config::EndpointAddress;
 
         const OUTSTATION_DELAY_MS: u16 = 100;
         const TOTAL_DELAY_MS: u16 = 200;
@@ -646,7 +652,7 @@ mod tests {
             let mut cursor = WriteCursor::new(&mut buffer);
             let task = task.start(association).unwrap();
             let mut writer = start_request(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 task.function(),
                 &mut cursor,
             )
@@ -692,7 +698,7 @@ mod tests {
             let mut cursor = WriteCursor::new(&mut buffer);
             let task = task.start(association).unwrap();
             let mut writer = start_request(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 task.function(),
                 &mut cursor,
             )
@@ -721,7 +727,7 @@ mod tests {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
             let writer = start_response(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 ResponseFunction::Response,
                 Iin::default(),
                 &mut cursor,
@@ -734,8 +740,10 @@ mod tests {
     }
 
     mod lan {
+        use crate::link::EndpointAddress;
+        use crate::master::association::AssociationConfig;
+
         use super::*;
-        use crate::config::EndpointAddress;
 
         const DELAY_MS: u16 = 200;
 
@@ -894,7 +902,7 @@ mod tests {
             let mut cursor = WriteCursor::new(&mut buffer);
             let task = task.start(association).unwrap();
             let mut writer = start_request(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 task.function(),
                 &mut cursor,
             )
@@ -935,7 +943,7 @@ mod tests {
             let mut cursor = WriteCursor::new(&mut buffer);
             let task = task.start(association).unwrap();
             let mut writer = start_request(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 task.function(),
                 &mut cursor,
             )
@@ -959,7 +967,7 @@ mod tests {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
             let writer = start_response(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 ResponseFunction::Response,
                 Iin::default(),
                 &mut cursor,

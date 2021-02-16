@@ -1,5 +1,6 @@
-use crate::link::error::LogicError;
 use std::ops::Range;
+
+use crate::link::error::LogicError;
 
 pub(crate) trait SliceExtNoPanic<T> {
     fn np_split_at(&self, pos: usize) -> Result<(&[T], &[T]), LogicError>;

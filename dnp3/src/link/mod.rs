@@ -1,3 +1,5 @@
+use crate::link::header::AnyAddress;
+
 mod crc;
 pub(crate) mod display;
 pub(crate) mod error;
@@ -20,6 +22,95 @@ pub(crate) mod constant {
     pub(crate) const MAX_BLOCK_SIZE: usize = 16;
     pub(crate) const CRC_LENGTH: usize = 2;
     pub(crate) const MAX_BLOCK_SIZE_WITH_CRC: usize = MAX_BLOCK_SIZE + CRC_LENGTH;
+}
+
+/// Result of a link status request initiated from the master or outstation API
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum LinkStatusResult {
+    /// The other device responded with a valid `LINK_STATUS` acknowledgement
+    Success,
+    /// There was activity on the link, but it wasn't a `LINK_STATUS`
+    ///
+    /// The link is still alive, but the behaviour of the other device
+    /// is unexpected.
+    UnexpectedResponse,
+}
+
+/// Controls how errors in parsed link-layer frames are handled. This behavior
+/// is configurable for physical layers with built-in error correction like TCP
+/// as the connection might be through a terminal server.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum LinkErrorMode {
+    /// Framing errors are discarded. The link-layer parser is reset on any error, and the
+    /// parser begins scanning for 0x0564. This is always the behavior for serial ports.
+    Discard,
+    /// Framing errors are bubbled up to calling code, closing the session. Suitable for physical
+    /// layers that provide error correction like TCP.
+    Close,
+}
+
+/// Represents a validated 16-bit endpoint address for a master or an outstation
+/// Certain special addresses are not allowed by the standard to be used
+/// as endpoint addresses.
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord)]
+pub struct EndpointAddress {
+    address: u16,
+}
+
+/// The specified address is special and may not be used as an EndpointAddress
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct SpecialAddressError {
+    pub address: u16,
+}
+
+impl std::error::Error for SpecialAddressError {}
+
+impl std::fmt::Display for SpecialAddressError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "special address ({}) may not be used as a master or outstation address",
+            self.address
+        )
+    }
+}
+
+impl EndpointAddress {
+    /// try to construct an EndpointAddress from a raw u16
+    pub fn from(value: u16) -> Result<Self, SpecialAddressError> {
+        use std::convert::TryInto;
+        value.try_into()
+    }
+
+    /// get the raw u16 value of the address
+    pub fn raw_value(&self) -> u16 {
+        self.address
+    }
+
+    pub(crate) const fn raw(address: u16) -> EndpointAddress {
+        EndpointAddress { address }
+    }
+
+    pub(crate) fn wrap(&self) -> AnyAddress {
+        AnyAddress::Endpoint(*self)
+    }
+}
+
+impl std::convert::TryFrom<u16> for EndpointAddress {
+    type Error = SpecialAddressError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match AnyAddress::from(value) {
+            AnyAddress::Endpoint(x) => Ok(x),
+            _ => Err(SpecialAddressError { address: value }),
+        }
+    }
+}
+
+impl std::fmt::Display for EndpointAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.address)
+    }
 }
 
 #[cfg(test)]

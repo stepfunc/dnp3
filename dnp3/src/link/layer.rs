@@ -1,16 +1,15 @@
 use crate::app::EndpointType;
-use crate::config::{DecodeLevel, EndpointAddress};
+use crate::decode::DecodeLevel;
+use crate::link::display::LinkDisplay;
 use crate::link::error::LinkError;
+use crate::link::format::format_header_fixed_size;
 use crate::link::function::Function;
 use crate::link::header::{
     AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, FrameType, Header,
 };
 use crate::link::parser::FramePayload;
-
-use crate::config::LinkErrorMode;
-use crate::link::display::LinkDisplay;
-use crate::link::format::format_header_fixed_size;
-use crate::outstation::config::Feature;
+use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::outstation::Feature;
 use crate::util::phys::PhysLayer;
 
 enum SecondaryState {

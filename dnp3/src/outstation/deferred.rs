@@ -1,6 +1,6 @@
-use crate::app::header::Iin2;
 use crate::app::parse::parser::HeaderCollection;
-use crate::app::sequence::Sequence;
+use crate::app::Iin2;
+use crate::app::Sequence;
 use crate::outstation::database::read::ReadHeader;
 use crate::outstation::database::DatabaseHandle;
 use crate::transport::FragmentInfo;

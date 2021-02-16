@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use crate::app::enums::FunctionCode;
 use crate::app::gen::count::CountVariation;
 use crate::app::parse::parser::Response;
+use crate::app::FunctionCode;
 use crate::master::error::TaskError;
 use crate::master::handle::Promise;
 use crate::master::tasks::NonReadTask;
@@ -113,13 +113,17 @@ impl RestartTask {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::app::format::write::{start_request, start_response};
-    use crate::app::header::{Control, Iin, ResponseFunction};
-    use crate::app::sequence::Sequence;
+    use crate::app::variations::{Group52Var1, Group52Var2};
+    use crate::app::Sequence;
+    use crate::app::{ControlField, Iin, ResponseFunction};
+    use crate::link::EndpointAddress;
+    use crate::master::association::{Association, AssociationConfig};
+    use crate::master::handle::NullHandler;
     use crate::master::tasks::RequestWriter;
-    use crate::prelude::master::*;
     use crate::util::cursor::WriteCursor;
+
+    use super::*;
 
     #[test]
     fn cold_restart() {
@@ -139,7 +143,7 @@ mod tests {
         let mut cursor = WriteCursor::new(&mut buffer);
         let task = task.start(&mut association).unwrap();
         let mut writer = start_request(
-            Control::request(Sequence::default()),
+            ControlField::request(Sequence::default()),
             task.function(),
             &mut cursor,
         )
@@ -154,7 +158,7 @@ mod tests {
         let mut buffer = [0; 20];
         let mut cursor = WriteCursor::new(&mut buffer);
         let mut writer = start_response(
-            Control::response(Sequence::default(), true, true, false),
+            ControlField::response(Sequence::default(), true, true, false),
             ResponseFunction::Response,
             Iin::default(),
             &mut cursor,
@@ -185,7 +189,7 @@ mod tests {
         let mut cursor = WriteCursor::new(&mut buffer);
         let task = task.start(&mut association).unwrap();
         let mut writer = start_request(
-            Control::request(Sequence::default()),
+            ControlField::request(Sequence::default()),
             task.function(),
             &mut cursor,
         )
@@ -200,7 +204,7 @@ mod tests {
         let mut buffer = [0; 20];
         let mut cursor = WriteCursor::new(&mut buffer);
         let mut writer = start_response(
-            Control::response(Sequence::default(), true, true, false),
+            ControlField::response(Sequence::default(), true, true, false),
             ResponseFunction::Response,
             Iin::default(),
             &mut cursor,

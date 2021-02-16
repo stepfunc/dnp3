@@ -1,5 +1,3 @@
-pub mod tcp;
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum AddressFilter {
     Any,

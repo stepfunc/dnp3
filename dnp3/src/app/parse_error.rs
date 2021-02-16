@@ -1,8 +1,9 @@
-use crate::app::enums::{FunctionCode, QualifierCode};
+use std::fmt::Formatter;
+
 use crate::app::parse::range::InvalidRange;
 use crate::app::variations::Variation;
+use crate::app::{FunctionCode, QualifierCode};
 use crate::util::cursor::ReadError;
-use std::fmt::Formatter;
 
 /// errors that occur when parsing an application layer header
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -34,7 +35,7 @@ pub enum ObjectParseError {
 
 /// errors that occur when interpreting a header as a request header
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum RequestValidationError {
+pub enum RequestValidationError {
     /// function code not allowed in requests
     UnexpectedFunction(FunctionCode),
     /// request with either FIR or FIN == 0

@@ -1,6 +1,6 @@
-use crate::app::flags::Flags;
-use crate::app::measurement::{Binary, BinaryOutputStatus, DoubleBitBinary, Time};
-use crate::app::types::DoubleBit;
+use crate::app::measurement::{
+    Binary, BinaryOutputStatus, DoubleBit, DoubleBitBinary, Flags, Time,
+};
 use crate::app::variations::{Group2Var3, Group4Var3};
 
 impl Group2Var3 {

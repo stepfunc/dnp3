@@ -1,25 +1,7 @@
-use crate::app::parse::error::ObjectParseError;
 use crate::app::parse::traits::FixedSize;
+use crate::app::parse_error::ObjectParseError;
+use crate::app::Bytes;
 use crate::util::cursor::ReadCursor;
-use std::fmt::Formatter;
-
-#[derive(Debug, PartialEq)]
-pub struct Bytes<'a> {
-    pub value: &'a [u8],
-}
-
-impl std::fmt::Display for Bytes<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.value.len() <= 3 {
-            return write!(f, "{:02X?}", self.value);
-        }
-
-        if let Some(s) = self.value.get(0..3) {
-            return write!(f, "length = {}, {:02X?} ...", self.value.len(), s);
-        }
-        Ok(())
-    }
-}
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct RangedBytesSequence<'a> {
@@ -56,12 +38,6 @@ where
     size: usize,
     remaining: usize,
     phantom: std::marker::PhantomData<T>,
-}
-
-impl<'a> Bytes<'a> {
-    pub(crate) fn new(value: &'a [u8]) -> Self {
-        Self { value }
-    }
 }
 
 impl<'a> RangedBytesSequence<'a> {
@@ -166,19 +142,5 @@ where
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.remaining, Some(self.remaining))
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn bytes_formats_as_expected() {
-        let short = Bytes::new(&[0x01, 0x02, 0x03]);
-        let long = Bytes::new(&[0x01, 0x02, 0x03, 0x04]);
-
-        assert_eq!(format!("{}", short), "[01, 02, 03]");
-        assert_eq!(format!("{}", long), "length = 4, [01, 02, 03] ...");
     }
 }

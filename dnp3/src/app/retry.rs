@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-/// Reconnection strategy
+/// Combines a `RetryStrategy` with an optional delay before reconnecting after a disconnection
 #[derive(Copy, Clone, Debug)]
 pub struct ReconnectStrategy {
     /// Retry strategy when used between attempts to
@@ -32,6 +32,8 @@ impl Default for ReconnectStrategy {
     }
 }
 
+/// Parameterizes the minimum and maximum delays between retries
+/// for a retry strategy based on exponential backoff
 #[derive(Copy, Clone, Debug)]
 pub struct RetryStrategy {
     pub(crate) min_delay: Duration,

@@ -18,8 +18,8 @@ use crate::app::parse::traits::{FixedSize, Index};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::bytes::PrefixedBytesSequence;
 use crate::app::measurement::Time;
-use crate::master::handle::{ReadHandler, HeaderInfo};
-use crate::app::parse::error::ObjectParseError;
+use crate::master::{ReadHandler, HeaderInfo};
+use crate::app::ObjectParseError;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {

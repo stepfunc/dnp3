@@ -1,12 +1,17 @@
+use std::sync::atomic::Ordering;
+use std::time::Duration;
+
 use crate::app::format::write::start_request;
-use crate::app::header::{Control, Iin, Iin1, Iin2};
-use crate::app::sequence::Sequence;
-use crate::prelude::master::*;
+use crate::app::variations::Variation;
+use crate::app::FunctionCode;
+use crate::app::RetryStrategy;
+use crate::app::Sequence;
+use crate::app::{ControlField, Iin, Iin1, Iin2};
+use crate::master::association::AssociationConfig;
+use crate::master::request::{Classes, EventClasses};
 use crate::tokio::test::*;
 use crate::tokio::time;
 use crate::util::cursor::WriteCursor;
-use std::sync::atomic::Ordering;
-use std::time::Duration;
 
 use super::harness::create_association;
 use super::harness::requests::*;
@@ -174,7 +179,7 @@ fn detect_restart_in_read_response() {
         let mut buffer = [0; 20];
         let mut cursor = WriteCursor::new(&mut buffer);
         let mut request =
-            start_request(Control::request(seq), FunctionCode::Read, &mut cursor).unwrap();
+            start_request(ControlField::request(seq), FunctionCode::Read, &mut cursor).unwrap();
 
         request
             .write_all_objects_header(Variation::Group60Var1)

@@ -1,15 +1,19 @@
-use crate::link::header::{FrameInfo, FrameType};
-use crate::master::session::{MasterSession, RunError};
-use crate::prelude::master::*;
-use crate::tokio::test::*;
-use crate::transport::create_master_transport_layer;
-
-use crate::config::{AppDecodeLevel, LinkErrorMode};
-use crate::util::phys::PhysLayer;
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
+
+use crate::decode::AppDecodeLevel;
+use crate::link::header::{FrameInfo, FrameType};
+use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::master::association::AssociationConfig;
+use crate::master::handle::{
+    AssociationHandle, AssociationHandler, HeaderInfo, MasterHandle, ReadHandler,
+};
+use crate::master::session::{MasterSession, RunError};
+use crate::tokio::test::*;
+use crate::transport::create_master_transport_layer;
+use crate::util::phys::PhysLayer;
 
 pub(crate) mod requests;
 
@@ -26,7 +30,7 @@ pub(crate) fn create_association(
     let (tx, rx) = crate::tokio::sync::mpsc::channel(1);
     let mut runner = MasterSession::new(
         AppDecodeLevel::ObjectValues.into(),
-        Timeout::from_secs(1).unwrap(),
+        crate::app::Timeout::from_secs(1).unwrap(),
         MasterSession::MIN_TX_BUFFER_SIZE,
         rx,
     );
@@ -91,9 +95,9 @@ impl AssociationHandler for CountHandler {
 }
 
 impl ReadHandler for CountHandler {
-    fn begin_fragment(&mut self, _header: crate::app::header::ResponseHeader) {}
+    fn begin_fragment(&mut self, _header: crate::app::ResponseHeader) {}
 
-    fn end_fragment(&mut self, _header: crate::app::header::ResponseHeader) {}
+    fn end_fragment(&mut self, _header: crate::app::ResponseHeader) {}
 
     fn handle_binary(
         &mut self,
@@ -148,7 +152,7 @@ impl ReadHandler for CountHandler {
     fn handle_octet_string<'a>(
         &mut self,
         _info: HeaderInfo,
-        _iter: &'a mut dyn Iterator<Item = (crate::app::parse::bytes::Bytes<'a>, u16)>,
+        _iter: &'a mut dyn Iterator<Item = (crate::app::Bytes<'a>, u16)>,
     ) {
     }
 }

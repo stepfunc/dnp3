@@ -1,8 +1,8 @@
-use crate::app::enums::QualifierCode;
 use crate::app::measurement::*;
 use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
-use crate::app::types::Timestamp;
 use crate::app::variations::{Group51Var1, Group51Var2};
+use crate::app::QualifierCode;
+use crate::app::Timestamp;
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::event::traits::EventVariation;
 use crate::outstation::database::details::event::write_fn::Continue;
@@ -338,8 +338,9 @@ impl Writable for Box<[u8]> {
 
 #[cfg(test)]
 mod tests {
+    use crate::app::measurement::Flags;
+
     use super::*;
-    use crate::app::flags::Flags;
 
     #[test]
     fn can_write_g2v1_x2() {

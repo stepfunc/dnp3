@@ -1,5 +1,6 @@
-use crate::ffi;
 use std::ptr::null_mut;
+
+use crate::ffi;
 
 pub struct Runtime {
     pub(crate) inner: std::sync::Arc<tokio::runtime::Runtime>,

@@ -1,11 +1,12 @@
 use std::time::Duration;
 
-use crate::shared::SharedDefinitions;
 use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::class::ClassHandle;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
+
+use crate::shared::SharedDefinitions;
 
 pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<(), BindingError> {
     let read_handler = crate::handler::define(lib, shared)?;

@@ -1,3 +1,20 @@
+pub use app_enums::*;
+pub use bytes::*;
+pub use header::*;
+pub use parse_error::*;
+pub use retry::*;
+pub use sequence::*;
+pub use timeout::*;
+pub use types::*;
+pub use variations::Variation;
+
+/// Types used for making binary and analog output control requests
+pub mod control {
+    pub use super::control_enums::*;
+    pub use super::control_types::ControlCode;
+    pub use super::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
+}
+
 /// internal enum used all over the place to specify master or outstation
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) enum EndpointType {
@@ -11,32 +28,29 @@ impl EndpointType {
     }
 }
 
-/// publicly exported enumerations defined by the standard
+mod bytes;
+
+mod control_types;
 #[rustfmt::skip]
-pub mod enums;
-/// extension impls for generated types
+mod app_enums;
+mod control_enums;
 mod extensions;
-/// measurement flags (aka quality) and display implementations
-pub mod flags;
-/// application layer header types
-pub mod header;
+mod header;
 /// measurement types, e.g. Binary, Analog, Counter, etc
 pub mod measurement;
 /// application layer parser
-pub mod parse;
-/// retry strategies
-pub mod retry;
-/// application layer sequence number
-pub mod sequence;
-/// types for handling timeouts
-pub mod timeout;
-/// types used in various other application layer objects
-pub mod types;
-/// public variations
+pub(crate) mod parse;
+mod retry;
+mod sequence;
+mod timeout;
+mod types;
+
 #[rustfmt::skip]
-pub mod variations;
+pub(crate) mod variations;
 
 pub(crate) mod format;
+/// errors associated with parsing the application layer
+mod parse_error;
 
 #[rustfmt::skip]
 pub(crate) mod gen {
