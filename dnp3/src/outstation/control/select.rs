@@ -1,4 +1,4 @@
-use crate::app::CommandStatus;
+use crate::app::control::CommandStatus;
 use crate::app::Sequence;
 
 /// records when a select occurs

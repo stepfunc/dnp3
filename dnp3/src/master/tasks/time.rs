@@ -321,8 +321,8 @@ mod tests {
     use std::cell::Cell;
     use std::time::SystemTime;
 
-    fn response_control_field(seq: Sequence) -> Control {
-        Control::response(seq, true, true, false)
+    fn response_control_field(seq: Sequence) -> ControlField {
+        ControlField::response(seq, true, true, false)
     }
 
     struct SingleTimestampTestHandler {
@@ -649,7 +649,7 @@ mod tests {
             let mut cursor = WriteCursor::new(&mut buffer);
             let task = task.start(association).unwrap();
             let mut writer = start_request(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 task.function(),
                 &mut cursor,
             )
@@ -695,7 +695,7 @@ mod tests {
             let mut cursor = WriteCursor::new(&mut buffer);
             let task = task.start(association).unwrap();
             let mut writer = start_request(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 task.function(),
                 &mut cursor,
             )
@@ -724,7 +724,7 @@ mod tests {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
             let writer = start_response(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 ResponseFunction::Response,
                 Iin::default(),
                 &mut cursor,
@@ -898,7 +898,7 @@ mod tests {
             let mut cursor = WriteCursor::new(&mut buffer);
             let task = task.start(association).unwrap();
             let mut writer = start_request(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 task.function(),
                 &mut cursor,
             )
@@ -939,7 +939,7 @@ mod tests {
             let mut cursor = WriteCursor::new(&mut buffer);
             let task = task.start(association).unwrap();
             let mut writer = start_request(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 task.function(),
                 &mut cursor,
             )
@@ -963,7 +963,7 @@ mod tests {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
             let writer = start_response(
-                Control::request(Sequence::default()),
+                ControlField::request(Sequence::default()),
                 ResponseFunction::Response,
                 Iin::default(),
                 &mut cursor,

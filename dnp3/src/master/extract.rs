@@ -83,7 +83,7 @@ mod test {
 
     fn header() -> ResponseHeader {
         ResponseHeader::new(
-            Control::from(0xC0),
+            ControlField::from(0xC0),
             ResponseFunction::Response,
             Iin::default(),
         )

@@ -1,5 +1,5 @@
+pub use app_enums::*;
 pub use bytes::*;
-pub use enums::*;
 pub use header::*;
 pub use retry::*;
 pub use sequence::*;
@@ -9,6 +9,8 @@ pub use variations::Variation;
 
 /// Types used for making binary and analog output control requests
 pub mod control {
+    pub use super::control_enums::*;
+    pub use super::control_types::ControlCode;
     pub use super::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 }
 
@@ -26,26 +28,22 @@ impl EndpointType {
 }
 
 mod bytes;
-/// publicly exported enumerations defined by the standard
+
+mod control_types;
 #[rustfmt::skip]
-mod enums;
-/// extension impls for generated types
+mod app_enums;
+mod control_enums;
 mod extensions;
-/// application layer header types
 mod header;
 /// measurement types, e.g. Binary, Analog, Counter, etc
 pub mod measurement;
 /// application layer parser
 pub(crate) mod parse;
-/// retry strategies
 mod retry;
-/// application layer sequence number
 mod sequence;
-/// types for handling timeouts
 mod timeout;
-/// types used in various other application layer objects
 mod types;
-/// public variations
+
 #[rustfmt::skip]
 pub(crate) mod variations;
 

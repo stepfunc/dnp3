@@ -1,15 +1,9 @@
-use dnp3::app::ControlCode;
-use dnp3::app::Sequence;
-use dnp3::app::{Control, RequestHeader};
+use dnp3::app::control::*;
+use dnp3::app::*;
 use dnp3::outstation::database::Database;
-use dnp3::outstation::traits::{
-    BroadcastAction, ControlHandler, ControlSupport, OperateType, OutstationApplication,
-    OutstationInformation, RestartDelay,
-};
+use dnp3::outstation::traits::*;
 
 use crate::ffi;
-use dnp3::app::control::*;
-use dnp3::app::{CommandStatus, FunctionCode, OpType, TripCloseCode};
 
 impl OutstationApplication for ffi::OutstationApplication {
     fn get_processing_delay_ms(&self) -> u16 {
@@ -274,8 +268,8 @@ impl From<RequestHeader> for ffi::RequestHeader {
     }
 }
 
-impl From<Control> for ffi::Control {
-    fn from(from: Control) -> Self {
+impl From<ControlField> for ffi::Control {
+    fn from(from: ControlField) -> Self {
         ffi::ControlFields {
             fir: from.fir,
             fin: from.fin,

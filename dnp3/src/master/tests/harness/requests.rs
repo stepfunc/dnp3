@@ -1,7 +1,7 @@
 use crate::app::format::write::{start_request, start_response};
 use crate::app::variations::{Group32Var2, Variation};
 use crate::app::Sequence;
-use crate::app::{Control, FunctionCode, Iin, Iin1, Iin2, ResponseFunction};
+use crate::app::{ControlField, FunctionCode, Iin, Iin1, Iin2, ResponseFunction};
 use crate::master::session::RunError;
 
 use crate::tokio::test::*;
@@ -34,7 +34,7 @@ pub(crate) fn disable_unsol_request(io: &mut io::Handle, seq: Sequence) {
     let mut buffer = [0; 20];
     let mut cursor = WriteCursor::new(&mut buffer);
     let mut request = start_request(
-        Control::request(seq),
+        ControlField::request(seq),
         FunctionCode::DisableUnsolicited,
         &mut cursor,
     )
@@ -58,7 +58,7 @@ pub(crate) fn integrity_poll_request(io: &mut io::Handle, seq: Sequence) {
     let mut buffer = [0; 20];
     let mut cursor = WriteCursor::new(&mut buffer);
     let mut request =
-        start_request(Control::request(seq), FunctionCode::Read, &mut cursor).unwrap();
+        start_request(ControlField::request(seq), FunctionCode::Read, &mut cursor).unwrap();
 
     request.write_class1230().unwrap();
 
@@ -70,7 +70,7 @@ pub(crate) fn enable_unsol_request(io: &mut io::Handle, seq: Sequence) {
     let mut buffer = [0; 20];
     let mut cursor = WriteCursor::new(&mut buffer);
     let mut request = start_request(
-        Control::request(seq),
+        ControlField::request(seq),
         FunctionCode::EnableUnsolicited,
         &mut cursor,
     )
@@ -94,7 +94,7 @@ pub(crate) fn clear_restart_iin(io: &mut io::Handle, seq: Sequence) {
     let mut buffer = [0; 20];
     let mut cursor = WriteCursor::new(&mut buffer);
     let mut request =
-        start_request(Control::request(seq), FunctionCode::Write, &mut cursor).unwrap();
+        start_request(ControlField::request(seq), FunctionCode::Write, &mut cursor).unwrap();
 
     request.write_clear_restart().unwrap();
 
@@ -109,7 +109,7 @@ pub(crate) fn empty_response_custom_iin(io: &mut io::Handle, seq: Sequence, iin:
     let mut buffer = [0; 4];
     let mut cursor = WriteCursor::new(&mut buffer);
     start_response(
-        Control::response(seq, true, true, false),
+        ControlField::response(seq, true, true, false),
         ResponseFunction::Response,
         iin,
         &mut cursor,
@@ -135,7 +135,7 @@ pub(crate) fn unsol_null_custom_iin(io: &mut io::Handle, seq: Sequence, iin: Iin
     let mut buffer = [0; 4];
     let mut cursor = WriteCursor::new(&mut buffer);
     start_response(
-        Control::unsolicited_response(seq),
+        ControlField::unsolicited_response(seq),
         ResponseFunction::UnsolicitedResponse,
         iin,
         &mut cursor,
@@ -149,7 +149,7 @@ pub(crate) fn unsol_confirm(io: &mut io::Handle, seq: Sequence) {
     let mut buffer = [0; 2];
     let mut cursor = WriteCursor::new(&mut buffer);
     start_request(
-        Control::unsolicited(seq),
+        ControlField::unsolicited(seq),
         FunctionCode::Confirm,
         &mut cursor,
     )
@@ -168,7 +168,7 @@ pub(crate) fn unsol_with_data(io: &mut io::Handle, seq: Sequence, data: i16, res
     let mut buffer = [0; 20];
     let mut cursor = WriteCursor::new(&mut buffer);
     let mut response = start_response(
-        Control::unsolicited_response(seq),
+        ControlField::unsolicited_response(seq),
         ResponseFunction::UnsolicitedResponse,
         iin,
         &mut cursor,

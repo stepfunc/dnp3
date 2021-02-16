@@ -117,7 +117,7 @@ mod tests {
     use crate::app::format::write::{start_request, start_response};
     use crate::app::variations::{Group52Var1, Group52Var2};
     use crate::app::Sequence;
-    use crate::app::{Control, Iin, ResponseFunction};
+    use crate::app::{ControlField, Iin, ResponseFunction};
     use crate::link::EndpointAddress;
     use crate::master::association::{Association, AssociationConfig};
     use crate::master::handle::NullHandler;
@@ -142,7 +142,7 @@ mod tests {
         let mut cursor = WriteCursor::new(&mut buffer);
         let task = task.start(&mut association).unwrap();
         let mut writer = start_request(
-            Control::request(Sequence::default()),
+            ControlField::request(Sequence::default()),
             task.function(),
             &mut cursor,
         )
@@ -157,7 +157,7 @@ mod tests {
         let mut buffer = [0; 20];
         let mut cursor = WriteCursor::new(&mut buffer);
         let mut writer = start_response(
-            Control::response(Sequence::default(), true, true, false),
+            ControlField::response(Sequence::default(), true, true, false),
             ResponseFunction::Response,
             Iin::default(),
             &mut cursor,
@@ -188,7 +188,7 @@ mod tests {
         let mut cursor = WriteCursor::new(&mut buffer);
         let task = task.start(&mut association).unwrap();
         let mut writer = start_request(
-            Control::request(Sequence::default()),
+            ControlField::request(Sequence::default()),
             task.function(),
             &mut cursor,
         )
@@ -203,7 +203,7 @@ mod tests {
         let mut buffer = [0; 20];
         let mut cursor = WriteCursor::new(&mut buffer);
         let mut writer = start_response(
-            Control::response(Sequence::default(), true, true, false),
+            ControlField::response(Sequence::default(), true, true, false),
             ResponseFunction::Response,
             Iin::default(),
             &mut cursor,

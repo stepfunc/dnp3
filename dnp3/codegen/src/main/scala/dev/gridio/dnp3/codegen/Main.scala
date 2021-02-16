@@ -14,15 +14,16 @@ object Main {
     override def lines(implicit indentation: Indentation): Iterator[String] = {
       "use crate::app::parse::traits::{FixedSize, FixedSizeVariation};".eol ++
       "use crate::util::cursor::*;".eol ++
-      "use crate::app::CommandStatus;".eol ++
-      "use crate::app::types::{ControlCode, Timestamp};".eol ++
-      "use crate::app::format::*;".eol
+      "use crate::app::control::{CommandStatus, ControlCode};".eol ++
+      "use crate::app::Timestamp;".eol ++
+      "use crate::app::measurement::*;".eol
     }
   }
 
   def modules : List[(Module, Path)] = List(
     // these have some publicly exported stuff
-    (ProtocolEnums,  appPath.resolve("enums.rs")),
+    (EnumModule.application,  appPath.resolve("app_enums.rs")),
+    (EnumModule.control,  appPath.resolve("control_enums.rs")),
     (CommonUseStatements ++ VariationEnumModule ++ FixedSizeVariationModule,  appPath.resolve("variations.rs")),
     // these don't contain any publicly exported stuff
     (RangedVariationModule,  implPath.resolve("ranged.rs")),

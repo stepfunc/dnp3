@@ -1,6 +1,6 @@
 use crate::app::format::write::start_request;
 use crate::app::Sequence;
-use crate::app::{Control, Iin, Iin1, Iin2};
+use crate::app::{ControlField, Iin, Iin1, Iin2};
 use crate::tokio::test::*;
 use crate::tokio::time;
 use crate::util::cursor::WriteCursor;
@@ -178,7 +178,7 @@ fn detect_restart_in_read_response() {
         let mut buffer = [0; 20];
         let mut cursor = WriteCursor::new(&mut buffer);
         let mut request =
-            start_request(Control::request(seq), FunctionCode::Read, &mut cursor).unwrap();
+            start_request(ControlField::request(seq), FunctionCode::Read, &mut cursor).unwrap();
 
         request
             .write_all_objects_header(Variation::Group60Var1)

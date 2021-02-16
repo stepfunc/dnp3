@@ -2,7 +2,7 @@ use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::gen::ranged::RangedVariation;
-use crate::app::header::{Control, Iin, RequestHeader, ResponseFunction, ResponseHeader};
+use crate::app::header::{ControlField, Iin, RequestHeader, ResponseFunction, ResponseHeader};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
@@ -51,7 +51,7 @@ where
 
 #[derive(Copy, Clone)]
 pub(crate) struct ParsedFragment<'a> {
-    pub(crate) control: Control,
+    pub(crate) control: ControlField,
     pub(crate) function: FunctionCode,
     pub(crate) iin: Option<Iin>,
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
@@ -140,7 +140,7 @@ impl<'a> ParsedFragment<'a> {
     fn parse_no_logging(fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
         let mut cursor = ReadCursor::new(fragment);
 
-        let control = Control::parse(&mut cursor)?;
+        let control = ControlField::parse(&mut cursor)?;
         let raw_func = cursor.read_u8()?;
         let function = match FunctionCode::from(raw_func) {
             None => return Err(HeaderParseError::UnknownFunction(raw_func)),
@@ -621,7 +621,8 @@ impl QualifierCode {
 mod test {
 
     use super::*;
-    use crate::app::header::{Control, Iin, Iin1, Iin2};
+    use crate::app::control::CommandStatus;
+    use crate::app::header::{ControlField, Iin, Iin1, Iin2};
     use crate::app::measurement::DoubleBit;
     use crate::app::parse::prefix::Prefix;
     use crate::app::parse_error::ResponseValidationError;
@@ -629,7 +630,6 @@ mod test {
     use crate::app::types::Timestamp;
     use crate::app::variations::*;
     use crate::app::Bytes;
-    use crate::app::CommandStatus;
 
     fn test_parse_error(input: &[u8], func: FunctionCode, err: ObjectParseError) {
         assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);
@@ -686,7 +686,7 @@ mod test {
             .to_request()
             .unwrap();
         let expected = RequestHeader {
-            control: Control {
+            control: ControlField {
                 fir: true,
                 fin: true,
                 con: false,
@@ -712,7 +712,7 @@ mod test {
             .to_response()
             .unwrap();
         let expected = ResponseHeader {
-            control: Control {
+            control: ControlField {
                 fir: true,
                 fin: true,
                 con: false,

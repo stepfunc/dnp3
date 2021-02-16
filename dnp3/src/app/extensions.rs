@@ -1,8 +1,7 @@
+use crate::app::control::*;
 use crate::app::measurement::Flags;
 use crate::app::measurement::*;
-use crate::app::types::ControlCode;
-use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
-use crate::app::{CommandStatus, FunctionCode, OpType, QualifierCode};
+use crate::app::{FunctionCode, QualifierCode};
 use crate::util::bit::bits::{BIT_6, BIT_7};
 
 impl Group12Var1 {

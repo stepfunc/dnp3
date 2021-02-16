@@ -1,4 +1,4 @@
-use crate::app::CommandStatus;
+use crate::app::control::CommandStatus;
 use crate::app::ObjectParseError;
 use crate::app::{Iin, Iin2};
 use crate::link::error::LinkError;

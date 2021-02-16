@@ -1,5 +1,4 @@
-use dnp3::app::control::Group12Var1;
-use dnp3::app::OpType;
+use dnp3::app::control::*;
 use dnp3::app::ReconnectStrategy;
 use dnp3::app::Timeout;
 use dnp3::app::Variation;

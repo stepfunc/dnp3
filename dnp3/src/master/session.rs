@@ -1,7 +1,7 @@
 use crate::app::format::write;
 use crate::app::format::write::start_request;
 use crate::app::parse::parser::Response;
-use crate::app::Control;
+use crate::app::ControlField;
 use crate::app::Sequence;
 use crate::app::Timeout;
 use crate::decode::DecodeLevel;
@@ -661,7 +661,7 @@ impl MasterSession {
         let association = self.associations.get_mut(address)?;
         let seq = association.increment_seq();
         let mut cursor = self.tx_buffer.write_cursor();
-        let mut hw = start_request(Control::request(seq), request.function(), &mut cursor)?;
+        let mut hw = start_request(ControlField::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
         writer
             .write(io, self.decode_level, address.wrap(), cursor.written())

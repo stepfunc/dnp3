@@ -8,7 +8,7 @@ use std::ops::{Add, BitOr, BitOrAssign};
 
 /// Control field in the application-layer header
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Control {
+pub struct ControlField {
     /// FIR bit - set if the first fragment in a multi-fragmented response
     pub fir: bool,
     /// FIN bit - set if the final fragment in a multi-fragmented response
@@ -21,7 +21,7 @@ pub struct Control {
     pub seq: Sequence,
 }
 
-impl std::fmt::Display for Control {
+impl std::fmt::Display for ControlField {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -35,7 +35,7 @@ impl std::fmt::Display for Control {
     }
 }
 
-impl Control {
+impl ControlField {
     const FIR_MASK: u8 = 0b1000_0000;
     const FIN_MASK: u8 = 0b0100_0000;
     const CON_MASK: u8 = 0b0010_0000;
@@ -419,7 +419,7 @@ impl BitOr for Iin {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct RequestHeader {
     /// control field
-    pub control: Control,
+    pub control: ControlField,
     /// function code
     pub function: FunctionCode,
 }
@@ -435,7 +435,7 @@ pub enum ResponseFunction {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ResponseHeader {
     /// control field
-    pub control: Control,
+    pub control: ControlField,
     /// Function code limited to Response or UnsolicitedResponse
     pub function: ResponseFunction,
     /// internal indications field
@@ -468,7 +468,7 @@ impl From<ResponseFunction> for FunctionCode {
 }
 
 impl RequestHeader {
-    pub(crate) fn new(control: Control, function: FunctionCode) -> Self {
+    pub(crate) fn new(control: ControlField, function: FunctionCode) -> Self {
         Self { control, function }
     }
 
@@ -482,7 +482,7 @@ impl RequestHeader {
 impl ResponseHeader {
     pub(crate) const LENGTH: usize = 4;
 
-    pub(crate) fn new(control: Control, function: ResponseFunction, iin: Iin) -> Self {
+    pub(crate) fn new(control: ControlField, function: ResponseFunction, iin: Iin) -> Self {
         Self {
             control,
             function,
