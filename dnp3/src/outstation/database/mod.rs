@@ -1,20 +1,20 @@
-mod config;
+use std::sync::{Arc, Mutex};
+
 pub use config::*;
-/// private internal control only needed by the parent module
-mod details;
-/// read headers
-pub(crate) mod read;
+use details::range::static_db::{Deadband, FlagsDetector, OctetStringDetector, PointConfig};
 
 use crate::app::measurement::*;
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::Iin2;
-use crate::util::cursor::WriteCursor;
-
-use details::range::static_db::{Deadband, FlagsDetector, OctetStringDetector, PointConfig};
-
 use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
-use std::sync::{Arc, Mutex};
+use crate::util::cursor::WriteCursor;
+
+mod config;
+/// private internal control only needed by the parent module
+mod details;
+/// read headers
+pub(crate) mod read;
 
 /// Controls how events are processed when updating values in the database
 #[derive(Debug, Copy, Clone, PartialEq)]

@@ -1,3 +1,7 @@
+use std::fmt::{Debug, Formatter};
+
+use xxhash_rust::xxh64::xxh64;
+
 use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::prefixed::PrefixedVariation;
@@ -11,8 +15,6 @@ use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
 use crate::decode::AppDecodeLevel;
 use crate::util::cursor::ReadCursor;
-use std::fmt::{Debug, Formatter};
-use xxhash_rust::xxh64::xxh64;
 
 pub(crate) fn format_count_of_items<T, V>(f: &mut Formatter, iter: T) -> std::fmt::Result
 where
@@ -619,8 +621,6 @@ impl QualifierCode {
 
 #[cfg(test)]
 mod test {
-
-    use super::*;
     use crate::app::control::CommandStatus;
     use crate::app::header::{ControlField, Iin, Iin1, Iin2};
     use crate::app::measurement::DoubleBit;
@@ -630,6 +630,8 @@ mod test {
     use crate::app::types::Timestamp;
     use crate::app::variations::*;
     use crate::app::Bytes;
+
+    use super::*;
 
     fn test_parse_error(input: &[u8], func: FunctionCode, err: ObjectParseError) {
         assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);

@@ -1,14 +1,16 @@
-use super::list::VecList;
-use super::writer::EventWriter;
+use std::cell::Cell;
+use std::fmt::Debug;
+use std::ops::BitOr;
+
 use crate::app::measurement;
 use crate::master::EventClasses;
 use crate::outstation::database::config::*;
 use crate::outstation::database::read::EventReadHeader;
 use crate::outstation::database::{EventBufferConfig, EventClass};
 use crate::util::cursor::{WriteCursor, WriteError};
-use std::cell::Cell;
-use std::fmt::Debug;
-use std::ops::BitOr;
+
+use super::list::VecList;
+use super::writer::EventWriter;
 
 impl From<EventClass> for EventClasses {
     fn from(x: EventClass) -> Self {
@@ -986,9 +988,9 @@ impl Insertable for measurement::OctetString {
 
 #[cfg(test)]
 mod tests {
+    use crate::app::measurement::*;
 
     use super::*;
-    use crate::app::measurement::*;
 
     fn insert_events(buffer: &mut EventBuffer) {
         buffer

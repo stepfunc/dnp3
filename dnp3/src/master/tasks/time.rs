@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::count::CountVariation;
 use crate::app::parse::parser::Response;
@@ -11,7 +13,6 @@ use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::NonReadTask;
 use crate::tokio::time::Instant;
 use crate::util::cursor::WriteError;
-use std::time::Duration;
 
 enum State {
     MeasureDelay(Option<Instant>),
@@ -309,7 +310,9 @@ impl From<std::num::TryFromIntError> for TimeSyncError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::cell::Cell;
+    use std::time::SystemTime;
+
     use crate::app::format::write::*;
     use crate::app::parse::parser::ParsedFragment;
     use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
@@ -318,8 +321,8 @@ mod tests {
     use crate::master::handle::{AssociationHandler, NullHandler, ReadHandler};
     use crate::master::tasks::RequestWriter;
     use crate::util::cursor::WriteCursor;
-    use std::cell::Cell;
-    use std::time::SystemTime;
+
+    use super::*;
 
     fn response_control_field(seq: Sequence) -> ControlField {
         ControlField::response(seq, true, true, false)
@@ -358,12 +361,12 @@ mod tests {
     }
 
     mod non_lan {
-
-        use super::*;
         use crate::app::variations::Group52Var2;
         use crate::app::QualifierCode;
         use crate::link::EndpointAddress;
         use crate::master::association::AssociationConfig;
+
+        use super::*;
 
         const OUTSTATION_DELAY_MS: u16 = 100;
         const TOTAL_DELAY_MS: u16 = 200;
@@ -737,9 +740,10 @@ mod tests {
     }
 
     mod lan {
-        use super::*;
         use crate::link::EndpointAddress;
         use crate::master::association::AssociationConfig;
+
+        use super::*;
 
         const DELAY_MS: u16 = 200;
 

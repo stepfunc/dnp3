@@ -1,11 +1,12 @@
+use std::convert::TryFrom;
 use std::time::{Duration, SystemTime};
+
+use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 
 use crate::app::measurement::DoubleBit;
 use crate::app::variations::Variation;
 use crate::app::QualifierCode;
 use crate::util::cursor::{WriteCursor, WriteError};
-use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use std::convert::TryFrom;
 
 /// Wrapper around a u64 count of milliseconds since Unix epoch UTC
 #[derive(Copy, Clone, Debug, PartialEq)]

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use dnp3::app::control::*;
 use dnp3::app::measurement::*;
 use dnp3::decode::*;
@@ -5,8 +7,6 @@ use dnp3::link::*;
 use dnp3::outstation::database::*;
 use dnp3::outstation::*;
 use dnp3::tcp::*;
-
-use std::time::Duration;
 
 fn get_outstation_config() -> OutstationConfig {
     // ANCHOR: outstation_config

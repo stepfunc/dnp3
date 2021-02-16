@@ -1,6 +1,7 @@
 pub use app_enums::*;
 pub use bytes::*;
 pub use header::*;
+pub use parse_error::*;
 pub use retry::*;
 pub use sequence::*;
 pub use timeout::*;
@@ -50,8 +51,6 @@ pub(crate) mod variations;
 pub(crate) mod format;
 /// errors associated with parsing the application layer
 mod parse_error;
-
-pub use parse_error::*;
 
 #[rustfmt::skip]
 pub(crate) mod gen {

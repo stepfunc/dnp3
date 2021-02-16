@@ -76,10 +76,11 @@ pub(crate) fn extract_measurements(
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::*;
     use crate::master::handle::{HeaderInfo, ReadHandler};
+
+    use super::*;
 
     fn header() -> ResponseHeader {
         ResponseHeader::new(

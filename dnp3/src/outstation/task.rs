@@ -1,3 +1,5 @@
+use tracing::Instrument;
+
 use crate::decode::DecodeLevel;
 use crate::link::LinkErrorMode;
 use crate::outstation::config::*;
@@ -8,7 +10,6 @@ use crate::outstation::OutstationHandle;
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::phys::PhysLayer;
 use crate::util::task::{Receiver, RunError};
-use tracing::Instrument;
 
 pub(crate) enum ConfigurationChange {
     SetDecodeLevel(DecodeLevel),

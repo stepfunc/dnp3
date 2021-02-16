@@ -1,3 +1,8 @@
+use std::ops::Add;
+use std::time::Duration;
+
+use tracing::Instrument;
+
 use crate::app::format::write;
 use crate::app::format::write::start_request;
 use crate::app::parse::parser::Response;
@@ -16,11 +21,7 @@ use crate::tokio::time::Instant;
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::phys::PhysLayer;
-
 use crate::util::task::Shutdown;
-use std::ops::Add;
-use std::time::Duration;
-use tracing::Instrument;
 
 pub(crate) struct MasterSession {
     decode_level: DecodeLevel,

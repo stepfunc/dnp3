@@ -1,6 +1,12 @@
+pub(crate) use reader::*;
+pub(crate) use types::*;
+pub(crate) use writer::*;
+
 use crate::app::EndpointType;
 use crate::link::EndpointAddress;
+use crate::link::LinkErrorMode;
 use crate::master::session::MasterSession;
+use crate::outstation::Feature;
 
 #[cfg(test)]
 pub(crate) mod mock;
@@ -10,13 +16,6 @@ pub(crate) mod real;
 mod reader;
 mod types;
 mod writer;
-
-use crate::link::LinkErrorMode;
-use crate::outstation::Feature;
-
-pub(crate) use reader::*;
-pub(crate) use types::*;
-pub(crate) use writer::*;
 
 pub(crate) fn create_master_transport_layer(
     link_error_mode: LinkErrorMode,

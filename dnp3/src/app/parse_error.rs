@@ -1,8 +1,9 @@
+use std::fmt::Formatter;
+
 use crate::app::parse::range::InvalidRange;
 use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
 use crate::util::cursor::ReadError;
-use std::fmt::Formatter;
 
 /// errors that occur when parsing an application layer header
 #[derive(Copy, Clone, Debug, PartialEq)]

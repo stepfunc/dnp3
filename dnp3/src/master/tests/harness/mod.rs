@@ -1,21 +1,19 @@
-use crate::link::header::{FrameInfo, FrameType};
-use crate::master::session::{MasterSession, RunError};
-use crate::tokio::test::*;
-use crate::transport::create_master_transport_layer;
-
-use crate::decode::AppDecodeLevel;
-use crate::util::phys::PhysLayer;
-
-use crate::master::association::AssociationConfig;
-use crate::master::handle::{
-    AssociationHandle, AssociationHandler, HeaderInfo, MasterHandle, ReadHandler,
-};
-
-use crate::link::{EndpointAddress, LinkErrorMode};
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
+
+use crate::decode::AppDecodeLevel;
+use crate::link::header::{FrameInfo, FrameType};
+use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::master::association::AssociationConfig;
+use crate::master::handle::{
+    AssociationHandle, AssociationHandler, HeaderInfo, MasterHandle, ReadHandler,
+};
+use crate::master::session::{MasterSession, RunError};
+use crate::tokio::test::*;
+use crate::transport::create_master_transport_layer;
+use crate::util::phys::PhysLayer;
 
 pub(crate) mod requests;
 

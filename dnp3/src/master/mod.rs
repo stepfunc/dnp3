@@ -1,13 +1,13 @@
-mod association;
-mod error;
-mod handle;
-mod request;
-
 pub use association::*;
 pub use error::*;
 pub use handle::*;
 pub use poll::PollHandle;
 pub use request::*;
+
+mod association;
+mod error;
+mod handle;
+mod request;
 
 pub(crate) mod convert;
 pub(crate) mod extract;

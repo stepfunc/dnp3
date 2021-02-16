@@ -1,9 +1,10 @@
+use std::fmt::Debug;
+
 use crate::app::control::*;
 use crate::outstation::control::collection::ControlTransaction;
 use crate::outstation::database::Database;
 use crate::outstation::traits::ControlSupport;
 use crate::outstation::traits::OperateType;
-use std::fmt::Debug;
 
 pub(crate) trait ControlType: Debug {
     /// make a copy of this control type with a new status code

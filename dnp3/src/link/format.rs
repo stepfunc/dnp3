@@ -154,7 +154,6 @@ fn format_frame<'a>(
 
 #[cfg(test)]
 mod test {
-
     use super::super::test_data::*;
     use super::*;
 

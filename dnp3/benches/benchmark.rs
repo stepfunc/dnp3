@@ -1,13 +1,13 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
 use criterion::{criterion_group, criterion_main, Criterion};
+use rand::{Rng, SeedableRng};
+
+use dnp3::app::header::ResponseHeader;
 use dnp3::app::measurement::{
     Analog, AnalogOutputStatus, Binary, BinaryOutputStatus, Counter, DoubleBitBinary,
     FrozenCounter, Time,
 };
-use dnp3::outstation::database::{
-    Add, Database, EventBufferConfig, EventClass, EventMode, Update, UpdateOptions,
-};
-
-use dnp3::app::header::ResponseHeader;
 use dnp3::app::parse::bytes::Bytes;
 use dnp3::app::retry::{ReconnectStrategy, RetryStrategy};
 use dnp3::app::timeout::Timeout;
@@ -26,14 +26,15 @@ use dnp3::outstation::database::config::{
     AnalogConfig, BinaryConfig, CounterConfig, EventAnalogVariation, EventBinaryVariation,
     EventCounterVariation, StaticAnalogVariation, StaticBinaryVariation, StaticCounterVariation,
 };
+use dnp3::outstation::database::{
+    Add, Database, EventBufferConfig, EventClass, EventMode, Update, UpdateOptions,
+};
 use dnp3::outstation::tcp::AddressFilter;
 use dnp3::outstation::tcp::{ServerHandle, TcpServer};
 use dnp3::outstation::traits::{
     DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
 };
 use dnp3::outstation::OutstationHandle;
-use rand::{Rng, SeedableRng};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 fn config() -> TestConfig {
     TestConfig {

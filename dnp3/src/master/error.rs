@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use crate::app::control::CommandStatus;
 use crate::app::ObjectParseError;
 use crate::app::{Iin, Iin2};
@@ -9,7 +11,6 @@ use crate::tokio::sync::mpsc::error::SendError;
 use crate::tokio::sync::oneshot::error::RecvError;
 use crate::util::cursor::WriteError;
 use crate::util::task::Shutdown;
-use std::error::Error;
 
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq)]

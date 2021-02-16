@@ -1,13 +1,14 @@
+use std::time::Duration;
+
+use tokio_stream::StreamExt;
+use tokio_util::codec::{FramedRead, LinesCodec};
+
 use dnp3::app::control::*;
 use dnp3::app::*;
 use dnp3::decode::*;
 use dnp3::link::EndpointAddress;
 use dnp3::master::*;
 use dnp3::serial::*;
-
-use std::time::Duration;
-use tokio_stream::StreamExt;
-use tokio_util::codec::{FramedRead, LinesCodec};
 
 /// example of using the master from within the Tokio runtime
 #[tokio::main(flavor = "multi_thread")]

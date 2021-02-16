@@ -1,10 +1,11 @@
+use std::fmt::Formatter;
+use std::ops::{Add, BitOr, BitOrAssign};
+
 use crate::app::sequence::Sequence;
 use crate::app::FunctionCode;
 use crate::util::bit::bits::*;
 use crate::util::bit::{format_bitfield, Bitfield};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
-use std::fmt::Formatter;
-use std::ops::{Add, BitOr, BitOrAssign};
 
 /// Control field in the application-layer header
 #[derive(Copy, Clone, Debug, PartialEq)]

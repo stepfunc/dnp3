@@ -145,9 +145,10 @@ impl Variation {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use crate::app::sequence::Sequence;
     use crate::util::cursor::WriteCursor;
+
+    use super::*;
 
     fn read_integrity(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         let mut writer = start_request(ControlField::request(seq), FunctionCode::Read, cursor)?;

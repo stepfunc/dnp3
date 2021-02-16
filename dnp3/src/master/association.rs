@@ -1,26 +1,27 @@
+use std::collections::{BTreeMap, VecDeque};
+use std::time::Duration;
+
+use xxhash_rust::xxh64::xxh64;
+
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::Sequence;
 use crate::app::Timestamp;
 use crate::app::{ExponentialBackOff, RetryStrategy};
 use crate::app::{Iin, ResponseHeader};
+use crate::link::EndpointAddress;
 use crate::master::error::{AssociationError, TaskError, TimeSyncError};
 use crate::master::extract::extract_measurements;
 use crate::master::handle::{AssociationHandler, Promise};
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollHandle, PollMap, PollMsg};
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
+use crate::master::session::RunError;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::NonReadTask::TimeSync;
 use crate::master::tasks::{AssociationTask, ReadTask, Task};
 use crate::tokio::time::Instant;
 use crate::util::Smallest;
-use std::collections::{BTreeMap, VecDeque};
-use std::time::Duration;
-use xxhash_rust::xxh64::xxh64;
-
-use crate::link::EndpointAddress;
-use crate::master::session::RunError;
 
 #[derive(Copy, Clone)]
 pub struct AssociationConfig {

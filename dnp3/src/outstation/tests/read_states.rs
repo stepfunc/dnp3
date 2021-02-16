@@ -1,8 +1,9 @@
+use tokio::time::Duration;
+
 use crate::app::measurement::*;
 use crate::app::*;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
-use tokio::time::Duration;
 
 const EMPTY_READ: &[u8] = &[0xC0, 0x01];
 const READ_CLASS_123: &[u8] = &[0xC0, 0x01, 60, 02, 0x06, 60, 03, 0x06, 60, 04, 0x06];

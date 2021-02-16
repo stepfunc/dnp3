@@ -113,7 +113,6 @@ impl RestartTask {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::app::format::write::{start_request, start_response};
     use crate::app::variations::{Group52Var1, Group52Var2};
     use crate::app::Sequence;
@@ -123,6 +122,8 @@ mod tests {
     use crate::master::handle::NullHandler;
     use crate::master::tasks::RequestWriter;
     use crate::util::cursor::WriteCursor;
+
+    use super::*;
 
     #[test]
     fn cold_restart() {

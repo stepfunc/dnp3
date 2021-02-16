@@ -323,7 +323,6 @@ impl<T> VecList<T> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]

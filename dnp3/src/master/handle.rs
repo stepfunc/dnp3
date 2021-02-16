@@ -1,3 +1,5 @@
+use std::time::{Duration, SystemTime};
+
 use crate::app::measurement::*;
 use crate::app::variations::Variation;
 use crate::app::Bytes;
@@ -21,7 +23,6 @@ use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
 use crate::tokio::sync::mpsc::error::SendError;
 use crate::util::task::Shutdown;
-use std::time::{Duration, SystemTime};
 
 #[derive(Clone, Debug)]
 pub struct MasterHandle {

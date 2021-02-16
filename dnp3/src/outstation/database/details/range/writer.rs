@@ -285,10 +285,11 @@ fn write_header(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::app::measurement::{Binary, DoubleBitBinary, Flags, Time};
     use crate::outstation::database::config::*;
     use crate::outstation::database::details::range::traits::StaticVariation;
+
+    use super::*;
 
     fn binary(value: bool) -> Binary {
         Binary::new(value, Flags::ONLINE, Time::synchronized(0))

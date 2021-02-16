@@ -1,12 +1,12 @@
-use crate::outstation::task::OutstationTask;
+use tracing::Instrument;
 
 use crate::link::LinkErrorMode;
 use crate::outstation::database::EventBufferConfig;
+use crate::outstation::task::OutstationTask;
 use crate::outstation::OutstationHandle;
 use crate::outstation::*;
 use crate::tcp::{AddressFilter, FilterError};
 use crate::util::task::Shutdown;
-use tracing::Instrument;
 
 struct Outstation {
     filter: AddressFilter,

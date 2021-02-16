@@ -1,13 +1,18 @@
+pub use config::*;
+pub use traits::*;
+
+use crate::decode::DecodeLevel;
+use crate::outstation::database::DatabaseHandle;
+use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
+use crate::util::phys::PhysLayer;
+use crate::util::task::Shutdown;
+
 /// configuration types
 
 /// database API to add/remove/update values
 pub mod database;
 
 mod config;
-mod traits;
-pub use config::*;
-pub use traits::*;
-
 /// functionality for processing control requests
 pub(crate) mod control;
 /// handling of deferred read requests
@@ -16,15 +21,10 @@ pub(crate) mod deferred;
 pub(crate) mod session;
 /// async outstation task
 pub(crate) mod task;
+mod traits;
 
 #[cfg(test)]
 mod tests;
-
-use crate::decode::DecodeLevel;
-use crate::outstation::database::DatabaseHandle;
-use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
-use crate::util::phys::PhysLayer;
-use crate::util::task::Shutdown;
 
 #[derive(Clone)]
 pub struct OutstationHandle {

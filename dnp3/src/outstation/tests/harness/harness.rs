@@ -1,7 +1,11 @@
+use std::sync::{Arc, Mutex};
+
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
+use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::EventBufferConfig;
+use crate::outstation::session::SessionError;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::tests::harness::{
     ApplicationData, Event, EventHandle, MockControlHandler, MockOutstationApplication,
@@ -9,11 +13,7 @@ use crate::outstation::tests::harness::{
 };
 use crate::outstation::OutstationHandle;
 use crate::tokio::test::*;
-
-use crate::link::{EndpointAddress, LinkErrorMode};
-use crate::outstation::session::SessionError;
 use crate::util::phys::PhysLayer;
-use std::sync::{Arc, Mutex};
 
 pub(crate) fn get_default_config() -> OutstationConfig {
     let mut config = get_default_unsolicited_config();

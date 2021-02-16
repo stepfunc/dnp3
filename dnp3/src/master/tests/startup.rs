@@ -1,19 +1,20 @@
-use crate::app::format::write::start_request;
-use crate::app::Sequence;
-use crate::app::{ControlField, Iin, Iin1, Iin2};
-use crate::tokio::test::*;
-use crate::tokio::time;
-use crate::util::cursor::WriteCursor;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use super::harness::create_association;
-use super::harness::requests::*;
+use crate::app::format::write::start_request;
 use crate::app::variations::Variation;
 use crate::app::FunctionCode;
 use crate::app::RetryStrategy;
+use crate::app::Sequence;
+use crate::app::{ControlField, Iin, Iin1, Iin2};
 use crate::master::association::AssociationConfig;
 use crate::master::request::{Classes, EventClasses};
+use crate::tokio::test::*;
+use crate::tokio::time;
+use crate::util::cursor::WriteCursor;
+
+use super::harness::create_association;
+use super::harness::requests::*;
 
 #[test]
 fn master_startup_procedure() {

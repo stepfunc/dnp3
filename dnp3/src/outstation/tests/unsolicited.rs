@@ -1,8 +1,9 @@
-use super::harness::*;
 use crate::app::measurement::*;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
 use crate::outstation::session::SessionError;
+
+use super::harness::*;
 
 const fn uns_confirm(seq: u8) -> u8 {
     0b1101_0000 | seq

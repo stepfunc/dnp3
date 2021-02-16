@@ -1,9 +1,3 @@
-pub(crate) mod auto;
-pub(crate) mod command;
-pub(crate) mod read;
-pub(crate) mod restart;
-pub(crate) mod time;
-
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::FunctionCode;
@@ -20,6 +14,12 @@ use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::RestartTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::util::cursor::WriteError;
+
+pub(crate) mod auto;
+pub(crate) mod command;
+pub(crate) mod read;
+pub(crate) mod restart;
+pub(crate) mod time;
 
 /// Queued task requiring I/O
 pub(crate) struct AssociationTask {
