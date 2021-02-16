@@ -2,7 +2,7 @@ use crate::app::parse::parser::ParsedFragment;
 use crate::decode::{AppDecodeLevel, DecodeLevel};
 use crate::link::error::LinkError;
 use crate::link::{EndpointAddress, LinkErrorMode};
-use crate::outstation::config::Feature;
+use crate::outstation::Feature;
 use crate::transport::{
     FragmentInfo, LinkLayerMessage, TransportData, TransportRequest, TransportResponse,
 };

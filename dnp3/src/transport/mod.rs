@@ -12,7 +12,7 @@ mod types;
 mod writer;
 
 use crate::link::LinkErrorMode;
-use crate::outstation::config::Feature;
+use crate::outstation::Feature;
 
 pub(crate) use reader::*;
 pub(crate) use types::*;
@@ -40,7 +40,7 @@ pub(crate) fn create_outstation_transport_layer(
     link_error_mode: LinkErrorMode,
     address: EndpointAddress,
     self_address: Feature,
-    rx_buffer_size: crate::outstation::config::BufferSize,
+    rx_buffer_size: crate::outstation::BufferSize,
 ) -> (TransportReader, TransportWriter) {
     (
         TransportReader::outstation(

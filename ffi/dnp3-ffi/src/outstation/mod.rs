@@ -6,10 +6,10 @@ use std::ffi::CStr;
 use std::time::Duration;
 
 use dnp3::link::{EndpointAddress, LinkErrorMode};
-use dnp3::outstation::config::{BufferSize, Feature, Features, OutstationConfig};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::tcp::ServerHandle;
 use dnp3::outstation::OutstationHandle;
+use dnp3::outstation::{BufferSize, Feature, Features, OutstationConfig};
 
 pub use database::*;
 pub use struct_constructors::*;

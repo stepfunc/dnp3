@@ -10,7 +10,7 @@ use crate::link::parser::FramePayload;
 use crate::link::display::LinkDisplay;
 use crate::link::format::format_header_fixed_size;
 use crate::link::{EndpointAddress, LinkErrorMode};
-use crate::outstation::config::Feature;
+use crate::outstation::Feature;
 use crate::util::phys::PhysLayer;
 
 enum SecondaryState {

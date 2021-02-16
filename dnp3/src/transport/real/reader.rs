@@ -4,7 +4,7 @@ use crate::link::error::LinkError;
 use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;
 use crate::link::{EndpointAddress, LinkErrorMode};
-use crate::outstation::config::Feature;
+use crate::outstation::Feature;
 use crate::transport::real::assembler::{Assembler, AssemblyState};
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;

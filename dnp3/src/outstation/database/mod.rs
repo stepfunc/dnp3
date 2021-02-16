@@ -1,5 +1,5 @@
-/// types for configuring the database
-pub mod config;
+mod config;
+pub use config::*;
 /// private internal control only needed by the parent module
 mod details;
 /// read headers
@@ -10,7 +10,6 @@ use crate::app::parse::parser::HeaderCollection;
 use crate::app::Iin2;
 use crate::util::cursor::WriteCursor;
 
-use config::*;
 use details::range::static_db::{Deadband, FlagsDetector, OctetStringDetector, PointConfig};
 
 use crate::master::request::EventClasses;
