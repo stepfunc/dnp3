@@ -9,8 +9,8 @@ use dnp3::app::Timestamp;
 use dnp3::app::{ReconnectStrategy, RetryStrategy};
 use dnp3::link::EndpointAddress;
 use dnp3::master::serial::{create_master_serial_client, DataBits, FlowControl, Parity, StopBits};
-use dnp3::master::ClientState;
 use dnp3::master::*;
+use dnp3::tcp::ClientState;
 use std::ffi::CStr;
 
 pub struct Master {
@@ -38,7 +38,7 @@ pub(crate) unsafe fn master_create_tcp_session(
     };
     let listener = ClientStateListenerAdapter::new(listener);
 
-    let (future, handle) = dnp3::master::tcp::create_master_tcp_client(
+    let (future, handle) = dnp3::tcp::create_master_tcp_client(
         link_error_mode.into(),
         config,
         endpoints.clone(),
@@ -321,7 +321,7 @@ impl ClientStateListenerAdapter {
     }
 }
 
-pub type EndpointList = dnp3::master::tcp::EndpointList;
+pub type EndpointList = dnp3::tcp::EndpointList;
 
 pub(crate) unsafe fn endpoint_list_new(main_endpoint: &CStr) -> *mut EndpointList {
     Box::into_raw(Box::new(EndpointList::single(

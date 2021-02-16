@@ -63,12 +63,14 @@ extern crate assert_matches;
 pub mod app;
 /// types used to control decoding in the log
 pub mod decode;
-/// types specific to the link-layer
+/// Types specific to the link-layer
 pub mod link;
-/// entry points, types, enums, and traits specific to masters
+/// Types and traits specific to masters
 pub mod master;
-/// entry points, types, enums, and traits specific to outstations
+/// Types and traits specific to outstations
 pub mod outstation;
+/// Entry points and types for TCP
+pub mod tcp;
 
 pub(crate) mod tokio;
 pub(crate) mod transport;
