@@ -7,6 +7,7 @@ use crate::util::cursor::{WriteCursor, WriteError};
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use std::convert::TryFrom;
 
+/// Wrapper around a u64 count of milliseconds since Unix epoch UTC
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Timestamp {
     value: u64,
@@ -16,20 +17,24 @@ impl Timestamp {
     pub const MAX_VALUE: u64 = 0x0000_FFFF_FFFF_FFFF;
     pub const OUT_OF_RANGE: &'static str = "<out of range>";
 
+    /// Create a timestamp from a count of milliseconds since epoch
     pub fn new(value: u64) -> Self {
         Self {
             value: value & Self::MAX_VALUE,
         }
     }
 
+    /// Minimum valid timestamp
     pub fn min() -> Self {
         Self::new(0)
     }
 
+    /// Maximum valid timestamp
     pub fn max() -> Self {
         Self::new(Self::MAX_VALUE)
     }
 
+    /// Attempt to create a Timestamp from a SystemTime
     pub fn try_from_system_time(system_time: SystemTime) -> Option<Timestamp> {
         Some(Timestamp::new(
             u64::try_from(
@@ -42,10 +47,12 @@ impl Timestamp {
         ))
     }
 
+    /// Attempt to create a DateTime<Utc> from a Timestamp
     pub fn to_datetime_utc(self) -> Option<DateTime<Utc>> {
         Utc.timestamp_millis_opt(self.value as i64).single()
     }
 
+    /// Retrieve the raw u64 value
     pub fn raw_value(&self) -> u64 {
         self.value
     }
