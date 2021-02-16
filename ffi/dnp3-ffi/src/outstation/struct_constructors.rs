@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 
 use dnp3::outstation::database::EventBufferConfig;
-use dnp3::outstation::traits::RestartDelay;
+use dnp3::outstation::RestartDelay;
 
 use crate::ffi;
 

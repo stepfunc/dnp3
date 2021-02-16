@@ -1,7 +1,7 @@
 use dnp3::app::control::*;
 use dnp3::app::*;
 use dnp3::outstation::database::Database;
-use dnp3::outstation::traits::*;
+use dnp3::outstation::*;
 
 use crate::ffi;
 

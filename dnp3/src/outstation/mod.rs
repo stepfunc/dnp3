@@ -4,8 +4,10 @@ pub mod config;
 pub mod database;
 /// TCP entry points and types
 pub mod tcp;
-/// user-facing traits used to receive dynamic callbacks from the outstation
-pub mod traits;
+
+mod traits;
+
+pub use traits::*;
 
 /// functionality for processing control requests
 pub(crate) mod control;
