@@ -5,7 +5,7 @@ authors = ["Émile Grégoire <emile@automatak.com>"]
 edition = "2018"
 
 [lib]
-crate-type = ["rlib", "cdylib"]
+crate-type = ["rlib", "staticlib", "cdylib"]
 
 [dependencies]
 tracing = "0.1"
