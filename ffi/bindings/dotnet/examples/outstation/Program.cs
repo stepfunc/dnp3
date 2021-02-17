@@ -86,9 +86,25 @@ class ExampleOutstation
     }
 
     public static void Main(string[] args)
-    {   
-            MainAsync().GetAwaiter().GetResult();
+    {
+        MainAsync().GetAwaiter().GetResult();
     }
+
+    // ANCHOR: event_buffer_config
+    private static EventBufferConfig GetEventBufferConfig()
+    {
+        return new EventBufferConfig(
+            10, // binary
+            10, // double-bit binary
+            10, // binary output status
+            5,  // counter
+            5,  // frozen counter
+            5,  // analog
+            5,  // analog output status
+            3   // octet string
+        );
+    }
+    // ANCHOR_END: event_buffer_config
 
     private static async Task MainAsync()
     {
@@ -113,17 +129,20 @@ class ExampleOutstation
                 // override the default application decoding level
                 config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
                 // ANCHOR_END: outstation_config
-                                
-                var application = new TestOutstationApplication();
-                var information = new TestOutstationInformation();
-                var controlHandler = new TestControlHandler();
-                var addressFilter = AddressFilter.Any();
-                var outstation = server.AddOutstation(config, EventBufferConfig.AllTypes(10), application, information, controlHandler, addressFilter);
+                                               
+                var outstation = server.AddOutstation(
+                    config,
+                    GetEventBufferConfig(),
+                    new TestOutstationApplication(),
+                    new TestOutstationInformation(),
+                    new TestControlHandler(),
+                    AddressFilter.Any()
+                );
 
                 // Setup initial points
                 outstation.Transaction(new OutstationTransaction((db) =>
                 {
-                    for(ushort i = 0; i < 10; i++)
+                    for (ushort i = 0; i < 10; i++)
                     {
                         db.AddBinary(i, EventClass.Class1, new BinaryConfig());
                         db.AddDoubleBitBinary(i, EventClass.Class1, new DoubleBitBinaryConfig());

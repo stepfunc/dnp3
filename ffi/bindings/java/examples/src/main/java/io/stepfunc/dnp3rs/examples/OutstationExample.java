@@ -200,48 +200,63 @@ public class OutstationExample {
     }
   }
 
+  public static void initializeDatabase(Database db) {
+    for (int i = 0; i < 10; i++) {
+      db.addBinary(ushort(i), EventClass.CLASS1, new BinaryConfig());
+      db.addDoubleBitBinary(ushort(i), EventClass.CLASS1, new DoubleBitBinaryConfig());
+      db.addBinaryOutputStatus(ushort(i), EventClass.CLASS1, new BinaryOutputStatusConfig());
+      db.addCounter(ushort(i), EventClass.CLASS1, new CounterConfig());
+      db.addFrozenCounter(ushort(i), EventClass.CLASS1, new FrozenCounterConfig());
+      db.addAnalog(ushort(i), EventClass.CLASS1, new AnalogConfig());
+      db.addAnalogOutputStatus(ushort(i), EventClass.CLASS1, new AnalogOutputStatusConfig());
+      db.addOctetString(ushort(i), EventClass.CLASS1);
+
+      Flags restart = new Flags(Flag.RESTART);
+
+      db.updateBinary(new Binary(ushort(i), false, restart, Timestamp.invalidTimestamp()),
+          new UpdateOptions());
+      db.updateDoubleBitBinary(new DoubleBitBinary(ushort(i), DoubleBit.INDETERMINATE, restart,
+          Timestamp.invalidTimestamp()), new UpdateOptions());
+      db.updateBinaryOutputStatus(
+          new BinaryOutputStatus(ushort(i), false, restart, Timestamp.invalidTimestamp()),
+          new UpdateOptions());
+      db.updateCounter(new Counter(ushort(i), uint(0), restart, Timestamp.invalidTimestamp()),
+          new UpdateOptions());
+      db.updateFrozenCounter(
+          new FrozenCounter(ushort(i), uint(0), restart, Timestamp.invalidTimestamp()),
+          new UpdateOptions());
+      db.updateAnalog(new Analog(ushort(i), 0.0, restart, Timestamp.invalidTimestamp()),
+          new UpdateOptions());
+      db.updateAnalogOutputStatus(
+          new AnalogOutputStatus(ushort(i), 0.0, restart, Timestamp.invalidTimestamp()),
+          new UpdateOptions());
+    }
+  }
+
+  // ANCHOR: event_buffer_config
+  private static EventBufferConfig getEventBufferConfig() {
+    return new EventBufferConfig(ushort(10), // binary
+        ushort(10), // double-bit binary
+        ushort(10), // binary output status
+        ushort(5), // counter
+        ushort(5), // frozen counter
+        ushort(5), // analog
+        ushort(5), // analog output status
+        ushort(3) // octet string
+    );
+  }
+  // ANCHOR_END: event_buffer_config
+
   public static void run(io.stepfunc.dnp3rs.Runtime runtime) {
 
     final TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
 
-    final Outstation outstation = server.addOutstation(getOutstationConfig(),
-        EventBufferConfig.allTypes(ushort(10)), new TestApplication(),
-        new TestOutstationInformation(), new TestControlHandler(), AddressFilter.any());
+    final Outstation outstation =
+        server.addOutstation(getOutstationConfig(), getEventBufferConfig(), new TestApplication(),
+            new TestOutstationInformation(), new TestControlHandler(), AddressFilter.any());
 
     // Setup initial points
-    outstation.transaction((db) -> {
-      for (int i = 0; i < 10; i++) {
-
-        db.addBinary(ushort(i), EventClass.CLASS1, new BinaryConfig());
-        db.addDoubleBitBinary(ushort(i), EventClass.CLASS1, new DoubleBitBinaryConfig());
-        db.addBinaryOutputStatus(ushort(i), EventClass.CLASS1, new BinaryOutputStatusConfig());
-        db.addCounter(ushort(i), EventClass.CLASS1, new CounterConfig());
-        db.addFrozenCounter(ushort(i), EventClass.CLASS1, new FrozenCounterConfig());
-        db.addAnalog(ushort(i), EventClass.CLASS1, new AnalogConfig());
-        db.addAnalogOutputStatus(ushort(i), EventClass.CLASS1, new AnalogOutputStatusConfig());
-        db.addOctetString(ushort(i), EventClass.CLASS1);
-
-        Flags restart = new Flags(Flag.RESTART);
-
-        db.updateBinary(new Binary(ushort(i), false, restart, Timestamp.invalidTimestamp()),
-            new UpdateOptions());
-        db.updateDoubleBitBinary(new DoubleBitBinary(ushort(i), DoubleBit.INDETERMINATE, restart,
-            Timestamp.invalidTimestamp()), new UpdateOptions());
-        db.updateBinaryOutputStatus(
-            new BinaryOutputStatus(ushort(i), false, restart, Timestamp.invalidTimestamp()),
-            new UpdateOptions());
-        db.updateCounter(new Counter(ushort(i), uint(0), restart, Timestamp.invalidTimestamp()),
-            new UpdateOptions());
-        db.updateFrozenCounter(
-            new FrozenCounter(ushort(i), uint(0), restart, Timestamp.invalidTimestamp()),
-            new UpdateOptions());
-        db.updateAnalog(new Analog(ushort(i), 0.0, restart, Timestamp.invalidTimestamp()),
-            new UpdateOptions());
-        db.updateAnalogOutputStatus(
-            new AnalogOutputStatus(ushort(i), 0.0, restart, Timestamp.invalidTimestamp()),
-            new UpdateOptions());
-      }
-    });
+    outstation.transaction((db) -> initializeDatabase(db));
 
     // Start the outstation
     server.bind();

@@ -46,7 +46,6 @@ where
 }
 
 pub(crate) unsafe fn runtime_new(config: ffi::RuntimeConfig) -> *mut crate::runtime::Runtime {
-
     let num_threads = if config.num_core_threads <= 0 {
         num_cpus::get()
     } else {

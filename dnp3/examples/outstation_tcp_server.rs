@@ -23,6 +23,16 @@ fn get_outstation_config() -> OutstationConfig {
     config
 }
 
+// ANCHOR: event_buffer_config
+fn get_event_buffer_config() -> EventBufferConfig {
+    // initialize the config to zero for every type
+    let mut config = EventBufferConfig::no_events();
+    // event buffer space for 100 analog events
+    config.max_analog = 100;
+    config
+}
+// ANCHOR_END: event_buffer_config
+
 /// example of using the outstation API asynchronously from within the Tokio runtime
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let handle = server.spawn_outstation(
         get_outstation_config(),
         // event buffer space for 100 analog events
-        EventBufferConfig::new(0, 0, 0, 0, 0, 100, 0, 0),
+        get_event_buffer_config(),
         // customizable trait that controls outstation behavior
         DefaultOutstationApplication::create(),
         // customizable trait to receive events about what the outstation is doing
