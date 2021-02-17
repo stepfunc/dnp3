@@ -46,7 +46,15 @@ where
 }
 
 pub(crate) unsafe fn runtime_new(config: ffi::RuntimeConfig) -> *mut crate::runtime::Runtime {
-    let result = build_runtime(|r| r.worker_threads(config.num_core_threads as usize));
+
+    let num_threads = if config.num_core_threads <= 0 {
+        num_cpus::get()
+    } else {
+        config.num_core_threads as usize
+    };
+
+    tracing::info!("creating runtime with {} threads", num_threads);
+    let result = build_runtime(|r| r.worker_threads(num_threads as usize));
 
     match result {
         Ok(r) => Box::into_raw(Box::new(Runtime::new(r))),
