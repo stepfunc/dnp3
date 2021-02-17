@@ -96,8 +96,15 @@ INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsol
 ## Protocol Decoding
 
 Protocol decoding can be configured on a per-communication channel basis, e.g. all of the traffic on a TCP socket or a serial port. The user specifies the
-`DecodeLogLevel` when creating a master or outstation instance which controls what level of decoding (including none) will take place. Refer to language
-specific API documentation for the meaning of each enumeration value. The decoding can even show the value of individual fields within objects:
+`DecodeLevel` when creating a master or outstation, but may adjust this at runtime. This struct controls the level of decoding (including none) that will take place for each layer of the
+protocol stack:
+
+* Application-layer headers, object headers, and object values
+* Transport-layer header and payload
+* Link-layer header and payload
+* Physical-layer length and data bytes
+
+Refer to language specific API documentation for the meaning of each enumeration value. The decoding can even show the value of individual fields within objects:
 
 ```
 APP TX - ctrl: [fir: true fin: true con: false uns: false seq: 1] func: Write ... (len = 6)
@@ -106,11 +113,8 @@ index: 7 false
 ```
 
 :::note
-Protocol decoding is always output at the *Info* log level, but it can be changed dynamically at runtime using
-:::
-
-:::info
-Protocol decoding can be extremely verbose in a production system.
+Protocol decoding is always output at the *Info* log level. It can be quite verbose in a production system if left enabled. When debugging a communication issue, users
+should first try adjusting the application-layer decoding to gain visibility in the messages being exchanged.
 :::
 
 
