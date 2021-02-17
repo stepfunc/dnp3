@@ -2,6 +2,8 @@ pub(crate) mod harness;
 
 /// control functionality
 mod controls;
+/// various IIN bit tests
+mod iin;
 /// state machine for READ requests
 mod read_states;
 /// clear restart IIN + cold/warm restart

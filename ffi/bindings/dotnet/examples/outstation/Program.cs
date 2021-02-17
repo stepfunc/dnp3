@@ -43,7 +43,7 @@ class ExampleOutstation
 
         public void SolicitedConfirmReceived(byte ecsn) { }
 
-        public void SolicitedConfirmWaitNewRequest(RequestHeader header) { }
+        public void SolicitedConfirmWaitNewRequest() { }
 
         public void WrongSolicitedConfirmSeq(byte ecsn, byte seq) { }
 

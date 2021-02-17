@@ -89,8 +89,19 @@ fn sol_confirm_wait_goes_back_to_idle_with_new_request() {
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
     // start a new request
     harness.test_request_response(EMPTY_READ, EMPTY_RESPONSE);
-    harness.check_events(&[Event::SolicitedConfirmWaitNewRequest(RequestHeader::new(
-        ControlField::from(0xC0),
-        FunctionCode::Read,
-    ))]);
+    harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
+}
+
+#[test]
+fn sol_confirm_wait_goes_back_to_idle_with_new_invalid_request() {
+    let mut harness = new_harness(get_default_config());
+
+    harness.handle.database.transaction(create_binary_and_event);
+    harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
+    harness.test_request_response(
+        &[0xC0, 0x70],             // Invalid function code
+        &[0xC0, 0x81, 0x80, 0x01], // NO_FUNC_CODE_SUPPORT
+    );
+    harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
 }

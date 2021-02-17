@@ -1,4 +1,5 @@
 use crate::app::parse::parser::{Request, Response};
+use crate::app::{HeaderParseError, RequestValidationError, ResponseValidationError, Sequence};
 use crate::link::header::BroadcastConfirmMode;
 use crate::link::EndpointAddress;
 
@@ -50,9 +51,47 @@ pub(crate) enum LinkLayerMessageType {
 pub(crate) enum TransportResponse<'a> {
     Response(EndpointAddress, Response<'a>),
     LinkLayerMessage(LinkLayerMessage),
+    Error(TransportResponseError),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum TransportResponseError {
+    HeaderParseError(HeaderParseError),
+    ResponseValidationError(ResponseValidationError),
+}
+
+impl From<HeaderParseError> for TransportResponseError {
+    fn from(from: HeaderParseError) -> Self {
+        Self::HeaderParseError(from)
+    }
+}
+
+impl From<ResponseValidationError> for TransportResponseError {
+    fn from(from: ResponseValidationError) -> Self {
+        Self::ResponseValidationError(from)
+    }
 }
 
 pub(crate) enum TransportRequest<'a> {
     Request(FragmentInfo, Request<'a>),
     LinkLayerMessage(LinkLayerMessage),
+    Error(TransportRequestError),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum TransportRequestError {
+    HeaderParseError(HeaderParseError),
+    RequestValidationError(Sequence, RequestValidationError),
+}
+
+impl RequestValidationError {
+    pub(crate) fn into(self, seq: Sequence) -> TransportRequestError {
+        TransportRequestError::RequestValidationError(seq, self)
+    }
+}
+
+impl From<HeaderParseError> for TransportRequestError {
+    fn from(from: HeaderParseError) -> Self {
+        Self::HeaderParseError(from)
+    }
 }

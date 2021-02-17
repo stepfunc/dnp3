@@ -38,9 +38,8 @@ impl OutstationInformation for MockOutstationInformation {
             .push(Event::SolicitedConfirmReceived(ecsn.value()))
     }
 
-    fn solicited_confirm_wait_new_request(&mut self, header: RequestHeader) {
-        self.events
-            .push(Event::SolicitedConfirmWaitNewRequest(header))
+    fn solicited_confirm_wait_new_request(&mut self) {
+        self.events.push(Event::SolicitedConfirmWaitNewRequest)
     }
 
     fn unexpected_confirm(&mut self, unsolicited: bool, seq: Sequence) {

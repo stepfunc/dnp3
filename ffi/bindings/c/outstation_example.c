@@ -25,7 +25,7 @@ void solicited_confirm_timeout(uint8_t ecsn, void *context) {}
 
 void solicited_confirm_received(uint8_t ecsn, void *context) {}
 
-void solicited_confirm_wait_new_request(request_header_t header, void *context) {}
+void solicited_confirm_wait_new_request(void *context) {}
 
 void wrong_solicited_confirm_seq(uint8_t ecsn, uint8_t seq, void *context) {}
 

@@ -170,6 +170,28 @@ fn handles_non_read_during_unsolicited_confirm_wait() {
 }
 
 #[test]
+fn handles_invalid_request_during_unsolicited_confirm_wait() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness);
+    enable_unsolicited(&mut harness);
+
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1);
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+    // send a delay measurement request while still in unsolicited confirm wait
+    harness.test_request_response(
+        &[0xC0, 0x70],             // Invalid request
+        &[0xC0, 0x81, 0x80, 0x01], // NO_FUNC_CODE_SUPPORT
+    );
+    harness.check_no_events();
+
+    // now send the confirm
+    harness.send(UNS_CONFIRM_SEQ_1);
+    harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
+    harness.check_all_io_consumed();
+}
+
+#[test]
 fn handles_disable_unsolicited_during_unsolicited_confirm_wait() {
     let mut harness = new_harness(get_default_unsolicited_config());
     confirm_null_unsolicited(&mut harness);

@@ -54,8 +54,8 @@ impl OutstationInformation for ffi::OutstationInformation {
         ffi::OutstationInformation::solicited_confirm_received(self, ecsn.value());
     }
 
-    fn solicited_confirm_wait_new_request(&mut self, header: RequestHeader) {
-        ffi::OutstationInformation::solicited_confirm_wait_new_request(self, header.into());
+    fn solicited_confirm_wait_new_request(&mut self) {
+        ffi::OutstationInformation::solicited_confirm_wait_new_request(self);
     }
 
     fn wrong_solicited_confirm_seq(&mut self, ecsn: Sequence, seq: Sequence) {

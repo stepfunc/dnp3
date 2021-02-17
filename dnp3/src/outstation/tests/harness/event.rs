@@ -1,10 +1,9 @@
+use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
+use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 use crate::app::FunctionCode;
-use crate::app::RequestHeader;
-use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Control {
@@ -28,7 +27,7 @@ pub(crate) enum Event {
     UnsolicitedConfirmTimeout(u8, bool),
     UnsolicitedConfirmReceived(u8),
     SolicitedConfirmReceived(u8),
-    SolicitedConfirmWaitNewRequest(RequestHeader),
+    SolicitedConfirmWaitNewRequest,
     UnexpectedConfirm(bool, u8),
     WrongSolicitedConfirmSeq(u8, u8),
     ColdRestart(Option<RestartDelay>),

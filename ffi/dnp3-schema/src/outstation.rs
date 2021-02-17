@@ -486,7 +486,7 @@ fn define_outstation_information(
 
     lib.define_interface("OutstationInformation", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))?
         .callback("process_request_from_idle", "Called when a request is processed from the IDLE state")?
-            .param("header", Type::Struct(request_header.clone()), "Request header")?
+            .param("header", Type::Struct(request_header), "Request header")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("broadcast_received", "Called when a broadcast request is received by the outstation")?
@@ -507,7 +507,6 @@ fn define_outstation_information(
             .return_type(ReturnType::void())?
             .build()?
         .callback("solicited_confirm_wait_new_request", "Received a new request while waiting for a solicited confirm, aborting the response series")?
-            .param("header", Type::Struct(request_header), "Request header")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("wrong_solicited_confirm_seq", "Received a solicited confirm with the wrong sequence number")?

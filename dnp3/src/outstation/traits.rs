@@ -87,7 +87,7 @@ pub trait OutstationInformation: Sync + Send + 'static {
     /// received the expected confirm
     fn solicited_confirm_received(&mut self, _ecsn: Sequence) {}
     /// received a new request while waiting for a solicited confirm, aborting the response series
-    fn solicited_confirm_wait_new_request(&mut self, _header: RequestHeader) {}
+    fn solicited_confirm_wait_new_request(&mut self) {}
     /// received a solicited confirm with the wrong sequence number
     fn wrong_solicited_confirm_seq(&mut self, _ecsn: Sequence, _seq: Sequence) {}
     /// received a confirm when not expecting one

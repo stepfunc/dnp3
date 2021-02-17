@@ -10,6 +10,7 @@ use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
 use crate::app::variations::{Group52Var1, Group52Var2};
 use crate::app::*;
+use crate::app::{ControlField, Iin, Iin1, Iin2, ResponseFunction, ResponseHeader};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
@@ -24,7 +25,8 @@ use crate::outstation::deferred::DeferredRead;
 use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
 use crate::outstation::traits::*;
 use crate::transport::{
-    FragmentInfo, RequestGuard, TransportReader, TransportRequest, TransportWriter,
+    FragmentInfo, RequestGuard, TransportReader, TransportRequest, TransportRequestError,
+    TransportWriter,
 };
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
@@ -233,7 +235,7 @@ enum FragmentType<'a> {
 #[derive(Copy, Clone)]
 enum ConfirmAction {
     Confirmed,
-    NewRequest(RequestHeader),
+    NewRequest,
     EchoLastResponse(Option<usize>),
     ContinueWait,
 }
@@ -635,6 +637,11 @@ impl OutstationSession {
                 self.on_link_activity();
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
+            Some(TransportRequest::Error(err)) => {
+                self.state.deferred_read.clear();
+                self.write_error_response(io, writer, err).await?;
+                return Ok(UnsolicitedWaitResult::ReadNext);
+            }
         };
 
         match self.classify(info, request) {
@@ -849,6 +856,10 @@ impl OutstationSession {
             Some(TransportRequest::LinkLayerMessage(_)) => {
                 self.on_link_activity();
             }
+            Some(TransportRequest::Error(err)) => {
+                self.on_link_activity();
+                self.write_error_response(io, writer, err).await?;
+            }
             None => (),
         }
 
@@ -868,6 +879,8 @@ impl OutstationSession {
         match self.classify(info, request) {
             FragmentType::MalformedRequest(hash, err) => {
                 let length = self.write_empty_solicited_response(seq, err.into());
+
+                // TODO: Shouldn't we return None here?
                 Some(LastValidRequest::new(seq, hash, Some(length), None))
             }
             FragmentType::NewRead(hash, objects) => {
@@ -939,6 +952,37 @@ impl OutstationSession {
         let mut cursor = self.unsol_tx_buffer.write_cursor();
         header.write(&mut cursor).unwrap();
         cursor.written().len()
+    }
+
+    async fn write_error_response(
+        &mut self,
+        io: &mut PhysLayer,
+        writer: &mut TransportWriter,
+        err: TransportRequestError,
+    ) -> Result<(), LinkError> {
+        let seq = match err {
+            TransportRequestError::HeaderParseError(err) => match err {
+                HeaderParseError::UnknownFunction(seq, _) => Some(seq),
+                HeaderParseError::InsufficientBytes => None,
+            },
+            TransportRequestError::RequestValidationError(seq, _) => Some(seq),
+        };
+
+        if let Some(seq) = seq {
+            let iin = Iin::new(self.get_response_iin(), Iin2::NO_FUNC_CODE_SUPPORT);
+            let header = ResponseHeader::new(
+                ControlField::single_response(seq),
+                ResponseFunction::Response,
+                iin,
+            );
+            let len = {
+                let mut cursor = self.sol_tx_buffer.write_cursor();
+                header.write(&mut cursor).unwrap();
+                cursor.written().len()
+            };
+            self.write_solicited(io, writer, len).await?;
+        }
+        Ok(())
     }
 
     fn write_first_read_response(
@@ -1519,8 +1563,8 @@ impl OutstationSession {
                             self.info.solicited_confirm_received(ecsn);
                             return Ok(Confirm::Yes);
                         }
-                        ConfirmAction::NewRequest(header) => {
-                            self.info.solicited_confirm_wait_new_request(header);
+                        ConfirmAction::NewRequest => {
+                            self.info.solicited_confirm_wait_new_request();
                             // retain the fragment so that it can be processed from the idle state
                             guard.retain();
                             return Ok(Confirm::NewRequest);
@@ -1548,19 +1592,23 @@ impl OutstationSession {
                 self.on_link_activity();
                 return ConfirmAction::ContinueWait;
             }
+            Some(TransportRequest::Error(_)) => {
+                self.on_link_activity();
+                return ConfirmAction::NewRequest;
+            }
             None => return ConfirmAction::ContinueWait,
         };
 
         match self.classify(info, request) {
-            FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest(request.header),
-            FragmentType::NewRead(_, _) => ConfirmAction::NewRequest(request.header),
+            FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest,
+            FragmentType::NewRead(_, _) => ConfirmAction::NewRequest,
             FragmentType::RepeatRead(_, response_length, _) => {
                 ConfirmAction::EchoLastResponse(response_length)
             }
-            FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest(request.header),
+            FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest,
             // this should never happen, but if it does, new request is probably best course of action
-            FragmentType::RepeatNonRead(_, _) => ConfirmAction::NewRequest(request.header),
-            FragmentType::Broadcast(_) => ConfirmAction::NewRequest(request.header),
+            FragmentType::RepeatNonRead(_, _) => ConfirmAction::NewRequest,
+            FragmentType::Broadcast(_) => ConfirmAction::NewRequest,
             FragmentType::SolicitedConfirm(seq) => {
                 if seq == ecsn {
                     ConfirmAction::Confirmed

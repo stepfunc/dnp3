@@ -69,7 +69,7 @@ class TestOutstationInformation implements OutstationInformation {
   }
 
   @Override
-  public void solicitedConfirmWaitNewRequest(RequestHeader header) {
+  public void solicitedConfirmWaitNewRequest() {
 
   }
 
