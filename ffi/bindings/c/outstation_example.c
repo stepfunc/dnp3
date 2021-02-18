@@ -408,7 +408,10 @@ int main()
 	outstation_transaction(outstation, startup_transaction);
 
 	// Start the outstation
-	tcpserver_bind(server);
+	if (!tcpserver_bind(server)) {
+		printf("unable to bind server\n");
+		goto cleanup;
+	}
 
 	database_points_t database_points =
 	{
