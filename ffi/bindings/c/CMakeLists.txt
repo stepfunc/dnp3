@@ -22,7 +22,7 @@ target_link_libraries(master_example PRIVATE ${dnp3rs_target})
 add_executable(outstation_example outstation_example.c)
 target_link_libraries(outstation_example PRIVATE ${dnp3rs_target})
 
-if(${dnp3rs_target} EQUAL "dnp3rs")
+if(${dnp3rs_target} STREQUAL "dnp3rs")
     # Copy the DLL after build
     add_custom_command(TARGET master_example POST_BUILD 
         COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:dnp3rs> $<TARGET_FILE_DIR:master_example>
