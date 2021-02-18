@@ -8,12 +8,16 @@ module.exports = {
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
-  favicon: 'img/favicon.ico',
+  favicon: 'images/brand/favicon.png',
   organizationName: 'stepfunc', // Usually your GitHub org/user name.
   projectName: 'dnp3', // Usually your repo name.
   themeConfig: {
     prism: {
       additionalLanguages: ['rust', 'java', 'csharp'],
+    },
+    colorMode: {
+      defaultMode: 'light',
+      disableSwitch: true,
     },
     navbar: {
       title: 'DNP3 <version>',
