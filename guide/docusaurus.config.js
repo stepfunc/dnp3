@@ -35,7 +35,10 @@ module.exports = {
       ],
     },
     footer: {
-      style: 'dark',
+      logo: {
+        alt: 'Step Function',
+        src: 'images/brand/footer-logo.svg',
+      },
       links: [
         {
           title: 'DNP3',

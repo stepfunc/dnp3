@@ -19,6 +19,8 @@
   --ifm-navbar-background-color: var(--ifm-color-primary);
   --ifm-navbar-link-color: #fff;
   --ifm-navbar-link-hover-color: rgba(255, 255, 255, 0.9);
+
+  --ifm-footer-background-color: #fff;
 }
 
 .navbar__link--active {
@@ -30,4 +32,16 @@
   display: block;
   margin: 0 calc(-1 * var(--ifm-pre-padding));
   padding: 0 var(--ifm-pre-padding);
+}
+
+.footer {
+  border-top: 1px solid var(--ifm-toc-border-color);
+
+}
+.footer__logo {
+  max-width: 5rem;
+}
+.footer__copyright {
+  font-size: 14px;
+  opacity: 0.5;
 }
