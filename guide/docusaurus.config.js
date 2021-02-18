@@ -23,7 +23,7 @@ module.exports = {
       title: 'DNP3 <version>',
       logo: {
         alt: 'Logo',
-        src: 'img/logo.svg',
+        src: 'images/brand/logo.svg',
       },
       items: [
         {
