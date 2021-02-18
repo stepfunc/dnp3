@@ -181,8 +181,8 @@ public class MasterExample {
         new EndpointList("127.0.0.1:20000"), new TestListener());
 
     // Create the association
-    AssociationConfig associationConfig = new AssociationConfig(new EventClasses(true, true, true),
-        new EventClasses(true, true, true), Classes.all(), new EventClasses(false, false, false));
+    AssociationConfig associationConfig = new AssociationConfig(EventClasses.all(),
+        EventClasses.all(), Classes.all(), EventClasses.none());
     associationConfig.autoTimeSync = AutoTimeSync.LAN;
     associationConfig.keepAliveTimeout = Duration.ofSeconds(60);
 

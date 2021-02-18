@@ -64,15 +64,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     // define the association
     let association_class = crate::association::define(lib, shared)?;
 
-    let event_classes = lib.declare_native_struct("EventClasses")?;
-    let event_classes = lib
-        .define_native_struct(&event_classes)?
-        .add("class1", Type::Bool, "Class 1 events")?
-        .add("class2", Type::Bool, "Class 2 events")?
-        .add("class3", Type::Bool, "Class 3 events")?
-        .doc("Event classes")?
-        .build()?;
-
+    let event_classes = define_event_classes(lib)?;
     let classes = define_classes(lib)?;
 
     let auto_time_sync_enum = lib
@@ -379,6 +371,42 @@ fn define_time_provider(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, Bin
         .build()?
         .destroy_callback("on_destroy")?
         .build()
+}
+
+fn define_event_classes(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
+    let event_classes = lib.declare_native_struct("EventClasses")?;
+    let event_classes = lib
+        .define_native_struct(&event_classes)?
+        .add("class1", Type::Bool, "Class 1 events")?
+        .add("class2", Type::Bool, "Class 2 events")?
+        .add("class3", Type::Bool, "Class 3 events")?
+        .doc("Event classes")?
+        .build()?;
+
+    let event_classes_all_fn = lib
+        .declare_native_function("event_classes_all")?
+        .return_type(ReturnType::Type(
+            Type::Struct(event_classes.clone()),
+            "Initialized value".into(),
+        ))?
+        .doc("Initialize all three event classes to true")?
+        .build()?;
+
+    let event_classes_none_fn = lib
+        .declare_native_function("event_classes_none")?
+        .return_type(ReturnType::Type(
+            Type::Struct(event_classes.clone()),
+            "Initialized value".into(),
+        ))?
+        .doc("Initialize all three event classes to false")?
+        .build()?;
+
+    lib.define_struct(&event_classes)?
+        .static_method("all", &event_classes_all_fn)?
+        .static_method("none", &event_classes_none_fn)?
+        .build();
+
+    Ok(event_classes)
 }
 
 fn define_classes(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {

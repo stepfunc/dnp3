@@ -197,7 +197,7 @@ class MainClass
         var readHandler = new TestReadHandler();
         var association = master.AddAssociation(
             1024,
-            new AssociationConfig(new EventClasses(true, true, true), new EventClasses(true, true, true), Classes.All(), new EventClasses(false, false, false))
+            new AssociationConfig(EventClasses.All(), EventClasses.All(), Classes.All(), EventClasses.None())
             {
                 AutoTimeSync = AutoTimeSync.Lan,
                 AutoTasksRetryStrategy = new RetryStrategy
