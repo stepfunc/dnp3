@@ -10,6 +10,12 @@ impl OutstationApplication for ffi::OutstationApplication {
         ffi::OutstationApplication::get_processing_delay_ms(self).unwrap_or(0)
     }
 
+    fn get_application_iin(&self) -> ApplicationIin {
+        ffi::OutstationApplication::get_application_iin(self)
+            .map(|iin| iin.into())
+            .unwrap_or_default()
+    }
+
     fn cold_restart(&mut self) -> Option<RestartDelay> {
         ffi::OutstationApplication::cold_restart(self)
             .map(|delay| delay.into())
@@ -20,6 +26,17 @@ impl OutstationApplication for ffi::OutstationApplication {
         ffi::OutstationApplication::warm_restart(self)
             .map(|delay| delay.into())
             .flatten()
+    }
+}
+
+impl From<ffi::ApplicationIin> for ApplicationIin {
+    fn from(from: ffi::ApplicationIin) -> Self {
+        ApplicationIin {
+            need_time: from.need_time(),
+            local_control: from.local_control(),
+            device_trouble: from.device_trouble(),
+            config_corrupt: from.config_corrupt(),
+        }
     }
 }
 

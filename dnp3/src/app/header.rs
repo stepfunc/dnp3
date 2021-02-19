@@ -3,6 +3,7 @@ use std::ops::{Add, BitOr, BitOrAssign};
 
 use crate::app::sequence::Sequence;
 use crate::app::FunctionCode;
+use crate::outstation::ApplicationIin;
 use crate::util::bit::bits::*;
 use crate::util::bit::{format_bitfield, Bitfield};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
@@ -214,21 +215,21 @@ impl Iin1 {
 
 impl Default for Iin1 {
     fn default() -> Self {
-        Self { value: 0 }
+        Self::new(0)
     }
 }
 
-impl Add<Iin2> for Iin1 {
-    type Output = Iin;
+impl BitOr for Iin1 {
+    type Output = Self;
 
-    fn add(self, rhs: Iin2) -> Self::Output {
-        Iin::new(self, rhs)
+    fn bitor(self, rhs: Iin1) -> Self::Output {
+        Self::new(self.value | rhs.value)
     }
 }
 
 impl BitOrAssign<Iin1> for Iin1 {
     fn bitor_assign(&mut self, rhs: Iin1) {
-        self.value |= rhs.value
+        *self = *self | rhs
     }
 }
 
@@ -288,33 +289,55 @@ impl Iin2 {
 
 impl Default for Iin2 {
     fn default() -> Self {
-        Self { value: 0 }
-    }
-}
-
-impl BitOr for Iin1 {
-    type Output = Self;
-
-    fn bitor(self, rhs: Self) -> Self::Output {
-        Self {
-            value: self.value | rhs.value,
-        }
-    }
-}
-
-impl BitOrAssign<Iin2> for Iin2 {
-    fn bitor_assign(&mut self, rhs: Iin2) {
-        self.value |= rhs.value;
+        Self::new(0)
     }
 }
 
 impl BitOr for Iin2 {
     type Output = Self;
 
+    fn bitor(self, rhs: Iin2) -> Self::Output {
+        Self::new(self.value | rhs.value)
+    }
+}
+
+impl BitOrAssign<Iin2> for Iin2 {
+    fn bitor_assign(&mut self, rhs: Iin2) {
+        *self = *self | rhs
+    }
+}
+
+impl Default for Iin {
+    fn default() -> Self {
+        Iin::new(Iin1::default(), Iin2::default())
+    }
+}
+
+impl BitOr for Iin {
+    type Output = Iin;
+
     fn bitor(self, rhs: Self) -> Self::Output {
         Self {
-            value: self.value | rhs.value,
+            iin1: self.iin1 | rhs.iin1,
+            iin2: self.iin2 | rhs.iin2,
         }
+    }
+}
+
+impl BitOr<Iin1> for Iin {
+    type Output = Self;
+
+    fn bitor(self, rhs: Iin1) -> Self::Output {
+        Self {
+            iin1: self.iin1 | rhs,
+            iin2: self.iin2,
+        }
+    }
+}
+
+impl BitOrAssign<Iin1> for Iin {
+    fn bitor_assign(&mut self, rhs: Iin1) {
+        *self = *self | rhs;
     }
 }
 
@@ -326,6 +349,50 @@ impl BitOr<Iin2> for Iin {
             iin1: self.iin1,
             iin2: self.iin2 | rhs,
         }
+    }
+}
+
+impl BitOrAssign<Iin2> for Iin {
+    fn bitor_assign(&mut self, rhs: Iin2) {
+        *self = *self | rhs;
+    }
+}
+
+impl BitOr<ApplicationIin> for Iin {
+    type Output = Self;
+
+    fn bitor(mut self, rhs: ApplicationIin) -> Self::Output {
+        if rhs.need_time {
+            self |= Iin1::NEED_TIME;
+        }
+
+        if rhs.local_control {
+            self |= Iin1::LOCAL_CONTROL;
+        }
+
+        if rhs.device_trouble {
+            self |= Iin1::DEVICE_TROUBLE;
+        }
+
+        if rhs.config_corrupt {
+            self |= Iin2::CONFIG_CORRUPT;
+        }
+
+        self
+    }
+}
+
+impl BitOrAssign<ApplicationIin> for Iin {
+    fn bitor_assign(&mut self, rhs: ApplicationIin) {
+        *self = *self | rhs;
+    }
+}
+
+impl Add<Iin2> for Iin1 {
+    type Output = Iin;
+
+    fn add(self, rhs: Iin2) -> Self::Output {
+        Iin::new(self, rhs)
     }
 }
 
@@ -392,27 +459,6 @@ impl Iin {
         cursor.write_u8(self.iin1.value)?;
         cursor.write_u8(self.iin2.value)?;
         Ok(())
-    }
-}
-
-impl Default for Iin {
-    fn default() -> Self {
-        Iin::new(Iin1::new(0), Iin2::new(0))
-    }
-}
-
-impl BitOr for Iin {
-    type Output = Iin;
-
-    fn bitor(self, rhs: Self) -> Self::Output {
-        Self {
-            iin1: Iin1 {
-                value: self.iin1.value | rhs.iin1.value,
-            },
-            iin2: Iin2 {
-                value: self.iin2.value | rhs.iin2.value,
-            },
-        }
     }
 }
 

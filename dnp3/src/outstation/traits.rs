@@ -7,6 +7,30 @@ use crate::app::RequestHeader;
 use crate::app::Sequence;
 use crate::outstation::database::Database;
 
+/// Application-controlled IIN bits
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct ApplicationIin {
+    /// IIN1.4: Time synchronization is required
+    pub need_time: bool,
+    /// IIN1.5: Some output points are in local mode
+    pub local_control: bool,
+    /// IIN1.6: Device trouble
+    pub device_trouble: bool,
+    /// IIN2.5 Configuration corrupt
+    pub config_corrupt: bool,
+}
+
+impl Default for ApplicationIin {
+    fn default() -> Self {
+        Self {
+            need_time: false,
+            local_control: false,
+            device_trouble: false,
+            config_corrupt: false,
+        }
+    }
+}
+
 /// Enumeration returned for cold/warm restart
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum RestartDelay {
@@ -30,6 +54,11 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// For more information, see IEEE-1815 2012, pg. 64
     fn get_processing_delay_ms(&self) -> u16 {
         0
+    }
+
+    /// Returns the application-controlled IIN bits
+    fn get_application_iin(&self) -> ApplicationIin {
+        ApplicationIin::default()
     }
 
     /// Request that the outstation perform a cold restart (IEEE-1815 2012, pg. 58)

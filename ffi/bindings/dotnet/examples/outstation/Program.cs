@@ -20,6 +20,11 @@ class ExampleOutstation
             return 0;
         }
 
+        public ApplicationIin GetApplicationIin()
+        {
+            return new ApplicationIin();
+        }
+
         public RestartDelay ColdRestart()
         {
             return RestartDelay.ValidSeconds(60);

@@ -30,6 +30,11 @@ class TestApplication implements OutstationApplication {
   }
 
   @Override
+  public ApplicationIin getApplicationIin() {
+    return new ApplicationIin();
+  }
+
+  @Override
   public RestartDelay coldRestart() {
     return RestartDelay.validSeconds(ushort(60));
   }

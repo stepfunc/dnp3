@@ -388,6 +388,32 @@ fn define_outstation_application(
         .doc("Type of restart delay value. Used by {struct:RestartDelay}.")?
         .build()?;
 
+    let application_iin = lib.declare_native_struct("ApplicationIIN")?;
+    let application_iin = lib
+        .define_native_struct(&application_iin)?
+        .add(
+            "need_time",
+            StructElementType::Bool(Some(false)),
+            "IIN1.4 - Time synchronization is required",
+        )?
+        .add(
+            "local_control",
+            StructElementType::Bool(Some(false)),
+            "IIN1.5 - Some output points are in local mode",
+        )?
+        .add(
+            "device_trouble",
+            StructElementType::Bool(Some(false)),
+            "IIN1.6 - Device trouble",
+        )?
+        .add(
+            "config_corrupt",
+            StructElementType::Bool(Some(false)),
+            "IIN2.5 - Configuration corrupt",
+        )?
+        .doc("Application-controlled IIN bits")?
+        .build()?;
+
     let restart_delay = lib.declare_native_struct("RestartDelay")?;
     let restart_delay = lib.define_native_struct(&restart_delay)?
         .add("restart_type", Type::Enum(restart_delay_type), "Indicates what {struct:RestartDelay.value} is.")?
@@ -441,6 +467,9 @@ fn define_outstation_application(
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
             .details("For more information, see IEEE-1815 2012, p. 64."))?
             .return_type(ReturnType::new(Type::Uint16, "Processing delay, in milliseconds"))?
+            .build()?
+        .callback("get_application_iin", "Returns the application-controlled IIN bits")?
+            .return_type(ReturnType::new(Type::Struct(application_iin), "Application IIN bits"))?
             .build()?
         .callback("cold_restart", doc("Request that the outstation perform a cold restart (IEEE-1815 2012, p. 58)")
             .details("The outstation will not automatically restart. It is the responsibility of the user application to handle this request and take the appropriate action."))?
