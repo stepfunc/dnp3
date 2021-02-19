@@ -24,6 +24,7 @@ use crate::util::phys::PhysLayer;
 use crate::util::task::Shutdown;
 
 pub(crate) struct MasterSession {
+    enabled: bool,
     decode_level: DecodeLevel,
     timeout: Timeout,
     associations: AssociationMap,
@@ -38,9 +39,21 @@ enum ReadResponseAction {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum RunError {
-    Link(LinkError),
+pub enum StateChange {
+    Disable,
     Shutdown,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum RunError {
+    State(StateChange),
+    Link(LinkError),
+}
+
+impl From<StateChange> for RunError {
+    fn from(x: StateChange) -> Self {
+        RunError::State(x)
+    }
 }
 
 impl From<LinkError> for RunError {
@@ -51,7 +64,7 @@ impl From<LinkError> for RunError {
 
 impl From<Shutdown> for RunError {
     fn from(_: Shutdown) -> Self {
-        RunError::Shutdown
+        RunError::State(StateChange::Shutdown)
     }
 }
 
@@ -76,6 +89,7 @@ impl MasterSession {
         };
 
         Self {
+            enabled: false,
             decode_level,
             timeout: response_timeout,
             associations: AssociationMap::new(),
@@ -91,7 +105,9 @@ impl MasterSession {
         loop {
             crate::tokio::select! {
                 result = self.process_message(false) => {
-                   result?;
+                   if let Err(StateChange::Shutdown) = result {
+                       return Err(Shutdown);
+                   }
                 }
                 _ = crate::tokio::time::sleep_until(deadline) => {
                    return Ok(());
@@ -195,11 +211,16 @@ impl MasterSession {
         }
     }
 
-    async fn process_message(&mut self, is_connected: bool) -> Result<(), Shutdown> {
+    async fn process_message(&mut self, is_connected: bool) -> Result<(), StateChange> {
         match self.user_queue.recv().await {
             Some(msg) => {
                 match msg {
-                    Message::Master(msg) => self.process_master_message(msg),
+                    Message::Master(msg) => {
+                        self.process_master_message(msg);
+                        if is_connected && !self.enabled {
+                            return Err(StateChange::Disable);
+                        }
+                    }
                     Message::Association(msg) => {
                         if let Ok(association) = self.associations.get_mut(msg.address) {
                             association.process_message(msg.details, is_connected);
@@ -210,7 +231,7 @@ impl MasterSession {
                 }
                 Ok(())
             }
-            None => Err(Shutdown),
+            None => Err(StateChange::Shutdown),
         }
     }
 
@@ -278,7 +299,7 @@ impl MasterSession {
         match result {
             Ok(()) => Ok(()),
             Err(err) => match err {
-                TaskError::Shutdown => Err(RunError::Shutdown),
+                TaskError::State(x) => Err(RunError::State(x)),
                 TaskError::Lower(err) => Err(RunError::Link(err)),
                 _ => Ok(()),
             },

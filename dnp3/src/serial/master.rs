@@ -5,7 +5,7 @@ use tracing::Instrument;
 
 use crate::app::ExponentialBackOff;
 use crate::link::LinkErrorMode;
-use crate::master::session::{MasterSession, RunError};
+use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::*;
 use crate::serial::SerialSettings;
 use crate::tcp::ClientState;
@@ -123,9 +123,12 @@ impl MasterTask {
                         .run(&mut io, &mut self.writer, &mut self.reader)
                         .await
                     {
-                        RunError::Shutdown => {
+                        RunError::State(StateChange::Shutdown) => {
                             self.listener.update(ClientState::Shutdown);
                             return Err(Shutdown);
+                        }
+                        RunError::State(StateChange::Disable) => {
+                            // TODO
                         }
                         RunError::Link(err) => {
                             tracing::warn!("connection lost - {}", err);

@@ -5,7 +5,7 @@ use tracing::Instrument;
 
 use crate::app::ExponentialBackOff;
 use crate::link::LinkErrorMode;
-use crate::master::session::{MasterSession, RunError};
+use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::{Listener, MasterConfig, MasterHandle};
 use crate::tcp::ClientState;
 use crate::tcp::EndpointList;
@@ -147,10 +147,11 @@ impl MasterTask {
             .run(&mut io, &mut self.writer, &mut self.reader)
             .await
         {
-            RunError::Shutdown => {
+            RunError::State(StateChange::Shutdown) => {
                 self.listener.update(ClientState::Shutdown);
                 Err(Shutdown)
             }
+            RunError::State(StateChange::Disable) => Ok(()),
             RunError::Link(err) => {
                 tracing::warn!("connection lost - {}", err);
                 if let Some(delay) = self.reconnect_delay {
