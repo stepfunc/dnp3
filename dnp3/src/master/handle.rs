@@ -81,6 +81,20 @@ impl MasterHandle {
         Self { sender }
     }
 
+    /// enable communications
+    pub async fn enable(&mut self) -> Result<(), Shutdown> {
+        self.send_master_message(MasterMsg::EnableCommunication(true))
+            .await?;
+        Ok(())
+    }
+
+    /// disable communications
+    pub async fn disable(&mut self) -> Result<(), Shutdown> {
+        self.send_master_message(MasterMsg::EnableCommunication(false))
+            .await?;
+        Ok(())
+    }
+
     /// Set the decoding level used by this master
     pub async fn set_decode_level(&mut self, decode_level: DecodeLevel) -> Result<(), Shutdown> {
         self.send_master_message(MasterMsg::SetDecodeLevel(decode_level))

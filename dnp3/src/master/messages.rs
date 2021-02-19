@@ -17,6 +17,8 @@ pub(crate) enum Message {
 }
 
 pub(crate) enum MasterMsg {
+    /// enable or disable communication
+    EnableCommunication(bool),
     /// Add an association to the master
     AddAssociation(Association, Promise<Result<(), AssociationError>>),
     /// Remove an association from the master

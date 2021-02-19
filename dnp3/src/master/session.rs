@@ -237,6 +237,9 @@ impl MasterSession {
 
     fn process_master_message(&mut self, msg: MasterMsg) {
         match msg {
+            MasterMsg::EnableCommunication(enable) => {
+                self.enabled = enable;
+            }
             MasterMsg::AddAssociation(association, callback) => {
                 callback.complete(self.associations.register(association));
             }
