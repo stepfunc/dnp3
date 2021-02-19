@@ -3,38 +3,14 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::{Rng, SeedableRng};
 
-use dnp3::app::header::ResponseHeader;
-use dnp3::app::measurement::{
-    Analog, AnalogOutputStatus, Binary, BinaryOutputStatus, Counter, DoubleBitBinary,
-    FrozenCounter, Time,
-};
-use dnp3::app::parse::bytes::Bytes;
-use dnp3::app::retry::{ReconnectStrategy, RetryStrategy};
-use dnp3::app::timeout::Timeout;
-use dnp3::app::types::Timestamp;
-use dnp3::app::Flags;
-use dnp3::decode::EndpointAddress;
-use dnp3::decode::{DecodeLevel, LinkErrorMode};
-use dnp3::master::association::AssociationConfig;
-use dnp3::master::handle::{
-    AssociationHandler, HeaderInfo, Listener, MasterConfig, MasterHandle, ReadHandler,
-};
-use dnp3::master::request::EventClasses;
-use dnp3::master::tcp::EndpointList;
-use dnp3::outstation::config::OutstationConfig;
-use dnp3::outstation::database::config::{
-    AnalogConfig, BinaryConfig, CounterConfig, EventAnalogVariation, EventBinaryVariation,
-    EventCounterVariation, StaticAnalogVariation, StaticBinaryVariation, StaticCounterVariation,
-};
-use dnp3::outstation::database::{
-    Add, Database, EventBufferConfig, EventClass, EventMode, Update, UpdateOptions,
-};
-use dnp3::outstation::tcp::AddressFilter;
-use dnp3::outstation::tcp::{ServerHandle, TcpServer};
-use dnp3::outstation::traits::{
-    DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
-};
-use dnp3::outstation::OutstationHandle;
+use dnp3::app::*;
+use dnp3::app::measurement::*;
+use dnp3::link::*;
+use dnp3::decode::*;
+use dnp3::master::*;
+use dnp3::tcp::*;
+use dnp3::outstation::*;
+use dnp3::outstation::database::*;
 
 fn config() -> TestConfig {
     TestConfig {
@@ -233,7 +209,7 @@ impl Pair {
         Measurements,
         tokio::sync::mpsc::Receiver<usize>,
     ) {
-        let mut master = dnp3::master::tcp::spawn_master_tcp_client(
+        let mut master = dnp3::tcp::spawn_master_tcp_client(
             LinkErrorMode::Close,
             Self::get_master_config(config.master_level),
             EndpointList::single(format!("127.0.0.1:{}", port)),
