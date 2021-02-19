@@ -97,48 +97,50 @@ impl MasterTask {
     }
 
     async fn run(&mut self) {
-        self.run_impl().await.ok();
-    }
-
-    async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
-            if let Some(endpoint) = self.endpoints.next_address().await {
-                self.listener.update(ClientState::Connecting);
-                match TcpStream::connect(endpoint).await {
-                    Err(err) => {
-                        let delay = self.back_off.on_failure();
-                        tracing::warn!(
-                            "failed to connect to {}: {} - waiting {} ms to retry",
-                            endpoint,
-                            err,
-                            delay.as_millis()
-                        );
-                        self.listener
-                            .update(ClientState::WaitAfterFailedConnect(delay));
-                        self.session.delay_for(delay).await?;
-                    }
-                    Ok(socket) => {
-                        tracing::info!("connected to {}", endpoint);
-                        self.run_socket(socket).await?;
-                    }
-                }
-            } else {
-                let delay = self.back_off.on_failure();
-                tracing::warn!(
-                    "Name resolution failure - waiting {} ms to retry",
-                    delay.as_millis()
-                );
-                self.listener
-                    .update(ClientState::WaitAfterFailedConnect(delay));
-                self.session.delay_for(delay).await?;
+            if self.run_one_connection().await.is_err() {
+                return;
             }
         }
     }
 
+    async fn run_one_connection(&mut self) -> Result<(), Shutdown> {
+        if let Some(endpoint) = self.endpoints.next_address().await {
+            self.listener.update(ClientState::Connecting);
+            match TcpStream::connect(endpoint).await {
+                Err(err) => {
+                    let delay = self.back_off.on_failure();
+                    tracing::warn!(
+                        "failed to connect to {}: {} - waiting {} ms to retry",
+                        endpoint,
+                        err,
+                        delay.as_millis()
+                    );
+                    self.listener
+                        .update(ClientState::WaitAfterFailedConnect(delay));
+                    self.session.delay_for(delay).await
+                }
+                Ok(socket) => {
+                    tracing::info!("connected to {}", endpoint);
+                    self.endpoints.reset();
+                    self.back_off.on_success();
+                    self.listener.update(ClientState::Connected);
+                    self.run_socket(socket).await
+                }
+            }
+        } else {
+            let delay = self.back_off.on_failure();
+            tracing::warn!(
+                "Name resolution failure - waiting {} ms to retry",
+                delay.as_millis()
+            );
+            self.listener
+                .update(ClientState::WaitAfterFailedConnect(delay));
+            self.session.delay_for(delay).await
+        }
+    }
+
     async fn run_socket(&mut self, socket: TcpStream) -> Result<(), Shutdown> {
-        self.endpoints.reset();
-        self.back_off.on_success();
-        self.listener.update(ClientState::Connected);
         let mut io = PhysLayer::Tcp(socket);
         match self
             .session
