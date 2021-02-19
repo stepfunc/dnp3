@@ -36,6 +36,10 @@ impl Database {
         self.event_buffer.clear_written();
     }
 
+    pub(crate) fn unwritten_classes(&self) -> EventClasses {
+        self.event_buffer.unwritten_classes()
+    }
+
     pub(crate) fn select_by_header(&mut self, header: ReadHeader) -> Iin2 {
         match header {
             ReadHeader::Static(header) => self.static_db.select(header),

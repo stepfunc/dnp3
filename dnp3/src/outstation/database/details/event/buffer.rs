@@ -413,8 +413,6 @@ impl EventBuffer {
         }
     }
 
-    // once we actually use this, we can remove the test attribute
-    #[cfg(test)]
     pub(crate) fn unwritten_classes(&self) -> EventClasses {
         let unwritten = self.total.classes.subtract(&self.written.classes);
         EventClasses::new(

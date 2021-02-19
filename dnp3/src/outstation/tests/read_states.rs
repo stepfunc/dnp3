@@ -11,6 +11,7 @@ const CONFIRM_SEQ_0: &[u8] = &[0xC0, 0x00];
 const UNS_CONFIRM_SEQ_0: &[u8] = &[0b11010000, 0x00];
 const CONFIRM_SEQ_1: &[u8] = &[0xC1, 0x00];
 const EMPTY_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
+const EMPTY_RESPONSE_WITH_PENDING_EVENTS: &[u8] = &[0xC0, 0x81, 0x82, 0x00];
 const BINARY_EVENT_RESPONSE: &[u8] = &[
     0xE0, 0x81, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
 ];
@@ -88,7 +89,7 @@ fn sol_confirm_wait_goes_back_to_idle_with_new_request() {
     harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
     // start a new request
-    harness.test_request_response(EMPTY_READ, EMPTY_RESPONSE);
+    harness.test_request_response(EMPTY_READ, EMPTY_RESPONSE_WITH_PENDING_EVENTS);
     harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
 }
 
@@ -101,7 +102,7 @@ fn sol_confirm_wait_goes_back_to_idle_with_new_invalid_request() {
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
     harness.test_request_response(
         &[0xC0, 0x70],             // Invalid function code
-        &[0xC0, 0x81, 0x80, 0x01], // NO_FUNC_CODE_SUPPORT
+        &[0xC0, 0x81, 0x82, 0x01], // NO_FUNC_CODE_SUPPORT
     );
     harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
 }

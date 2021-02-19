@@ -126,6 +126,8 @@ impl<'a> WriteCursor<'a> {
         result
     }
 
+    // TODO: remove this?
+    #[cfg(test)]
     pub(crate) fn at_start<T, R>(&mut self, write: T) -> Result<R, WriteError>
     where
         T: Fn(&mut WriteCursor) -> Result<R, WriteError>,

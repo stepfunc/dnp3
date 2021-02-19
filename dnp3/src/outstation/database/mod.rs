@@ -314,6 +314,10 @@ impl DatabaseHandle {
         self.inner.lock().unwrap().inner.clear_written_events();
     }
 
+    pub(crate) fn unwritten_classes(&self) -> EventClasses {
+        self.inner.lock().unwrap().inner.unwritten_classes()
+    }
+
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> Iin2 {
         let mut iin2 = Iin2::default();
         let mut guard = self.inner.lock().unwrap();

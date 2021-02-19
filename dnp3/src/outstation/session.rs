@@ -512,7 +512,7 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
     ) -> Result<UnsolicitedResult, SessionError> {
         let seq = self.state.unsolicited_seq.increment();
-        let length = self.write_null_unsolicited_response(seq);
+        let length = self.write_null_unsolicited_response(seq, self.get_response_iin(database));
         self.perform_unsolicited_response_series(database, seq, length, io, reader, writer)
             .await
     }
@@ -543,25 +543,31 @@ impl OutstationSession {
         &mut self,
         database: &mut DatabaseHandle,
     ) -> Option<(Sequence, usize)> {
-        let iin = self.get_response_iin();
-        let mut cursor = self.unsol_tx_buffer.write_cursor();
-        let _ = cursor.skip(ResponseHeader::LENGTH);
+        let len = {
+            let mut cursor = self.unsol_tx_buffer.write_cursor();
+            let _ = cursor.skip(ResponseHeader::LENGTH);
 
-        let count = database.write_unsolicited(self.state.enabled_unsolicited_classes, &mut cursor);
+            let count =
+                database.write_unsolicited(self.state.enabled_unsolicited_classes, &mut cursor);
 
-        if count == 0 {
-            return None;
-        }
+            if count == 0 {
+                return None;
+            }
+
+            cursor.written().len()
+        };
 
         let seq = self.state.unsolicited_seq.increment();
 
+        let iin = self.get_response_iin(database);
         let header = ResponseHeader::new(
             ControlField::unsolicited_response(seq),
             ResponseFunction::UnsolicitedResponse,
             iin,
         );
-        cursor.at_start(|cur| header.write(cur)).unwrap();
-        Some((seq, cursor.position()))
+        let mut cursor = self.unsol_tx_buffer.write_cursor();
+        header.write(&mut cursor).unwrap();
+        Some((seq, len))
     }
 
     async fn perform_unsolicited_response_series(
@@ -639,7 +645,7 @@ impl OutstationSession {
             }
             Some(TransportRequest::Error(err)) => {
                 self.state.deferred_read.clear();
-                self.write_error_response(io, writer, err).await?;
+                self.write_error_response(io, writer, err, database).await?;
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
         };
@@ -670,8 +676,10 @@ impl OutstationSession {
             }
             FragmentType::MalformedRequest(_, err) => {
                 self.state.deferred_read.clear();
-                let length =
-                    self.write_empty_solicited_response(request.header.control.seq, err.into());
+                let length = self.write_empty_solicited_response(
+                    request.header.control.seq,
+                    self.get_response_iin(database) | Iin2::from(err),
+                );
                 self.write_solicited(io, writer, length).await?;
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
@@ -858,7 +866,7 @@ impl OutstationSession {
             }
             Some(TransportRequest::Error(err)) => {
                 self.on_link_activity();
-                self.write_error_response(io, writer, err).await?;
+                self.write_error_response(io, writer, err, database).await?;
             }
             None => (),
         }
@@ -878,7 +886,10 @@ impl OutstationSession {
 
         match self.classify(info, request) {
             FragmentType::MalformedRequest(hash, err) => {
-                let length = self.write_empty_solicited_response(seq, err.into());
+                let length = self.write_empty_solicited_response(
+                    seq,
+                    self.get_response_iin(database) | Iin2::from(err),
+                );
 
                 // TODO: Shouldn't we return None here?
                 Some(LastValidRequest::new(seq, hash, Some(length), None))
@@ -930,8 +941,7 @@ impl OutstationSession {
         }
     }
 
-    fn write_empty_solicited_response(&mut self, seq: Sequence, iin2: Iin2) -> usize {
-        let iin = self.get_response_iin() | iin2;
+    fn write_empty_solicited_response(&mut self, seq: Sequence, iin: Iin) -> usize {
         let header = ResponseHeader::new(
             ControlField::response(seq, true, true, false),
             ResponseFunction::Response,
@@ -942,8 +952,7 @@ impl OutstationSession {
         cursor.written().len()
     }
 
-    fn write_null_unsolicited_response(&mut self, seq: Sequence) -> usize {
-        let iin = self.get_response_iin();
+    fn write_null_unsolicited_response(&mut self, seq: Sequence, iin: Iin) -> usize {
         let header = ResponseHeader::new(
             ControlField::unsolicited_response(seq),
             ResponseFunction::UnsolicitedResponse,
@@ -959,6 +968,7 @@ impl OutstationSession {
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
         err: TransportRequestError,
+        database: &DatabaseHandle,
     ) -> Result<(), LinkError> {
         let seq = match err {
             TransportRequestError::HeaderParseError(err) => match err {
@@ -969,7 +979,7 @@ impl OutstationSession {
         };
 
         if let Some(seq) = seq {
-            let iin = self.get_response_iin() | Iin2::NO_FUNC_CODE_SUPPORT;
+            let iin = self.get_response_iin(database) | Iin2::NO_FUNC_CODE_SUPPORT;
             let header = ResponseHeader::new(
                 ControlField::single_response(seq),
                 ResponseFunction::Response,
@@ -1002,17 +1012,22 @@ impl OutstationSession {
         seq: Sequence,
         iin2: Iin2,
     ) -> (usize, Option<ResponseSeries>) {
-        let iin = self.get_response_iin() | iin2;
-        let mut cursor = self.sol_tx_buffer.write_cursor();
-        cursor.skip(ResponseHeader::LENGTH).unwrap();
-        let info = database.write_response_headers(&mut cursor);
+        let (len, info) = {
+            let mut cursor = self.sol_tx_buffer.write_cursor();
+            cursor.skip(ResponseHeader::LENGTH).unwrap();
+            let info = database.write_response_headers(&mut cursor);
+            (cursor.written().len(), info)
+        };
+
+        let iin = self.get_response_iin(database) | iin2;
         let header = ResponseHeader::new(
             ControlField::response(seq, fir, info.complete, info.need_confirm()),
             ResponseFunction::Response,
             iin,
         );
-        cursor.at_start(|cur| header.write(cur)).unwrap();
-        (cursor.written().len(), info.get_response_series(seq))
+        let mut cursor = self.sol_tx_buffer.write_cursor();
+        header.write(&mut cursor).unwrap();
+        (len, info.get_response_series(seq))
     }
 
     fn handle_non_read(
@@ -1026,16 +1041,18 @@ impl OutstationSession {
         let iin2 = Self::get_iin2(function, object_headers);
 
         match function {
-            FunctionCode::Write => Some(self.handle_write(seq, object_headers)),
+            FunctionCode::Write => Some(self.handle_write(database, seq, object_headers)),
             // these function don't process objects
-            FunctionCode::DelayMeasure => Some(self.handle_delay_measure(seq, iin2)),
+            FunctionCode::DelayMeasure => {
+                Some(self.handle_delay_measure(seq, self.get_response_iin(database) | iin2))
+            }
             FunctionCode::ColdRestart => {
                 let delay = self.application.cold_restart();
-                Some(self.handle_restart(seq, delay, iin2))
+                Some(self.handle_restart(seq, delay, self.get_response_iin(database) | iin2))
             }
             FunctionCode::WarmRestart => {
                 let delay = self.application.warm_restart();
-                Some(self.handle_restart(seq, delay, iin2))
+                Some(self.handle_restart(seq, delay, self.get_response_iin(database) | iin2))
             }
             // controls
             FunctionCode::Select => {
@@ -1052,15 +1069,21 @@ impl OutstationSession {
                 None
             }
             FunctionCode::EnableUnsolicited => {
-                Some(self.handle_enable_or_disable_unsolicited(true, seq, object_headers))
+                Some(self.handle_enable_or_disable_unsolicited(true, database, seq, object_headers))
             }
-            FunctionCode::DisableUnsolicited => {
-                Some(self.handle_enable_or_disable_unsolicited(false, seq, object_headers))
-            }
+            FunctionCode::DisableUnsolicited => Some(self.handle_enable_or_disable_unsolicited(
+                false,
+                database,
+                seq,
+                object_headers,
+            )),
 
             _ => {
                 tracing::warn!("unsupported function code: {:?}", function);
-                Some(self.write_empty_solicited_response(seq, Iin2::NO_FUNC_CODE_SUPPORT))
+                Some(self.write_empty_solicited_response(
+                    seq,
+                    self.get_response_iin(database) | Iin2::NO_FUNC_CODE_SUPPORT,
+                ))
             }
         }
     }
@@ -1078,7 +1101,12 @@ impl OutstationSession {
         }
     }
 
-    fn handle_write(&mut self, seq: Sequence, object_headers: HeaderCollection) -> usize {
+    fn handle_write(
+        &mut self,
+        database: &DatabaseHandle,
+        seq: Sequence,
+        object_headers: HeaderCollection,
+    ) -> usize {
         let mut iin2 = Iin2::default();
 
         for header in object_headers.iter() {
@@ -1116,12 +1144,10 @@ impl OutstationSession {
             }
         }
 
-        self.write_empty_solicited_response(seq, iin2)
+        self.write_empty_solicited_response(seq, self.get_response_iin(database) | iin2)
     }
 
-    fn handle_delay_measure(&mut self, seq: Sequence, iin2: Iin2) -> usize {
-        let iin = self.get_response_iin() | iin2;
-
+    fn handle_delay_measure(&mut self, seq: Sequence, iin: Iin) -> usize {
         let g52v2 = Group52Var2 {
             time: self.application.get_processing_delay_ms(),
         };
@@ -1139,15 +1165,13 @@ impl OutstationSession {
         cursor.written().len()
     }
 
-    fn handle_restart(&mut self, seq: Sequence, delay: Option<RestartDelay>, iin2: Iin2) -> usize {
+    fn handle_restart(&mut self, seq: Sequence, delay: Option<RestartDelay>, iin: Iin) -> usize {
         let delay = match delay {
             None => {
-                return self.write_empty_solicited_response(seq, iin2 | Iin2::NO_FUNC_CODE_SUPPORT)
+                return self.write_empty_solicited_response(seq, iin | Iin2::NO_FUNC_CODE_SUPPORT)
             }
             Some(x) => x,
         };
-
-        let iin = self.get_response_iin() | iin2;
 
         // respond with the delay
         let mut cursor = self.sol_tx_buffer.write_cursor();
@@ -1188,7 +1212,10 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return self.write_empty_solicited_response(seq, Iin2::PARAMETER_ERROR);
+                return self.write_empty_solicited_response(
+                    seq,
+                    self.get_response_iin(database) | Iin2::PARAMETER_ERROR,
+                );
             }
             Ok(controls) => controls,
         };
@@ -1215,7 +1242,7 @@ impl OutstationSession {
         };
 
         // Calculate IIN and write it
-        let mut iin = self.get_response_iin();
+        let mut iin = self.get_response_iin(database);
 
         if let Ok(CommandStatus::NotSupported) = result {
             iin |= Iin2::PARAMETER_ERROR;
@@ -1234,6 +1261,7 @@ impl OutstationSession {
     fn handle_enable_or_disable_unsolicited(
         &mut self,
         enable: bool,
+        database: &DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection,
     ) -> usize {
@@ -1247,7 +1275,10 @@ impl OutstationSession {
 
         if self.config.unsolicited.is_disabled() {
             tracing::warn!("received {} unsolicited request, but unsolicited support is disabled by configuration", to_string(enable));
-            return self.write_empty_solicited_response(seq, Iin2::NO_FUNC_CODE_SUPPORT);
+            return self.write_empty_solicited_response(
+                seq,
+                self.get_response_iin(database) | Iin2::NO_FUNC_CODE_SUPPORT,
+            );
         }
 
         let mut iin2 = Iin2::default();
@@ -1270,7 +1301,7 @@ impl OutstationSession {
             }
         }
 
-        self.write_empty_solicited_response(seq, iin2)
+        self.write_empty_solicited_response(seq, self.get_response_iin(database) | iin2)
     }
 
     fn handle_direct_operate_no_ack(
@@ -1312,7 +1343,10 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return self.write_empty_solicited_response(seq, Iin2::PARAMETER_ERROR);
+                return self.write_empty_solicited_response(
+                    seq,
+                    self.get_response_iin(database) | Iin2::PARAMETER_ERROR,
+                );
             }
             Ok(controls) => controls,
         };
@@ -1348,7 +1382,7 @@ impl OutstationSession {
         }
 
         // Calculate IIN and write it
-        let mut iin = self.get_response_iin();
+        let mut iin = self.get_response_iin(database);
 
         if let Ok(CommandStatus::NotSupported) = result {
             iin |= Iin2::PARAMETER_ERROR;
@@ -1378,7 +1412,10 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return self.write_empty_solicited_response(seq, Iin2::PARAMETER_ERROR);
+                return self.write_empty_solicited_response(
+                    seq,
+                    self.get_response_iin(database) | Iin2::PARAMETER_ERROR,
+                );
             }
             Ok(controls) => controls,
         };
@@ -1430,7 +1467,7 @@ impl OutstationSession {
         };
 
         // Calculate IIN and write it
-        let mut iin = self.get_response_iin();
+        let mut iin = self.get_response_iin(database);
 
         if status == CommandStatus::NotSupported {
             iin |= Iin2::PARAMETER_ERROR;
@@ -1446,12 +1483,27 @@ impl OutstationSession {
         len
     }
 
-    fn get_response_iin(&self) -> Iin {
+    fn get_response_iin(&self, database: &DatabaseHandle) -> Iin {
         let mut iin = Iin::default();
+
+        // Restart IIN bit
         if self.state.restart_iin_asserted {
             iin |= Iin1::RESTART
         }
 
+        // Events available
+        let events = database.unwritten_classes();
+        if events.class1 {
+            iin |= Iin1::CLASS_1_EVENTS;
+        }
+        if events.class2 {
+            iin |= Iin1::CLASS_2_EVENTS;
+        }
+        if events.class3 {
+            iin |= Iin1::CLASS_3_EVENTS;
+        }
+
+        // Application-controlled IIN bits
         iin |= self.application.get_application_iin();
 
         iin
