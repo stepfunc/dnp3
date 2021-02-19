@@ -118,30 +118,8 @@ impl MasterTask {
                         self.session.delay_for(delay).await?;
                     }
                     Ok(socket) => {
-                        let mut io = PhysLayer::Tcp(socket);
                         tracing::info!("connected to {}", endpoint);
-                        self.endpoints.reset();
-                        self.back_off.on_success();
-                        self.listener.update(ClientState::Connected);
-                        match self
-                            .session
-                            .run(&mut io, &mut self.writer, &mut self.reader)
-                            .await
-                        {
-                            RunError::Shutdown => {
-                                self.listener.update(ClientState::Shutdown);
-                                return Err(Shutdown);
-                            }
-                            RunError::Link(err) => {
-                                tracing::warn!("connection lost - {}", err);
-                                if let Some(delay) = self.reconnect_delay {
-                                    tracing::warn!("waiting {} ms to reconnect", delay.as_millis());
-                                    self.listener
-                                        .update(ClientState::WaitAfterDisconnect(delay));
-                                    self.session.delay_for(delay).await?;
-                                }
-                            }
-                        }
+                        self.run_socket(socket).await?;
                     }
                 }
             } else {
@@ -153,6 +131,33 @@ impl MasterTask {
                 self.listener
                     .update(ClientState::WaitAfterFailedConnect(delay));
                 self.session.delay_for(delay).await?;
+            }
+        }
+    }
+
+    async fn run_socket(&mut self, socket: TcpStream) -> Result<(), Shutdown> {
+        self.endpoints.reset();
+        self.back_off.on_success();
+        self.listener.update(ClientState::Connected);
+        let mut io = PhysLayer::Tcp(socket);
+        match self
+            .session
+            .run(&mut io, &mut self.writer, &mut self.reader)
+            .await
+        {
+            RunError::Shutdown => {
+                self.listener.update(ClientState::Shutdown);
+                Err(Shutdown)
+            }
+            RunError::Link(err) => {
+                tracing::warn!("connection lost - {}", err);
+                if let Some(delay) = self.reconnect_delay {
+                    tracing::warn!("waiting {} ms to reconnect", delay.as_millis());
+                    self.listener
+                        .update(ClientState::WaitAfterDisconnect(delay));
+                    self.session.delay_for(delay).await?;
+                }
+                Ok(())
             }
         }
     }
