@@ -76,6 +76,7 @@ impl MasterSession {
     pub(crate) const MIN_RX_BUFFER_SIZE: usize = 2048;
 
     pub(crate) fn new(
+        enabled: bool,
         decode_level: DecodeLevel,
         response_timeout: Timeout,
         tx_buffer_size: usize,
@@ -89,7 +90,7 @@ impl MasterSession {
         };
 
         Self {
-            enabled: false,
+            enabled,
             decode_level,
             timeout: response_timeout,
             associations: AssociationMap::new(),
@@ -99,19 +100,33 @@ impl MasterSession {
     }
 
     /// Wait for the defined duration, processing messages that are received in the meantime.
-    pub(crate) async fn delay_for(&mut self, duration: Duration) -> Result<(), Shutdown> {
+    pub(crate) async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StateChange> {
         let deadline = Instant::now().add(duration);
 
         loop {
             crate::tokio::select! {
                 result = self.process_message(false) => {
-                   if let Err(StateChange::Shutdown) = result {
-                       return Err(Shutdown);
+                   result?;
+                   if !self.enabled {
+                       return Err(StateChange::Disable)
                    }
                 }
                 _ = crate::tokio::time::sleep_until(deadline) => {
                    return Ok(());
                 }
+            }
+        }
+    }
+
+    /// wait until the session has been enabled
+    pub(crate) async fn wait_for_enabled(&mut self) -> Result<(), Shutdown> {
+        loop {
+            if self.enabled {
+                return Ok(());
+            }
+
+            if let Err(StateChange::Shutdown) = self.process_message(false).await {
+                return Err(Shutdown);
             }
         }
     }
@@ -238,6 +253,11 @@ impl MasterSession {
     fn process_master_message(&mut self, msg: MasterMsg) {
         match msg {
             MasterMsg::EnableCommunication(enable) => {
+                if enable {
+                    tracing::info!("communication enabled");
+                } else {
+                    tracing::info!("communication disabled");
+                }
                 self.enabled = enable;
             }
             MasterMsg::AddAssociation(association, callback) => {

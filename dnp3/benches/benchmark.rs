@@ -225,7 +225,7 @@ impl Pair {
             tx,
         };
 
-        // don't are about the handle
+        // don't care about the handle
         let _ = master
             .add_association(
                 Self::outstation_address(),
@@ -234,6 +234,8 @@ impl Pair {
             )
             .await
             .unwrap();
+
+        master.enable().await.unwrap();
 
         (master, measurements, rx)
     }

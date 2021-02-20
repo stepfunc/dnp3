@@ -44,3 +44,11 @@ impl From<Shutdown> for RunError {
         RunError::Shutdown
     }
 }
+
+impl std::fmt::Display for Shutdown {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("request could not be completed because the component has shut down")
+    }
+}
+
+impl std::error::Error for Shutdown {}

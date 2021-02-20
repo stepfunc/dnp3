@@ -53,13 +53,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
             "dln" => {
-                master.set_decode_level(DecodeLevel::nothing()).await.ok();
+                master.set_decode_level(DecodeLevel::nothing()).await?;
             }
             "dlv" => {
                 master
                     .set_decode_level(AppDecodeLevel::ObjectValues.into())
-                    .await
-                    .ok();
+                    .await?;
             }
             "rao" => {
                 if let Err(err) = association
