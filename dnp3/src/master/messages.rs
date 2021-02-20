@@ -1,3 +1,4 @@
+use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
 use crate::master::error::PollError;
@@ -6,7 +7,6 @@ use crate::master::handle::Promise;
 use crate::master::poll::PollMsg;
 use crate::master::tasks::Task;
 use crate::master::{AssociationConfig, AssociationHandler};
-use crate::util::task::Shutdown;
 
 /// Messages sent from the handles to the master task via an mpsc.
 pub(crate) enum Message {

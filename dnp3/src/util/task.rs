@@ -1,8 +1,5 @@
+use crate::app::Shutdown;
 use crate::link::error::LinkError;
-
-/// Indicates that a task shutdown has been requested
-#[derive(Copy, Clone, Debug)]
-pub struct Shutdown;
 
 pub(crate) struct Receiver<T> {
     inner: crate::tokio::sync::mpsc::Receiver<T>,
@@ -33,22 +30,14 @@ pub(crate) enum RunError {
     Shutdown,
 }
 
-impl From<LinkError> for RunError {
-    fn from(err: LinkError) -> Self {
-        RunError::Link(err)
-    }
-}
-
 impl From<Shutdown> for RunError {
     fn from(_: Shutdown) -> Self {
         RunError::Shutdown
     }
 }
 
-impl std::fmt::Display for Shutdown {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str("request could not be completed because the component has shut down")
+impl From<LinkError> for RunError {
+    fn from(err: LinkError) -> Self {
+        RunError::Link(err)
     }
 }
-
-impl std::error::Error for Shutdown {}

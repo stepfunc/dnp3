@@ -1,11 +1,11 @@
 pub use config::*;
 pub use traits::*;
 
+use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
 use crate::util::phys::PhysLayer;
-use crate::util::task::Shutdown;
 
 /// configuration types
 

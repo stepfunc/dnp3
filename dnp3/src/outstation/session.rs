@@ -29,7 +29,7 @@ use crate::transport::{
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 use crate::util::phys::PhysLayer;
-use crate::util::task::{Receiver, RunError, Shutdown};
+use crate::util::task::{Receiver, RunError};
 
 #[derive(Copy, Clone)]
 enum Timeout {

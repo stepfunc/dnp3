@@ -319,9 +319,9 @@ impl From<RecvError> for TimeSyncError {
     }
 }
 
-impl<T> From<SendError<T>> for crate::util::task::Shutdown {
+impl<T> From<SendError<T>> for crate::app::Shutdown {
     fn from(_: SendError<T>) -> Self {
-        crate::util::task::Shutdown
+        crate::app::Shutdown
     }
 }
 

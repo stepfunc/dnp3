@@ -2,12 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use crate::app::measurement::*;
 use crate::app::variations::Variation;
-use crate::app::Bytes;
-use crate::app::QualifierCode;
-use crate::app::ReconnectStrategy;
-use crate::app::ResponseHeader;
-use crate::app::Timeout;
-use crate::app::Timestamp;
+use crate::app::*;
 use crate::decode::DecodeLevel;
 use crate::link::{EndpointAddress, LinkStatusResult};
 use crate::master::association::AssociationConfig;
@@ -22,7 +17,6 @@ use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
 use crate::tokio::sync::mpsc::error::SendError;
-use crate::util::task::Shutdown;
 
 #[derive(Clone, Debug)]
 pub struct MasterHandle {

@@ -4,6 +4,7 @@ use std::time::Duration;
 use tracing::Instrument;
 
 use crate::app::ExponentialBackOff;
+use crate::app::Shutdown;
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::{Listener, MasterConfig, MasterHandle};
@@ -13,7 +14,6 @@ use crate::tokio::net::TcpStream;
 use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
 use crate::util::phys::PhysLayer;
-use crate::util::task::Shutdown;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.

@@ -8,6 +8,7 @@ use crate::app::format::write::start_request;
 use crate::app::parse::parser::Response;
 use crate::app::ControlField;
 use crate::app::Sequence;
+use crate::app::Shutdown;
 use crate::app::Timeout;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
@@ -22,7 +23,6 @@ use crate::tokio::time::Instant;
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::phys::PhysLayer;
-use crate::util::task::Shutdown;
 
 pub(crate) struct MasterSession {
     enabled: bool,
