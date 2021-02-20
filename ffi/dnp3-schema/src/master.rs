@@ -61,6 +61,28 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .build()?;
 
+    let enable_fn = lib
+        .declare_native_function("master_enable")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "master to enable",
+        )?
+        .return_type(ReturnType::Void)?
+        .doc("start communications")?
+        .build()?;
+
+    let disable_fn = lib
+        .declare_native_function("master_disable")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "master to disable",
+        )?
+        .return_type(ReturnType::Void)?
+        .doc("stop communications")?
+        .build()?;
+
     // define the association
     let association_class = crate::association::define(lib, shared)?;
 
@@ -209,6 +231,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .destructor(&destroy_fn)?
         .static_method("CreateTCPSession", &master_create_tcp_session_fn)?
         .static_method("CreateSerialSession", &master_create_serial_session_fn)?
+        .method("Enable", &enable_fn)?
+        .method("Disable", &disable_fn)?
         .method("AddAssociation", &add_association_fn)?
         .method("SetDecodeLevel", &set_decode_level_fn)?
         .method("GetDecodeLevel", &get_decode_level_fn)?

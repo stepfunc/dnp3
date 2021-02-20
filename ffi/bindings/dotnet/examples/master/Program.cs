@@ -214,12 +214,25 @@ class MainClass
         var pollRequest = Request.ClassRequest(false, true, true, true);
         var poll = association.AddPoll(pollRequest, TimeSpan.FromSeconds(5));
 
+        // start communications
+        master.Enable();
+
         while (true)
         {
             switch (await GetInputAsync())
             {
                 case "x":
                     return;
+                case "enable":
+                    {
+                        master.Enable();
+                        break;
+                    }
+                case "disable":
+                    {
+                        master.Disable();
+                        break;
+                    }
                 case "dln":
                     {
                         master.SetDecodeLevel(new DecodeLevel());
