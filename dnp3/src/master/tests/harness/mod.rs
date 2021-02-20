@@ -13,6 +13,7 @@ use crate::master::handle::{
 use crate::master::session::{MasterSession, RunError};
 use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
+use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
 pub(crate) mod requests;
@@ -33,7 +34,7 @@ pub(crate) fn create_association(
         AppDecodeLevel::ObjectValues.into(),
         crate::app::Timeout::from_secs(1).unwrap(),
         MasterSession::MIN_TX_BUFFER_SIZE,
-        rx,
+        Receiver::new(rx),
     );
     let mut master = MasterHandle::new(tx);
 

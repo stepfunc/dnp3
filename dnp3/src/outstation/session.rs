@@ -27,9 +27,9 @@ use crate::transport::{
     FragmentInfo, RequestGuard, TransportReader, TransportRequest, TransportWriter,
 };
 use crate::util::buffer::Buffer;
+use crate::util::channel::Receiver;
 use crate::util::cursor::WriteError;
 use crate::util::phys::PhysLayer;
-use crate::util::task::Receiver;
 
 #[derive(Copy, Clone)]
 enum Timeout {

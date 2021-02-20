@@ -22,6 +22,7 @@ use crate::master::Association;
 use crate::tokio::time::Instant;
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
+use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
 pub(crate) struct MasterSession {
@@ -29,7 +30,7 @@ pub(crate) struct MasterSession {
     decode_level: DecodeLevel,
     timeout: Timeout,
     associations: AssociationMap,
-    user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
+    messages: Receiver<Message>,
     tx_buffer: Buffer,
 }
 
@@ -49,6 +50,12 @@ pub enum StateChange {
 pub(crate) enum RunError {
     State(StateChange),
     Link(LinkError),
+}
+
+impl From<Shutdown> for StateChange {
+    fn from(_: Shutdown) -> Self {
+        StateChange::Shutdown
+    }
 }
 
 impl From<StateChange> for RunError {
@@ -81,7 +88,7 @@ impl MasterSession {
         decode_level: DecodeLevel,
         response_timeout: Timeout,
         tx_buffer_size: usize,
-        user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
+        messages: Receiver<Message>,
     ) -> Self {
         let tx_buffer_size = if tx_buffer_size < Self::MIN_TX_BUFFER_SIZE {
             tracing::warn!("Minimum TX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", Self::MIN_TX_BUFFER_SIZE, tx_buffer_size);
@@ -95,7 +102,7 @@ impl MasterSession {
             decode_level,
             timeout: response_timeout,
             associations: AssociationMap::new(),
-            user_queue,
+            messages,
             tx_buffer: Buffer::new(tx_buffer_size),
         }
     }
@@ -228,27 +235,23 @@ impl MasterSession {
     }
 
     async fn process_message(&mut self, is_connected: bool) -> Result<(), StateChange> {
-        match self.user_queue.recv().await {
-            Some(msg) => {
-                match msg {
-                    Message::Master(msg) => {
-                        self.process_master_message(msg);
-                        if is_connected && !self.enabled {
-                            return Err(StateChange::Disable);
-                        }
-                    }
-                    Message::Association(msg) => {
-                        if let Ok(association) = self.associations.get_mut(msg.address) {
-                            association.process_message(msg.details, is_connected);
-                        } else {
-                            msg.on_association_failure();
-                        }
-                    }
+        let message = self.messages.next().await?;
+        match message {
+            Message::Master(msg) => {
+                self.process_master_message(msg);
+                if is_connected && !self.enabled {
+                    return Err(StateChange::Disable);
                 }
-                Ok(())
             }
-            None => Err(StateChange::Shutdown),
+            Message::Association(msg) => {
+                if let Ok(association) = self.associations.get_mut(msg.address) {
+                    association.process_message(msg.details, is_connected);
+                } else {
+                    msg.on_association_failure();
+                }
+            }
         }
+        Ok(())
     }
 
     fn process_master_message(&mut self, msg: MasterMsg) {
