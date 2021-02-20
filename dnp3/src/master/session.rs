@@ -17,6 +17,7 @@ use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
+use crate::master::Association;
 use crate::tokio::time::Instant;
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
@@ -260,8 +261,11 @@ impl MasterSession {
                 }
                 self.enabled = enable;
             }
-            MasterMsg::AddAssociation(association, callback) => {
-                callback.complete(self.associations.register(association));
+            MasterMsg::AddAssociation(address, config, handler, callback) => {
+                callback.complete(
+                    self.associations
+                        .register(Association::new(address, config, handler)),
+                );
             }
             MasterMsg::RemoveAssociation(address) => {
                 self.associations.remove(address);

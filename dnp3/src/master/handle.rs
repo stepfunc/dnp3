@@ -10,7 +10,7 @@ use crate::app::Timeout;
 use crate::app::Timestamp;
 use crate::decode::DecodeLevel;
 use crate::link::{EndpointAddress, LinkStatusResult};
-use crate::master::association::{Association, AssociationConfig};
+use crate::master::association::AssociationConfig;
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
@@ -120,10 +120,14 @@ impl MasterHandle {
         config: AssociationConfig,
         handler: Box<dyn AssociationHandler>,
     ) -> Result<AssociationHandle, AssociationError> {
-        let association = Association::new(address, config, handler);
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
-        self.send_master_message(MasterMsg::AddAssociation(association, Promise::OneShot(tx)))
-            .await?;
+        self.send_master_message(MasterMsg::AddAssociation(
+            address,
+            config,
+            handler,
+            Promise::OneShot(tx),
+        ))
+        .await?;
         rx.await?
             .map(|_| (AssociationHandle::new(address, self.clone())))
     }
