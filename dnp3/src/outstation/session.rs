@@ -29,7 +29,7 @@ use crate::transport::{
 use crate::util::buffer::Buffer;
 use crate::util::cursor::WriteError;
 use crate::util::phys::PhysLayer;
-use crate::util::task::{Receiver, RunError};
+use crate::util::task::Receiver;
 
 #[derive(Copy, Clone)]
 enum Timeout {
@@ -232,6 +232,24 @@ enum ConfirmAction {
     NewRequest(RequestHeader),
     EchoLastResponse(Option<usize>),
     ContinueWait,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum RunError {
+    Link(LinkError),
+    Shutdown,
+}
+
+impl From<Shutdown> for RunError {
+    fn from(_: Shutdown) -> Self {
+        RunError::Shutdown
+    }
+}
+
+impl From<LinkError> for RunError {
+    fn from(err: LinkError) -> Self {
+        RunError::Link(err)
+    }
 }
 
 #[derive(Debug)]

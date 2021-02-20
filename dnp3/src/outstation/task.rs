@@ -4,12 +4,12 @@ use crate::decode::DecodeLevel;
 use crate::link::LinkErrorMode;
 use crate::outstation::config::*;
 use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
-use crate::outstation::session::{OutstationSession, SessionError};
+use crate::outstation::session::{OutstationSession, RunError, SessionError};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::phys::PhysLayer;
-use crate::util::task::{Receiver, RunError};
+use crate::util::task::Receiver;
 
 pub(crate) enum ConfigurationChange {
     SetDecodeLevel(DecodeLevel),
