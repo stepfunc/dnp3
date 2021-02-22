@@ -8,6 +8,7 @@ use crate::app::format::write::start_request;
 use crate::app::parse::parser::Response;
 use crate::app::ControlField;
 use crate::app::Sequence;
+use crate::app::Shutdown;
 use crate::app::Timeout;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
@@ -17,17 +18,19 @@ use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
+use crate::master::Association;
 use crate::tokio::time::Instant;
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
+use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
-use crate::util::task::Shutdown;
 
 pub(crate) struct MasterSession {
+    enabled: bool,
     decode_level: DecodeLevel,
     timeout: Timeout,
     associations: AssociationMap,
-    user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
+    messages: Receiver<Message>,
     tx_buffer: Buffer,
 }
 
@@ -38,9 +41,27 @@ enum ReadResponseAction {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum RunError {
-    Link(LinkError),
+pub enum StateChange {
+    Disable,
     Shutdown,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum RunError {
+    State(StateChange),
+    Link(LinkError),
+}
+
+impl From<Shutdown> for StateChange {
+    fn from(_: Shutdown) -> Self {
+        StateChange::Shutdown
+    }
+}
+
+impl From<StateChange> for RunError {
+    fn from(x: StateChange) -> Self {
+        RunError::State(x)
+    }
 }
 
 impl From<LinkError> for RunError {
@@ -51,7 +72,7 @@ impl From<LinkError> for RunError {
 
 impl From<Shutdown> for RunError {
     fn from(_: Shutdown) -> Self {
-        RunError::Shutdown
+        RunError::State(StateChange::Shutdown)
     }
 }
 
@@ -63,10 +84,11 @@ impl MasterSession {
     pub(crate) const MIN_RX_BUFFER_SIZE: usize = 2048;
 
     pub(crate) fn new(
+        enabled: bool,
         decode_level: DecodeLevel,
         response_timeout: Timeout,
         tx_buffer_size: usize,
-        user_queue: crate::tokio::sync::mpsc::Receiver<Message>,
+        messages: Receiver<Message>,
     ) -> Self {
         let tx_buffer_size = if tx_buffer_size < Self::MIN_TX_BUFFER_SIZE {
             tracing::warn!("Minimum TX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", Self::MIN_TX_BUFFER_SIZE, tx_buffer_size);
@@ -76,26 +98,43 @@ impl MasterSession {
         };
 
         Self {
+            enabled,
             decode_level,
             timeout: response_timeout,
             associations: AssociationMap::new(),
-            user_queue,
+            messages,
             tx_buffer: Buffer::new(tx_buffer_size),
         }
     }
 
     /// Wait for the defined duration, processing messages that are received in the meantime.
-    pub(crate) async fn delay_for(&mut self, duration: Duration) -> Result<(), Shutdown> {
+    pub(crate) async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StateChange> {
         let deadline = Instant::now().add(duration);
 
         loop {
             crate::tokio::select! {
                 result = self.process_message(false) => {
                    result?;
+                   if !self.enabled {
+                       return Err(StateChange::Disable)
+                   }
                 }
                 _ = crate::tokio::time::sleep_until(deadline) => {
                    return Ok(());
                 }
+            }
+        }
+    }
+
+    /// wait until the session has been enabled
+    pub(crate) async fn wait_for_enabled(&mut self) -> Result<(), Shutdown> {
+        loop {
+            if self.enabled {
+                return Ok(());
+            }
+
+            if let Err(StateChange::Shutdown) = self.process_message(false).await {
+                return Err(Shutdown);
             }
         }
     }
@@ -195,29 +234,41 @@ impl MasterSession {
         }
     }
 
-    async fn process_message(&mut self, is_connected: bool) -> Result<(), Shutdown> {
-        match self.user_queue.recv().await {
-            Some(msg) => {
-                match msg {
-                    Message::Master(msg) => self.process_master_message(msg),
-                    Message::Association(msg) => {
-                        if let Ok(association) = self.associations.get_mut(msg.address) {
-                            association.process_message(msg.details, is_connected);
-                        } else {
-                            msg.on_association_failure();
-                        }
-                    }
+    async fn process_message(&mut self, is_connected: bool) -> Result<(), StateChange> {
+        let message = self.messages.receive().await?;
+        match message {
+            Message::Master(msg) => {
+                self.process_master_message(msg);
+                if is_connected && !self.enabled {
+                    return Err(StateChange::Disable);
                 }
-                Ok(())
             }
-            None => Err(Shutdown),
+            Message::Association(msg) => {
+                if let Ok(association) = self.associations.get_mut(msg.address) {
+                    association.process_message(msg.details, is_connected);
+                } else {
+                    msg.on_association_failure();
+                }
+            }
         }
+        Ok(())
     }
 
     fn process_master_message(&mut self, msg: MasterMsg) {
         match msg {
-            MasterMsg::AddAssociation(association, callback) => {
-                callback.complete(self.associations.register(association));
+            MasterMsg::EnableCommunication(enable) => {
+                if enable {
+                    tracing::info!("communication enabled");
+                } else {
+                    tracing::info!("communication disabled");
+                }
+                self.enabled = enable;
+            }
+            MasterMsg::AddAssociation(address, config, handler, callback) => {
+                callback.complete(
+                    self.associations
+                        .register(Association::new(address, config, handler)),
+                );
             }
             MasterMsg::RemoveAssociation(address) => {
                 self.associations.remove(address);
@@ -278,7 +329,7 @@ impl MasterSession {
         match result {
             Ok(()) => Ok(()),
             Err(err) => match err {
-                TaskError::Shutdown => Err(RunError::Shutdown),
+                TaskError::State(x) => Err(RunError::State(x)),
                 TaskError::Lower(err) => Err(RunError::Link(err)),
                 _ => Ok(()),
             },

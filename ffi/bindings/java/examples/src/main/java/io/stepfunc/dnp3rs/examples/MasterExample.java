@@ -196,6 +196,9 @@ public class MasterExample {
     Request pollRequest = Request.classRequest(false, true, true, true);
     Poll poll = association.addPoll(pollRequest, Duration.ofSeconds(5));
 
+    // start communications
+    master.enable();
+
     // Handle user input
     BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
     while (true) {
@@ -203,6 +206,12 @@ public class MasterExample {
       switch (line) {
         case "x":
           return;
+        case "enable":
+          master.enable();
+          break;
+        case "disable":
+          master.disable();
+          break;
         case "dln":
           master.setDecodeLevel(new DecodeLevel());
           break;

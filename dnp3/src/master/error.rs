@@ -1,16 +1,15 @@
 use std::error::Error;
 
 use crate::app::control::CommandStatus;
-use crate::app::ObjectParseError;
 use crate::app::{Iin, Iin2};
+use crate::app::{ObjectParseError, Shutdown};
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::NoAssociation;
-use crate::master::session::RunError;
+use crate::master::session::{RunError, StateChange};
 use crate::tokio::sync::mpsc::error::SendError;
 use crate::tokio::sync::oneshot::error::RecvError;
 use crate::util::cursor::WriteError;
-use crate::util::task::Shutdown;
 
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -46,8 +45,8 @@ pub enum TaskError {
     NoSuchAssociation(EndpointAddress),
     /// There is not connection at the transport level
     NoConnection,
-    /// The master was shutdown
-    Shutdown,
+    /// The master was disabled or shutdown
+    State(StateChange),
 }
 
 // Errors that can occur when adding/modifying polls
@@ -194,7 +193,12 @@ impl std::fmt::Display for TaskError {
             TaskError::WriteError => {
                 f.write_str("unable to serialize the task's request (insufficient buffer space)")
             }
-            TaskError::Shutdown => f.write_str("the master was shutdown while executing the task"),
+            TaskError::State(StateChange::Shutdown) => {
+                f.write_str("the master was shutdown while executing the task")
+            }
+            TaskError::State(StateChange::Disable) => {
+                f.write_str("the master was disabled while executing the task")
+            }
             TaskError::NoConnection => f.write_str("no connection"),
             TaskError::NoSuchAssociation(x) => write!(f, "no association with address: {}", x),
         }
@@ -240,16 +244,10 @@ impl From<ObjectParseError> for TaskError {
     }
 }
 
-impl From<Shutdown> for TaskError {
-    fn from(_: Shutdown) -> Self {
-        TaskError::Shutdown
-    }
-}
-
 impl From<RunError> for TaskError {
     fn from(x: RunError) -> Self {
         match x {
-            RunError::Shutdown => TaskError::Shutdown,
+            RunError::State(s) => TaskError::State(s),
             RunError::Link(x) => TaskError::Lower(x),
         }
     }
@@ -258,12 +256,6 @@ impl From<RunError> for TaskError {
 impl From<NoAssociation> for TaskError {
     fn from(x: NoAssociation) -> Self {
         TaskError::NoSuchAssociation(x.address)
-    }
-}
-
-impl From<Shutdown> for PollError {
-    fn from(_: Shutdown) -> Self {
-        PollError::Shutdown
     }
 }
 
@@ -303,21 +295,27 @@ impl From<RecvError> for AssociationError {
     }
 }
 
+impl From<StateChange> for TaskError {
+    fn from(x: StateChange) -> Self {
+        TaskError::State(x)
+    }
+}
+
 impl From<RecvError> for TaskError {
     fn from(_: RecvError) -> Self {
-        TaskError::Shutdown
+        TaskError::State(StateChange::Shutdown)
     }
 }
 
 impl From<RecvError> for CommandError {
     fn from(_: RecvError) -> Self {
-        CommandError::Task(TaskError::Shutdown)
+        CommandError::Task(TaskError::State(StateChange::Shutdown))
     }
 }
 
 impl From<RecvError> for TimeSyncError {
     fn from(_: RecvError) -> Self {
-        TimeSyncError::Task(TaskError::Shutdown)
+        TimeSyncError::Task(TaskError::State(StateChange::Shutdown))
     }
 }
 
@@ -327,32 +325,32 @@ impl<T> From<SendError<T>> for Shutdown {
     }
 }
 
-impl<T> From<SendError<T>> for AssociationError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for AssociationError {
+    fn from(_: Shutdown) -> Self {
         AssociationError::Shutdown
     }
 }
 
-impl<T> From<SendError<T>> for TaskError {
-    fn from(_: SendError<T>) -> Self {
-        TaskError::Shutdown
+impl From<Shutdown> for TaskError {
+    fn from(_: Shutdown) -> Self {
+        TaskError::State(StateChange::Shutdown)
     }
 }
 
-impl<T> From<SendError<T>> for CommandError {
-    fn from(_: SendError<T>) -> Self {
-        CommandError::Task(TaskError::Shutdown)
+impl From<Shutdown> for CommandError {
+    fn from(_: Shutdown) -> Self {
+        CommandError::Task(TaskError::State(StateChange::Shutdown))
     }
 }
 
-impl<T> From<SendError<T>> for TimeSyncError {
-    fn from(_: SendError<T>) -> Self {
-        TimeSyncError::Task(TaskError::Shutdown)
+impl From<Shutdown> for TimeSyncError {
+    fn from(_: Shutdown) -> Self {
+        TimeSyncError::Task(TaskError::State(StateChange::Shutdown))
     }
 }
 
-impl<T> From<SendError<T>> for PollError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for PollError {
+    fn from(_: Shutdown) -> Self {
         PollError::Shutdown
     }
 }

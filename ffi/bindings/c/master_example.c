@@ -323,14 +323,27 @@ int main()
     poll_t* poll = association_add_poll(association, poll_request, 5000);
     request_destroy(poll_request);
 
-    char cbuf[5];
+    // start communications
+    master_enable(master);
+
+    char cbuf[10];
     while(true)
     {
-        fgets(cbuf, 5, stdin);
+        fgets(cbuf, 10, stdin);
 
         if(strcmp(cbuf, "x\n") == 0)
         {
             goto cleanup;
+        }
+        else if (strcmp(cbuf, "enable\n") == 0)
+        {
+            printf("calling enable\n");
+            master_enable(master);
+        }
+        else if (strcmp(cbuf, "disable\n") == 0)
+        {
+            printf("calling disable\n");
+            master_disable(master);
         }
         else if(strcmp(cbuf, "dln\n") == 0)
         {

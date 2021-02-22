@@ -99,6 +99,22 @@ pub unsafe fn master_destroy(master: *mut Master) {
     }
 }
 
+pub unsafe fn master_enable(master: *mut crate::Master) {
+    if let Some(master) = master.as_mut() {
+        if let Some(runtime) = master.runtime.get() {
+            let _ = runtime.block_on(master.handle.enable());
+        }
+    }
+}
+
+pub unsafe fn master_disable(master: *mut crate::Master) {
+    if let Some(master) = master.as_mut() {
+        if let Some(runtime) = master.runtime.get() {
+            let _ = runtime.block_on(master.handle.disable());
+        }
+    }
+}
+
 pub unsafe fn master_add_association(
     master: *mut Master,
     address: u16,

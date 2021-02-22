@@ -1,11 +1,11 @@
 pub(crate) mod bit;
 pub(crate) mod buffer;
+pub(crate) mod channel;
 pub(crate) mod cursor;
 pub(crate) mod decode;
 pub(crate) mod future;
 pub(crate) mod phys;
 pub(crate) mod slice_ext;
-pub(crate) mod task;
 
 pub(crate) struct Smallest<T>
 where

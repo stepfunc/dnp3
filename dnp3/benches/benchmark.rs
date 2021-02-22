@@ -3,14 +3,14 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::{Rng, SeedableRng};
 
-use dnp3::app::*;
 use dnp3::app::measurement::*;
-use dnp3::link::*;
+use dnp3::app::*;
 use dnp3::decode::*;
+use dnp3::link::*;
 use dnp3::master::*;
-use dnp3::tcp::*;
-use dnp3::outstation::*;
 use dnp3::outstation::database::*;
+use dnp3::outstation::*;
+use dnp3::tcp::*;
 
 fn config() -> TestConfig {
     TestConfig {
@@ -225,7 +225,7 @@ impl Pair {
             tx,
         };
 
-        // don't are about the handle
+        // don't care about the handle
         let _ = master
             .add_association(
                 Self::outstation_address(),
@@ -234,6 +234,8 @@ impl Pair {
             )
             .await
             .unwrap();
+
+        master.enable().await.unwrap();
 
         (master, measurements, rx)
     }
