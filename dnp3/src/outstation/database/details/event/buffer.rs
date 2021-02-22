@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::fmt::Debug;
 use std::ops::BitOr;
 
-use crate::app::measurement;
+use crate::app::measurement::{self};
 use crate::master::EventClasses;
 use crate::outstation::database::config::*;
 use crate::outstation::database::read::EventReadHeader;
@@ -389,6 +389,7 @@ pub(crate) struct EventBuffer {
     events: VecList<EventRecord>,
     total: Counters,
     written: Counters,
+    is_overflown: bool,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -410,6 +411,7 @@ impl EventBuffer {
             events: VecList::new(max_size),
             total: Counters::new(),
             written: Counters::new(),
+            is_overflown: false,
         }
     }
 
@@ -442,6 +444,7 @@ impl EventBuffer {
             if let Some(record) = self.events.remove_first(T::is_type) {
                 T::decrement_type(&mut self.total.types);
                 self.total.classes.decrement(record.class);
+                self.is_overflown = true;
             }
             Err(InsertError::Overflow)
         } else {
@@ -578,6 +581,9 @@ impl EventBuffer {
             .remove_all(|e| e.state.get() == EventState::Written);
         self.total = self.total.subtract(&self.written);
         self.written.zero();
+        if !self.is_any_full() {
+            self.is_overflown = false;
+        }
         count
     }
 
@@ -586,6 +592,34 @@ impl EventBuffer {
             r.state.set(EventState::Unselected);
         }
         self.written.zero();
+    }
+
+    pub(crate) fn is_overflown(&self) -> bool {
+        self.is_overflown
+    }
+
+    fn is_any_full(&self) -> bool {
+        self.is_full::<measurement::Binary>()
+            || self.is_full::<measurement::DoubleBitBinary>()
+            || self.is_full::<measurement::BinaryOutputStatus>()
+            || self.is_full::<measurement::Counter>()
+            || self.is_full::<measurement::FrozenCounter>()
+            || self.is_full::<measurement::Analog>()
+            || self.is_full::<measurement::AnalogOutputStatus>()
+            || self.is_full::<measurement::OctetString>()
+    }
+
+    fn is_full<T>(&self) -> bool
+    where
+        T: Insertable,
+    {
+        let max = T::get_max(&self.config);
+
+        if max == 0 {
+            return false;
+        }
+
+        T::get_type_count(&self.total.types) >= max as usize
     }
 
     fn select<F>(&mut self, limit: Option<usize>, selector: F) -> usize

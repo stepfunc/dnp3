@@ -247,6 +247,7 @@ pub trait Remove<T> {
 pub trait Update<T> {
     /// Update a value at a particular index. The options control
     /// how static/event data is modified
+    /// Returns true if the update succeeded (i.e. the point exists)
     fn update(&mut self, index: u16, value: &T, options: UpdateOptions) -> bool;
 }
 
@@ -316,6 +317,10 @@ impl DatabaseHandle {
 
     pub(crate) fn unwritten_classes(&self) -> EventClasses {
         self.inner.lock().unwrap().inner.unwritten_classes()
+    }
+
+    pub(crate) fn is_overflown(&self) -> bool {
+        self.inner.lock().unwrap().inner.is_overflown()
     }
 
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> Iin2 {

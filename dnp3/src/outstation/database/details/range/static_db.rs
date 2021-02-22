@@ -310,19 +310,19 @@ impl StaticDatabase {
         value: &T,
         index: u16,
         options: UpdateOptions,
-    ) -> Option<(T::EventVariation, EventClass)>
+    ) -> (bool, Option<(T::EventVariation, EventClass)>)
     where
         T: Updatable,
     {
         match self.get_map::<T>().get_mut(index) {
-            None => None,
+            None => (false, None),
             Some(x) => {
                 if options.update_static {
                     x.current = value.clone();
                 }
 
                 // event detection
-                match options.event_mode {
+                let event = match options.event_mode {
                     EventMode::Suppress => None,
                     EventMode::Force => {
                         x.last_event = value.clone();
@@ -336,7 +336,9 @@ impl StaticDatabase {
                             None
                         }
                     }
-                }
+                };
+
+                (true, event)
             }
         }
     }

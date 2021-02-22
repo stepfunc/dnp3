@@ -1503,6 +1503,11 @@ impl OutstationSession {
             iin |= Iin1::CLASS_3_EVENTS;
         }
 
+        // Buffer overflow
+        if database.is_overflown() {
+            iin |= Iin2::EVENT_BUFFER_OVERFLOW;
+        }
+
         // Application-controlled IIN bits
         iin |= self.application.get_application_iin();
 

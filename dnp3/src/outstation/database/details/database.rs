@@ -40,6 +40,10 @@ impl Database {
         self.event_buffer.unwritten_classes()
     }
 
+    pub(crate) fn is_overflown(&self) -> bool {
+        self.event_buffer.is_overflown()
+    }
+
     pub(crate) fn select_by_header(&mut self, header: ReadHeader) -> Iin2 {
         match header {
             ReadHeader::Static(header) => self.static_db.select(header),
@@ -72,15 +76,15 @@ impl Database {
     where
         T: Updatable,
     {
-        let event_data = self.static_db.update(value, index, options);
+        let (exists, event_data) = self.static_db.update(value, index, options);
 
         // if an event should be produced, insert it into the buffer
         if let Some((variation, class)) = event_data {
-            // TODO - do something with an overflow
+            // Overflow is handled in the event buffer
             let _ = self.event_buffer.insert(index, class, value, variation);
         }
 
-        true
+        exists
     }
 
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {
