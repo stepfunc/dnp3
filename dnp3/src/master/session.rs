@@ -235,7 +235,7 @@ impl MasterSession {
     }
 
     async fn process_message(&mut self, is_connected: bool) -> Result<(), StateChange> {
-        let message = self.messages.next().await?;
+        let message = self.messages.receive().await?;
         match message {
             Message::Master(msg) => {
                 self.process_master_message(msg);

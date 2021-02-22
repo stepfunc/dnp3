@@ -16,11 +16,11 @@ use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
-use crate::tokio::sync::mpsc::error::SendError;
+use crate::util::channel::Sender;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct MasterHandle {
-    sender: crate::tokio::sync::mpsc::Sender<Message>,
+    sender: Sender<Message>,
 }
 
 /// Handle used to make requests against
@@ -71,7 +71,7 @@ impl MasterConfig {
 }
 
 impl MasterHandle {
-    pub(crate) fn new(sender: crate::tokio::sync::mpsc::Sender<Message>) -> Self {
+    pub(crate) fn new(sender: Sender<Message>) -> Self {
         Self { sender }
     }
 
@@ -126,15 +126,16 @@ impl MasterHandle {
             .map(|_| (AssociationHandle::new(address, self.clone())))
     }
 
-    async fn send_master_message(&mut self, msg: MasterMsg) -> Result<(), SendError<Message>> {
-        self.sender.send(Message::Master(msg)).await
+    async fn send_master_message(&mut self, msg: MasterMsg) -> Result<(), Shutdown> {
+        self.sender.send(Message::Master(msg)).await?;
+        Ok(())
     }
 
     async fn send_association_message(
         &mut self,
         address: EndpointAddress,
         msg: AssociationMsgType,
-    ) -> Result<(), SendError<Message>> {
+    ) -> Result<(), Shutdown> {
         self.sender
             .send(Message::Association(AssociationMsg {
                 address,
@@ -229,16 +230,13 @@ impl AssociationHandle {
         rx.await?
     }
 
-    async fn send_task(&mut self, task: Task) -> Result<(), SendError<Message>> {
+    async fn send_task(&mut self, task: Task) -> Result<(), Shutdown> {
         self.master
             .send_association_message(self.address, AssociationMsgType::QueueTask(task))
             .await
     }
 
-    pub(crate) async fn send_poll_message(
-        &mut self,
-        msg: PollMsg,
-    ) -> Result<(), SendError<Message>> {
+    pub(crate) async fn send_poll_message(&mut self, msg: PollMsg) -> Result<(), Shutdown> {
         self.master
             .send_association_message(self.address, AssociationMsgType::Poll(msg))
             .await

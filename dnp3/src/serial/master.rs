@@ -12,7 +12,6 @@ use crate::serial::SerialSettings;
 use crate::tcp::ClientState;
 use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
-use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
@@ -74,13 +73,13 @@ impl MasterTask {
         config: MasterConfig,
         listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
-        let (tx, rx) = crate::tokio::sync::mpsc::channel(100); // TODO
+        let (tx, rx) = crate::util::channel::request_channel();
         let session = MasterSession::new(
             false,
             config.decode_level,
             config.response_timeout,
             config.tx_buffer_size,
-            Receiver::new(rx),
+            rx,
         );
         let (reader, writer) = crate::transport::create_master_transport_layer(
             // serial ports always discard link parsing errors

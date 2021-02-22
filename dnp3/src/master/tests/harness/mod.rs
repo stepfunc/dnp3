@@ -13,7 +13,6 @@ use crate::master::handle::{
 use crate::master::session::{MasterSession, RunError};
 use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
-use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
 pub(crate) mod requests;
@@ -28,13 +27,13 @@ pub(crate) fn create_association(
     let outstation_address = EndpointAddress::from(1024).unwrap();
 
     // Create the master session
-    let (tx, rx) = crate::tokio::sync::mpsc::channel(1);
+    let (tx, rx) = crate::util::channel::request_channel();
     let mut runner = MasterSession::new(
         true,
         AppDecodeLevel::ObjectValues.into(),
         crate::app::Timeout::from_secs(1).unwrap(),
         MasterSession::MIN_TX_BUFFER_SIZE,
-        Receiver::new(rx),
+        rx,
     );
     let mut master = MasterHandle::new(tx);
 

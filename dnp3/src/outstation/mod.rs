@@ -5,6 +5,7 @@ use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
+use crate::util::channel::Sender;
 use crate::util::phys::PhysLayer;
 
 /// configuration types
@@ -29,7 +30,7 @@ mod tests;
 #[derive(Clone)]
 pub struct OutstationHandle {
     pub database: DatabaseHandle,
-    sender: crate::tokio::sync::mpsc::Sender<OutstationMessage>,
+    sender: Sender<OutstationMessage>,
 }
 
 impl OutstationHandle {

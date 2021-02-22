@@ -184,7 +184,7 @@ impl SessionState {
 }
 
 pub(crate) struct OutstationSession {
-    receiver: Receiver<OutstationMessage>,
+    messages: Receiver<OutstationMessage>,
     sol_tx_buffer: Buffer,
     unsol_tx_buffer: Buffer,
     config: SessionConfig,
@@ -278,7 +278,7 @@ impl From<Shutdown> for SessionError {
 
 impl OutstationSession {
     pub(crate) fn new(
-        receiver: Receiver<OutstationMessage>,
+        messages: Receiver<OutstationMessage>,
         config: SessionConfig,
         param: SessionParameters,
         application: Box<dyn OutstationApplication>,
@@ -290,7 +290,7 @@ impl OutstationSession {
             .map(|delay| crate::tokio::time::Instant::now() + delay);
 
         Self {
-            receiver,
+            messages,
             config,
             sol_tx_buffer: param.sol_tx_buffer_size.create_buffer(),
             unsol_tx_buffer: param.unsol_tx_buffer_size.create_buffer(),
@@ -304,7 +304,7 @@ impl OutstationSession {
 
     pub(crate) async fn wait_for_io(&mut self) -> Result<NewSession, Shutdown> {
         loop {
-            match self.receiver.next().await? {
+            match self.messages.receive().await? {
                 OutstationMessage::Shutdown => return Err(Shutdown),
                 OutstationMessage::Configuration(change) => self.handle_config_change(change),
                 OutstationMessage::ChangeSession(session) => return Ok(session),
@@ -764,7 +764,7 @@ impl OutstationSession {
     }
 
     async fn handle_next_message(&mut self) -> Result<(), SessionError> {
-        match self.receiver.next().await? {
+        match self.messages.receive().await? {
             OutstationMessage::Shutdown => Err(Shutdown.into()),
             OutstationMessage::ChangeSession(session) => Err(SessionError::NewSession(session)),
             OutstationMessage::Configuration(change) => {

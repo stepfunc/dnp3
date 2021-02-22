@@ -1,8 +1,8 @@
 use std::error::Error;
 
 use crate::app::control::CommandStatus;
-use crate::app::ObjectParseError;
 use crate::app::{Iin, Iin2};
+use crate::app::{ObjectParseError, Shutdown};
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::NoAssociation;
@@ -319,38 +319,38 @@ impl From<RecvError> for TimeSyncError {
     }
 }
 
-impl<T> From<SendError<T>> for crate::app::Shutdown {
+impl<T> From<SendError<T>> for Shutdown {
     fn from(_: SendError<T>) -> Self {
-        crate::app::Shutdown
+        Shutdown
     }
 }
 
-impl<T> From<SendError<T>> for AssociationError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for AssociationError {
+    fn from(_: Shutdown) -> Self {
         AssociationError::Shutdown
     }
 }
 
-impl<T> From<SendError<T>> for TaskError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for TaskError {
+    fn from(_: Shutdown) -> Self {
         TaskError::State(StateChange::Shutdown)
     }
 }
 
-impl<T> From<SendError<T>> for CommandError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for CommandError {
+    fn from(_: Shutdown) -> Self {
         CommandError::Task(TaskError::State(StateChange::Shutdown))
     }
 }
 
-impl<T> From<SendError<T>> for TimeSyncError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for TimeSyncError {
+    fn from(_: Shutdown) -> Self {
         TimeSyncError::Task(TaskError::State(StateChange::Shutdown))
     }
 }
 
-impl<T> From<SendError<T>> for PollError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for PollError {
+    fn from(_: Shutdown) -> Self {
         PollError::Shutdown
     }
 }
