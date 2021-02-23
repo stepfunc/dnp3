@@ -52,8 +52,7 @@ pub fn create_master_tcp_client(
     let (mut task, handle) =
         MasterTask::new(link_error_mode, endpoints, config, reconnect, listener);
     let future = async move {
-        let _ = task
-            .run()
+        task.run()
             .instrument(tracing::info_span!("DNP3-Master-TCP", "endpoint" = ?main_addr))
             .await;
     };
@@ -103,11 +102,16 @@ impl MasterTask {
         (task, MasterHandle::new(tx))
     }
 
-    async fn run(&mut self) -> Result<(), Shutdown> {
+    async fn run(&mut self) {
+        let _ = self.run_impl().await;
+        self.listener.update(ClientState::Shutdown);
+    }
+
+    async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
+            self.listener.update(ClientState::Disabled);
             self.session.wait_for_enabled().await?;
             if let Err(StateChange::Shutdown) = self.run_connection().await {
-                self.listener.update(ClientState::Shutdown);
                 return Err(Shutdown);
             }
         }

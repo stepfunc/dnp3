@@ -47,11 +47,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
+    master.enable().await?;
+
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
     loop {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
+            "enable" => {
+                master.enable().await?;
+            }
+            "disable" => {
+                master.disable().await?;
+            }
             "dln" => {
                 master.set_decode_level(DecodeLevel::nothing()).await?;
             }

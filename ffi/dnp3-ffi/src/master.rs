@@ -73,14 +73,14 @@ pub(crate) unsafe fn master_create_serial_session(
     path: &CStr,
     serial_params: ffi::SerialPortSettings,
     retry_delay: Duration,
-    listener: ffi::ClientStateListener,
+    listener: ffi::PortStateListener,
 ) -> *mut Master {
     let config = if let Some(config) = config.into() {
         config
     } else {
         return std::ptr::null_mut();
     };
-    let listener = ClientStateListenerAdapter::new(listener);
+    let listener = PortStateListenerAdapter::new(listener);
 
     let (future, handle) = create_master_serial_client(
         config,
@@ -352,11 +352,34 @@ impl ClientStateListenerAdapter {
     fn into_listener(self) -> Listener<ClientState> {
         Listener::BoxedFn(Box::new(move |value| {
             let value = match value {
+                ClientState::Disabled => ffi::ClientState::Disabled,
                 ClientState::Connecting => ffi::ClientState::Connecting,
                 ClientState::Connected => ffi::ClientState::Connected,
                 ClientState::WaitAfterFailedConnect(_) => ffi::ClientState::WaitAfterFailedConnect,
                 ClientState::WaitAfterDisconnect(_) => ffi::ClientState::WaitAfterDisconnect,
                 ClientState::Shutdown => ffi::ClientState::Shutdown,
+            };
+            self.native_cb.on_change(value);
+        }))
+    }
+}
+
+struct PortStateListenerAdapter {
+    native_cb: ffi::PortStateListener,
+}
+
+impl PortStateListenerAdapter {
+    fn new(native_cb: ffi::PortStateListener) -> Self {
+        Self { native_cb }
+    }
+
+    fn into_listener(self) -> Listener<PortState> {
+        Listener::BoxedFn(Box::new(move |value| {
+            let value = match value {
+                PortState::Disabled => ffi::PortState::Disabled,
+                PortState::Wait(_) => ffi::PortState::Wait,
+                PortState::Open => ffi::PortState::Open,
+                PortState::Shutdown => ffi::PortState::Shutdown,
             };
             self.native_cb.on_change(value);
         }))
