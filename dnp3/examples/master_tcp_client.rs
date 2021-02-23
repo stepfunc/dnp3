@@ -34,10 +34,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         MasterConfig::new(
             EndpointAddress::from(1)?,
             AppDecodeLevel::ObjectValues.into(),
-            ReconnectStrategy::default(),
             Timeout::from_secs(1)?,
         ),
         EndpointList::new("127.0.0.1:20000".to_owned(), &[]),
+        ReconnectStrategy::default(),
         Listener::None,
     );
 

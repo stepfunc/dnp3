@@ -25,6 +25,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .param("link_error_mode", Type::Enum(shared.link_error_mode.clone()), "Controls how link errors are handled with respect to the TCP session")?
         .param("config", Type::Struct(master_config.clone()), "Master configuration")?
         .param("endpoints", Type::ClassRef(endpoint_list.declaration()), "List of IP endpoints.")?
+        .param("connect_strategy", Type::Struct(shared.retry_strategy.clone()), "Connection retry strategy to use")?
+        .param("reconnect_delay", Type::Duration(DurationMapping::Milliseconds), "delay before reconnecting after a disconnect")?
         .param("listener", Type::Interface(tcp_client_state_listener.clone()), "TCP connection listener used to receive updates on the status of the connection")?
         .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occurred"))?
         .doc(
@@ -39,6 +41,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .param("config", Type::Struct(master_config), "Master configuration")?
         .param("path", Type::String, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
         .param("serial_params", Type::Struct(shared.serial_port_settings.clone()), "Serial port settings")?
+        .param("open_retry_delay", Type::Duration(DurationMapping::Milliseconds), "delay bbetween attempts to open the serial port")?
         .param("listener", Type::Interface(tcp_client_state_listener), "Client connection listener to receive updates on the status of the connection")?
         .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occurred"))?
         .doc(
@@ -291,8 +294,6 @@ fn define_master_config(
     lib.define_native_struct(&master_config)?
         .add("address", Type::Uint16, "Local DNP3 data-link address")?
         .add("decode_level", StructElementType::Struct(shared.decode_level.clone()), "Decoding level for this master. You can modify this later on with {class:Master.SetDecodeLevel()}.")?
-        .add("reconnection_strategy", Type::Struct(shared.retry_strategy.clone()), "Reconnection retry strategy to use")?
-        .add("reconnection_delay", StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_millis(0))), doc("Optional reconnection delay when a connection is lost.").details("A value of 0 means no delay."))?
         .add(
             "response_timeout",
             StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(5))),

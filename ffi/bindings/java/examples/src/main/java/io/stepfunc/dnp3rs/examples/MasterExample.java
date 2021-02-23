@@ -178,7 +178,8 @@ public class MasterExample {
     masterConfig.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
 
     Master master = Master.createTcpSession(runtime, LinkErrorMode.CLOSE, masterConfig,
-        new EndpointList("127.0.0.1:20000"), new TestListener());
+        new EndpointList("127.0.0.1:20000"), new RetryStrategy(), Duration.ofSeconds(1),
+        new TestListener());
 
     // Create the association
     AssociationConfig associationConfig = new AssociationConfig(EventClasses.all(),

@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use tracing::Instrument;
 
-use crate::app::ExponentialBackOff;
 use crate::app::Shutdown;
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
@@ -23,9 +22,11 @@ pub fn spawn_master_serial_client(
     config: MasterConfig,
     path: &str,
     serial_settings: SerialSettings,
+    retry_delay: Duration,
     listener: Listener<ClientState>,
 ) -> MasterHandle {
-    let (future, handle) = create_master_serial_client(config, path, serial_settings, listener);
+    let (future, handle) =
+        create_master_serial_client(config, path, serial_settings, retry_delay, listener);
     crate::tokio::spawn(future);
     handle
 }
@@ -42,10 +43,11 @@ pub fn create_master_serial_client(
     config: MasterConfig,
     path: &str,
     settings: SerialSettings,
+    retry_delay: Duration,
     listener: Listener<ClientState>,
 ) -> (impl Future<Output = ()> + 'static, MasterHandle) {
     let log_path = path.to_owned();
-    let (mut task, handle) = MasterTask::new(path, settings, config, listener);
+    let (mut task, handle) = MasterTask::new(path, settings, config, retry_delay, listener);
     let future = async move {
         let _ = task
             .run()
@@ -58,8 +60,7 @@ pub fn create_master_serial_client(
 struct MasterTask {
     path: String,
     serial_settings: SerialSettings,
-    back_off: ExponentialBackOff,
-    reconnect_delay: Option<Duration>,
+    retry_delay: Duration,
     session: MasterSession,
     reader: TransportReader,
     writer: TransportWriter,
@@ -71,6 +72,7 @@ impl MasterTask {
         path: &str,
         serial_settings: SerialSettings,
         config: MasterConfig,
+        retry_delay: Duration,
         listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
         let (tx, rx) = crate::util::channel::request_channel();
@@ -90,8 +92,7 @@ impl MasterTask {
         let task = Self {
             path: path.to_string(),
             serial_settings,
-            back_off: ExponentialBackOff::new(config.reconnection_strategy.retry_strategy),
-            reconnect_delay: config.reconnection_strategy.reconnect_delay,
+            retry_delay,
             session,
             reader,
             writer,
@@ -115,16 +116,18 @@ impl MasterTask {
             self.listener.update(ClientState::Connecting);
             match tokio_one_serial::open(self.path.as_str(), self.serial_settings) {
                 Err(err) => {
-                    let delay = self.back_off.on_failure();
-                    tracing::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
+                    tracing::warn!(
+                        "{} - waiting {} ms to re-open port",
+                        err,
+                        self.retry_delay.as_millis()
+                    );
                     self.listener
-                        .update(ClientState::WaitAfterFailedConnect(delay));
-                    self.session.wait_for_retry(delay).await?;
+                        .update(ClientState::WaitAfterFailedConnect(self.retry_delay));
+                    self.session.wait_for_retry(self.retry_delay).await?;
                 }
                 Ok(serial) => {
                     let mut io = PhysLayer::Serial(serial);
-                    tracing::info!("connected");
-                    self.back_off.on_success();
+                    tracing::info!("serial device open");
                     self.listener.update(ClientState::Connected);
                     match self
                         .session
@@ -135,13 +138,14 @@ impl MasterTask {
                             return Err(x);
                         }
                         RunError::Link(err) => {
-                            tracing::warn!("connection lost - {}", err);
-                            if let Some(delay) = self.reconnect_delay {
-                                tracing::warn!("waiting {} ms to reconnect", delay.as_millis());
-                                self.listener
-                                    .update(ClientState::WaitAfterDisconnect(delay));
-                                self.session.wait_for_retry(delay).await?;
-                            }
+                            tracing::warn!("serial port error: {}", err);
+                            tracing::info!(
+                                "waiting {} ms to re-open",
+                                self.retry_delay.as_millis()
+                            );
+                            self.listener
+                                .update(ClientState::WaitAfterDisconnect(self.retry_delay));
+                            self.session.wait_for_retry(self.retry_delay).await?;
                         }
                     }
                 }

@@ -37,8 +37,6 @@ pub struct MasterConfig {
     pub address: EndpointAddress,
     /// Decode-level for DNP3 objects
     pub decode_level: DecodeLevel,
-    /// Reconnection strategy
-    pub reconnection_strategy: ReconnectStrategy,
     /// Response timeout
     pub response_timeout: Timeout,
     /// TX buffer size
@@ -56,13 +54,11 @@ impl MasterConfig {
     pub fn new(
         address: EndpointAddress,
         decode_level: DecodeLevel,
-        reconnection_strategy: ReconnectStrategy,
         response_timeout: Timeout,
     ) -> Self {
         Self {
             address,
             decode_level,
-            reconnection_strategy,
             response_timeout,
             tx_buffer_size: MasterSession::DEFAULT_TX_BUFFER_SIZE,
             rx_buffer_size: MasterSession::DEFAULT_RX_BUFFER_SIZE,

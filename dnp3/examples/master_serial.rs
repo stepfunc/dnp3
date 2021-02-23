@@ -23,11 +23,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         MasterConfig::new(
             EndpointAddress::from(1)?,
             AppDecodeLevel::ObjectValues.into(),
-            ReconnectStrategy::default(),
             Timeout::from_secs(1)?,
         ),
         "/dev/pts/4",
         SerialSettings::default(),
+        Duration::from_secs(1),
         Listener::None,
     );
 

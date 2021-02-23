@@ -22,6 +22,8 @@ pub(crate) unsafe fn master_create_tcp_session(
     link_error_mode: ffi::LinkErrorMode,
     config: ffi::MasterConfig,
     endpoints: *const crate::EndpointList,
+    connect_strategy: ffi::RetryStrategy,
+    reconnect_delay: Duration,
     listener: ffi::ClientStateListener,
 ) -> *mut Master {
     let config = if let Some(config) = config.into() {
@@ -37,10 +39,17 @@ pub(crate) unsafe fn master_create_tcp_session(
     };
     let listener = ClientStateListenerAdapter::new(listener);
 
+    let reconnect_delay = if reconnect_delay == Duration::from_millis(0) {
+        None
+    } else {
+        Some(reconnect_delay)
+    };
+
     let (future, handle) = dnp3::tcp::create_master_tcp_client(
         link_error_mode.into(),
         config,
         endpoints.clone(),
+        ReconnectStrategy::new(connect_strategy.into(), reconnect_delay),
         listener.into_listener(),
     );
 
@@ -63,6 +72,7 @@ pub(crate) unsafe fn master_create_serial_session(
     config: ffi::MasterConfig,
     path: &CStr,
     serial_params: ffi::SerialPortSettings,
+    retry_delay: Duration,
     listener: ffi::ClientStateListener,
 ) -> *mut Master {
     let config = if let Some(config) = config.into() {
@@ -76,6 +86,7 @@ pub(crate) unsafe fn master_create_serial_session(
         config,
         &path.to_string_lossy().to_string(),
         serial_params.into(),
+        retry_delay,
         listener.into_listener(),
     );
 
@@ -383,26 +394,19 @@ impl ffi::MasterConfig {
             }
         };
 
-        let strategy = ReconnectStrategy::new(
-            RetryStrategy::new(
-                self.reconnection_strategy().min_delay(),
-                self.reconnection_strategy().max_delay(),
-            ),
-            if self.reconnection_delay() != Duration::from_millis(0) {
-                Some(self.reconnection_delay())
-            } else {
-                None
-            },
-        );
-
         Some(MasterConfig {
             address,
             decode_level: self.decode_level().clone().into(),
-            reconnection_strategy: strategy,
             response_timeout: Timeout::from_duration(self.response_timeout()).unwrap(),
             tx_buffer_size: self.tx_buffer_size() as usize,
             rx_buffer_size: self.rx_buffer_size() as usize,
         })
+    }
+}
+
+impl From<ffi::RetryStrategy> for dnp3::app::RetryStrategy {
+    fn from(x: ffi::RetryStrategy) -> Self {
+        dnp3::app::RetryStrategy::new(x.min_delay(), x.max_delay())
     }
 }
 

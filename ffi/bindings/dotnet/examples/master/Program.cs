@@ -168,15 +168,7 @@ class MainClass
     private static MasterConfig GetMasterConfig()
     {
         // create a default configuration with a master address of "1"
-        var config = new MasterConfig(1)
-        {
-            // override the reconnect strategy            
-            ReconnectionStrategy = new RetryStrategy
-            {
-                MinDelay = TimeSpan.FromMilliseconds(100),
-                MaxDelay = TimeSpan.FromSeconds(5),
-            }
-        };
+        var config = new MasterConfig(1);
         
         config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
 
@@ -191,6 +183,8 @@ class MainClass
             LinkErrorMode.Close,
             GetMasterConfig(),
             new EndpointList("127.0.0.1:20000"),
+            new RetryStrategy(),
+            TimeSpan.FromSeconds(1),
             new TestListener()
         );
 
