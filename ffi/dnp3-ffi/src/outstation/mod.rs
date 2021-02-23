@@ -107,29 +107,42 @@ pub unsafe fn tcpserver_add_outstation(
     }))
 }
 
-pub unsafe fn tcpserver_bind(server: *mut TcpServer) {
+pub unsafe fn tcpserver_bind(server: *mut TcpServer) -> bool {
     let server = match server.as_mut() {
         Some(server) => server,
-        None => return,
-    };
-
-    let server_handle = match server.server.take() {
-        Some(server) => server,
-        None => return,
+        None => {
+            tracing::error!("server parameter is NULL");
+            return false;
+        }
     };
 
     let runtime = match server.runtime.get() {
         Some(runtime) => runtime,
-        None => return,
+        None => {
+            tracing::error!("runtime destroyed");
+            return false;
+        }
+    };
+
+    let server_handle = match server.server.take() {
+        Some(server) => server,
+        None => {
+            tracing::error!("server already bound");
+            return false;
+        }
     };
 
     let (handle, task) = match runtime.block_on(server_handle.bind()) {
         Ok((handle, task)) => (handle, task),
-        Err(_) => return,
+        Err(err) => {
+            tracing::error!("server bind failed: {}", err);
+            return false;
+        }
     };
 
     runtime.spawn(task);
     server._handle = Some(handle);
+    true
 }
 
 pub unsafe fn outstation_destroy(outstation: *mut Outstation) {

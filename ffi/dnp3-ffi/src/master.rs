@@ -99,6 +99,22 @@ pub unsafe fn master_destroy(master: *mut Master) {
     }
 }
 
+pub unsafe fn master_enable(master: *mut crate::Master) {
+    if let Some(master) = master.as_mut() {
+        if let Some(runtime) = master.runtime.get() {
+            let _ = runtime.block_on(master.handle.enable());
+        }
+    }
+}
+
+pub unsafe fn master_disable(master: *mut crate::Master) {
+    if let Some(master) = master.as_mut() {
+        if let Some(runtime) = master.runtime.get() {
+            let _ = runtime.block_on(master.handle.disable());
+        }
+    }
+}
+
 pub unsafe fn master_add_association(
     master: *mut Master,
     address: u16,
@@ -219,6 +235,22 @@ pub fn classes_all() -> ffi::Classes {
 pub fn classes_none() -> ffi::Classes {
     ffi::Classes {
         class0: false,
+        class1: false,
+        class2: false,
+        class3: false,
+    }
+}
+
+pub fn event_classes_all() -> ffi::EventClasses {
+    ffi::EventClasses {
+        class1: true,
+        class2: true,
+        class3: true,
+    }
+}
+
+pub fn event_classes_none() -> ffi::EventClasses {
+    ffi::EventClasses {
         class1: false,
         class2: false,
         class3: false,

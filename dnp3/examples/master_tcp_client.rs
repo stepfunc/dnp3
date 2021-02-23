@@ -43,6 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create the association
     let mut config = AssociationConfig::default();
+    config.enable_unsol_classes = EventClasses::none();
     config.auto_time_sync = Some(TimeSyncProcedure::Lan);
     config.keep_alive_timeout = Some(Duration::from_secs(60));
     let mut association = master
@@ -57,19 +58,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
+    master.enable().await?;
+
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
     loop {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
+            "enable" => {
+                master.enable().await?;
+            }
+            "disable" => {
+                master.disable().await?;
+            }
             "dln" => {
-                master.set_decode_level(DecodeLevel::nothing()).await.ok();
+                master.set_decode_level(DecodeLevel::nothing()).await?;
             }
             "dlv" => {
                 master
                     .set_decode_level(AppDecodeLevel::ObjectValues.into())
-                    .await
-                    .ok();
+                    .await?;
             }
             "rao" => {
                 if let Err(err) = association

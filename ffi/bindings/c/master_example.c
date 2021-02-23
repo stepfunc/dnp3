@@ -290,11 +290,16 @@ int main()
         .handle_octet_string = &handle_octet_strings,
         .ctx = NULL,
     };
+
     association_config_t association_config = association_config_init(
-        event_classes_init(true, true, true),
-        event_classes_init(true, true, true),
+        // disable unsolicited (Class 1/2/3)
+        event_classes_all(),
+        // after the integrity poll, enable unsolicited (Class 1/2/3)
+        event_classes_all(),
+        // perform an integrity poll with Class 1/2/3/0
         classes_all(),
-        event_classes_init(false, false, false)
+        // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
+        event_classes_none()
     );
     association_config.auto_time_sync = AutoTimeSync_Lan;
     association_config.keep_alive_timeout = 60;
@@ -318,14 +323,27 @@ int main()
     poll_t* poll = association_add_poll(association, poll_request, 5000);
     request_destroy(poll_request);
 
-    char cbuf[5];
+    // start communications
+    master_enable(master);
+
+    char cbuf[10];
     while(true)
     {
-        fgets(cbuf, 5, stdin);
+        fgets(cbuf, 10, stdin);
 
         if(strcmp(cbuf, "x\n") == 0)
         {
             goto cleanup;
+        }
+        else if (strcmp(cbuf, "enable\n") == 0)
+        {
+            printf("calling enable\n");
+            master_enable(master);
+        }
+        else if (strcmp(cbuf, "disable\n") == 0)
+        {
+            printf("calling disable\n");
+            master_disable(master);
         }
         else if(strcmp(cbuf, "dln\n") == 0)
         {

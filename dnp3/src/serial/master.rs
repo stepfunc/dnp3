@@ -4,15 +4,15 @@ use std::time::Duration;
 use tracing::Instrument;
 
 use crate::app::ExponentialBackOff;
+use crate::app::Shutdown;
 use crate::link::LinkErrorMode;
-use crate::master::session::{MasterSession, RunError};
+use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::*;
 use crate::serial::SerialSettings;
 use crate::tcp::ClientState;
 use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
 use crate::util::phys::PhysLayer;
-use crate::util::task::Shutdown;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.
@@ -47,9 +47,10 @@ pub fn create_master_serial_client(
     let log_path = path.to_owned();
     let (mut task, handle) = MasterTask::new(path, settings, config, listener);
     let future = async move {
-        task.run()
+        let _ = task
+            .run()
             .instrument(tracing::info_span!("DNP3-Master-Serial", "port" = ?log_path))
-            .await
+            .await;
     };
     (future, handle)
 }
@@ -72,8 +73,9 @@ impl MasterTask {
         config: MasterConfig,
         listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
-        let (tx, rx) = crate::tokio::sync::mpsc::channel(100); // TODO
+        let (tx, rx) = crate::util::channel::request_channel();
         let session = MasterSession::new(
+            false,
             config.decode_level,
             config.response_timeout,
             config.tx_buffer_size,
@@ -98,11 +100,17 @@ impl MasterTask {
         (task, MasterHandle::new(tx))
     }
 
-    async fn run(&mut self) {
-        self.run_impl().await.ok();
+    async fn run(&mut self) -> Result<(), Shutdown> {
+        loop {
+            self.session.wait_for_enabled().await?;
+            if let Err(StateChange::Shutdown) = self.run_enabled().await {
+                self.listener.update(ClientState::Shutdown);
+                return Err(Shutdown);
+            }
+        }
     }
 
-    async fn run_impl(&mut self) -> Result<(), Shutdown> {
+    async fn run_enabled(&mut self) -> Result<(), StateChange> {
         loop {
             self.listener.update(ClientState::Connecting);
             match tokio_one_serial::open(self.path.as_str(), self.serial_settings) {
@@ -111,7 +119,7 @@ impl MasterTask {
                     tracing::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
                     self.listener
                         .update(ClientState::WaitAfterFailedConnect(delay));
-                    self.session.delay_for(delay).await?;
+                    self.session.wait_for_retry(delay).await?;
                 }
                 Ok(serial) => {
                     let mut io = PhysLayer::Serial(serial);
@@ -123,9 +131,8 @@ impl MasterTask {
                         .run(&mut io, &mut self.writer, &mut self.reader)
                         .await
                     {
-                        RunError::Shutdown => {
-                            self.listener.update(ClientState::Shutdown);
-                            return Err(Shutdown);
+                        RunError::State(x) => {
+                            return Err(x);
                         }
                         RunError::Link(err) => {
                             tracing::warn!("connection lost - {}", err);
@@ -133,7 +140,7 @@ impl MasterTask {
                                 tracing::warn!("waiting {} ms to reconnect", delay.as_millis());
                                 self.listener
                                     .update(ClientState::WaitAfterDisconnect(delay));
-                                self.session.delay_for(delay).await?;
+                                self.session.wait_for_retry(delay).await?;
                             }
                         }
                     }

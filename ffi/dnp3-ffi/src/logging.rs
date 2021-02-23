@@ -56,6 +56,7 @@ impl ffi::LoggingConfig {
         let level: tracing::Level = self.level().into();
 
         let builder = tracing_subscriber::fmt()
+            .with_ansi(false)
             .with_max_level(level)
             .with_level(self.print_level)
             .with_target(self.print_module_info)

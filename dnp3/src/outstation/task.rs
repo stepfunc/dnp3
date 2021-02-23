@@ -4,12 +4,11 @@ use crate::decode::DecodeLevel;
 use crate::link::LinkErrorMode;
 use crate::outstation::config::*;
 use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
-use crate::outstation::session::{OutstationSession, SessionError};
+use crate::outstation::session::{OutstationSession, RunError, SessionError};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::phys::PhysLayer;
-use crate::util::task::{Receiver, RunError};
 
 pub(crate) enum ConfigurationChange {
     SetDecodeLevel(DecodeLevel),
@@ -62,7 +61,7 @@ impl OutstationTask {
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
     ) -> (Self, OutstationHandle) {
-        let (tx, rx) = crate::tokio::sync::mpsc::channel(10); // TODO - should this be parameterized?
+        let (tx, rx) = crate::util::channel::request_channel();
         let handle = DatabaseHandle::new(
             config.max_read_request_headers,
             config.class_zero,
@@ -76,7 +75,7 @@ impl OutstationTask {
         );
         let task = Self {
             session: OutstationSession::new(
-                Receiver::new(rx),
+                rx,
                 config.into(),
                 config.into(),
                 application,

@@ -307,7 +307,7 @@ impl Association {
         // Fail any pending requests
         while let Some(task) = self.request_queue.pop_front() {
             let task_err = match err {
-                RunError::Shutdown => TaskError::Shutdown,
+                RunError::State(s) => TaskError::State(s),
                 RunError::Link(_) => TaskError::NoConnection,
             };
             task.on_task_error(Some(self), task_err);

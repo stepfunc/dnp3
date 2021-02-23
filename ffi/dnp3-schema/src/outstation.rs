@@ -73,7 +73,7 @@ pub fn define(
 
     let tcp_server_bind_fn = lib.declare_native_function("tcpserver_bind")?
         .param("server", Type::ClassRef(tcp_server.clone()), "Server to bind")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::Type(Type::Bool, "true if the bind was successful".into()))?
         .doc("Bind the server to the port and starts listening. Also starts all the outstations associated to it.")?
         .build()?;
 

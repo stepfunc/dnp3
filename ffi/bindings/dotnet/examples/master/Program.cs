@@ -197,7 +197,7 @@ class MainClass
         var readHandler = new TestReadHandler();
         var association = master.AddAssociation(
             1024,
-            new AssociationConfig(new EventClasses(true, true, true), new EventClasses(true, true, true), Classes.All(), new EventClasses(false, false, false))
+            new AssociationConfig(EventClasses.All(), EventClasses.All(), Classes.All(), EventClasses.None())
             {
                 AutoTimeSync = AutoTimeSync.Lan,
                 AutoTasksRetryStrategy = new RetryStrategy
@@ -214,12 +214,25 @@ class MainClass
         var pollRequest = Request.ClassRequest(false, true, true, true);
         var poll = association.AddPoll(pollRequest, TimeSpan.FromSeconds(5));
 
+        // start communications
+        master.Enable();
+
         while (true)
         {
             switch (await GetInputAsync())
             {
                 case "x":
                     return;
+                case "enable":
+                    {
+                        master.Enable();
+                        break;
+                    }
+                case "disable":
+                    {
+                        master.Disable();
+                        break;
+                    }
                 case "dln":
                     {
                         master.SetDecodeLevel(new DecodeLevel());

@@ -1,12 +1,12 @@
+use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
-use crate::master::association::Association;
 use crate::master::error::PollError;
 use crate::master::error::{AssociationError, TaskError};
 use crate::master::handle::Promise;
 use crate::master::poll::PollMsg;
 use crate::master::tasks::Task;
-use crate::util::task::Shutdown;
+use crate::master::{AssociationConfig, AssociationHandler};
 
 /// Messages sent from the handles to the master task via an mpsc.
 pub(crate) enum Message {
@@ -17,8 +17,15 @@ pub(crate) enum Message {
 }
 
 pub(crate) enum MasterMsg {
+    /// enable or disable communication
+    EnableCommunication(bool),
     /// Add an association to the master
-    AddAssociation(Association, Promise<Result<(), AssociationError>>),
+    AddAssociation(
+        EndpointAddress,
+        AssociationConfig,
+        Box<dyn AssociationHandler>,
+        Promise<Result<(), AssociationError>>,
+    ),
     /// Remove an association from the master
     RemoveAssociation(EndpointAddress),
     /// Set the decoding level

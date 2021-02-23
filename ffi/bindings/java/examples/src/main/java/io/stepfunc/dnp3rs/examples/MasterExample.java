@@ -181,8 +181,8 @@ public class MasterExample {
         new EndpointList("127.0.0.1:20000"), new TestListener());
 
     // Create the association
-    AssociationConfig associationConfig = new AssociationConfig(new EventClasses(true, true, true),
-        new EventClasses(true, true, true), Classes.all(), new EventClasses(false, false, false));
+    AssociationConfig associationConfig = new AssociationConfig(EventClasses.all(),
+        EventClasses.all(), Classes.all(), EventClasses.none());
     associationConfig.autoTimeSync = AutoTimeSync.LAN;
     associationConfig.keepAliveTimeout = Duration.ofSeconds(60);
 
@@ -196,6 +196,9 @@ public class MasterExample {
     Request pollRequest = Request.classRequest(false, true, true, true);
     Poll poll = association.addPoll(pollRequest, Duration.ofSeconds(5));
 
+    // start communications
+    master.enable();
+
     // Handle user input
     BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
     while (true) {
@@ -203,6 +206,12 @@ public class MasterExample {
       switch (line) {
         case "x":
           return;
+        case "enable":
+          master.enable();
+          break;
+        case "disable":
+          master.disable();
+          break;
         case "dln":
           master.setDecodeLevel(new DecodeLevel());
           break;
