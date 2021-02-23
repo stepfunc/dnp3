@@ -255,9 +255,7 @@ int main()
     // ANCHOR_END: runtime_init
 
     // Create the master
-    master_config_t master_config = master_config_init(1);
-    master_config.reconnection_strategy.min_delay = 100;
-    master_config.reconnection_strategy.max_delay = 5000;
+    master_config_t master_config = master_config_init(1);    
     master_config.decode_level.application = AppDecodeLevel_ObjectValues;
 
     endpoint_list_t* endpoints = endpoint_list_new("127.0.0.1:20000");
@@ -271,6 +269,8 @@ int main()
         LinkErrorMode_Close,
         master_config,
         endpoints,
+        retry_strategy_init(),
+        1000,
         listener
     );
     endpoint_list_destroy(endpoints);

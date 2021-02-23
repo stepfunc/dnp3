@@ -23,11 +23,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         MasterConfig::new(
             EndpointAddress::from(1)?,
             AppDecodeLevel::ObjectValues.into(),
-            ReconnectStrategy::default(),
             Timeout::from_secs(1)?,
         ),
         "/dev/pts/4",
         SerialSettings::default(),
+        Duration::from_secs(1),
         Listener::None,
     );
 
@@ -47,11 +47,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
+    master.enable().await?;
+
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
     loop {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
+            "enable" => {
+                master.enable().await?;
+            }
+            "disable" => {
+                master.disable().await?;
+            }
             "dln" => {
                 master.set_decode_level(DecodeLevel::nothing()).await?;
             }
