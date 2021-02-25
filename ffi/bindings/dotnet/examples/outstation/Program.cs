@@ -20,6 +20,11 @@ class ExampleOutstation
             return 0;
         }
 
+        public WriteTimeResult WriteAbsoluteTime(ulong time)
+        {
+            return WriteTimeResult.NotSupported;
+        }
+
         public ApplicationIin GetApplicationIin()
         {
             return new ApplicationIin();

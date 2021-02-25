@@ -6,6 +6,7 @@ use xxhash_rust::xxh64::xxh64;
 use crate::app::control::CommandStatus;
 use crate::app::format::write::start_response;
 use crate::app::gen::all::AllObjectsVariation;
+use crate::app::gen::count::CountVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
 use crate::app::variations::{Group52Var1, Group52Var2};
@@ -173,6 +174,7 @@ struct SessionState {
     unsolicited: UnsolicitedState,
     unsolicited_seq: Sequence,
     deferred_read: DeferredRead,
+    last_recorded_time: Option<crate::tokio::time::Instant>,
 }
 
 impl SessionState {
@@ -185,6 +187,7 @@ impl SessionState {
             unsolicited: UnsolicitedState::NullRequired(None),
             unsolicited_seq: Sequence::default(),
             deferred_read: DeferredRead::new(max_read_headers),
+            last_recorded_time: None,
         }
     }
 }
@@ -1046,6 +1049,9 @@ impl OutstationSession {
             FunctionCode::DelayMeasure => {
                 Some(self.handle_delay_measure(seq, self.get_response_iin(database) | iin2))
             }
+            FunctionCode::RecordCurrentTime => {
+                Some(self.handle_record_current_time(seq, self.get_response_iin(database) | iin2))
+            }
             FunctionCode::ColdRestart => {
                 let delay = self.application.cold_restart();
                 Some(self.handle_restart(seq, delay, self.get_response_iin(database) | iin2))
@@ -1109,7 +1115,7 @@ impl OutstationSession {
     ) -> usize {
         let mut iin2 = Iin2::default();
 
-        for header in object_headers.iter() {
+        if let Some(header) = object_headers.get_only_header() {
             match header.details {
                 HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(seq)) => {
                     for (value, index) in seq.iter() {
@@ -1131,6 +1137,55 @@ impl OutstationSession {
                             );
                             iin2 |= Iin2::PARAMETER_ERROR;
                         }
+                    }
+                }
+                HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
+                    if let Some(value) = seq.single() {
+                        match self.application.write_absolute_time(value.time) {
+                            WriteTimeResult::NotSupported => {
+                                iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
+                            }
+                            WriteTimeResult::InvalidValue => {
+                                iin2 |= Iin2::PARAMETER_ERROR;
+                            }
+                            WriteTimeResult::Ok => (),
+                        }
+                    } else {
+                        tracing::warn!("request didn't have a single g50v1");
+                        iin2 |= Iin2::PARAMETER_ERROR;
+                    }
+                }
+                HeaderDetails::OneByteCount(_, CountVariation::Group50Var3(seq)) => {
+                    if let Some(value) = seq.single() {
+                        if let Some(last_recorded_time) = self.state.last_recorded_time {
+                            let now = crate::tokio::time::Instant::now();
+                            if let Some(delay) = now.checked_duration_since(last_recorded_time) {
+                                if let Some(timestamp) = value.time.checked_add(delay) {
+                                    self.state.last_recorded_time = None;
+                                    match self.application.write_absolute_time(timestamp) {
+                                        WriteTimeResult::NotSupported => {
+                                            iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
+                                        }
+                                        WriteTimeResult::InvalidValue => {
+                                            iin2 |= Iin2::PARAMETER_ERROR;
+                                        }
+                                        WriteTimeResult::Ok => (),
+                                    }
+                                } else {
+                                    tracing::warn!("calculating current time overflown");
+                                    iin2 |= Iin2::PARAMETER_ERROR;
+                                }
+                            } else {
+                                tracing::warn!("clock rollback detected (this should never happen per tokio statement in the docs)");
+                                iin2 |= Iin2::PARAMETER_ERROR;
+                            }
+                        } else {
+                            tracing::warn!("no previous RECORD_CURRENT_TIME");
+                            iin2 |= Iin2::PARAMETER_ERROR;
+                        }
+                    } else {
+                        tracing::warn!("request didn't have a single g50v3");
+                        iin2 |= Iin2::PARAMETER_ERROR;
                     }
                 }
                 _ => {
@@ -1163,6 +1218,11 @@ impl OutstationSession {
 
         writer.write_count_of_one(g52v2).unwrap();
         cursor.written().len()
+    }
+
+    fn handle_record_current_time(&mut self, seq: Sequence, iin: Iin) -> usize {
+        self.state.last_recorded_time = Some(crate::tokio::time::Instant::now());
+        self.write_empty_solicited_response(seq, iin)
     }
 
     fn handle_restart(&mut self, seq: Sequence, delay: Option<RestartDelay>, iin: Iin) -> usize {

@@ -10,6 +10,12 @@ impl OutstationApplication for ffi::OutstationApplication {
         ffi::OutstationApplication::get_processing_delay_ms(self).unwrap_or(0)
     }
 
+    fn write_absolute_time(&mut self, time: Timestamp) -> WriteTimeResult {
+        ffi::OutstationApplication::write_absolute_time(self, time.raw_value())
+            .map(|res| res.into())
+            .unwrap_or(WriteTimeResult::NotSupported)
+    }
+
     fn get_application_iin(&self) -> ApplicationIin {
         ffi::OutstationApplication::get_application_iin(self)
             .map(|iin| iin.into())
@@ -46,6 +52,16 @@ impl From<ffi::RestartDelay> for Option<RestartDelay> {
             ffi::RestartDelayType::NotSupported => None,
             ffi::RestartDelayType::Seconds => Some(RestartDelay::Seconds(from.value())),
             ffi::RestartDelayType::Milliseconds => Some(RestartDelay::Milliseconds(from.value())),
+        }
+    }
+}
+
+impl From<ffi::WriteTimeResult> for WriteTimeResult {
+    fn from(from: ffi::WriteTimeResult) -> Self {
+        match from {
+            ffi::WriteTimeResult::NotSupported => WriteTimeResult::NotSupported,
+            ffi::WriteTimeResult::InvalidValue => WriteTimeResult::InvalidValue,
+            ffi::WriteTimeResult::Ok => WriteTimeResult::Ok,
         }
     }
 }

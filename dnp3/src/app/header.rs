@@ -162,7 +162,7 @@ impl Iin1 {
     pub const CLASS_1_EVENTS: Iin1 = Iin1::new(BIT_1.value);
     pub const CLASS_2_EVENTS: Iin1 = Iin1::new(BIT_2.value);
     pub const CLASS_3_EVENTS: Iin1 = Iin1::new(BIT_3.value);
-    pub const NEED_TIME: Iin1 = Iin1::new(BIT_5.value);
+    pub const NEED_TIME: Iin1 = Iin1::new(BIT_4.value);
     pub const LOCAL_CONTROL: Iin1 = Iin1::new(BIT_5.value);
     pub const DEVICE_TROUBLE: Iin1 = Iin1::new(BIT_6.value);
     pub const RESTART: Iin1 = Iin1::new(BIT_7.value);

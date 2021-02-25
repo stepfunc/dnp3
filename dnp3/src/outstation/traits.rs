@@ -1,10 +1,10 @@
-use crate::app::control::*;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::FunctionCode;
 use crate::app::RequestHeader;
 use crate::app::Sequence;
+use crate::app::{control::*, Timestamp};
 use crate::outstation::database::Database;
 
 /// Application-controlled IIN bits
@@ -40,6 +40,13 @@ pub enum RestartDelay {
     Milliseconds(u16),
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum WriteTimeResult {
+    NotSupported,
+    InvalidValue,
+    Ok,
+}
+
 /// dynamic information required by the outstation from the user application
 pub trait OutstationApplication: Sync + Send + 'static {
     /// The value returned by this method is used in conjunction with the `Delay Measurement`
@@ -54,6 +61,13 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// For more information, see IEEE-1815 2012, pg. 64
     fn get_processing_delay_ms(&self) -> u16 {
         0
+    }
+
+    /// Handle a write of the absolute time.
+    ///
+    /// This is used during time synchronization procedures.
+    fn write_absolute_time(&mut self, _time: Timestamp) -> WriteTimeResult {
+        WriteTimeResult::NotSupported
     }
 
     /// Returns the application-controlled IIN bits

@@ -3,6 +3,7 @@ package io.stepfunc.dnp3rs.examples;
 import io.stepfunc.dnp3rs.Runtime;
 import io.stepfunc.dnp3rs.*;
 import org.joou.UByte;
+import org.joou.ULong;
 import org.joou.UShort;
 
 import java.io.BufferedReader;
@@ -27,6 +28,11 @@ class TestApplication implements OutstationApplication {
   @Override
   public UShort getProcessingDelayMs() {
     return ushort(0);
+  }
+
+  @Override
+  public WriteTimeResult writeAbsoluteTime(ULong time) {
+    return WriteTimeResult.NOT_SUPPORTED;
   }
 
   @Override

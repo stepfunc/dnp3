@@ -10,6 +10,8 @@ void on_log_message(log_level_t level, const char *msg, void *arg) { printf("%s"
 // Application callbacks
 uint16_t get_processing_delay_ms(void *context) { return 0; }
 
+write_time_result_t write_absolute_time(uint64_t time, void* context) { return WriteTimeResult_NotSupported; }
+
 application_iin_t get_application_iin(void* context) { return application_iin_init(); }
 
 restart_delay_t cold_restart(void *context) { return restart_delay_seconds(60); }
@@ -222,6 +224,7 @@ int main()
 
     outstation_application_t application = {
         .get_processing_delay_ms = &get_processing_delay_ms,
+        .write_absolute_time = &write_absolute_time,
         .get_application_iin = &get_application_iin,
         .cold_restart = &cold_restart,
         .warm_restart = &warm_restart,

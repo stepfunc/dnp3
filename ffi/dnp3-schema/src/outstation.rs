@@ -461,12 +461,23 @@ fn define_outstation_application(
         .static_method("ValidMillis", &restart_delay_millis_fn)?
         .build();
 
+    let write_time_result = lib.define_native_enum("WriteTimeResult")?
+        .push("NotSupported", "Writing time is not supported by this outstation (translated to NO_FUNC_CODE_SUPPORT).")?
+        .push("InvalidValue", "The provided value was invalid (translated to PARAM_ERROR)")?
+        .push("Ok", "The write time operation succeeded.")?
+        .doc("Write time result used by {interface:OutstationApplication.write_absolute_time()}")?
+        .build()?;
+
     lib.define_interface("OutstationApplication", "Dynamic information required by the outstation from the user application")?
         .callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
             .details("For more information, see IEEE-1815 2012, p. 64."))?
             .return_type(ReturnType::new(Type::Uint16, "Processing delay, in milliseconds"))?
+            .build()?
+        .callback("write_absolute_time", "Handle a write of the absolute time during time synchronization procedures.")?
+            .param("time", Type::Uint64, "Received time in milliseconds since EPOCH (only 48 bits are used)")?
+            .return_type(ReturnType::new(Type::Enum(write_time_result), "Result of the write time operation"))?
             .build()?
         .callback("get_application_iin", "Returns the application-controlled IIN bits")?
             .return_type(ReturnType::new(Type::Struct(application_iin), "Application IIN bits"))?

@@ -3,7 +3,7 @@ use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-use crate::app::FunctionCode;
+use crate::app::{FunctionCode, Timestamp};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Control {
@@ -33,6 +33,7 @@ pub(crate) enum Event {
     ColdRestart(Option<RestartDelay>),
     WarmRestart(Option<RestartDelay>),
     ClearRestartIIN,
+    WriteAbsoluteTime(Timestamp),
 }
 
 #[derive(Clone)]
