@@ -303,8 +303,7 @@ int main()
     );
     association_config.auto_time_sync = AutoTimeSync_Lan;
     association_config.keep_alive_timeout = 60;
-
-    association_handlers_t association_handlers = association_handlers_init(read_handler, read_handler, read_handler);
+   
     time_provider_t time_provider =
     {
         .get_time = get_time,
@@ -314,7 +313,7 @@ int main()
         master,
         1024,
         association_config,
-        association_handlers,
+        read_handler,
         time_provider
     );
 

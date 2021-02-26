@@ -83,15 +83,7 @@ impl CountHandler {
 }
 
 impl AssociationHandler for CountHandler {
-    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
         self
     }
 }

@@ -293,12 +293,8 @@ pub trait AssociationHandler: Send {
         Timestamp::try_from_system_time(SystemTime::now())
     }
 
-    /// retrieve a handler used to process integrity polls
-    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler;
-    /// retrieve a handler used to process unsolicited responses
-    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler;
-    /// retrieve a default handler used to process user-defined polls
-    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler;
+    /// retrieve a handler used to process received measurement data
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler;
 }
 
 /// Information about the object header from which the measurement values were mapped
@@ -432,15 +428,7 @@ impl ReadHandler for NullHandler {
 }
 
 impl AssociationHandler for NullHandler {
-    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
         self
     }
 }

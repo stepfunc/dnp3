@@ -187,8 +187,7 @@ class MainClass
             TimeSpan.FromSeconds(1),
             new TestListener()
         );
-
-        var readHandler = new TestReadHandler();
+        
         var association = master.AddAssociation(
             1024,
             new AssociationConfig(EventClasses.All(), EventClasses.All(), Classes.All(), EventClasses.None())
@@ -201,7 +200,7 @@ class MainClass
                 },
                 KeepAliveTimeout = TimeSpan.FromSeconds(60),
             },
-            new AssociationHandlers(readHandler, readHandler, readHandler),
+            new TestReadHandler(),            
             new TestTimeProvider()
         );
 

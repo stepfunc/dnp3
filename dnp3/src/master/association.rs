@@ -470,7 +470,7 @@ impl Association {
                     ReadType::Unsolicited,
                     response.header,
                     objects,
-                    self.handler.get_unsolicited_handler(),
+                    self.handler.get_read_handler(),
                 );
             }
 
@@ -492,7 +492,7 @@ impl Association {
             ReadType::StartupIntegrity,
             header,
             objects,
-            self.handler.get_integrity_handler(),
+            self.handler.get_read_handler(),
         );
     }
 
@@ -505,7 +505,7 @@ impl Association {
             ReadType::PeriodicPoll,
             header,
             objects,
-            self.handler.get_default_poll_handler(),
+            self.handler.get_read_handler(),
         );
     }
 
@@ -518,7 +518,7 @@ impl Association {
             ReadType::PeriodicPoll,
             header,
             objects,
-            self.handler.get_integrity_handler(),
+            self.handler.get_read_handler(),
         );
     }
 
@@ -531,7 +531,7 @@ impl Association {
             ReadType::SinglePoll,
             header,
             objects,
-            self.handler.get_default_poll_handler(),
+            self.handler.get_read_handler(),
         );
     }
 

@@ -187,11 +187,8 @@ public class MasterExample {
     associationConfig.autoTimeSync = AutoTimeSync.LAN;
     associationConfig.keepAliveTimeout = Duration.ofSeconds(60);
 
-    TestReadHandler readHandler = new TestReadHandler();
-    AssociationHandlers associationHandlers =
-        new AssociationHandlers(readHandler, readHandler, readHandler);
     Association association = master.addAssociation(ushort(1024), associationConfig,
-        associationHandlers, new TestTimeProvider());
+        new TestReadHandler(), new TestTimeProvider());
 
     // Create a periodic poll
     Request pollRequest = Request.classRequest(false, true, true, true);

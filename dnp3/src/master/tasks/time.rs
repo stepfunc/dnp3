@@ -347,15 +347,7 @@ mod tests {
             self.time.take()
         }
 
-        fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-            &mut self.handler
-        }
-
-        fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-            &mut self.handler
-        }
-
-        fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
+        fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
             &mut self.handler
         }
     }
@@ -391,15 +383,7 @@ mod tests {
                 Some(self.time)
             }
 
-            fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-                &mut self.handler
-            }
-
-            fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-                &mut self.handler
-            }
-
-            fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
+            fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
                 &mut self.handler
             }
         }
