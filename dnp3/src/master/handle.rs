@@ -319,9 +319,22 @@ impl HeaderInfo {
     }
 }
 
+/// Describes the source of the read event
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ReadType {
+    /// Startup integrity poll
+    StartupIntegrity,
+    /// Unsolicited message
+    Unsolicited,
+    /// Single poll requested by the user
+    SinglePoll,
+    /// Periodic poll configured by the user
+    PeriodicPoll,
+}
+
 pub trait ReadHandler {
-    fn begin_fragment(&mut self, header: ResponseHeader);
-    fn end_fragment(&mut self, header: ResponseHeader);
+    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
+    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
 
     fn handle_binary(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Binary, u16)>);
     fn handle_double_bit_binary(
@@ -365,9 +378,9 @@ impl NullHandler {
 }
 
 impl ReadHandler for NullHandler {
-    fn begin_fragment(&mut self, _header: ResponseHeader) {}
+    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
-    fn end_fragment(&mut self, _header: ResponseHeader) {}
+    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
     fn handle_binary(&mut self, _info: HeaderInfo, _iter: &mut dyn Iterator<Item = (Binary, u16)>) {
     }

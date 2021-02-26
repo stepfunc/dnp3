@@ -20,6 +20,7 @@ use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::NonReadTask::TimeSync;
 use crate::master::tasks::{AssociationTask, ReadTask, Task};
+use crate::master::ReadType;
 use crate::tokio::time::Instant;
 use crate::util::Smallest;
 
@@ -466,6 +467,7 @@ impl Association {
 
             if let Ok(objects) = response.objects {
                 extract_measurements(
+                    ReadType::Unsolicited,
                     response.header,
                     objects,
                     self.handler.get_unsolicited_handler(),
@@ -486,7 +488,12 @@ impl Association {
         header: ResponseHeader,
         objects: HeaderCollection,
     ) {
-        extract_measurements(header, objects, self.handler.get_integrity_handler());
+        extract_measurements(
+            ReadType::StartupIntegrity,
+            header,
+            objects,
+            self.handler.get_integrity_handler(),
+        );
     }
 
     pub(crate) fn handle_poll_response(
@@ -494,7 +501,12 @@ impl Association {
         header: ResponseHeader,
         objects: HeaderCollection,
     ) {
-        extract_measurements(header, objects, self.handler.get_default_poll_handler());
+        extract_measurements(
+            ReadType::PeriodicPoll,
+            header,
+            objects,
+            self.handler.get_default_poll_handler(),
+        );
     }
 
     pub(crate) fn handle_event_scan_response(
@@ -502,7 +514,12 @@ impl Association {
         header: ResponseHeader,
         objects: HeaderCollection,
     ) {
-        extract_measurements(header, objects, self.handler.get_integrity_handler());
+        extract_measurements(
+            ReadType::PeriodicPoll,
+            header,
+            objects,
+            self.handler.get_integrity_handler(),
+        );
     }
 
     pub(crate) fn handle_read_response(
@@ -510,8 +527,12 @@ impl Association {
         header: ResponseHeader,
         objects: HeaderCollection,
     ) {
-        // TODO: Get another poll handler?
-        extract_measurements(header, objects, self.handler.get_default_poll_handler());
+        extract_measurements(
+            ReadType::SinglePoll,
+            header,
+            objects,
+            self.handler.get_default_poll_handler(),
+        );
     }
 
     pub(crate) fn priority_task(&mut self) -> Option<Task> {

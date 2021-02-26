@@ -11,6 +11,7 @@ use crate::master::handle::{
     AssociationHandle, AssociationHandler, HeaderInfo, MasterHandle, ReadHandler,
 };
 use crate::master::session::{MasterSession, RunError};
+use crate::master::ReadType;
 use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
 use crate::util::phys::PhysLayer;
@@ -96,9 +97,9 @@ impl AssociationHandler for CountHandler {
 }
 
 impl ReadHandler for CountHandler {
-    fn begin_fragment(&mut self, _header: crate::app::ResponseHeader) {}
+    fn begin_fragment(&mut self, _read_type: ReadType, _header: crate::app::ResponseHeader) {}
 
-    fn end_fragment(&mut self, _header: crate::app::ResponseHeader) {}
+    fn end_fragment(&mut self, _read_type: ReadType, _header: crate::app::ResponseHeader) {}
 
     fn handle_binary(
         &mut self,
