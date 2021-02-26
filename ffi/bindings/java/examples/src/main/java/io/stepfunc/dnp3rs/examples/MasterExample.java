@@ -34,13 +34,13 @@ class TestListener implements ClientStateListener {
 class TestReadHandler implements ReadHandler {
 
   @Override
-  public void beginFragment(ResponseHeader header) {
+  public void beginFragment(ReadType readType, ResponseHeader header) {
     System.out.println(
         "Beginning fragment (broadcast: " + header.iin.iin1.isSet(Iin1Flag.BROADCAST) + ")");
   }
 
   @Override
-  public void endFragment(ResponseHeader header) {
+  public void endFragment(ReadType readType, ResponseHeader header) {
     System.out.println("End fragment");
   }
 

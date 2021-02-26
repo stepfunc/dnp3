@@ -315,7 +315,7 @@ impl HeaderInfo {
     }
 }
 
-/// Describes the source of the read event
+/// Describes the source of a read event
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ReadType {
     /// Startup integrity poll
