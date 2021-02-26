@@ -130,7 +130,7 @@ pub unsafe fn master_add_association(
     master: *mut Master,
     address: u16,
     config: ffi::AssociationConfig,
-    handlers: ffi::AssociationHandlers,
+    read_handler: ffi::ReadHandler,
     time_provider: ffi::TimeProvider,
 ) -> *mut Association {
     let master = match master.as_mut() {
@@ -170,9 +170,7 @@ pub unsafe fn master_add_association(
     };
 
     let handler = AssociationHandlerAdapter {
-        integrity_handler: handlers.integrity_handler,
-        unsolicited_handler: handlers.unsolicited_handler,
-        default_poll_handler: handlers.default_poll_handler,
+        read_handler,
         time_provider,
     };
 
@@ -288,9 +286,7 @@ fn convert_auto_time_sync(config: &ffi::AutoTimeSync) -> Option<TimeSyncProcedur
 }
 
 struct AssociationHandlerAdapter {
-    integrity_handler: ffi::ReadHandler,
-    unsolicited_handler: ffi::ReadHandler,
-    default_poll_handler: ffi::ReadHandler,
+    read_handler: ffi::ReadHandler,
     time_provider: ffi::TimeProvider,
 }
 
@@ -303,16 +299,8 @@ impl AssociationHandler for AssociationHandlerAdapter {
         }
     }
 
-    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-        &mut self.integrity_handler
-    }
-
-    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-        &mut self.unsolicited_handler
-    }
-
-    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
-        &mut self.default_poll_handler
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
+        &mut self.read_handler
     }
 }
 

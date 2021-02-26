@@ -149,18 +149,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .doc("Association configuration")?
         .build()?;
 
-    let association_handlers = lib.declare_native_struct("AssociationHandlers")?;
-    let association_handlers = lib
-        .define_native_struct(&association_handlers)?
-        .add("integrity_handler", Type::Interface(read_handler.clone()), "Handler for the initial integrity scan")?
-        .add("unsolicited_handler", Type::Interface(read_handler.clone()), "Handler for unsolicited responses")?
-        .add("default_poll_handler", Type::Interface(read_handler), "Handler for all other responses")?
-        .doc(
-            doc("Handlers that will receive readings.")
-            .details("You can set all handlers to the same handler if knowing what type of event generated the value is not required.")
-        )?
-        .build()?;
-
     let time_provider_interface = define_time_provider(lib)?;
 
     let add_association_fn = lib
@@ -181,9 +169,9 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             "Association configuration",
         )?
         .param(
-            "handlers",
-            Type::Struct(association_handlers),
-            "Handlers to call when receiving point data",
+            "read_handler",
+            Type::Interface(read_handler),
+            "Interface uses to load measurement data",
         )?
         .param(
             "time_provider",
