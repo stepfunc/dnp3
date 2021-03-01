@@ -36,7 +36,7 @@ pub fn define(
         .return_type(ReturnType::void())?
         .doc(
                 doc("Demand the immediate execution of a poll previously created with {class:Association.AddPoll()}.")
-                .details("This method returns immediatly. The result will be sent to the registered {interface:ReadHandler}.")
+                .details("This method returns immediately. The result will be sent to the registered {interface:ReadHandler}.")
                 .details("This method resets the internal timer of the poll.")
         )?
         .build()?;

@@ -89,65 +89,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     // define the association
     let association_class = crate::association::define(lib, shared)?;
 
-    let event_classes = define_event_classes(lib)?;
-    let classes = define_classes(lib)?;
-
-    let auto_time_sync_enum = lib
-        .define_native_enum("AutoTimeSync")?
-        .push("None", "Do not perform automatic time sync")?
-        .push(
-            "Lan",
-            "Perform automatic time sync with Record Current Time (0x18) function code",
-        )?
-        .push(
-            "NonLan",
-            "Perform automatic time sync with Delay Measurement (0x17) function code",
-        )?
-        .doc("Automatic time synchronization configuration")?
-        .build()?;
-
-    let association_config = lib.declare_native_struct("AssociationConfig")?;
-    let association_config = lib
-        .define_native_struct(&association_config)?
-        .add(
-            "disable_unsol_classes",
-            Type::Struct(event_classes.clone()),
-            "Classes to disable unsolicited responses at startup",
-        )?
-        .add(
-            "enable_unsol_classes",
-            Type::Struct(event_classes.clone()),
-            "Classes to enable unsolicited responses at startup",
-        )?
-        .add(
-            "startup_integrity_classes",
-                Type::Struct(classes),
-                doc("Startup integrity classes to ask on master startup and when an outstation restart is detected.").details("For conformance, this should be Class 1230.")
-        )?
-        .add(
-            "auto_time_sync",
-            StructElementType::Enum(auto_time_sync_enum, Some("None".to_string())),
-            "Automatic time synchronization configuration",
-        )?
-        .add(
-            "auto_tasks_retry_strategy",
-            Type::Struct(shared.retry_strategy.clone()),
-            "Automatic tasks retry strategy",
-        )?
-        .add("keep_alive_timeout",
-            StructElementType::Duration(DurationMapping::Seconds, Some(Duration::from_secs(60))),
-            doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the outstation").details("A value of zero means no automatic keep-alive.")
-        )?
-        .add("auto_integrity_scan_on_buffer_overflow",
-        StructElementType::Bool(Some(true)),
-            doc("Automatic integrity scan when an EVENT_BUFFER_OVERFLOW is detected")
-        )?
-        .add("event_scan_on_events_available",
-            Type::Struct(event_classes),
-            doc("Classes to automatically send reads when the IIN bit is asserted")
-        )?
-        .doc("Association configuration")?
-        .build()?;
+    let association_config = define_association_config(lib, shared)?;
 
     let time_provider_interface = define_time_provider(lib)?;
 
@@ -235,6 +177,71 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .build()?;
 
     Ok(())
+}
+
+fn define_association_config(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> std::result::Result<NativeStructHandle, BindingError> {
+    let event_classes = define_event_classes(lib)?;
+    let classes = define_classes(lib)?;
+
+    let auto_time_sync_enum = lib
+        .define_native_enum("AutoTimeSync")?
+        .push("None", "Do not perform automatic time sync")?
+        .push(
+            "Lan",
+            "Perform automatic time sync with Record Current Time (0x18) function code",
+        )?
+        .push(
+            "NonLan",
+            "Perform automatic time sync with Delay Measurement (0x17) function code",
+        )?
+        .doc("Automatic time synchronization configuration")?
+        .build()?;
+
+    let association_config = lib.declare_native_struct("AssociationConfig")?;
+    lib
+        .define_native_struct(&association_config)?
+        .add(
+            "disable_unsol_classes",
+            Type::Struct(event_classes.clone()),
+            "Classes to disable unsolicited responses at startup",
+        )?
+        .add(
+            "enable_unsol_classes",
+            Type::Struct(event_classes.clone()),
+            "Classes to enable unsolicited responses at startup",
+        )?
+        .add(
+            "startup_integrity_classes",
+            Type::Struct(classes),
+            doc("Startup integrity classes to ask on master startup and when an outstation restart is detected.").details("For conformance, this should be Class 1230.")
+        )?
+        .add(
+            "auto_time_sync",
+            StructElementType::Enum(auto_time_sync_enum, Some("None".to_string())),
+            "Automatic time synchronization configuration",
+        )?
+        .add(
+            "auto_tasks_retry_strategy",
+            Type::Struct(shared.retry_strategy.clone()),
+            "Automatic tasks retry strategy",
+        )?
+        .add("keep_alive_timeout",
+             StructElementType::Duration(DurationMapping::Seconds, Some(Duration::from_secs(60))),
+             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the outstation").details("A value of zero means no automatic keep-alive.")
+        )?
+        .add("auto_integrity_scan_on_buffer_overflow",
+             StructElementType::Bool(Some(true)),
+             doc("Automatic integrity scan when an EVENT_BUFFER_OVERFLOW is detected")
+        )?
+        .add("event_scan_on_events_available",
+             Type::Struct(event_classes),
+             doc("Classes to automatically send reads when the IIN bit is asserted")
+        )?
+        .doc("Association configuration")?
+        .build()
 }
 
 fn define_tcp_client_state_listener(
