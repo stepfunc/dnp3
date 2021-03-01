@@ -5,214 +5,162 @@ use dnp3::outstation::database::*;
 
 use crate::ffi;
 
-pub unsafe fn database_add_binary(
-    database: *mut Database,
-    index: u16,
-    point_class: ffi::EventClass,
-    config: ffi::BinaryConfig,
-) {
-    if let Some(database) = database.as_mut() {
-        database.add(index, point_class.into(), BinaryConfig::from(config));
-    }
+macro_rules! implement_database_point_operations {
+    (
+        $add_name:ident, $remove_name:ident, $update_name:ident, $get_name:ident,
+        $lib_point_type:ty, $lib_config_type:ty,
+        $ffi_point_type:ty, $ffi_config_type:ty, $ffi_optional_point_type:ty, $ffi_optional_point_fields:ident
+    ) => {
+        pub unsafe fn $add_name(
+            database: *mut Database,
+            index: u16,
+            point_class: ffi::EventClass,
+            config: $ffi_config_type,
+        ) {
+            if let Some(database) = database.as_mut() {
+                database.add(index, point_class.into(), <$lib_config_type>::from(config));
+            }
+        }
+
+        pub unsafe fn $remove_name(database: *mut Database, index: u16) {
+            if let Some(database) = database.as_mut() {
+                Remove::<$lib_point_type>::remove(database, index);
+            }
+        }
+
+        pub unsafe fn $update_name(
+            database: *mut Database,
+            value: $ffi_point_type,
+            options: ffi::UpdateOptions,
+        ) {
+            if let Some(database) = database.as_mut() {
+                database.update(value.index, &<$lib_point_type>::from(value), options.into());
+            }
+        }
+
+        pub unsafe fn $get_name(database: *mut Database, index: u16) -> $ffi_optional_point_type {
+            let value = if let Some(database) = database.as_mut() {
+                Get::<$lib_point_type>::get(database, index)
+            } else {
+                None
+            };
+
+            value
+                .map(|value| {
+                    $ffi_optional_point_fields {
+                        is_present: true,
+                        value: <$ffi_point_type>::new(index, value),
+                    }
+                    .into()
+                })
+                .unwrap_or(
+                    $ffi_optional_point_fields {
+                        is_present: false,
+                        value: <$ffi_point_type>::new(index, <$lib_point_type>::default()),
+                    }
+                    .into(),
+                )
+        }
+    };
 }
 
-pub unsafe fn database_remove_binary(database: *mut Database, index: u16) {
-    if let Some(database) = database.as_mut() {
-        Remove::<Binary>::remove(database, index);
-    }
-}
+use ffi::OptionalBinaryFields;
+implement_database_point_operations!(
+    database_add_binary,
+    database_remove_binary,
+    database_update_binary,
+    database_get_binary,
+    Binary,
+    BinaryConfig,
+    ffi::Binary,
+    ffi::BinaryConfig,
+    ffi::OptionalBinary,
+    OptionalBinaryFields
+);
 
-pub unsafe fn database_update_binary(
-    database: *mut Database,
-    value: ffi::Binary,
-    options: ffi::UpdateOptions,
-) {
-    if let Some(database) = database.as_mut() {
-        database.update(value.index, &Binary::from(value), options.into());
-    }
-}
+use ffi::OptionalDoubleBitBinaryFields;
+implement_database_point_operations!(
+    database_add_double_bit_binary,
+    database_remove_double_bit_binary,
+    database_update_double_bit_binary,
+    database_get_double_bit_binary,
+    DoubleBitBinary,
+    DoubleBitBinaryConfig,
+    ffi::DoubleBitBinary,
+    ffi::DoubleBitBinaryConfig,
+    ffi::OptionalDoubleBitBinary,
+    OptionalDoubleBitBinaryFields
+);
 
-pub unsafe fn database_add_double_bit_binary(
-    database: *mut Database,
-    index: u16,
-    point_class: ffi::EventClass,
-    config: ffi::DoubleBitBinaryConfig,
-) {
-    if let Some(database) = database.as_mut() {
-        database.add(
-            index,
-            point_class.into(),
-            DoubleBitBinaryConfig::from(config),
-        );
-    }
-}
+use ffi::OptionalBinaryOutputStatusFields;
+implement_database_point_operations!(
+    database_add_binary_output_status,
+    database_remove_binary_output_status,
+    database_update_binary_output_status,
+    database_get_binary_output_status,
+    BinaryOutputStatus,
+    BinaryOutputStatusConfig,
+    ffi::BinaryOutputStatus,
+    ffi::BinaryOutputStatusConfig,
+    ffi::OptionalBinaryOutputStatus,
+    OptionalBinaryOutputStatusFields
+);
 
-pub unsafe fn database_remove_double_bit_binary(database: *mut Database, index: u16) {
-    if let Some(database) = database.as_mut() {
-        Remove::<DoubleBitBinary>::remove(database, index);
-    }
-}
+use ffi::OptionalCounterFields;
+implement_database_point_operations!(
+    database_add_counter,
+    database_remove_counter,
+    database_update_counter,
+    database_get_counter,
+    Counter,
+    CounterConfig,
+    ffi::Counter,
+    ffi::CounterConfig,
+    ffi::OptionalCounter,
+    OptionalCounterFields
+);
 
-pub unsafe fn database_update_double_bit_binary(
-    database: *mut Database,
-    value: ffi::DoubleBitBinary,
-    options: ffi::UpdateOptions,
-) {
-    if let Some(database) = database.as_mut() {
-        database.update(value.index, &DoubleBitBinary::from(value), options.into());
-    }
-}
+use ffi::OptionalFrozenCounterFields;
+implement_database_point_operations!(
+    database_add_frozen_counter,
+    database_remove_frozen_counter,
+    database_update_frozen_counter,
+    database_get_frozen_counter,
+    FrozenCounter,
+    FrozenCounterConfig,
+    ffi::FrozenCounter,
+    ffi::FrozenCounterConfig,
+    ffi::OptionalFrozenCounter,
+    OptionalFrozenCounterFields
+);
 
-pub unsafe fn database_add_binary_output_status(
-    database: *mut Database,
-    index: u16,
-    point_class: ffi::EventClass,
-    config: ffi::BinaryOutputStatusConfig,
-) {
-    if let Some(database) = database.as_mut() {
-        database.add(
-            index,
-            point_class.into(),
-            BinaryOutputStatusConfig::from(config),
-        );
-    }
-}
+use ffi::OptionalAnalogFields;
+implement_database_point_operations!(
+    database_add_analog,
+    database_remove_analog,
+    database_update_analog,
+    database_get_analog,
+    Analog,
+    AnalogConfig,
+    ffi::Analog,
+    ffi::AnalogConfig,
+    ffi::OptionalAnalog,
+    OptionalAnalogFields
+);
 
-pub unsafe fn database_remove_binary_output_status(database: *mut Database, index: u16) {
-    if let Some(database) = database.as_mut() {
-        Remove::<BinaryOutputStatus>::remove(database, index);
-    }
-}
-
-pub unsafe fn database_update_binary_output_status(
-    database: *mut Database,
-    value: ffi::BinaryOutputStatus,
-    options: ffi::UpdateOptions,
-) {
-    if let Some(database) = database.as_mut() {
-        database.update(
-            value.index,
-            &BinaryOutputStatus::from(value),
-            options.into(),
-        );
-    }
-}
-
-pub unsafe fn database_add_counter(
-    database: *mut Database,
-    index: u16,
-    point_class: ffi::EventClass,
-    config: ffi::CounterConfig,
-) {
-    if let Some(database) = database.as_mut() {
-        database.add(index, point_class.into(), CounterConfig::from(config));
-    }
-}
-
-pub unsafe fn database_remove_counter(database: *mut Database, index: u16) {
-    if let Some(database) = database.as_mut() {
-        Remove::<Counter>::remove(database, index);
-    }
-}
-
-pub unsafe fn database_update_counter(
-    database: *mut Database,
-    value: ffi::Counter,
-    options: ffi::UpdateOptions,
-) {
-    if let Some(database) = database.as_mut() {
-        database.update(value.index, &Counter::from(value), options.into());
-    }
-}
-
-pub unsafe fn database_add_frozen_counter(
-    database: *mut Database,
-    index: u16,
-    point_class: ffi::EventClass,
-    config: ffi::FrozenCounterConfig,
-) {
-    if let Some(database) = database.as_mut() {
-        database.add(index, point_class.into(), FrozenCounterConfig::from(config));
-    }
-}
-
-pub unsafe fn database_remove_frozen_counter(database: *mut Database, index: u16) {
-    if let Some(database) = database.as_mut() {
-        Remove::<FrozenCounter>::remove(database, index);
-    }
-}
-
-pub unsafe fn database_update_frozen_counter(
-    database: *mut Database,
-    value: ffi::FrozenCounter,
-    options: ffi::UpdateOptions,
-) {
-    if let Some(database) = database.as_mut() {
-        database.update(value.index, &FrozenCounter::from(value), options.into());
-    }
-}
-
-pub unsafe fn database_add_analog(
-    database: *mut Database,
-    index: u16,
-    point_class: ffi::EventClass,
-    config: ffi::AnalogConfig,
-) {
-    if let Some(database) = database.as_mut() {
-        database.add(index, point_class.into(), AnalogConfig::from(config));
-    }
-}
-
-pub unsafe fn database_remove_analog(database: *mut Database, index: u16) {
-    if let Some(database) = database.as_mut() {
-        Remove::<Analog>::remove(database, index);
-    }
-}
-
-pub unsafe fn database_update_analog(
-    database: *mut Database,
-    value: ffi::Analog,
-    options: ffi::UpdateOptions,
-) {
-    if let Some(database) = database.as_mut() {
-        database.update(value.index, &Analog::from(value), options.into());
-    }
-}
-
-pub unsafe fn database_add_analog_output_status(
-    database: *mut Database,
-    index: u16,
-    point_class: ffi::EventClass,
-    config: ffi::AnalogOutputStatusConfig,
-) {
-    if let Some(database) = database.as_mut() {
-        database.add(
-            index,
-            point_class.into(),
-            AnalogOutputStatusConfig::from(config),
-        );
-    }
-}
-
-pub unsafe fn database_remove_analog_output_status(database: *mut Database, index: u16) {
-    if let Some(database) = database.as_mut() {
-        Remove::<AnalogOutputStatus>::remove(database, index);
-    }
-}
-
-pub unsafe fn database_update_analog_output_status(
-    database: *mut Database,
-    value: ffi::AnalogOutputStatus,
-    options: ffi::UpdateOptions,
-) {
-    if let Some(database) = database.as_mut() {
-        database.update(
-            value.index,
-            &AnalogOutputStatus::from(value),
-            options.into(),
-        );
-    }
-}
+use ffi::OptionalAnalogOutputStatusFields;
+implement_database_point_operations!(
+    database_add_analog_output_status,
+    database_remove_analog_output_status,
+    database_update_analog_output_status,
+    database_get_analog_output_status,
+    AnalogOutputStatus,
+    AnalogOutputStatusConfig,
+    ffi::AnalogOutputStatus,
+    ffi::AnalogOutputStatusConfig,
+    ffi::OptionalAnalogOutputStatus,
+    OptionalAnalogOutputStatusFields
+);
 
 pub unsafe fn database_add_octet_string(
     database: *mut Database,

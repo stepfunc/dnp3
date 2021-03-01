@@ -72,6 +72,13 @@ impl Database {
         self.static_db.remove::<T>(index)
     }
 
+    pub(crate) fn get<T>(&self, index: u16) -> Option<T>
+    where
+        T: Updatable,
+    {
+        self.static_db.get::<T>(index)
+    }
+
     pub(crate) fn update<T>(&mut self, value: &T, index: u16, options: UpdateOptions) -> bool
     where
         T: Updatable,

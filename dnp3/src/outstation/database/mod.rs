@@ -251,6 +251,12 @@ pub trait Update<T> {
     fn update(&mut self, index: u16, value: &T, options: UpdateOptions) -> bool;
 }
 
+/// trait for getting the current value in the database
+pub trait Get<T> {
+    /// retrieve the current value off the database.
+    fn get(&self, index: u16) -> Option<T>;
+}
+
 /// Core database implementation shared between an outstation task and the user facing API.
 /// This type is always guarded by a `DatabaseHandle` which provides a transactional API.
 pub struct Database {
@@ -564,5 +570,53 @@ impl Remove<AnalogOutputStatus> for Database {
 impl Remove<OctetString> for Database {
     fn remove(&mut self, index: u16) -> bool {
         self.inner.remove::<OctetString>(index)
+    }
+}
+
+impl Get<Binary> for Database {
+    fn get(&self, index: u16) -> Option<Binary> {
+        self.inner.get::<Binary>(index)
+    }
+}
+
+impl Get<DoubleBitBinary> for Database {
+    fn get(&self, index: u16) -> Option<DoubleBitBinary> {
+        self.inner.get::<DoubleBitBinary>(index)
+    }
+}
+
+impl Get<BinaryOutputStatus> for Database {
+    fn get(&self, index: u16) -> Option<BinaryOutputStatus> {
+        self.inner.get::<BinaryOutputStatus>(index)
+    }
+}
+
+impl Get<Counter> for Database {
+    fn get(&self, index: u16) -> Option<Counter> {
+        self.inner.get::<Counter>(index)
+    }
+}
+
+impl Get<FrozenCounter> for Database {
+    fn get(&self, index: u16) -> Option<FrozenCounter> {
+        self.inner.get::<FrozenCounter>(index)
+    }
+}
+
+impl Get<Analog> for Database {
+    fn get(&self, index: u16) -> Option<Analog> {
+        self.inner.get::<Analog>(index)
+    }
+}
+
+impl Get<AnalogOutputStatus> for Database {
+    fn get(&self, index: u16) -> Option<AnalogOutputStatus> {
+        self.inner.get::<AnalogOutputStatus>(index)
+    }
+}
+
+impl Get<OctetString> for Database {
+    fn get(&self, index: u16) -> Option<OctetString> {
+        self.inner.get::<OctetString>(index)
     }
 }

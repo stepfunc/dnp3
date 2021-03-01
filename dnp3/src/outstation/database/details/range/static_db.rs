@@ -22,7 +22,8 @@ where
 pub(crate) trait Updatable: Insertable + Clone + Default {
     type StaticVariation: StaticVariation<Self>;
     type Detector: EventDetector<Self>;
-    fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self>;
+    fn get_map(maps: &StaticDatabase) -> &PointMap<Self>;
+    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self>;
     fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange;
     fn enabled_class_zero(config: &ClassZeroConfig) -> bool;
 }
@@ -287,7 +288,7 @@ impl StaticDatabase {
     where
         T: Updatable,
     {
-        let map = self.get_map::<T>();
+        let map = self.get_mut_map::<T>();
 
         if map.inner.contains_key(&index) {
             return false;
@@ -302,7 +303,17 @@ impl StaticDatabase {
     where
         T: Updatable,
     {
-        self.get_map::<T>().inner.remove(&index).is_some()
+        self.get_mut_map::<T>().inner.remove(&index).is_some()
+    }
+
+    pub(crate) fn get<T>(&self, index: u16) -> Option<T>
+    where
+        T: Updatable,
+    {
+        self.get_map::<T>()
+            .inner
+            .get(&index)
+            .map(|point| point.current.clone())
     }
 
     pub(crate) fn update<T>(
@@ -314,7 +325,7 @@ impl StaticDatabase {
     where
         T: Updatable,
     {
-        match self.get_map::<T>().get_mut(index) {
+        match self.get_mut_map::<T>().get_mut(index) {
             None => (false, None),
             Some(x) => {
                 if options.update_static {
@@ -460,7 +471,7 @@ impl StaticDatabase {
         match range {
             Some(range) => self.push_selection(T::wrap(range, variation)),
             None => {
-                if let Some(x) = T::get_map(self).select_all_with_variation(variation) {
+                if let Some(x) = T::get_mut_map(self).select_all_with_variation(variation) {
                     self.push_selection(x)
                 } else {
                     Iin2::default()
@@ -477,11 +488,18 @@ impl StaticDatabase {
         }
     }
 
-    fn get_map<T>(&mut self) -> &mut PointMap<T>
+    fn get_map<T>(&self) -> &PointMap<T>
     where
         T: Updatable,
     {
         T::get_map(self)
+    }
+
+    fn get_mut_map<T>(&mut self) -> &mut PointMap<T>
+    where
+        T: Updatable,
+    {
+        T::get_mut_map(self)
     }
 
     fn select_class_zero_type<T>(&mut self) -> Iin2
@@ -489,7 +507,7 @@ impl StaticDatabase {
         T: Updatable,
     {
         if T::enabled_class_zero(&self.class_zero) {
-            let full_range = match T::get_map(self).select_all() {
+            let full_range = match T::get_mut_map(self).select_all() {
                 None => return Iin2::default(),
                 Some(x) => x,
             };
@@ -612,7 +630,11 @@ impl Updatable for Binary {
     type StaticVariation = StaticBinaryVariation;
     type Detector = FlagsDetector;
 
-    fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
+    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
+        &maps.binary
+    }
+
+    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
         &mut maps.binary
     }
 
@@ -629,7 +651,11 @@ impl Updatable for DoubleBitBinary {
     type StaticVariation = StaticDoubleBitBinaryVariation;
     type Detector = FlagsDetector;
 
-    fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
+    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
+        &maps.double_bit_binary
+    }
+
+    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
         &mut maps.double_bit_binary
     }
 
@@ -646,7 +672,11 @@ impl Updatable for BinaryOutputStatus {
     type StaticVariation = StaticBinaryOutputStatusVariation;
     type Detector = FlagsDetector;
 
-    fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
+    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
+        &maps.binary_output_status
+    }
+
+    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
         &mut maps.binary_output_status
     }
 
@@ -663,7 +693,11 @@ impl Updatable for Counter {
     type StaticVariation = StaticCounterVariation;
     type Detector = Deadband<u32>;
 
-    fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
+    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
+        &maps.counter
+    }
+
+    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
         &mut maps.counter
     }
 
@@ -680,7 +714,11 @@ impl Updatable for FrozenCounter {
     type StaticVariation = StaticFrozenCounterVariation;
     type Detector = Deadband<u32>;
 
-    fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
+    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
+        &maps.frozen_counter
+    }
+
+    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
         &mut maps.frozen_counter
     }
 
@@ -697,7 +735,11 @@ impl Updatable for Analog {
     type StaticVariation = StaticAnalogVariation;
     type Detector = Deadband<f64>;
 
-    fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
+    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
+        &maps.analog
+    }
+
+    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
         &mut maps.analog
     }
 
@@ -714,7 +756,11 @@ impl Updatable for AnalogOutputStatus {
     type StaticVariation = StaticAnalogOutputStatusVariation;
     type Detector = Deadband<f64>;
 
-    fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
+    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
+        &maps.analog_output_status
+    }
+
+    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
         &mut maps.analog_output_status
     }
 
@@ -731,7 +777,11 @@ impl Updatable for OctetString {
     type StaticVariation = StaticOctetStringVariation;
     type Detector = OctetStringDetector;
 
-    fn get_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
+    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
+        &maps.octet_strings
+    }
+
+    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
         &mut maps.octet_strings
     }
 

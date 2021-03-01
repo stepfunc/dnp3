@@ -383,6 +383,52 @@ mod tests {
     }
 
     #[test]
+    fn can_write_three_bytes_of_g3v1() {
+        let mut buffer = [0u8; 64];
+        let mut cursor = WriteCursor::new(buffer.as_mut());
+        let mut writer = RangeWriter::new();
+
+        fn db_modulo(i: u16) -> DoubleBit {
+            match i % 4 {
+                0 => DoubleBit::Intermediate,
+                1 => DoubleBit::DeterminedOff,
+                2 => DoubleBit::DeterminedOn,
+                _ => DoubleBit::Indeterminate,
+            }
+        }
+
+        let g3v1 = StaticDoubleBitBinaryVariation::Group3Var1
+            .get_write_info(&double_bit(DoubleBit::DeterminedOff));
+
+        for index in 1..=9 {
+            let value = double_bit(db_modulo(index));
+            writer.write(&mut cursor, index, &value, g3v1).unwrap();
+        }
+
+        assert_eq!(
+            cursor.written(),
+            [
+                // g3v1 - 16-bit start/stop
+                3,
+                1,
+                0x01,
+                // start
+                01,
+                00,
+                // stop
+                09,
+                00,
+                // first byte
+                0b0011_1001,
+                // second byte
+                0b0011_1001,
+                // third byte
+                0b0000_0001,
+            ]
+        )
+    }
+
+    #[test]
     #[rustfmt::skip]
     fn switches_headers_with_same_index() {
         let mut buffer = [0u8; 64];

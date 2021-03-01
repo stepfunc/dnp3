@@ -1074,6 +1074,40 @@ impl OutstationSession {
                 self.handle_direct_operate_no_ack(database, object_headers);
                 None
             }
+            FunctionCode::ImmediateFreeze => Some(self.handle_freeze(
+                database,
+                seq,
+                object_headers,
+                FreezeType::ImmediateFreeze,
+                true,
+            )),
+            FunctionCode::ImmediateFreezeNoResponse => {
+                self.handle_freeze(
+                    database,
+                    seq,
+                    object_headers,
+                    FreezeType::ImmediateFreeze,
+                    false,
+                );
+                None
+            }
+            FunctionCode::FreezeClear => Some(self.handle_freeze(
+                database,
+                seq,
+                object_headers,
+                FreezeType::FreezeAndClear,
+                true,
+            )),
+            FunctionCode::FreezeClearNoResponse => {
+                self.handle_freeze(
+                    database,
+                    seq,
+                    object_headers,
+                    FreezeType::FreezeAndClear,
+                    false,
+                );
+                None
+            }
             FunctionCode::EnableUnsolicited => {
                 Some(self.handle_enable_or_disable_unsolicited(true, database, seq, object_headers))
             }
@@ -1541,6 +1575,55 @@ impl OutstationSession {
         let mut cursor = self.sol_tx_buffer.write_cursor();
         header.write(&mut cursor).unwrap();
         len
+    }
+
+    fn handle_freeze(
+        &mut self,
+        database: &mut DatabaseHandle,
+        seq: Sequence,
+        object_headers: HeaderCollection,
+        freeze_type: FreezeType,
+        respond: bool,
+    ) -> usize {
+        let mut iin = Iin::default();
+        database.transaction(|db| {
+            self.control_handler.begin_fragment();
+            for header in object_headers.iter() {
+                match header.details {
+                    HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => {
+                        iin |= self.control_handler.freeze_counter(
+                            FreezeIndices::All,
+                            freeze_type,
+                            db,
+                        );
+                    }
+                    HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => {
+                        iin |= self.control_handler.freeze_counter(
+                            FreezeIndices::Range(start as u16, stop as u16),
+                            freeze_type,
+                            db,
+                        );
+                    }
+                    HeaderDetails::TwoByteStartStop(start, stop, RangedVariation::Group20Var0) => {
+                        iin |= self.control_handler.freeze_counter(
+                            FreezeIndices::Range(start, stop),
+                            freeze_type,
+                            db,
+                        );
+                    }
+                    _ => {
+                        iin |= Iin2::NO_FUNC_CODE_SUPPORT;
+                    }
+                }
+            }
+            self.control_handler.end_fragment();
+        });
+
+        if respond {
+            self.write_empty_solicited_response(seq, self.get_response_iin(database) | iin)
+        } else {
+            0
+        }
     }
 
     fn get_response_iin(&self, database: &DatabaseHandle) -> Iin {

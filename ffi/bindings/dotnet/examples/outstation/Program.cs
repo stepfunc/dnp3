@@ -93,6 +93,10 @@ class ExampleOutstation
         public CommandStatus SelectG41v4(double value, ushort index, Database database) { return CommandStatus.NotSupported; }
 
         public CommandStatus OperateG41v4(double value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+
+        public FreezeResult FreezeCountersAll(FreezeType freezeType, Database database) { return FreezeResult.NotSupported; }
+
+        public FreezeResult FreezeCountersRange(ushort start, ushort stop, FreezeType freezeType, Database database) { return FreezeResult.NotSupported; }
     }
 
     public static void Main(string[] args)

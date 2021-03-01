@@ -603,6 +603,23 @@ fn define_control_handler(
         .doc("Enumeration describing how the master requested the control operation")?
         .build()?;
 
+    let freeze_type = lib.define_native_enum("FreezeType")?
+        .push("ImmediateFreeze", "Copy the current value of a counter to the associated point")?
+        .push("FreezeAndClear", "Copy the current value of a counter to the associated point and clear the current value to 0.")?
+        .doc("Freeze operation type")?
+        .build()?;
+
+    let freeze_result = lib
+        .define_native_enum("FreezeResult")?
+        .push("Success", "Freeze operation was successful")?
+        .push("ParameterError", "One of the point is invalid")?
+        .push(
+            "NotSupported",
+            "The demanded freeze operation is not supported by this device",
+        )?
+        .doc("Result of a freeze operation")?
+        .build()?;
+
     lib.define_interface("ControlHandler", "Callbacks for handling controls")?
         .callback("begin_fragment", "Notifies the start of a command fragment")?
             .return_type(ReturnType::void())?
@@ -684,6 +701,18 @@ fn define_control_handler(
             .param("op_type", Type::Enum(operate_type), "Operate type")?
             .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status), "Command status"))?
+            .build()?
+        .callback("freeze_counters_all", "Freeze all the counters")?
+            .param("freeze_type", Type::Enum(freeze_type.clone()), "Type of freeze operation")?
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
+            .return_type(ReturnType::new(Type::Enum(freeze_result.clone()), "Result of the freeze operation"))?
+            .build()?
+        .callback("freeze_counters_range", "Freeze a range of counters")?
+            .param("start", Type::Uint16, "Start index to freeze (inclusive)")?
+            .param("stop", Type::Uint16, "Stop index to freeze (inclusive)")?
+            .param("freeze_type", Type::Enum(freeze_type), "Type of freeze operation")?
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
+            .return_type(ReturnType::new(Type::Enum(freeze_result), "Result of the freeze operation"))?
             .build()?
         .destroy_callback("on_destroy")?
         .build()

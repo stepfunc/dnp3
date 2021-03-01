@@ -83,6 +83,16 @@ command_status_t operate_g41v4(double control, uint16_t index, operate_type_t op
     return CommandStatus_NotSupported;
 }
 
+freeze_result_t freeze_counters_all(freeze_type_t freeze_type, database_t* database, void* context)
+{
+    return FreezeResult_NotSupported;
+}
+
+freeze_result_t freeze_counters_range(uint16_t start, uint16_t stop, freeze_type_t freeze_type, database_t* database, void* context)
+{
+    return FreezeResult_NotSupported;
+}
+
 // Transactions
 void outstation_transaction_startup(database_t *db, void *context)
 {
@@ -262,6 +272,8 @@ int main()
         .operate_g41v3 = &operate_g41v3,
         .select_g41v4 = &select_g41v4,
         .operate_g41v4 = &operate_g41v4,
+        .freeze_counters_all = &freeze_counters_all,
+        .freeze_counters_range = &freeze_counters_range,
         .on_destroy = NULL,
         .ctx = NULL,
     };

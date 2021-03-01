@@ -1,5 +1,6 @@
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
+use crate::outstation::{FreezeIndices, FreezeType};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
@@ -19,6 +20,7 @@ pub(crate) enum Event {
     BeginControls,
     Select(Control),
     Operate(Control, OperateType),
+    Freeze(FreezeIndices, FreezeType),
     EndControls,
     BroadcastReceived(FunctionCode, BroadcastAction),
     EnterSolicitedConfirmWait(u8),

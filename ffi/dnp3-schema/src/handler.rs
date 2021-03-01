@@ -1,5 +1,4 @@
 use oo_bindgen::callback::InterfaceHandle;
-use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::NativeStructHandle;
 use oo_bindgen::*;
@@ -61,8 +60,6 @@ pub fn define(
         )?
         .doc("Object header information")?
         .build()?;
-
-    let octet_string_it = build_octet_string(lib)?;
 
     let read_type = define_read_type_enum(lib)?;
 
@@ -205,7 +202,7 @@ pub fn define(
         )?
         .param(
             "it",
-            Type::Iterator(octet_string_it),
+            Type::Iterator(shared_def.octet_string_it.clone()),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .return_type(ReturnType::void())?
@@ -334,50 +331,4 @@ fn define_read_type_enum(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, B
         .push("PeriodicPoll", "Periodic poll configured by the user")?
         .doc("Describes the source of a read event")?
         .build()
-}
-
-fn build_octet_string(lib: &mut LibraryBuilder) -> Result<IteratorHandle, BindingError> {
-    // Octet string stuff
-    let byte_struct = lib.declare_native_struct("Byte")?;
-    let byte_struct = lib
-        .define_native_struct(&byte_struct)?
-        .add("value", Type::Uint8, "Byte value")?
-        .doc("Single byte struct")?
-        .build()?;
-
-    let byte_it = lib.declare_class("ByteIterator")?;
-    let byte_it_next_fn = lib
-        .declare_native_function("byte_next")?
-        .param("it", Type::ClassRef(byte_it), "Iterator")?
-        .return_type(ReturnType::new(
-            Type::StructRef(byte_struct.declaration()),
-            "Next value of the iterator or {null} if the iterator reached the end",
-        ))?
-        .doc("Get the next value of the iterator")?
-        .build()?;
-    let byte_it = lib.define_iterator_with_lifetime(&byte_it_next_fn, &byte_struct)?;
-
-    let octet_string_struct = lib.declare_native_struct("OctetString")?;
-    let octet_string_struct = lib
-        .define_native_struct(&octet_string_struct)?
-        .add("index", Type::Uint16, "Point index")?
-        .add("value", Type::Iterator(byte_it), "Point value")?
-        .doc("Octet String point")?
-        .build()?;
-
-    let octet_string_iterator = lib.declare_class("OctetStringIterator")?;
-    let iterator_next_fn = lib
-        .declare_native_function("octetstring_next")?
-        .param("it", Type::ClassRef(octet_string_iterator), "Iterator")?
-        .return_type(ReturnType::new(
-            Type::StructRef(octet_string_struct.declaration()),
-            "Next value of the iterator or {null} if the iterator reached the end",
-        ))?
-        .doc("Get the next value of the iterator")?
-        .build()?;
-
-    let octet_string_iterator =
-        lib.define_iterator_with_lifetime(&iterator_next_fn, &octet_string_struct)?;
-
-    Ok(octet_string_iterator)
 }

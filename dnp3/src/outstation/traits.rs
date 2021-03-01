@@ -199,6 +199,36 @@ pub trait ControlSupport<T> {
     ) -> CommandStatus;
 }
 
+/// Indices used by freeze operations
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum FreezeIndices {
+    /// All counters
+    All,
+    /// Range of counters (the range is inclusive)
+    Range(u16, u16),
+}
+
+/// Freeze operation type
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum FreezeType {
+    /// Copy the current value of a counter to the associated point
+    ImmediateFreeze,
+    /// Copy the current value of a counter to the associated point and
+    /// clear the current value to 0
+    FreezeAndClear,
+}
+
+/// Result of a freeze operation
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum FreezeResult {
+    /// Freeze operation was successful
+    Success,
+    /// One of the point is invalid
+    ParameterError,
+    /// The demanded freeze operation is not supported by this device
+    NotSupported,
+}
+
 /// callbacks for handling controls
 pub trait ControlHandler:
     ControlSupport<Group12Var1>
@@ -212,6 +242,15 @@ pub trait ControlHandler:
 {
     fn begin_fragment(&mut self) {}
     fn end_fragment(&mut self) {}
+
+    fn freeze_counter(
+        &mut self,
+        _indices: FreezeIndices,
+        _freeze_type: FreezeType,
+        _database: &mut Database,
+    ) -> FreezeResult {
+        FreezeResult::NotSupported
+    }
 }
 
 #[derive(Copy, Clone)]

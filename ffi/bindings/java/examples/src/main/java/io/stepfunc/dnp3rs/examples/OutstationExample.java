@@ -182,6 +182,17 @@ class TestControlHandler implements ControlHandler {
       Database database) {
     return CommandStatus.NOT_SUPPORTED;
   }
+
+  @Override
+  public FreezeResult freezeCountersAll(FreezeType freezeType, Database database) {
+    return FreezeResult.NOT_SUPPORTED;
+  }
+
+  @Override
+  public FreezeResult freezeCountersRange(UShort start, UShort stop, FreezeType freezeType,
+      Database database) {
+    return FreezeResult.NOT_SUPPORTED;
+  }
 }
 
 
