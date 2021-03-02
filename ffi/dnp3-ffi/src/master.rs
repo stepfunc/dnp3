@@ -279,7 +279,7 @@ pub(crate) unsafe fn master_add_poll(
 
     ffi::PollId {
         association_id: id.address,
-        poll_id: handle.get_id(),
+        id: handle.get_id(),
     }
 }
 
@@ -307,7 +307,7 @@ pub(crate) unsafe fn master_remove_poll(master: *mut crate::Master, poll: ffi::P
 
     let poll = PollHandle::create(
         AssociationHandle::create(endpoint, master.handle.clone()),
-        poll.poll_id,
+        poll.id,
     );
 
     if let Err(_) = runtime.block_on(poll.remove()) {
@@ -339,7 +339,7 @@ pub unsafe extern "C" fn master_demand_poll(master: *mut crate::Master, poll: ff
 
     let mut poll = PollHandle::create(
         AssociationHandle::create(endpoint, master.handle.clone()),
-        poll.poll_id,
+        poll.id,
     );
 
     if let Err(_) = runtime.block_on(poll.demand()) {

@@ -288,8 +288,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .method("AddPoll", &add_poll_fn)?
         .method("RemovePoll", &remove_poll_fn)?
         .method("DemandPoll", &demand_poll_fn)?
-        .method("Read", &read_fn)?
-        .method("Operate", &operate_fn)?
+        .async_method("Read", &read_fn)?
+        .async_method("Operate", &operate_fn)?
         .doc(
             doc("Master channel of communication")
             .details("To communicate with a particular outstation, you need to add an association with {class:Master.AddAssociation()}.")
@@ -327,7 +327,7 @@ fn define_poll_id(
             "Outstation address of the association",
         )?
         .add(
-            "poll_id",
+            "id",
             Type::Uint64,
             "Unique poll id assigned by the association",
         )?
