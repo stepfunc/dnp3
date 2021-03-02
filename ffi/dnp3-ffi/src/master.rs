@@ -151,11 +151,6 @@ pub unsafe fn master_add_association(
         }
     };
 
-    if !tokio::runtime::Handle::try_current().is_err() {
-        tracing::warn!("Tried calling 'master_add_association' from within a Tokio thread");
-        unimplemented!()
-    }
-
     let runtime = match master.runtime.get() {
         Some(x) => x,
         None => {
@@ -189,11 +184,14 @@ pub unsafe fn master_add_association(
         time_provider,
     };
 
-    if let Ok(_) = runtime.block_on(master.handle.add_association(
-        address,
-        config,
-        Box::new(handler),
-    )) {
+    if runtime
+        .block_on(
+            master
+                .handle
+                .add_association(address, config, Box::new(handler)),
+        )
+        .is_ok()
+    {
         ffi::AssociationId {
             address: address.raw_value(),
         }
@@ -228,7 +226,10 @@ pub(crate) unsafe fn master_remove_association(
         }
     };
 
-    if let Err(_) = runtime.block_on(master.handle.remove_association(endpoint)) {
+    if runtime
+        .block_on(master.handle.remove_association(endpoint))
+        .is_err()
+    {
         unimplemented!()
     }
 
@@ -310,7 +311,7 @@ pub(crate) unsafe fn master_remove_poll(master: *mut crate::Master, poll: ffi::P
         poll.id,
     );
 
-    if let Err(_) = runtime.block_on(poll.remove()) {
+    if runtime.block_on(poll.remove()).is_err() {
         unimplemented!()
     }
 }
@@ -342,7 +343,7 @@ pub unsafe extern "C" fn master_demand_poll(master: *mut crate::Master, poll: ff
         poll.id,
     );
 
-    if let Err(_) = runtime.block_on(poll.demand()) {
+    if runtime.block_on(poll.demand()).is_err() {
         unimplemented!()
     }
 }

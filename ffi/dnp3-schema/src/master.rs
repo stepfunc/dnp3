@@ -187,7 +187,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             Type::ClassRef(master_class.clone()),
             "Master on which to apply the operation",
         )?
-        .param("poll_id", Type::Struct(poll_id.clone()), "Id of the poll")?
+        .param("poll_id", Type::Struct(poll_id), "Id of the poll")?
         .return_type(ReturnType::void())?
         .doc(
             doc("Demand the immediate execution of a poll previously created with {class:Master.AddPoll()}.")
@@ -257,7 +257,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param(
             "association",
-            Type::Struct(association_id.clone()),
+            Type::Struct(association_id),
             "Id of the association",
         )?
         .param("mode", Type::Enum(command_mode), "Operation mode")?
