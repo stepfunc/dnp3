@@ -81,39 +81,6 @@ pub unsafe fn association_add_poll(
     }
 }
 
-pub unsafe fn association_read(
-    association: *mut Association,
-    request: *const Request,
-    callback: ffi::ReadTaskCallback,
-) {
-    let association = match association.as_mut() {
-        Some(association) => association,
-        None => {
-            callback.on_complete(ffi::ReadResult::TaskError);
-            return;
-        }
-    };
-
-    let request = match request.as_ref() {
-        Some(request) => request,
-        None => {
-            callback.on_complete(ffi::ReadResult::TaskError);
-            return;
-        }
-    };
-
-    let handle = &mut association.handle;
-    let req = request.build();
-    association.runtime.unwrap().spawn(async move {
-        let result = match handle.read(req).await {
-            Ok(_) => ffi::ReadResult::Success,
-            Err(_) => ffi::ReadResult::TaskError,
-        };
-
-        callback.on_complete(result);
-    });
-}
-
 pub unsafe fn association_operate(
     association: *mut Association,
     mode: ffi::CommandMode,

@@ -9,7 +9,6 @@ use dnp3::master::*;
 use dnp3::serial::*;
 use dnp3::tcp::ClientState;
 
-use crate::association::Association;
 use crate::ffi;
 
 pub struct Master {
@@ -132,10 +131,12 @@ pub unsafe fn master_add_association(
     config: ffi::AssociationConfig,
     read_handler: ffi::ReadHandler,
     time_provider: ffi::TimeProvider,
-) -> *mut Association {
+) -> ffi::AssociationId {
     let master = match master.as_mut() {
         Some(master) => master,
-        None => return std::ptr::null_mut(),
+        None => {
+            unimplemented!()
+        }
     };
 
     let address = match EndpointAddress::from(address) {
@@ -145,7 +146,21 @@ pub unsafe fn master_add_association(
                 "special addresses may not be used for the master address: {}",
                 err.address
             );
-            return std::ptr::null_mut();
+            // TODO - return error
+            unimplemented!()
+        }
+    };
+
+    if !tokio::runtime::Handle::try_current().is_err() {
+        tracing::warn!("Tried calling 'master_add_association' from within a Tokio thread");
+        unimplemented!()
+    }
+
+    let runtime = match master.runtime.get() {
+        Some(x) => x,
+        None => {
+            tracing::warn!("runtime has been shut down");
+            unimplemented!()
         }
     };
 
@@ -174,32 +189,278 @@ pub unsafe fn master_add_association(
         time_provider,
     };
 
-    if tokio::runtime::Handle::try_current().is_err() {
-        if let Ok(handle) = master
-            .runtime
-            .unwrap()
-            .block_on(
-                master
-                    .handle
-                    .add_association(address, config, Box::new(handler)),
-            )
-        {
-            let association = Association {
-                runtime: master.runtime.clone(),
-                handle,
-            };
-            Box::into_raw(Box::new(association))
-        } else {
-            tracing::warn!("Associate creation failure");
-            std::ptr::null_mut()
+    if let Ok(_) = runtime.block_on(master.handle.add_association(
+        address,
+        config,
+        Box::new(handler),
+    )) {
+        ffi::AssociationId {
+            address: address.raw_value(),
         }
     } else {
-        tracing::warn!("Tried calling 'master_add_association' from within a tokio thread");
-        std::ptr::null_mut()
+        tracing::warn!("Associate creation failure");
+        unimplemented!()
     }
 }
 
-pub unsafe fn master_set_decode_level(master: *mut Master, level: ffi::DecodeLevel) {
+pub(crate) unsafe fn master_remove_association(
+    master: *mut crate::Master,
+    id: ffi::AssociationId,
+) -> bool {
+    let master = match master.as_mut() {
+        Some(master) => master,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let endpoint = match EndpointAddress::from(id.address) {
+        Ok(x) => x,
+        Err(_) => {
+            unimplemented!()
+        }
+    };
+
+    let runtime = match master.runtime.get() {
+        Some(x) => x,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    if let Err(_) = runtime.block_on(master.handle.remove_association(endpoint)) {
+        unimplemented!()
+    }
+
+    true
+}
+
+pub(crate) unsafe fn master_add_poll(
+    master: *mut Master,
+    id: ffi::AssociationId,
+    request: *mut crate::Request,
+    period: std::time::Duration,
+) -> ffi::PollId {
+    let master = match master.as_mut() {
+        Some(master) => master,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let runtime = match master.runtime.get() {
+        Some(master) => master,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let address = match EndpointAddress::from(id.address) {
+        Ok(x) => x,
+        Err(_) => {
+            unimplemented!()
+        }
+    };
+
+    let request = match request.as_ref() {
+        Some(x) => x,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let mut association = AssociationHandle::create(address, master.handle.clone());
+    let handle = match runtime.block_on(association.add_poll(request.build(), period)) {
+        Ok(x) => x,
+        Err(_) => {
+            unimplemented!()
+        }
+    };
+
+    ffi::PollId {
+        association_id: id.address,
+        poll_id: handle.get_id(),
+    }
+}
+
+pub(crate) unsafe fn master_remove_poll(master: *mut crate::Master, poll: ffi::PollId) {
+    let master = match master.as_mut() {
+        Some(master) => master,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let runtime = match master.runtime.get() {
+        Some(master) => master,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let endpoint = match EndpointAddress::from(poll.association_id) {
+        Ok(x) => x,
+        Err(_) => {
+            unimplemented!()
+        }
+    };
+
+    let poll = PollHandle::create(
+        AssociationHandle::create(endpoint, master.handle.clone()),
+        poll.poll_id,
+    );
+
+    if let Err(_) = runtime.block_on(poll.remove()) {
+        unimplemented!()
+    }
+}
+
+pub unsafe extern "C" fn master_demand_poll(master: *mut crate::Master, poll: ffi::PollId) {
+    let master = match master.as_mut() {
+        Some(master) => master,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let runtime = match master.runtime.get() {
+        Some(master) => master,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let endpoint = match EndpointAddress::from(poll.association_id) {
+        Ok(x) => x,
+        Err(_) => {
+            unimplemented!()
+        }
+    };
+
+    let mut poll = PollHandle::create(
+        AssociationHandle::create(endpoint, master.handle.clone()),
+        poll.poll_id,
+    );
+
+    if let Err(_) = runtime.block_on(poll.demand()) {
+        unimplemented!()
+    }
+}
+
+pub(crate) unsafe fn master_read(
+    master: *mut crate::Master,
+    association: ffi::AssociationId,
+    request: *mut crate::Request,
+    callback: ffi::ReadTaskCallback,
+) {
+    let master = match master.as_mut() {
+        Some(master) => master,
+        None => {
+            // don't need to callback here because the whole function will become fallible
+            unimplemented!()
+        }
+    };
+
+    let runtime = match master.runtime.get() {
+        Some(master) => master,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let address = match EndpointAddress::from(association.address) {
+        Ok(x) => x,
+        Err(_) => {
+            unimplemented!()
+        }
+    };
+
+    let request = match request.as_ref() {
+        Some(x) => x.build(),
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let mut handle = AssociationHandle::create(address, master.handle.clone());
+
+    let operation = async move {
+        let result = match handle.read(request).await {
+            Ok(_) => ffi::ReadResult::Success,
+            Err(_) => ffi::ReadResult::TaskError,
+        };
+
+        callback.on_complete(result);
+    };
+
+    runtime.spawn(operation);
+}
+
+pub unsafe extern "C" fn master_operate(
+    master: *mut crate::Master,
+    association: ffi::AssociationId,
+    mode: ffi::CommandMode,
+    commands: *mut crate::Command,
+    callback: ffi::CommandTaskCallback,
+) {
+    let master = match master.as_mut() {
+        Some(master) => master,
+        None => {
+            // don't need to callback here because the whole function will become fallible
+            unimplemented!()
+        }
+    };
+
+    let runtime = match master.runtime.get() {
+        Some(x) => x,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let address = match EndpointAddress::from(association.address) {
+        Ok(x) => x,
+        Err(_) => {
+            unimplemented!()
+        }
+    };
+
+    let headers = match commands.as_ref() {
+        Some(x) => x.clone().build(),
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let mut handle = AssociationHandle::create(address, master.handle.clone());
+
+    let operation = async move {
+        let result = match handle.operate(mode.into(), headers).await {
+            Ok(_) => ffi::CommandResult::Success,
+            Err(CommandError::Task(_)) => ffi::CommandResult::TaskError,
+            Err(CommandError::Response(err)) => match err {
+                CommandResponseError::Request(_) => ffi::CommandResult::TaskError,
+                CommandResponseError::BadStatus(_) => ffi::CommandResult::BadStatus,
+                CommandResponseError::HeaderCountMismatch => {
+                    ffi::CommandResult::HeaderCountMismatch
+                }
+                CommandResponseError::HeaderTypeMismatch => ffi::CommandResult::HeaderTypeMismatch,
+                CommandResponseError::ObjectCountMismatch => {
+                    ffi::CommandResult::ObjectCountMismatch
+                }
+                CommandResponseError::ObjectValueMismatch => {
+                    ffi::CommandResult::ObjectValueMismatch
+                }
+            },
+        };
+
+        callback.on_complete(result);
+    };
+
+    runtime.spawn(operation);
+}
+
+pub(crate) unsafe fn master_set_decode_level(master: *mut Master, level: ffi::DecodeLevel) {
     if let Some(master) = master.as_mut() {
         master
             .runtime
@@ -208,7 +469,7 @@ pub unsafe fn master_set_decode_level(master: *mut Master, level: ffi::DecodeLev
     }
 }
 
-pub unsafe fn master_get_decode_level(master: *mut Master) -> ffi::DecodeLevel {
+pub(crate) unsafe fn master_get_decode_level(master: *mut Master) -> ffi::DecodeLevel {
     if tokio::runtime::Handle::try_current().is_err() {
         if let Some(master) = master.as_mut() {
             if let Ok(level) = master
@@ -232,7 +493,7 @@ pub unsafe fn master_get_decode_level(master: *mut Master) -> ffi::DecodeLevel {
     .into()
 }
 
-pub fn classes_all() -> ffi::Classes {
+pub(crate) fn classes_all() -> ffi::Classes {
     ffi::Classes {
         class0: true,
         class1: true,
@@ -241,7 +502,7 @@ pub fn classes_all() -> ffi::Classes {
     }
 }
 
-pub fn classes_none() -> ffi::Classes {
+pub(crate) fn classes_none() -> ffi::Classes {
     ffi::Classes {
         class0: false,
         class1: false,
@@ -250,7 +511,7 @@ pub fn classes_none() -> ffi::Classes {
     }
 }
 
-pub fn event_classes_all() -> ffi::EventClasses {
+pub(crate) fn event_classes_all() -> ffi::EventClasses {
     ffi::EventClasses {
         class1: true,
         class2: true,
@@ -258,7 +519,7 @@ pub fn event_classes_all() -> ffi::EventClasses {
     }
 }
 
-pub fn event_classes_none() -> ffi::EventClasses {
+pub(crate) fn event_classes_none() -> ffi::EventClasses {
     ffi::EventClasses {
         class1: false,
         class2: false,
@@ -445,6 +706,15 @@ impl From<ffi::SerialPortSettings> for dnp3::serial::SerialSettings {
                 ffi::StopBits::One => StopBits::One,
                 ffi::StopBits::Two => StopBits::Two,
             },
+        }
+    }
+}
+
+impl From<ffi::CommandMode> for CommandMode {
+    fn from(x: ffi::CommandMode) -> Self {
+        match x {
+            ffi::CommandMode::DirectOperate => CommandMode::DirectOperate,
+            ffi::CommandMode::SelectBeforeOperate => CommandMode::SelectBeforeOperate,
         }
     }
 }

@@ -1,12 +1,13 @@
 use std::time::Duration;
 
-use oo_bindgen::callback::InterfaceHandle;
+use oo_bindgen::callback::{InterfaceHandle, OneTimeCallbackHandle};
 use oo_bindgen::class::ClassHandle;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
+use oo_bindgen::native_enum::NativeEnumHandle;
 
 pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<(), BindingError> {
     let read_handler = crate::handler::define(lib, shared)?;
@@ -86,19 +87,21 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .doc("stop communications")?
         .build()?;
 
-    // define the association
-    let association_class = crate::association::define(lib, shared)?;
+    let association_id = define_association_id(lib)?;
+    let poll_id = define_poll_id(lib)?;
 
     let association_config = define_association_config(lib, shared)?;
 
     let time_provider_interface = define_time_provider(lib)?;
+
+    let request_class = crate::request::define(lib, shared)?;
 
     let add_association_fn = lib
         .declare_native_function("master_add_association")?
         .param(
             "master",
             Type::ClassRef(master_class.clone()),
-            "Master to add the association to",
+            "Master on which the association will be created",
         )?
         .param(
             "address",
@@ -121,10 +124,76 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             "Time provider for the association",
         )?
         .return_type(ReturnType::new(
-            Type::ClassRef(association_class),
-            "Handle to the created association or NULL if an error occurred",
+            Type::Struct(association_id.clone()),
+            "Id of the association",
         ))?
         .doc("Add an association to the master")?
+        .build()?;
+
+    let remove_association_fn = lib
+        .declare_native_function("master_remove_association")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "Master on which to apply the operation",
+        )?
+        .param(
+            "id",
+            Type::Struct(association_id.clone()),
+            "Id of the association",
+        )?
+        .return_type(ReturnType::Type(
+            Type::Bool,
+            "true if the operation was successful".into(),
+        ))?
+        .doc("Remove an association from the master")?
+        .build()?;
+
+    let add_poll_fn = lib.declare_native_function("master_add_poll")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "Master on which to apply the operation",
+        )?
+        .param("id", Type::Struct(association_id.clone()), "Association on which to add the poll")?
+        .param("request", Type::ClassRef(request_class.declaration()), "Request to perform")?
+        .param("period", Type::Duration(DurationMapping::Milliseconds), "Period to wait between each poll (in ms)")?
+        .return_type(ReturnType::new(Type::Struct(poll_id.clone()), "Id of the created poll"))?
+        .doc(
+            doc("Add a periodic poll to an association")
+                .details("Each result of the poll will be sent to the {interface:ReadHandler} of the association.")
+                .warning("This cannot be called from within a callback.")
+        )?
+        .build()?;
+
+    let remove_poll_fn = lib.declare_native_function("master_remove_poll")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "Master on which to apply the operation",
+        )?
+        .param("poll_id", Type::Struct(poll_id.clone()), "Id of the created poll")?
+        .return_type(ReturnType::Void)?
+        .doc(
+            doc("Add a periodic poll to an association")
+                .details("Each result of the poll will be sent to the {interface:ReadHandler} of the association.")
+                .warning("This cannot be called from within a callback.")
+        )?
+        .build()?;
+
+    let demand_poll_fn = lib.declare_native_function("master_demand_poll")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "Master on which to apply the operation",
+        )?
+        .param("poll_id", Type::Struct(poll_id.clone()), "Id of the poll")?
+        .return_type(ReturnType::void())?
+        .doc(
+            doc("Demand the immediate execution of a poll previously created with {class:Master.AddPoll()}.")
+                .details("This method returns immediately. The result will be sent to the registered {interface:ReadHandler}.")
+                .details("This method resets the internal timer of the poll.")
+        )?
         .build()?;
 
     let set_decode_level_fn = lib
@@ -132,7 +201,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .param(
             "master",
             Type::ClassRef(master_class.clone()),
-            "Master to modify",
+            "Master on which to apply the operation",
         )?
         .param(
             "decode_level",
@@ -160,6 +229,52 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .build()?;
 
+    let read_callback = define_read_callback(lib)?;
+
+    let read_fn = lib
+        .declare_native_function("master_read")?
+        .param("master", Type::ClassRef(master_class.clone()), "Master on which to perform the operation")?
+        .param("association", Type::Struct(association_id.clone()), "Association on which to perform the read")?
+        .param("request", Type::ClassRef(request_class.declaration()), "Request to send")?
+        .param("callback", Type::OneTimeCallback(read_callback), "Callback that will be invoked once the read is complete")?
+        .return_type(ReturnType::void())?
+        .doc(
+            doc("Perform a read on the association.")
+                .details("The callback will be called once the read is completely received, but the actual values will be sent to the {interface:ReadHandler} of the association.")
+        )?
+        .build()?;
+
+    let command = define_command_builder(lib, shared)?;
+    let command_mode = define_command_mode(lib)?;
+    let command_cb = define_command_callback(lib)?;
+
+    let operate_fn = lib
+        .declare_native_function("master_operate")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "Master on which to perform the operation",
+        )?
+        .param(
+            "association",
+            Type::Struct(association_id.clone()),
+            "Id of the association",
+        )?
+        .param("mode", Type::Enum(command_mode), "Operation mode")?
+        .param(
+            "command",
+            Type::ClassRef(command.declaration()),
+            "Command to send",
+        )?
+        .param(
+            "callback",
+            Type::OneTimeCallback(command_cb),
+            "Callback that will receive the result of the command",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Asynchronously perform a command operation on the association")?
+        .build()?;
+
     lib.define_class(&master_class)?
         .destructor(&destroy_fn)?
         .static_method("CreateTCPSession", &master_create_tcp_session_fn)?
@@ -167,8 +282,14 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .method("Enable", &enable_fn)?
         .method("Disable", &disable_fn)?
         .method("AddAssociation", &add_association_fn)?
+        .method("RemoveAssociation", &remove_association_fn)?
         .method("SetDecodeLevel", &set_decode_level_fn)?
         .method("GetDecodeLevel", &get_decode_level_fn)?
+        .method("AddPoll", &add_poll_fn)?
+        .method("RemovePoll", &remove_poll_fn)?
+        .method("DemandPoll", &demand_poll_fn)?
+        .method("Read", &read_fn)?
+        .method("Operate", &operate_fn)?
         .doc(
             doc("Master channel of communication")
             .details("To communicate with a particular outstation, you need to add an association with {class:Master.AddAssociation()}.")
@@ -177,6 +298,62 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .build()?;
 
     Ok(())
+}
+
+fn define_association_id(
+    lib: &mut LibraryBuilder,
+) -> std::result::Result<NativeStructHandle, BindingError> {
+    let id = lib.declare_native_struct("AssociationId")?;
+    lib.define_native_struct(&id)?
+        .make_opaque()
+        .add(
+            "address",
+            Type::Uint16,
+            "Outstation address of the association",
+        )?
+        .doc("Association identifier")?
+        .build()
+}
+
+fn define_poll_id(
+    lib: &mut LibraryBuilder,
+) -> std::result::Result<NativeStructHandle, BindingError> {
+    let id = lib.declare_native_struct("PollId")?;
+    lib.define_native_struct(&id)?
+        .make_opaque()
+        .add(
+            "association_id",
+            Type::Uint16,
+            "Outstation address of the association",
+        )?
+        .add(
+            "poll_id",
+            Type::Uint64,
+            "Unique poll id assigned by the association",
+        )?
+        .doc("Poll identifier")?
+        .build()
+}
+
+fn define_read_callback(
+    lib: &mut LibraryBuilder,
+) -> std::result::Result<OneTimeCallbackHandle, BindingError> {
+    let read_result = lib
+        .define_native_enum("ReadResult")?
+        .push("Success", "Read was perform successfully")?
+        .push("TaskError", "The read was not performed properly")?
+        .doc("Result of a read operation")?
+        .build()?;
+
+    lib.define_one_time_callback("ReadTaskCallback", "Handler for read tasks")?
+        .callback(
+            "on_complete",
+            "Called when the read task reached completion or failed",
+        )?
+        .param("result", Type::Enum(read_result), "Result of the read task")?
+        .return_type(ReturnType::void())?
+        .build()?
+        .build()
 }
 
 fn define_association_config(
@@ -459,4 +636,283 @@ fn define_classes(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, Bindin
         .build();
 
     Ok(classes)
+}
+
+fn define_command_mode(
+    lib: &mut LibraryBuilder,
+) -> std::result::Result<NativeEnumHandle, BindingError> {
+    lib.define_native_enum("CommandMode")?
+        .push("DirectOperate", "Perform a Direct Operate (0x05)")?
+        .push(
+            "SelectBeforeOperate",
+            "Perform a Select & Operate (0x03 then 0x04)",
+        )?
+        .doc("Command operation mode")?
+        .build()
+}
+
+fn define_command_callback(
+    lib: &mut LibraryBuilder,
+) -> std::result::Result<OneTimeCallbackHandle, BindingError> {
+    let command_result = lib
+        .define_native_enum("CommandResult")?
+        .push("Success", "Command was a success")?
+        .push("TaskError", "Failed b/c of a generic task execution error")?
+        .push(
+            "BadStatus",
+            "Outstation indicated that a command was not SUCCESS",
+        )?
+        .push(
+            "HeaderCountMismatch",
+            "Number of headers in the response doesn't match the number in the request",
+        )?
+        .push(
+            "HeaderTypeMismatch",
+            "Header in the response doesn't match the request",
+        )?
+        .push(
+            "ObjectCountMismatch",
+            "Number of objects in one of the headers doesn't match the request",
+        )?
+        .push(
+            "ObjectValueMismatch",
+            "Value in one of the objects in the response doesn't match the request",
+        )?
+        .doc("Result of a command")?
+        .build()?;
+
+    lib.define_one_time_callback("CommandTaskCallback", "Handler for command tasks")?
+        .callback(
+            "on_complete",
+            "Called when the command task reached completion or failed",
+        )?
+        .param(
+            "result",
+            Type::Enum(command_result),
+            "Result of the command task",
+        )?
+        .return_type(ReturnType::void())?
+        .build()?
+        .build()
+}
+
+fn define_command_builder(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> std::result::Result<ClassHandle, BindingError> {
+    let command = lib.declare_class("Command")?;
+
+    let command_new_fn = lib
+        .declare_native_function("command_new")?
+        .return_type(ReturnType::new(
+            Type::ClassRef(command.clone()),
+            "Handle to the created command",
+        ))?
+        .doc("Create a new command")?
+        .build()?;
+
+    let command_destroy_fn = lib
+        .declare_native_function("command_destroy")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to destroy",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Destroy command")?
+        .build()?;
+
+    let command_add_u8_g12v1_fn = lib
+        .declare_native_function("command_add_u8_g12v1")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint8,
+            "Index of the point to send the command to",
+        )?
+        .param(
+            "header",
+            Type::Struct(shared.g12v1_struct.clone()),
+            "CROB data",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Add a CROB with 1-byte prefix index")?
+        .build()?;
+
+    let command_add_u16_g12v1_fn = lib
+        .declare_native_function("command_add_u16_g12v1")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint16,
+            "Index of the point to send the command to",
+        )?
+        .param(
+            "header",
+            Type::Struct(shared.g12v1_struct.clone()),
+            "CROB data",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Add a CROB with 2-byte prefix index")?
+        .build()?;
+
+    let command_add_u8_g41v1_fn = lib
+        .declare_native_function("command_add_u8_g41v1")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint8,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Sint32, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (signed 32-bit integer) with 1-byte prefix index")?
+        .build()?;
+
+    let command_add_u16_g41v1_fn = lib
+        .declare_native_function("command_add_u16_g41v1")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint16,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Sint32, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (signed 32-bit integer) with 2-byte prefix index")?
+        .build()?;
+
+    let command_add_u8_g41v2_fn = lib
+        .declare_native_function("command_add_u8_g41v2")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint8,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Sint16, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (signed 16-bit integer) with 1-byte prefix index")?
+        .build()?;
+
+    let command_add_u16_g41v2_fn = lib
+        .declare_native_function("command_add_u16_g41v2")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint16,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Sint16, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (signed 16-bit integer) with 2-byte prefix index")?
+        .build()?;
+
+    let command_add_u8_g41v3_fn = lib
+        .declare_native_function("command_add_u8_g41v3")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint8,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Float, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (single-precision float) with 1-byte prefix index")?
+        .build()?;
+
+    let command_add_u16_g41v3_fn = lib
+        .declare_native_function("command_add_u16_g41v3")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint16,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Float, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (single-precision float) with 2-byte prefix index")?
+        .build()?;
+
+    let command_add_u8_g41v4_fn = lib
+        .declare_native_function("command_add_u8_g41v4")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint8,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Double, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (double-precision float) with 1-byte prefix index")?
+        .build()?;
+
+    let command_add_u16_g41v4_fn = lib
+        .declare_native_function("command_add_u16_g41v4")?
+        .param(
+            "command",
+            Type::ClassRef(command.clone()),
+            "Command to modify",
+        )?
+        .param(
+            "idx",
+            Type::Uint16,
+            "Index of the point to send the command to",
+        )?
+        .param("value", Type::Double, "Value to set the analog output to")?
+        .return_type(ReturnType::void())?
+        .doc("Add a Analog Output command (double-precision float) with 2-byte prefix index")?
+        .build()?;
+
+    lib.define_class(&command)?
+        .constructor(&command_new_fn)?
+        .destructor(&command_destroy_fn)?
+        .method("AddU8G12V1", &command_add_u8_g12v1_fn)?
+        .method("AddU16G12V1", &command_add_u16_g12v1_fn)?
+        .method("AddU8G41V1", &command_add_u8_g41v1_fn)?
+        .method("AddU16G41V1", &command_add_u16_g41v1_fn)?
+        .method("AddU8G41V2", &command_add_u8_g41v2_fn)?
+        .method("AddU16G41V2", &command_add_u16_g41v2_fn)?
+        .method("AddU8G41V3", &command_add_u8_g41v3_fn)?
+        .method("AddU16G41V3", &command_add_u16_g41v3_fn)?
+        .method("AddU8G41V4", &command_add_u8_g41v4_fn)?
+        .method("AddU16G41V4", &command_add_u16_g41v4_fn)?
+        .doc("Builder type used to construct command requests")?
+        .build()
 }

@@ -196,6 +196,7 @@ void on_command_complete(command_result_t result, void* arg)
     printf("CommandResult: %s\n", CommandResult_to_string(result));
 }
 
+/*
 // Timesync callback
 void on_timesync_complete(time_sync_result_t result, void* arg)
 {
@@ -212,6 +213,7 @@ void on_link_status_complete(link_status_result_t result, void* arg)
 {
     printf("LinkStatusResult: %s\n", LinkStatusResult_to_string(result));
 }
+*/
 
 // Timestamp callback
 time_provider_timestamp_t get_time(void* arg)
@@ -301,7 +303,7 @@ int main()
         .get_time = get_time,
         .ctx = NULL,
     };
-    association_t* association = master_add_association(
+    association_id_t association_id = master_add_association(
         master,
         1024,
         association_config,
@@ -311,7 +313,7 @@ int main()
 
     // Add an event poll
     request_t* poll_request = request_new_class(false, true, true, true);
-    poll_t* poll = association_add_poll(association, poll_request, 5000);
+    poll_id_t poll_id = master_add_poll(master, association_id, poll_request, 5000);
     request_destroy(poll_request);
 
     // start communications
@@ -356,7 +358,7 @@ int main()
                 .on_complete = &on_read_complete,
                 .ctx = NULL,
             };
-            association_read(association, request, cb);
+            master_read(master, association_id, request, cb);
 
             request_destroy(request);
         }
@@ -371,7 +373,7 @@ int main()
                 .on_complete = &on_read_complete,
                 .ctx = NULL,
             };
-            association_read(association, request, cb);
+            master_read(master, association_id, request, cb);
 
             request_destroy(request);
         }
@@ -392,8 +394,9 @@ int main()
                 .ctx = NULL,
             };
 
-            association_operate(
-                association,
+            master_operate(
+                master,
+                association_id,
                 CommandMode_SelectBeforeOperate,
                 command,
                 cb
@@ -403,8 +406,9 @@ int main()
         }
         else if(strcmp(cbuf, "evt\n") == 0)
         {
-            poll_demand(poll);
+            master_demand_poll(master, poll_id);
         }
+        /*
         else if(strcmp(cbuf, "lts\n") == 0)
         {
             time_sync_task_callback_t cb =
@@ -450,6 +454,7 @@ int main()
             };
             association_check_link_status(association, cb);
         }
+        */
         else
         {
             printf("Unknown command\n");
@@ -457,9 +462,7 @@ int main()
     }
 
     // Cleanup
-cleanup:
-    poll_destroy(poll);
-    association_destroy(association);
+cleanup:    
     master_destroy(master);
     // ANCHOR: runtime_destroy
     runtime_destroy(runtime);

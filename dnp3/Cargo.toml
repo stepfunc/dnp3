@@ -20,6 +20,10 @@ tokio-stream = { version = "0.1.1" }
 criterion = "0.3"
 rand = "0.8"
 
+[features]
+# this feature flag is only used when building the FFI
+ffi = []
+
 [[bench]]
 name = "benchmark"
 harness = false

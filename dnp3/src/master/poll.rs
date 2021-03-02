@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use crate::app::format::write::HeaderWriter;
+use crate::app::Shutdown;
 use crate::master::association::Next;
 use crate::master::error::PollError;
 use crate::master::handle::{AssociationHandle, Promise};
@@ -146,21 +147,29 @@ pub struct PollHandle {
 }
 
 impl PollHandle {
+    #[cfg(feature = "ffi")]
+    pub fn get_id(&self) -> u64 {
+        self.id
+    }
+
+    #[cfg(feature = "ffi")]
+    pub fn create(association: AssociationHandle, id: u64) -> Self {
+        Self::new(association, id)
+    }
+
     pub(crate) fn new(association: AssociationHandle, id: u64) -> Self {
         Self { association, id }
     }
 
-    pub async fn demand(&mut self) {
+    pub async fn demand(&mut self) -> Result<(), Shutdown> {
         self.association
             .send_poll_message(PollMsg::Demand(self.id))
             .await
-            .ok();
     }
 
-    pub async fn remove(mut self) {
+    pub async fn remove(mut self) -> Result<(), Shutdown> {
         self.association
             .send_poll_message(PollMsg::RemovePoll(self.id))
             .await
-            .ok();
     }
 }
