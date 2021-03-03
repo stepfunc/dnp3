@@ -101,15 +101,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::warn!("error: {}", err);
                 }
             }
-            "evt" => poll.demand().await,
+            "evt" => poll.demand().await?,
             "lts" => {
-                if let Err(err) = association.perform_time_sync(TimeSyncProcedure::Lan).await {
+                if let Err(err) = association.synchronize_time(TimeSyncProcedure::Lan).await {
                     tracing::warn!("error: {}", err);
                 }
             }
             "nts" => {
                 if let Err(err) = association
-                    .perform_time_sync(TimeSyncProcedure::NonLan)
+                    .synchronize_time(TimeSyncProcedure::NonLan)
                     .await
                 {
                     tracing::warn!("error: {}", err);

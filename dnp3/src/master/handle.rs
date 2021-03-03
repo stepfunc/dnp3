@@ -122,6 +122,17 @@ impl MasterHandle {
             .map(|_| (AssociationHandle::new(address, self.clone())))
     }
 
+    /// Remove an association
+    /// * `address` is the DNP3 link-layer address of the outstation
+    pub async fn remove_association(
+        &mut self,
+        address: EndpointAddress,
+    ) -> Result<(), AssociationError> {
+        self.send_master_message(MasterMsg::RemoveAssociation(address))
+            .await?;
+        Ok(())
+    }
+
     async fn send_master_message(&mut self, msg: MasterMsg) -> Result<(), Shutdown> {
         self.sender.send(Message::Master(msg)).await?;
         Ok(())
@@ -142,6 +153,11 @@ impl MasterHandle {
 }
 
 impl AssociationHandle {
+    #[cfg(feature = "ffi")]
+    pub fn create(address: EndpointAddress, master: MasterHandle) -> Self {
+        Self::new(address, master)
+    }
+
     pub(crate) fn new(address: EndpointAddress, master: MasterHandle) -> Self {
         Self { address, master }
     }
@@ -208,7 +224,7 @@ impl AssociationHandle {
         rx.await?
     }
 
-    pub async fn perform_time_sync(
+    pub async fn synchronize_time(
         &mut self,
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {

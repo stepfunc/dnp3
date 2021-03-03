@@ -203,9 +203,8 @@ class MainClass
             new TestReadHandler(),            
             new TestTimeProvider()
         );
-
-        var pollRequest = Request.ClassRequest(false, true, true, true);
-        var poll = association.AddPoll(pollRequest, TimeSpan.FromSeconds(5));
+        
+        var poll = master.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
 
         // start communications
         master.Enable();
@@ -240,7 +239,7 @@ class MainClass
                     {
                         var request = new Request();
                         request.AddAllObjectsHeader(Variation.Group40Var0);
-                        var result = await association.Read(request);
+                        var result = await master.Read(association, request);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
@@ -249,7 +248,7 @@ class MainClass
                         var request = new Request();
                         request.AddAllObjectsHeader(Variation.Group10Var0);
                         request.AddAllObjectsHeader(Variation.Group40Var0);
-                        var result = await association.Read(request);
+                        var result = await master.Read(association, request);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
@@ -257,45 +256,45 @@ class MainClass
                     {
                         var command = new Command();
                         command.AddU16g12v1(3, new G12v1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
-                        var result = await association.Operate(CommandMode.SelectBeforeOperate, command);
+                        var result = await master.Operate(association, CommandMode.SelectBeforeOperate, command);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
                 case "evt":
                     {
-                        poll.Demand();
+                        master.DemandPoll(poll);                        
                         break;
-                    }
+                    }                    
                 case "lts":
                     {
-                        var result = await association.PerformTimeSync(TimeSyncMode.Lan);
+                        var result = await master.SynchronizeTime(association, TimeSyncMode.Lan);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
                 case "nts":
                     {
-                        var result = await association.PerformTimeSync(TimeSyncMode.NonLan);
+                        var result = await master.SynchronizeTime(association, TimeSyncMode.NonLan);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
                 case "crt":
                     {
-                        var result = await association.ColdRestart();
+                        var result = await master.ColdRestart(association);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
                 case "wrt":
                     {
-                        var result = await association.WarmRestart();
+                        var result = await master.WarmRestart(association);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
                 case "lsr":
                     {
-                        var result = await association.CheckLinkStatus();
+                        var result = await master.CheckLinkStatus(association);
                         Console.WriteLine($"Result: {result}");
                         break;
-                    }
+                    }                    
                 default:
                     Console.WriteLine("Unknown command");
                     break;
