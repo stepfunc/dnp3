@@ -247,19 +247,34 @@ public class MasterExample {
         case "evt":
           master.demandPoll(poll);
           break;
-        /*
-         * case "lts": { TimeSyncResult result =
-         * association.performTimeSync(TimeSyncMode.LAN).toCompletableFuture().get();
-         * System.out.println("Result: " + result); break; } case "nts": { TimeSyncResult result =
-         * association.performTimeSync(TimeSyncMode.NON_LAN).toCompletableFuture().get();
-         * System.out.println("Result: " + result); break; } case "crt": { RestartResult result =
-         * association.coldRestart().toCompletableFuture().get(); System.out.println("Result: " +
-         * result); break; } case "wrt": { RestartResult result =
-         * association.warmRestart().toCompletableFuture().get(); System.out.println("Result: " +
-         * result); break; } case "lsr": { LinkStatusResult result =
-         * association.checkLinkStatus().toCompletableFuture().get(); System.out.println("Result: "
-         * + result); break; }
-         */
+
+        case "lts": {
+          TimeSyncResult result =
+              master.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
+          System.out.println("Result: " + result);
+          break;
+        }
+        case "nts": {
+          TimeSyncResult result =
+              master.synchronizeTime(association, TimeSyncMode.NON_LAN).toCompletableFuture().get();
+          System.out.println("Result: " + result);
+          break;
+        }
+        case "crt": {
+          RestartResult result = master.coldRestart(association).toCompletableFuture().get();
+          System.out.println("Result: " + result);
+          break;
+        }
+        case "wrt": {
+          RestartResult result = master.warmRestart(association).toCompletableFuture().get();
+          System.out.println("Result: " + result);
+          break;
+        }
+        case "lsr": {
+          LinkStatusResult result = master.checkLinkStatus(association).toCompletableFuture().get();
+          System.out.println("Result: " + result);
+          break;
+        }
         default:
           System.out.println("Unknown command");
           break;
