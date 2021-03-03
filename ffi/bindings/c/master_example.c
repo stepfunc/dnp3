@@ -196,7 +196,6 @@ void on_command_complete(command_result_t result, void* arg)
     printf("CommandResult: %s\n", CommandResult_to_string(result));
 }
 
-/*
 // Timesync callback
 void on_timesync_complete(time_sync_result_t result, void* arg)
 {
@@ -213,7 +212,6 @@ void on_link_status_complete(link_status_result_t result, void* arg)
 {
     printf("LinkStatusResult: %s\n", LinkStatusResult_to_string(result));
 }
-*/
 
 // Timestamp callback
 time_provider_timestamp_t get_time(void* arg)
@@ -407,8 +405,7 @@ int main()
         else if(strcmp(cbuf, "evt\n") == 0)
         {
             master_demand_poll(master, poll_id);
-        }
-        /*
+        }        
         else if(strcmp(cbuf, "lts\n") == 0)
         {
             time_sync_task_callback_t cb =
@@ -416,7 +413,7 @@ int main()
                 .on_complete = &on_timesync_complete,
                 .ctx = NULL,
             };
-            association_perform_time_sync(association, TimeSyncMode_Lan, cb);
+            master_sync_time(master, association_id, TimeSyncMode_Lan, cb);
         }
         else if(strcmp(cbuf, "nts\n") == 0)
         {
@@ -425,7 +422,7 @@ int main()
                 .on_complete = &on_timesync_complete,
                 .ctx = NULL,
             };
-            association_perform_time_sync(association, TimeSyncMode_NonLan, cb);
+            master_sync_time(master, association_id, TimeSyncMode_NonLan, cb);
         }
         else if(strcmp(cbuf, "crt\n") == 0)
         {
@@ -434,7 +431,7 @@ int main()
                 .on_complete = &on_restart_complete,
                 .ctx = NULL,
             };
-            association_cold_restart(association, cb);
+            master_cold_restart(master, association_id, cb);
         }
         else if(strcmp(cbuf, "wrt\n") == 0)
         {
@@ -443,7 +440,7 @@ int main()
                 .on_complete = &on_restart_complete,
                 .ctx = NULL,
             };
-            association_warm_restart(association, cb);
+            master_warm_restart(master, association_id, cb);
         }
         else if(strcmp(cbuf, "lsr\n") == 0)
         {
@@ -452,9 +449,8 @@ int main()
                 .on_complete = &on_link_status_complete,
                 .ctx = NULL,
             };
-            association_check_link_status(association, cb);
-        }
-        */
+            master_check_link_status(master, association_id, cb);
+        }        
         else
         {
             printf("Unknown command\n");

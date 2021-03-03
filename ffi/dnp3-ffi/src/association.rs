@@ -134,91 +134,7 @@ pub unsafe fn association_operate(
     });
 }
 
-pub unsafe fn association_perform_time_sync(
-    association: *mut Association,
-    mode: ffi::TimeSyncMode,
-    callback: ffi::TimeSyncTaskCallback,
-) {
-    let association = match association.as_mut() {
-        Some(association) => association,
-        None => {
-            callback.on_complete(ffi::TimeSyncResult::TaskError);
-            return;
-        }
-    };
 
-    let mode = match mode {
-        ffi::TimeSyncMode::Lan => TimeSyncProcedure::Lan,
-        ffi::TimeSyncMode::NonLan => TimeSyncProcedure::NonLan,
-    };
-
-    let handle = &mut association.handle;
-    association.runtime.unwrap().spawn(async move {
-        let result = match handle.perform_time_sync(mode).await {
-            Ok(_) => ffi::TimeSyncResult::Success,
-            Err(TimeSyncError::Task(_)) => ffi::TimeSyncResult::TaskError,
-            Err(TimeSyncError::ClockRollback) => ffi::TimeSyncResult::ClockRollback,
-            Err(TimeSyncError::SystemTimeNotUnix) => ffi::TimeSyncResult::SystemTimeNotUnix,
-            Err(TimeSyncError::BadOutstationTimeDelay(_)) => {
-                ffi::TimeSyncResult::BadOutstationTimeDelay
-            }
-            Err(TimeSyncError::Overflow) => ffi::TimeSyncResult::Overflow,
-            Err(TimeSyncError::StillNeedsTime) => ffi::TimeSyncResult::StillNeedsTime,
-            Err(TimeSyncError::SystemTimeNotAvailable) => {
-                ffi::TimeSyncResult::SystemTimeNotAvailable
-            }
-            Err(TimeSyncError::IinError(_)) => ffi::TimeSyncResult::IinError,
-        };
-
-        callback.on_complete(result);
-    });
-}
-
-pub unsafe fn association_cold_restart(
-    association: *mut Association,
-    callback: ffi::RestartTaskCallback,
-) {
-    let association = match association.as_mut() {
-        Some(association) => association,
-        None => {
-            callback.on_complete(ffi::RestartResult::error());
-            return;
-        }
-    };
-
-    let handle = &mut association.handle;
-    association.runtime.unwrap().spawn(async move {
-        let result = match handle.cold_restart().await {
-            Ok(value) => ffi::RestartResult::new_success(value),
-            Err(_) => ffi::RestartResult::error(),
-        };
-
-        callback.on_complete(result);
-    });
-}
-
-pub unsafe fn association_warm_restart(
-    association: *mut Association,
-    callback: ffi::RestartTaskCallback,
-) {
-    let association = match association.as_mut() {
-        Some(association) => association,
-        None => {
-            callback.on_complete(ffi::RestartResult::error());
-            return;
-        }
-    };
-
-    let handle = &mut association.handle;
-    association.runtime.unwrap().spawn(async move {
-        let result = match handle.warm_restart().await {
-            Ok(value) => ffi::RestartResult::new_success(value),
-            Err(_) => ffi::RestartResult::error(),
-        };
-
-        callback.on_complete(result);
-    });
-}
 
 pub unsafe fn association_check_link_status(
     association: *mut Association,
@@ -244,20 +160,3 @@ pub unsafe fn association_check_link_status(
     });
 }
 
-impl ffi::RestartResult {
-    fn new_success(delay: Duration) -> Self {
-        ffi::RestartResultFields {
-            delay,
-            success: ffi::RestartSuccess::Success,
-        }
-        .into()
-    }
-
-    fn error() -> Self {
-        ffi::RestartResultFields {
-            delay: Duration::from_millis(0),
-            success: ffi::RestartSuccess::TaskError,
-        }
-        .into()
-    }
-}

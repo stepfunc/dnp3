@@ -4,7 +4,7 @@ use std::time::Duration;
 use dnp3::app::Timeout;
 use dnp3::app::Timestamp;
 use dnp3::app::{ReconnectStrategy, RetryStrategy};
-use dnp3::link::EndpointAddress;
+use dnp3::link::{EndpointAddress, LinkStatusResult};
 use dnp3::master::*;
 use dnp3::serial::*;
 use dnp3::tcp::ClientState;
@@ -385,7 +385,7 @@ pub(crate) unsafe fn master_read(
 
     let mut handle = AssociationHandle::create(address, master.handle.clone());
 
-    let operation = async move {
+    let task = async move {
         let result = match handle.read(request).await {
             Ok(_) => ffi::ReadResult::Success,
             Err(_) => ffi::ReadResult::TaskError,
@@ -394,7 +394,7 @@ pub(crate) unsafe fn master_read(
         callback.on_complete(result);
     };
 
-    runtime.spawn(operation);
+    runtime.spawn(task);
 }
 
 pub unsafe extern "C" fn master_operate(
@@ -435,7 +435,7 @@ pub unsafe extern "C" fn master_operate(
 
     let mut handle = AssociationHandle::create(address, master.handle.clone());
 
-    let operation = async move {
+    let task = async move {
         let result = match handle.operate(mode.into(), headers).await {
             Ok(_) => ffi::CommandResult::Success,
             Err(CommandError::Task(_)) => ffi::CommandResult::TaskError,
@@ -458,7 +458,184 @@ pub unsafe extern "C" fn master_operate(
         callback.on_complete(result);
     };
 
-    runtime.spawn(operation);
+    runtime.spawn(task);
+}
+
+pub(crate) unsafe fn master_sync_time(
+    master: *mut crate::Master,
+    association: ffi::AssociationId,
+    mode: ffi::TimeSyncMode,
+    callback: ffi::TimeSyncTaskCallback,
+) {
+    let master = match master.as_mut() {
+        Some(master) => master,
+        None => {
+            // don't need to callback here because the whole function will become fallible
+            unimplemented!()
+        }
+    };
+
+    let runtime = match master.runtime.get() {
+        Some(x) => x,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let address = match EndpointAddress::from(association.address) {
+        Ok(x) => x,
+        Err(_) => {
+            unimplemented!()
+        }
+    };
+
+    let mut association = AssociationHandle::create(address, master.handle.clone());
+
+    let task = async move {
+        let result = match association.perform_time_sync(mode.into()).await {
+            Ok(_) => ffi::TimeSyncResult::Success,
+            Err(TimeSyncError::Task(_)) => ffi::TimeSyncResult::TaskError,
+            Err(TimeSyncError::ClockRollback) => ffi::TimeSyncResult::ClockRollback,
+            Err(TimeSyncError::SystemTimeNotUnix) => ffi::TimeSyncResult::SystemTimeNotUnix,
+            Err(TimeSyncError::BadOutstationTimeDelay(_)) => {
+                ffi::TimeSyncResult::BadOutstationTimeDelay
+            }
+            Err(TimeSyncError::Overflow) => ffi::TimeSyncResult::Overflow,
+            Err(TimeSyncError::StillNeedsTime) => ffi::TimeSyncResult::StillNeedsTime,
+            Err(TimeSyncError::SystemTimeNotAvailable) => {
+                ffi::TimeSyncResult::SystemTimeNotAvailable
+            }
+            Err(TimeSyncError::IinError(_)) => ffi::TimeSyncResult::IinError,
+        };
+
+        callback.on_complete(result);
+    };
+
+    runtime.spawn(task);
+}
+
+pub(crate) unsafe fn master_cold_restart(
+    master: *mut crate::Master,
+    association: ffi::AssociationId,
+    callback: ffi::RestartTaskCallback,
+) {
+    let master = match master.as_mut() {
+        Some(master) => master,
+        None => {
+            // don't need to callback here because the whole function will become fallible
+            unimplemented!()
+        }
+    };
+
+    let runtime = match master.runtime.get() {
+        Some(x) => x,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let address = match EndpointAddress::from(association.address) {
+        Ok(x) => x,
+        Err(_) => {
+            unimplemented!()
+        }
+    };
+
+    let mut association = AssociationHandle::create(address, master.handle.clone());
+
+    let task = async move {
+        let result = match association.cold_restart().await {
+            Ok(value) => ffi::RestartResult::new_success(value),
+            Err(_) => ffi::RestartResult::error(),
+        };
+
+        callback.on_complete(result);
+    };
+
+    runtime.spawn(task);
+}
+
+pub(crate) unsafe fn master_warm_restart(
+    master: *mut crate::Master,
+    association: ffi::AssociationId,
+    callback: ffi::RestartTaskCallback,
+) {
+    let master = match master.as_mut() {
+        Some(master) => master,
+        None => {
+            // don't need to callback here because the whole function will become fallible
+            unimplemented!()
+        }
+    };
+
+    let runtime = match master.runtime.get() {
+        Some(x) => x,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let address = match EndpointAddress::from(association.address) {
+        Ok(x) => x,
+        Err(_) => {
+            unimplemented!()
+        }
+    };
+
+    let mut association = AssociationHandle::create(address, master.handle.clone());
+
+    let task = async move {
+        let result = match association.warm_restart().await {
+            Ok(value) => ffi::RestartResult::new_success(value),
+            Err(_) => ffi::RestartResult::error(),
+        };
+
+        callback.on_complete(result);
+    };
+
+    runtime.spawn(task);
+}
+
+pub(crate) unsafe fn master_check_link_status(
+    master: *mut crate::Master,
+    association: ffi::AssociationId,
+    callback: ffi::LinkStatusCallback,
+) {
+    let master = match master.as_mut() {
+        Some(master) => master,
+        None => {
+            // don't need to callback here because the whole function will become fallible
+            unimplemented!()
+        }
+    };
+
+    let runtime = match master.runtime.get() {
+        Some(x) => x,
+        None => {
+            unimplemented!()
+        }
+    };
+
+    let address = match EndpointAddress::from(association.address) {
+        Ok(x) => x,
+        Err(_) => {
+            unimplemented!()
+        }
+    };
+
+    let mut association = AssociationHandle::create(address, master.handle.clone());
+
+    let task = async move {
+        let result = match association.check_link_status().await {
+            Ok(LinkStatusResult::Success) => ffi::LinkStatusResult::Success,
+            Ok(LinkStatusResult::UnexpectedResponse) => ffi::LinkStatusResult::UnexpectedResponse,
+            Err(_) => ffi::LinkStatusResult::TaskError,
+        };
+
+        callback.on_complete(result);
+    };
+
+    runtime.spawn(task);
 }
 
 pub(crate) unsafe fn master_set_decode_level(master: *mut Master, level: ffi::DecodeLevel) {
@@ -492,6 +669,24 @@ pub(crate) unsafe fn master_get_decode_level(master: *mut Master) -> ffi::Decode
         physical: ffi::PhysDecodeLevel::Nothing,
     }
     .into()
+}
+
+impl ffi::RestartResult {
+    fn new_success(delay: Duration) -> Self {
+        ffi::RestartResultFields {
+            delay,
+            success: ffi::RestartSuccess::Success,
+        }
+        .into()
+    }
+
+    fn error() -> Self {
+        ffi::RestartResultFields {
+            delay: Duration::from_millis(0),
+            success: ffi::RestartSuccess::TaskError,
+        }
+        .into()
+    }
 }
 
 pub(crate) fn classes_all() -> ffi::Classes {
@@ -716,6 +911,15 @@ impl From<ffi::CommandMode> for CommandMode {
         match x {
             ffi::CommandMode::DirectOperate => CommandMode::DirectOperate,
             ffi::CommandMode::SelectBeforeOperate => CommandMode::SelectBeforeOperate,
+        }
+    }
+}
+
+impl From<ffi::TimeSyncMode> for TimeSyncProcedure {
+    fn from(x: ffi::TimeSyncMode) -> Self {
+        match x {
+            ffi::TimeSyncMode::Lan => TimeSyncProcedure::Lan,
+            ffi::TimeSyncMode::NonLan => TimeSyncProcedure::NonLan,
         }
     }
 }

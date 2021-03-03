@@ -257,7 +257,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param(
             "association",
-            Type::Struct(association_id),
+            Type::Struct(association_id.clone()),
             "Id of the association",
         )?
         .param("mode", Type::Enum(command_mode), "Operation mode")?
@@ -275,6 +275,98 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .doc("Asynchronously perform a command operation on the association")?
         .build()?;
 
+    let time_sync_mode = define_time_sync_mode(lib)?;
+    let time_sync_cb = define_time_sync_callback(lib)?;
+
+    let perform_time_sync_fn = lib
+        .declare_native_function("master_sync_time")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "Master on which to perform the operation",
+        )?
+        .param(
+            "association",
+            Type::Struct(association_id.clone()),
+            "Id of the association",
+        )?
+        .param("mode", Type::Enum(time_sync_mode), "Time sync mode")?
+        .param(
+            "callback",
+            Type::OneTimeCallback(time_sync_cb),
+            "Callback that will receive the result of the time sync",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Asynchronously perform a time sync operation to the association")?
+        .build()?;
+
+    let restart_cb = define_restart_callback(lib)?;
+
+    let cold_restart_fn = lib
+        .declare_native_function("master_cold_restart")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "Master on which to perform the operation",
+        )?
+        .param(
+            "association",
+            Type::Struct(association_id.clone()),
+            "Id of the association",
+        )?
+        .param(
+            "callback",
+            Type::OneTimeCallback(restart_cb.clone()),
+            "Callback that will receive the result of the restart",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Asynchronously perform a cold restart operation to the association")?
+        .build()?;
+
+    let warm_restart_fn = lib
+        .declare_native_function("master_warm_restart")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "Master on which to perform the operation",
+        )?
+        .param(
+            "association",
+            Type::Struct(association_id.clone()),
+            "Id of the association",
+        )?
+        .param(
+            "callback",
+            Type::OneTimeCallback(restart_cb),
+            "Callback that will receive the result of the restart",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Asynchronously perform a warm restart operation to the association")?
+        .build()?;
+
+    let link_status_cb = define_link_status_callback(lib)?;
+
+    let check_link_status_fn = lib
+        .declare_native_function("master_check_link_status")?
+        .param(
+            "master",
+            Type::ClassRef(master_class.clone()),
+            "Master on which to perform the operation",
+        )?
+        .param(
+            "association",
+            Type::Struct(association_id),
+            "Id of the association",
+        )?
+        .param(
+            "callback",
+            Type::OneTimeCallback(link_status_cb),
+            "Callback that will receive the result of the link status",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Asynchronously perform a link status check")?
+        .build()?;
+
     lib.define_class(&master_class)?
         .destructor(&destroy_fn)?
         .static_method("CreateTCPSession", &master_create_tcp_session_fn)?
@@ -290,6 +382,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .method("DemandPoll", &demand_poll_fn)?
         .async_method("Read", &read_fn)?
         .async_method("Operate", &operate_fn)?
+        .async_method("SynchronizeTime", &perform_time_sync_fn)?
+        .async_method("ColdRestart", &cold_restart_fn)?
+        .async_method("WarmRestart", &warm_restart_fn)?
+        .async_method("CheckLinkStatus", &check_link_status_fn)?
         .doc(
             doc("Master channel of communication")
             .details("To communicate with a particular outstation, you need to add an association with {class:Master.AddAssociation()}.")
@@ -914,5 +1010,127 @@ fn define_command_builder(
         .method("AddU8G41V4", &command_add_u8_g41v4_fn)?
         .method("AddU16G41V4", &command_add_u16_g41v4_fn)?
         .doc("Builder type used to construct command requests")?
+        .build()
+}
+
+fn define_time_sync_callback(
+    lib: &mut LibraryBuilder,
+) -> Result<OneTimeCallbackHandle, BindingError> {
+    let timesync_result = lib
+        .define_native_enum("TimeSyncResult")?
+        .push("Success", "Time synchronization operation was a success")?
+        .push("TaskError", "Failed b/c of a generic task execution error")?
+        .push("ClockRollback", "Detected a clock rollback")?
+        .push(
+            "SystemTimeNotUnix",
+            "The system time cannot be converted to a Unix timestamp",
+        )?
+        .push(
+            "BadOutstationTimeDelay",
+            "Outstation time delay exceeded the response delay",
+        )?
+        .push("Overflow", "Overflow in calculation")?
+        .push(
+            "StillNeedsTime",
+            "Outstation did not clear the NEED_TIME IIN bit",
+        )?
+        .push("SystemTimeNotAvailable", "System time not available")?
+        .push("IinError", "Outstation indicated an error")?
+        .doc("Result of a time sync operation")?
+        .build()?;
+
+    lib.define_one_time_callback(
+        "TimeSyncTaskCallback",
+        "Handler for time synchronization tasks",
+    )?
+    .callback(
+        "on_complete",
+        "Called when the timesync task reached completion or failed",
+    )?
+    .param(
+        "result",
+        Type::Enum(timesync_result),
+        "Result of the time synchronization task",
+    )?
+    .return_type(ReturnType::void())?
+    .build()?
+    .build()
+}
+
+fn define_time_sync_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
+    lib.define_native_enum("TimeSyncMode")?
+        .push(
+            "Lan",
+            "Perform a LAN time sync with Record Current Time (0x18) function code",
+        )?
+        .push(
+            "NonLan",
+            "Perform a non-LAN time sync with Delay Measurement (0x17) function code",
+        )?
+        .doc("Time synchronization mode")?
+        .build()
+}
+
+fn define_restart_callback(
+    lib: &mut LibraryBuilder,
+) -> Result<OneTimeCallbackHandle, BindingError> {
+    let restart_success = lib
+        .define_native_enum("RestartSuccess")?
+        .push("Success", "Restart was perform successfully")?
+        .push("TaskError", "The restart was not performed properly")?
+        .doc("Result of a read operation")?
+        .build()?;
+
+    let restart_result = lib.declare_native_struct("RestartResult")?;
+    let restart_result = lib.define_native_struct(&restart_result)?
+        .add("success", Type::Enum(restart_success), "Success status of the restart task")?
+        .add("delay", Type::Duration(DurationMapping::Milliseconds), "Delay value returned by the outstation. Valid only if {struct:RestartResult.success} is {enum:RestartSuccess.Success}.")?
+        .doc("Result of a restart task")?
+        .build()?;
+
+    lib.define_one_time_callback("RestartTaskCallback", "Handler for restart tasks")?
+        .callback(
+            "on_complete",
+            "Called when the restart task reached completion or failed",
+        )?
+        .param(
+            "result",
+            Type::Struct(restart_result),
+            "Result of the restart task",
+        )?
+        .return_type(ReturnType::void())?
+        .build()?
+        .build()
+}
+
+fn define_link_status_callback(
+    lib: &mut LibraryBuilder,
+) -> Result<OneTimeCallbackHandle, BindingError> {
+    let link_status_enum = lib
+        .define_native_enum("LinkStatusResult")?
+        .push(
+            "Success",
+            "The outstation responded with a valid LINK_STATUS",
+        )?
+        .push(
+            "UnexpectedResponse",
+            "There was activity on the link, but it wasn't a LINK_STATUS",
+        )?
+        .push(
+            "TaskError",
+            "The task failed for some reason (e.g. the master was shutdown)",
+        )?
+        .doc("Result of a link status check. See {class:Master.CheckLinkStatus()}")?
+        .build()?;
+
+    lib.define_one_time_callback("LinkStatusCallback", "Handler for link status check")?
+        .callback("on_complete", "Called when a link status is received")?
+        .param(
+            "result",
+            Type::Enum(link_status_enum),
+            "Result of the link status",
+        )?
+        .return_type(ReturnType::void())?
+        .build()?
         .build()
 }
