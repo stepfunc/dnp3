@@ -492,7 +492,7 @@ pub(crate) unsafe fn master_sync_time(
     let mut association = AssociationHandle::create(address, master.handle.clone());
 
     let task = async move {
-        let result = match association.perform_time_sync(mode.into()).await {
+        let result = match association.synchronize_time(mode.into()).await {
             Ok(_) => ffi::TimeSyncResult::Success,
             Err(TimeSyncError::Task(_)) => ffi::TimeSyncResult::TaskError,
             Err(TimeSyncError::ClockRollback) => ffi::TimeSyncResult::ClockRollback,

@@ -224,7 +224,7 @@ impl AssociationHandle {
         rx.await?
     }
 
-    pub async fn perform_time_sync(
+    pub async fn synchronize_time(
         &mut self,
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
