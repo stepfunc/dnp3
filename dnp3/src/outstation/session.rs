@@ -160,8 +160,8 @@ impl From<OutstationConfig> for SessionParameters {
 
 #[derive(Copy, Clone)]
 enum UnsolicitedState {
-    /// need to perform NULL unsolicited, possibly waiting for a retry deadline
-    NullRequired(Option<crate::tokio::time::Instant>),
+    /// need to perform NULL unsolicited
+    NullRequired,
     Ready(Option<crate::tokio::time::Instant>),
 }
 
@@ -184,7 +184,7 @@ impl SessionState {
             restart_iin_asserted: true,
             last_valid_request: None,
             select: None,
-            unsolicited: UnsolicitedState::NullRequired(None),
+            unsolicited: UnsolicitedState::NullRequired,
             unsolicited_seq: Sequence::default(),
             deferred_read: DeferredRead::new(max_read_headers),
             last_recorded_time: None,
@@ -428,22 +428,15 @@ impl OutstationSession {
         }
 
         match self.state.unsolicited {
-            UnsolicitedState::NullRequired(deadline) => {
-                if let Some(deadline) = deadline {
-                    if crate::tokio::time::Instant::now() < deadline {
-                        return Ok(Some(deadline)); // not ready yet
-                    }
-                }
-
+            UnsolicitedState::NullRequired => {
                 // perform NULL unsolicited
                 match self
                     .perform_null_unsolicited(io, reader, writer, database)
                     .await?
                 {
                     UnsolicitedResult::Timeout | UnsolicitedResult::ReturnToIdle => {
-                        let retry_at = self.new_unsolicited_retry_deadline();
-                        self.state.unsolicited = UnsolicitedState::NullRequired(Some(retry_at));
-                        Ok(Some(retry_at))
+                        self.state.unsolicited = UnsolicitedState::NullRequired;
+                        Ok(Some(crate::tokio::time::Instant::now()))
                     }
                     UnsolicitedResult::Confirmed => {
                         self.state.unsolicited = UnsolicitedState::Ready(None);
@@ -516,7 +509,7 @@ impl OutstationSession {
     ) -> Result<UnsolicitedResult, SessionError> {
         let seq = self.state.unsolicited_seq.increment();
         let length = self.write_null_unsolicited_response(seq, self.get_response_iin(database));
-        self.perform_unsolicited_response_series(database, seq, length, io, reader, writer)
+        self.perform_unsolicited_response_series(database, seq, length, true, io, reader, writer)
             .await
     }
 
@@ -535,7 +528,9 @@ impl OutstationSession {
             None => Ok(None),
             Some((seq, length)) => {
                 let result = self
-                    .perform_unsolicited_response_series(database, seq, length, io, reader, writer)
+                    .perform_unsolicited_response_series(
+                        database, seq, length, false, io, reader, writer,
+                    )
                     .await?;
                 Ok(Some(result))
             }
@@ -573,11 +568,13 @@ impl OutstationSession {
         Some((seq, len))
     }
 
+    #[allow(clippy::clippy::too_many_arguments)]
     async fn perform_unsolicited_response_series(
         &mut self,
         database: &mut DatabaseHandle,
         uns_ecsn: Sequence,
         length: usize,
+        is_null: bool,
         io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
@@ -588,6 +585,11 @@ impl OutstationSession {
         self.info.enter_unsolicited_confirm_wait(uns_ecsn);
 
         let mut retry_count = RetryCounter::new(self.config.max_unsolicited_retries);
+
+        // For null responses, we want to regenerate a response everytime (see section 5.1.1.1.1 Rule 2)
+        if is_null {
+            retry_count = RetryCounter::new(Some(0));
+        }
 
         let mut deadline = self.new_confirm_deadline();
 
@@ -605,7 +607,13 @@ impl OutstationSession {
                 }
                 UnsolicitedWaitResult::Complete(result) => return Ok(result),
                 UnsolicitedWaitResult::Timeout => {
-                    let retry = retry_count.decrement();
+                    let mut retry = retry_count.decrement();
+
+                    // If a deferred read is pending, we want to exit
+                    if self.state.deferred_read.is_set() {
+                        retry = false;
+                    }
+
                     self.info.unsolicited_confirm_timeout(uns_ecsn, retry);
 
                     if !retry {
@@ -827,6 +835,7 @@ impl OutstationSession {
                     ))
                     .await?;
             }
+            self.state.deferred_read.clear();
         }
 
         Ok(())
