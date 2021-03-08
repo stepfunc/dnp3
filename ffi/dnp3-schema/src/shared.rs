@@ -1,3 +1,4 @@
+use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::doc;
 use oo_bindgen::iterator::IteratorHandle;
@@ -7,6 +8,7 @@ use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
 
 pub struct SharedDefinitions {
+    pub port_state_listener: InterfaceHandle,
     pub variation_enum: NativeEnumHandle,
     pub runtime_class: ClassDeclarationHandle,
     pub decode_level: NativeStructHandle,
@@ -155,6 +157,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     )?;
 
     Ok(SharedDefinitions {
+        port_state_listener: define_port_state_listener(lib)?,
         variation_enum: crate::variation::define(lib)?,
         runtime_class: crate::runtime::define(lib)?,
         decode_level: crate::logging::define(lib)?,
@@ -291,6 +294,31 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
         .build()?;
 
     Ok(flags_struct)
+}
+
+fn define_port_state_listener(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
+    let port_state = lib
+        .define_native_enum("PortState")?
+        .push("Disabled", "Disabled until enabled")?
+        .push("Wait", "Waiting to perform an open retry")?
+        .push("Open", "Port is open")?
+        .push("Shutdown", "Task has been shut down")?
+        .doc("State of the serial port")?
+        .build()?;
+
+    let port_state_listener = lib
+        .define_interface(
+            "PortStateListener",
+            "Callback interface for receiving updates about the state of a serial port",
+        )?
+        .callback("on_change", "Invoked when the serial port changes state")?
+        .param("state", Type::Enum(port_state), "New state of the port")?
+        .return_type(ReturnType::Void)?
+        .build()?
+        .destroy_callback("on_destroy")?
+        .build()?;
+
+    Ok(port_state_listener)
 }
 
 fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {

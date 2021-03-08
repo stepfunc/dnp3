@@ -37,8 +37,6 @@ pub struct MasterConfig {
     pub address: EndpointAddress,
     /// Decode-level for DNP3 objects
     pub decode_level: DecodeLevel,
-    /// Reconnection strategy
-    pub reconnection_strategy: ReconnectStrategy,
     /// Response timeout
     pub response_timeout: Timeout,
     /// TX buffer size
@@ -56,13 +54,11 @@ impl MasterConfig {
     pub fn new(
         address: EndpointAddress,
         decode_level: DecodeLevel,
-        reconnection_strategy: ReconnectStrategy,
         response_timeout: Timeout,
     ) -> Self {
         Self {
             address,
             decode_level,
-            reconnection_strategy,
             response_timeout,
             tx_buffer_size: MasterSession::DEFAULT_TX_BUFFER_SIZE,
             rx_buffer_size: MasterSession::DEFAULT_RX_BUFFER_SIZE,
@@ -126,6 +122,17 @@ impl MasterHandle {
             .map(|_| (AssociationHandle::new(address, self.clone())))
     }
 
+    /// Remove an association
+    /// * `address` is the DNP3 link-layer address of the outstation
+    pub async fn remove_association(
+        &mut self,
+        address: EndpointAddress,
+    ) -> Result<(), AssociationError> {
+        self.send_master_message(MasterMsg::RemoveAssociation(address))
+            .await?;
+        Ok(())
+    }
+
     async fn send_master_message(&mut self, msg: MasterMsg) -> Result<(), Shutdown> {
         self.sender.send(Message::Master(msg)).await?;
         Ok(())
@@ -146,6 +153,11 @@ impl MasterHandle {
 }
 
 impl AssociationHandle {
+    #[cfg(feature = "ffi")]
+    pub fn create(address: EndpointAddress, master: MasterHandle) -> Self {
+        Self::new(address, master)
+    }
+
     pub(crate) fn new(address: EndpointAddress, master: MasterHandle) -> Self {
         Self { address, master }
     }
@@ -212,7 +224,7 @@ impl AssociationHandle {
         rx.await?
     }
 
-    pub async fn perform_time_sync(
+    pub async fn synchronize_time(
         &mut self,
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
@@ -297,12 +309,8 @@ pub trait AssociationHandler: Send {
         Timestamp::try_from_system_time(SystemTime::now())
     }
 
-    /// retrieve a handler used to process integrity polls
-    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler;
-    /// retrieve a handler used to process unsolicited responses
-    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler;
-    /// retrieve a default handler used to process user-defined polls
-    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler;
+    /// retrieve a handler used to process received measurement data
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler;
 }
 
 /// Information about the object header from which the measurement values were mapped
@@ -323,9 +331,22 @@ impl HeaderInfo {
     }
 }
 
+/// Describes the source of a read event
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ReadType {
+    /// Startup integrity poll
+    StartupIntegrity,
+    /// Unsolicited message
+    Unsolicited,
+    /// Single poll requested by the user
+    SinglePoll,
+    /// Periodic poll configured by the user
+    PeriodicPoll,
+}
+
 pub trait ReadHandler {
-    fn begin_fragment(&mut self, header: ResponseHeader);
-    fn end_fragment(&mut self, header: ResponseHeader);
+    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
+    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
 
     fn handle_binary(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Binary, u16)>);
     fn handle_double_bit_binary(
@@ -369,9 +390,9 @@ impl NullHandler {
 }
 
 impl ReadHandler for NullHandler {
-    fn begin_fragment(&mut self, _header: ResponseHeader) {}
+    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
-    fn end_fragment(&mut self, _header: ResponseHeader) {}
+    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
     fn handle_binary(&mut self, _info: HeaderInfo, _iter: &mut dyn Iterator<Item = (Binary, u16)>) {
     }
@@ -423,15 +444,7 @@ impl ReadHandler for NullHandler {
 }
 
 impl AssociationHandler for NullHandler {
-    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
         self
     }
 }

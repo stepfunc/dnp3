@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use tracing::Instrument;
 
-use crate::app::ExponentialBackOff;
 use crate::app::Shutdown;
+use crate::app::{ExponentialBackOff, ReconnectStrategy};
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::{Listener, MasterConfig, MasterHandle};
@@ -24,9 +24,11 @@ pub fn spawn_master_tcp_client(
     link_error_mode: LinkErrorMode,
     config: MasterConfig,
     endpoints: EndpointList,
+    reconnect: ReconnectStrategy,
     listener: Listener<ClientState>,
 ) -> MasterHandle {
-    let (future, handle) = create_master_tcp_client(link_error_mode, config, endpoints, listener);
+    let (future, handle) =
+        create_master_tcp_client(link_error_mode, config, endpoints, reconnect, listener);
     crate::tokio::spawn(future);
     handle
 }
@@ -43,13 +45,14 @@ pub fn create_master_tcp_client(
     link_error_mode: LinkErrorMode,
     config: MasterConfig,
     endpoints: EndpointList,
+    reconnect: ReconnectStrategy,
     listener: Listener<ClientState>,
 ) -> (impl Future<Output = ()> + 'static, MasterHandle) {
     let main_addr = endpoints.main_addr().to_string();
-    let (mut task, handle) = MasterTask::new(link_error_mode, endpoints, config, listener);
+    let (mut task, handle) =
+        MasterTask::new(link_error_mode, endpoints, config, reconnect, listener);
     let future = async move {
-        let _ = task
-            .run()
+        task.run()
             .instrument(tracing::info_span!("DNP3-Master-TCP", "endpoint" = ?main_addr))
             .await;
     };
@@ -71,6 +74,7 @@ impl MasterTask {
         link_error_mode: LinkErrorMode,
         endpoints: EndpointList,
         config: MasterConfig,
+        reconnect: ReconnectStrategy,
         listener: Listener<ClientState>,
     ) -> (Self, MasterHandle) {
         let (tx, rx) = crate::util::channel::request_channel();
@@ -88,8 +92,8 @@ impl MasterTask {
         );
         let task = Self {
             endpoints,
-            back_off: ExponentialBackOff::new(config.reconnection_strategy.retry_strategy),
-            reconnect_delay: config.reconnection_strategy.reconnect_delay,
+            back_off: ExponentialBackOff::new(reconnect.retry_strategy),
+            reconnect_delay: reconnect.reconnect_delay,
             session,
             reader,
             writer,
@@ -98,11 +102,16 @@ impl MasterTask {
         (task, MasterHandle::new(tx))
     }
 
-    async fn run(&mut self) -> Result<(), Shutdown> {
+    async fn run(&mut self) {
+        let _ = self.run_impl().await;
+        self.listener.update(ClientState::Shutdown);
+    }
+
+    async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
+            self.listener.update(ClientState::Disabled);
             self.session.wait_for_enabled().await?;
             if let Err(StateChange::Shutdown) = self.run_connection().await {
-                self.listener.update(ClientState::Shutdown);
                 return Err(Shutdown);
             }
         }

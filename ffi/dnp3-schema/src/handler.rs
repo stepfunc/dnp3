@@ -5,6 +5,7 @@ use oo_bindgen::native_struct::NativeStructHandle;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
+use oo_bindgen::native_enum::NativeEnumHandle;
 
 pub fn define(
     lib: &mut LibraryBuilder,
@@ -63,12 +64,19 @@ pub fn define(
 
     let octet_string_it = build_octet_string(lib)?;
 
+    let read_type = define_read_type_enum(lib)?;
+
     let read_handler_interface = lib
         .define_interface(
             "ReadHandler",
             "General handler that will receive all values read from the outstation.",
         )?
         .callback("begin_fragment", "Marks the beginning of a fragment")?
+        .param(
+            "read_type",
+            Type::Enum(read_type.clone()),
+            "Describes what triggered the read event"
+        )?
         .param(
             "header",
             Type::Struct(response_header.clone()),
@@ -77,6 +85,11 @@ pub fn define(
         .return_type(ReturnType::void())?
         .build()?
         .callback("end_fragment", "Marks the end of a fragment")?
+        .param(
+            "read_type",
+            Type::Enum(read_type),
+            "Describes what triggered the read event"
+        )?
         .param(
             "header",
             Type::Struct(response_header),
@@ -311,6 +324,16 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, Bi
         .build()?;
 
     Ok(iin)
+}
+
+fn define_read_type_enum(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
+    lib.define_native_enum("ReadType")?
+        .push("StartupIntegrity", "Startup integrity poll")?
+        .push("Unsolicited", "Unsolicited message")?
+        .push("SinglePoll", "Single poll requested by the user")?
+        .push("PeriodicPoll", "Periodic poll configured by the user")?
+        .doc("Describes the source of a read event")?
+        .build()
 }
 
 fn build_octet_string(lib: &mut LibraryBuilder) -> Result<IteratorHandle, BindingError> {

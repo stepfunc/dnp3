@@ -34,10 +34,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         MasterConfig::new(
             EndpointAddress::from(1)?,
             AppDecodeLevel::ObjectValues.into(),
-            ReconnectStrategy::default(),
             Timeout::from_secs(1)?,
         ),
         EndpointList::new("127.0.0.1:20000".to_owned(), &[]),
+        ReconnectStrategy::default(),
         Listener::None,
     );
 
@@ -112,15 +112,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::warn!("error: {}", err);
                 }
             }
-            "evt" => poll.demand().await,
+            "evt" => poll.demand().await?,
             "lts" => {
-                if let Err(err) = association.perform_time_sync(TimeSyncProcedure::Lan).await {
+                if let Err(err) = association.synchronize_time(TimeSyncProcedure::Lan).await {
                     tracing::warn!("error: {}", err);
                 }
             }
             "nts" => {
                 if let Err(err) = association
-                    .perform_time_sync(TimeSyncProcedure::NonLan)
+                    .synchronize_time(TimeSyncProcedure::NonLan)
                     .await
                 {
                     tracing::warn!("error: {}", err);

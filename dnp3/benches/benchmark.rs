@@ -213,6 +213,7 @@ impl Pair {
             LinkErrorMode::Close,
             Self::get_master_config(config.master_level),
             EndpointList::single(format!("127.0.0.1:{}", port)),
+            ReconnectStrategy::default(),
             Listener::None,
         );
 
@@ -252,7 +253,6 @@ impl Pair {
         MasterConfig::new(
             Self::master_address(),
             level,
-            ReconnectStrategy::default(),
             Timeout::from_secs(5).unwrap(),
         )
     }
@@ -277,11 +277,11 @@ struct TestHandler {
 }
 
 impl ReadHandler for TestHandler {
-    fn begin_fragment(&mut self, _header: ResponseHeader) {
+    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {
         self.count = 0;
     }
 
-    fn end_fragment(&mut self, _header: ResponseHeader) {
+    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {
         self.tx.try_send(self.count).unwrap();
     }
 
@@ -355,15 +355,7 @@ impl ReadHandler for TestHandler {
 }
 
 impl AssociationHandler for TestHandler {
-    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
         self
     }
 }

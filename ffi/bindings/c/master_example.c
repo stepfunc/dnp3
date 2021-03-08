@@ -30,12 +30,12 @@ void client_state_on_change(client_state_t state, void* arg)
 }
 
 // ReadHandler callbacks
-void begin_fragment(response_header_t header, void* arg)
+void begin_fragment(read_type_t read_type, response_header_t header, void* arg)
 {
     printf("Beginning fragment (broadcast: %u)\n", iin1_is_set(&header.iin.iin1, Iin1Flag_Broadcast));
 }
 
-void end_fragment(response_header_t header, void* arg)
+void end_fragment(read_type_t read_type, response_header_t header, void* arg)
 {
     printf("End fragment\n");
 }
@@ -50,11 +50,10 @@ void handle_binary(header_info_t info, binary_iterator_t* it, void* arg)
     print_variation(info.variation);
     printf("\n");
 
-    binary_t* value = binary_next(it);
-    while(value != NULL)
+    binary_t* value = NULL;
+    while(value = binary_next(it))
     {
-        printf("BI %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
-        value = binary_next(it);
+        printf("BI %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);        
     }
 }
 
@@ -68,11 +67,10 @@ void handle_double_bit_binary(header_info_t info, double_bit_binary_iterator_t* 
     print_variation(info.variation);
     printf("\n");
 
-    double_bit_binary_t* value = doublebitbinary_next(it);
-    while(value != NULL)
+    double_bit_binary_t* value = NULL;
+    while(value = doublebitbinary_next(it))
     {
-        printf("DBBI %u: Value=%X Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
-        value = doublebitbinary_next(it);
+        printf("DBBI %u: Value=%X Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);        
     }
 }
 
@@ -86,11 +84,10 @@ void handle_binary_output_status(header_info_t info, binary_output_status_iterat
     print_variation(info.variation);
     printf("\n");
 
-    binary_output_status_t* value = binaryoutputstatus_next(it);
-    while(value != NULL)
+    binary_output_status_t* value = NULL;
+    while(value = binaryoutputstatus_next(it))
     {
-        printf("BOS %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
-        value = binaryoutputstatus_next(it);
+        printf("BOS %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);        
     }
 }
 
@@ -104,11 +101,10 @@ void handle_counter(header_info_t info, counter_iterator_t* it, void* arg)
     print_variation(info.variation);
     printf("\n");
 
-    counter_t* value = counter_next(it);
-    while(value != NULL)
+    counter_t* value = NULL;
+    while(value = counter_next(it))
     {
-        printf("Counter %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
-        value = counter_next(it);
+        printf("Counter %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);        
     }
 }
 
@@ -122,11 +118,10 @@ void handle_frozen_counter(header_info_t info, frozen_counter_iterator_t* it, vo
     print_variation(info.variation);
     printf("\n");
 
-    frozen_counter_t* value = frozencounter_next(it);
-    while(value != NULL)
+    frozen_counter_t* value = NULL;
+    while(value = frozencounter_next(it))
     {
-        printf("Frozen Counter %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
-        value = frozencounter_next(it);
+        printf("Frozen Counter %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);        
     }
 }
 
@@ -140,11 +135,10 @@ void handle_analog(header_info_t info, analog_iterator_t* it, void* arg)
     print_variation(info.variation);
     printf("\n");
 
-    analog_t* value = analog_next(it);
-    while(value != NULL)
+    analog_t* value = NULL;
+    while(value = analog_next(it))
     {
-        printf("AI %u: Value=%f Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
-        value = analog_next(it);
+        printf("AI %u: Value=%f Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);        
     }
 }
 
@@ -158,11 +152,10 @@ void handle_analog_output_status(header_info_t info, analog_output_status_iterat
     print_variation(info.variation);
     printf("\n");
 
-    analog_output_status_t* value = analogoutputstatus_next(it);
-    while(value != NULL)
+    analog_output_status_t* value = NULL;
+    while(value = analogoutputstatus_next(it))
     {
-        printf("AOS %u: Value=%f Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
-        value = analogoutputstatus_next(it);
+        printf("AOS %u: Value=%f Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);        
     }
 }
 
@@ -176,8 +169,8 @@ void handle_octet_strings(header_info_t info, octet_string_iterator_t* it, void*
     print_variation(info.variation);
     printf("\n");
 
-    octet_string_t* value = octetstring_next(it);
-    while(value != NULL)
+    octet_string_t* value = NULL;
+    while(value = octetstring_next(it))
     {
         printf("Octet String: %u: Value=", value->index);
         byte_t* single_byte = byte_next(value->value);
@@ -187,8 +180,7 @@ void handle_octet_strings(header_info_t info, octet_string_iterator_t* it, void*
             single_byte = byte_next(value->value);
         }
 
-        printf("\n");
-        value = octetstring_next(it);
+        printf("\n");        
     }
 }
 
@@ -255,9 +247,7 @@ int main()
     // ANCHOR_END: runtime_init
 
     // Create the master
-    master_config_t master_config = master_config_init(1);
-    master_config.reconnection_strategy.min_delay = 100;
-    master_config.reconnection_strategy.max_delay = 5000;
+    master_config_t master_config = master_config_init(1);    
     master_config.decode_level.application = AppDecodeLevel_ObjectValues;
 
     endpoint_list_t* endpoints = endpoint_list_new("127.0.0.1:20000");
@@ -271,6 +261,8 @@ int main()
         LinkErrorMode_Close,
         master_config,
         endpoints,
+        retry_strategy_init(),
+        1000,
         listener
     );
     endpoint_list_destroy(endpoints);
@@ -303,24 +295,23 @@ int main()
     );
     association_config.auto_time_sync = AutoTimeSync_Lan;
     association_config.keep_alive_timeout = 60;
-
-    association_handlers_t association_handlers = association_handlers_init(read_handler, read_handler, read_handler);
+   
     time_provider_t time_provider =
     {
         .get_time = get_time,
         .ctx = NULL,
     };
-    association_t* association = master_add_association(
+    association_id_t association_id = master_add_association(
         master,
         1024,
         association_config,
-        association_handlers,
+        read_handler,
         time_provider
     );
 
     // Add an event poll
     request_t* poll_request = request_new_class(false, true, true, true);
-    poll_t* poll = association_add_poll(association, poll_request, 5000);
+    poll_id_t poll_id = master_add_poll(master, association_id, poll_request, 5000);
     request_destroy(poll_request);
 
     // start communications
@@ -365,7 +356,7 @@ int main()
                 .on_complete = &on_read_complete,
                 .ctx = NULL,
             };
-            association_read(association, request, cb);
+            master_read(master, association_id, request, cb);
 
             request_destroy(request);
         }
@@ -380,7 +371,7 @@ int main()
                 .on_complete = &on_read_complete,
                 .ctx = NULL,
             };
-            association_read(association, request, cb);
+            master_read(master, association_id, request, cb);
 
             request_destroy(request);
         }
@@ -401,8 +392,9 @@ int main()
                 .ctx = NULL,
             };
 
-            association_operate(
-                association,
+            master_operate(
+                master,
+                association_id,
                 CommandMode_SelectBeforeOperate,
                 command,
                 cb
@@ -412,8 +404,8 @@ int main()
         }
         else if(strcmp(cbuf, "evt\n") == 0)
         {
-            poll_demand(poll);
-        }
+            master_demand_poll(master, poll_id);
+        }        
         else if(strcmp(cbuf, "lts\n") == 0)
         {
             time_sync_task_callback_t cb =
@@ -421,7 +413,7 @@ int main()
                 .on_complete = &on_timesync_complete,
                 .ctx = NULL,
             };
-            association_perform_time_sync(association, TimeSyncMode_Lan, cb);
+            master_sync_time(master, association_id, TimeSyncMode_Lan, cb);
         }
         else if(strcmp(cbuf, "nts\n") == 0)
         {
@@ -430,7 +422,7 @@ int main()
                 .on_complete = &on_timesync_complete,
                 .ctx = NULL,
             };
-            association_perform_time_sync(association, TimeSyncMode_NonLan, cb);
+            master_sync_time(master, association_id, TimeSyncMode_NonLan, cb);
         }
         else if(strcmp(cbuf, "crt\n") == 0)
         {
@@ -439,7 +431,7 @@ int main()
                 .on_complete = &on_restart_complete,
                 .ctx = NULL,
             };
-            association_cold_restart(association, cb);
+            master_cold_restart(master, association_id, cb);
         }
         else if(strcmp(cbuf, "wrt\n") == 0)
         {
@@ -448,7 +440,7 @@ int main()
                 .on_complete = &on_restart_complete,
                 .ctx = NULL,
             };
-            association_warm_restart(association, cb);
+            master_warm_restart(master, association_id, cb);
         }
         else if(strcmp(cbuf, "lsr\n") == 0)
         {
@@ -457,8 +449,8 @@ int main()
                 .on_complete = &on_link_status_complete,
                 .ctx = NULL,
             };
-            association_check_link_status(association, cb);
-        }
+            master_check_link_status(master, association_id, cb);
+        }        
         else
         {
             printf("Unknown command\n");
@@ -466,9 +458,7 @@ int main()
     }
 
     // Cleanup
-cleanup:
-    poll_destroy(poll);
-    association_destroy(association);
+cleanup:    
     master_destroy(master);
     // ANCHOR: runtime_destroy
     runtime_destroy(runtime);

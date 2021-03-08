@@ -34,13 +34,13 @@ class TestListener implements ClientStateListener {
 class TestReadHandler implements ReadHandler {
 
   @Override
-  public void beginFragment(ResponseHeader header) {
+  public void beginFragment(ReadType readType, ResponseHeader header) {
     System.out.println(
         "Beginning fragment (broadcast: " + header.iin.iin1.isSet(Iin1Flag.BROADCAST) + ")");
   }
 
   @Override
-  public void endFragment(ResponseHeader header) {
+  public void endFragment(ReadType readType, ResponseHeader header) {
     System.out.println("End fragment");
   }
 
@@ -178,7 +178,8 @@ public class MasterExample {
     masterConfig.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
 
     Master master = Master.createTcpSession(runtime, LinkErrorMode.CLOSE, masterConfig,
-        new EndpointList("127.0.0.1:20000"), new TestListener());
+        new EndpointList("127.0.0.1:20000"), new RetryStrategy(), Duration.ofSeconds(1),
+        new TestListener());
 
     // Create the association
     AssociationConfig associationConfig = new AssociationConfig(EventClasses.all(),
@@ -186,15 +187,12 @@ public class MasterExample {
     associationConfig.autoTimeSync = AutoTimeSync.LAN;
     associationConfig.keepAliveTimeout = Duration.ofSeconds(60);
 
-    TestReadHandler readHandler = new TestReadHandler();
-    AssociationHandlers associationHandlers =
-        new AssociationHandlers(readHandler, readHandler, readHandler);
-    Association association = master.addAssociation(ushort(1024), associationConfig,
-        associationHandlers, new TestTimeProvider());
+    AssociationId association = master.addAssociation(ushort(1024), associationConfig,
+        new TestReadHandler(), new TestTimeProvider());
 
     // Create a periodic poll
-    Request pollRequest = Request.classRequest(false, true, true, true);
-    Poll poll = association.addPoll(pollRequest, Duration.ofSeconds(5));
+    PollId poll = master.addPoll(association, Request.classRequest(false, true, true, true),
+        Duration.ofSeconds(5));
 
     // start communications
     master.enable();
@@ -223,7 +221,7 @@ public class MasterExample {
         case "rao": {
           Request request = new Request();
           request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-          ReadResult result = association.read(request).toCompletableFuture().get();
+          ReadResult result = master.read(association, request).toCompletableFuture().get();
           System.out.println("Result: " + result);
           break;
         }
@@ -231,7 +229,7 @@ public class MasterExample {
           Request request = new Request();
           request.addAllObjectsHeader(Variation.GROUP10_VAR0);
           request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-          ReadResult result = association.read(request).toCompletableFuture().get();
+          ReadResult result = master.read(association, request).toCompletableFuture().get();
           System.out.println("Result: " + result);
           break;
         }
@@ -240,38 +238,40 @@ public class MasterExample {
           G12v1 g12v1 = new G12v1(new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
               ubyte(1), uint(1000), uint(1000));
           command.addU16g12v1(ushort(3), g12v1);
-          CommandResult result = association.operate(CommandMode.SELECT_BEFORE_OPERATE, command)
-              .toCompletableFuture().get();
+          CommandResult result =
+              master.operate(association, CommandMode.SELECT_BEFORE_OPERATE, command)
+                  .toCompletableFuture().get();
           System.out.println("Result: " + result);
           break;
         }
         case "evt":
-          poll.demand();
+          master.demandPoll(poll);
           break;
+
         case "lts": {
           TimeSyncResult result =
-              association.performTimeSync(TimeSyncMode.LAN).toCompletableFuture().get();
+              master.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
           System.out.println("Result: " + result);
           break;
         }
         case "nts": {
           TimeSyncResult result =
-              association.performTimeSync(TimeSyncMode.NON_LAN).toCompletableFuture().get();
+              master.synchronizeTime(association, TimeSyncMode.NON_LAN).toCompletableFuture().get();
           System.out.println("Result: " + result);
           break;
         }
         case "crt": {
-          RestartResult result = association.coldRestart().toCompletableFuture().get();
+          RestartResult result = master.coldRestart(association).toCompletableFuture().get();
           System.out.println("Result: " + result);
           break;
         }
         case "wrt": {
-          RestartResult result = association.warmRestart().toCompletableFuture().get();
+          RestartResult result = master.warmRestart(association).toCompletableFuture().get();
           System.out.println("Result: " + result);
           break;
         }
         case "lsr": {
-          LinkStatusResult result = association.checkLinkStatus().toCompletableFuture().get();
+          LinkStatusResult result = master.checkLinkStatus(association).toCompletableFuture().get();
           System.out.println("Result: " + result);
           break;
         }
