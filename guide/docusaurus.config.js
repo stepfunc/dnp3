@@ -24,15 +24,9 @@ module.exports = {
       logo: {
         alt: 'Logo',
         src: 'images/brand/logo.svg',
+        href: '/docs/guide'
       },
-      items: [
-        {
-          to: 'docs/dnp3',
-          activeBasePath: 'docs',
-          label: 'Docs',
-          position: 'left',
-        },
-      ],
+      items: [],
     },
     footer: {
       logo: {
