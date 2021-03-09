@@ -324,6 +324,12 @@ impl BitOr for Iin {
     }
 }
 
+impl BitOrAssign for Iin {
+    fn bitor_assign(&mut self, rhs: Iin) {
+        *self = *self | rhs
+    }
+}
+
 impl BitOr<Iin1> for Iin {
     type Output = Self;
 

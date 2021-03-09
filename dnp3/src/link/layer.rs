@@ -154,21 +154,18 @@ impl Layer {
             },
         };
 
-        // broadcasts may only use unconfirmed user data
-        if broadcast.is_some() {
-            return match header.control.func {
-                Function::PriUnconfirmedUserData => (
-                    Some(FrameInfo::new(source, broadcast, FrameType::Data)),
-                    None,
-                ),
-                _ => {
-                    tracing::warn!(
-                        "ignoring broadcast frame with function: {:?}",
-                        header.control.func
-                    );
-                    (None, None)
-                }
-            };
+        // broadcasts may only accept user data
+        if broadcast.is_some()
+            && !matches!(
+                header.control.func,
+                Function::PriUnconfirmedUserData | Function::PriConfirmedUserData
+            )
+        {
+            tracing::warn!(
+                "ignoring broadcast frame with function: {:?}",
+                header.control.func
+            );
+            return (None, None);
         }
 
         match header.control.func {
@@ -206,15 +203,22 @@ impl Layer {
                         (None, None)
                     }
                     SecondaryState::Reset(expected) => {
+                        let response = if broadcast.is_none() {
+                            Some(Reply::new(source, Function::SecAck))
+                        } else {
+                            // Do not answer if it's a broadcast
+                            None
+                        };
+
                         if header.control.fcb == expected {
                             self.secondary_state = SecondaryState::Reset(!expected);
                             (
                                 Some(FrameInfo::new(source, broadcast, FrameType::Data)),
-                                Some(Reply::new(source, Function::SecAck)),
+                                response,
                             )
                         } else {
                             tracing::info!("ignoring confirmed user data with non-matching fcb");
-                            (None, Some(Reply::new(source, Function::SecAck)))
+                            (None, response)
                         }
                     }
                 }
