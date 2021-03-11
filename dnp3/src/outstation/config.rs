@@ -90,7 +90,6 @@ pub struct OutstationConfig {
     pub features: Features,
     pub max_unsolicited_retries: Option<usize>,
     pub unsolicited_retry_delay: std::time::Duration,
-    pub max_read_headers_per_request: u16,
     pub keep_alive_timeout: Option<std::time::Duration>,
     /// Maximum number of headers that will be processed
     /// in a READ request. Internally, this controls the size of a
@@ -99,6 +98,8 @@ pub struct OutstationConfig {
     /// Requesting more than this number will result in the PARAMETER_ERROR
     /// IIN bit being set in the response.
     pub max_read_request_headers: Option<u16>,
+    /// Maximum number of controls in a single request
+    pub max_controls_per_request: Option<u16>,
     /// controls responses to class 0 READ requests
     pub class_zero: ClassZeroConfig,
 }
@@ -135,9 +136,9 @@ impl OutstationConfig {
             features: Features::default(),
             max_unsolicited_retries: None,
             unsolicited_retry_delay: Self::DEFAULT_UNSOLICITED_RETRY_DELAY,
-            max_read_headers_per_request: Self::DEFAULT_MAX_READ_REQUEST_HEADERS,
             keep_alive_timeout: Some(std::time::Duration::from_secs(60)),
             max_read_request_headers: None,
+            max_controls_per_request: None,
             class_zero: ClassZeroConfig::default(),
         }
     }

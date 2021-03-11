@@ -200,7 +200,7 @@ implement_iterator!(
 );
 
 impl ffi::Binary {
-    fn new(idx: u16, value: Binary) -> Self {
+    pub(crate) fn new(idx: u16, value: Binary) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -211,7 +211,7 @@ impl ffi::Binary {
 }
 
 impl ffi::DoubleBitBinary {
-    fn new(idx: u16, value: DoubleBitBinary) -> Self {
+    pub(crate) fn new(idx: u16, value: DoubleBitBinary) -> Self {
         ffi::DoubleBitBinaryFields {
             index: idx,
             value: match value.value {
@@ -228,7 +228,7 @@ impl ffi::DoubleBitBinary {
 }
 
 impl ffi::BinaryOutputStatus {
-    fn new(idx: u16, value: BinaryOutputStatus) -> Self {
+    pub(crate) fn new(idx: u16, value: BinaryOutputStatus) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -239,7 +239,7 @@ impl ffi::BinaryOutputStatus {
 }
 
 impl ffi::Counter {
-    fn new(idx: u16, value: Counter) -> Self {
+    pub(crate) fn new(idx: u16, value: Counter) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -250,7 +250,7 @@ impl ffi::Counter {
 }
 
 impl ffi::FrozenCounter {
-    fn new(idx: u16, value: FrozenCounter) -> Self {
+    pub(crate) fn new(idx: u16, value: FrozenCounter) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -261,7 +261,7 @@ impl ffi::FrozenCounter {
 }
 
 impl ffi::Analog {
-    fn new(idx: u16, value: Analog) -> Self {
+    pub(crate) fn new(idx: u16, value: Analog) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -272,7 +272,7 @@ impl ffi::Analog {
 }
 
 impl ffi::AnalogOutputStatus {
-    fn new(idx: u16, value: AnalogOutputStatus) -> Self {
+    pub(crate) fn new(idx: u16, value: AnalogOutputStatus) -> Self {
         Self {
             index: idx,
             value: value.value,

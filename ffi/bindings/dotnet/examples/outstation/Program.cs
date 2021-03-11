@@ -20,6 +20,16 @@ class ExampleOutstation
             return 0;
         }
 
+        public WriteTimeResult WriteAbsoluteTime(ulong time)
+        {
+            return WriteTimeResult.NotSupported;
+        }
+
+        public ApplicationIin GetApplicationIin()
+        {
+            return new ApplicationIin();
+        }
+
         public RestartDelay ColdRestart()
         {
             return RestartDelay.ValidSeconds(60);
@@ -43,7 +53,7 @@ class ExampleOutstation
 
         public void SolicitedConfirmReceived(byte ecsn) { }
 
-        public void SolicitedConfirmWaitNewRequest(RequestHeader header) { }
+        public void SolicitedConfirmWaitNewRequest() { }
 
         public void WrongSolicitedConfirmSeq(byte ecsn, byte seq) { }
 
@@ -83,6 +93,10 @@ class ExampleOutstation
         public CommandStatus SelectG41v4(double value, ushort index, Database database) { return CommandStatus.NotSupported; }
 
         public CommandStatus OperateG41v4(double value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+
+        public FreezeResult FreezeCountersAll(FreezeType freezeType, Database database) { return FreezeResult.NotSupported; }
+
+        public FreezeResult FreezeCountersRange(ushort start, ushort stop, FreezeType freezeType, Database database) { return FreezeResult.NotSupported; }
     }
 
     public static void Main(string[] args)

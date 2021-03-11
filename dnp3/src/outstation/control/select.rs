@@ -30,6 +30,10 @@ impl SelectState {
         }
     }
 
+    pub(crate) fn update_frame_id(&mut self, new_frame_id: u32) {
+        self.frame_id = new_frame_id;
+    }
+
     pub(crate) fn match_operate(
         &self,
         timeout: std::time::Duration,

@@ -125,6 +125,17 @@ pub fn define(
         .doc("Update a Binary Input point")?
         .build()?;
 
+    let binary_get_fn = lib
+        .declare_native_function("database_get_binary")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.optional_binary_point.clone()),
+            "Binary Input point",
+        ))?
+        .doc("Get a Binary Input point")?
+        .build()?;
+
     // Double-bit Binary Input
     let double_bit_binary_static_variation = lib
         .define_native_enum("StaticDoubleBitBinaryVariation")?
@@ -212,6 +223,17 @@ pub fn define(
         .doc("Update a Double-Bit Binary Input point")?
         .build()?;
 
+    let double_bit_binary_get_fn = lib
+        .declare_native_function("database_get_double_bit_binary")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.optional_double_bit_binary_point.clone()),
+            "Double-Bit Binary Input point",
+        ))?
+        .doc("Get a Double-Bit Binary Input point")?
+        .build()?;
+
     // Binary Output Status
     let binary_output_status_static_variation = lib
         .define_native_enum("StaticBinaryOutputStatusVariation")?
@@ -292,6 +314,17 @@ pub fn define(
         .doc("Update a Binary Output Status point")?
         .build()?;
 
+    let binary_output_status_get_fn = lib
+        .declare_native_function("database_get_binary_output_status")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.optional_binary_output_status_point.clone()),
+            "Binary Output Status point",
+        ))?
+        .doc("Get a Binary Output Status point")?
+        .build()?;
+
     // Counter
     let counter_static_variation = lib
         .define_native_enum("StaticCounterVariation")?
@@ -369,6 +402,17 @@ pub fn define(
         )?
         .return_type(ReturnType::void())?
         .doc("Update a Counter point")?
+        .build()?;
+
+    let counter_get_fn = lib
+        .declare_native_function("database_get_counter")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.optional_counter_point.clone()),
+            "Counter point",
+        ))?
+        .doc("Get a Counter point")?
         .build()?;
 
     // Frozen Counter
@@ -465,7 +509,18 @@ pub fn define(
             "Update options",
         )?
         .return_type(ReturnType::void())?
-        .doc("Update an Analog point")?
+        .doc("Update an Frozen Counter point")?
+        .build()?;
+
+    let frozen_counter_get_fn = lib
+        .declare_native_function("database_get_frozen_counter")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.optional_frozen_counter_point.clone()),
+            "Frozen Counter point",
+        ))?
+        .doc("Get a Frozen Counter point")?
         .build()?;
 
     // Analog
@@ -569,6 +624,17 @@ pub fn define(
         )?
         .return_type(ReturnType::void())?
         .doc("Update a Analog point")?
+        .build()?;
+
+    let analog_get_fn = lib
+        .declare_native_function("database_get_analog")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.optional_analog_point.clone()),
+            "Analog point",
+        ))?
+        .doc("Get a Analog point")?
         .build()?;
 
     // Analog Output Status
@@ -682,6 +748,17 @@ pub fn define(
         .doc("Update a Analog Output Status point")?
         .build()?;
 
+    let analog_output_status_get_fn = lib
+        .declare_native_function("database_get_analog_output_status")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.optional_analog_output_status_point.clone()),
+            "Analog Output Status point",
+        ))?
+        .doc("Get a Analog Output Status point")?
+        .build()?;
+
     // Octet String
     let octet_string_class = lib.declare_class("OctetStringValue")?;
 
@@ -754,14 +831,18 @@ pub fn define(
         .doc("Update an Octet String point")?
         .build()?;
 
+    // TODO: Add a getter for octet strings
+
     let database = lib
         .define_class(&database)?
         .method("add_binary", &binary_add_fn)?
         .method("remove_binary", &binary_remove_fn)?
         .method("update_binary", &binary_update_fn)?
+        .method("get_binary", &binary_get_fn)?
         .method("add_double_bit_binary", &double_bit_binary_add_fn)?
         .method("remove_double_bit_binary", &double_bit_binary_remove_fn)?
         .method("update_double_bit_binary", &double_bit_binary_update_fn)?
+        .method("get_double_bit_binary", &double_bit_binary_get_fn)?
         .method("add_binary_output_status", &binary_output_status_add_fn)?
         .method(
             "remove_binary_output_status",
@@ -771,15 +852,19 @@ pub fn define(
             "update_binary_output_status",
             &binary_output_status_update_fn,
         )?
+        .method("get_binary_output_status", &binary_output_status_get_fn)?
         .method("add_counter", &counter_add_fn)?
         .method("remove_counter", &counter_remove_fn)?
         .method("update_counter", &counter_update_fn)?
+        .method("get_counter", &counter_get_fn)?
         .method("add_frozen_counter", &frozen_counter_add_fn)?
         .method("remove_frozen_counter", &frozen_counter_remove_fn)?
         .method("update_frozen_counter", &frozen_counter_update_fn)?
+        .method("get_frozen_counter", &frozen_counter_get_fn)?
         .method("add_analog", &analog_add_fn)?
         .method("remove_analog", &analog_remove_fn)?
         .method("update_analog", &analog_update_fn)?
+        .method("get_analog", &analog_get_fn)?
         .method("add_analog_output_status", &analog_output_status_add_fn)?
         .method(
             "remove_analog_output_status",
@@ -789,6 +874,7 @@ pub fn define(
             "update_analog_output_status",
             &analog_output_status_update_fn,
         )?
+        .method("get_analog_output_status", &analog_output_status_get_fn)?
         .method("add_octet_string", &octet_string_add_fn)?
         .method("remove_octet_string", &octet_string_remove_fn)?
         .method("update_octet_string", &octet_string_update_fn)?

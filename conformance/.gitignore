@@ -1,0 +1,9 @@
+# IntelliJ stuff
+/.idea
+*.iml
+
+# Compiled stuff
+/target
+
+# Test results
+/results

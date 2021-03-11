@@ -10,6 +10,18 @@ impl OutstationApplication for ffi::OutstationApplication {
         ffi::OutstationApplication::get_processing_delay_ms(self).unwrap_or(0)
     }
 
+    fn write_absolute_time(&mut self, time: Timestamp) -> WriteTimeResult {
+        ffi::OutstationApplication::write_absolute_time(self, time.raw_value())
+            .map(|res| res.into())
+            .unwrap_or(WriteTimeResult::NotSupported)
+    }
+
+    fn get_application_iin(&self) -> ApplicationIin {
+        ffi::OutstationApplication::get_application_iin(self)
+            .map(|iin| iin.into())
+            .unwrap_or_default()
+    }
+
     fn cold_restart(&mut self) -> Option<RestartDelay> {
         ffi::OutstationApplication::cold_restart(self)
             .map(|delay| delay.into())
@@ -23,12 +35,33 @@ impl OutstationApplication for ffi::OutstationApplication {
     }
 }
 
+impl From<ffi::ApplicationIin> for ApplicationIin {
+    fn from(from: ffi::ApplicationIin) -> Self {
+        ApplicationIin {
+            need_time: from.need_time(),
+            local_control: from.local_control(),
+            device_trouble: from.device_trouble(),
+            config_corrupt: from.config_corrupt(),
+        }
+    }
+}
+
 impl From<ffi::RestartDelay> for Option<RestartDelay> {
     fn from(from: ffi::RestartDelay) -> Self {
         match from.restart_type() {
             ffi::RestartDelayType::NotSupported => None,
             ffi::RestartDelayType::Seconds => Some(RestartDelay::Seconds(from.value())),
             ffi::RestartDelayType::Milliseconds => Some(RestartDelay::Milliseconds(from.value())),
+        }
+    }
+}
+
+impl From<ffi::WriteTimeResult> for WriteTimeResult {
+    fn from(from: ffi::WriteTimeResult) -> Self {
+        match from {
+            ffi::WriteTimeResult::NotSupported => WriteTimeResult::NotSupported,
+            ffi::WriteTimeResult::InvalidValue => WriteTimeResult::InvalidValue,
+            ffi::WriteTimeResult::Ok => WriteTimeResult::Ok,
         }
     }
 }
@@ -54,8 +87,8 @@ impl OutstationInformation for ffi::OutstationInformation {
         ffi::OutstationInformation::solicited_confirm_received(self, ecsn.value());
     }
 
-    fn solicited_confirm_wait_new_request(&mut self, header: RequestHeader) {
-        ffi::OutstationInformation::solicited_confirm_wait_new_request(self, header.into());
+    fn solicited_confirm_wait_new_request(&mut self) {
+        ffi::OutstationInformation::solicited_confirm_wait_new_request(self);
     }
 
     fn wrong_solicited_confirm_seq(&mut self, ecsn: Sequence, seq: Sequence) {
@@ -90,6 +123,51 @@ impl ControlHandler for ffi::ControlHandler {
 
     fn end_fragment(&mut self) {
         ffi::ControlHandler::end_fragment(self);
+    }
+
+    fn freeze_counter(
+        &mut self,
+        indices: FreezeIndices,
+        freeze_type: FreezeType,
+        database: &mut Database,
+    ) -> FreezeResult {
+        match indices {
+            FreezeIndices::All => ffi::ControlHandler::freeze_counters_all(
+                self,
+                freeze_type.into(),
+                database as *mut _,
+            )
+            .map(|res| res.into())
+            .unwrap_or(FreezeResult::NotSupported),
+            FreezeIndices::Range(start, stop) => ffi::ControlHandler::freeze_counters_range(
+                self,
+                start,
+                stop,
+                freeze_type.into(),
+                database as *mut _,
+            )
+            .map(|res| res.into())
+            .unwrap_or(FreezeResult::NotSupported),
+        }
+    }
+}
+
+impl From<ffi::FreezeResult> for FreezeResult {
+    fn from(from: ffi::FreezeResult) -> Self {
+        match from {
+            ffi::FreezeResult::Success => FreezeResult::Success,
+            ffi::FreezeResult::ParameterError => FreezeResult::ParameterError,
+            ffi::FreezeResult::NotSupported => FreezeResult::NotSupported,
+        }
+    }
+}
+
+impl From<FreezeType> for ffi::FreezeType {
+    fn from(from: FreezeType) -> Self {
+        match from {
+            FreezeType::ImmediateFreeze => ffi::FreezeType::ImmediateFreeze,
+            FreezeType::FreezeAndClear => ffi::FreezeType::FreezeAndClear,
+        }
     }
 }
 

@@ -281,17 +281,13 @@ fn define_outstation_config(
             "Delay to wait before retrying an unsolicited response",
         )?
         .add(
-            "max_read_headers_per_request",
-            StructElementType::Uint16(Some(64)),
-            "Maximum number of read headers per request",
-        )?
-        .add(
             "keep_alive_timeout",
             StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(60))),
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the master")
                 .details("A value of zero means no automatic keep-alives."),
         )?
         .add("max_read_request_headers", StructElementType::Uint16(Some(64)), doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
+        .add("max_controls_per_request", StructElementType::Uint16(Some(64)), doc("Maximum number of controls in a single request."))?
         .add("class_zero", Type::Struct(class_zero_config), "Controls responses to Class 0 reads")?
         .doc("Outstation configuration")?
         .build()?;
@@ -392,6 +388,32 @@ fn define_outstation_application(
         .doc("Type of restart delay value. Used by {struct:RestartDelay}.")?
         .build()?;
 
+    let application_iin = lib.declare_native_struct("ApplicationIIN")?;
+    let application_iin = lib
+        .define_native_struct(&application_iin)?
+        .add(
+            "need_time",
+            StructElementType::Bool(Some(false)),
+            "IIN1.4 - Time synchronization is required",
+        )?
+        .add(
+            "local_control",
+            StructElementType::Bool(Some(false)),
+            "IIN1.5 - Some output points are in local mode",
+        )?
+        .add(
+            "device_trouble",
+            StructElementType::Bool(Some(false)),
+            "IIN1.6 - Device trouble",
+        )?
+        .add(
+            "config_corrupt",
+            StructElementType::Bool(Some(false)),
+            "IIN2.5 - Configuration corrupt",
+        )?
+        .doc("Application-controlled IIN bits")?
+        .build()?;
+
     let restart_delay = lib.declare_native_struct("RestartDelay")?;
     let restart_delay = lib.define_native_struct(&restart_delay)?
         .add("restart_type", Type::Enum(restart_delay_type), "Indicates what {struct:RestartDelay.value} is.")?
@@ -439,12 +461,26 @@ fn define_outstation_application(
         .static_method("ValidMillis", &restart_delay_millis_fn)?
         .build();
 
+    let write_time_result = lib.define_native_enum("WriteTimeResult")?
+        .push("NotSupported", "Writing time is not supported by this outstation (translated to NO_FUNC_CODE_SUPPORT).")?
+        .push("InvalidValue", "The provided value was invalid (translated to PARAM_ERROR)")?
+        .push("Ok", "The write time operation succeeded.")?
+        .doc("Write time result used by {interface:OutstationApplication.write_absolute_time()}")?
+        .build()?;
+
     lib.define_interface("OutstationApplication", "Dynamic information required by the outstation from the user application")?
         .callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
             .details("For more information, see IEEE-1815 2012, p. 64."))?
             .return_type(ReturnType::new(Type::Uint16, "Processing delay, in milliseconds"))?
+            .build()?
+        .callback("write_absolute_time", "Handle a write of the absolute time during time synchronization procedures.")?
+            .param("time", Type::Uint64, "Received time in milliseconds since EPOCH (only 48 bits are used)")?
+            .return_type(ReturnType::new(Type::Enum(write_time_result), "Result of the write time operation"))?
+            .build()?
+        .callback("get_application_iin", "Returns the application-controlled IIN bits")?
+            .return_type(ReturnType::new(Type::Struct(application_iin), "Application IIN bits"))?
             .build()?
         .callback("cold_restart", doc("Request that the outstation perform a cold restart (IEEE-1815 2012, p. 58)")
             .details("The outstation will not automatically restart. It is the responsibility of the user application to handle this request and take the appropriate action."))?
@@ -490,7 +526,7 @@ fn define_outstation_information(
 
     lib.define_interface("OutstationInformation", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))?
         .callback("process_request_from_idle", "Called when a request is processed from the IDLE state")?
-            .param("header", Type::Struct(request_header.clone()), "Request header")?
+            .param("header", Type::Struct(request_header), "Request header")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("broadcast_received", "Called when a broadcast request is received by the outstation")?
@@ -511,7 +547,6 @@ fn define_outstation_information(
             .return_type(ReturnType::void())?
             .build()?
         .callback("solicited_confirm_wait_new_request", "Received a new request while waiting for a solicited confirm, aborting the response series")?
-            .param("header", Type::Struct(request_header), "Request header")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("wrong_solicited_confirm_seq", "Received a solicited confirm with the wrong sequence number")?
@@ -566,6 +601,23 @@ fn define_control_handler(
             "operate the control via a DirectOperateNoAck request",
         )?
         .doc("Enumeration describing how the master requested the control operation")?
+        .build()?;
+
+    let freeze_type = lib.define_native_enum("FreezeType")?
+        .push("ImmediateFreeze", "Copy the current value of a counter to the associated point")?
+        .push("FreezeAndClear", "Copy the current value of a counter to the associated point and clear the current value to 0.")?
+        .doc("Freeze operation type")?
+        .build()?;
+
+    let freeze_result = lib
+        .define_native_enum("FreezeResult")?
+        .push("Success", "Freeze operation was successful")?
+        .push("ParameterError", "One of the point is invalid")?
+        .push(
+            "NotSupported",
+            "The demanded freeze operation is not supported by this device",
+        )?
+        .doc("Result of a freeze operation")?
         .build()?;
 
     lib.define_interface("ControlHandler", "Callbacks for handling controls")?
@@ -649,6 +701,18 @@ fn define_control_handler(
             .param("op_type", Type::Enum(operate_type), "Operate type")?
             .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(command_status), "Command status"))?
+            .build()?
+        .callback("freeze_counters_all", "Freeze all the counters")?
+            .param("freeze_type", Type::Enum(freeze_type.clone()), "Type of freeze operation")?
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
+            .return_type(ReturnType::new(Type::Enum(freeze_result.clone()), "Result of the freeze operation"))?
+            .build()?
+        .callback("freeze_counters_range", "Freeze a range of counters")?
+            .param("start", Type::Uint16, "Start index to freeze (inclusive)")?
+            .param("stop", Type::Uint16, "Stop index to freeze (inclusive)")?
+            .param("freeze_type", Type::Enum(freeze_type), "Type of freeze operation")?
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
+            .return_type(ReturnType::new(Type::Enum(freeze_result), "Result of the freeze operation"))?
             .build()?
         .destroy_callback("on_destroy")?
         .build()

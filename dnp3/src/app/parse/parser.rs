@@ -145,7 +145,7 @@ impl<'a> ParsedFragment<'a> {
         let control = ControlField::parse(&mut cursor)?;
         let raw_func = cursor.read_u8()?;
         let function = match FunctionCode::from(raw_func) {
-            None => return Err(HeaderParseError::UnknownFunction(raw_func)),
+            None => return Err(HeaderParseError::UnknownFunction(control.seq, raw_func)),
             Some(x) => x,
         };
         let iin = match function {

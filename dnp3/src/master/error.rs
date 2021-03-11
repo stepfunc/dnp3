@@ -9,6 +9,7 @@ use crate::master::association::NoAssociation;
 use crate::master::session::{RunError, StateChange};
 use crate::tokio::sync::mpsc::error::SendError;
 use crate::tokio::sync::oneshot::error::RecvError;
+use crate::transport::TransportResponseError;
 use crate::util::cursor::WriteError;
 
 /// Errors that can occur when adding an association
@@ -23,8 +24,10 @@ pub enum AssociationError {
 /// Errors that can occur while executing a master task
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskError {
-    /// An error occurred at the link or transport level
-    Lower(LinkError),
+    /// An error occurred at the link level
+    Link(LinkError),
+    /// An error occurred at the transport/app level
+    Transport,
     /// A response to the task's request was malformed
     MalformedResponse(ObjectParseError),
     /// The response contains headers that don't match the request
@@ -172,7 +175,8 @@ impl std::fmt::Display for CommandError {
 impl std::fmt::Display for TaskError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            TaskError::Lower(_) => f.write_str("I/O error"),
+            TaskError::Link(_) => f.write_str("link-layer or I/O error"),
+            TaskError::Transport => f.write_str("malformed response"),
             TaskError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
             TaskError::UnexpectedResponseHeaders => {
                 f.write_str("response contains headers that don't match the request")
@@ -234,7 +238,13 @@ impl From<WriteError> for TaskError {
 
 impl From<LinkError> for TaskError {
     fn from(err: LinkError) -> Self {
-        TaskError::Lower(err)
+        TaskError::Link(err)
+    }
+}
+
+impl From<TransportResponseError> for TaskError {
+    fn from(_: TransportResponseError) -> Self {
+        TaskError::Transport
     }
 }
 
@@ -248,7 +258,7 @@ impl From<RunError> for TaskError {
     fn from(x: RunError) -> Self {
         match x {
             RunError::State(s) => TaskError::State(s),
-            RunError::Link(x) => TaskError::Lower(x),
+            RunError::Link(x) => TaskError::Link(x),
         }
     }
 }

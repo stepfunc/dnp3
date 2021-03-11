@@ -1,6 +1,7 @@
 use std::fmt::Formatter;
 
 use crate::app::parse::range::InvalidRange;
+use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
 use crate::util::cursor::ReadError;
@@ -9,7 +10,7 @@ use crate::util::cursor::ReadError;
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum HeaderParseError {
     /// unknown function code
-    UnknownFunction(u8),
+    UnknownFunction(Sequence, u8),
     /// insufficient bytes for a header
     InsufficientBytes,
 }
@@ -60,7 +61,7 @@ pub enum ResponseValidationError {
 impl std::fmt::Display for HeaderParseError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            HeaderParseError::UnknownFunction(x) => write!(f, "unknown function: {:?}", x),
+            HeaderParseError::UnknownFunction(_seq, x) => write!(f, "unknown function: {:?}", x),
             HeaderParseError::InsufficientBytes => {
                 write!(f, "insufficient bytes for application layer header")
             }

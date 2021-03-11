@@ -3,6 +3,7 @@ package io.stepfunc.dnp3rs.examples;
 import io.stepfunc.dnp3rs.Runtime;
 import io.stepfunc.dnp3rs.*;
 import org.joou.UByte;
+import org.joou.ULong;
 import org.joou.UShort;
 
 import java.io.BufferedReader;
@@ -27,6 +28,16 @@ class TestApplication implements OutstationApplication {
   @Override
   public UShort getProcessingDelayMs() {
     return ushort(0);
+  }
+
+  @Override
+  public WriteTimeResult writeAbsoluteTime(ULong time) {
+    return WriteTimeResult.NOT_SUPPORTED;
+  }
+
+  @Override
+  public ApplicationIin getApplicationIin() {
+    return new ApplicationIin();
   }
 
   @Override
@@ -69,7 +80,7 @@ class TestOutstationInformation implements OutstationInformation {
   }
 
   @Override
-  public void solicitedConfirmWaitNewRequest(RequestHeader header) {
+  public void solicitedConfirmWaitNewRequest() {
 
   }
 
@@ -170,6 +181,17 @@ class TestControlHandler implements ControlHandler {
   public CommandStatus operateG41v4(double value, UShort index, OperateType opType,
       Database database) {
     return CommandStatus.NOT_SUPPORTED;
+  }
+
+  @Override
+  public FreezeResult freezeCountersAll(FreezeType freezeType, Database database) {
+    return FreezeResult.NOT_SUPPORTED;
+  }
+
+  @Override
+  public FreezeResult freezeCountersRange(UShort start, UShort stop, FreezeType freezeType,
+      Database database) {
+    return FreezeResult.NOT_SUPPORTED;
   }
 }
 

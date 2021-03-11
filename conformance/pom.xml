@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.stepfunc</groupId>
+    <artifactId>dnp3rs-conformance</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <scala.version>2.13.4</scala.version>
+        <dnp3rs.version>0.1.0</dnp3rs.version>
+        <dnp4s.version>0.1.0-SNAPSHOT</dnp4s.version>
+        <scala-maven-plugin.version>4.4.0</scala-maven-plugin.version>
+    </properties>
+
+    <build>
+        <sourceDirectory>src/main/scala</sourceDirectory>
+        <plugins>
+            <plugin>
+                <groupId>net.alchim31.maven</groupId>
+                <artifactId>scala-maven-plugin</artifactId>
+                <version>${scala-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>compile</goal>
+                            <goal>testCompile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <recompileMode>incremental</recompileMode>
+                    <args>
+                        <arg>-language:implicitConversions</arg>
+                        <arg>-feature</arg>
+                        <arg>-deprecation</arg>
+                    </args>
+                    <launchers>
+                        <launcher>
+                            <id>conformance</id>
+                            <mainClass>io.stepfunc.dnp3rs_conformance.Main</mainClass>
+                            <args>
+                                <arg>-config</arg>
+                                <arg>device.ini</arg>
+                                <arg>-run</arg>
+                                <arg>all</arg>
+                            </args>
+                        </launcher>
+                    </launchers>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <version>${scala.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.automatak.dnp4s</groupId>
+            <artifactId>conformance</artifactId>
+            <version>${dnp4s.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.stepfunc</groupId>
+            <artifactId>dnp3rs</artifactId>
+            <version>${dnp3rs.version}</version>
+        </dependency>
+    </dependencies>
+</project>

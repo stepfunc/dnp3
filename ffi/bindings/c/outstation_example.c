@@ -10,6 +10,10 @@ void on_log_message(log_level_t level, const char *msg, void *arg) { printf("%s"
 // Application callbacks
 uint16_t get_processing_delay_ms(void *context) { return 0; }
 
+write_time_result_t write_absolute_time(uint64_t time, void* context) { return WriteTimeResult_NotSupported; }
+
+application_iin_t get_application_iin(void* context) { return application_iin_init(); }
+
 restart_delay_t cold_restart(void *context) { return restart_delay_seconds(60); }
 
 restart_delay_t warm_restart(void *context) { return restart_delay_not_supported(); }
@@ -25,7 +29,7 @@ void solicited_confirm_timeout(uint8_t ecsn, void *context) {}
 
 void solicited_confirm_received(uint8_t ecsn, void *context) {}
 
-void solicited_confirm_wait_new_request(request_header_t header, void *context) {}
+void solicited_confirm_wait_new_request(void *context) {}
 
 void wrong_solicited_confirm_seq(uint8_t ecsn, uint8_t seq, void *context) {}
 
@@ -77,6 +81,16 @@ command_status_t select_g41v4(double control, uint16_t index, database_t *databa
 command_status_t operate_g41v4(double control, uint16_t index, operate_type_t op_type, database_t *database, void *context)
 {
     return CommandStatus_NotSupported;
+}
+
+freeze_result_t freeze_counters_all(freeze_type_t freeze_type, database_t* database, void* context)
+{
+    return FreezeResult_NotSupported;
+}
+
+freeze_result_t freeze_counters_range(uint16_t start, uint16_t stop, freeze_type_t freeze_type, database_t* database, void* context)
+{
+    return FreezeResult_NotSupported;
 }
 
 // Transactions
@@ -220,6 +234,8 @@ int main()
 
     outstation_application_t application = {
         .get_processing_delay_ms = &get_processing_delay_ms,
+        .write_absolute_time = &write_absolute_time,
+        .get_application_iin = &get_application_iin,
         .cold_restart = &cold_restart,
         .warm_restart = &warm_restart,
         .on_destroy = NULL,
@@ -256,6 +272,8 @@ int main()
         .operate_g41v3 = &operate_g41v3,
         .select_g41v4 = &select_g41v4,
         .operate_g41v4 = &operate_g41v4,
+        .freeze_counters_all = &freeze_counters_all,
+        .freeze_counters_range = &freeze_counters_range,
         .on_destroy = NULL,
         .ctx = NULL,
     };
