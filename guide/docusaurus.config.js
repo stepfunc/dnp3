@@ -13,6 +13,7 @@ module.exports = {
   projectName: 'dnp3', // Usually your repo name.
   themeConfig: {
     prism: {
+      theme: require('prism-react-renderer/themes/vsLight'),
       additionalLanguages: ['rust', 'java', 'csharp'],
     },
     colorMode: {
