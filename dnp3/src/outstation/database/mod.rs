@@ -174,10 +174,13 @@ pub(crate) struct ResponseInfo {
     pub(crate) has_events: bool,
     /// true if all selected data has been written (FIN == 1)
     pub(crate) complete: bool,
-    /*
-    /// flags for IIN
-    pub(crate) unwritten: EventClasses,
-     */
+}
+
+pub(crate) struct EventsInfo {
+    /// which classes have unwritten events
+    pub(crate) unwritten_classes: EventClasses,
+    /// True if an overflow occured
+    pub(crate) is_overflown: bool,
 }
 
 /// Options that control how the update is performed. 99% of the time
@@ -321,12 +324,13 @@ impl DatabaseHandle {
         self.inner.lock().unwrap().inner.clear_written_events();
     }
 
-    pub(crate) fn unwritten_classes(&self) -> EventClasses {
-        self.inner.lock().unwrap().inner.unwritten_classes()
-    }
+    pub(crate) fn get_events_info(&self) -> EventsInfo {
+        let guard = self.inner.lock().unwrap();
 
-    pub(crate) fn is_overflown(&self) -> bool {
-        self.inner.lock().unwrap().inner.is_overflown()
+        EventsInfo {
+            unwritten_classes: guard.inner.unwritten_classes(),
+            is_overflown: guard.inner.is_overflown(),
+        }
     }
 
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> Iin2 {

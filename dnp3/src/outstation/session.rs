@@ -8,8 +8,9 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::ranged::RangedVariation;
+use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
-use crate::app::variations::{Group52Var1, Group52Var2};
+use crate::app::variations::{Group50Var3, Group52Var1, Group52Var2};
 use crate::app::*;
 use crate::app::{ControlField, Iin, Iin1, Iin2, ResponseFunction, ResponseHeader};
 use crate::decode::DecodeLevel;
@@ -1203,11 +1204,10 @@ impl OutstationSession {
     }
 
     fn handle_write(&mut self, seq: Sequence, object_headers: HeaderCollection) -> Response {
-        let mut iin2 = Iin2::default();
-
-        if let Some(header) = object_headers.get_only_header() {
+        let iin2 = if let Some(header) = object_headers.get_only_header() {
             match header.details {
                 HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(seq)) => {
+                    let mut iin2 = Iin2::default();
                     for (value, index) in seq.iter() {
                         if index == 7 {
                             // restart IIN
@@ -1228,55 +1228,22 @@ impl OutstationSession {
                             iin2 |= Iin2::PARAMETER_ERROR;
                         }
                     }
+                    iin2
                 }
                 HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
                     if let Some(value) = seq.single() {
                         match self.application.write_absolute_time(value.time) {
-                            WriteTimeResult::NotSupported => {
-                                iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
-                            }
-                            WriteTimeResult::InvalidValue => {
-                                iin2 |= Iin2::PARAMETER_ERROR;
-                            }
-                            WriteTimeResult::Ok => (),
+                            WriteTimeResult::NotSupported => Iin2::NO_FUNC_CODE_SUPPORT,
+                            WriteTimeResult::InvalidValue => Iin2::PARAMETER_ERROR,
+                            WriteTimeResult::Ok => Iin2::default(),
                         }
                     } else {
                         tracing::warn!("request didn't have a single g50v1");
-                        iin2 |= Iin2::PARAMETER_ERROR;
+                        Iin2::PARAMETER_ERROR
                     }
                 }
                 HeaderDetails::OneByteCount(_, CountVariation::Group50Var3(seq)) => {
-                    if let Some(value) = seq.single() {
-                        if let Some(last_recorded_time) = self.state.last_recorded_time {
-                            let now = crate::tokio::time::Instant::now();
-                            if let Some(delay) = now.checked_duration_since(last_recorded_time) {
-                                if let Some(timestamp) = value.time.checked_add(delay) {
-                                    self.state.last_recorded_time = None;
-                                    match self.application.write_absolute_time(timestamp) {
-                                        WriteTimeResult::NotSupported => {
-                                            iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
-                                        }
-                                        WriteTimeResult::InvalidValue => {
-                                            iin2 |= Iin2::PARAMETER_ERROR;
-                                        }
-                                        WriteTimeResult::Ok => (),
-                                    }
-                                } else {
-                                    tracing::warn!("calculating current time overflown");
-                                    iin2 |= Iin2::PARAMETER_ERROR;
-                                }
-                            } else {
-                                tracing::warn!("clock rollback detected (this should never happen per tokio statement in the docs)");
-                                iin2 |= Iin2::PARAMETER_ERROR;
-                            }
-                        } else {
-                            tracing::warn!("no previous RECORD_CURRENT_TIME");
-                            iin2 |= Iin2::PARAMETER_ERROR;
-                        }
-                    } else {
-                        tracing::warn!("request didn't have a single g50v3");
-                        iin2 |= Iin2::PARAMETER_ERROR;
-                    }
+                    self.handle_g50v3(seq)
                 }
                 _ => {
                     tracing::warn!(
@@ -1284,12 +1251,53 @@ impl OutstationSession {
                         header.details.qualifier(),
                         header.variation
                     );
-                    iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
+                    Iin2::NO_FUNC_CODE_SUPPORT
                 }
             }
-        }
+        } else {
+            tracing::warn!("empty WRITE request");
+            Iin2::default()
+        };
 
         Response::empty_solicited(seq, Iin::default() | iin2)
+    }
+
+    fn handle_g50v3(&mut self, seq: CountSequence<Group50Var3>) -> Iin2 {
+        let value = if let Some(value) = seq.single() {
+            value
+        } else {
+            tracing::warn!("request didn't have a single g50v3");
+            return Iin2::PARAMETER_ERROR;
+        };
+
+        let last_recorded_time = if let Some(last_recorded_time) = self.state.last_recorded_time {
+            last_recorded_time
+        } else {
+            tracing::warn!("no previous RECORD_CURRENT_TIME");
+            return Iin2::PARAMETER_ERROR;
+        };
+
+        let now = crate::tokio::time::Instant::now();
+        let delay = if let Some(delay) = now.checked_duration_since(last_recorded_time) {
+            delay
+        } else {
+            tracing::warn!("clock rollback detected (this should never happen per tokio statement in the docs)");
+            return Iin2::PARAMETER_ERROR;
+        };
+
+        let timestamp = if let Some(timestamp) = value.time.checked_add(delay) {
+            timestamp
+        } else {
+            tracing::warn!("calculating current time overflown");
+            return Iin2::PARAMETER_ERROR;
+        };
+
+        self.state.last_recorded_time = None;
+        match self.application.write_absolute_time(timestamp) {
+            WriteTimeResult::NotSupported => Iin2::NO_FUNC_CODE_SUPPORT,
+            WriteTimeResult::InvalidValue => Iin2::PARAMETER_ERROR,
+            WriteTimeResult::Ok => Iin2::default(),
+        }
     }
 
     fn handle_delay_measure(&mut self, seq: Sequence) -> Response {
@@ -1672,19 +1680,19 @@ impl OutstationSession {
         }
 
         // Events available
-        let events = database.unwritten_classes();
-        if events.class1 {
+        let events_info = database.get_events_info();
+        if events_info.unwritten_classes.class1 {
             iin |= Iin1::CLASS_1_EVENTS;
         }
-        if events.class2 {
+        if events_info.unwritten_classes.class2 {
             iin |= Iin1::CLASS_2_EVENTS;
         }
-        if events.class3 {
+        if events_info.unwritten_classes.class3 {
             iin |= Iin1::CLASS_3_EVENTS;
         }
 
         // Buffer overflow
-        if database.is_overflown() {
+        if events_info.is_overflown {
             iin |= Iin2::EVENT_BUFFER_OVERFLOW;
         }
 
