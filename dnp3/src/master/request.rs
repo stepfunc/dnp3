@@ -257,6 +257,7 @@ impl ReadRequest {
     }
 }
 
+#[derive(Clone)]
 pub(crate) enum CommandHeader {
     G12V1U8(Vec<(Group12Var1, u8)>),
     G41V1U8(Vec<(Group41Var1, u8)>),
@@ -378,6 +379,7 @@ impl CommandHeaders {
     }
 }
 
+#[derive(Clone)]
 pub struct CommandBuilder {
     headers: Vec<CommandHeader>,
     partial: Option<CommandHeader>,
