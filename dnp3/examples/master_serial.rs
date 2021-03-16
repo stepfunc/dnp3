@@ -91,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Err(err) = association
                     .operate(
                         CommandMode::SelectBeforeOperate,
-                        CommandBuilder::single_u16_header(
+                        CommandBuilder::single_header_u16(
                             Group12Var1::from_op_type(OpType::LatchOn),
                             3u16,
                         ),

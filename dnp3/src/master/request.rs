@@ -257,7 +257,7 @@ impl ReadRequest {
     }
 }
 
-pub enum CommandHeader {
+pub(crate) enum CommandHeader {
     G12V1U8(Vec<(Group12Var1, u8)>),
     G41V1U8(Vec<(Group41Var1, u8)>),
     G41V2U8(Vec<(Group41Var2, u8)>),
@@ -270,7 +270,7 @@ pub enum CommandHeader {
     G41V4U16(Vec<(Group41Var4, u16)>),
 }
 
-pub trait Command {
+pub(crate) trait Command {
     fn status(&self) -> CommandStatus;
     fn to_header_u8(&self, index: u8) -> CommandHeader;
     fn to_header_u16(&self, index: u16) -> CommandHeader;
@@ -346,6 +346,12 @@ pub struct CommandHeaders {
 }
 
 impl CommandHeaders {
+    pub(crate) fn single(header: CommandHeader) -> Self {
+        Self {
+            headers: vec![header],
+        }
+    }
+
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         for header in self.headers.iter() {
             header.write(writer)?;
@@ -374,51 +380,268 @@ impl CommandHeaders {
 
 pub struct CommandBuilder {
     headers: Vec<CommandHeader>,
+    partial: Option<CommandHeader>,
+}
+
+pub trait CommandSupport<T> {
+    fn add_u8(&mut self, command: T, index: u8);
+    fn add_u16(&mut self, command: T, index: u16);
+    fn single_header_u8(command: T, index: u8) -> CommandHeaders;
+    fn single_header_u16(command: T, index: u16) -> CommandHeaders;
 }
 
 impl CommandBuilder {
     pub fn new() -> Self {
         Self {
             headers: Vec::new(),
+            partial: None,
         }
     }
 
-    pub fn add_u8_header<C>(&mut self, command: C, index: u8)
-    where
-        C: Command,
-    {
-        self.headers.push(command.to_header_u8(index));
+    /// manually complete any partially built header
+    /// this allows you to build multiple headers of the same type if desired,
+    /// e.g. two g12v1 values in two separate headers
+    pub fn complete(&mut self) {
+        if let Some(header) = self.partial.take() {
+            self.headers.push(header);
+        }
     }
 
-    pub fn add_u16_header<C>(&mut self, command: C, index: u16)
-    where
-        C: Command,
-    {
-        self.headers.push(command.to_header_u16(index));
+    fn add_g12v1_u8(&mut self, command: Group12Var1, index: u8) {
+        if let Some(partial) = self.partial.take() {
+            if let CommandHeader::G12V1U8(mut vec) = partial {
+                vec.push((command, index));
+                self.partial = Some(CommandHeader::G12V1U8(vec));
+            } else {
+                self.headers.push(partial);
+                self.partial = Some(command.to_header_u8(index));
+            }
+        } else {
+            self.partial = Some(command.to_header_u8(index));
+        }
     }
 
-    pub fn single_u8_header<C>(command: C, index: u8) -> CommandHeaders
-    where
-        C: Command,
-    {
-        let mut builder = Self::new();
-        builder.add_u8_header(command, index);
-        builder.build()
+    fn add_g12v1_u16(&mut self, command: Group12Var1, index: u16) {
+        if let Some(partial) = self.partial.take() {
+            if let CommandHeader::G12V1U16(mut vec) = partial {
+                vec.push((command, index));
+                self.partial = Some(CommandHeader::G12V1U16(vec));
+            } else {
+                self.headers.push(partial);
+                self.partial = Some(command.to_header_u16(index));
+            }
+        } else {
+            self.partial = Some(command.to_header_u16(index));
+        }
     }
 
-    pub fn single_u16_header<C>(command: C, index: u16) -> CommandHeaders
-    where
-        C: Command,
-    {
-        let mut builder = Self::new();
-        builder.add_u16_header(command, index);
-        builder.build()
+    fn add_g41v1_u8(&mut self, command: Group41Var1, index: u8) {
+        if let Some(partial) = self.partial.take() {
+            if let CommandHeader::G41V1U8(mut vec) = partial {
+                vec.push((command, index));
+                self.partial = Some(CommandHeader::G41V1U8(vec));
+            } else {
+                self.headers.push(partial);
+                self.partial = Some(command.to_header_u8(index));
+            }
+        } else {
+            self.partial = Some(command.to_header_u8(index));
+        }
     }
 
-    pub fn build(self) -> CommandHeaders {
+    fn add_g41v1_u16(&mut self, command: Group41Var1, index: u16) {
+        if let Some(partial) = self.partial.take() {
+            if let CommandHeader::G41V1U16(mut vec) = partial {
+                vec.push((command, index));
+                self.partial = Some(CommandHeader::G41V1U16(vec));
+            } else {
+                self.headers.push(partial);
+                self.partial = Some(command.to_header_u16(index));
+            }
+        } else {
+            self.partial = Some(command.to_header_u16(index));
+        }
+    }
+
+    fn add_g41v2_u8(&mut self, command: Group41Var2, index: u8) {
+        if let Some(partial) = self.partial.take() {
+            if let CommandHeader::G41V2U8(mut vec) = partial {
+                vec.push((command, index));
+                self.partial = Some(CommandHeader::G41V2U8(vec));
+            } else {
+                self.headers.push(partial);
+                self.partial = Some(command.to_header_u8(index));
+            }
+        } else {
+            self.partial = Some(command.to_header_u8(index));
+        }
+    }
+
+    fn add_g41v2_u16(&mut self, command: Group41Var2, index: u16) {
+        if let Some(partial) = self.partial.take() {
+            if let CommandHeader::G41V2U16(mut vec) = partial {
+                vec.push((command, index));
+                self.partial = Some(CommandHeader::G41V2U16(vec));
+            } else {
+                self.headers.push(partial);
+                self.partial = Some(command.to_header_u16(index));
+            }
+        } else {
+            self.partial = Some(command.to_header_u16(index));
+        }
+    }
+
+    fn add_g41v3_u8(&mut self, command: Group41Var3, index: u8) {
+        if let Some(partial) = self.partial.take() {
+            if let CommandHeader::G41V3U8(mut vec) = partial {
+                vec.push((command, index));
+                self.partial = Some(CommandHeader::G41V3U8(vec));
+            } else {
+                self.headers.push(partial);
+                self.partial = Some(command.to_header_u8(index));
+            }
+        } else {
+            self.partial = Some(command.to_header_u8(index));
+        }
+    }
+
+    fn add_g41v3_u16(&mut self, command: Group41Var3, index: u16) {
+        if let Some(partial) = self.partial.take() {
+            if let CommandHeader::G41V3U16(mut vec) = partial {
+                vec.push((command, index));
+                self.partial = Some(CommandHeader::G41V3U16(vec));
+            } else {
+                self.headers.push(partial);
+                self.partial = Some(command.to_header_u16(index));
+            }
+        } else {
+            self.partial = Some(command.to_header_u16(index));
+        }
+    }
+
+    fn add_g41v4_u8(&mut self, command: Group41Var4, index: u8) {
+        if let Some(partial) = self.partial.take() {
+            if let CommandHeader::G41V4U8(mut vec) = partial {
+                vec.push((command, index));
+                self.partial = Some(CommandHeader::G41V4U8(vec));
+            } else {
+                self.headers.push(partial);
+                self.partial = Some(command.to_header_u8(index));
+            }
+        } else {
+            self.partial = Some(command.to_header_u8(index));
+        }
+    }
+
+    fn add_g41v4_u16(&mut self, command: Group41Var4, index: u16) {
+        if let Some(partial) = self.partial.take() {
+            if let CommandHeader::G41V4U16(mut vec) = partial {
+                vec.push((command, index));
+                self.partial = Some(CommandHeader::G41V4U16(vec));
+            } else {
+                self.headers.push(partial);
+                self.partial = Some(command.to_header_u16(index));
+            }
+        } else {
+            self.partial = Some(command.to_header_u16(index));
+        }
+    }
+
+    pub fn build(mut self) -> CommandHeaders {
+        self.complete();
         CommandHeaders {
             headers: self.headers,
         }
+    }
+}
+
+impl CommandSupport<Group12Var1> for CommandBuilder {
+    fn add_u8(&mut self, command: Group12Var1, index: u8) {
+        self.add_g12v1_u8(command, index);
+    }
+
+    fn add_u16(&mut self, command: Group12Var1, index: u16) {
+        self.add_g12v1_u16(command, index);
+    }
+
+    fn single_header_u8(command: Group12Var1, index: u8) -> CommandHeaders {
+        CommandHeaders::single(command.to_header_u8(index))
+    }
+
+    fn single_header_u16(command: Group12Var1, index: u16) -> CommandHeaders {
+        CommandHeaders::single(command.to_header_u16(index))
+    }
+}
+
+impl CommandSupport<Group41Var1> for CommandBuilder {
+    fn add_u8(&mut self, command: Group41Var1, index: u8) {
+        self.add_g41v1_u8(command, index);
+    }
+
+    fn add_u16(&mut self, command: Group41Var1, index: u16) {
+        self.add_g41v1_u16(command, index);
+    }
+
+    fn single_header_u8(command: Group41Var1, index: u8) -> CommandHeaders {
+        CommandHeaders::single(command.to_header_u8(index))
+    }
+
+    fn single_header_u16(command: Group41Var1, index: u16) -> CommandHeaders {
+        CommandHeaders::single(command.to_header_u16(index))
+    }
+}
+
+impl CommandSupport<Group41Var2> for CommandBuilder {
+    fn add_u8(&mut self, command: Group41Var2, index: u8) {
+        self.add_g41v2_u8(command, index);
+    }
+
+    fn add_u16(&mut self, command: Group41Var2, index: u16) {
+        self.add_g41v2_u16(command, index);
+    }
+
+    fn single_header_u8(command: Group41Var2, index: u8) -> CommandHeaders {
+        CommandHeaders::single(command.to_header_u8(index))
+    }
+
+    fn single_header_u16(command: Group41Var2, index: u16) -> CommandHeaders {
+        CommandHeaders::single(command.to_header_u16(index))
+    }
+}
+
+impl CommandSupport<Group41Var3> for CommandBuilder {
+    fn add_u8(&mut self, command: Group41Var3, index: u8) {
+        self.add_g41v3_u8(command, index);
+    }
+
+    fn add_u16(&mut self, command: Group41Var3, index: u16) {
+        self.add_g41v3_u16(command, index);
+    }
+
+    fn single_header_u8(command: Group41Var3, index: u8) -> CommandHeaders {
+        CommandHeaders::single(command.to_header_u8(index))
+    }
+
+    fn single_header_u16(command: Group41Var3, index: u16) -> CommandHeaders {
+        CommandHeaders::single(command.to_header_u16(index))
+    }
+}
+
+impl CommandSupport<Group41Var4> for CommandBuilder {
+    fn add_u8(&mut self, command: Group41Var4, index: u8) {
+        self.add_g41v4_u8(command, index);
+    }
+
+    fn add_u16(&mut self, command: Group41Var4, index: u16) {
+        self.add_g41v4_u16(command, index);
+    }
+
+    fn single_header_u8(command: Group41Var4, index: u8) -> CommandHeaders {
+        CommandHeaders::single(command.to_header_u8(index))
+    }
+
+    fn single_header_u16(command: Group41Var4, index: u16) -> CommandHeaders {
+        CommandHeaders::single(command.to_header_u16(index))
     }
 }
 

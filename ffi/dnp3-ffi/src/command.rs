@@ -1,4 +1,5 @@
 use dnp3::app::control::*;
+use dnp3::master::*;
 
 use crate::ffi;
 
@@ -106,18 +107,18 @@ impl Command {
         for header in self.headers {
             match header {
                 CommandHeader::U8(idx, el) => match el {
-                    CommandHeaderElement::G12V1(el) => builder.add_u8_header(el, idx),
-                    CommandHeaderElement::G41V1(el) => builder.add_u8_header(el, idx),
-                    CommandHeaderElement::G41V2(el) => builder.add_u8_header(el, idx),
-                    CommandHeaderElement::G41V3(el) => builder.add_u8_header(el, idx),
-                    CommandHeaderElement::G41V4(el) => builder.add_u8_header(el, idx),
+                    CommandHeaderElement::G12V1(el) => builder.add_u8(el, idx),
+                    CommandHeaderElement::G41V1(el) => builder.add_u8(el, idx),
+                    CommandHeaderElement::G41V2(el) => builder.add_u8(el, idx),
+                    CommandHeaderElement::G41V3(el) => builder.add_u8(el, idx),
+                    CommandHeaderElement::G41V4(el) => builder.add_u8(el, idx),
                 },
                 CommandHeader::U16(idx, el) => match el {
-                    CommandHeaderElement::G12V1(el) => builder.add_u16_header(el, idx),
-                    CommandHeaderElement::G41V1(el) => builder.add_u16_header(el, idx),
-                    CommandHeaderElement::G41V2(el) => builder.add_u16_header(el, idx),
-                    CommandHeaderElement::G41V3(el) => builder.add_u16_header(el, idx),
-                    CommandHeaderElement::G41V4(el) => builder.add_u16_header(el, idx),
+                    CommandHeaderElement::G12V1(el) => builder.add_u16(el, idx),
+                    CommandHeaderElement::G41V1(el) => builder.add_u16(el, idx),
+                    CommandHeaderElement::G41V2(el) => builder.add_u16(el, idx),
+                    CommandHeaderElement::G41V3(el) => builder.add_u16(el, idx),
+                    CommandHeaderElement::G41V4(el) => builder.add_u16(el, idx),
                 },
             }
         }
