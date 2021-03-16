@@ -44,6 +44,12 @@ pub unsafe fn commands_destroy(commands: *mut Commands) {
     }
 }
 
+pub unsafe fn commands_finish_header(commands: *mut crate::Commands) {
+    if let Some(commands) = commands.as_mut() {
+        commands.finish_header();
+    }
+}
+
 pub unsafe fn commands_add_g12v1_u8(commands: *mut Commands, idx: u8, value: ffi::G12v1) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group12Var1>::add_u8(commands, value.into(), idx);

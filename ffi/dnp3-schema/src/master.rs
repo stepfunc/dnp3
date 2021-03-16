@@ -818,6 +818,17 @@ fn define_command_builder(
         .doc("Destroy set of commands")?
         .build()?;
 
+    let command_finish_header_fn = lib
+        .declare_native_function("commands_finish_header")?
+        .param(
+            "commands",
+            Type::ClassRef(command.clone()),
+            "Commands on which to finish the header",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Finish any partially partially completed header. This allows for the construction of two headers with the same type and index")?
+        .build()?;
+
     let command_add_u8_g12v1_fn = lib
         .declare_native_function("commands_add_g12v1_u8")?
         .param(
@@ -1009,6 +1020,7 @@ fn define_command_builder(
         .method("AddG41V3U16", &command_add_u16_g41v3_fn)?
         .method("AddG41V4U8", &command_add_u8_g41v4_fn)?
         .method("AddG41V4U16", &command_add_u16_g41v4_fn)?
+        .method("FinishHeader", &command_finish_header_fn)?
         .doc("Builder type used to construct command requests")?
         .build()
 }

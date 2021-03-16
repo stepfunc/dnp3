@@ -403,7 +403,7 @@ impl CommandBuilder {
     /// manually complete any partially built header
     /// this allows you to build multiple headers of the same type if desired,
     /// e.g. two g12v1 values in two separate headers
-    pub fn complete(&mut self) {
+    pub fn finish_header(&mut self) {
         if let Some(header) = self.partial.take() {
             self.headers.push(header);
         }
@@ -550,7 +550,7 @@ impl CommandBuilder {
     }
 
     pub fn build(mut self) -> CommandHeaders {
-        self.complete();
+        self.finish_header();
         CommandHeaders {
             headers: self.headers,
         }
