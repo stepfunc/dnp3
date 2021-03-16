@@ -257,52 +257,17 @@ impl ReadRequest {
     }
 }
 
-pub enum OneByteCommandHeader {
-    G12V1(Vec<(Group12Var1, u8)>),
-    G41V1(Vec<(Group41Var1, u8)>),
-    G41V2(Vec<(Group41Var2, u8)>),
-    G41V3(Vec<(Group41Var3, u8)>),
-    G41V4(Vec<(Group41Var4, u8)>),
-}
-
-pub enum TwoByteCommandHeader {
-    G12V1(Vec<(Group12Var1, u16)>),
-    G41V1(Vec<(Group41Var1, u16)>),
-    G41V2(Vec<(Group41Var2, u16)>),
-    G41V3(Vec<(Group41Var3, u16)>),
-    G41V4(Vec<(Group41Var4, u16)>),
-}
-
-impl OneByteCommandHeader {
-    pub(crate) fn wrap(self) -> CommandHeader {
-        CommandHeader::U8(self)
-    }
-
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        match self {
-            OneByteCommandHeader::G12V1(items) => writer.write_prefixed_items(items.iter()),
-            OneByteCommandHeader::G41V1(items) => writer.write_prefixed_items(items.iter()),
-            OneByteCommandHeader::G41V2(items) => writer.write_prefixed_items(items.iter()),
-            OneByteCommandHeader::G41V3(items) => writer.write_prefixed_items(items.iter()),
-            OneByteCommandHeader::G41V4(items) => writer.write_prefixed_items(items.iter()),
-        }
-    }
-}
-
-impl TwoByteCommandHeader {
-    pub(crate) fn wrap(self) -> CommandHeader {
-        CommandHeader::U16(self)
-    }
-
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        match self {
-            TwoByteCommandHeader::G12V1(items) => writer.write_prefixed_items(items.iter()),
-            TwoByteCommandHeader::G41V1(items) => writer.write_prefixed_items(items.iter()),
-            TwoByteCommandHeader::G41V2(items) => writer.write_prefixed_items(items.iter()),
-            TwoByteCommandHeader::G41V3(items) => writer.write_prefixed_items(items.iter()),
-            TwoByteCommandHeader::G41V4(items) => writer.write_prefixed_items(items.iter()),
-        }
-    }
+pub enum CommandHeader {
+    G12V1U8(Vec<(Group12Var1, u8)>),
+    G41V1U8(Vec<(Group41Var1, u8)>),
+    G41V2U8(Vec<(Group41Var2, u8)>),
+    G41V3U8(Vec<(Group41Var3, u8)>),
+    G41V4U8(Vec<(Group41Var4, u8)>),
+    G12V1U16(Vec<(Group12Var1, u16)>),
+    G41V1U16(Vec<(Group41Var1, u16)>),
+    G41V2U16(Vec<(Group41Var2, u16)>),
+    G41V3U16(Vec<(Group41Var3, u16)>),
+    G41V4U16(Vec<(Group41Var4, u16)>),
 }
 
 pub trait Command {
@@ -317,11 +282,11 @@ impl Command for Group12Var1 {
     }
 
     fn to_header_u8(&self, index: u8) -> CommandHeader {
-        OneByteCommandHeader::G12V1(vec![(*self, index)]).wrap()
+        CommandHeader::G12V1U8(vec![(*self, index)])
     }
 
     fn to_header_u16(&self, index: u16) -> CommandHeader {
-        TwoByteCommandHeader::G12V1(vec![(*self, index)]).wrap()
+        CommandHeader::G12V1U16(vec![(*self, index)])
     }
 }
 
@@ -331,11 +296,11 @@ impl Command for Group41Var1 {
     }
 
     fn to_header_u8(&self, index: u8) -> CommandHeader {
-        OneByteCommandHeader::G41V1(vec![(*self, index)]).wrap()
+        CommandHeader::G41V1U8(vec![(*self, index)])
     }
 
     fn to_header_u16(&self, index: u16) -> CommandHeader {
-        TwoByteCommandHeader::G41V1(vec![(*self, index)]).wrap()
+        CommandHeader::G41V1U16(vec![(*self, index)])
     }
 }
 
@@ -344,10 +309,10 @@ impl Command for Group41Var2 {
         self.status
     }
     fn to_header_u8(&self, index: u8) -> CommandHeader {
-        OneByteCommandHeader::G41V2(vec![(*self, index)]).wrap()
+        CommandHeader::G41V2U8(vec![(*self, index)])
     }
     fn to_header_u16(&self, index: u16) -> CommandHeader {
-        TwoByteCommandHeader::G41V2(vec![(*self, index)]).wrap()
+        CommandHeader::G41V2U16(vec![(*self, index)])
     }
 }
 
@@ -356,10 +321,10 @@ impl Command for Group41Var3 {
         self.status
     }
     fn to_header_u8(&self, index: u8) -> CommandHeader {
-        OneByteCommandHeader::G41V3(vec![(*self, index)]).wrap()
+        CommandHeader::G41V3U8(vec![(*self, index)])
     }
     fn to_header_u16(&self, index: u16) -> CommandHeader {
-        TwoByteCommandHeader::G41V3(vec![(*self, index)]).wrap()
+        CommandHeader::G41V3U16(vec![(*self, index)])
     }
 }
 
@@ -368,11 +333,11 @@ impl Command for Group41Var4 {
         self.status
     }
     fn to_header_u8(&self, index: u8) -> CommandHeader {
-        OneByteCommandHeader::G41V4(vec![(*self, index)]).wrap()
+        CommandHeader::G41V4U8(vec![(*self, index)])
     }
 
     fn to_header_u16(&self, index: u16) -> CommandHeader {
-        TwoByteCommandHeader::G41V4(vec![(*self, index)]).wrap()
+        CommandHeader::G41V4U16(vec![(*self, index)])
     }
 }
 
@@ -463,16 +428,19 @@ impl Default for CommandBuilder {
     }
 }
 
-pub enum CommandHeader {
-    U8(OneByteCommandHeader),
-    U16(TwoByteCommandHeader),
-}
-
 impl CommandHeader {
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match self {
-            CommandHeader::U8(header) => header.write(writer),
-            CommandHeader::U16(header) => header.write(writer),
+            CommandHeader::G12V1U8(items) => writer.write_prefixed_items(items.iter()),
+            CommandHeader::G41V1U8(items) => writer.write_prefixed_items(items.iter()),
+            CommandHeader::G41V2U8(items) => writer.write_prefixed_items(items.iter()),
+            CommandHeader::G41V3U8(items) => writer.write_prefixed_items(items.iter()),
+            CommandHeader::G41V4U8(items) => writer.write_prefixed_items(items.iter()),
+            CommandHeader::G12V1U16(items) => writer.write_prefixed_items(items.iter()),
+            CommandHeader::G41V1U16(items) => writer.write_prefixed_items(items.iter()),
+            CommandHeader::G41V2U16(items) => writer.write_prefixed_items(items.iter()),
+            CommandHeader::G41V3U16(items) => writer.write_prefixed_items(items.iter()),
+            CommandHeader::G41V4U16(items) => writer.write_prefixed_items(items.iter()),
         }
     }
 
@@ -509,61 +477,61 @@ impl CommandHeader {
 
     pub(crate) fn compare(&self, response: HeaderDetails) -> Result<(), CommandResponseError> {
         match self {
-            CommandHeader::U8(OneByteCommandHeader::G12V1(items)) => match response {
+            CommandHeader::G12V1U8(items) => match response {
                 HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
-            CommandHeader::U16(TwoByteCommandHeader::G12V1(items)) => match response {
+            CommandHeader::G12V1U16(items) => match response {
                 HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
-            CommandHeader::U8(OneByteCommandHeader::G41V1(items)) => match response {
+            CommandHeader::G41V1U8(items) => match response {
                 HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
-            CommandHeader::U16(TwoByteCommandHeader::G41V1(items)) => match response {
+            CommandHeader::G41V1U16(items) => match response {
                 HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
-            CommandHeader::U8(OneByteCommandHeader::G41V2(items)) => match response {
+            CommandHeader::G41V2U8(items) => match response {
                 HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
-            CommandHeader::U16(TwoByteCommandHeader::G41V2(items)) => match response {
+            CommandHeader::G41V2U16(items) => match response {
                 HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
-            CommandHeader::U8(OneByteCommandHeader::G41V3(items)) => match response {
+            CommandHeader::G41V3U8(items) => match response {
                 HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
-            CommandHeader::U16(TwoByteCommandHeader::G41V3(items)) => match response {
+            CommandHeader::G41V3U16(items) => match response {
                 HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
-            CommandHeader::U8(OneByteCommandHeader::G41V4(items)) => match response {
+            CommandHeader::G41V4U8(items) => match response {
                 HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
-            CommandHeader::U16(TwoByteCommandHeader::G41V4(items)) => match response {
+            CommandHeader::G41V4U16(items) => match response {
                 HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
                     Self::compare_items(seq, items)
                 }
