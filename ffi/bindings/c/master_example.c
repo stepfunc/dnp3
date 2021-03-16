@@ -306,18 +306,18 @@ int main()
             request_destroy(request);
         }
         else if (strcmp(cbuf, "cmd\n") == 0) {
-            command_t *command = command_new();
+            commands_t *commands = commands_new();
             g12v1_t g12v1 = g12v1_init(control_code_init(TripCloseCode_Nul, false, OpType_LatchOn), 1, 1000, 1000);
-            command_add_u16_g12v1(command, 3, g12v1);
+            commands_add_g12v1_u16(commands, 3, g12v1);
 
             command_task_callback_t cb = {
                 .on_complete = &on_command_complete,
                 .ctx = NULL,
             };
 
-            master_operate(master, association_id, CommandMode_SelectBeforeOperate, command, cb);
+            master_operate(master, association_id, CommandMode_SelectBeforeOperate, commands, cb);
 
-            command_destroy(command);
+            commands_destroy(commands);
         }
         else if (strcmp(cbuf, "evt\n") == 0) {
             master_demand_poll(master, poll_id);

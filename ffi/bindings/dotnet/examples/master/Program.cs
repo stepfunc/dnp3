@@ -254,9 +254,9 @@ class MainClass
                     }
                 case "cmd":
                     {
-                        var command = new Command();
-                        command.AddU16g12v1(3, new G12v1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
-                        var result = await master.Operate(association, CommandMode.SelectBeforeOperate, command);
+                        var commands = new Commands();
+                        commands.AddG12v1u8(3, new G12v1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
+                        var result = await master.Operate(association, CommandMode.SelectBeforeOperate, commands);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
