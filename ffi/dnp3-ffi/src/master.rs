@@ -401,7 +401,7 @@ pub unsafe extern "C" fn master_operate(
     master: *mut crate::Master,
     association: ffi::AssociationId,
     mode: ffi::CommandMode,
-    commands: *mut crate::Command,
+    commands: *mut crate::Commands,
     callback: ffi::CommandTaskCallback,
 ) {
     let master = match master.as_mut() {

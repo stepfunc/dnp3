@@ -234,12 +234,12 @@ public class MasterExample {
           break;
         }
         case "cmd": {
-          Command command = new Command();
+          Commands commands = new Commands();
           G12v1 g12v1 = new G12v1(new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
               ubyte(1), uint(1000), uint(1000));
-          command.addU16g12v1(ushort(3), g12v1);
+          commands.addG12v1u16(ushort(3), g12v1);
           CommandResult result =
-              master.operate(association, CommandMode.SELECT_BEFORE_OPERATE, command)
+              master.operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
                   .toCompletableFuture().get();
           System.out.println("Result: " + result);
           break;

@@ -796,34 +796,45 @@ fn define_command_builder(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> std::result::Result<ClassHandle, BindingError> {
-    let command = lib.declare_class("Command")?;
+    let command = lib.declare_class("Commands")?;
 
     let command_new_fn = lib
-        .declare_native_function("command_new")?
+        .declare_native_function("commands_new")?
         .return_type(ReturnType::new(
             Type::ClassRef(command.clone()),
-            "Handle to the created command",
+            "Handle to the created set of commands",
         ))?
-        .doc("Create a new command")?
+        .doc("Create a new set of commands")?
         .build()?;
 
     let command_destroy_fn = lib
-        .declare_native_function("command_destroy")?
+        .declare_native_function("commands_destroy")?
         .param(
             "command",
             Type::ClassRef(command.clone()),
-            "Command to destroy",
+            "Set of commands to destroy",
         )?
         .return_type(ReturnType::void())?
-        .doc("Destroy command")?
+        .doc("Destroy set of commands")?
+        .build()?;
+
+    let command_finish_header_fn = lib
+        .declare_native_function("commands_finish_header")?
+        .param(
+            "commands",
+            Type::ClassRef(command.clone()),
+            "Commands on which to finish the header",
+        )?
+        .return_type(ReturnType::void())?
+        .doc("Finish any partially completed header. This allows for the construction of two headers with the same type and index")?
         .build()?;
 
     let command_add_u8_g12v1_fn = lib
-        .declare_native_function("command_add_u8_g12v1")?
+        .declare_native_function("commands_add_g12v1_u8")?
         .param(
             "command",
             Type::ClassRef(command.clone()),
-            "Command to modify",
+            "Commands to modify",
         )?
         .param(
             "idx",
@@ -840,7 +851,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u16_g12v1_fn = lib
-        .declare_native_function("command_add_u16_g12v1")?
+        .declare_native_function("commands_add_g12v1_u16")?
         .param(
             "command",
             Type::ClassRef(command.clone()),
@@ -861,7 +872,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u8_g41v1_fn = lib
-        .declare_native_function("command_add_u8_g41v1")?
+        .declare_native_function("commands_add_g41v1_u8")?
         .param(
             "command",
             Type::ClassRef(command.clone()),
@@ -878,11 +889,11 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u16_g41v1_fn = lib
-        .declare_native_function("command_add_u16_g41v1")?
+        .declare_native_function("commands_add_g41v1_u16")?
         .param(
             "command",
             Type::ClassRef(command.clone()),
-            "Command to modify",
+            "Commands to modify",
         )?
         .param(
             "idx",
@@ -895,11 +906,11 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u8_g41v2_fn = lib
-        .declare_native_function("command_add_u8_g41v2")?
+        .declare_native_function("commands_add_g41v2_u8")?
         .param(
             "command",
             Type::ClassRef(command.clone()),
-            "Command to modify",
+            "Commands to modify",
         )?
         .param(
             "idx",
@@ -912,11 +923,11 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u16_g41v2_fn = lib
-        .declare_native_function("command_add_u16_g41v2")?
+        .declare_native_function("commands_add_g41v2_u16")?
         .param(
             "command",
             Type::ClassRef(command.clone()),
-            "Command to modify",
+            "Commands to modify",
         )?
         .param(
             "idx",
@@ -929,11 +940,11 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u8_g41v3_fn = lib
-        .declare_native_function("command_add_u8_g41v3")?
+        .declare_native_function("commands_add_g41v3_u8")?
         .param(
             "command",
             Type::ClassRef(command.clone()),
-            "Command to modify",
+            "Commands to modify",
         )?
         .param(
             "idx",
@@ -946,11 +957,11 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u16_g41v3_fn = lib
-        .declare_native_function("command_add_u16_g41v3")?
+        .declare_native_function("commands_add_g41v3_u16")?
         .param(
-            "command",
+            "commands",
             Type::ClassRef(command.clone()),
-            "Command to modify",
+            "Commands to modify",
         )?
         .param(
             "idx",
@@ -963,11 +974,11 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u8_g41v4_fn = lib
-        .declare_native_function("command_add_u8_g41v4")?
+        .declare_native_function("commands_add_g41v4_u8")?
         .param(
-            "command",
+            "commands",
             Type::ClassRef(command.clone()),
-            "Command to modify",
+            "Commands to modify",
         )?
         .param(
             "idx",
@@ -980,11 +991,11 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u16_g41v4_fn = lib
-        .declare_native_function("command_add_u16_g41v4")?
+        .declare_native_function("commands_add_g41v4_u16")?
         .param(
-            "command",
+            "commands",
             Type::ClassRef(command.clone()),
-            "Command to modify",
+            "Commands to modify",
         )?
         .param(
             "idx",
@@ -999,16 +1010,17 @@ fn define_command_builder(
     lib.define_class(&command)?
         .constructor(&command_new_fn)?
         .destructor(&command_destroy_fn)?
-        .method("AddU8G12V1", &command_add_u8_g12v1_fn)?
-        .method("AddU16G12V1", &command_add_u16_g12v1_fn)?
-        .method("AddU8G41V1", &command_add_u8_g41v1_fn)?
-        .method("AddU16G41V1", &command_add_u16_g41v1_fn)?
-        .method("AddU8G41V2", &command_add_u8_g41v2_fn)?
-        .method("AddU16G41V2", &command_add_u16_g41v2_fn)?
-        .method("AddU8G41V3", &command_add_u8_g41v3_fn)?
-        .method("AddU16G41V3", &command_add_u16_g41v3_fn)?
-        .method("AddU8G41V4", &command_add_u8_g41v4_fn)?
-        .method("AddU16G41V4", &command_add_u16_g41v4_fn)?
+        .method("AddG12V1U8", &command_add_u8_g12v1_fn)?
+        .method("AddG12V1U16", &command_add_u16_g12v1_fn)?
+        .method("AddG41V1U8", &command_add_u8_g41v1_fn)?
+        .method("AddG41V1U16", &command_add_u16_g41v1_fn)?
+        .method("AddG41V2U8", &command_add_u8_g41v2_fn)?
+        .method("AddG41V2U16", &command_add_u16_g41v2_fn)?
+        .method("AddG41V3U8", &command_add_u8_g41v3_fn)?
+        .method("AddG41V3U16", &command_add_u16_g41v3_fn)?
+        .method("AddG41V4U8", &command_add_u8_g41v4_fn)?
+        .method("AddG41V4U16", &command_add_u16_g41v4_fn)?
+        .method("FinishHeader", &command_finish_header_fn)?
         .doc("Builder type used to construct command requests")?
         .build()
 }
