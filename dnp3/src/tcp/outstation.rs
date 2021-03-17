@@ -3,14 +3,110 @@ use tracing::Instrument;
 use crate::app::Shutdown;
 use crate::link::LinkErrorMode;
 use crate::outstation::database::EventBufferConfig;
+use crate::outstation::session::RunError;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::OutstationHandle;
 use crate::outstation::*;
 use crate::tcp::{AddressFilter, FilterError};
+use crate::util::channel::{request_channel, Receiver, Sender};
+use crate::util::phys::PhysLayer;
 
-struct Outstation {
+/// message that gets sent to OutstationTaskAdapter when
+/// it needs to switch to a new session
+#[derive(Debug)]
+pub(crate) struct NewSession {
+    pub(crate) id: u64,
+    pub(crate) phys: PhysLayer,
+}
+
+impl NewSession {
+    pub(crate) fn new(id: u64, phys: PhysLayer) -> Self {
+        Self { id, phys }
+    }
+}
+
+/// adapts an OutstationTask to something that can listen for new
+/// connections on a channel and shutdown an existing session
+struct OutstationTaskAdapter {
+    receiver: Receiver<NewSession>,
+    task: OutstationTask,
+}
+
+impl OutstationTaskAdapter {
+    fn create(task: OutstationTask) -> (Self, Sender<NewSession>) {
+        let (tx, rx) = request_channel();
+
+        (Self { receiver: rx, task }, tx)
+    }
+
+    async fn wait_for_session(&mut self) -> Result<NewSession, Shutdown> {
+        loop {
+            crate::tokio::select! {
+                session = self.receiver.receive() => {
+                    return session;
+                }
+                ret = self.task.process_messages() => {
+                    ret?
+                }
+            }
+        }
+    }
+
+    async fn run_one_session(&mut self, io: &mut PhysLayer) -> Result<NewSession, RunError> {
+        crate::tokio::select! {
+            res = self.task.run(io) => {
+                Err(res)
+            }
+            x = self.receiver.receive() => {
+                Ok(x?)
+            }
+        }
+    }
+
+    async fn run(&mut self) -> Result<(), Shutdown> {
+        let mut session = None;
+
+        loop {
+            match session.take() {
+                None => {
+                    session.replace(self.wait_for_session().await?);
+                }
+                Some(mut s) => {
+                    let id = s.id;
+
+                    let result = self
+                        .run_one_session(&mut s.phys)
+                        .instrument(tracing::info_span!("Session", "id" = id))
+                        .await;
+
+                    match result {
+                        Ok(new_session) => {
+                            // TODO reset the task
+                            tracing::warn!(
+                                "closing session {} for new session {}",
+                                id,
+                                new_session.id
+                            );
+                            // go to next iteration with a new session
+                            session.replace(new_session);
+                        }
+                        Err(RunError::Link(err)) => {
+                            // TODO reset the task
+                            tracing::warn!("Session error: {}", err);
+                        }
+                        Err(RunError::Shutdown) => return Err(Shutdown),
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct OutstationInfo {
     filter: AddressFilter,
     handle: OutstationHandle,
+    /// how we notify the outstation adapter task to switch to new socket
+    sender: Sender<NewSession>,
 }
 
 /// A builder for creating a TCP server with one or more outstation instances
@@ -19,7 +115,7 @@ pub struct TcpServer {
     link_error_mode: LinkErrorMode,
     connection_id: u64,
     address: std::net::SocketAddr,
-    outstations: Vec<Outstation>,
+    outstations: Vec<OutstationInfo>,
 }
 
 /// Handle to a running server. Dropping the handle, shuts down the server.
@@ -52,7 +148,7 @@ impl TcpServer {
             }
         }
 
-        let (mut task, handle) = OutstationTask::create(
+        let (task, handle) = OutstationTask::create(
             self.link_error_mode,
             config,
             event_config,
@@ -61,20 +157,23 @@ impl TcpServer {
             control_handler,
         );
 
-        let outstation = Outstation {
+        let (mut adapter, tx) = OutstationTaskAdapter::create(task);
+
+        let outstation = OutstationInfo {
             filter,
             handle: handle.clone(),
+            sender: tx,
         };
         self.outstations.push(outstation);
 
         let endpoint = self.address;
         let address = config.outstation_address.raw_value();
         let future = async move {
-            task.run()
+            let _ = adapter.run()
                 .instrument(
                     tracing::info_span!("DNP3-Outstation-TCP", "listen" = ?endpoint, "addr" = address),
                 )
-                .await
+                .await;
         };
         Ok((handle, future))
     }
@@ -200,8 +299,11 @@ impl TcpServer {
             }
             Some(x) => {
                 let _ = x
-                    .handle
-                    .change_session(id, crate::util::phys::PhysLayer::Tcp(stream))
+                    .sender
+                    .send(NewSession::new(
+                        id,
+                        crate::util::phys::PhysLayer::Tcp(stream),
+                    ))
                     .await;
             }
         }

@@ -24,7 +24,7 @@ use crate::outstation::control::collection::{ControlCollection, ControlTransacti
 use crate::outstation::control::select::SelectState;
 use crate::outstation::database::{DatabaseHandle, ResponseInfo};
 use crate::outstation::deferred::DeferredRead;
-use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
+use crate::outstation::task::{ConfigurationChange, OutstationMessage};
 use crate::outstation::traits::*;
 use crate::transport::{
     FragmentInfo, RequestGuard, TransportReader, TransportRequest, TransportRequestError,
@@ -289,30 +289,6 @@ impl From<LinkError> for RunError {
     }
 }
 
-#[derive(Debug)]
-pub(crate) enum SessionError {
-    Run(RunError),
-    NewSession(NewSession),
-}
-
-impl From<RunError> for SessionError {
-    fn from(x: RunError) -> Self {
-        SessionError::Run(x)
-    }
-}
-
-impl From<LinkError> for SessionError {
-    fn from(err: LinkError) -> Self {
-        SessionError::Run(err.into())
-    }
-}
-
-impl From<Shutdown> for SessionError {
-    fn from(x: Shutdown) -> Self {
-        SessionError::Run(x.into())
-    }
-}
-
 impl OutstationSession {
     pub(crate) fn new(
         messages: Receiver<OutstationMessage>,
@@ -339,13 +315,10 @@ impl OutstationSession {
         }
     }
 
-    pub(crate) async fn wait_for_io(&mut self) -> Result<NewSession, Shutdown> {
+    /// used when the there is no running IO to process outstation messages
+    pub(crate) async fn process_messages(&mut self) -> Result<(), Shutdown> {
         loop {
-            match self.messages.receive().await? {
-                OutstationMessage::Shutdown => return Err(Shutdown),
-                OutstationMessage::Configuration(change) => self.handle_config_change(change),
-                OutstationMessage::ChangeSession(session) => return Ok(session),
-            }
+            self.handle_next_message().await?;
         }
     }
 
@@ -355,7 +328,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> SessionError {
+    ) -> RunError {
         loop {
             if let Err(err) = self.run_idle_state(io, reader, writer, database).await {
                 return err;
@@ -446,7 +419,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), SessionError> {
+    ) -> Result<(), RunError> {
         // handle a request fragment if present
         self.handle_one_request_from_idle(io, reader, writer, database)
             .await?;
@@ -495,7 +468,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<crate::tokio::time::Instant>, SessionError> {
+    ) -> Result<Option<crate::tokio::time::Instant>, RunError> {
         if self.config.unsolicited.is_disabled() {
             return Ok(None);
         }
@@ -552,7 +525,7 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
-    ) -> Result<(), SessionError> {
+    ) -> Result<(), RunError> {
         if let Some(next) = self.next_link_status {
             // Wait until we need to send the link status
             if next > crate::tokio::time::Instant::now() {
@@ -579,7 +552,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<UnsolicitedResult, SessionError> {
+    ) -> Result<UnsolicitedResult, RunError> {
         let header = ResponseHeader::new(
             ControlField::unsolicited_response(self.state.unsolicited_seq.increment()),
             ResponseFunction::UnsolicitedResponse,
@@ -602,7 +575,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<UnsolicitedResult>, SessionError> {
+    ) -> Result<Option<UnsolicitedResult>, RunError> {
         if !self.state.enabled_unsolicited_classes.any() {
             return Ok(None);
         }
@@ -647,7 +620,7 @@ impl OutstationSession {
         io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
-    ) -> Result<UnsolicitedResult, SessionError> {
+    ) -> Result<UnsolicitedResult, RunError> {
         let response = self
             .write_unsolicited(io, writer, response, database)
             .await?;
@@ -716,7 +689,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<UnsolicitedWaitResult, SessionError> {
+    ) -> Result<UnsolicitedWaitResult, RunError> {
         if let Timeout::Yes = self.read_until(io, reader, deadline).await? {
             return Ok(UnsolicitedWaitResult::Timeout);
         }
@@ -836,7 +809,7 @@ impl OutstationSession {
         io: &mut PhysLayer,
         reader: &mut TransportReader,
         deadline: crate::tokio::time::Instant,
-    ) -> Result<Timeout, SessionError> {
+    ) -> Result<Timeout, RunError> {
         loop {
             let decode_level = self.config.decode_level;
             crate::tokio::select! {
@@ -855,7 +828,7 @@ impl OutstationSession {
     async fn sleep_until(
         &mut self,
         instant: Option<crate::tokio::time::Instant>,
-    ) -> Result<(), SessionError> {
+    ) -> Result<(), RunError> {
         async fn sleep_only(instant: Option<crate::tokio::time::Instant>) {
             match instant {
                 Some(x) => crate::tokio::time::sleep_until(x).await,
@@ -878,10 +851,9 @@ impl OutstationSession {
         }
     }
 
-    async fn handle_next_message(&mut self) -> Result<(), SessionError> {
+    async fn handle_next_message(&mut self) -> Result<(), Shutdown> {
         match self.messages.receive().await? {
-            OutstationMessage::Shutdown => Err(Shutdown.into()),
-            OutstationMessage::ChangeSession(session) => Err(SessionError::NewSession(session)),
+            OutstationMessage::Shutdown => Err(Shutdown),
             OutstationMessage::Configuration(change) => {
                 self.handle_config_change(change);
                 Ok(())
@@ -904,7 +876,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), SessionError> {
+    ) -> Result<(), RunError> {
         if let Some(x) = self.state.deferred_read.select(database) {
             tracing::info!("handling deferred READ request");
             let (response, mut series) = self.write_read_response(database, true, x.seq, x.iin2);
@@ -938,7 +910,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<(), SessionError> {
+    ) -> Result<(), RunError> {
         let mut guard = reader.pop_request();
         match guard.get() {
             Some(TransportRequest::Request(info, request)) => {
@@ -1055,7 +1027,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         err: TransportRequestError,
         database: &DatabaseHandle,
-    ) -> Result<(), LinkError> {
+    ) -> Result<(), RunError> {
         let seq = match err {
             TransportRequestError::HeaderParseError(err) => match err {
                 HeaderParseError::UnknownFunction(seq, _) => Some(seq),
@@ -1803,7 +1775,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
         mut series: ResponseSeries,
-    ) -> Result<(), SessionError> {
+    ) -> Result<(), RunError> {
         self.info.enter_solicited_confirm_wait(series.ecsn);
 
         loop {
@@ -1850,7 +1822,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         ecsn: Sequence,
-    ) -> Result<Confirm, SessionError> {
+    ) -> Result<Confirm, RunError> {
         let mut deadline = self.new_confirm_deadline();
         loop {
             match self.read_until(io, reader, deadline).await? {
