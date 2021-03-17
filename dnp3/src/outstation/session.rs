@@ -218,6 +218,14 @@ impl SessionState {
             last_broadcast_type: None,
         }
     }
+
+    // reset items that should reset between communication (TCP) sessions
+    fn reset(&mut self) {
+        self.last_valid_request = None;
+        self.select = None;
+        self.unsolicited_seq = Sequence::default();
+        self.deferred_read.clear();
+    }
 }
 
 pub(crate) struct OutstationSession {
@@ -334,6 +342,10 @@ impl OutstationSession {
                 return err;
             }
         }
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.state.reset();
     }
 
     async fn write_unsolicited(
