@@ -826,7 +826,7 @@ fn define_command_builder(
             "Commands on which to finish the header",
         )?
         .return_type(ReturnType::void())?
-        .doc("Finish any partially partially completed header. This allows for the construction of two headers with the same type and index")?
+        .doc("Finish any partially completed header. This allows for the construction of two headers with the same type and index")?
         .build()?;
 
     let command_add_u8_g12v1_fn = lib
