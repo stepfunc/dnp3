@@ -10,6 +10,15 @@ use dnp3::link::EndpointAddress;
 use dnp3::master::*;
 use dnp3::serial::*;
 
+fn get_serial_port_path() -> String {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() != 2 {
+        "/dev/pts/4".to_string()
+    } else {
+        args[1].clone()
+    }
+}
+
 /// example of using the master from within the Tokio runtime
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             AppDecodeLevel::ObjectValues.into(),
             Timeout::from_secs(1)?,
         ),
-        "/dev/pts/4",
+        &get_serial_port_path(),
         SerialSettings::default(),
         Duration::from_secs(1),
         Listener::None,
