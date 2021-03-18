@@ -7,10 +7,15 @@ use crate::outstation::task::OutstationTask;
 use crate::outstation::OutstationHandle;
 use crate::outstation::*;
 use crate::tcp::{AddressFilter, FilterError};
+use crate::util::channel::Sender;
 
-struct Outstation {
+use crate::outstation::adapter::{NewSession, OutstationTaskAdapter};
+
+struct OutstationInfo {
     filter: AddressFilter,
     handle: OutstationHandle,
+    /// how we notify the outstation adapter task to switch to new socket
+    sender: Sender<NewSession>,
 }
 
 /// A builder for creating a TCP server with one or more outstation instances
@@ -19,7 +24,7 @@ pub struct TcpServer {
     link_error_mode: LinkErrorMode,
     connection_id: u64,
     address: std::net::SocketAddr,
-    outstations: Vec<Outstation>,
+    outstations: Vec<OutstationInfo>,
 }
 
 /// Handle to a running server. Dropping the handle, shuts down the server.
@@ -52,7 +57,7 @@ impl TcpServer {
             }
         }
 
-        let (mut task, handle) = OutstationTask::create(
+        let (task, handle) = OutstationTask::create(
             self.link_error_mode,
             config,
             event_config,
@@ -61,20 +66,23 @@ impl TcpServer {
             control_handler,
         );
 
-        let outstation = Outstation {
+        let (mut adapter, tx) = OutstationTaskAdapter::create(task);
+
+        let outstation = OutstationInfo {
             filter,
             handle: handle.clone(),
+            sender: tx,
         };
         self.outstations.push(outstation);
 
         let endpoint = self.address;
         let address = config.outstation_address.raw_value();
         let future = async move {
-            task.run()
+            let _ = adapter.run()
                 .instrument(
                     tracing::info_span!("DNP3-Outstation-TCP", "listen" = ?endpoint, "addr" = address),
                 )
-                .await
+                .await;
         };
         Ok((handle, future))
     }
@@ -135,10 +143,10 @@ impl TcpServer {
 
         crate::tokio::select! {
              _ = self.accept_loop(listener) => {
-
+                // if the accept loop shuts down we exit
              }
              _ = rx => {
-
+                // if we get the message or shutdown we exit
              }
         }
 
@@ -200,8 +208,11 @@ impl TcpServer {
             }
             Some(x) => {
                 let _ = x
-                    .handle
-                    .change_session(id, crate::util::phys::PhysLayer::Tcp(stream))
+                    .sender
+                    .send(NewSession::new(
+                        id,
+                        crate::util::phys::PhysLayer::Tcp(stream),
+                    ))
                     .await;
             }
         }

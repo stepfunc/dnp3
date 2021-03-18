@@ -1,10 +1,9 @@
-use tracing::Instrument;
-
+use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::link::LinkErrorMode;
 use crate::outstation::config::*;
 use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
-use crate::outstation::session::{OutstationSession, RunError, SessionError};
+use crate::outstation::session::{OutstationSession, RunError};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
 use crate::transport::{TransportReader, TransportWriter};
@@ -20,28 +19,9 @@ impl From<ConfigurationChange> for OutstationMessage {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct NewSession {
-    pub(crate) id: u64,
-    pub(crate) phys: PhysLayer,
-}
-
-impl From<NewSession> for OutstationMessage {
-    fn from(x: NewSession) -> Self {
-        OutstationMessage::ChangeSession(x)
-    }
-}
-
-impl NewSession {
-    pub(crate) fn new(id: u64, phys: PhysLayer) -> Self {
-        Self { id, phys }
-    }
-}
-
 pub(crate) enum OutstationMessage {
     Shutdown,
     Configuration(ConfigurationChange),
-    ChangeSession(NewSession),
 }
 
 pub(crate) struct OutstationTask {
@@ -96,60 +76,23 @@ impl OutstationTask {
     }
 
     /// run the outstation task asynchronously until a `SessionError` occurs
-    pub(crate) async fn run_io(&mut self, io: &mut PhysLayer) -> SessionError {
+    pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
         self.session
             .run(io, &mut self.reader, &mut self.writer, &mut self.database)
             .await
     }
 
-    /// run the outstation task asynchronously until a shutdown is requested
-    pub(crate) async fn run(&mut self) {
-        let mut session = None;
-
+    /// process received outstation messages while idle without a session
+    pub(crate) async fn process_messages(&mut self) -> Result<(), Shutdown> {
         loop {
-            match session.take() {
-                None => match self.session.wait_for_io().await {
-                    Err(_) => return,
-                    Ok(s) => {
-                        session.replace(s);
-                    }
-                },
-                Some(s) => {
-                    let id = s.id;
-
-                    let result = self
-                        .run_one_session(s.phys)
-                        .instrument(tracing::info_span!("Session", "id" = id))
-                        .await;
-
-                    match result {
-                        SessionError::Run(RunError::Shutdown) => return,
-                        SessionError::Run(RunError::Link(_)) => {
-                            // TODO - reset the session
-                        }
-                        SessionError::NewSession(s) => {
-                            session.replace(s);
-                        }
-                    }
-                }
-            }
+            self.session.process_messages().await?;
         }
     }
 
-    async fn run_one_session(&mut self, mut phys: PhysLayer) -> SessionError {
-        let err = self.run_io(&mut phys).await;
-        match &err {
-            SessionError::Run(RunError::Shutdown) => {
-                tracing::info!("received shutdown");
-            }
-            SessionError::Run(RunError::Link(err)) => {
-                tracing::warn!("link error: {}", err);
-            }
-            SessionError::NewSession(session) => {
-                tracing::info!("closing for new connection: {}", session.id)
-            }
-        };
-        err
+    pub(crate) fn reset(&mut self) {
+        self.session.reset();
+        self.reader.reset();
+        self.writer.reset();
     }
 
     #[cfg(test)]

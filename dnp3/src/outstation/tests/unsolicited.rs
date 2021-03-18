@@ -1,7 +1,7 @@
 use crate::app::measurement::*;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
-use crate::outstation::session::SessionError;
+use crate::outstation::session::RunError;
 
 use super::harness::*;
 
@@ -48,14 +48,14 @@ fn generate_binary_event(handle: &mut DatabaseHandle) {
 
 fn enable_unsolicited<T>(harness: &mut OutstationTestHarness<T>)
 where
-    T: std::future::Future<Output = SessionError>,
+    T: std::future::Future<Output = RunError>,
 {
     harness.test_request_response(ENABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0);
 }
 
 fn confirm_null_unsolicited<T>(harness: &mut OutstationTestHarness<T>)
 where
-    T: std::future::Future<Output = SessionError>,
+    T: std::future::Future<Output = RunError>,
 {
     harness.expect_response(NULL_UNSOL_SEQ_0);
     harness.send(UNS_CONFIRM_SEQ_0);
