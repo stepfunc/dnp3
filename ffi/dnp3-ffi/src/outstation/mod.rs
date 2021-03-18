@@ -10,6 +10,8 @@ use dnp3::tcp::ServerHandle;
 pub use struct_constructors::*;
 
 use crate::{ffi, Runtime, RuntimeHandle};
+use dnp3::serial::create_outstation_serial;
+use std::ptr::null_mut;
 
 mod adapters;
 mod database;
@@ -149,6 +151,55 @@ pub unsafe fn outstation_destroy(outstation: *mut Outstation) {
     if !outstation.is_null() {
         Box::from_raw(outstation);
     }
+}
+
+#[allow(clippy::too_many_arguments)] // TODO
+pub unsafe fn outstation_create_serial_session(
+    runtime: *mut crate::Runtime,
+    serial_path: &CStr,
+    settings: ffi::SerialPortSettings,
+    config: ffi::OutstationConfig,
+    event_config: ffi::EventBufferConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+) -> *mut crate::Outstation {
+    let runtime = match runtime.as_ref() {
+        Some(x) => x,
+        None => return null_mut(),
+    };
+
+    let serial_path = match serial_path.to_str() {
+        Ok(s) => s,
+        Err(_) => return null_mut(),
+    };
+
+    let config = match convert_outstation_config(config) {
+        Some(x) => x,
+        None => return null_mut(),
+    };
+
+    let (task, handle) = match create_outstation_serial(
+        serial_path,
+        settings.into(),
+        config,
+        event_config.into(),
+        Box::new(application),
+        Box::new(information),
+        Box::new(control_handler),
+    ) {
+        Ok(x) => x,
+        Err(_) => return null_mut(),
+    };
+
+    let handle = Box::new(crate::Outstation {
+        handle,
+        runtime: runtime.handle(),
+    });
+
+    runtime.inner.spawn(task);
+
+    Box::into_raw(handle)
 }
 
 pub unsafe fn outstation_transaction(

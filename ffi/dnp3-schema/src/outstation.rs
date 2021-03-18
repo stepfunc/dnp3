@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use class::ClassHandle;
 use oo_bindgen::callback::InterfaceHandle;
+use oo_bindgen::class::ClassHandle;
 use oo_bindgen::native_enum::*;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::*;
@@ -9,19 +9,41 @@ use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
 
+struct OutstationTypes {
+    database: ClassHandle,
+    outstation_config: NativeStructHandle,
+    event_buffer_config: NativeStructHandle,
+    outstation_application: InterfaceHandle,
+    outstation_information: InterfaceHandle,
+    control_handler: InterfaceHandle,
+}
+
+impl OutstationTypes {
+    fn define(
+        lib: &mut LibraryBuilder,
+        shared_def: &SharedDefinitions,
+    ) -> Result<Self, BindingError> {
+        let database = crate::database::define(lib, shared_def)?;
+
+        Ok(Self {
+            database: database.clone(),
+            outstation_config: define_outstation_config(lib, shared_def)?,
+            event_buffer_config: define_event_buffer_config(lib)?,
+            outstation_application: define_outstation_application(lib)?,
+            outstation_information: define_outstation_information(lib, shared_def)?,
+            control_handler: define_control_handler(lib, &database, shared_def)?,
+        })
+    }
+}
+
 pub fn define(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
 ) -> Result<(), BindingError> {
     // Everything required to create an outstation
 
-    let database = crate::database::define(lib, shared_def)?;
-    let outstation = define_outstation(lib, shared_def, &database)?;
-    let outstation_config = define_outstation_config(lib, shared_def)?;
-    let event_buffer_config = define_event_buffer_config(lib)?;
-    let outstation_application = define_outstation_application(lib)?;
-    let outstation_information = define_outstation_information(lib, shared_def)?;
-    let control_handler = define_control_handler(lib, &database, shared_def)?;
+    let types = OutstationTypes::define(lib, shared_def)?;
+    let outstation = define_outstation(lib, shared_def, &types)?;
     let address_filter = define_address_filter(lib)?;
 
     // Define the TCP server
@@ -59,11 +81,11 @@ pub fn define(
 
     let tcp_server_add_outstation_fn = lib.declare_native_function("tcpserver_add_outstation")?
         .param("server", Type::ClassRef(tcp_server.clone()), "TCP server to add the outstation to")?
-        .param("config", Type::Struct(outstation_config), "Outstation configuration")?
-        .param("event_config", Type::Struct(event_buffer_config), "Event buffer configuration")?
-        .param("application", Type::Interface(outstation_application), "Outstation application callbacks")?
-        .param("information", Type::Interface(outstation_information), "Outstation information callbacks")?
-        .param("control_handler", Type::Interface(control_handler), "Outstation control handler")?
+        .param("config", Type::Struct(types.outstation_config), "Outstation configuration")?
+        .param("event_config", Type::Struct(types.event_buffer_config), "Event buffer configuration")?
+        .param("application", Type::Interface(types.outstation_application), "Outstation application callbacks")?
+        .param("information", Type::Interface(types.outstation_information), "Outstation information callbacks")?
+        .param("control_handler", Type::Interface(types.control_handler), "Outstation control handler")?
         .param("filter", Type::ClassRef(address_filter.declaration()), "Address filter")?
         .return_type(ReturnType::new(Type::ClassRef(outstation.declaration()), "Outstation handle"))?
         .doc(doc("Add an outstation to the server.")
@@ -93,7 +115,7 @@ pub fn define(
 fn define_outstation(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
-    database: &ClassHandle,
+    types: &OutstationTypes,
 ) -> Result<ClassHandle, BindingError> {
     let transaction_interface = lib
         .define_one_time_callback("OutstationTransaction", "Outstation transaction interface")?
@@ -103,7 +125,7 @@ fn define_outstation(
         )?
         .param(
             "database",
-            Type::ClassRef(database.declaration()),
+            Type::ClassRef(types.database.declaration()),
             "Database",
         )?
         .return_type(ReturnType::void())?
@@ -111,6 +133,51 @@ fn define_outstation(
         .build()?;
 
     let outstation = lib.declare_class("Outstation")?;
+
+    let outstation_create_serial_session_fn = lib
+        .declare_native_function("outstation_create_serial_session")?
+        .param(
+            "runtime",
+            Type::ClassRef(shared_def.runtime_class.clone()),
+            "runtime on which to spawn the outstation",
+        )?
+        .param("serial_path", Type::String, "Path of the serial device")?
+        .param(
+            "settings",
+            Type::Struct(shared_def.serial_port_settings.clone()),
+            "settings for the serial port",
+        )?
+        .param(
+            "config",
+            Type::Struct(types.outstation_config.clone()),
+            "outstation configuration",
+        )?
+        .param(
+            "event_config",
+            Type::Struct(types.event_buffer_config.clone()),
+            "event buffer configuration",
+        )?
+        .param(
+            "application",
+            Type::Interface(types.outstation_application.clone()),
+            "application interface",
+        )?
+        .param(
+            "information",
+            Type::Interface(types.outstation_information.clone()),
+            "informational events interface",
+        )?
+        .param(
+            "control_handler",
+            Type::Interface(types.control_handler.clone()),
+            "control handler interface",
+        )?
+        .return_type(ReturnType::Type(
+            Type::ClassRef(outstation.clone()),
+            "Outstation instance or {null} if the port cannot be opened".into(),
+        ))?
+        .doc("Create an outstation instance running on a serial port")?
+        .build()?;
 
     let outstation_destroy_fn = lib.declare_native_function("outstation_destroy")?
         .param("outstation", Type::ClassRef(outstation.clone()), "Outstation to destroy")?
@@ -152,6 +219,10 @@ fn define_outstation(
 
     lib.define_class(&outstation)?
         .destructor(&outstation_destroy_fn)?
+        .static_method(
+            "create_serial_session",
+            &outstation_create_serial_session_fn,
+        )?
         .method("transaction", &outstation_transaction_fn)?
         .method("set_decode_level", &outstation_set_decode_level_fn)?
         .doc(doc("Outstation handle").details("Use this handle to modify the internal database."))?
