@@ -3,8 +3,10 @@ pub use tokio_one_serial::{DataBits, FlowControl, Parity, StopBits};
 pub use tokio_one_serial::Settings as SerialSettings;
 
 pub use master::*;
+pub use outstation::*;
 
 mod master;
+mod outstation;
 
 /// State of the serial port
 #[derive(Copy, Clone, Debug, PartialEq)]

@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     // spawn the master onto another task
-    let mut master = spawn_master_serial_client(
+    let mut master = spawn_master_serial(
         MasterConfig::new(
             EndpointAddress::from(1)?,
             AppDecodeLevel::ObjectValues.into(),
