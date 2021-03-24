@@ -117,7 +117,7 @@ impl MasterTask {
 
     async fn run_enabled(&mut self) -> Result<(), StateChange> {
         loop {
-            match tokio_one_serial::open(self.path.as_str(), self.serial_settings) {
+            match crate::serial::open(self.path.as_str(), self.serial_settings) {
                 Err(err) => {
                     tracing::warn!(
                         "{} - waiting {} ms to re-open port",

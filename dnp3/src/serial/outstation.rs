@@ -56,7 +56,7 @@ pub fn create_outstation_serial(
     information: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
 ) -> std::io::Result<(impl Future<Output = ()> + 'static, OutstationHandle)> {
-    let serial = tokio_one_serial::open(path, settings)?;
+    let serial = crate::serial::open(path, settings)?;
     let (mut task, handle) = OutstationTask::create(
         LinkErrorMode::Discard,
         config,
