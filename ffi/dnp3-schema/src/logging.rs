@@ -101,9 +101,8 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingErr
         )?
         .build()?;
 
-    let logging_class = lib.declare_class("Logging")?;
     let _logging_class = lib
-        .define_class(&logging_class)?
+        .define_static_class("Logging")?
         .static_method("Configure", &configure_logging_fn)?
         .doc("Provides a static method for configuring logging")?
         .build()?;

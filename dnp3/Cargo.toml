@@ -8,7 +8,7 @@ edition = "2018"
 tracing = "0.1"
 chrono = "0.4"
 tokio-mock = { git = "https://github.com/stepfunc/tokio-mock.git", branch="master" }
-tokio-one-serial = { git = "https://github.com/stepfunc/tokio-1.0-serial.git", branch="master" }
+tokio-serial = { git = "https://github.com/stepfunc/tokio-serial.git", branch="v4.4.0", default-features = false }
 xxhash-rust = { version = "0.8.0-beta.5", features = ["xxh64"] }
 
 [dev-dependencies]

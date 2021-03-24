@@ -81,7 +81,7 @@ pub(crate) unsafe fn master_create_serial_session(
     };
     let listener = PortStateListenerAdapter::new(listener);
 
-    let (future, handle) = create_master_serial_client(
+    let (future, handle) = create_master_serial(
         config,
         &path.to_string_lossy().to_string(),
         serial_params.into(),
