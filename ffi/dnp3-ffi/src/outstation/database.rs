@@ -9,62 +9,57 @@ macro_rules! implement_database_point_operations {
     (
         $add_name:ident, $remove_name:ident, $update_name:ident, $get_name:ident,
         $lib_point_type:ty, $lib_config_type:ty,
-        $ffi_point_type:ty, $ffi_config_type:ty, $ffi_optional_point_type:ty, $ffi_optional_point_fields:ident
+        $ffi_point_type:ty, $ffi_config_type:ty,
     ) => {
         pub unsafe fn $add_name(
             database: *mut Database,
             index: u16,
             point_class: ffi::EventClass,
             config: $ffi_config_type,
-        ) {
+        ) -> bool {
             if let Some(database) = database.as_mut() {
-                database.add(index, point_class.into(), <$lib_config_type>::from(config));
+                return database.add(index, point_class.into(), <$lib_config_type>::from(config));
             }
+            false
         }
 
-        pub unsafe fn $remove_name(database: *mut Database, index: u16) {
+        pub unsafe fn $remove_name(database: *mut Database, index: u16) -> bool {
             if let Some(database) = database.as_mut() {
-                Remove::<$lib_point_type>::remove(database, index);
+                return Remove::<$lib_point_type>::remove(database, index);
             }
+            false
         }
 
         pub unsafe fn $update_name(
             database: *mut Database,
             value: $ffi_point_type,
             options: ffi::UpdateOptions,
-        ) {
+        ) -> bool {
             if let Some(database) = database.as_mut() {
-                database.update(value.index, &<$lib_point_type>::from(value), options.into());
+                return database.update(
+                    value.index,
+                    &<$lib_point_type>::from(value),
+                    options.into(),
+                );
             }
+            false
         }
 
-        pub unsafe fn $get_name(database: *mut Database, index: u16) -> $ffi_optional_point_type {
-            let value = if let Some(database) = database.as_mut() {
-                Get::<$lib_point_type>::get(database, index)
-            } else {
-                None
-            };
+        pub unsafe fn $get_name(
+            database: *mut Database,
+            index: u16,
+        ) -> Result<$ffi_point_type, ffi::Dnp3Error> {
+            let database = database.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
 
-            value
-                .map(|value| {
-                    $ffi_optional_point_fields {
-                        is_present: true,
-                        value: <$ffi_point_type>::new(index, value),
-                    }
-                    .into()
-                })
-                .unwrap_or(
-                    $ffi_optional_point_fields {
-                        is_present: false,
-                        value: <$ffi_point_type>::new(index, <$lib_point_type>::default()),
-                    }
-                    .into(),
-                )
+            if let Some(point) = Get::<$lib_point_type>::get(database, index) {
+                Ok(<$ffi_point_type>::new(index, point))
+            } else {
+                Err(ffi::Dnp3Error::PointDoesNotExist)
+            }
         }
     };
 }
 
-use ffi::OptionalBinaryFields;
 implement_database_point_operations!(
     database_add_binary,
     database_remove_binary,
@@ -74,11 +69,8 @@ implement_database_point_operations!(
     BinaryConfig,
     ffi::Binary,
     ffi::BinaryConfig,
-    ffi::OptionalBinary,
-    OptionalBinaryFields
 );
 
-use ffi::OptionalDoubleBitBinaryFields;
 implement_database_point_operations!(
     database_add_double_bit_binary,
     database_remove_double_bit_binary,
@@ -88,11 +80,8 @@ implement_database_point_operations!(
     DoubleBitBinaryConfig,
     ffi::DoubleBitBinary,
     ffi::DoubleBitBinaryConfig,
-    ffi::OptionalDoubleBitBinary,
-    OptionalDoubleBitBinaryFields
 );
 
-use ffi::OptionalBinaryOutputStatusFields;
 implement_database_point_operations!(
     database_add_binary_output_status,
     database_remove_binary_output_status,
@@ -102,11 +91,8 @@ implement_database_point_operations!(
     BinaryOutputStatusConfig,
     ffi::BinaryOutputStatus,
     ffi::BinaryOutputStatusConfig,
-    ffi::OptionalBinaryOutputStatus,
-    OptionalBinaryOutputStatusFields
 );
 
-use ffi::OptionalCounterFields;
 implement_database_point_operations!(
     database_add_counter,
     database_remove_counter,
@@ -116,11 +102,8 @@ implement_database_point_operations!(
     CounterConfig,
     ffi::Counter,
     ffi::CounterConfig,
-    ffi::OptionalCounter,
-    OptionalCounterFields
 );
 
-use ffi::OptionalFrozenCounterFields;
 implement_database_point_operations!(
     database_add_frozen_counter,
     database_remove_frozen_counter,
@@ -130,11 +113,8 @@ implement_database_point_operations!(
     FrozenCounterConfig,
     ffi::FrozenCounter,
     ffi::FrozenCounterConfig,
-    ffi::OptionalFrozenCounter,
-    OptionalFrozenCounterFields
 );
 
-use ffi::OptionalAnalogFields;
 implement_database_point_operations!(
     database_add_analog,
     database_remove_analog,
@@ -144,11 +124,8 @@ implement_database_point_operations!(
     AnalogConfig,
     ffi::Analog,
     ffi::AnalogConfig,
-    ffi::OptionalAnalog,
-    OptionalAnalogFields
 );
 
-use ffi::OptionalAnalogOutputStatusFields;
 implement_database_point_operations!(
     database_add_analog_output_status,
     database_remove_analog_output_status,
@@ -158,24 +135,24 @@ implement_database_point_operations!(
     AnalogOutputStatusConfig,
     ffi::AnalogOutputStatus,
     ffi::AnalogOutputStatusConfig,
-    ffi::OptionalAnalogOutputStatus,
-    OptionalAnalogOutputStatusFields
 );
 
 pub unsafe fn database_add_octet_string(
     database: *mut Database,
     index: u16,
     point_class: ffi::EventClass,
-) {
+) -> bool {
     if let Some(database) = database.as_mut() {
-        database.add(index, point_class.into(), OctetStringConfig);
+        return database.add(index, point_class.into(), OctetStringConfig);
     }
+    false
 }
 
-pub unsafe fn database_remove_octet_string(database: *mut Database, index: u16) {
+pub unsafe fn database_remove_octet_string(database: *mut Database, index: u16) -> bool {
     if let Some(database) = database.as_mut() {
-        Remove::<OctetString>::remove(database, index);
+        return Remove::<OctetString>::remove(database, index);
     }
+    false
 }
 
 pub unsafe fn database_update_octet_string(
@@ -183,14 +160,15 @@ pub unsafe fn database_update_octet_string(
     index: u16,
     value: *mut OctetStringValue,
     options: ffi::UpdateOptions,
-) {
+) -> bool {
     if let Some(database) = database.as_mut() {
         if let Some(value) = value.as_ref() {
             if let Some(value) = value.into() {
-                database.update(index, &value, options.into());
+                return database.update(index, &value, options.into());
             }
         }
     }
+    false
 }
 
 pub fn update_options_default() -> ffi::UpdateOptions {

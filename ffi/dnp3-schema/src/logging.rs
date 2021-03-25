@@ -1,8 +1,12 @@
+use oo_bindgen::error_type::ErrorType;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::*;
 
-pub fn define(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
+pub fn define(
+    lib: &mut LibraryBuilder,
+    error_type: ErrorType,
+) -> Result<NativeStructHandle, BindingError> {
     let log_level_enum = lib
         .define_native_enum("LogLevel")?
         .push("Error", "Error log level")?
@@ -94,6 +98,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingErr
             "Logger that will receive each logged message",
         )?
         .return_type(ReturnType::void())?
+        .fails_with(error_type)?
         .doc(
             doc("Set the callback that will receive all the log messages")
             .details("There is only a single globally allocated logger. Calling this method a second time will result in a panic.")

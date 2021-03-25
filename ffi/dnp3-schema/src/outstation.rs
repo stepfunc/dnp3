@@ -44,7 +44,7 @@ pub fn define(
 
     let types = OutstationTypes::define(lib, shared_def)?;
     let outstation = define_outstation(lib, shared_def, &types)?;
-    let address_filter = define_address_filter(lib)?;
+    let address_filter = define_address_filter(lib, shared_def)?;
 
     // Define the TCP server
     let tcp_server = lib.declare_class("TCPServer")?;
@@ -70,6 +70,7 @@ pub fn define(
             Type::ClassRef(tcp_server.clone()),
             "New TCP server instance",
         ))?
+        .fails_with(shared_def.error_type.clone())?
         .doc(doc("Create a new TCP server.").details("To start it, use {class:TCPServer.bind()}."))?
         .build()?;
 
@@ -88,6 +89,7 @@ pub fn define(
         .param("control_handler", Type::Interface(types.control_handler), "Outstation control handler")?
         .param("filter", Type::ClassRef(address_filter.declaration()), "Address filter")?
         .return_type(ReturnType::new(Type::ClassRef(outstation.declaration()), "Outstation handle"))?
+        .fails_with(shared_def.error_type.clone())?
         .doc(doc("Add an outstation to the server.")
             .details("The returned {class:Outstation} can be used to modify points of the outstation.")
             .details("In order for the outstation to run, the TCP server must be running. Use {class:TCPServer.bind()} to run it."))?
@@ -95,7 +97,8 @@ pub fn define(
 
     let tcp_server_bind_fn = lib.declare_native_function("tcpserver_bind")?
         .param("server", Type::ClassRef(tcp_server.clone()), "Server to bind")?
-        .return_type(ReturnType::Type(Type::Bool, "true if the bind was successful".into()))?
+        .return_type(ReturnType::void())?
+        .fails_with(shared_def.error_type.clone())?
         .doc("Bind the server to the port and starts listening. Also starts all the outstations associated to it.")?
         .build()?;
 
@@ -176,6 +179,7 @@ fn define_outstation(
             Type::ClassRef(outstation.clone()),
             "Outstation instance or {null} if the port cannot be opened".into(),
         ))?
+        .fails_with(shared_def.error_type.clone())?
         .doc("Create an outstation instance running on a serial port")?
         .build()?;
 
@@ -214,6 +218,7 @@ fn define_outstation(
             "Decode log",
         )?
         .return_type(ReturnType::void())?
+        .fails_with(shared_def.error_type.clone())?
         .doc("Set decoding log level")?
         .build()?;
 
@@ -789,7 +794,10 @@ fn define_control_handler(
         .build()
 }
 
-fn define_address_filter(lib: &mut LibraryBuilder) -> Result<ClassHandle, BindingError> {
+fn define_address_filter(
+    lib: &mut LibraryBuilder,
+    shared_def: &SharedDefinitions,
+) -> Result<ClassHandle, BindingError> {
     let address_filter = lib.declare_class("AddressFilter")?;
 
     let address_filter_any_fn = lib
@@ -808,6 +816,7 @@ fn define_address_filter(lib: &mut LibraryBuilder) -> Result<ClassHandle, Bindin
             Type::ClassRef(address_filter.clone()),
             "Address filter",
         ))?
+        .fails_with(shared_def.error_type.clone())?
         .doc("Create an address filter that accepts any IP address")?
         .build()?;
 
@@ -820,6 +829,7 @@ fn define_address_filter(lib: &mut LibraryBuilder) -> Result<ClassHandle, Bindin
         )?
         .param("address", Type::String, "IP address to add")?
         .return_type(ReturnType::void())?
+        .fails_with(shared_def.error_type.clone())?
         .doc("Add an accepted IP address to the filter")?
         .build()?;
 

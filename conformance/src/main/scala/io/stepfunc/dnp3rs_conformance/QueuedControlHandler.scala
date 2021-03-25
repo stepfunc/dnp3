@@ -257,7 +257,7 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
 
   override def freezeCountersAll(freezeType: FreezeType, database: Database): FreezeResult = {
     for (i <- 0 to 9) {
-      val currentCounter = database.getCounter(ushort(i)).value
+      val currentCounter = database.getCounter(ushort(i))
       database.updateFrozenCounter(new FrozenCounter(currentCounter.index, currentCounter.value, currentCounter.flags, currentCounter.time), new UpdateOptions())
       if(freezeType == FreezeType.FREEZE_AND_CLEAR) {
         currentCounter.value = uint(0)
@@ -274,7 +274,7 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
     }
 
     for (i <- start.intValue() to stop.intValue()) {
-      val currentCounter = database.getCounter(ushort(i)).value
+      val currentCounter = database.getCounter(ushort(i))
       database.updateFrozenCounter(new FrozenCounter(currentCounter.index, currentCounter.value, currentCounter.flags, currentCounter.time), new UpdateOptions())
       if(freezeType == FreezeType.FREEZE_AND_CLEAR) {
         currentCounter.value = uint(0)

@@ -1,4 +1,7 @@
-use std::ptr::null_mut;
+use std::future::Future;
+
+use dnp3::app::Shutdown;
+use tokio::runtime::Handle;
 
 use crate::ffi;
 
@@ -26,14 +29,28 @@ pub(crate) struct RuntimeHandle {
 }
 
 impl RuntimeHandle {
-    pub(crate) fn unwrap(&self) -> std::sync::Arc<tokio::runtime::Runtime> {
-        self.inner
+    pub(crate) fn block_on<F: Future>(&self, future: F) -> Result<F::Output, ffi::Dnp3Error> {
+        let inner = self
+            .inner
             .upgrade()
-            .expect("Runtime has been destroyed, RuntimeHandle is invalid")
+            .ok_or(ffi::Dnp3Error::RuntimeDestroyed)?;
+        if Handle::try_current().is_ok() {
+            return Err(ffi::Dnp3Error::RuntimeCannotBlockWithinAsync);
+        }
+        Ok(inner.block_on(future))
     }
 
-    pub(crate) fn get(&self) -> Option<std::sync::Arc<tokio::runtime::Runtime>> {
-        self.inner.upgrade()
+    pub(crate) fn spawn<F>(&self, future: F) -> Result<(), ffi::Dnp3Error>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        let inner = self
+            .inner
+            .upgrade()
+            .ok_or(ffi::Dnp3Error::RuntimeDestroyed)?;
+        inner.spawn(future);
+        Ok(())
     }
 }
 
@@ -45,7 +62,9 @@ where
     f(&mut builder).enable_all().build()
 }
 
-pub(crate) unsafe fn runtime_new(config: ffi::RuntimeConfig) -> *mut crate::runtime::Runtime {
+pub(crate) unsafe fn runtime_new(
+    config: ffi::RuntimeConfig,
+) -> Result<*mut crate::runtime::Runtime, ffi::Dnp3Error> {
     let num_threads = if config.num_core_threads == 0 {
         num_cpus::get()
     } else {
@@ -53,19 +72,19 @@ pub(crate) unsafe fn runtime_new(config: ffi::RuntimeConfig) -> *mut crate::runt
     };
 
     tracing::info!("creating runtime with {} threads", num_threads);
-    let result = build_runtime(|r| r.worker_threads(num_threads as usize));
-
-    match result {
-        Ok(r) => Box::into_raw(Box::new(Runtime::new(r))),
-        Err(err) => {
-            tracing::error!("Unable to build runtime: {}", err);
-            null_mut()
-        }
-    }
+    let runtime = build_runtime(|r| r.worker_threads(num_threads as usize))
+        .map_err(|_| ffi::Dnp3Error::RuntimeCreationFailure)?;
+    Ok(Box::into_raw(Box::new(Runtime::new(runtime))))
 }
 
 pub(crate) unsafe fn runtime_destroy(runtime: *mut crate::runtime::Runtime) {
     if !runtime.is_null() {
         Box::from_raw(runtime);
     };
+}
+
+impl From<Shutdown> for ffi::Dnp3Error {
+    fn from(_: Shutdown) -> Self {
+        ffi::Dnp3Error::MasterAlreadyShutdown
+    }
 }

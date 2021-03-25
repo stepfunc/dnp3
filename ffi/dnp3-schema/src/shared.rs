@@ -1,6 +1,7 @@
 use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::doc;
+use oo_bindgen::error_type::{ErrorType, ExceptionType};
 use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::native_enum::NativeEnumHandle;
 use oo_bindgen::native_function::{DurationMapping, ReturnType, Type};
@@ -8,6 +9,7 @@ use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
 
 pub struct SharedDefinitions {
+    pub error_type: ErrorType,
     pub port_state_listener: InterfaceHandle,
     pub variation_enum: NativeEnumHandle,
     pub runtime_class: ClassDeclarationHandle,
@@ -18,32 +20,69 @@ pub struct SharedDefinitions {
     pub control_struct: NativeStructHandle,
     pub g12v1_struct: NativeStructHandle,
     pub binary_point: NativeStructHandle,
-    pub optional_binary_point: NativeStructHandle,
     pub binary_it: IteratorHandle,
     pub double_bit_binary_point: NativeStructHandle,
-    pub optional_double_bit_binary_point: NativeStructHandle,
     pub double_bit_binary_it: IteratorHandle,
     pub binary_output_status_point: NativeStructHandle,
-    pub optional_binary_output_status_point: NativeStructHandle,
     pub binary_output_status_it: IteratorHandle,
     pub counter_point: NativeStructHandle,
-    pub optional_counter_point: NativeStructHandle,
     pub counter_it: IteratorHandle,
     pub frozen_counter_point: NativeStructHandle,
-    pub optional_frozen_counter_point: NativeStructHandle,
     pub frozen_counter_it: IteratorHandle,
     pub analog_point: NativeStructHandle,
-    pub optional_analog_point: NativeStructHandle,
     pub analog_it: IteratorHandle,
     pub analog_output_status_point: NativeStructHandle,
-    pub optional_analog_output_status_point: NativeStructHandle,
     pub analog_output_status_it: IteratorHandle,
     pub octet_string: NativeStructHandle,
     pub octet_string_it: IteratorHandle,
 }
 
 pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingError> {
+    let error_type = lib
+        .define_error_type(
+            "Dnp3Error",
+            "Dnp3Exception",
+            ExceptionType::UncheckedException,
+        )?
+        .add_error("NullParameter", "Null parameter")?
+        .add_error(
+            "AssociationDoesNotExist",
+            "The specified association does not exist",
+        )?
+        .add_error(
+            "AssociationDuplicateAddress",
+            "Duplicate association address",
+        )?
+        .add_error("InvalidSocketAddress", "Invalid socket address")?
+        .add_error("InvalidDnp3Address", "Invalid link-layer DNP3 address")?
+        .add_error("InvalidBufferSize", "Invalid buffer size")?
+        .add_error(
+            "AddressFilterConflict",
+            "Conflit in the address filter specification",
+        )?
+        .add_error("ServerAlreadyStarted", "Server already started")?
+        .add_error(
+            "ServerBindError",
+            "Server failed to bind to the specified port",
+        )?
+        .add_error("MasterAlreadyShutdown", "Master was already shutdown")?
+        .add_error("RuntimeCreationFailure", "Failed to create tokio runtime")?
+        .add_error("RuntimeDestroyed", "Runtime was already disposed of")?
+        .add_error(
+            "RuntimeCannotBlockWithinAsync",
+            "Runtime cannot execute blocking call within asynchronous context",
+        )?
+        .add_error(
+            "LoggingAlreadyConfigured",
+            "Logging can only be configured once",
+        )?
+        .add_error("PointDoesNotExist", "Point does not exist")?
+        .doc("Global error type used throughout the library")?
+        .build()?;
+
     crate::constants::define(lib)?;
+    let decode_level = crate::logging::define(lib, error_type.clone())?;
+    let runtime_class = crate::runtime::define(lib, error_type.clone())?;
 
     let control_struct = lib.declare_native_struct("Control")?;
     let control_struct = lib
@@ -120,86 +159,77 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .doc("Double-bit binary input value")?
         .build()?;
 
-    let (binary_point, optional_binary_point, binary_it) =
+    let (binary_point, binary_it) =
         build_iterator("Binary", Type::Bool, lib, &flags_struct, &timestamp_struct)?;
-    let (double_bit_binary_point, optional_double_bit_binary_point, double_bit_binary_it) =
-        build_iterator(
-            "DoubleBitBinary",
-            Type::Enum(double_bit_enum),
-            lib,
-            &flags_struct,
-            &timestamp_struct,
-        )?;
-    let (binary_output_status_point, optional_binary_output_status_point, binary_output_status_it) =
-        build_iterator(
-            "BinaryOutputStatus",
-            Type::Bool,
-            lib,
-            &flags_struct,
-            &timestamp_struct,
-        )?;
-    let (counter_point, optional_counter_point, counter_it) = build_iterator(
+    let (double_bit_binary_point, double_bit_binary_it) = build_iterator(
+        "DoubleBitBinary",
+        Type::Enum(double_bit_enum),
+        lib,
+        &flags_struct,
+        &timestamp_struct,
+    )?;
+    let (binary_output_status_point, binary_output_status_it) = build_iterator(
+        "BinaryOutputStatus",
+        Type::Bool,
+        lib,
+        &flags_struct,
+        &timestamp_struct,
+    )?;
+    let (counter_point, counter_it) = build_iterator(
         "Counter",
         Type::Uint32,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
-    let (frozen_counter_point, optional_frozen_counter_point, frozen_counter_it) = build_iterator(
+    let (frozen_counter_point, frozen_counter_it) = build_iterator(
         "FrozenCounter",
         Type::Uint32,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
-    let (analog_point, optional_analog_point, analog_it) = build_iterator(
+    let (analog_point, analog_it) = build_iterator(
         "Analog",
         Type::Double,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
-    let (analog_output_status_point, optional_analog_output_status_point, analog_output_status_it) =
-        build_iterator(
-            "AnalogOutputStatus",
-            Type::Double,
-            lib,
-            &flags_struct,
-            &timestamp_struct,
-        )?;
+    let (analog_output_status_point, analog_output_status_it) = build_iterator(
+        "AnalogOutputStatus",
+        Type::Double,
+        lib,
+        &flags_struct,
+        &timestamp_struct,
+    )?;
 
     let (octet_string, octet_string_it) = build_octet_string(lib)?;
 
     Ok(SharedDefinitions {
+        error_type,
         port_state_listener: define_port_state_listener(lib)?,
         variation_enum: crate::variation::define(lib)?,
-        runtime_class: crate::runtime::define(lib)?,
-        decode_level: crate::logging::define(lib)?,
+        runtime_class,
+        decode_level,
         retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_params(lib)?,
         link_error_mode: define_link_error_mode(lib)?,
         control_struct,
         g12v1_struct,
         binary_point,
-        optional_binary_point,
         binary_it,
         double_bit_binary_point,
-        optional_double_bit_binary_point,
         double_bit_binary_it,
         binary_output_status_point,
-        optional_binary_output_status_point,
         binary_output_status_it,
         counter_point,
-        optional_counter_point,
         counter_it,
         frozen_counter_point,
-        optional_frozen_counter_point,
         frozen_counter_it,
         analog_point,
-        optional_analog_point,
         analog_it,
         analog_output_status_point,
-        optional_analog_output_status_point,
         analog_output_status_it,
         octet_string,
         octet_string_it,
@@ -426,7 +456,7 @@ fn build_iterator(
     lib: &mut LibraryBuilder,
     flags_struct: &NativeStructHandle,
     timestamp_struct: &NativeStructHandle,
-) -> Result<(NativeStructHandle, NativeStructHandle, IteratorHandle), BindingError> {
+) -> Result<(NativeStructHandle, IteratorHandle), BindingError> {
     let value_struct = lib.declare_native_struct(name)?;
     let value_struct = lib
         .define_native_struct(&value_struct)?
@@ -439,22 +469,6 @@ fn build_iterator(
             "Point timestamp",
         )?
         .doc(format!("{} point", name))?
-        .build()?;
-
-    let optional_value_struct_name = format!("Optional{}", name);
-    let optional_value_struct = lib.declare_native_struct(&optional_value_struct_name)?;
-    let optional_value_struct = lib
-        .define_native_struct(&optional_value_struct)?
-        .add(
-            "is_present",
-            Type::Bool,
-            format!(
-                "If this is true, then {{struct:{}.value}} is valid.",
-                optional_value_struct_name
-            ),
-        )?
-        .add("value", Type::Struct(value_struct.clone()), "Value")?
-        .doc(format!("Optionally present value of {}", name))?
         .build()?;
 
     let value_iterator = lib.declare_class(&format!("{}Iterator", name))?;
@@ -470,7 +484,7 @@ fn build_iterator(
 
     let value_iterator = lib.define_iterator(&iterator_next_fn, &value_struct)?;
 
-    Ok((value_struct, optional_value_struct, value_iterator))
+    Ok((value_struct, value_iterator))
 }
 
 fn build_octet_string(
