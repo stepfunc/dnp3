@@ -12,12 +12,12 @@ use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
 use crate::util::phys::PhysLayer;
 
-/// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
+/// Spawn a master task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
-pub fn spawn_master_serial_client(
+pub fn spawn_master_serial(
     config: MasterConfig,
     path: &str,
     serial_settings: SerialSettings,
@@ -25,12 +25,12 @@ pub fn spawn_master_serial_client(
     listener: Listener<PortState>,
 ) -> MasterHandle {
     let (future, handle) =
-        create_master_serial_client(config, path, serial_settings, retry_delay, listener);
+        create_master_serial(config, path, serial_settings, retry_delay, listener);
     crate::tokio::spawn(future);
     handle
 }
 
-/// Create a Future, which can be spawned onto a runtime, along with a controlling handle.
+/// Create a master future, which can be spawned onto a runtime, along with a controlling handle.
 ///
 /// Once spawned or otherwise executed using the `run` method, the task runs until the handle
 /// and any `AssociationHandle` created from it are dropped.
@@ -38,7 +38,7 @@ pub fn spawn_master_serial_client(
 /// **Note**: This function is required instead of `spawn` when using a runtime to directly spawn
 /// tasks instead of within the context of a runtime, e.g. in applications that cannot use
 /// `[tokio::main]` such as C language bindings.
-pub fn create_master_serial_client(
+pub fn create_master_serial(
     config: MasterConfig,
     path: &str,
     settings: SerialSettings,
@@ -117,7 +117,7 @@ impl MasterTask {
 
     async fn run_enabled(&mut self) -> Result<(), StateChange> {
         loop {
-            match tokio_one_serial::open(self.path.as_str(), self.serial_settings) {
+            match crate::serial::open(self.path.as_str(), self.serial_settings) {
                 Err(err) => {
                     tracing::warn!(
                         "{} - waiting {} ms to re-open port",

@@ -2,7 +2,6 @@
 
 members = [
     "dnp3",
-
     "ffi/dnp3-schema",
     "ffi/dnp3-ffi",
     "ffi/dnp3-bindings",

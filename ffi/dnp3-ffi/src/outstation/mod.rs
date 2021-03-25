@@ -11,6 +11,7 @@ use dnp3::tcp::{FilterError, ServerHandle};
 pub use struct_constructors::*;
 
 use crate::{ffi, Runtime, RuntimeHandle};
+use dnp3::serial::create_outstation_serial;
 
 mod adapters;
 mod database;
@@ -112,6 +113,45 @@ pub unsafe fn outstation_destroy(outstation: *mut Outstation) {
     if !outstation.is_null() {
         Box::from_raw(outstation);
     }
+}
+
+#[allow(clippy::too_many_arguments)] // TODO
+pub unsafe fn outstation_create_serial_session(
+    runtime: *mut crate::Runtime,
+    serial_path: &CStr,
+    settings: ffi::SerialPortSettings,
+    config: ffi::OutstationConfig,
+    event_config: ffi::EventBufferConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+) -> Result<*mut crate::Outstation, ffi::Dnp3Error> {
+    let runtime = runtime
+        .as_ref()
+        .ok_or(ffi::Dnp3Error::NullParameter)?
+        .handle();
+    let serial_path = serial_path.to_string_lossy();
+
+    let config = convert_outstation_config(config)?;
+
+    let (task, handle) = create_outstation_serial(
+        &serial_path,
+        settings.into(),
+        config,
+        event_config.into(),
+        Box::new(application),
+        Box::new(information),
+        Box::new(control_handler),
+    )?;
+
+    runtime.spawn(task)?;
+
+    let handle = Box::new(crate::Outstation {
+        handle,
+        runtime,
+    });
+
+    Ok(Box::into_raw(handle))
 }
 
 pub unsafe fn outstation_transaction(
