@@ -189,7 +189,7 @@ class MainClass
         );
         
         var association = master.AddAssociation(
-            65535,
+            1024,
             new AssociationConfig(EventClasses.All(), EventClasses.All(), Classes.All(), EventClasses.None())
             {
                 AutoTimeSync = AutoTimeSync.Lan,

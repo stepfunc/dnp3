@@ -20,25 +20,18 @@ pub struct SharedDefinitions {
     pub control_struct: NativeStructHandle,
     pub g12v1_struct: NativeStructHandle,
     pub binary_point: NativeStructHandle,
-    pub optional_binary_point: NativeStructHandle,
     pub binary_it: IteratorHandle,
     pub double_bit_binary_point: NativeStructHandle,
-    pub optional_double_bit_binary_point: NativeStructHandle,
     pub double_bit_binary_it: IteratorHandle,
     pub binary_output_status_point: NativeStructHandle,
-    pub optional_binary_output_status_point: NativeStructHandle,
     pub binary_output_status_it: IteratorHandle,
     pub counter_point: NativeStructHandle,
-    pub optional_counter_point: NativeStructHandle,
     pub counter_it: IteratorHandle,
     pub frozen_counter_point: NativeStructHandle,
-    pub optional_frozen_counter_point: NativeStructHandle,
     pub frozen_counter_it: IteratorHandle,
     pub analog_point: NativeStructHandle,
-    pub optional_analog_point: NativeStructHandle,
     pub analog_it: IteratorHandle,
     pub analog_output_status_point: NativeStructHandle,
-    pub optional_analog_output_status_point: NativeStructHandle,
     pub analog_output_status_it: IteratorHandle,
     pub octet_string: NativeStructHandle,
     pub octet_string_it: IteratorHandle,
@@ -83,6 +76,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
             "LoggingAlreadyConfigured",
             "Logging can only be configured once",
         )?
+        .add_error("PointDoesNotExist", "Point does not exist")?
         .doc("Global error type used throughout the library")?
         .build()?;
 
@@ -165,53 +159,50 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .doc("Double-bit binary input value")?
         .build()?;
 
-    let (binary_point, optional_binary_point, binary_it) =
+    let (binary_point, binary_it) =
         build_iterator("Binary", Type::Bool, lib, &flags_struct, &timestamp_struct)?;
-    let (double_bit_binary_point, optional_double_bit_binary_point, double_bit_binary_it) =
-        build_iterator(
-            "DoubleBitBinary",
-            Type::Enum(double_bit_enum),
-            lib,
-            &flags_struct,
-            &timestamp_struct,
-        )?;
-    let (binary_output_status_point, optional_binary_output_status_point, binary_output_status_it) =
-        build_iterator(
-            "BinaryOutputStatus",
-            Type::Bool,
-            lib,
-            &flags_struct,
-            &timestamp_struct,
-        )?;
-    let (counter_point, optional_counter_point, counter_it) = build_iterator(
+    let (double_bit_binary_point, double_bit_binary_it) = build_iterator(
+        "DoubleBitBinary",
+        Type::Enum(double_bit_enum),
+        lib,
+        &flags_struct,
+        &timestamp_struct,
+    )?;
+    let (binary_output_status_point, binary_output_status_it) = build_iterator(
+        "BinaryOutputStatus",
+        Type::Bool,
+        lib,
+        &flags_struct,
+        &timestamp_struct,
+    )?;
+    let (counter_point, counter_it) = build_iterator(
         "Counter",
         Type::Uint32,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
-    let (frozen_counter_point, optional_frozen_counter_point, frozen_counter_it) = build_iterator(
+    let (frozen_counter_point, frozen_counter_it) = build_iterator(
         "FrozenCounter",
         Type::Uint32,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
-    let (analog_point, optional_analog_point, analog_it) = build_iterator(
+    let (analog_point, analog_it) = build_iterator(
         "Analog",
         Type::Double,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
-    let (analog_output_status_point, optional_analog_output_status_point, analog_output_status_it) =
-        build_iterator(
-            "AnalogOutputStatus",
-            Type::Double,
-            lib,
-            &flags_struct,
-            &timestamp_struct,
-        )?;
+    let (analog_output_status_point, analog_output_status_it) = build_iterator(
+        "AnalogOutputStatus",
+        Type::Double,
+        lib,
+        &flags_struct,
+        &timestamp_struct,
+    )?;
 
     let (octet_string, octet_string_it) = build_octet_string(lib)?;
 
@@ -227,25 +218,18 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         control_struct,
         g12v1_struct,
         binary_point,
-        optional_binary_point,
         binary_it,
         double_bit_binary_point,
-        optional_double_bit_binary_point,
         double_bit_binary_it,
         binary_output_status_point,
-        optional_binary_output_status_point,
         binary_output_status_it,
         counter_point,
-        optional_counter_point,
         counter_it,
         frozen_counter_point,
-        optional_frozen_counter_point,
         frozen_counter_it,
         analog_point,
-        optional_analog_point,
         analog_it,
         analog_output_status_point,
-        optional_analog_output_status_point,
         analog_output_status_it,
         octet_string,
         octet_string_it,
@@ -472,7 +456,7 @@ fn build_iterator(
     lib: &mut LibraryBuilder,
     flags_struct: &NativeStructHandle,
     timestamp_struct: &NativeStructHandle,
-) -> Result<(NativeStructHandle, NativeStructHandle, IteratorHandle), BindingError> {
+) -> Result<(NativeStructHandle, IteratorHandle), BindingError> {
     let value_struct = lib.declare_native_struct(name)?;
     let value_struct = lib
         .define_native_struct(&value_struct)?
@@ -485,22 +469,6 @@ fn build_iterator(
             "Point timestamp",
         )?
         .doc(format!("{} point", name))?
-        .build()?;
-
-    let optional_value_struct_name = format!("Optional{}", name);
-    let optional_value_struct = lib.declare_native_struct(&optional_value_struct_name)?;
-    let optional_value_struct = lib
-        .define_native_struct(&optional_value_struct)?
-        .add(
-            "is_present",
-            Type::Bool,
-            format!(
-                "If this is true, then {{struct:{}.value}} is valid.",
-                optional_value_struct_name
-            ),
-        )?
-        .add("value", Type::Struct(value_struct.clone()), "Value")?
-        .doc(format!("Optionally present value of {}", name))?
         .build()?;
 
     let value_iterator = lib.declare_class(&format!("{}Iterator", name))?;
@@ -516,7 +484,7 @@ fn build_iterator(
 
     let value_iterator = lib.define_iterator(&iterator_next_fn, &value_struct)?;
 
-    Ok((value_struct, optional_value_struct, value_iterator))
+    Ok((value_struct, value_iterator))
 }
 
 fn build_octet_string(

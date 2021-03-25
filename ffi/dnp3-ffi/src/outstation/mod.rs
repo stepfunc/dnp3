@@ -146,10 +146,7 @@ pub unsafe fn outstation_create_serial_session(
 
     runtime.spawn(task)?;
 
-    let handle = Box::new(crate::Outstation {
-        handle,
-        runtime,
-    });
+    let handle = Box::new(crate::Outstation { handle, runtime });
 
     Ok(Box::into_raw(handle))
 }

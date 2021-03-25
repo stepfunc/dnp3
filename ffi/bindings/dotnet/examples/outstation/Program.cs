@@ -127,7 +127,7 @@ class ExampleOutstation
                 // override the default application decoding level
                 config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
                 // ANCHOR_END: outstation_config
-                                
+
                 var application = new TestOutstationApplication();
                 var information = new TestOutstationInformation();
                 var controlHandler = new TestControlHandler();
