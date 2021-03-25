@@ -16,26 +16,29 @@ macro_rules! implement_database_point_operations {
             index: u16,
             point_class: ffi::EventClass,
             config: $ffi_config_type,
-        ) {
+        ) -> bool {
             if let Some(database) = database.as_mut() {
-                database.add(index, point_class.into(), <$lib_config_type>::from(config));
+                return database.add(index, point_class.into(), <$lib_config_type>::from(config));
             }
+            false
         }
 
-        pub unsafe fn $remove_name(database: *mut Database, index: u16) {
+        pub unsafe fn $remove_name(database: *mut Database, index: u16) -> bool {
             if let Some(database) = database.as_mut() {
-                Remove::<$lib_point_type>::remove(database, index);
+                return Remove::<$lib_point_type>::remove(database, index);
             }
+            false
         }
 
         pub unsafe fn $update_name(
             database: *mut Database,
             value: $ffi_point_type,
             options: ffi::UpdateOptions,
-        ) {
+        ) -> bool {
             if let Some(database) = database.as_mut() {
-                database.update(value.index, &<$lib_point_type>::from(value), options.into());
+                return database.update(value.index, &<$lib_point_type>::from(value), options.into());
             }
+            false
         }
 
         pub unsafe fn $get_name(database: *mut Database, index: u16) -> $ffi_optional_point_type {
@@ -166,16 +169,18 @@ pub unsafe fn database_add_octet_string(
     database: *mut Database,
     index: u16,
     point_class: ffi::EventClass,
-) {
+) -> bool {
     if let Some(database) = database.as_mut() {
-        database.add(index, point_class.into(), OctetStringConfig);
+        return database.add(index, point_class.into(), OctetStringConfig);
     }
+    false
 }
 
-pub unsafe fn database_remove_octet_string(database: *mut Database, index: u16) {
+pub unsafe fn database_remove_octet_string(database: *mut Database, index: u16) -> bool {
     if let Some(database) = database.as_mut() {
-        Remove::<OctetString>::remove(database, index);
+        return Remove::<OctetString>::remove(database, index);
     }
+    false
 }
 
 pub unsafe fn database_update_octet_string(
@@ -183,14 +188,15 @@ pub unsafe fn database_update_octet_string(
     index: u16,
     value: *mut OctetStringValue,
     options: ffi::UpdateOptions,
-) {
+) -> bool {
     if let Some(database) = database.as_mut() {
         if let Some(value) = value.as_ref() {
             if let Some(value) = value.into() {
-                database.update(index, &value, options.into());
+                return database.update(index, &value, options.into());
             }
         }
     }
+    false
 }
 
 pub fn update_options_default() -> ffi::UpdateOptions {
