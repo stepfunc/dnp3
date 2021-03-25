@@ -1,5 +1,6 @@
 #include "dnp3rs.h"
 
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -201,7 +202,9 @@ int main()
     runtime_config_t runtime_config = {
         .num_core_threads = 4,
     };
-    runtime_t *runtime = runtime_new(runtime_config);
+    runtime_t *runtime = NULL;
+    if(runtime_new(runtime_config, &runtime) != Dnp3Error_Ok)
+        goto cleanup;
     // ANCHOR_END: runtime_init
 
     // Create the master
@@ -213,7 +216,10 @@ int main()
         .on_change = &client_state_on_change,
         .ctx = NULL,
     };
-    master_t *master = master_create_tcp_session(runtime, LinkErrorMode_Close, master_config, endpoints, retry_strategy_init(), 1000, listener);
+    master_t *master = NULL;
+    if(master_create_tcp_session(runtime, LinkErrorMode_Close, master_config, endpoints, retry_strategy_init(), 1000, listener, &master) != Dnp3Error_Ok)
+        goto cleanup;
+
     endpoint_list_destroy(endpoints);
 
     // Create the association
@@ -247,11 +253,15 @@ int main()
         .get_time = get_time,
         .ctx = NULL,
     };
-    association_id_t association_id = master_add_association(master, 1024, association_config, read_handler, time_provider);
+    association_id_t association_id;
+    if(master_add_association(master, 1024, association_config, read_handler, time_provider, &association_id) != Dnp3Error_Ok)
+        goto cleanup;
 
     // Add an event poll
     request_t *poll_request = request_new_class(false, true, true, true);
-    poll_id_t poll_id = master_add_poll(master, association_id, poll_request, 5000);
+    poll_id_t poll_id;
+    if(master_add_poll(master, association_id, poll_request, 5000, &poll_id) != Dnp3Error_Ok)
+        goto cleanup;
     request_destroy(poll_request);
 
     // start communications
@@ -364,9 +374,11 @@ int main()
 
     // Cleanup
 cleanup:
-    master_destroy(master);
+    if(master)
+        master_destroy(master);
     // ANCHOR: runtime_destroy
-    runtime_destroy(runtime);
+    if(runtime)
+        runtime_destroy(runtime);
     // ANCHOR_END: runtime_destroy
 
     return 0;

@@ -30,6 +30,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .param("reconnect_delay", Type::Duration(DurationMapping::Milliseconds), "delay before reconnecting after a disconnect")?
         .param("listener", Type::Interface(tcp_client_state_listener), "TCP connection listener used to receive updates on the status of the connection")?
         .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occurred"))?
+        .fails_with(shared.error_type.clone())?
         .doc(
             doc("Create a master TCP session connecting to the specified endpoint(s)")
                 .details("The returned master must be gracefully shutdown with {class:Master.[destructor]} when done.")
@@ -45,6 +46,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .param("open_retry_delay", Type::Duration(DurationMapping::Milliseconds), "delay between attempts to open the serial port")?
         .param("listener", Type::Interface(shared.port_state_listener.clone()), "Listener to receive updates on the status of the serial port")?
         .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occurred"))?
+        .fails_with(shared.error_type.clone())?
         .doc(
             doc("Create a master session on the specified serial port")
                 .details("The returned master must be gracefully shutdown with {class:Master.[destructor]} when done.")
@@ -73,6 +75,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             "master to enable",
         )?
         .return_type(ReturnType::Void)?
+        .fails_with(shared.error_type.clone())?
         .doc("start communications")?
         .build()?;
 
@@ -84,6 +87,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             "master to disable",
         )?
         .return_type(ReturnType::Void)?
+        .fails_with(shared.error_type.clone())?
         .doc("stop communications")?
         .build()?;
 
@@ -127,6 +131,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             Type::Struct(association_id.clone()),
             "Id of the association",
         ))?
+        .fails_with(shared.error_type.clone())?
         .doc("Add an association to the master")?
         .build()?;
 
@@ -142,10 +147,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             Type::Struct(association_id.clone()),
             "Id of the association",
         )?
-        .return_type(ReturnType::Type(
-            Type::Bool,
-            "true if the operation was successful".into(),
-        ))?
+        .return_type(ReturnType::void())?
+        .fails_with(shared.error_type.clone())?
         .doc("Remove an association from the master")?
         .build()?;
 
@@ -159,6 +162,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .param("request", Type::ClassRef(request_class.declaration()), "Request to perform")?
         .param("period", Type::Duration(DurationMapping::Milliseconds), "Period to wait between each poll (in ms)")?
         .return_type(ReturnType::new(Type::Struct(poll_id.clone()), "Id of the created poll"))?
+        .fails_with(shared.error_type.clone())?
         .doc(
             doc("Add a periodic poll to an association")
                 .details("Each result of the poll will be sent to the {interface:ReadHandler} of the association.")
@@ -174,6 +178,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param("poll_id", Type::Struct(poll_id.clone()), "Id of the created poll")?
         .return_type(ReturnType::Void)?
+        .fails_with(shared.error_type.clone())?
         .doc(
             doc("Add a periodic poll to an association")
                 .details("Each result of the poll will be sent to the {interface:ReadHandler} of the association.")
@@ -189,6 +194,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param("poll_id", Type::Struct(poll_id), "Id of the poll")?
         .return_type(ReturnType::void())?
+        .fails_with(shared.error_type.clone())?
         .doc(
             doc("Demand the immediate execution of a poll previously created with {class:Master.AddPoll()}.")
                 .details("This method returns immediately. The result will be sent to the registered {interface:ReadHandler}.")
@@ -209,6 +215,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             "Decoding level",
         )?
         .return_type(ReturnType::void())?
+        .fails_with(shared.error_type.clone())?
         .doc("Set the master decoding level for log messages")?
         .build()?;
 
@@ -223,6 +230,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             Type::Struct(shared.decode_level.clone()),
             "Decode level",
         ))?
+        .fails_with(shared.error_type.clone())?
         .doc(
             doc("Get the master decoding level for log messages")
                 .warning("This cannot be called from within a callback."),
@@ -238,6 +246,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .param("request", Type::ClassRef(request_class.declaration()), "Request to send")?
         .param("callback", Type::OneTimeCallback(read_callback), "Callback that will be invoked once the read is complete")?
         .return_type(ReturnType::void())?
+        .fails_with(shared.error_type.clone())?
         .doc(
             doc("Perform a read on the association.")
                 .details("The callback will be called once the read is completely received, but the actual values will be sent to the {interface:ReadHandler} of the association.")
@@ -272,6 +281,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             "Callback that will receive the result of the command",
         )?
         .return_type(ReturnType::void())?
+        .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a command operation on the association")?
         .build()?;
 
@@ -297,6 +307,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             "Callback that will receive the result of the time sync",
         )?
         .return_type(ReturnType::void())?
+        .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a time sync operation to the association")?
         .build()?;
 
@@ -320,6 +331,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             "Callback that will receive the result of the restart",
         )?
         .return_type(ReturnType::void())?
+        .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a cold restart operation to the association")?
         .build()?;
 
@@ -341,6 +353,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             "Callback that will receive the result of the restart",
         )?
         .return_type(ReturnType::void())?
+        .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a warm restart operation to the association")?
         .build()?;
 
@@ -364,6 +377,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             "Callback that will receive the result of the link status",
         )?
         .return_type(ReturnType::void())?
+        .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a link status check")?
         .build()?;
 

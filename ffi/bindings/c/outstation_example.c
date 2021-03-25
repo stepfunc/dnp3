@@ -1,5 +1,6 @@
 #include "dnp3rs.h"
 
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -217,9 +218,13 @@ int main()
     runtime_config_t runtime_config = {
         .num_core_threads = 4,
     };
-    runtime_t *runtime = runtime_new(runtime_config);
+    runtime_t *runtime = NULL;
+    if(runtime_new(runtime_config, &runtime) != Dnp3Error_Ok)
+        goto cleanup;
 
-    tcp_server_t *server = tcpserver_new(runtime, LinkErrorMode_Close, "127.0.0.1:20000");
+    tcp_server_t *server = NULL;
+    if(tcpserver_new(runtime, LinkErrorMode_Close, "127.0.0.1:20000", &server) != Dnp3Error_Ok)
+        goto cleanup;
 
     // ANCHOR: outstation_config
     // create an outstation configuration with default values
@@ -278,8 +283,9 @@ int main()
         .ctx = NULL,
     };
     address_filter_t *address_filter = address_filter_any();
-    outstation_t *outstation =
-        tcpserver_add_outstation(server, config, event_buffer_config_all_types(10), application, information, control_handler, address_filter);
+    outstation_t *outstation = NULL;
+    if(tcpserver_add_outstation(server, config, event_buffer_config_all_types(10), application, information, control_handler, address_filter, &outstation) != Dnp3Error_Ok)
+        goto cleanup;
     address_filter_destroy(address_filter);
 
     // Setup initial points
@@ -375,9 +381,12 @@ int main()
 
     // Cleanup
 cleanup:
-    outstation_destroy(outstation);
-    tcpserver_destroy(server);
-    runtime_destroy(runtime);
+    if(outstation)
+        outstation_destroy(outstation);
+    if(server)
+        tcpserver_destroy(server);
+    if(runtime)
+        runtime_destroy(runtime);
 
     return 0;
 }

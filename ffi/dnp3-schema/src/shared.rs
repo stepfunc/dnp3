@@ -1,6 +1,7 @@
 use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::doc;
+use oo_bindgen::error_type::{ErrorType, ExceptionType};
 use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::native_enum::NativeEnumHandle;
 use oo_bindgen::native_function::{DurationMapping, ReturnType, Type};
@@ -8,6 +9,7 @@ use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
 
 pub struct SharedDefinitions {
+    pub error_type: ErrorType,
     pub port_state_listener: InterfaceHandle,
     pub variation_enum: NativeEnumHandle,
     pub runtime_class: ClassDeclarationHandle,
@@ -43,7 +45,50 @@ pub struct SharedDefinitions {
 }
 
 pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingError> {
+    let error_type = lib
+        .define_error_type(
+            "Dnp3Error",
+            "Dnp3Exception",
+            ExceptionType::UncheckedException,
+        )?
+        .add_error("NullParameter", "Null parameter")?
+        .add_error(
+            "AssociationDoesNotExist",
+            "The specified association does not exist",
+        )?
+        .add_error(
+            "AssociationDuplicateAddress",
+            "Duplicate association address",
+        )?
+        .add_error("InvalidSocketAddress", "Invalid socket address")?
+        .add_error("InvalidDnp3Address", "Invalid link-layer DNP3 address")?
+        .add_error("InvalidBufferSize", "Invalid buffer size")?
+        .add_error(
+            "AddressFilterConflict",
+            "Conflit in the address filter specification",
+        )?
+        .add_error("ServerAlreadyStarted", "Server already started")?
+        .add_error(
+            "ServerBindError",
+            "Server failed to bind to the specified port",
+        )?
+        .add_error("MasterAlreadyShutdown", "Master was already shutdown")?
+        .add_error("RuntimeCreationFailure", "Failed to create tokio runtime")?
+        .add_error("RuntimeDestroyed", "Runtime was already disposed of")?
+        .add_error(
+            "RuntimeCannotBlockWithinAsync",
+            "Runtime cannot execute blocking call within asynchronous context",
+        )?
+        .add_error(
+            "LoggingAlreadyConfigured",
+            "Logging can only be configured once",
+        )?
+        .doc("Global error type used throughout the library")?
+        .build()?;
+
     crate::constants::define(lib)?;
+    let decode_level = crate::logging::define(lib, error_type.clone())?;
+    let runtime_class = crate::runtime::define(lib, error_type.clone())?;
 
     let control_struct = lib.declare_native_struct("Control")?;
     let control_struct = lib
@@ -171,10 +216,11 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     let (octet_string, octet_string_it) = build_octet_string(lib)?;
 
     Ok(SharedDefinitions {
+        error_type,
         port_state_listener: define_port_state_listener(lib)?,
         variation_enum: crate::variation::define(lib)?,
-        runtime_class: crate::runtime::define(lib)?,
-        decode_level: crate::logging::define(lib)?,
+        runtime_class,
+        decode_level,
         retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_params(lib)?,
         link_error_mode: define_link_error_mode(lib)?,
