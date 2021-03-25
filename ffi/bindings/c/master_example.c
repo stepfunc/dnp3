@@ -4,8 +4,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <inttypes.h>
 
-void print_qualifier(qualifier_code_t qualifier) { printf(Variation_to_string(qualifier)); }
+void print_qualifier(qualifier_code_t qualifier) { printf("%s", Variation_to_string(qualifier)); }
 
 void print_variation(variation_t variation) { printf(Variation_to_string(variation)); }
 
@@ -37,7 +38,7 @@ void handle_binary(header_info_t info, binary_iterator_t *it, void *arg)
 
     binary_t *value = NULL;
     while (value = binary_next(it)) {
-        printf("BI %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("BI %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
@@ -53,7 +54,7 @@ void handle_double_bit_binary(header_info_t info, double_bit_binary_iterator_t *
 
     double_bit_binary_t *value = NULL;
     while (value = doublebitbinary_next(it)) {
-        printf("DBBI %u: Value=%X Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("DBBI %u: Value=%X Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
@@ -69,7 +70,7 @@ void handle_binary_output_status(header_info_t info, binary_output_status_iterat
 
     binary_output_status_t *value = NULL;
     while (value = binaryoutputstatus_next(it)) {
-        printf("BOS %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("BOS %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
@@ -85,7 +86,7 @@ void handle_counter(header_info_t info, counter_iterator_t *it, void *arg)
 
     counter_t *value = NULL;
     while (value = counter_next(it)) {
-        printf("Counter %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("Counter %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
@@ -101,7 +102,7 @@ void handle_frozen_counter(header_info_t info, frozen_counter_iterator_t *it, vo
 
     frozen_counter_t *value = NULL;
     while (value = frozencounter_next(it)) {
-        printf("Frozen Counter %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("Frozen Counter %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
@@ -117,7 +118,7 @@ void handle_analog(header_info_t info, analog_iterator_t *it, void *arg)
 
     analog_t *value = NULL;
     while (value = analog_next(it)) {
-        printf("AI %u: Value=%f Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("AI %u: Value=%f Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
@@ -133,7 +134,7 @@ void handle_analog_output_status(header_info_t info, analog_output_status_iterat
 
     analog_output_status_t *value = NULL;
     while (value = analogoutputstatus_next(it)) {
-        printf("AOS %u: Value=%f Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("AOS %u: Value=%f Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
