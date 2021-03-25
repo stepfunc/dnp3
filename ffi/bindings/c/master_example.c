@@ -197,14 +197,18 @@ int main()
     configure_logging(logging_config_init(), logger);
     // ANCHOR_END: logging_init
 
+    // long-lived types that must be freed before exit
+    runtime_t* runtime = NULL;
+    master_t* master = NULL;
+
     // ANCHOR: runtime_init
     // create the runtime
     runtime_config_t runtime_config = {
         .num_core_threads = 4,
-    };
-    runtime_t *runtime = NULL;
-    if(runtime_new(runtime_config, &runtime) != Dnp3Error_Ok)
+    };    
+    if (runtime_new(runtime_config, &runtime)) {
         goto cleanup;
+    }        
     // ANCHOR_END: runtime_init
 
     // Create the master
@@ -216,9 +220,10 @@ int main()
         .on_change = &client_state_on_change,
         .ctx = NULL,
     };
-    master_t *master = NULL;
-    if(master_create_tcp_session(runtime, LinkErrorMode_Close, master_config, endpoints, retry_strategy_init(), 1000, listener, &master) != Dnp3Error_Ok)
+    
+    if (master_create_tcp_session(runtime, LinkErrorMode_Close, master_config, endpoints, retry_strategy_init(), 1000, listener, &master)) {
         goto cleanup;
+    }
 
     endpoint_list_destroy(endpoints);
 
@@ -254,14 +259,14 @@ int main()
         .ctx = NULL,
     };
     association_id_t association_id;
-    if(master_add_association(master, 1024, association_config, read_handler, time_provider, &association_id) != Dnp3Error_Ok)
+    if (master_add_association(master, 1024, association_config, read_handler, time_provider, &association_id)) {
         goto cleanup;
-
+    }
+        
     // Add an event poll
     request_t *poll_request = request_new_class(false, true, true, true);
     poll_id_t poll_id;
-    if(master_add_poll(master, association_id, poll_request, 5000, &poll_id) != Dnp3Error_Ok)
-        goto cleanup;
+    master_add_poll(master, association_id, poll_request, 5000, &poll_id);
     request_destroy(poll_request);
 
     // start communications
@@ -371,14 +376,12 @@ int main()
             printf("Unknown command\n");
         }
     }
-
-    // Cleanup
-cleanup:
-    if(master)
-        master_destroy(master);
+    
+// all of the destroy functions are NULL-safe
+cleanup:    
+    master_destroy(master);
     // ANCHOR: runtime_destroy
-    if(runtime)
-        runtime_destroy(runtime);
+    runtime_destroy(runtime);
     // ANCHOR_END: runtime_destroy
 
     return 0;

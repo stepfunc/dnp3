@@ -58,7 +58,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .add_error("InvalidBufferSize", "Invalid buffer size")?
         .add_error(
             "AddressFilterConflict",
-            "Conflit in the address filter specification",
+            "Conflict in the address filter specification",
         )?
         .add_error("ServerAlreadyStarted", "Server already started")?
         .add_error(
