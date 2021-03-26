@@ -159,10 +159,7 @@ impl TimeSyncTask {
 
         let delay_ms: Option<u16> = objects.get_only_header().and_then(|x| {
             if let Some(CountVariation::Group52Var2(seq)) = x.details.count() {
-                match seq.single() {
-                    Some(x) => Some(x.time),
-                    None => None,
-                }
+                seq.single().map(|x| x.time)
             } else {
                 None
             }

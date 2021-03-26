@@ -116,7 +116,7 @@ impl BitAnd for EventClasses {
 
 impl Classes {
     pub fn new(class0: bool, events: EventClasses) -> Self {
-        Self { events, class0 }
+        Self { class0, events }
     }
 
     pub fn to_request(self) -> ReadRequest {

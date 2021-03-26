@@ -303,13 +303,12 @@ impl std::fmt::Display for FragmentDisplay<'_> {
             }
             Err(err) => {
                 // if an error occurred, we re-parse the object headers so we can log any headers before the error
-                for result in
+                for header in
                     ObjectParser::one_pass(self.fragment.function, self.fragment.raw_objects)
+                        .flatten()
                 {
-                    if let Ok(header) = result {
-                        f.write_str("\n")?;
-                        header.format(self.level.object_values(), f)?;
-                    }
+                    f.write_str("\n")?;
+                    header.format(self.level.object_values(), f)?;
                 }
                 // log the original error after any valid headers that preceded it
                 tracing::warn!("{}", err);

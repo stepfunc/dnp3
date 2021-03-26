@@ -433,10 +433,10 @@ impl Association {
     }
 
     pub(crate) fn on_link_activity(&mut self) {
-        self.next_link_status = match self.config.keep_alive_timeout {
-            Some(timeout) => Some(Instant::now() + timeout),
-            None => None,
-        }
+        self.next_link_status = self
+            .config
+            .keep_alive_timeout
+            .map(|timeout| Instant::now() + timeout)
     }
 
     pub(crate) fn handle_unsolicited_response(&mut self, response: &Response) -> bool {
