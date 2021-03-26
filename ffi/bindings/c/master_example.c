@@ -4,10 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-
-void print_qualifier(qualifier_code_t qualifier) { printf(Variation_to_string(qualifier)); }
-
-void print_variation(variation_t variation) { printf(Variation_to_string(variation)); }
+#include <inttypes.h>
 
 // ANCHOR: logging_callback
 // callback which will receive log messages
@@ -28,124 +25,92 @@ void end_fragment(read_type_t read_type, response_header_t header, void *arg) { 
 void handle_binary(header_info_t info, binary_iterator_t *it, void *arg)
 {
     printf("Binaries:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     binary_t *value = NULL;
     while (value = binary_next(it)) {
-        printf("BI %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("BI %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
 void handle_double_bit_binary(header_info_t info, double_bit_binary_iterator_t *it, void *arg)
 {
     printf("Double Bit Binaries:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     double_bit_binary_t *value = NULL;
     while (value = doublebitbinary_next(it)) {
-        printf("DBBI %u: Value=%X Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("DBBI %u: Value=%X Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
 void handle_binary_output_status(header_info_t info, binary_output_status_iterator_t *it, void *arg)
 {
     printf("Binary Output Statuses:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     binary_output_status_t *value = NULL;
     while (value = binaryoutputstatus_next(it)) {
-        printf("BOS %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("BOS %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
 void handle_counter(header_info_t info, counter_iterator_t *it, void *arg)
 {
     printf("Counters:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     counter_t *value = NULL;
     while (value = counter_next(it)) {
-        printf("Counter %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("Counter %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
 void handle_frozen_counter(header_info_t info, frozen_counter_iterator_t *it, void *arg)
 {
     printf("Frozen Counters:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     frozen_counter_t *value = NULL;
     while (value = frozencounter_next(it)) {
-        printf("Frozen Counter %u: Value=%u Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("Frozen Counter %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
 void handle_analog(header_info_t info, analog_iterator_t *it, void *arg)
 {
     printf("Analogs:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     analog_t *value = NULL;
     while (value = analog_next(it)) {
-        printf("AI %u: Value=%f Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("AI %u: Value=%f Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
 void handle_analog_output_status(header_info_t info, analog_output_status_iterator_t *it, void *arg)
 {
     printf("Analog Output Statuses:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     analog_output_status_t *value = NULL;
     while (value = analogoutputstatus_next(it)) {
-        printf("AOS %u: Value=%f Flags=0x%02X Time=%llu\n", value->index, value->value, value->flags.value, value->time.value);
+        printf("AOS %u: Value=%f Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
 void handle_octet_strings(header_info_t info, octet_string_iterator_t *it, void *arg)
 {
     printf("Octet Strings:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     octet_string_t *value = NULL;
     while (value = octetstring_next(it)) {
@@ -197,14 +162,18 @@ int main()
     configure_logging(logging_config_init(), logger);
     // ANCHOR_END: logging_init
 
+    // long-lived types that must be freed before exit
+    runtime_t* runtime = NULL;
+    master_t* master = NULL;
+
     // ANCHOR: runtime_init
     // create the runtime
     runtime_config_t runtime_config = {
         .num_core_threads = 4,
-    };
-    runtime_t *runtime = NULL;
-    if(runtime_new(runtime_config, &runtime) != Dnp3Error_Ok)
+    };    
+    if (runtime_new(runtime_config, &runtime)) {
         goto cleanup;
+    }        
     // ANCHOR_END: runtime_init
 
     // Create the master
@@ -216,9 +185,10 @@ int main()
         .on_change = &client_state_on_change,
         .ctx = NULL,
     };
-    master_t *master = NULL;
-    if(master_create_tcp_session(runtime, LinkErrorMode_Close, master_config, endpoints, retry_strategy_init(), 1000, listener, &master) != Dnp3Error_Ok)
+    
+    if (master_create_tcp_session(runtime, LinkErrorMode_Close, master_config, endpoints, retry_strategy_init(), 1000, listener, &master)) {
         goto cleanup;
+    }
 
     endpoint_list_destroy(endpoints);
 
@@ -254,14 +224,14 @@ int main()
         .ctx = NULL,
     };
     association_id_t association_id;
-    if(master_add_association(master, 1024, association_config, read_handler, time_provider, &association_id) != Dnp3Error_Ok)
+    if (master_add_association(master, 1024, association_config, read_handler, time_provider, &association_id)) {
         goto cleanup;
-
+    }
+        
     // Add an event poll
     request_t *poll_request = request_new_class(false, true, true, true);
     poll_id_t poll_id;
-    if(master_add_poll(master, association_id, poll_request, 5000, &poll_id) != Dnp3Error_Ok)
-        goto cleanup;
+    master_add_poll(master, association_id, poll_request, 5000, &poll_id);
     request_destroy(poll_request);
 
     // start communications
@@ -371,14 +341,12 @@ int main()
             printf("Unknown command\n");
         }
     }
-
-    // Cleanup
-cleanup:
-    if(master)
-        master_destroy(master);
+    
+// all of the destroy functions are NULL-safe
+cleanup:    
+    master_destroy(master);
     // ANCHOR: runtime_destroy
-    if(runtime)
-        runtime_destroy(runtime);
+    runtime_destroy(runtime);
     // ANCHOR_END: runtime_destroy
 
     return 0;

@@ -214,17 +214,22 @@ int main()
     // initialize logging with the default configuration
     configure_logging(logging_config_init(), logger);
 
+    // types that get heap allocated and must be freed in "cleanup"
+    runtime_t* runtime = NULL;
+    tcp_server_t* server = NULL;
+    outstation_t* outstation = NULL;
+
     // Create runtime
     runtime_config_t runtime_config = {
         .num_core_threads = 4,
     };
-    runtime_t *runtime = NULL;
-    if(runtime_new(runtime_config, &runtime) != Dnp3Error_Ok)
+    if (runtime_new(runtime_config, &runtime)) {        
         goto cleanup;
+    }
 
-    tcp_server_t *server = NULL;
-    if(tcpserver_new(runtime, LinkErrorMode_Close, "127.0.0.1:20000", &server) != Dnp3Error_Ok)
+    if (tcpserver_new(runtime, LinkErrorMode_Close, "127.0.0.1:20000", &server)) {
         goto cleanup;
+    }
 
     // ANCHOR: outstation_config
     // create an outstation configuration with default values
@@ -282,10 +287,10 @@ int main()
         .on_destroy = NULL,
         .ctx = NULL,
     };
-    address_filter_t *address_filter = address_filter_any();
-    outstation_t *outstation = NULL;
-    if(tcpserver_add_outstation(server, config, event_buffer_config_all_types(10), application, information, control_handler, address_filter, &outstation) != Dnp3Error_Ok)
+    address_filter_t *address_filter = address_filter_any();    
+    if (tcpserver_add_outstation(server, config, event_buffer_config_all_types(10), application, information, control_handler, address_filter, &outstation)) {
         goto cleanup;
+    }        
     address_filter_destroy(address_filter);
 
     // Setup initial points
@@ -295,8 +300,8 @@ int main()
     };
     outstation_transaction(outstation, startup_transaction);
 
-    // Start the outstation
-    if (!tcpserver_bind(server)) {
+    // Start the outstation    
+    if (tcpserver_bind(server)) {
         printf("unable to bind server\n");
         goto cleanup;
     }
@@ -378,15 +383,11 @@ int main()
             printf("Unknown command\n");
         }
     }
-
-    // Cleanup
-cleanup:
-    if(outstation)
-        outstation_destroy(outstation);
-    if(server)
-        tcpserver_destroy(server);
-    if(runtime)
-        runtime_destroy(runtime);
-
+    
+// all of the destroy functions are NULL-safe
+cleanup:    
+    outstation_destroy(outstation);
+    tcpserver_destroy(server);
+    runtime_destroy(runtime);    
     return 0;
 }
