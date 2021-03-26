@@ -6,10 +6,6 @@
 #include <time.h>
 #include <inttypes.h>
 
-void print_qualifier(qualifier_code_t qualifier) { printf("%s", Variation_to_string(qualifier)); }
-
-void print_variation(variation_t variation) { printf(Variation_to_string(variation)); }
-
 // ANCHOR: logging_callback
 // callback which will receive log messages
 void on_log_message(log_level_t level, const char *msg, void *ctx) { printf("%s", msg); }
@@ -29,12 +25,8 @@ void end_fragment(read_type_t read_type, response_header_t header, void *arg) { 
 void handle_binary(header_info_t info, binary_iterator_t *it, void *arg)
 {
     printf("Binaries:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     binary_t *value = NULL;
     while (value = binary_next(it)) {
@@ -45,12 +37,8 @@ void handle_binary(header_info_t info, binary_iterator_t *it, void *arg)
 void handle_double_bit_binary(header_info_t info, double_bit_binary_iterator_t *it, void *arg)
 {
     printf("Double Bit Binaries:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     double_bit_binary_t *value = NULL;
     while (value = doublebitbinary_next(it)) {
@@ -61,12 +49,8 @@ void handle_double_bit_binary(header_info_t info, double_bit_binary_iterator_t *
 void handle_binary_output_status(header_info_t info, binary_output_status_iterator_t *it, void *arg)
 {
     printf("Binary Output Statuses:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     binary_output_status_t *value = NULL;
     while (value = binaryoutputstatus_next(it)) {
@@ -77,12 +61,8 @@ void handle_binary_output_status(header_info_t info, binary_output_status_iterat
 void handle_counter(header_info_t info, counter_iterator_t *it, void *arg)
 {
     printf("Counters:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     counter_t *value = NULL;
     while (value = counter_next(it)) {
@@ -93,12 +73,8 @@ void handle_counter(header_info_t info, counter_iterator_t *it, void *arg)
 void handle_frozen_counter(header_info_t info, frozen_counter_iterator_t *it, void *arg)
 {
     printf("Frozen Counters:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     frozen_counter_t *value = NULL;
     while (value = frozencounter_next(it)) {
@@ -109,12 +85,8 @@ void handle_frozen_counter(header_info_t info, frozen_counter_iterator_t *it, vo
 void handle_analog(header_info_t info, analog_iterator_t *it, void *arg)
 {
     printf("Analogs:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     analog_t *value = NULL;
     while (value = analog_next(it)) {
@@ -125,12 +97,8 @@ void handle_analog(header_info_t info, analog_iterator_t *it, void *arg)
 void handle_analog_output_status(header_info_t info, analog_output_status_iterator_t *it, void *arg)
 {
     printf("Analog Output Statuses:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     analog_output_status_t *value = NULL;
     while (value = analogoutputstatus_next(it)) {
@@ -141,12 +109,8 @@ void handle_analog_output_status(header_info_t info, analog_output_status_iterat
 void handle_octet_strings(header_info_t info, octet_string_iterator_t *it, void *arg)
 {
     printf("Octet Strings:\n");
-    printf("Qualifier: ");
-    print_qualifier(info.qualifier);
-    printf("\n");
-    printf("Variation: ");
-    print_variation(info.variation);
-    printf("\n");
+    printf("Qualifier: %s \n", QualifierCode_to_string(info.qualifier));
+    printf("Variation: %s \n", Variation_to_string(info.variation));
 
     octet_string_t *value = NULL;
     while (value = octetstring_next(it)) {
