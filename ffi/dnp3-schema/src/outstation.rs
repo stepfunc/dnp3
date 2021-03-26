@@ -121,7 +121,7 @@ fn define_outstation(
     types: &OutstationTypes,
 ) -> Result<ClassHandle, BindingError> {
     let transaction_interface = lib
-        .define_one_time_callback("OutstationTransaction", "Outstation transaction interface")?
+        .define_interface("OutstationTransaction", "Outstation transaction interface")?
         .callback(
             "execute",
             "Execute the transaction with the provided database",
@@ -133,6 +133,7 @@ fn define_outstation(
         )?
         .return_type(ReturnType::void())?
         .build()?
+        .destroy_callback("on_destroy")?
         .build()?;
 
     let outstation = lib.declare_class("Outstation")?;
@@ -198,7 +199,7 @@ fn define_outstation(
         )?
         .param(
             "callback",
-            Type::OneTimeCallback(transaction_interface),
+            Type::Interface(transaction_interface),
             "Method to execute as a transaction",
         )?
         .return_type(ReturnType::void())?
