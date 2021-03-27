@@ -528,6 +528,10 @@ fn define_association_config(
              Type::Struct(event_classes),
              doc("Classes to automatically send reads when the IIN bit is asserted")
         )?
+        .add("max_queued_user_requests",
+            StructElementType::Uint16(Some(16)),
+            doc("maximum number of user requests (e.g. commands, adhoc reads, etc) that will be queued before back-pressure is applied by failing requests")
+        )?
         .doc("Association configuration")?
         .build()
 }

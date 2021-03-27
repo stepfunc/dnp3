@@ -24,6 +24,8 @@ pub enum AssociationError {
 /// Errors that can occur while executing a master task
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskError {
+    /// There are too many user requests queued
+    TooManyRequests,
     /// An error occurred at the link level
     Link(LinkError),
     /// An error occurred at the transport/app level
@@ -175,6 +177,9 @@ impl std::fmt::Display for CommandError {
 impl std::fmt::Display for TaskError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            TaskError::TooManyRequests => {
+                f.write_str("the number of queued user requests has reached the configured limit")
+            }
             TaskError::Link(_) => f.write_str("link-layer or I/O error"),
             TaskError::Transport => f.write_str("malformed response"),
             TaskError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
