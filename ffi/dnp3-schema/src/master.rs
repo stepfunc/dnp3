@@ -1041,9 +1041,7 @@ fn define_command_builder(
         .build()
 }
 
-fn define_time_sync_callback(
-    lib: &mut LibraryBuilder,
-) -> Result<InterfaceHandle, BindingError> {
+fn define_time_sync_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let timesync_result = lib
         .define_native_enum("TimeSyncResult")?
         .push("Success", "Time synchronization operation was a success")?
@@ -1100,9 +1098,7 @@ fn define_time_sync_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, B
         .build()
 }
 
-fn define_restart_callback(
-    lib: &mut LibraryBuilder,
-) -> Result<InterfaceHandle, BindingError> {
+fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let restart_success = lib
         .define_native_enum("RestartSuccess")?
         .push("Success", "Restart was perform successfully")?
@@ -1133,9 +1129,7 @@ fn define_restart_callback(
         .build()
 }
 
-fn define_link_status_callback(
-    lib: &mut LibraryBuilder,
-) -> Result<InterfaceHandle, BindingError> {
+fn define_link_status_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let link_status_enum = lib
         .define_native_enum("LinkStatusResult")?
         .push(
