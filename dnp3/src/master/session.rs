@@ -168,9 +168,16 @@ impl MasterSession {
         }
     }
 
+    pub(crate) async fn shutdown(&mut self) {
+        // close the receiver to new messages
+        self.messages.close();
+        // process any existing messages
+        while let Ok(()) = self.process_message(false).await {}
+    }
+
     /// Wait until a message is received or a response is received.
     ///
-    /// Returns an error only if shutdown or link layer error occured.
+    /// Returns an error only if shutdown or link layer error occurred.
     async fn idle_forever(
         &mut self,
         io: &mut PhysLayer,
