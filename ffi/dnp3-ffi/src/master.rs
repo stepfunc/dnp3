@@ -264,9 +264,9 @@ pub unsafe fn master_operate(
     let task = async move {
         let result = match handle.operate(mode.into(), headers).await {
             Ok(_) => ffi::CommandResult::Success,
-            Err(CommandError::Task(_)) => ffi::CommandResult::TaskError,
+            Err(CommandError::Task(err)) => err.into(),
             Err(CommandError::Response(err)) => match err {
-                CommandResponseError::Request(_) => ffi::CommandResult::TaskError,
+                CommandResponseError::Request(err) => err.into(),
                 CommandResponseError::BadStatus(_) => ffi::CommandResult::BadStatus,
                 CommandResponseError::HeaderCountMismatch => ffi::CommandResult::HeaderMismatch,
                 CommandResponseError::HeaderTypeMismatch => ffi::CommandResult::HeaderMismatch,
@@ -672,6 +672,28 @@ impl From<PollError> for ffi::Dnp3Error {
         match error {
             PollError::Shutdown => ffi::Dnp3Error::MasterAlreadyShutdown,
             PollError::NoSuchAssociation(_) => ffi::Dnp3Error::AssociationDoesNotExist,
+        }
+    }
+}
+
+impl From<TaskError> for ffi::CommandResult {
+    fn from(err: TaskError) -> Self {
+        match err {
+            TaskError::TooManyRequests => ffi::CommandResult::TooManyRequests,
+            TaskError::Link(_) => ffi::CommandResult::NoConnection,
+            TaskError::Transport => ffi::CommandResult::NoConnection,
+            TaskError::MalformedResponse(_) => ffi::CommandResult::BadResponse,
+            TaskError::UnexpectedResponseHeaders => ffi::CommandResult::BadResponse,
+            TaskError::NonFinWithoutCon => ffi::CommandResult::BadResponse,
+            TaskError::NeverReceivedFir => ffi::CommandResult::BadResponse,
+            TaskError::UnexpectedFir => ffi::CommandResult::BadResponse,
+            TaskError::MultiFragmentResponse => ffi::CommandResult::BadResponse,
+            TaskError::ResponseTimeout => ffi::CommandResult::ResponseTimeout,
+            TaskError::WriteError => ffi::CommandResult::WriteError,
+            TaskError::NoSuchAssociation(_) => ffi::CommandResult::AssociationRemoved,
+            TaskError::NoConnection => ffi::CommandResult::NoConnection,
+            TaskError::Shutdown => ffi::CommandResult::Shutdown,
+            TaskError::Disabled => ffi::CommandResult::NoConnection,
         }
     }
 }

@@ -7,7 +7,7 @@ use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
-use oo_bindgen::native_enum::NativeEnumHandle;
+use oo_bindgen::native_enum::{NativeEnumBuilder, NativeEnumHandle};
 
 pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<(), BindingError> {
     let read_handler = crate::handler::define(lib, shared)?;
@@ -766,21 +766,38 @@ fn define_command_mode(
         .build()
 }
 
+fn add_task_errors(builder: NativeEnumBuilder) -> Result<NativeEnumBuilder, BindingError> {
+    builder
+        .push("TooManyRequests", "too many user requests queued")?
+        .push(
+            "BadResponse",
+            "response was malformed or contained object headers",
+        )?
+        .push(
+            "ResponseTimeout",
+            "timeout occurred before receiving a response",
+        )?
+        .push(
+            "WriteError",
+            "insufficient buffer space to serialize the request",
+        )?
+        .push("NoConnection", "no connection")?
+        .push("Shutdown", "master was shutdown")?
+        .push("AssociationRemoved", "association was removed mid-task")
+}
+
 fn define_command_callback(
     lib: &mut LibraryBuilder,
 ) -> std::result::Result<InterfaceHandle, BindingError> {
-    let command_result = lib
+    let builder = lib
         .define_native_enum("CommandResult")?
         .push("Success", "Command was a success")?
         .push("TaskError", "Failed b/c of a generic task execution error")?
-        .push(
-            "BadStatus",
-            "Outstation indicated that a command was not SUCCESS",
-        )?
-        .push(
-            "HeaderMismatch",
-            "Number of headers and/or objects in the response didn't match the number in the request",
-        )?
+        .push("BadStatus", "Outstation indicated that a command was not SUCCESS")?
+        .push("HeaderMismatch", "Number of headers and/or objects in the response didn't match the number in the request")?;
+
+    let command_result = add_task_errors(builder)?
+        // -------------------
         .doc("Result of a command")?
         .build()?;
 

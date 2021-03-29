@@ -338,7 +338,8 @@ impl MasterSession {
         match result {
             Ok(()) => Ok(()),
             Err(err) => match err {
-                TaskError::State(x) => Err(RunError::State(x)),
+                TaskError::Shutdown => Err(RunError::State(StateChange::Shutdown)),
+                TaskError::Disabled => Err(RunError::State(StateChange::Disable)),
                 TaskError::Link(err) => Err(RunError::Link(err)),
                 _ => Ok(()),
             },
