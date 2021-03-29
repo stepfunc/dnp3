@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use oo_bindgen::callback::{InterfaceHandle, OneTimeCallbackHandle};
+use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::class::ClassHandle;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::*;
@@ -244,7 +244,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .param("master", Type::ClassRef(master_class.clone()), "Master on which to perform the operation")?
         .param("association", Type::Struct(association_id.clone()), "Association on which to perform the read")?
         .param("request", Type::ClassRef(request_class.declaration()), "Request to send")?
-        .param("callback", Type::OneTimeCallback(read_callback), "Callback that will be invoked once the read is complete")?
+        .param("callback", Type::Interface(read_callback), "Callback that will be invoked once the read is complete")?
         .return_type(ReturnType::void())?
         .fails_with(shared.error_type.clone())?
         .doc(
@@ -277,7 +277,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param(
             "callback",
-            Type::OneTimeCallback(command_cb),
+            Type::Interface(command_cb),
             "Callback that will receive the result of the command",
         )?
         .return_type(ReturnType::void())?
@@ -303,7 +303,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .param("mode", Type::Enum(time_sync_mode), "Time sync mode")?
         .param(
             "callback",
-            Type::OneTimeCallback(time_sync_cb),
+            Type::Interface(time_sync_cb),
             "Callback that will receive the result of the time sync",
         )?
         .return_type(ReturnType::void())?
@@ -327,7 +327,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param(
             "callback",
-            Type::OneTimeCallback(restart_cb.clone()),
+            Type::Interface(restart_cb.clone()),
             "Callback that will receive the result of the restart",
         )?
         .return_type(ReturnType::void())?
@@ -349,7 +349,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param(
             "callback",
-            Type::OneTimeCallback(restart_cb),
+            Type::Interface(restart_cb),
             "Callback that will receive the result of the restart",
         )?
         .return_type(ReturnType::void())?
@@ -373,7 +373,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param(
             "callback",
-            Type::OneTimeCallback(link_status_cb),
+            Type::Interface(link_status_cb),
             "Callback that will receive the result of the link status",
         )?
         .return_type(ReturnType::void())?
@@ -447,7 +447,7 @@ fn define_poll_id(
 
 fn define_read_callback(
     lib: &mut LibraryBuilder,
-) -> std::result::Result<OneTimeCallbackHandle, BindingError> {
+) -> std::result::Result<InterfaceHandle, BindingError> {
     let read_result = lib
         .define_native_enum("ReadResult")?
         .push("Success", "Read was perform successfully")?
@@ -455,7 +455,7 @@ fn define_read_callback(
         .doc("Result of a read operation")?
         .build()?;
 
-    lib.define_one_time_callback("ReadTaskCallback", "Handler for read tasks")?
+    lib.define_interface("ReadTaskCallback", "Handler for read tasks")?
         .callback(
             "on_complete",
             "Called when the read task reached completion or failed",
@@ -463,6 +463,7 @@ fn define_read_callback(
         .param("result", Type::Enum(read_result), "Result of the read task")?
         .return_type(ReturnType::void())?
         .build()?
+        .destroy_callback("on_destroy")?
         .build()
 }
 
@@ -763,7 +764,7 @@ fn define_command_mode(
 
 fn define_command_callback(
     lib: &mut LibraryBuilder,
-) -> std::result::Result<OneTimeCallbackHandle, BindingError> {
+) -> std::result::Result<InterfaceHandle, BindingError> {
     let command_result = lib
         .define_native_enum("CommandResult")?
         .push("Success", "Command was a success")?
@@ -791,7 +792,7 @@ fn define_command_callback(
         .doc("Result of a command")?
         .build()?;
 
-    lib.define_one_time_callback("CommandTaskCallback", "Handler for command tasks")?
+    lib.define_interface("CommandTaskCallback", "Handler for command tasks")?
         .callback(
             "on_complete",
             "Called when the command task reached completion or failed",
@@ -803,6 +804,7 @@ fn define_command_callback(
         )?
         .return_type(ReturnType::void())?
         .build()?
+        .destroy_callback("on_destroy")?
         .build()
 }
 
@@ -1039,9 +1041,7 @@ fn define_command_builder(
         .build()
 }
 
-fn define_time_sync_callback(
-    lib: &mut LibraryBuilder,
-) -> Result<OneTimeCallbackHandle, BindingError> {
+fn define_time_sync_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let timesync_result = lib
         .define_native_enum("TimeSyncResult")?
         .push("Success", "Time synchronization operation was a success")?
@@ -1065,7 +1065,7 @@ fn define_time_sync_callback(
         .doc("Result of a time sync operation")?
         .build()?;
 
-    lib.define_one_time_callback(
+    lib.define_interface(
         "TimeSyncTaskCallback",
         "Handler for time synchronization tasks",
     )?
@@ -1080,6 +1080,7 @@ fn define_time_sync_callback(
     )?
     .return_type(ReturnType::void())?
     .build()?
+    .destroy_callback("on_destroy")?
     .build()
 }
 
@@ -1097,9 +1098,7 @@ fn define_time_sync_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, B
         .build()
 }
 
-fn define_restart_callback(
-    lib: &mut LibraryBuilder,
-) -> Result<OneTimeCallbackHandle, BindingError> {
+fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let restart_success = lib
         .define_native_enum("RestartSuccess")?
         .push("Success", "Restart was perform successfully")?
@@ -1114,7 +1113,7 @@ fn define_restart_callback(
         .doc("Result of a restart task")?
         .build()?;
 
-    lib.define_one_time_callback("RestartTaskCallback", "Handler for restart tasks")?
+    lib.define_interface("RestartTaskCallback", "Handler for restart tasks")?
         .callback(
             "on_complete",
             "Called when the restart task reached completion or failed",
@@ -1126,12 +1125,11 @@ fn define_restart_callback(
         )?
         .return_type(ReturnType::void())?
         .build()?
+        .destroy_callback("on_destroy")?
         .build()
 }
 
-fn define_link_status_callback(
-    lib: &mut LibraryBuilder,
-) -> Result<OneTimeCallbackHandle, BindingError> {
+fn define_link_status_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let link_status_enum = lib
         .define_native_enum("LinkStatusResult")?
         .push(
@@ -1149,7 +1147,7 @@ fn define_link_status_callback(
         .doc("Result of a link status check. See {class:Master.CheckLinkStatus()}")?
         .build()?;
 
-    lib.define_one_time_callback("LinkStatusCallback", "Handler for link status check")?
+    lib.define_interface("LinkStatusCallback", "Handler for link status check")?
         .callback("on_complete", "Called when a link status is received")?
         .param(
             "result",
@@ -1158,5 +1156,6 @@ fn define_link_status_callback(
         )?
         .return_type(ReturnType::void())?
         .build()?
+        .destroy_callback("on_destroy")?
         .build()
 }

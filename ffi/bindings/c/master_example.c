@@ -154,6 +154,8 @@ int main()
     logger_t logger = {
         // function pointer where log messages will be sent
         .on_message = &on_log_message,
+        // no context to free
+        .on_destroy = NULL,
         // optional context argument applied to all log callbacks
         .ctx = NULL,
     };
@@ -183,6 +185,7 @@ int main()
     endpoint_list_t *endpoints = endpoint_list_new("127.0.0.1:20000");
     client_state_listener_t listener = {
         .on_change = &client_state_on_change,
+        .on_destroy = NULL,
         .ctx = NULL,
     };
     
@@ -204,6 +207,7 @@ int main()
         .handle_analog = &handle_analog,
         .handle_analog_output_status = &handle_analog_output_status,
         .handle_octet_string = &handle_octet_strings,
+        .on_destroy = NULL,
         .ctx = NULL,
     };
 
@@ -221,6 +225,7 @@ int main()
 
     time_provider_t time_provider = {
         .get_time = get_time,
+        .on_destroy = NULL,
         .ctx = NULL,
     };
     association_id_t association_id;
@@ -266,6 +271,7 @@ int main()
 
             read_task_callback_t cb = {
                 .on_complete = &on_read_complete,
+                .on_destroy = NULL,
                 .ctx = NULL,
             };
             master_read(master, association_id, request, cb);
@@ -279,6 +285,7 @@ int main()
 
             read_task_callback_t cb = {
                 .on_complete = &on_read_complete,
+                .on_destroy = NULL,
                 .ctx = NULL,
             };
             master_read(master, association_id, request, cb);
@@ -292,6 +299,7 @@ int main()
 
             command_task_callback_t cb = {
                 .on_complete = &on_command_complete,
+                .on_destroy = NULL,
                 .ctx = NULL,
             };
 
@@ -305,6 +313,7 @@ int main()
         else if (strcmp(cbuf, "lts\n") == 0) {
             time_sync_task_callback_t cb = {
                 .on_complete = &on_timesync_complete,
+                .on_destroy = NULL,
                 .ctx = NULL,
             };
             master_sync_time(master, association_id, TimeSyncMode_Lan, cb);
@@ -312,6 +321,7 @@ int main()
         else if (strcmp(cbuf, "nts\n") == 0) {
             time_sync_task_callback_t cb = {
                 .on_complete = &on_timesync_complete,
+                .on_destroy = NULL,
                 .ctx = NULL,
             };
             master_sync_time(master, association_id, TimeSyncMode_NonLan, cb);
@@ -319,6 +329,7 @@ int main()
         else if (strcmp(cbuf, "crt\n") == 0) {
             restart_task_callback_t cb = {
                 .on_complete = &on_restart_complete,
+                .on_destroy = NULL,
                 .ctx = NULL,
             };
             master_cold_restart(master, association_id, cb);
@@ -326,6 +337,7 @@ int main()
         else if (strcmp(cbuf, "wrt\n") == 0) {
             restart_task_callback_t cb = {
                 .on_complete = &on_restart_complete,
+                .on_destroy = NULL,
                 .ctx = NULL,
             };
             master_warm_restart(master, association_id, cb);
@@ -333,6 +345,7 @@ int main()
         else if (strcmp(cbuf, "lsr\n") == 0) {
             link_status_callback_t cb = {
                 .on_complete = &on_link_status_complete,
+                .on_destroy = NULL,
                 .ctx = NULL,
             };
             master_check_link_status(master, association_id, cb);
