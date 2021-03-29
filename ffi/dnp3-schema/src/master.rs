@@ -792,9 +792,8 @@ fn define_command_callback(
     let builder = lib
         .define_native_enum("CommandResult")?
         .push("Success", "Command was a success")?
-        .push("TaskError", "Failed b/c of a generic task execution error")?
         .push("BadStatus", "Outstation indicated that a command was not SUCCESS")?
-        .push("HeaderMismatch", "Number of headers and/or objects in the response didn't match the number in the request")?;
+        .push("HeaderMismatch", "Number of headers or objects in the response didn't match the number in the request")?;
 
     let command_result = add_task_errors(builder)?
         // -------------------
