@@ -40,6 +40,10 @@ impl<T> Receiver<T> {
             None => Err(Shutdown),
         }
     }
+
+    pub(crate) fn close(&mut self) {
+        self.inner.close()
+    }
 }
 
 impl<T> Sender<T> {

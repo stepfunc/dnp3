@@ -129,6 +129,7 @@ pub unsafe fn master_add_association(
         event_scan_on_events_available: convert_event_classes(
             &config.event_scan_on_events_available(),
         ),
+        max_queued_user_requests: config.max_queued_user_requests as usize,
     };
 
     let handler = AssociationHandlerAdapter {
