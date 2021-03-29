@@ -760,7 +760,7 @@ fn define_command_mode(
         .push("DirectOperate", "Perform a Direct Operate (0x05)")?
         .push(
             "SelectBeforeOperate",
-            "Perform a Select & Operate (0x03 then 0x04)",
+            "Perform a Select and Operate (0x03 then 0x04)",
         )?
         .doc("Command operation mode")?
         .build()
@@ -778,20 +778,8 @@ fn define_command_callback(
             "Outstation indicated that a command was not SUCCESS",
         )?
         .push(
-            "HeaderCountMismatch",
-            "Number of headers in the response doesn't match the number in the request",
-        )?
-        .push(
-            "HeaderTypeMismatch",
-            "Header in the response doesn't match the request",
-        )?
-        .push(
-            "ObjectCountMismatch",
-            "Number of objects in one of the headers doesn't match the request",
-        )?
-        .push(
-            "ObjectValueMismatch",
-            "Value in one of the objects in the response doesn't match the request",
+            "HeaderMismatch",
+            "Number of headers and/or objects in the response didn't match the number in the request",
         )?
         .doc("Result of a command")?
         .build()?;

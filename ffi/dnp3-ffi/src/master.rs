@@ -268,16 +268,10 @@ pub unsafe fn master_operate(
             Err(CommandError::Response(err)) => match err {
                 CommandResponseError::Request(_) => ffi::CommandResult::TaskError,
                 CommandResponseError::BadStatus(_) => ffi::CommandResult::BadStatus,
-                CommandResponseError::HeaderCountMismatch => {
-                    ffi::CommandResult::HeaderCountMismatch
-                }
-                CommandResponseError::HeaderTypeMismatch => ffi::CommandResult::HeaderTypeMismatch,
-                CommandResponseError::ObjectCountMismatch => {
-                    ffi::CommandResult::ObjectCountMismatch
-                }
-                CommandResponseError::ObjectValueMismatch => {
-                    ffi::CommandResult::ObjectValueMismatch
-                }
+                CommandResponseError::HeaderCountMismatch => ffi::CommandResult::HeaderMismatch,
+                CommandResponseError::HeaderTypeMismatch => ffi::CommandResult::HeaderMismatch,
+                CommandResponseError::ObjectCountMismatch => ffi::CommandResult::HeaderMismatch,
+                CommandResponseError::ObjectValueMismatch => ffi::CommandResult::HeaderMismatch,
             },
         };
 
