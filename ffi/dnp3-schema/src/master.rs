@@ -22,19 +22,47 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
 
     let master_create_tcp_session_fn = lib
         .declare_native_function("master_create_tcp_session")?
-        .param("runtime", Type::ClassRef(shared.runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
-        .param("link_error_mode", Type::Enum(shared.link_error_mode.clone()), "Controls how link errors are handled with respect to the TCP session")?
-        .param("config", Type::Struct(master_config.clone()), "Master configuration")?
-        .param("endpoints", Type::ClassRef(endpoint_list.declaration()), "List of IP endpoints.")?
-        .param("connect_strategy", Type::Struct(shared.retry_strategy.clone()), "Connection retry strategy to use")?
-        .param("reconnect_delay", Type::Duration(DurationMapping::Milliseconds), "delay before reconnecting after a disconnect")?
-        .param("listener", Type::Interface(tcp_client_state_listener), "TCP connection listener used to receive updates on the status of the connection")?
-        .return_type(ReturnType::new(Type::ClassRef(master_class.clone()), "Handle to the master created, {null} if an error occurred"))?
-        .fails_with(shared.error_type.clone())?
-        .doc(
-            doc("Create a master TCP session connecting to the specified endpoint(s)")
-                .details("The returned master must be gracefully shutdown with {class:Master.[destructor]} when done.")
+        .param(
+            "runtime",
+            Type::ClassRef(shared.runtime_class.clone()),
+            "Runtime to use to drive asynchronous operations of the master",
         )?
+        .param(
+            "link_error_mode",
+            Type::Enum(shared.link_error_mode.clone()),
+            "Controls how link errors are handled with respect to the TCP session",
+        )?
+        .param(
+            "config",
+            Type::Struct(master_config.clone()),
+            "Master configuration",
+        )?
+        .param(
+            "endpoints",
+            Type::ClassRef(endpoint_list.declaration()),
+            "List of IP endpoints.",
+        )?
+        .param(
+            "connect_strategy",
+            Type::Struct(shared.retry_strategy.clone()),
+            "Connection retry strategy to use",
+        )?
+        .param(
+            "reconnect_delay",
+            Type::Duration(DurationMapping::Milliseconds),
+            "delay before reconnecting after a disconnect",
+        )?
+        .param(
+            "listener",
+            Type::Interface(tcp_client_state_listener),
+            "TCP connection listener used to receive updates on the status of the connection",
+        )?
+        .return_type(ReturnType::new(
+            Type::ClassRef(master_class.clone()),
+            "Handle to the master created, {null} if an error occurred",
+        ))?
+        .fails_with(shared.error_type.clone())?
+        .doc("Create a master TCP session connecting to the specified endpoint(s)")?
         .build()?;
 
     let master_create_serial_session_fn = lib
@@ -400,6 +428,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .async_method("ColdRestart", &cold_restart_fn)?
         .async_method("WarmRestart", &warm_restart_fn)?
         .async_method("CheckLinkStatus", &check_link_status_fn)?
+        .manual_destroy()?
         .doc(
             doc("Master channel of communication")
             .details("To communicate with a particular outstation, you need to add an association with {class:Master.AddAssociation()}.")
