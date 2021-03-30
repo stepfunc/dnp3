@@ -7,8 +7,8 @@ edition = "2018"
 [dependencies]
 tracing = "0.1"
 chrono = "0.4"
-tokio-mock = { git = "https://github.com/stepfunc/tokio-mock.git", branch="feature/tokio-1.0" }
-tokio-one-serial = { git = "https://github.com/stepfunc/tokio-1.0-serial.git", branch="master" }
+tokio-mock = { git = "https://github.com/stepfunc/tokio-mock.git", branch="master" }
+tokio-serial = { git = "https://github.com/stepfunc/tokio-serial.git", branch="v4.4.0", default-features = false }
 xxhash-rust = { version = "0.8.0-beta.5", features = ["xxh64"] }
 
 [dev-dependencies]
@@ -19,6 +19,10 @@ tokio-util = { version = "0.6", features = ["codec"] }
 tokio-stream = { version = "0.1.1" }
 criterion = "0.3"
 rand = "0.8"
+
+[features]
+# this feature flag is only used when building the FFI
+ffi = []
 
 [[bench]]
 name = "benchmark"

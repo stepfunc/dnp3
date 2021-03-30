@@ -8,30 +8,32 @@ module.exports = {
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
-  favicon: 'img/favicon.ico',
+  favicon: 'images/brand/favicon.png',
   organizationName: 'stepfunc', // Usually your GitHub org/user name.
   projectName: 'dnp3', // Usually your repo name.
   themeConfig: {
     prism: {
+      theme: require('prism-react-renderer/themes/vsLight'),
       additionalLanguages: ['rust', 'java', 'csharp'],
+    },
+    colorMode: {
+      defaultMode: 'light',
+      disableSwitch: true,
     },
     navbar: {
       title: 'DNP3 <version>',
       logo: {
         alt: 'Logo',
-        src: 'img/logo.svg',
+        src: 'images/brand/logo.svg',
+        href: '/docs/guide'
       },
-      items: [
-        {
-          to: 'docs/dnp3',
-          activeBasePath: 'docs',
-          label: 'Docs',
-          position: 'left',
-        },
-      ],
+      items: [],
     },
     footer: {
-      style: 'dark',
+      logo: {
+        alt: 'Step Function',
+        src: 'images/brand/footer-logo.svg',
+      },
       links: [
         {
           title: 'DNP3',

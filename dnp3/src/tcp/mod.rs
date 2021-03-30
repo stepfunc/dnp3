@@ -11,6 +11,7 @@ mod outstation;
 /// state of TCP client connection
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ClientState {
+    Disabled,
     Connecting,
     Connected,
     WaitAfterFailedConnect(std::time::Duration),

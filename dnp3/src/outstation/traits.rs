@@ -1,11 +1,35 @@
-use crate::app::control::*;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::FunctionCode;
 use crate::app::RequestHeader;
 use crate::app::Sequence;
+use crate::app::{control::*, Timestamp};
 use crate::outstation::database::Database;
+
+/// Application-controlled IIN bits
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct ApplicationIin {
+    /// IIN1.4: Time synchronization is required
+    pub need_time: bool,
+    /// IIN1.5: Some output points are in local mode
+    pub local_control: bool,
+    /// IIN1.6: Device trouble
+    pub device_trouble: bool,
+    /// IIN2.5 Configuration corrupt
+    pub config_corrupt: bool,
+}
+
+impl Default for ApplicationIin {
+    fn default() -> Self {
+        Self {
+            need_time: false,
+            local_control: false,
+            device_trouble: false,
+            config_corrupt: false,
+        }
+    }
+}
 
 /// Enumeration returned for cold/warm restart
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -14,6 +38,13 @@ pub enum RestartDelay {
     Seconds(u16),
     /// corresponds to g52v2
     Milliseconds(u16),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum WriteTimeResult {
+    NotSupported,
+    InvalidValue,
+    Ok,
 }
 
 /// dynamic information required by the outstation from the user application
@@ -30,6 +61,18 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// For more information, see IEEE-1815 2012, pg. 64
     fn get_processing_delay_ms(&self) -> u16 {
         0
+    }
+
+    /// Handle a write of the absolute time.
+    ///
+    /// This is used during time synchronization procedures.
+    fn write_absolute_time(&mut self, _time: Timestamp) -> WriteTimeResult {
+        WriteTimeResult::NotSupported
+    }
+
+    /// Returns the application-controlled IIN bits
+    fn get_application_iin(&self) -> ApplicationIin {
+        ApplicationIin::default()
     }
 
     /// Request that the outstation perform a cold restart (IEEE-1815 2012, pg. 58)
@@ -87,7 +130,7 @@ pub trait OutstationInformation: Sync + Send + 'static {
     /// received the expected confirm
     fn solicited_confirm_received(&mut self, _ecsn: Sequence) {}
     /// received a new request while waiting for a solicited confirm, aborting the response series
-    fn solicited_confirm_wait_new_request(&mut self, _header: RequestHeader) {}
+    fn solicited_confirm_wait_new_request(&mut self) {}
     /// received a solicited confirm with the wrong sequence number
     fn wrong_solicited_confirm_seq(&mut self, _ecsn: Sequence, _seq: Sequence) {}
     /// received a confirm when not expecting one
@@ -156,6 +199,36 @@ pub trait ControlSupport<T> {
     ) -> CommandStatus;
 }
 
+/// Indices used by freeze operations
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum FreezeIndices {
+    /// All counters
+    All,
+    /// Range of counters (the range is inclusive)
+    Range(u16, u16),
+}
+
+/// Freeze operation type
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum FreezeType {
+    /// Copy the current value of a counter to the associated point
+    ImmediateFreeze,
+    /// Copy the current value of a counter to the associated point and
+    /// clear the current value to 0
+    FreezeAndClear,
+}
+
+/// Result of a freeze operation
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum FreezeResult {
+    /// Freeze operation was successful
+    Success,
+    /// One of the point is invalid
+    ParameterError,
+    /// The demanded freeze operation is not supported by this device
+    NotSupported,
+}
+
 /// callbacks for handling controls
 pub trait ControlHandler:
     ControlSupport<Group12Var1>
@@ -169,6 +242,15 @@ pub trait ControlHandler:
 {
     fn begin_fragment(&mut self) {}
     fn end_fragment(&mut self) {}
+
+    fn freeze_counter(
+        &mut self,
+        _indices: FreezeIndices,
+        _freeze_type: FreezeType,
+        _database: &mut Database,
+    ) -> FreezeResult {
+        FreezeResult::NotSupported
+    }
 }
 
 #[derive(Copy, Clone)]

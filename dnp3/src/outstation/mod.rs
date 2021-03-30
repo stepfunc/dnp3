@@ -1,17 +1,19 @@
 pub use config::*;
 pub use traits::*;
 
+use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::outstation::database::DatabaseHandle;
-use crate::outstation::task::{ConfigurationChange, NewSession, OutstationMessage};
-use crate::util::phys::PhysLayer;
-use crate::util::task::Shutdown;
+use crate::outstation::task::{ConfigurationChange, OutstationMessage};
+use crate::util::channel::Sender;
 
 /// configuration types
 
 /// database API to add/remove/update values
 pub mod database;
 
+/// wraps an outstation task so that it can switch communication sessions
+pub(crate) mod adapter;
 mod config;
 /// functionality for processing control requests
 pub(crate) mod control;
@@ -29,24 +31,13 @@ mod tests;
 #[derive(Clone)]
 pub struct OutstationHandle {
     pub database: DatabaseHandle,
-    sender: crate::tokio::sync::mpsc::Sender<OutstationMessage>,
+    sender: Sender<OutstationMessage>,
 }
 
 impl OutstationHandle {
     pub async fn set_decode_level(&mut self, decode_level: DecodeLevel) -> Result<(), Shutdown> {
         self.sender
             .send(ConfigurationChange::SetDecodeLevel(decode_level).into())
-            .await?;
-        Ok(())
-    }
-
-    pub(crate) async fn change_session(
-        &mut self,
-        id: u64,
-        phys: PhysLayer,
-    ) -> Result<(), Shutdown> {
-        self.sender
-            .send(OutstationMessage::ChangeSession(NewSession::new(id, phys)))
             .await?;
         Ok(())
     }

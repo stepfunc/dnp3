@@ -96,7 +96,10 @@ pub fn define(
             "Event class",
         )?
         .param("config", Type::Struct(binary_config), "Configuration")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully added, false otherwise",
+        ))?
         .doc("Add a new Binary Input point")?
         .build()?;
 
@@ -104,7 +107,10 @@ pub fn define(
         .declare_native_function("database_remove_binary")?
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully removed, false otherwise",
+        ))?
         .doc("Remove a Binary Input point")?
         .build()?;
 
@@ -121,8 +127,23 @@ pub fn define(
             Type::Struct(update_options.clone()),
             "Update options",
         )?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully updated, false otherwise",
+        ))?
         .doc("Update a Binary Input point")?
+        .build()?;
+
+    let binary_get_fn = lib
+        .declare_native_function("database_get_binary")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.binary_point.clone()),
+            "Binary Input point",
+        ))?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Binary Input point")?
         .build()?;
 
     // Double-bit Binary Input
@@ -183,7 +204,10 @@ pub fn define(
             Type::Struct(double_bit_binary_config),
             "Configuration",
         )?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully added, false otherwise",
+        ))?
         .doc("Add a new Double-Bit Binary Input point")?
         .build()?;
 
@@ -191,7 +215,10 @@ pub fn define(
         .declare_native_function("database_remove_double_bit_binary")?
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully removed, false otherwise",
+        ))?
         .doc("Remove a Double-Bit Binary Input point")?
         .build()?;
 
@@ -208,8 +235,23 @@ pub fn define(
             Type::Struct(update_options.clone()),
             "Update options",
         )?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully updated, false otherwise",
+        ))?
         .doc("Update a Double-Bit Binary Input point")?
+        .build()?;
+
+    let double_bit_binary_get_fn = lib
+        .declare_native_function("database_get_double_bit_binary")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.double_bit_binary_point.clone()),
+            "Double-Bit Binary Input point",
+        ))?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Double-Bit Binary Input point")?
         .build()?;
 
     // Binary Output Status
@@ -263,7 +305,10 @@ pub fn define(
             Type::Struct(binary_output_status_config),
             "Configuration",
         )?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully added, false otherwise",
+        ))?
         .doc("Add a new Binary Output Status point")?
         .build()?;
 
@@ -271,7 +316,10 @@ pub fn define(
         .declare_native_function("database_remove_binary_output_status")?
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully removed, false otherwise",
+        ))?
         .doc("Remove a Binary Output Status point")?
         .build()?;
 
@@ -288,8 +336,23 @@ pub fn define(
             Type::Struct(update_options.clone()),
             "Update options",
         )?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully updated, false otherwise",
+        ))?
         .doc("Update a Binary Output Status point")?
+        .build()?;
+
+    let binary_output_status_get_fn = lib
+        .declare_native_function("database_get_binary_output_status")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.binary_output_status_point.clone()),
+            "Binary Output Status point",
+        ))?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Binary Output Status point")?
         .build()?;
 
     // Counter
@@ -342,7 +405,10 @@ pub fn define(
             "Event class",
         )?
         .param("config", Type::Struct(counter_config), "Configuration")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully added, false otherwise",
+        ))?
         .doc("Add a new Counter point")?
         .build()?;
 
@@ -350,7 +416,10 @@ pub fn define(
         .declare_native_function("database_remove_counter")?
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully removed, false otherwise",
+        ))?
         .doc("Remove a Counter point")?
         .build()?;
 
@@ -367,8 +436,23 @@ pub fn define(
             Type::Struct(update_options.clone()),
             "Update options",
         )?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully updated, false otherwise",
+        ))?
         .doc("Update a Counter point")?
+        .build()?;
+
+    let counter_get_fn = lib
+        .declare_native_function("database_get_counter")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.counter_point.clone()),
+            "Counter point",
+        ))?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Counter point")?
         .build()?;
 
     // Frozen Counter
@@ -439,7 +523,10 @@ pub fn define(
             Type::Struct(frozen_counter_config),
             "Configuration",
         )?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully added, false otherwise",
+        ))?
         .doc("Add a new Frozen Counter point")?
         .build()?;
 
@@ -447,7 +534,10 @@ pub fn define(
         .declare_native_function("database_remove_frozen_counter")?
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully removed, false otherwise",
+        ))?
         .doc("Remove a Frozen Counter point")?
         .build()?;
 
@@ -464,8 +554,23 @@ pub fn define(
             Type::Struct(update_options.clone()),
             "Update options",
         )?
-        .return_type(ReturnType::void())?
-        .doc("Update an Analog point")?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully updated, false otherwise",
+        ))?
+        .doc("Update an Frozen Counter point")?
+        .build()?;
+
+    let frozen_counter_get_fn = lib
+        .declare_native_function("database_get_frozen_counter")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.frozen_counter_point.clone()),
+            "Frozen Counter point",
+        ))?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Frozen Counter point")?
         .build()?;
 
     // Analog
@@ -542,7 +647,10 @@ pub fn define(
             "Event class",
         )?
         .param("config", Type::Struct(analog_config), "Configuration")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully added, false otherwise",
+        ))?
         .doc("Add a new Analog point")?
         .build()?;
 
@@ -550,7 +658,10 @@ pub fn define(
         .declare_native_function("database_remove_analog")?
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully removed, false otherwise",
+        ))?
         .doc("Remove an Analog point")?
         .build()?;
 
@@ -567,8 +678,23 @@ pub fn define(
             Type::Struct(update_options.clone()),
             "Update options",
         )?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully updated, false otherwise",
+        ))?
         .doc("Update a Analog point")?
+        .build()?;
+
+    let analog_get_fn = lib
+        .declare_native_function("database_get_analog")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.analog_point.clone()),
+            "Analog point",
+        ))?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Analog point")?
         .build()?;
 
     // Analog Output Status
@@ -653,7 +779,10 @@ pub fn define(
             Type::Struct(analog_output_status_config),
             "Configuration",
         )?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully added, false otherwise",
+        ))?
         .doc("Add a new Analog Output Status point")?
         .build()?;
 
@@ -661,7 +790,10 @@ pub fn define(
         .declare_native_function("database_remove_analog_output_status")?
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully removed, false otherwise",
+        ))?
         .doc("Remove an Analog Output Status point")?
         .build()?;
 
@@ -678,8 +810,23 @@ pub fn define(
             Type::Struct(update_options.clone()),
             "Update options",
         )?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully updated, false otherwise",
+        ))?
         .doc("Update a Analog Output Status point")?
+        .build()?;
+
+    let analog_output_status_get_fn = lib
+        .declare_native_function("database_get_analog_output_status")?
+        .param("db", Type::ClassRef(database.clone()), "Database")?
+        .param("index", Type::Uint16, "Index of the point to get")?
+        .return_type(ReturnType::new(
+            Type::Struct(shared_def.analog_output_status_point.clone()),
+            "Analog Output Status point",
+        ))?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Analog Output Status point")?
         .build()?;
 
     // Octet String
@@ -728,7 +875,10 @@ pub fn define(
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
         .param("point_class", Type::Enum(event_class), "Event class")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully added, false otherwise",
+        ))?
         .doc("Add a new Octet String point")?
         .build()?;
 
@@ -736,7 +886,10 @@ pub fn define(
         .declare_native_function("database_remove_octet_string")?
         .param("db", Type::ClassRef(database.clone()), "Database")?
         .param("index", Type::Uint16, "Index of the point")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully removed, false otherwise",
+        ))?
         .doc("Remove an Octet String point")?
         .build()?;
 
@@ -750,18 +903,25 @@ pub fn define(
             "New value of the point",
         )?
         .param("options", Type::Struct(update_options), "Update options")?
-        .return_type(ReturnType::void())?
+        .return_type(ReturnType::new(
+            Type::Bool,
+            "True if the point was successfully updated, false otherwise",
+        ))?
         .doc("Update an Octet String point")?
         .build()?;
+
+    // TODO: Add a getter for octet strings
 
     let database = lib
         .define_class(&database)?
         .method("add_binary", &binary_add_fn)?
         .method("remove_binary", &binary_remove_fn)?
         .method("update_binary", &binary_update_fn)?
+        .method("get_binary", &binary_get_fn)?
         .method("add_double_bit_binary", &double_bit_binary_add_fn)?
         .method("remove_double_bit_binary", &double_bit_binary_remove_fn)?
         .method("update_double_bit_binary", &double_bit_binary_update_fn)?
+        .method("get_double_bit_binary", &double_bit_binary_get_fn)?
         .method("add_binary_output_status", &binary_output_status_add_fn)?
         .method(
             "remove_binary_output_status",
@@ -771,15 +931,19 @@ pub fn define(
             "update_binary_output_status",
             &binary_output_status_update_fn,
         )?
+        .method("get_binary_output_status", &binary_output_status_get_fn)?
         .method("add_counter", &counter_add_fn)?
         .method("remove_counter", &counter_remove_fn)?
         .method("update_counter", &counter_update_fn)?
+        .method("get_counter", &counter_get_fn)?
         .method("add_frozen_counter", &frozen_counter_add_fn)?
         .method("remove_frozen_counter", &frozen_counter_remove_fn)?
         .method("update_frozen_counter", &frozen_counter_update_fn)?
+        .method("get_frozen_counter", &frozen_counter_get_fn)?
         .method("add_analog", &analog_add_fn)?
         .method("remove_analog", &analog_remove_fn)?
         .method("update_analog", &analog_update_fn)?
+        .method("get_analog", &analog_get_fn)?
         .method("add_analog_output_status", &analog_output_status_add_fn)?
         .method(
             "remove_analog_output_status",
@@ -789,6 +953,7 @@ pub fn define(
             "update_analog_output_status",
             &analog_output_status_update_fn,
         )?
+        .method("get_analog_output_status", &analog_output_status_get_fn)?
         .method("add_octet_string", &octet_string_add_fn)?
         .method("remove_octet_string", &octet_string_remove_fn)?
         .method("update_octet_string", &octet_string_update_fn)?

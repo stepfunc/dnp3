@@ -3,38 +3,14 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::{Rng, SeedableRng};
 
-use dnp3::app::header::ResponseHeader;
-use dnp3::app::measurement::{
-    Analog, AnalogOutputStatus, Binary, BinaryOutputStatus, Counter, DoubleBitBinary,
-    FrozenCounter, Time,
-};
-use dnp3::app::parse::bytes::Bytes;
-use dnp3::app::retry::{ReconnectStrategy, RetryStrategy};
-use dnp3::app::timeout::Timeout;
-use dnp3::app::types::Timestamp;
-use dnp3::app::Flags;
-use dnp3::decode::EndpointAddress;
-use dnp3::decode::{DecodeLevel, LinkErrorMode};
-use dnp3::master::association::AssociationConfig;
-use dnp3::master::handle::{
-    AssociationHandler, HeaderInfo, Listener, MasterConfig, MasterHandle, ReadHandler,
-};
-use dnp3::master::request::EventClasses;
-use dnp3::master::tcp::EndpointList;
-use dnp3::outstation::config::OutstationConfig;
-use dnp3::outstation::database::config::{
-    AnalogConfig, BinaryConfig, CounterConfig, EventAnalogVariation, EventBinaryVariation,
-    EventCounterVariation, StaticAnalogVariation, StaticBinaryVariation, StaticCounterVariation,
-};
-use dnp3::outstation::database::{
-    Add, Database, EventBufferConfig, EventClass, EventMode, Update, UpdateOptions,
-};
-use dnp3::outstation::tcp::AddressFilter;
-use dnp3::outstation::tcp::{ServerHandle, TcpServer};
-use dnp3::outstation::traits::{
-    DefaultControlHandler, DefaultOutstationApplication, DefaultOutstationInformation,
-};
-use dnp3::outstation::OutstationHandle;
+use dnp3::app::measurement::*;
+use dnp3::app::*;
+use dnp3::decode::*;
+use dnp3::link::*;
+use dnp3::master::*;
+use dnp3::outstation::database::*;
+use dnp3::outstation::*;
+use dnp3::tcp::*;
 
 fn config() -> TestConfig {
     TestConfig {
@@ -233,10 +209,11 @@ impl Pair {
         Measurements,
         tokio::sync::mpsc::Receiver<usize>,
     ) {
-        let mut master = dnp3::master::tcp::spawn_master_tcp_client(
+        let mut master = dnp3::tcp::spawn_master_tcp_client(
             LinkErrorMode::Close,
             Self::get_master_config(config.master_level),
             EndpointList::single(format!("127.0.0.1:{}", port)),
+            ReconnectStrategy::default(),
             Listener::None,
         );
 
@@ -249,7 +226,7 @@ impl Pair {
             tx,
         };
 
-        // don't are about the handle
+        // don't care about the handle
         let _ = master
             .add_association(
                 Self::outstation_address(),
@@ -258,6 +235,8 @@ impl Pair {
             )
             .await
             .unwrap();
+
+        master.enable().await.unwrap();
 
         (master, measurements, rx)
     }
@@ -274,7 +253,6 @@ impl Pair {
         MasterConfig::new(
             Self::master_address(),
             level,
-            ReconnectStrategy::default(),
             Timeout::from_secs(5).unwrap(),
         )
     }
@@ -299,11 +277,11 @@ struct TestHandler {
 }
 
 impl ReadHandler for TestHandler {
-    fn begin_fragment(&mut self, _header: ResponseHeader) {
+    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {
         self.count = 0;
     }
 
-    fn end_fragment(&mut self, _header: ResponseHeader) {
+    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {
         self.tx.try_send(self.count).unwrap();
     }
 
@@ -377,15 +355,7 @@ impl ReadHandler for TestHandler {
 }
 
 impl AssociationHandler for TestHandler {
-    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
         self
     }
 }

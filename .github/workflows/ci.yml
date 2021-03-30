@@ -15,31 +15,15 @@ jobs:
         rust:
           - stable
           - beta
-          - nightly
-        toolchain:
-          - default
-          - musl
-        exclude:
-          - os: windows-latest
-            toolchain: musl
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v1
       - name: Install Rust ${{ matrix.rust }}
-        if: ${{ matrix.toolchain != 'musl' }}
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: ${{ matrix.rust }}
-          override: true
-      - name: Install Rust ${{ matrix.rust }} (musl)
-        if: ${{ matrix.toolchain == 'musl' }}
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          target: x86_64-unknown-linux-musl
           override: true
       - name: Copy Windows config
         if: ${{ runner.os == 'Windows' }}
@@ -49,80 +33,16 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         shell: pwsh
         run: Copy-Item -Path .cargo/config-linux.toml -Destination .cargo/config.toml
-      - name: Copy Linux musl config
-        if: ${{ runner.os == 'Linux' && matrix.toolchain == 'musl' }}
-        shell: pwsh
-        run: Copy-Item -Path .cargo/config-linux-musl.toml -Destination .cargo/config.toml
+      - name: Caching
+        uses: Swatinem/rust-cache@v1
+      - name: Update dependencies
+        uses: actions-rs/cargo@v1
+        with:
+          command: update
       - name: Run Rust unit tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-      - name: C bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --bin dnp3-bindings -- --c
-      - name: .NET bindings
-        if: ${{ matrix.toolchain != 'musl' }}
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --bin dnp3-bindings -- --dotnet
-      - name: Java bindings
-        if: ${{ matrix.toolchain != 'musl' }}
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --bin dnp3-bindings -- --java
-      - name: Upload compiled bindings
-        if: ${{ matrix.rust == 'stable' }}
-        uses: actions/upload-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi/bindings/c/generated/lib
-      - name: Upload compiled Java bindings
-        if: ${{ matrix.rust == 'stable' && matrix.toolchain != 'musl' }}
-        uses: actions/upload-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi/bindings/java/dnp3rs/src/main/resources
-  packaging:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v1
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - name: Download compiled FFI
-        uses: actions/download-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi-modules
-      - name: Package all bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --bin dnp3-bindings -- --package ./ffi-modules
-      - name: Upload C bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: c-bindings
-          path: ffi/bindings/c/generated
-      - name: Upload .NET bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: dotnet-bindings
-          path: ffi/bindings/dotnet/nupkg/*.nupkg
-      - name: Upload Java bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: java-bindings
-          path: ffi/bindings/java/dnp3rs/target/*.jar
   linting:
     strategy:
       fail-fast: false
@@ -151,3 +71,143 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+  bindings:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Copy Windows config
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: Copy-Item -Path .cargo/config-windows.toml -Destination .cargo/config.toml
+      - name: Copy Linux config
+        if: ${{ runner.os == 'Linux' }}
+        shell: pwsh
+        run: Copy-Item -Path .cargo/config-linux.toml -Destination .cargo/config.toml
+      - name: Caching
+        uses: Swatinem/rust-cache@v1
+      - name: Update dependencies
+        uses: actions-rs/cargo@v1
+        with:
+          command: update
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - name: C bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --c
+      - name: .NET bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --dotnet
+      - name: Java bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --java
+      - name: Upload compiled C bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/c/generated/lib
+      - name: Upload compiled Java bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/java/dnp3rs/src/main/resources
+  packaging:
+    needs: bindings
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Caching
+        uses: Swatinem/rust-cache@v1
+      - name: Update dependencies
+        uses: actions-rs/cargo@v1
+        with:
+          command: update
+      - name: Download compiled FFI
+        uses: actions/download-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi-modules
+      - name: Package all bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --bin dnp3-bindings -- --package ./ffi-modules
+      - name: Upload C bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: c-bindings
+          path: ffi/bindings/c/generated
+      - name: Upload .NET bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: dotnet-bindings
+          path: ffi/bindings/dotnet/nupkg/*.nupkg
+      - name: Upload Java bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: java-bindings
+          path: ffi/bindings/java/dnp3rs/target/*.jar
+  conformance:
+    needs: packaging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          path: dnp3rs
+      - name: Download pre-built Java bindings
+        uses: actions/download-artifact@v2
+        with:
+          name: java-bindings
+          path: java-bindings
+      - name: Install Java bindings
+        run: >
+          jarfile=( java-bindings/*.jar ) &&
+          sudo mvn --batch-mode org.apache.maven.plugins:maven-install-plugin:3.0.0-M1:install-file -Dfile=$jarfile
+      - name: Checkout dnp4s
+        uses: actions/checkout@v2
+        with:
+          repository: stepfunc/dnp4s
+          ssh-key: ${{ secrets.DNP4S_SSH_KEY }}
+          ref: scala-2.13
+          path: dnp4s
+      - name: Build dnp4s
+        working-directory: dnp4s
+        run: sudo mvn --batch-mode install
+      - name: Run the conformance tests
+        working-directory: dnp3rs/conformance
+        run: sudo mvn --batch-mode scala:run
+      - name: Upload conformance test results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: conformance-results
+          path: dnp3rs/conformance/results

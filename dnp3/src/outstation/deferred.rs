@@ -46,6 +46,10 @@ impl DeferredRead {
         self.vec.clear();
     }
 
+    pub(crate) fn is_set(&self) -> bool {
+        self.info.is_some()
+    }
+
     pub(crate) fn set(
         &mut self,
         hash: u64,

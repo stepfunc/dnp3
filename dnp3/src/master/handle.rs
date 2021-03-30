@@ -2,15 +2,10 @@ use std::time::{Duration, SystemTime};
 
 use crate::app::measurement::*;
 use crate::app::variations::Variation;
-use crate::app::Bytes;
-use crate::app::QualifierCode;
-use crate::app::ReconnectStrategy;
-use crate::app::ResponseHeader;
-use crate::app::Timeout;
-use crate::app::Timestamp;
+use crate::app::*;
 use crate::decode::DecodeLevel;
 use crate::link::{EndpointAddress, LinkStatusResult};
-use crate::master::association::{Association, AssociationConfig};
+use crate::master::association::AssociationConfig;
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
@@ -21,12 +16,11 @@ use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
-use crate::tokio::sync::mpsc::error::SendError;
-use crate::util::task::Shutdown;
+use crate::util::channel::Sender;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct MasterHandle {
-    sender: crate::tokio::sync::mpsc::Sender<Message>,
+    sender: Sender<Message>,
 }
 
 /// Handle used to make requests against
@@ -43,8 +37,6 @@ pub struct MasterConfig {
     pub address: EndpointAddress,
     /// Decode-level for DNP3 objects
     pub decode_level: DecodeLevel,
-    /// Reconnection strategy
-    pub reconnection_strategy: ReconnectStrategy,
     /// Response timeout
     pub response_timeout: Timeout,
     /// TX buffer size
@@ -62,13 +54,11 @@ impl MasterConfig {
     pub fn new(
         address: EndpointAddress,
         decode_level: DecodeLevel,
-        reconnection_strategy: ReconnectStrategy,
         response_timeout: Timeout,
     ) -> Self {
         Self {
             address,
             decode_level,
-            reconnection_strategy,
             response_timeout,
             tx_buffer_size: MasterSession::DEFAULT_TX_BUFFER_SIZE,
             rx_buffer_size: MasterSession::DEFAULT_RX_BUFFER_SIZE,
@@ -77,8 +67,22 @@ impl MasterConfig {
 }
 
 impl MasterHandle {
-    pub(crate) fn new(sender: crate::tokio::sync::mpsc::Sender<Message>) -> Self {
+    pub(crate) fn new(sender: Sender<Message>) -> Self {
         Self { sender }
+    }
+
+    /// enable communications
+    pub async fn enable(&mut self) -> Result<(), Shutdown> {
+        self.send_master_message(MasterMsg::EnableCommunication(true))
+            .await?;
+        Ok(())
+    }
+
+    /// disable communications
+    pub async fn disable(&mut self) -> Result<(), Shutdown> {
+        self.send_master_message(MasterMsg::EnableCommunication(false))
+            .await?;
+        Ok(())
     }
 
     /// Set the decoding level used by this master
@@ -106,23 +110,39 @@ impl MasterHandle {
         config: AssociationConfig,
         handler: Box<dyn AssociationHandler>,
     ) -> Result<AssociationHandle, AssociationError> {
-        let association = Association::new(address, config, handler);
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
-        self.send_master_message(MasterMsg::AddAssociation(association, Promise::OneShot(tx)))
-            .await?;
+        self.send_master_message(MasterMsg::AddAssociation(
+            address,
+            config,
+            handler,
+            Promise::OneShot(tx),
+        ))
+        .await?;
         rx.await?
             .map(|_| (AssociationHandle::new(address, self.clone())))
     }
 
-    async fn send_master_message(&mut self, msg: MasterMsg) -> Result<(), SendError<Message>> {
-        self.sender.send(Message::Master(msg)).await
+    /// Remove an association
+    /// * `address` is the DNP3 link-layer address of the outstation
+    pub async fn remove_association(
+        &mut self,
+        address: EndpointAddress,
+    ) -> Result<(), AssociationError> {
+        self.send_master_message(MasterMsg::RemoveAssociation(address))
+            .await?;
+        Ok(())
+    }
+
+    async fn send_master_message(&mut self, msg: MasterMsg) -> Result<(), Shutdown> {
+        self.sender.send(Message::Master(msg)).await?;
+        Ok(())
     }
 
     async fn send_association_message(
         &mut self,
         address: EndpointAddress,
         msg: AssociationMsgType,
-    ) -> Result<(), SendError<Message>> {
+    ) -> Result<(), Shutdown> {
         self.sender
             .send(Message::Association(AssociationMsg {
                 address,
@@ -133,6 +153,11 @@ impl MasterHandle {
 }
 
 impl AssociationHandle {
+    #[cfg(feature = "ffi")]
+    pub fn create(address: EndpointAddress, master: MasterHandle) -> Self {
+        Self::new(address, master)
+    }
+
     pub(crate) fn new(address: EndpointAddress, master: MasterHandle) -> Self {
         Self { address, master }
     }
@@ -199,7 +224,7 @@ impl AssociationHandle {
         rx.await?
     }
 
-    pub async fn perform_time_sync(
+    pub async fn synchronize_time(
         &mut self,
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
@@ -217,16 +242,13 @@ impl AssociationHandle {
         rx.await?
     }
 
-    async fn send_task(&mut self, task: Task) -> Result<(), SendError<Message>> {
+    async fn send_task(&mut self, task: Task) -> Result<(), Shutdown> {
         self.master
             .send_association_message(self.address, AssociationMsgType::QueueTask(task))
             .await
     }
 
-    pub(crate) async fn send_poll_message(
-        &mut self,
-        msg: PollMsg,
-    ) -> Result<(), SendError<Message>> {
+    pub(crate) async fn send_poll_message(&mut self, msg: PollMsg) -> Result<(), Shutdown> {
         self.master
             .send_association_message(self.address, AssociationMsgType::Poll(msg))
             .await
@@ -287,12 +309,8 @@ pub trait AssociationHandler: Send {
         Timestamp::try_from_system_time(SystemTime::now())
     }
 
-    /// retrieve a handler used to process integrity polls
-    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler;
-    /// retrieve a handler used to process unsolicited responses
-    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler;
-    /// retrieve a default handler used to process user-defined polls
-    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler;
+    /// retrieve a handler used to process received measurement data
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler;
 }
 
 /// Information about the object header from which the measurement values were mapped
@@ -313,9 +331,22 @@ impl HeaderInfo {
     }
 }
 
+/// Describes the source of a read event
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ReadType {
+    /// Startup integrity poll
+    StartupIntegrity,
+    /// Unsolicited message
+    Unsolicited,
+    /// Single poll requested by the user
+    SinglePoll,
+    /// Periodic poll configured by the user
+    PeriodicPoll,
+}
+
 pub trait ReadHandler {
-    fn begin_fragment(&mut self, header: ResponseHeader);
-    fn end_fragment(&mut self, header: ResponseHeader);
+    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
+    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
 
     fn handle_binary(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Binary, u16)>);
     fn handle_double_bit_binary(
@@ -359,9 +390,9 @@ impl NullHandler {
 }
 
 impl ReadHandler for NullHandler {
-    fn begin_fragment(&mut self, _header: ResponseHeader) {}
+    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
-    fn end_fragment(&mut self, _header: ResponseHeader) {}
+    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
     fn handle_binary(&mut self, _info: HeaderInfo, _iter: &mut dyn Iterator<Item = (Binary, u16)>) {
     }
@@ -413,15 +444,7 @@ impl ReadHandler for NullHandler {
 }
 
 impl AssociationHandler for NullHandler {
-    fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-
-    fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
+    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
         self
     }
 }

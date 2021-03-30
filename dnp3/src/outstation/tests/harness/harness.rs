@@ -5,7 +5,7 @@ use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::EventBufferConfig;
-use crate::outstation::session::SessionError;
+use crate::outstation::session::RunError;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::tests::harness::{
     ApplicationData, Event, EventHandle, MockControlHandler, MockOutstationApplication,
@@ -34,7 +34,7 @@ pub(crate) fn get_default_unsolicited_config() -> OutstationConfig {
 
 pub(crate) struct OutstationTestHarness<T>
 where
-    T: std::future::Future<Output = SessionError>,
+    T: std::future::Future<Output = RunError>,
 {
     pub(crate) handle: OutstationHandle,
     io: io::Handle,
@@ -45,7 +45,7 @@ where
 
 impl<T> OutstationTestHarness<T>
 where
-    T: std::future::Future<Output = SessionError>,
+    T: std::future::Future<Output = RunError>,
 {
     pub(crate) fn poll_pending(&mut self) {
         assert_pending!(self.task.poll());
@@ -109,21 +109,21 @@ where
 
 pub(crate) fn new_harness(
     config: OutstationConfig,
-) -> OutstationTestHarness<impl std::future::Future<Output = SessionError>> {
+) -> OutstationTestHarness<impl std::future::Future<Output = RunError>> {
     new_harness_impl(config, None)
 }
 
 pub(crate) fn new_harness_for_broadcast(
     config: OutstationConfig,
     broadcast: BroadcastConfirmMode,
-) -> OutstationTestHarness<impl std::future::Future<Output = SessionError>> {
+) -> OutstationTestHarness<impl std::future::Future<Output = RunError>> {
     new_harness_impl(config, Some(broadcast))
 }
 
 fn new_harness_impl(
     config: OutstationConfig,
     broadcast: Option<BroadcastConfirmMode>,
-) -> OutstationTestHarness<impl std::future::Future<Output = SessionError>> {
+) -> OutstationTestHarness<impl std::future::Future<Output = RunError>> {
     let events = EventHandle::new();
 
     let (data, application) = MockOutstationApplication::new(events.clone());
@@ -154,7 +154,7 @@ fn new_harness_impl(
     OutstationTestHarness {
         handle,
         io: io_handle,
-        task: spawn(async move { task.run_io(&mut io).await }),
+        task: spawn(async move { task.run(&mut io).await }),
         events,
         application_data: data,
     }

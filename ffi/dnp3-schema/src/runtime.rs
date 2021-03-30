@@ -1,10 +1,12 @@
 use oo_bindgen::class::ClassDeclarationHandle;
+use oo_bindgen::error_type::ErrorType;
 use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
 
 pub fn define(
     lib: &mut LibraryBuilder,
+    error_type: ErrorType,
 ) -> std::result::Result<ClassDeclarationHandle, BindingError> {
     // Forward declare the class
     let runtime_class = lib.declare_class("Runtime")?;
@@ -34,6 +36,7 @@ pub fn define(
             Type::ClassRef(runtime_class.clone()),
             "Handle to the created runtime, {null} if an error occurred",
         ))?
+        .fails_with(error_type)?
         .doc(
             doc("Creates a new runtime for running the protocol stack.")
             .warning("The runtime should be kept alive for as long as it's needed and it should be released with {class:Runtime.[destructor]}")

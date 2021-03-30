@@ -1,5 +1,7 @@
+use oo_bindgen::callback::InterfaceHandle;
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::doc;
+use oo_bindgen::error_type::{ErrorType, ExceptionType};
 use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::native_enum::NativeEnumHandle;
 use oo_bindgen::native_function::{DurationMapping, ReturnType, Type};
@@ -7,6 +9,8 @@ use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
 
 pub struct SharedDefinitions {
+    pub error_type: ErrorType,
+    pub port_state_listener: InterfaceHandle,
     pub variation_enum: NativeEnumHandle,
     pub runtime_class: ClassDeclarationHandle,
     pub decode_level: NativeStructHandle,
@@ -29,10 +33,56 @@ pub struct SharedDefinitions {
     pub analog_it: IteratorHandle,
     pub analog_output_status_point: NativeStructHandle,
     pub analog_output_status_it: IteratorHandle,
+    pub octet_string: NativeStructHandle,
+    pub octet_string_it: IteratorHandle,
 }
 
 pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingError> {
+    let error_type = lib
+        .define_error_type(
+            "Dnp3Error",
+            "Dnp3Exception",
+            ExceptionType::UncheckedException,
+        )?
+        .add_error("NullParameter", "Null parameter")?
+        .add_error(
+            "AssociationDoesNotExist",
+            "The specified association does not exist",
+        )?
+        .add_error(
+            "AssociationDuplicateAddress",
+            "Duplicate association address",
+        )?
+        .add_error("InvalidSocketAddress", "Invalid socket address")?
+        .add_error("InvalidDnp3Address", "Invalid link-layer DNP3 address")?
+        .add_error("InvalidBufferSize", "Invalid buffer size")?
+        .add_error(
+            "AddressFilterConflict",
+            "Conflict in the address filter specification",
+        )?
+        .add_error("ServerAlreadyStarted", "Server already started")?
+        .add_error(
+            "ServerBindError",
+            "Server failed to bind to the specified port",
+        )?
+        .add_error("MasterAlreadyShutdown", "Master was already shutdown")?
+        .add_error("RuntimeCreationFailure", "Failed to create tokio runtime")?
+        .add_error("RuntimeDestroyed", "Runtime was already disposed of")?
+        .add_error(
+            "RuntimeCannotBlockWithinAsync",
+            "Runtime cannot execute blocking call within asynchronous context",
+        )?
+        .add_error(
+            "LoggingAlreadyConfigured",
+            "Logging can only be configured once",
+        )?
+        .add_error("PointDoesNotExist", "Point does not exist")?
+        .doc("Global error type used throughout the library")?
+        .build()?;
+
     crate::constants::define(lib)?;
+    let decode_level = crate::logging::define(lib, error_type.clone())?;
+    let runtime_class = crate::runtime::define(lib, error_type.clone())?;
 
     let control_struct = lib.declare_native_struct("Control")?;
     let control_struct = lib
@@ -154,10 +204,14 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         &timestamp_struct,
     )?;
 
+    let (octet_string, octet_string_it) = build_octet_string(lib)?;
+
     Ok(SharedDefinitions {
+        error_type,
+        port_state_listener: define_port_state_listener(lib)?,
         variation_enum: crate::variation::define(lib)?,
-        runtime_class: crate::runtime::define(lib)?,
-        decode_level: crate::logging::define(lib)?,
+        runtime_class,
+        decode_level,
         retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_params(lib)?,
         link_error_mode: define_link_error_mode(lib)?,
@@ -177,6 +231,8 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         analog_it,
         analog_output_status_point,
         analog_output_status_it,
+        octet_string,
+        octet_string_it,
     })
 }
 
@@ -293,6 +349,31 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
     Ok(flags_struct)
 }
 
+fn define_port_state_listener(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
+    let port_state = lib
+        .define_native_enum("PortState")?
+        .push("Disabled", "Disabled until enabled")?
+        .push("Wait", "Waiting to perform an open retry")?
+        .push("Open", "Port is open")?
+        .push("Shutdown", "Task has been shut down")?
+        .doc("State of the serial port")?
+        .build()?;
+
+    let port_state_listener = lib
+        .define_interface(
+            "PortStateListener",
+            "Callback interface for receiving updates about the state of a serial port",
+        )?
+        .callback("on_change", "Invoked when the serial port changes state")?
+        .param("state", Type::Enum(port_state), "New state of the port")?
+        .return_type(ReturnType::Void)?
+        .build()?
+        .destroy_callback("on_destroy")?
+        .build()?;
+
+    Ok(port_state_listener)
+}
+
 fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
     let time_quality_enum = lib
         .define_native_enum("TimeQuality")?
@@ -404,4 +485,52 @@ fn build_iterator(
     let value_iterator = lib.define_iterator(&iterator_next_fn, &value_struct)?;
 
     Ok((value_struct, value_iterator))
+}
+
+fn build_octet_string(
+    lib: &mut LibraryBuilder,
+) -> Result<(NativeStructHandle, IteratorHandle), BindingError> {
+    // Octet string stuff
+    let byte_struct = lib.declare_native_struct("Byte")?;
+    let byte_struct = lib
+        .define_native_struct(&byte_struct)?
+        .add("value", Type::Uint8, "Byte value")?
+        .doc("Single byte struct")?
+        .build()?;
+
+    let byte_it = lib.declare_class("ByteIterator")?;
+    let byte_it_next_fn = lib
+        .declare_native_function("byte_next")?
+        .param("it", Type::ClassRef(byte_it), "Iterator")?
+        .return_type(ReturnType::new(
+            Type::StructRef(byte_struct.declaration()),
+            "Next value of the iterator or {null} if the iterator reached the end",
+        ))?
+        .doc("Get the next value of the iterator")?
+        .build()?;
+    let byte_it = lib.define_iterator_with_lifetime(&byte_it_next_fn, &byte_struct)?;
+
+    let octet_string_struct = lib.declare_native_struct("OctetString")?;
+    let octet_string_struct = lib
+        .define_native_struct(&octet_string_struct)?
+        .add("index", Type::Uint16, "Point index")?
+        .add("value", Type::Iterator(byte_it), "Point value")?
+        .doc("Octet String point")?
+        .build()?;
+
+    let octet_string_iterator = lib.declare_class("OctetStringIterator")?;
+    let iterator_next_fn = lib
+        .declare_native_function("octetstring_next")?
+        .param("it", Type::ClassRef(octet_string_iterator), "Iterator")?
+        .return_type(ReturnType::new(
+            Type::StructRef(octet_string_struct.declaration()),
+            "Next value of the iterator or {null} if the iterator reached the end",
+        ))?
+        .doc("Get the next value of the iterator")?
+        .build()?;
+
+    let octet_string_iterator =
+        lib.define_iterator_with_lifetime(&iterator_next_fn, &octet_string_struct)?;
+
+    Ok((octet_string_struct, octet_string_iterator))
 }

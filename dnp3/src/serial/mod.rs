@@ -1,7 +1,61 @@
-pub use tokio_one_serial::{DataBits, FlowControl, Parity, StopBits};
-// re-export these from the serial crate
-pub use tokio_one_serial::Settings as SerialSettings;
+pub use tokio_serial::{DataBits, FlowControl, Parity, StopBits};
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct SerialSettings {
+    pub baud_rate: u32,
+    pub data_bits: DataBits,
+    pub flow_control: FlowControl,
+    pub stop_bits: StopBits,
+    pub parity: Parity,
+}
+
+impl SerialSettings {
+    pub(crate) fn apply(
+        &self,
+        builder: tokio_serial::SerialPortBuilder,
+    ) -> tokio_serial::SerialPortBuilder {
+        builder
+            .baud_rate(self.baud_rate)
+            .data_bits(self.data_bits)
+            .flow_control(self.flow_control)
+            .stop_bits(self.stop_bits)
+            .parity(self.parity)
+    }
+}
+
+impl Default for SerialSettings {
+    fn default() -> Self {
+        Self {
+            baud_rate: 9600,
+            data_bits: DataBits::Eight,
+            flow_control: FlowControl::None,
+            stop_bits: StopBits::One,
+            parity: Parity::None,
+        }
+    }
+}
+
+pub(crate) fn open(path: &str, settings: SerialSettings) -> tokio_serial::Result<TTYPort> {
+    let builder = settings.apply(tokio_serial::new(path, settings.baud_rate));
+    TTYPort::open(&builder)
+}
 
 pub use master::*;
+pub use outstation::*;
+use tokio_serial::TTYPort;
 
 mod master;
+mod outstation;
+
+/// State of the serial port
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum PortState {
+    /// Disabled and idle until enabled
+    Disabled,
+    /// waiting to perform an open retry
+    Wait(std::time::Duration),
+    /// Port is open
+    Open,
+    /// Task has been shut down
+    Shutdown,
+}

@@ -1,16 +1,16 @@
 use std::error::Error;
 
 use crate::app::control::CommandStatus;
-use crate::app::ObjectParseError;
 use crate::app::{Iin, Iin2};
+use crate::app::{ObjectParseError, Shutdown};
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::NoAssociation;
-use crate::master::session::RunError;
+use crate::master::session::{RunError, StateChange};
 use crate::tokio::sync::mpsc::error::SendError;
 use crate::tokio::sync::oneshot::error::RecvError;
+use crate::transport::TransportResponseError;
 use crate::util::cursor::WriteError;
-use crate::util::task::Shutdown;
 
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -24,8 +24,12 @@ pub enum AssociationError {
 /// Errors that can occur while executing a master task
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskError {
-    /// An error occurred at the link or transport level
-    Lower(LinkError),
+    /// There are too many user requests queued
+    TooManyRequests,
+    /// An error occurred at the link level
+    Link(LinkError),
+    /// An error occurred at the transport/app level
+    Transport,
     /// A response to the task's request was malformed
     MalformedResponse(ObjectParseError),
     /// The response contains headers that don't match the request
@@ -46,8 +50,10 @@ pub enum TaskError {
     NoSuchAssociation(EndpointAddress),
     /// There is not connection at the transport level
     NoConnection,
-    /// The master was shutdown
+    /// The master was disabled or shutdown
     Shutdown,
+    /// The master was disabled
+    Disabled,
 }
 
 // Errors that can occur when adding/modifying polls
@@ -173,7 +179,11 @@ impl std::fmt::Display for CommandError {
 impl std::fmt::Display for TaskError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            TaskError::Lower(_) => f.write_str("I/O error"),
+            TaskError::TooManyRequests => {
+                f.write_str("the number of queued user requests has reached the configured limit")
+            }
+            TaskError::Link(_) => f.write_str("link-layer or I/O error"),
+            TaskError::Transport => f.write_str("malformed response"),
             TaskError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
             TaskError::UnexpectedResponseHeaders => {
                 f.write_str("response contains headers that don't match the request")
@@ -195,6 +205,7 @@ impl std::fmt::Display for TaskError {
                 f.write_str("unable to serialize the task's request (insufficient buffer space)")
             }
             TaskError::Shutdown => f.write_str("the master was shutdown while executing the task"),
+            TaskError::Disabled => f.write_str("the master was disabled while executing the task"),
             TaskError::NoConnection => f.write_str("no connection"),
             TaskError::NoSuchAssociation(x) => write!(f, "no association with address: {}", x),
         }
@@ -230,7 +241,13 @@ impl From<WriteError> for TaskError {
 
 impl From<LinkError> for TaskError {
     fn from(err: LinkError) -> Self {
-        TaskError::Lower(err)
+        TaskError::Link(err)
+    }
+}
+
+impl From<TransportResponseError> for TaskError {
+    fn from(_: TransportResponseError) -> Self {
+        TaskError::Transport
     }
 }
 
@@ -240,17 +257,12 @@ impl From<ObjectParseError> for TaskError {
     }
 }
 
-impl From<Shutdown> for TaskError {
-    fn from(_: Shutdown) -> Self {
-        TaskError::Shutdown
-    }
-}
-
 impl From<RunError> for TaskError {
     fn from(x: RunError) -> Self {
         match x {
-            RunError::Shutdown => TaskError::Shutdown,
-            RunError::Link(x) => TaskError::Lower(x),
+            RunError::State(StateChange::Shutdown) => TaskError::Shutdown,
+            RunError::State(StateChange::Disable) => TaskError::Disabled,
+            RunError::Link(x) => TaskError::Link(x),
         }
     }
 }
@@ -258,12 +270,6 @@ impl From<RunError> for TaskError {
 impl From<NoAssociation> for TaskError {
     fn from(x: NoAssociation) -> Self {
         TaskError::NoSuchAssociation(x.address)
-    }
-}
-
-impl From<Shutdown> for PollError {
-    fn from(_: Shutdown) -> Self {
-        PollError::Shutdown
     }
 }
 
@@ -303,6 +309,15 @@ impl From<RecvError> for AssociationError {
     }
 }
 
+impl From<StateChange> for TaskError {
+    fn from(x: StateChange) -> Self {
+        match x {
+            StateChange::Disable => TaskError::Disabled,
+            StateChange::Shutdown => TaskError::Shutdown,
+        }
+    }
+}
+
 impl From<RecvError> for TaskError {
     fn from(_: RecvError) -> Self {
         TaskError::Shutdown
@@ -327,32 +342,32 @@ impl<T> From<SendError<T>> for Shutdown {
     }
 }
 
-impl<T> From<SendError<T>> for AssociationError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for AssociationError {
+    fn from(_: Shutdown) -> Self {
         AssociationError::Shutdown
     }
 }
 
-impl<T> From<SendError<T>> for TaskError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for TaskError {
+    fn from(_: Shutdown) -> Self {
         TaskError::Shutdown
     }
 }
 
-impl<T> From<SendError<T>> for CommandError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for CommandError {
+    fn from(_: Shutdown) -> Self {
         CommandError::Task(TaskError::Shutdown)
     }
 }
 
-impl<T> From<SendError<T>> for TimeSyncError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for TimeSyncError {
+    fn from(_: Shutdown) -> Self {
         TimeSyncError::Task(TaskError::Shutdown)
     }
 }
 
-impl<T> From<SendError<T>> for PollError {
-    fn from(_: SendError<T>) -> Self {
+impl From<Shutdown> for PollError {
+    fn from(_: Shutdown) -> Self {
         PollError::Shutdown
     }
 }

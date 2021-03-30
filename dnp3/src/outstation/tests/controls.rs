@@ -193,3 +193,33 @@ fn select_can_time_out() {
 
     harness.check_no_events();
 }
+
+#[test]
+fn accept_two_identical_selects_before_operate() {
+    let mut harness = new_harness(get_default_config());
+
+    // ------------ select -------------
+
+    harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
+
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Select(G41V2_INDEX_7),
+        Event::EndControls,
+    ]);
+
+    // --------- second select ----------
+    harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
+
+    harness.check_no_events();
+
+    // ------------ operate -------------
+
+    harness.test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SUCCESS);
+
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Operate(G41V2_INDEX_7, OperateType::SelectBeforeOperate),
+        Event::EndControls,
+    ]);
+}

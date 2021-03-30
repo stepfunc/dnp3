@@ -106,14 +106,12 @@ impl From<Option<Time>> for Timestamp {
 impl Time {
     pub(crate) fn checked_add(self, x: u16) -> Option<Self> {
         match self {
-            Time::Synchronized(ts) => match ts.checked_add(Duration::from_millis(x as u64)) {
-                Some(x) => Some(Time::Synchronized(x)),
-                None => None,
-            },
-            Time::NotSynchronized(ts) => match ts.checked_add(Duration::from_millis(x as u64)) {
-                Some(x) => Some(Time::NotSynchronized(x)),
-                None => None,
-            },
+            Time::Synchronized(ts) => ts
+                .checked_add(Duration::from_millis(x as u64))
+                .map(Time::Synchronized),
+            Time::NotSynchronized(ts) => ts
+                .checked_add(Duration::from_millis(x as u64))
+                .map(Time::NotSynchronized),
         }
     }
 

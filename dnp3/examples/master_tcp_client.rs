@@ -34,15 +34,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         MasterConfig::new(
             EndpointAddress::from(1)?,
             AppDecodeLevel::ObjectValues.into(),
-            ReconnectStrategy::default(),
             Timeout::from_secs(1)?,
         ),
         EndpointList::new("127.0.0.1:20000".to_owned(), &[]),
+        ReconnectStrategy::default(),
         Listener::None,
     );
 
     // Create the association
     let mut config = AssociationConfig::default();
+    config.enable_unsol_classes = EventClasses::none();
     config.auto_time_sync = Some(TimeSyncProcedure::Lan);
     config.keep_alive_timeout = Some(Duration::from_secs(60));
     let mut association = master
@@ -57,19 +58,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
+    master.enable().await?;
+
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
     loop {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
+            "enable" => {
+                master.enable().await?;
+            }
+            "disable" => {
+                master.disable().await?;
+            }
             "dln" => {
-                master.set_decode_level(DecodeLevel::nothing()).await.ok();
+                master.set_decode_level(DecodeLevel::nothing()).await?;
             }
             "dlv" => {
                 master
                     .set_decode_level(AppDecodeLevel::ObjectValues.into())
-                    .await
-                    .ok();
+                    .await?;
             }
             "rao" => {
                 if let Err(err) = association
@@ -94,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Err(err) = association
                     .operate(
                         CommandMode::SelectBeforeOperate,
-                        CommandBuilder::single_u16_header(
+                        CommandBuilder::single_header_u16(
                             Group12Var1::from_op_type(OpType::LatchOn),
                             3u16,
                         ),
@@ -104,15 +112,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::warn!("error: {}", err);
                 }
             }
-            "evt" => poll.demand().await,
+            "evt" => poll.demand().await?,
             "lts" => {
-                if let Err(err) = association.perform_time_sync(TimeSyncProcedure::Lan).await {
+                if let Err(err) = association.synchronize_time(TimeSyncProcedure::Lan).await {
                     tracing::warn!("error: {}", err);
                 }
             }
             "nts" => {
                 if let Err(err) = association
-                    .perform_time_sync(TimeSyncProcedure::NonLan)
+                    .synchronize_time(TimeSyncProcedure::NonLan)
                     .await
                 {
                     tracing::warn!("error: {}", err);

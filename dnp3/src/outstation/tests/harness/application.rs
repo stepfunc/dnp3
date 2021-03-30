@@ -1,7 +1,9 @@
 use std::sync::{Arc, Mutex};
 
+use crate::app::Timestamp;
 use crate::outstation::tests::harness::{Event, EventHandle};
 use crate::outstation::traits::{OutstationApplication, RestartDelay};
+use crate::outstation::WriteTimeResult;
 
 pub(crate) struct MockOutstationApplication {
     events: EventHandle,
@@ -32,6 +34,11 @@ impl MockOutstationApplication {
 }
 
 impl OutstationApplication for MockOutstationApplication {
+    fn write_absolute_time(&mut self, time: Timestamp) -> WriteTimeResult {
+        self.events.push(Event::WriteAbsoluteTime(time));
+        WriteTimeResult::Ok
+    }
+
     fn get_processing_delay_ms(&self) -> u16 {
         self.data.lock().unwrap().processing_delay
     }

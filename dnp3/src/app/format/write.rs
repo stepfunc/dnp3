@@ -1,4 +1,6 @@
-use crate::app::header::{ControlField, Iin, RequestHeader, ResponseFunction, ResponseHeader};
+use crate::app::header::{ControlField, RequestHeader};
+#[cfg(test)]
+use crate::app::header::{Iin, ResponseFunction, ResponseHeader};
 #[cfg(test)]
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
@@ -21,6 +23,7 @@ pub(crate) fn start_request<'a, 'b>(
     Ok(HeaderWriter { cursor })
 }
 
+#[cfg(test)]
 pub(crate) fn start_response<'a, 'b>(
     control: ControlField,
     function: ResponseFunction,
@@ -45,6 +48,10 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         self.write_all_objects_header(Variation::Group60Var4)?;
         self.write_all_objects_header(Variation::Group60Var1)?;
         Ok(())
+    }
+
+    pub(crate) fn new(cursor: &'b mut WriteCursor<'a>) -> Self {
+        Self { cursor }
     }
 
     pub(crate) fn write_all_objects_header(

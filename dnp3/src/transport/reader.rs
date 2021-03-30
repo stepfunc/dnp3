@@ -1,4 +1,5 @@
 use crate::app::parse::parser::ParsedFragment;
+use crate::app::HeaderParseError;
 use crate::decode::{AppDecodeLevel, DecodeLevel};
 use crate::link::error::LinkError;
 use crate::link::{EndpointAddress, LinkErrorMode};
@@ -118,13 +119,14 @@ impl TransportReader {
         let data = self.parse(false)?;
 
         match data {
-            ParsedTransportData::Fragment(info, fragment) => fragment
-                .to_response()
-                .ok()
-                .map(|response| TransportResponse::Response(info.source, response)),
-            ParsedTransportData::LinkLayerMessage(msg) => {
+            Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_response() {
+                Ok(response) => Some(TransportResponse::Response(info.source, response)),
+                Err(err) => Some(TransportResponse::Error(err.into())),
+            },
+            Ok(ParsedTransportData::LinkLayerMessage(msg)) => {
                 Some(TransportResponse::LinkLayerMessage(msg))
             }
+            Err(err) => Some(TransportResponse::Error(err.into())),
         }
     }
 
@@ -135,17 +137,18 @@ impl TransportReader {
     fn peek_request(&mut self) -> Option<TransportRequest> {
         let data = self.parse(true)?;
         match data {
-            ParsedTransportData::Fragment(info, fragment) => fragment
-                .to_request()
-                .ok()
-                .map(|request| TransportRequest::Request(info, request)),
-            ParsedTransportData::LinkLayerMessage(msg) => {
+            Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_request() {
+                Ok(request) => Some(TransportRequest::Request(info, request)),
+                Err(err) => Some(TransportRequest::Error(err.into(fragment.control.seq))),
+            },
+            Ok(ParsedTransportData::LinkLayerMessage(msg)) => {
                 Some(TransportRequest::LinkLayerMessage(msg))
             }
+            Err(err) => Some(TransportRequest::Error(err.into())),
         }
     }
 
-    fn parse(&mut self, peek: bool) -> Option<ParsedTransportData> {
+    fn parse(&mut self, peek: bool) -> Option<Result<ParsedTransportData, HeaderParseError>> {
         let transport_data = if peek {
             self.inner.peek()?
         } else {
@@ -153,12 +156,12 @@ impl TransportReader {
         };
 
         match transport_data {
-            TransportData::Fragment(fragment) => {
-                let parsed = ParsedFragment::parse(fragment.data).ok()?;
-                Some(ParsedTransportData::Fragment(fragment.info, parsed))
-            }
+            TransportData::Fragment(fragment) => Some(
+                ParsedFragment::parse(fragment.data)
+                    .map(|parsed| ParsedTransportData::Fragment(fragment.info, parsed)),
+            ),
             TransportData::LinkLayerMessage(msg) => {
-                Some(ParsedTransportData::LinkLayerMessage(msg))
+                Some(Ok(ParsedTransportData::LinkLayerMessage(msg)))
             }
         }
     }

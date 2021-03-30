@@ -20,6 +20,7 @@ use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::NonReadTask::TimeSync;
 use crate::master::tasks::{AssociationTask, ReadTask, Task};
+use crate::master::ReadType;
 use crate::tokio::time::Instant;
 use crate::util::Smallest;
 
@@ -46,9 +47,14 @@ pub struct AssociationConfig {
     pub auto_integrity_scan_on_buffer_overflow: bool,
     /// Classes to perform an automatic class scan when their IIN bit is detected
     pub event_scan_on_events_available: EventClasses,
+    /// The maximum number of user requests (e.g. commands, adhoc reads, etc) that will be queued
+    /// before back-pressure is applied by failing requests with TaskError::TooManyRequests
+    pub max_queued_user_requests: usize,
 }
 
 impl AssociationConfig {
+    const DEFAULT_MAX_QUEUED_USER_REQUESTS: usize = 16;
+
     pub fn quiet(auto_tasks_retry_strategy: RetryStrategy) -> Self {
         Self {
             disable_unsol_classes: EventClasses::none(),
@@ -59,6 +65,7 @@ impl AssociationConfig {
             keep_alive_timeout: None,
             auto_integrity_scan_on_buffer_overflow: false,
             event_scan_on_events_available: EventClasses::none(),
+            max_queued_user_requests: Self::DEFAULT_MAX_QUEUED_USER_REQUESTS,
         }
     }
 }
@@ -74,6 +81,7 @@ impl Default for AssociationConfig {
             keep_alive_timeout: None,
             auto_integrity_scan_on_buffer_overflow: true,
             event_scan_on_events_available: EventClasses::none(),
+            max_queued_user_requests: Self::DEFAULT_MAX_QUEUED_USER_REQUESTS,
         }
     }
 }
@@ -240,6 +248,7 @@ pub(crate) struct Association {
     seq: Sequence,
     last_unsol_frag: Option<LastUnsolFragment>,
     request_queue: VecDeque<Task>,
+    max_request_queue_size: usize,
     auto_tasks: TaskStates,
     handler: Box<dyn AssociationHandler>,
     config: AssociationConfig,
@@ -260,6 +269,7 @@ impl Association {
             seq: Sequence::default(),
             last_unsol_frag: None,
             request_queue: VecDeque::new(),
+            max_request_queue_size: config.max_queued_user_requests,
             auto_tasks: TaskStates::new(),
             handler,
             config,
@@ -276,7 +286,11 @@ impl Association {
         match msg {
             AssociationMsgType::QueueTask(task) => {
                 if is_connected {
-                    self.request_queue.push_back(task);
+                    if self.request_queue.len() < self.max_request_queue_size {
+                        self.request_queue.push_back(task);
+                    } else {
+                        task.on_task_error(Some(self), TaskError::TooManyRequests);
+                    }
                 } else {
                     task.on_task_error(Some(self), TaskError::NoConnection);
                 }
@@ -306,11 +320,7 @@ impl Association {
     fn reset(&mut self, err: RunError) {
         // Fail any pending requests
         while let Some(task) = self.request_queue.pop_front() {
-            let task_err = match err {
-                RunError::Shutdown => TaskError::Shutdown,
-                RunError::Link(_) => TaskError::NoConnection,
-            };
-            task.on_task_error(Some(self), task_err);
+            task.on_task_error(Some(self), err.into());
         }
 
         // Reset the auto tasks
@@ -436,10 +446,10 @@ impl Association {
     }
 
     pub(crate) fn on_link_activity(&mut self) {
-        self.next_link_status = match self.config.keep_alive_timeout {
-            Some(timeout) => Some(Instant::now() + timeout),
-            None => None,
-        }
+        self.next_link_status = self
+            .config
+            .keep_alive_timeout
+            .map(|timeout| Instant::now() + timeout)
     }
 
     pub(crate) fn handle_unsolicited_response(&mut self, response: &Response) -> bool {
@@ -466,9 +476,10 @@ impl Association {
 
             if let Ok(objects) = response.objects {
                 extract_measurements(
+                    ReadType::Unsolicited,
                     response.header,
                     objects,
-                    self.handler.get_unsolicited_handler(),
+                    self.handler.get_read_handler(),
                 );
             }
 
@@ -486,7 +497,12 @@ impl Association {
         header: ResponseHeader,
         objects: HeaderCollection,
     ) {
-        extract_measurements(header, objects, self.handler.get_integrity_handler());
+        extract_measurements(
+            ReadType::StartupIntegrity,
+            header,
+            objects,
+            self.handler.get_read_handler(),
+        );
     }
 
     pub(crate) fn handle_poll_response(
@@ -494,7 +510,12 @@ impl Association {
         header: ResponseHeader,
         objects: HeaderCollection,
     ) {
-        extract_measurements(header, objects, self.handler.get_default_poll_handler());
+        extract_measurements(
+            ReadType::PeriodicPoll,
+            header,
+            objects,
+            self.handler.get_read_handler(),
+        );
     }
 
     pub(crate) fn handle_event_scan_response(
@@ -502,7 +523,12 @@ impl Association {
         header: ResponseHeader,
         objects: HeaderCollection,
     ) {
-        extract_measurements(header, objects, self.handler.get_integrity_handler());
+        extract_measurements(
+            ReadType::PeriodicPoll,
+            header,
+            objects,
+            self.handler.get_read_handler(),
+        );
     }
 
     pub(crate) fn handle_read_response(
@@ -510,8 +536,12 @@ impl Association {
         header: ResponseHeader,
         objects: HeaderCollection,
     ) {
-        // TODO: Get another poll handler?
-        extract_measurements(header, objects, self.handler.get_default_poll_handler());
+        extract_measurements(
+            ReadType::SinglePoll,
+            header,
+            objects,
+            self.handler.get_read_handler(),
+        );
     }
 
     pub(crate) fn priority_task(&mut self) -> Option<Task> {

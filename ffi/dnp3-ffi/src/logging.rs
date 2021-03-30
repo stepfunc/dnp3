@@ -13,9 +13,12 @@ thread_local! {
    pub static LOG_BUFFER: std::cell::RefCell<Vec<u8>> = std::cell::RefCell::new(Vec::new());
 }
 
-pub fn configure_logging(config: ffi::LoggingConfig, handler: ffi::Logger) {
+pub fn configure_logging(
+    config: ffi::LoggingConfig,
+    handler: ffi::Logger,
+) -> Result<(), ffi::Dnp3Error> {
     tracing::subscriber::set_global_default(adapter(config, handler))
-        .expect("unable to install tracing subscriber");
+        .map_err(|_| ffi::Dnp3Error::LoggingAlreadyConfigured)
 }
 
 struct ThreadLocalBufferWriter;
@@ -56,6 +59,7 @@ impl ffi::LoggingConfig {
         let level: tracing::Level = self.level().into();
 
         let builder = tracing_subscriber::fmt()
+            .with_ansi(false)
             .with_max_level(level)
             .with_level(self.print_level)
             .with_target(self.print_module_info)

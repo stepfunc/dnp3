@@ -1,17 +1,17 @@
 use dnp3::app::measurement::*;
 use dnp3::app::*;
 use dnp3::app::{Iin1, Iin2, ResponseFunction, ResponseHeader};
-use dnp3::master::{HeaderInfo, ReadHandler};
+use dnp3::master::{HeaderInfo, ReadHandler, ReadType};
 
 use crate::ffi;
 
 impl ReadHandler for ffi::ReadHandler {
-    fn begin_fragment(&mut self, header: ResponseHeader) {
-        ffi::ReadHandler::begin_fragment(self, header.into());
+    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) {
+        ffi::ReadHandler::begin_fragment(self, read_type.into(), header.into());
     }
 
-    fn end_fragment(&mut self, header: ResponseHeader) {
-        ffi::ReadHandler::end_fragment(self, header.into());
+    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader) {
+        ffi::ReadHandler::end_fragment(self, read_type.into(), header.into());
     }
 
     fn handle_binary(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Binary, u16)>) {
@@ -80,6 +80,17 @@ impl ReadHandler for ffi::ReadHandler {
         let info = info.into();
         let mut iterator = OctetStringIterator::new(iter);
         ffi::ReadHandler::handle_octet_string(self, info, &mut iterator);
+    }
+}
+
+impl From<ReadType> for ffi::ReadType {
+    fn from(x: ReadType) -> Self {
+        match x {
+            ReadType::Unsolicited => ffi::ReadType::Unsolicited,
+            ReadType::StartupIntegrity => ffi::ReadType::StartupIntegrity,
+            ReadType::PeriodicPoll => ffi::ReadType::PeriodicPoll,
+            ReadType::SinglePoll => ffi::ReadType::SinglePoll,
+        }
     }
 }
 
@@ -189,7 +200,7 @@ implement_iterator!(
 );
 
 impl ffi::Binary {
-    fn new(idx: u16, value: Binary) -> Self {
+    pub(crate) fn new(idx: u16, value: Binary) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -200,7 +211,7 @@ impl ffi::Binary {
 }
 
 impl ffi::DoubleBitBinary {
-    fn new(idx: u16, value: DoubleBitBinary) -> Self {
+    pub(crate) fn new(idx: u16, value: DoubleBitBinary) -> Self {
         ffi::DoubleBitBinaryFields {
             index: idx,
             value: match value.value {
@@ -217,7 +228,7 @@ impl ffi::DoubleBitBinary {
 }
 
 impl ffi::BinaryOutputStatus {
-    fn new(idx: u16, value: BinaryOutputStatus) -> Self {
+    pub(crate) fn new(idx: u16, value: BinaryOutputStatus) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -228,7 +239,7 @@ impl ffi::BinaryOutputStatus {
 }
 
 impl ffi::Counter {
-    fn new(idx: u16, value: Counter) -> Self {
+    pub(crate) fn new(idx: u16, value: Counter) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -239,7 +250,7 @@ impl ffi::Counter {
 }
 
 impl ffi::FrozenCounter {
-    fn new(idx: u16, value: FrozenCounter) -> Self {
+    pub(crate) fn new(idx: u16, value: FrozenCounter) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -250,7 +261,7 @@ impl ffi::FrozenCounter {
 }
 
 impl ffi::Analog {
-    fn new(idx: u16, value: Analog) -> Self {
+    pub(crate) fn new(idx: u16, value: Analog) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -261,7 +272,7 @@ impl ffi::Analog {
 }
 
 impl ffi::AnalogOutputStatus {
-    fn new(idx: u16, value: AnalogOutputStatus) -> Self {
+    pub(crate) fn new(idx: u16, value: AnalogOutputStatus) -> Self {
         Self {
             index: idx,
             value: value.value,

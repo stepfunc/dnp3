@@ -159,10 +159,7 @@ impl TimeSyncTask {
 
         let delay_ms: Option<u16> = objects.get_only_header().and_then(|x| {
             if let Some(CountVariation::Group52Var2(seq)) = x.details.count() {
-                match seq.single() {
-                    Some(x) => Some(x.time),
-                    None => None,
-                }
+                seq.single().map(|x| x.time)
             } else {
                 None
             }
@@ -347,15 +344,7 @@ mod tests {
             self.time.take()
         }
 
-        fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-            &mut self.handler
-        }
-
-        fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-            &mut self.handler
-        }
-
-        fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
+        fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
             &mut self.handler
         }
     }
@@ -391,15 +380,7 @@ mod tests {
                 Some(self.time)
             }
 
-            fn get_integrity_handler(&mut self) -> &mut dyn ReadHandler {
-                &mut self.handler
-            }
-
-            fn get_unsolicited_handler(&mut self) -> &mut dyn ReadHandler {
-                &mut self.handler
-            }
-
-            fn get_default_poll_handler(&mut self) -> &mut dyn ReadHandler {
+            fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
                 &mut self.handler
             }
         }

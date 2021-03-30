@@ -154,60 +154,90 @@ impl Layer {
             },
         };
 
-        // broadcasts may only use unconfirmed user data
-        if broadcast.is_some() {
-            return match header.control.func {
-                Function::PriUnconfirmedUserData => (
-                    Some(FrameInfo::new(source, broadcast, FrameType::Data)),
-                    None,
-                ),
-                _ => {
-                    tracing::warn!(
-                        "ignoring broadcast frame with function: {:?}",
-                        header.control.func
-                    );
-                    (None, None)
-                }
-            };
+        // broadcasts may only accept user data
+        if broadcast.is_some()
+            && !matches!(
+                header.control.func,
+                Function::PriUnconfirmedUserData | Function::PriConfirmedUserData
+            )
+        {
+            tracing::warn!(
+                "ignoring broadcast frame with function: {:?}",
+                header.control.func
+            );
+            return (None, None);
         }
 
         match header.control.func {
-            Function::PriUnconfirmedUserData => (
-                Some(FrameInfo::new(source, broadcast, FrameType::Data)),
-                None,
-            ),
+            Function::PriUnconfirmedUserData => {
+                if header.control.fcv {
+                    tracing::warn!("ignoring frame of unconfirmed user data with FCV bit set");
+                    return (None, None);
+                }
+
+                (
+                    Some(FrameInfo::new(source, broadcast, FrameType::Data)),
+                    None,
+                )
+            }
             Function::PriResetLinkStates => {
-                self.secondary_state = SecondaryState::Reset(true); // TODO - does it start true or false
+                if header.control.fcv {
+                    tracing::warn!("ignoring reset link states with FCV bit set");
+                    return (None, None);
+                }
+
+                self.secondary_state = SecondaryState::Reset(true);
                 (None, Some(Reply::new(source, Function::SecAck)))
             }
-            Function::PriConfirmedUserData => match self.secondary_state {
-                SecondaryState::NotReset => {
-                    tracing::info!(
-                        "ignoring confirmed user data while secondary state is not reset"
-                    );
-                    (None, None)
+            Function::PriConfirmedUserData => {
+                if !header.control.fcv {
+                    tracing::warn!("ignoring frame of confirmed user data with FCV bit unset");
+                    return (None, None);
                 }
-                SecondaryState::Reset(expected) => {
-                    if header.control.fcb == expected {
-                        self.secondary_state = SecondaryState::Reset(!expected);
-                        (
-                            Some(FrameInfo::new(source, broadcast, FrameType::Data)),
-                            None,
-                        )
-                    } else {
-                        tracing::info!("ignoring confirmed user data with non-matching fcb");
+
+                match self.secondary_state {
+                    SecondaryState::NotReset => {
+                        tracing::info!(
+                            "ignoring confirmed user data while secondary state is not reset"
+                        );
                         (None, None)
                     }
+                    SecondaryState::Reset(expected) => {
+                        let response = if broadcast.is_none() {
+                            Some(Reply::new(source, Function::SecAck))
+                        } else {
+                            // Do not answer if it's a broadcast
+                            None
+                        };
+
+                        if header.control.fcb == expected {
+                            self.secondary_state = SecondaryState::Reset(!expected);
+                            (
+                                Some(FrameInfo::new(source, broadcast, FrameType::Data)),
+                                response,
+                            )
+                        } else {
+                            tracing::info!("ignoring confirmed user data with non-matching fcb");
+                            (None, response)
+                        }
+                    }
                 }
-            },
-            Function::PriRequestLinkStatus => (
-                Some(FrameInfo::new(
-                    source,
-                    broadcast,
-                    FrameType::LinkStatusRequest,
-                )),
-                Some(Reply::new(source, Function::SecLinkStatus)),
-            ),
+            }
+            Function::PriRequestLinkStatus => {
+                if header.control.fcv {
+                    tracing::warn!("ignoring request link status with FCV bit set");
+                    return (None, None);
+                }
+
+                (
+                    Some(FrameInfo::new(
+                        source,
+                        broadcast,
+                        FrameType::LinkStatusRequest,
+                    )),
+                    Some(Reply::new(source, Function::SecLinkStatus)),
+                )
+            }
             Function::SecLinkStatus => (
                 Some(FrameInfo::new(
                     source,

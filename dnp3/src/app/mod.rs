@@ -4,6 +4,7 @@ pub use header::*;
 pub use parse_error::*;
 pub use retry::*;
 pub use sequence::*;
+pub use shutdown::*;
 pub use timeout::*;
 pub use types::*;
 pub use variations::Variation;
@@ -42,6 +43,7 @@ pub mod measurement;
 pub(crate) mod parse;
 mod retry;
 mod sequence;
+mod shutdown;
 mod timeout;
 mod types;
 
