@@ -234,7 +234,7 @@ pub(crate) unsafe fn master_read(
     let task = async move {
         let result = match handle.read(request).await {
             Ok(_) => ffi::ReadResult::Success,
-            Err(_) => ffi::ReadResult::TaskError,
+            Err(err) => err.into(),
         };
 
         callback.on_complete(result);
@@ -264,20 +264,14 @@ pub unsafe fn master_operate(
     let task = async move {
         let result = match handle.operate(mode.into(), headers).await {
             Ok(_) => ffi::CommandResult::Success,
-            Err(CommandError::Task(_)) => ffi::CommandResult::TaskError,
+            Err(CommandError::Task(err)) => err.into(),
             Err(CommandError::Response(err)) => match err {
-                CommandResponseError::Request(_) => ffi::CommandResult::TaskError,
+                CommandResponseError::Request(err) => err.into(),
                 CommandResponseError::BadStatus(_) => ffi::CommandResult::BadStatus,
-                CommandResponseError::HeaderCountMismatch => {
-                    ffi::CommandResult::HeaderCountMismatch
-                }
-                CommandResponseError::HeaderTypeMismatch => ffi::CommandResult::HeaderTypeMismatch,
-                CommandResponseError::ObjectCountMismatch => {
-                    ffi::CommandResult::ObjectCountMismatch
-                }
-                CommandResponseError::ObjectValueMismatch => {
-                    ffi::CommandResult::ObjectValueMismatch
-                }
+                CommandResponseError::HeaderCountMismatch => ffi::CommandResult::HeaderMismatch,
+                CommandResponseError::HeaderTypeMismatch => ffi::CommandResult::HeaderMismatch,
+                CommandResponseError::ObjectCountMismatch => ffi::CommandResult::HeaderMismatch,
+                CommandResponseError::ObjectValueMismatch => ffi::CommandResult::HeaderMismatch,
             },
         };
 
@@ -302,7 +296,7 @@ pub(crate) unsafe fn master_sync_time(
     let task = async move {
         let result = match association.synchronize_time(mode.into()).await {
             Ok(_) => ffi::TimeSyncResult::Success,
-            Err(TimeSyncError::Task(_)) => ffi::TimeSyncResult::TaskError,
+            Err(TimeSyncError::Task(err)) => err.into(),
             Err(TimeSyncError::ClockRollback) => ffi::TimeSyncResult::ClockRollback,
             Err(TimeSyncError::SystemTimeNotUnix) => ffi::TimeSyncResult::SystemTimeNotUnix,
             Err(TimeSyncError::BadOutstationTimeDelay(_)) => {
@@ -336,7 +330,7 @@ pub(crate) unsafe fn master_cold_restart(
     let task = async move {
         let result = match association.cold_restart().await {
             Ok(value) => ffi::RestartResult::new_success(value),
-            Err(_) => ffi::RestartResult::error(),
+            Err(err) => ffi::RestartResult::new_error(err.into()),
         };
 
         callback.on_complete(result);
@@ -359,7 +353,7 @@ pub(crate) unsafe fn master_warm_restart(
     let task = async move {
         let result = match association.warm_restart().await {
             Ok(value) => ffi::RestartResult::new_success(value),
-            Err(_) => ffi::RestartResult::error(),
+            Err(err) => ffi::RestartResult::new_error(err.into()),
         };
 
         callback.on_complete(result);
@@ -420,15 +414,15 @@ impl ffi::RestartResult {
     fn new_success(delay: Duration) -> Self {
         ffi::RestartResultFields {
             delay,
-            success: ffi::RestartSuccess::Success,
+            error: ffi::RestartError::Ok,
         }
         .into()
     }
 
-    fn error() -> Self {
+    fn new_error(error: ffi::RestartError) -> Self {
         ffi::RestartResultFields {
             delay: Duration::from_millis(0),
-            success: ffi::RestartSuccess::TaskError,
+            error,
         }
         .into()
     }
@@ -681,3 +675,34 @@ impl From<PollError> for ffi::Dnp3Error {
         }
     }
 }
+
+macro_rules! define_task_from_impl {
+    ($name:ident) => {
+        impl From<TaskError> for ffi::$name {
+            fn from(err: TaskError) -> Self {
+                match err {
+                    TaskError::TooManyRequests => ffi::$name::TooManyRequests,
+                    TaskError::Link(_) => ffi::$name::NoConnection,
+                    TaskError::Transport => ffi::$name::NoConnection,
+                    TaskError::MalformedResponse(_) => ffi::$name::BadResponse,
+                    TaskError::UnexpectedResponseHeaders => ffi::$name::BadResponse,
+                    TaskError::NonFinWithoutCon => ffi::$name::BadResponse,
+                    TaskError::NeverReceivedFir => ffi::$name::BadResponse,
+                    TaskError::UnexpectedFir => ffi::$name::BadResponse,
+                    TaskError::MultiFragmentResponse => ffi::$name::BadResponse,
+                    TaskError::ResponseTimeout => ffi::$name::ResponseTimeout,
+                    TaskError::WriteError => ffi::$name::WriteError,
+                    TaskError::NoSuchAssociation(_) => ffi::$name::AssociationRemoved,
+                    TaskError::NoConnection => ffi::$name::NoConnection,
+                    TaskError::Shutdown => ffi::$name::Shutdown,
+                    TaskError::Disabled => ffi::$name::NoConnection,
+                }
+            }
+        }
+    };
+}
+
+define_task_from_impl!(CommandResult);
+define_task_from_impl!(TimeSyncResult);
+define_task_from_impl!(RestartError);
+define_task_from_impl!(ReadResult);

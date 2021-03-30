@@ -51,7 +51,9 @@ pub enum TaskError {
     /// There is not connection at the transport level
     NoConnection,
     /// The master was disabled or shutdown
-    State(StateChange),
+    Shutdown,
+    /// The master was disabled
+    Disabled,
 }
 
 // Errors that can occur when adding/modifying polls
@@ -202,12 +204,8 @@ impl std::fmt::Display for TaskError {
             TaskError::WriteError => {
                 f.write_str("unable to serialize the task's request (insufficient buffer space)")
             }
-            TaskError::State(StateChange::Shutdown) => {
-                f.write_str("the master was shutdown while executing the task")
-            }
-            TaskError::State(StateChange::Disable) => {
-                f.write_str("the master was disabled while executing the task")
-            }
+            TaskError::Shutdown => f.write_str("the master was shutdown while executing the task"),
+            TaskError::Disabled => f.write_str("the master was disabled while executing the task"),
             TaskError::NoConnection => f.write_str("no connection"),
             TaskError::NoSuchAssociation(x) => write!(f, "no association with address: {}", x),
         }
@@ -262,7 +260,8 @@ impl From<ObjectParseError> for TaskError {
 impl From<RunError> for TaskError {
     fn from(x: RunError) -> Self {
         match x {
-            RunError::State(s) => TaskError::State(s),
+            RunError::State(StateChange::Shutdown) => TaskError::Shutdown,
+            RunError::State(StateChange::Disable) => TaskError::Disabled,
             RunError::Link(x) => TaskError::Link(x),
         }
     }
@@ -312,25 +311,28 @@ impl From<RecvError> for AssociationError {
 
 impl From<StateChange> for TaskError {
     fn from(x: StateChange) -> Self {
-        TaskError::State(x)
+        match x {
+            StateChange::Disable => TaskError::Disabled,
+            StateChange::Shutdown => TaskError::Shutdown,
+        }
     }
 }
 
 impl From<RecvError> for TaskError {
     fn from(_: RecvError) -> Self {
-        TaskError::State(StateChange::Shutdown)
+        TaskError::Shutdown
     }
 }
 
 impl From<RecvError> for CommandError {
     fn from(_: RecvError) -> Self {
-        CommandError::Task(TaskError::State(StateChange::Shutdown))
+        CommandError::Task(TaskError::Shutdown)
     }
 }
 
 impl From<RecvError> for TimeSyncError {
     fn from(_: RecvError) -> Self {
-        TimeSyncError::Task(TaskError::State(StateChange::Shutdown))
+        TimeSyncError::Task(TaskError::Shutdown)
     }
 }
 
@@ -348,19 +350,19 @@ impl From<Shutdown> for AssociationError {
 
 impl From<Shutdown> for TaskError {
     fn from(_: Shutdown) -> Self {
-        TaskError::State(StateChange::Shutdown)
+        TaskError::Shutdown
     }
 }
 
 impl From<Shutdown> for CommandError {
     fn from(_: Shutdown) -> Self {
-        CommandError::Task(TaskError::State(StateChange::Shutdown))
+        CommandError::Task(TaskError::Shutdown)
     }
 }
 
 impl From<Shutdown> for TimeSyncError {
     fn from(_: Shutdown) -> Self {
-        TimeSyncError::Task(TaskError::State(StateChange::Shutdown))
+        TimeSyncError::Task(TaskError::Shutdown)
     }
 }
 

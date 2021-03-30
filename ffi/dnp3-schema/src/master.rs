@@ -7,7 +7,7 @@ use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
-use oo_bindgen::native_enum::NativeEnumHandle;
+use oo_bindgen::native_enum::{NativeEnumBuilder, NativeEnumHandle};
 
 pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<(), BindingError> {
     let read_handler = crate::handler::define(lib, shared)?;
@@ -451,7 +451,7 @@ fn define_read_callback(
     let read_result = lib
         .define_native_enum("ReadResult")?
         .push("Success", "Read was perform successfully")?
-        .push("TaskError", "The read was not performed properly")?
+        .add_task_errors()?
         .doc("Result of a read operation")?
         .build()?;
 
@@ -760,10 +760,35 @@ fn define_command_mode(
         .push("DirectOperate", "Perform a Direct Operate (0x05)")?
         .push(
             "SelectBeforeOperate",
-            "Perform a Select & Operate (0x03 then 0x04)",
+            "Perform a Select and Operate (0x03 then 0x04)",
         )?
         .doc("Command operation mode")?
         .build()
+}
+
+trait TaskErrors: Sized {
+    fn add_task_errors(self) -> std::result::Result<Self, BindingError>;
+}
+
+impl TaskErrors for NativeEnumBuilder<'_> {
+    fn add_task_errors(self) -> std::result::Result<Self, BindingError> {
+        self.push("TooManyRequests", "too many user requests queued")?
+            .push(
+                "BadResponse",
+                "response was malformed or contained object headers",
+            )?
+            .push(
+                "ResponseTimeout",
+                "timeout occurred before receiving a response",
+            )?
+            .push(
+                "WriteError",
+                "insufficient buffer space to serialize the request",
+            )?
+            .push("NoConnection", "no connection")?
+            .push("Shutdown", "master was shutdown")?
+            .push("AssociationRemoved", "association was removed mid-task")
+    }
 }
 
 fn define_command_callback(
@@ -772,27 +797,15 @@ fn define_command_callback(
     let command_result = lib
         .define_native_enum("CommandResult")?
         .push("Success", "Command was a success")?
-        .push("TaskError", "Failed b/c of a generic task execution error")?
         .push(
             "BadStatus",
             "Outstation indicated that a command was not SUCCESS",
         )?
         .push(
-            "HeaderCountMismatch",
-            "Number of headers in the response doesn't match the number in the request",
+            "HeaderMismatch",
+            "Number of headers or objects in the response didn't match the number in the request",
         )?
-        .push(
-            "HeaderTypeMismatch",
-            "Header in the response doesn't match the request",
-        )?
-        .push(
-            "ObjectCountMismatch",
-            "Number of objects in one of the headers doesn't match the request",
-        )?
-        .push(
-            "ObjectValueMismatch",
-            "Value in one of the objects in the response doesn't match the request",
-        )?
+        .add_task_errors()?
         .doc("Result of a command")?
         .build()?;
 
@@ -1049,7 +1062,6 @@ fn define_time_sync_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle
     let timesync_result = lib
         .define_native_enum("TimeSyncResult")?
         .push("Success", "Time synchronization operation was a success")?
-        .push("TaskError", "Failed b/c of a generic task execution error")?
         .push("ClockRollback", "Detected a clock rollback")?
         .push(
             "SystemTimeNotUnix",
@@ -1066,6 +1078,7 @@ fn define_time_sync_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle
         )?
         .push("SystemTimeNotAvailable", "System time not available")?
         .push("IinError", "Outstation indicated an error")?
+        .add_task_errors()?
         .doc("Result of a time sync operation")?
         .build()?;
 
@@ -1103,17 +1116,17 @@ fn define_time_sync_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, B
 }
 
 fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
-    let restart_success = lib
-        .define_native_enum("RestartSuccess")?
-        .push("Success", "Restart was perform successfully")?
-        .push("TaskError", "The restart was not performed properly")?
-        .doc("Result of a read operation")?
+    let restart_error = lib
+        .define_native_enum("RestartError")?
+        .push("Ok", "Restart was perform successfully")?
+        .add_task_errors()?
+        .doc("Result of a restart operation")?
         .build()?;
 
     let restart_result = lib.declare_native_struct("RestartResult")?;
     let restart_result = lib.define_native_struct(&restart_result)?
-        .add("success", Type::Enum(restart_success), "Success status of the restart task")?
-        .add("delay", Type::Duration(DurationMapping::Milliseconds), "Delay value returned by the outstation. Valid only if {struct:RestartResult.success} is {enum:RestartSuccess.Success}.")?
+        .add("error", Type::Enum(restart_error), "Success/failure of the restart task")?
+        .add("delay", Type::Duration(DurationMapping::Milliseconds), "Delay value returned by the outstation. Valid only if {struct:RestartResult.error} is {enum:RestartError.Ok}.")?
         .doc("Result of a restart task")?
         .build()?;
 
