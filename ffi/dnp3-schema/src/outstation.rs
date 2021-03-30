@@ -850,7 +850,7 @@ fn define_address_filter(
         .destructor(&address_filter_destroy_fn)?
         .static_method("Any", &address_filter_any_fn)?
         .method("Add", &address_filter_add_fn)?
-        .doc("")?
+        .doc("Outstation address filter")?
         .build()
 }
 

@@ -619,7 +619,7 @@ fn define_endpoint_list(
         .param("list", Type::ClassRef(endpoint_list_class.clone()), "Endpoint list to modify")?
         .param("endpoint", Type::String, "Endpoint to add to the list")?
         .return_type(ReturnType::void())?
-        .doc(doc(".").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
+        .doc(doc("Add an IP endpoint to the list.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
         .build()?;
 
     let endpoint_list_class = lib.define_class(&endpoint_list_class)?

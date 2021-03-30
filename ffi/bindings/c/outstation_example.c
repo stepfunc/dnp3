@@ -6,23 +6,23 @@
 #include <time.h>
 
 // Logger callback
-void on_log_message(log_level_t level, const char *msg, void *arg) { printf("%s", msg); }
+void on_log_message(dnp3_log_level_t level, const char *msg, void *arg) { printf("%s", msg); }
 
 // Application callbacks
 uint16_t get_processing_delay_ms(void *context) { return 0; }
 
-write_time_result_t write_absolute_time(uint64_t time, void* context) { return WriteTimeResult_NotSupported; }
+dnp3_write_time_result_t write_absolute_time(uint64_t time, void* context) { return DNP3_WRITE_TIME_RESULT_NOT_SUPPORTED; }
 
-application_iin_t get_application_iin(void* context) { return application_iin_init(); }
+dnp3_application_iin_t get_application_iin(void* context) { return dnp3_application_iin_init(); }
 
-restart_delay_t cold_restart(void *context) { return restart_delay_seconds(60); }
+dnp3_restart_delay_t cold_restart(void *context) { return dnp3_restart_delay_seconds(60); }
 
-restart_delay_t warm_restart(void *context) { return restart_delay_not_supported(); }
+dnp3_restart_delay_t warm_restart(void *context) { return dnp3_restart_delay_not_supported(); }
 
 // Outstation information callbacks
-void process_request_from_idle(request_header_t header, void *context) {}
+void process_request_from_idle(dnp3_request_header_t header, void *context) {}
 
-void broadcast_received(function_code_t function_code, broadcast_action_t action, void *context) {}
+void broadcast_received(dnp3_function_code_t function_code, dnp3_broadcast_action_t action, void *context) {}
 
 void enter_solicited_confirm_wait(uint8_t ecsn, void *context) {}
 
@@ -49,87 +49,87 @@ void begin_fragment(void *context) {}
 
 void end_fragment(void *context) {}
 
-command_status_t select_g12v1(g12v1_t control, uint16_t index, database_t *database, void *context) { return CommandStatus_NotSupported; }
+dnp3_command_status_t select_g12v1(dnp3_g12v1_t control, uint16_t index, dnp3_database_t *database, void *context) { return DNP3_COMMAND_STATUS_NOT_SUPPORTED; }
 
-command_status_t operate_g12v1(g12v1_t control, uint16_t index, operate_type_t op_type, database_t *database, void *context)
+dnp3_command_status_t operate_g12v1(dnp3_g12v1_t control, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
 {
-    return CommandStatus_NotSupported;
+    return DNP3_COMMAND_STATUS_NOT_SUPPORTED;
 }
 
-command_status_t select_g41v1(int32_t control, uint16_t index, database_t *database, void *context) { return CommandStatus_NotSupported; }
+dnp3_command_status_t select_g41v1(int32_t control, uint16_t index, dnp3_database_t *database, void *context) { return DNP3_COMMAND_STATUS_NOT_SUPPORTED; }
 
-command_status_t operate_g41v1(int32_t control, uint16_t index, operate_type_t op_type, database_t *database, void *context)
+dnp3_command_status_t operate_g41v1(int32_t control, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
 {
-    return CommandStatus_NotSupported;
+    return DNP3_COMMAND_STATUS_NOT_SUPPORTED;
 }
 
-command_status_t select_g41v2(int16_t control, uint16_t index, database_t *database, void *context) { return CommandStatus_NotSupported; }
+dnp3_command_status_t select_g41v2(int16_t control, uint16_t index, dnp3_database_t *database, void *context) { return DNP3_COMMAND_STATUS_NOT_SUPPORTED; }
 
-command_status_t operate_g41v2(int16_t control, uint16_t index, operate_type_t op_type, database_t *database, void *context)
+dnp3_command_status_t operate_g41v2(int16_t control, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
 {
-    return CommandStatus_NotSupported;
+    return DNP3_COMMAND_STATUS_NOT_SUPPORTED;
 }
 
-command_status_t select_g41v3(float control, uint16_t index, database_t *database, void *context) { return CommandStatus_NotSupported; }
+dnp3_command_status_t select_g41v3(float control, uint16_t index, dnp3_database_t *database, void *context) { return DNP3_COMMAND_STATUS_NOT_SUPPORTED; }
 
-command_status_t operate_g41v3(float control, uint16_t index, operate_type_t op_type, database_t *database, void *context)
+dnp3_command_status_t operate_g41v3(float control, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
 {
-    return CommandStatus_NotSupported;
+    return DNP3_COMMAND_STATUS_NOT_SUPPORTED;
 }
 
-command_status_t select_g41v4(double control, uint16_t index, database_t *database, void *context) { return CommandStatus_NotSupported; }
+dnp3_command_status_t select_g41v4(double control, uint16_t index, dnp3_database_t *database, void *context) { return DNP3_COMMAND_STATUS_NOT_SUPPORTED; }
 
-command_status_t operate_g41v4(double control, uint16_t index, operate_type_t op_type, database_t *database, void *context)
+dnp3_command_status_t operate_g41v4(double control, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
 {
-    return CommandStatus_NotSupported;
+    return DNP3_COMMAND_STATUS_NOT_SUPPORTED;
 }
 
-freeze_result_t freeze_counters_all(freeze_type_t freeze_type, database_t* database, void* context)
+dnp3_freeze_result_t freeze_counters_all(dnp3_freeze_type_t freeze_type, dnp3_database_t* database, void* context)
 {
-    return FreezeResult_NotSupported;
+    return DNP3_FREEZE_RESULT_NOT_SUPPORTED;
 }
 
-freeze_result_t freeze_counters_range(uint16_t start, uint16_t stop, freeze_type_t freeze_type, database_t* database, void* context)
+dnp3_freeze_result_t freeze_counters_range(uint16_t start, uint16_t stop, dnp3_freeze_type_t freeze_type, dnp3_database_t* database, void* context)
 {
-    return FreezeResult_NotSupported;
+    return DNP3_FREEZE_RESULT_NOT_SUPPORTED;
 }
 
 // Transactions
-void outstation_transaction_startup(database_t *db, void *context)
+void outstation_transaction_startup(dnp3_database_t *db, void *context)
 {
     for (uint16_t i = 0; i < 10; ++i) {
         // initialize each point with default configuration
-        database_add_binary(db, i, EventClass_Class1, binary_config_init());
-        database_add_double_bit_binary(db, i, EventClass_Class1, double_bit_binary_config_init());
-        database_add_binary_output_status(db, i, EventClass_Class1, binary_output_status_config_init());
-        database_add_counter(db, i, EventClass_Class1, counter_config_init());
-        database_add_frozen_counter(db, i, EventClass_Class1, frozen_counter_config_init());
-        database_add_analog(db, i, EventClass_Class1, analog_config_init());
-        database_add_analog_output_status(db, i, EventClass_Class1, analog_output_status_config_init());
-        database_add_octet_string(db, i, EventClass_Class1);
+        dnp3_database_add_binary(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_binary_config_init());
+        dnp3_database_add_double_bit_binary(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_double_bit_binary_config_init());
+        dnp3_database_add_binary_output_status(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_binary_output_status_config_init());
+        dnp3_database_add_counter(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_counter_config_init());
+        dnp3_database_add_frozen_counter(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_frozen_counter_config_init());
+        dnp3_database_add_analog(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_analog_config_init());
+        dnp3_database_add_analog_output_status(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_analog_output_status_config_init());
+        dnp3_database_add_octet_string(db, i, DNP3_EVENT_CLASS_CLASS1);
 
         // Set initial values
-        flags_t restart = flags_init(FLAG_RESTART);
+        dnp3_flags_t restart = dnp3_flags_init(DNP3_FLAG_RESTART);
 
-        database_update_binary(db, binary_init(i, false, restart, timestamp_invalid()), update_options_init());
+        dnp3_database_update_binary(db, dnp3_binary_init(i, false, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
 
-        database_update_double_bit_binary(db, double_bit_binary_init(i, DoubleBit_DeterminedOff, restart, timestamp_invalid()), update_options_init());
+        dnp3_database_update_double_bit_binary(db, dnp3_double_bit_binary_init(i, DNP3_DOUBLE_BIT_DETERMINED_OFF, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
 
-        database_update_binary_output_status(db, binary_output_status_init(i, false, restart, timestamp_invalid()), update_options_init());
+        dnp3_database_update_binary_output_status(db, dnp3_binary_output_status_init(i, false, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
 
-        database_update_counter(db, counter_init(i, 0, restart, timestamp_invalid()), update_options_init());
+        dnp3_database_update_counter(db, dnp3_counter_init(i, 0, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
 
-        database_update_frozen_counter(db, frozen_counter_init(i, 0, restart, timestamp_invalid()), update_options_init());
+        dnp3_database_update_frozen_counter(db, dnp3_frozen_counter_init(i, 0, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
 
-        database_update_analog(db, analog_init(i, 0.0, restart, timestamp_invalid()), update_options_init());
+        dnp3_database_update_analog(db, dnp3_analog_init(i, 0.0, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
 
-        database_update_analog_output_status(db, analog_output_status_init(i, 0.0, restart, timestamp_invalid()), update_options_init());
+        dnp3_database_update_analog_output_status(db, dnp3_analog_output_status_init(i, 0.0, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
     }
 }
 
 typedef struct database_points_t {
     bool binaryValue;
-    double_bit_t doubleBitBinaryValue;
+    dnp3_double_bit_t doubleBitBinaryValue;
     bool binaryOutputStatusValue;
     uint32_t counterValue;
     uint32_t frozenCounterValue;
@@ -137,112 +137,112 @@ typedef struct database_points_t {
     double analogOutputStatusValue;
 } database_points_t;
 
-void binary_transaction(database_t *db, void *context)
+void binary_transaction(dnp3_database_t *db, void *context)
 {
     ((database_points_t *)context)->binaryValue = !((database_points_t *)context)->binaryValue;
 
-    binary_t value = binary_init(7, ((database_points_t *)context)->binaryValue, flags_init(FLAG_ONLINE), timestamp_synchronized(0));
-    database_update_binary(db, value, update_options_init());
+    dnp3_binary_t value = dnp3_binary_init(7, ((database_points_t *)context)->binaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+    dnp3_database_update_binary(db, value, dnp3_update_options_init());
 }
 
-void double_bit_binary_transaction(database_t *db, void *context)
+void double_bit_binary_transaction(dnp3_database_t *db, void *context)
 {
     ((database_points_t *)context)->doubleBitBinaryValue =
-        ((database_points_t *)context)->doubleBitBinaryValue == DoubleBit_DeterminedOff ? DoubleBit_DeterminedOn : DoubleBit_DeterminedOff;
+        ((database_points_t *)context)->doubleBitBinaryValue == DNP3_DOUBLE_BIT_DETERMINED_OFF ? DNP3_DOUBLE_BIT_DETERMINED_ON : DNP3_DOUBLE_BIT_DETERMINED_OFF;
 
-    double_bit_binary_t value =
-        double_bit_binary_init(7, ((database_points_t *)context)->doubleBitBinaryValue, flags_init(FLAG_ONLINE), timestamp_synchronized(0));
-    database_update_double_bit_binary(db, value, update_options_init());
+    dnp3_double_bit_binary_t value =
+        dnp3_double_bit_binary_init(7, ((database_points_t *)context)->doubleBitBinaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+    dnp3_database_update_double_bit_binary(db, value, dnp3_update_options_init());
 }
 
-void binary_output_status_transaction(database_t *db, void *context)
+void binary_output_status_transaction(dnp3_database_t *db, void *context)
 {
     ((database_points_t *)context)->binaryOutputStatusValue = !((database_points_t *)context)->binaryOutputStatusValue;
 
-    binary_output_status_t value =
-        binary_output_status_init(7, ((database_points_t *)context)->binaryOutputStatusValue, flags_init(FLAG_ONLINE), timestamp_synchronized(0));
-    database_update_binary_output_status(db, value, update_options_init());
+    dnp3_binary_output_status_t value =
+        dnp3_binary_output_status_init(7, ((database_points_t *)context)->binaryOutputStatusValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+    dnp3_database_update_binary_output_status(db, value, dnp3_update_options_init());
 }
 
-void counter_transaction(database_t *db, void *context)
+void counter_transaction(dnp3_database_t *db, void *context)
 {
-    counter_t value = counter_init(7, ++((database_points_t *)context)->counterValue, flags_init(FLAG_ONLINE), timestamp_synchronized(0));
-    database_update_counter(db, value, update_options_init());
+    dnp3_counter_t value = dnp3_counter_init(7, ++((database_points_t *)context)->counterValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+    dnp3_database_update_counter(db, value, dnp3_update_options_init());
 }
 
-void frozen_counter_transaction(database_t *db, void *context)
+void frozen_counter_transaction(dnp3_database_t *db, void *context)
 {
-    frozen_counter_t value = frozen_counter_init(7, ++((database_points_t *)context)->frozenCounterValue, flags_init(FLAG_ONLINE), timestamp_synchronized(0));
-    database_update_frozen_counter(db, value, update_options_init());
+    dnp3_frozen_counter_t value = dnp3_frozen_counter_init(7, ++((database_points_t *)context)->frozenCounterValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+    dnp3_database_update_frozen_counter(db, value, dnp3_update_options_init());
 }
 
-void analog_transaction(database_t *db, void *context)
+void analog_transaction(dnp3_database_t *db, void *context)
 {
-    analog_t value = analog_init(7, ++((database_points_t *)context)->analogValue, flags_init(FLAG_ONLINE), timestamp_synchronized(0));
-    database_update_analog(db, value, update_options_init());
+    dnp3_analog_t value = dnp3_analog_init(7, ++((database_points_t *)context)->analogValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+    dnp3_database_update_analog(db, value, dnp3_update_options_init());
 }
 
-void analog_output_status_transaction(database_t *db, void *context)
+void analog_output_status_transaction(dnp3_database_t *db, void *context)
 {
-    analog_output_status_t value =
-        analog_output_status_init(7, ++((database_points_t *)context)->analogOutputStatusValue, flags_init(FLAG_ONLINE), timestamp_synchronized(0));
-    database_update_analog_output_status(db, value, update_options_init());
+    dnp3_analog_output_status_t value =
+        dnp3_analog_output_status_init(7, ++((database_points_t *)context)->analogOutputStatusValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+    dnp3_database_update_analog_output_status(db, value, dnp3_update_options_init());
 }
 
-void octet_string_transaction(database_t *db, void *context)
+void octet_string_transaction(dnp3_database_t *db, void *context)
 {
-    octet_string_value_t *octet_string = octet_string_new();
-    octet_string_add(octet_string, 0x48); // H
-    octet_string_add(octet_string, 0x65); // e
-    octet_string_add(octet_string, 0x6C); // l
-    octet_string_add(octet_string, 0x6C); // l
-    octet_string_add(octet_string, 0x6F); // o
-    octet_string_add(octet_string, 0x00); // \0
+    dnp3_octet_string_value_t *octet_string = dnp3_octet_string_new();
+    dnp3_octet_string_add(octet_string, 0x48); // H
+    dnp3_octet_string_add(octet_string, 0x65); // e
+    dnp3_octet_string_add(octet_string, 0x6C); // l
+    dnp3_octet_string_add(octet_string, 0x6C); // l
+    dnp3_octet_string_add(octet_string, 0x6F); // o
+    dnp3_octet_string_add(octet_string, 0x00); // \0
 
-    database_update_octet_string(db, 7, octet_string, update_options_init());
+    dnp3_database_update_octet_string(db, 7, octet_string, dnp3_update_options_init());
 
-    octet_string_destroy(octet_string);
+    dnp3_octet_string_destroy(octet_string);
 }
 
 int main()
 {
     // Setup logging
-    logger_t logger = {
+    dnp3_logger_t logger = {
         .on_message = &on_log_message,
         .ctx = NULL,
     };
     // initialize logging with the default configuration
-    configure_logging(logging_config_init(), logger);
+    dnp3_configure_logging(dnp3_logging_config_init(), logger);
 
     // types that get heap allocated and must be freed in "cleanup"
-    runtime_t* runtime = NULL;
-    tcp_server_t* server = NULL;
-    outstation_t* outstation = NULL;
+    dnp3_runtime_t* runtime = NULL;
+    dnp3_tcp_server_t* server = NULL;
+    dnp3_outstation_t* outstation = NULL;
 
     // Create runtime
-    runtime_config_t runtime_config = {
+    dnp3_runtime_config_t runtime_config = {
         .num_core_threads = 4,
     };
-    if (runtime_new(runtime_config, &runtime)) {        
+    if (dnp3_runtime_new(runtime_config, &runtime)) {        
         goto cleanup;
     }
 
-    if (tcpserver_new(runtime, LinkErrorMode_Close, "127.0.0.1:20000", &server)) {
+    if (dnp3_tcpserver_new(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", &server)) {
         goto cleanup;
     }
 
     // ANCHOR: outstation_config
     // create an outstation configuration with default values
-    outstation_config_t config = outstation_config_init(
+    dnp3_outstation_config_t config = dnp3_outstation_config_init(
         // outstation address
         1024,
         // master address
         1);
     // override the default application decoding level
-    config.decode_level.application = AppDecodeLevel_ObjectValues;
+    config.decode_level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
     // ANCHOR_END: outstation_config
 
-    outstation_application_t application = {
+    dnp3_outstation_application_t application = {
         .get_processing_delay_ms = &get_processing_delay_ms,
         .write_absolute_time = &write_absolute_time,
         .get_application_iin = &get_application_iin,
@@ -252,7 +252,7 @@ int main()
         .ctx = NULL,
     };
 
-    outstation_information_t information = {
+    dnp3_outstation_information_t information = {
         .process_request_from_idle = &process_request_from_idle,
         .broadcast_received = &broadcast_received,
         .enter_solicited_confirm_wait = &enter_solicited_confirm_wait,
@@ -269,7 +269,7 @@ int main()
         .ctx = NULL,
     };
 
-    control_handler_t control_handler = {
+    dnp3_control_handler_t control_handler = {
         .begin_fragment = &begin_fragment,
         .end_fragment = &end_fragment,
         .select_g12v1 = &select_g12v1,
@@ -287,29 +287,29 @@ int main()
         .on_destroy = NULL,
         .ctx = NULL,
     };
-    address_filter_t *address_filter = address_filter_any();    
-    if (tcpserver_add_outstation(server, config, event_buffer_config_all_types(10), application, information, control_handler, address_filter, &outstation)) {
+    dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
+    if (dnp3_tcpserver_add_outstation(server, config, dnp3_event_buffer_config_all_types(10), application, information, control_handler, address_filter, &outstation)) {
         goto cleanup;
     }        
-    address_filter_destroy(address_filter);
+    dnp3_address_filter_destroy(address_filter);
 
     // Setup initial points
-    outstation_transaction_t startup_transaction = {
+    dnp3_outstation_transaction_t startup_transaction = {
         .execute = &outstation_transaction_startup,
         .on_destroy = NULL,
         .ctx = NULL,
     };
-    outstation_transaction(outstation, startup_transaction);
+    dnp3_outstation_transaction(outstation, startup_transaction);
 
     // Start the outstation    
-    if (tcpserver_bind(server)) {
+    if (dnp3_tcpserver_bind(server)) {
         printf("unable to bind server\n");
         goto cleanup;
     }
 
     database_points_t database_points = {
         .binaryValue = false,
-        .doubleBitBinaryValue = DoubleBit_DeterminedOff,
+        .doubleBitBinaryValue = DNP3_DOUBLE_BIT_DETERMINED_OFF,
         .binaryOutputStatusValue = false,
         .counterValue = 0,
         .frozenCounterValue = 0,
@@ -325,68 +325,68 @@ int main()
             goto cleanup;
         }
         else if (strcmp(cbuf, "bi\n") == 0) {
-            outstation_transaction_t transaction = {
+            dnp3_outstation_transaction_t transaction = {
                 .execute = &binary_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            outstation_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "dbbi\n") == 0) {
-            outstation_transaction_t transaction = {
+            dnp3_outstation_transaction_t transaction = {
                 .execute = &double_bit_binary_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            outstation_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "bos\n") == 0) {
-            outstation_transaction_t transaction = {
+            dnp3_outstation_transaction_t transaction = {
                 .execute = &binary_output_status_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            outstation_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "co\n") == 0) {
-            outstation_transaction_t transaction = {
+            dnp3_outstation_transaction_t transaction = {
                 .execute = &counter_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            outstation_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "fco\n") == 0) {
-            outstation_transaction_t transaction = {
+            dnp3_outstation_transaction_t transaction = {
                 .execute = &frozen_counter_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            outstation_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "ai\n") == 0) {
-            outstation_transaction_t transaction = {
+            dnp3_outstation_transaction_t transaction = {
                 .execute = &analog_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            outstation_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "aos\n") == 0) {
-            outstation_transaction_t transaction = {
+            dnp3_outstation_transaction_t transaction = {
                 .execute = &analog_output_status_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            outstation_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "os\n") == 0) {
-            outstation_transaction_t transaction = {
+            dnp3_outstation_transaction_t transaction = {
                 .execute = &octet_string_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            outstation_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else {
             printf("Unknown command\n");
@@ -395,8 +395,8 @@ int main()
     
 // all of the destroy functions are NULL-safe
 cleanup:    
-    outstation_destroy(outstation);
-    tcpserver_destroy(server);
-    runtime_destroy(runtime);    
+    dnp3_outstation_destroy(outstation);
+    dnp3_tcpserver_destroy(server);
+    dnp3_runtime_destroy(runtime);
     return 0;
 }
