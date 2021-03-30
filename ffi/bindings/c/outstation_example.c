@@ -204,6 +204,21 @@ void octet_string_transaction(dnp3_database_t *db, void *context)
     dnp3_octet_string_destroy(octet_string);
 }
 
+// ANCHOR: event_buffer_config
+event_buffer_config_t get_event_buffer_config() {
+    return event_buffer_config_init(
+            10, // binary
+            10, // double-bit binary
+            10, // binary output status
+            5,  // counter
+            5,  // frozen counter
+            5,  // analog
+            5,  // analog output status
+            3   // octet string
+    );
+}
+// ANCHOR_END: event_buffer_config
+
 int main()
 {
     // Setup logging
@@ -288,7 +303,16 @@ int main()
         .ctx = NULL,
     };
     dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
-    if (dnp3_tcpserver_add_outstation(server, config, dnp3_event_buffer_config_all_types(10), application, information, control_handler, address_filter, &outstation)) {
+    if (dnp3_tcpserver_add_outstation(
+            server,
+            config,
+            get_event_buffer_config(),
+            application,
+            information,
+            control_handler,
+            address_filter,
+            &outstation)) {
+        printf("unable to create outstation\n");
         goto cleanup;
     }        
     dnp3_address_filter_destroy(address_filter);

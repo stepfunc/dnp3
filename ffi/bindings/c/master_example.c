@@ -165,7 +165,9 @@ int main()
     // ANCHOR_END: logging_init
 
     // long-lived types that must be freed before exit
+    // ANCHOR: runtime_declare
     dnp3_runtime_t* runtime = NULL;
+    // ANCHOR_END: runtime_declare
     dnp3_master_t* master = NULL;
 
     // ANCHOR: runtime_init
@@ -174,6 +176,7 @@ int main()
         .num_core_threads = 4,
     };    
     if (dnp3_runtime_new(runtime_config, &runtime)) {
+
         goto cleanup;
     }        
     // ANCHOR_END: runtime_init
