@@ -219,15 +219,21 @@ int main()
     dnp3_tcp_server_t* server = NULL;
     dnp3_outstation_t* outstation = NULL;
 
+    // error code we'll reference elsewhere
+    dnp3_param_error_t err = DNP3_PARAM_ERROR_OK;
+
     // Create runtime
-    dnp3_runtime_config_t runtime_config = {
-        .num_core_threads = 4,
-    };
-    if (dnp3_runtime_new(runtime_config, &runtime)) {        
+    dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
+    runtime_config.num_core_threads = 4;
+    err = dnp3_runtime_new(runtime_config, &runtime);
+    if (err) {
+        printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
 
-    if (dnp3_tcpserver_new(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", &server)) {
+    err = dnp3_tcpserver_new(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", &server);
+    if (err) {
+        printf("unable to create server: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
 
@@ -288,7 +294,9 @@ int main()
         .ctx = NULL,
     };
     dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
-    if (dnp3_tcpserver_add_outstation(server, config, dnp3_event_buffer_config_all_types(10), application, information, control_handler, address_filter, &outstation)) {
+    err = dnp3_tcpserver_add_outstation(server, config, dnp3_event_buffer_config_all_types(10), application, information, control_handler, address_filter, &outstation);
+    if (err) {
+        printf("unable to add outstation: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }        
     dnp3_address_filter_destroy(address_filter);
@@ -302,8 +310,9 @@ int main()
     dnp3_outstation_transaction(outstation, startup_transaction);
 
     // Start the outstation    
-    if (dnp3_tcpserver_bind(server)) {
-        printf("unable to bind server\n");
+    err = dnp3_tcpserver_bind(server);
+    if (err) {
+        printf("unable to bind server: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
 

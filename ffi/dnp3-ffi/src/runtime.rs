@@ -29,18 +29,18 @@ pub(crate) struct RuntimeHandle {
 }
 
 impl RuntimeHandle {
-    pub(crate) fn block_on<F: Future>(&self, future: F) -> Result<F::Output, ffi::Dnp3Error> {
+    pub(crate) fn block_on<F: Future>(&self, future: F) -> Result<F::Output, ffi::ParamError> {
         let inner = self
             .inner
             .upgrade()
-            .ok_or(ffi::Dnp3Error::RuntimeDestroyed)?;
+            .ok_or(ffi::ParamError::RuntimeDestroyed)?;
         if Handle::try_current().is_ok() {
-            return Err(ffi::Dnp3Error::RuntimeCannotBlockWithinAsync);
+            return Err(ffi::ParamError::RuntimeCannotBlockWithinAsync);
         }
         Ok(inner.block_on(future))
     }
 
-    pub(crate) fn spawn<F>(&self, future: F) -> Result<(), ffi::Dnp3Error>
+    pub(crate) fn spawn<F>(&self, future: F) -> Result<(), ffi::ParamError>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -48,7 +48,7 @@ impl RuntimeHandle {
         let inner = self
             .inner
             .upgrade()
-            .ok_or(ffi::Dnp3Error::RuntimeDestroyed)?;
+            .ok_or(ffi::ParamError::RuntimeDestroyed)?;
         inner.spawn(future);
         Ok(())
     }
@@ -64,7 +64,7 @@ where
 
 pub(crate) unsafe fn runtime_new(
     config: ffi::RuntimeConfig,
-) -> Result<*mut crate::runtime::Runtime, ffi::Dnp3Error> {
+) -> Result<*mut crate::runtime::Runtime, ffi::ParamError> {
     let num_threads = if config.num_core_threads == 0 {
         num_cpus::get()
     } else {
@@ -73,7 +73,7 @@ pub(crate) unsafe fn runtime_new(
 
     tracing::info!("creating runtime with {} threads", num_threads);
     let runtime = build_runtime(|r| r.worker_threads(num_threads as usize))
-        .map_err(|_| ffi::Dnp3Error::RuntimeCreationFailure)?;
+        .map_err(|_| ffi::ParamError::RuntimeCreationFailure)?;
     Ok(Box::into_raw(Box::new(Runtime::new(runtime))))
 }
 
@@ -83,8 +83,8 @@ pub(crate) unsafe fn runtime_destroy(runtime: *mut crate::runtime::Runtime) {
     };
 }
 
-impl From<Shutdown> for ffi::Dnp3Error {
+impl From<Shutdown> for ffi::ParamError {
     fn from(_: Shutdown) -> Self {
-        ffi::Dnp3Error::MasterAlreadyShutdown
+        ffi::ParamError::MasterAlreadyShutdown
     }
 }

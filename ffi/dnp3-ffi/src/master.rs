@@ -24,9 +24,9 @@ pub(crate) unsafe fn master_create_tcp_session(
     connect_strategy: ffi::RetryStrategy,
     reconnect_delay: Duration,
     listener: ffi::ClientStateListener,
-) -> Result<*mut Master, ffi::Dnp3Error> {
+) -> Result<*mut Master, ffi::ParamError> {
     let config = convert_config(config)?;
-    let endpoints = endpoints.as_ref().ok_or(ffi::Dnp3Error::NullParameter)?;
+    let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let listener = ClientStateListenerAdapter::new(listener);
 
     let reconnect_delay = if reconnect_delay == Duration::from_millis(0) {
@@ -43,7 +43,7 @@ pub(crate) unsafe fn master_create_tcp_session(
         listener.into_listener(),
     );
 
-    let runtime = runtime.as_ref().ok_or(ffi::Dnp3Error::NullParameter)?;
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     runtime.inner.spawn(future);
     let master = Master {
         runtime: runtime.handle(),
@@ -60,7 +60,7 @@ pub(crate) unsafe fn master_create_serial_session(
     serial_params: ffi::SerialPortSettings,
     retry_delay: Duration,
     listener: ffi::PortStateListener,
-) -> Result<*mut Master, ffi::Dnp3Error> {
+) -> Result<*mut Master, ffi::ParamError> {
     let config = convert_config(config)?;
     let listener = PortStateListenerAdapter::new(listener);
 
@@ -72,7 +72,7 @@ pub(crate) unsafe fn master_create_serial_session(
         listener.into_listener(),
     );
 
-    let runtime = runtime.as_ref().ok_or(ffi::Dnp3Error::NullParameter)?;
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     runtime.inner.spawn(future);
 
     let master = Master {
@@ -89,14 +89,14 @@ pub unsafe fn master_destroy(master: *mut Master) {
     }
 }
 
-pub unsafe fn master_enable(master: *mut crate::Master) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+pub unsafe fn master_enable(master: *mut crate::Master) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     master.runtime.block_on(master.handle.enable())??;
     Ok(())
 }
 
-pub unsafe fn master_disable(master: *mut crate::Master) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+pub unsafe fn master_disable(master: *mut crate::Master) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     master.runtime.block_on(master.handle.disable())??;
     Ok(())
 }
@@ -107,8 +107,8 @@ pub unsafe fn master_add_association(
     config: ffi::AssociationConfig,
     read_handler: ffi::ReadHandler,
     time_provider: ffi::TimeProvider,
-) -> Result<ffi::AssociationId, ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<ffi::AssociationId, ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(address)?;
 
     let config = AssociationConfig {
@@ -150,8 +150,8 @@ pub unsafe fn master_add_association(
 pub(crate) unsafe fn master_remove_association(
     master: *mut crate::Master,
     id: ffi::AssociationId,
-) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let endpoint = EndpointAddress::from(id.address)?;
 
     master
@@ -166,10 +166,10 @@ pub(crate) unsafe fn master_add_poll(
     id: ffi::AssociationId,
     request: *mut crate::Request,
     period: std::time::Duration,
-) -> Result<ffi::PollId, ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<ffi::PollId, ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(id.address)?;
-    let request = request.as_ref().ok_or(ffi::Dnp3Error::NullParameter)?;
+    let request = request.as_ref().ok_or(ffi::ParamError::NullParameter)?;
 
     let mut association = AssociationHandle::create(address, master.handle.clone());
     let handle = master
@@ -185,8 +185,8 @@ pub(crate) unsafe fn master_add_poll(
 pub(crate) unsafe fn master_remove_poll(
     master: *mut crate::Master,
     poll: ffi::PollId,
-) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let endpoint = EndpointAddress::from(poll.association_id)?;
 
     let poll = PollHandle::create(
@@ -202,8 +202,8 @@ pub(crate) unsafe fn master_remove_poll(
 pub unsafe fn master_demand_poll(
     master: *mut crate::Master,
     poll: ffi::PollId,
-) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let endpoint = EndpointAddress::from(poll.association_id)?;
 
     let mut poll = PollHandle::create(
@@ -221,12 +221,12 @@ pub(crate) unsafe fn master_read(
     association: ffi::AssociationId,
     request: *mut crate::Request,
     callback: ffi::ReadTaskCallback,
-) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
     let request = request
         .as_ref()
-        .ok_or(ffi::Dnp3Error::NullParameter)?
+        .ok_or(ffi::ParamError::NullParameter)?
         .build();
 
     let mut handle = AssociationHandle::create(address, master.handle.clone());
@@ -250,12 +250,12 @@ pub unsafe fn master_operate(
     mode: ffi::CommandMode,
     commands: *mut crate::Commands,
     callback: ffi::CommandTaskCallback,
-) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
     let headers = commands
         .as_ref()
-        .ok_or(ffi::Dnp3Error::NullParameter)?
+        .ok_or(ffi::ParamError::NullParameter)?
         .clone()
         .build();
 
@@ -287,8 +287,8 @@ pub(crate) unsafe fn master_sync_time(
     association: ffi::AssociationId,
     mode: ffi::TimeSyncMode,
     callback: ffi::TimeSyncTaskCallback,
-) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
 
     let mut association = AssociationHandle::create(address, master.handle.clone());
@@ -321,8 +321,8 @@ pub(crate) unsafe fn master_cold_restart(
     master: *mut crate::Master,
     association: ffi::AssociationId,
     callback: ffi::RestartTaskCallback,
-) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
 
     let mut association = AssociationHandle::create(address, master.handle.clone());
@@ -344,8 +344,8 @@ pub(crate) unsafe fn master_warm_restart(
     master: *mut crate::Master,
     association: ffi::AssociationId,
     callback: ffi::RestartTaskCallback,
-) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
 
     let mut association = AssociationHandle::create(address, master.handle.clone());
@@ -367,8 +367,8 @@ pub(crate) unsafe fn master_check_link_status(
     master: *mut crate::Master,
     association: ffi::AssociationId,
     callback: ffi::LinkStatusCallback,
-) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
 
     let mut association = AssociationHandle::create(address, master.handle.clone());
@@ -390,8 +390,8 @@ pub(crate) unsafe fn master_check_link_status(
 pub(crate) unsafe fn master_set_decode_level(
     master: *mut Master,
     level: ffi::DecodeLevel,
-) -> Result<(), ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<(), ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     master
         .runtime
         .spawn(master.handle.set_decode_level(level.into()))?;
@@ -400,8 +400,8 @@ pub(crate) unsafe fn master_set_decode_level(
 
 pub(crate) unsafe fn master_get_decode_level(
     master: *mut Master,
-) -> Result<ffi::DecodeLevel, ffi::Dnp3Error> {
-    let master = master.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<ffi::DecodeLevel, ffi::ParamError> {
+    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
 
     let result = master
         .runtime
@@ -588,7 +588,7 @@ pub(crate) unsafe fn endpoint_list_add(list: *mut EndpointList, endpoint: &CStr)
     }
 }
 
-fn convert_config(config: ffi::MasterConfig) -> Result<MasterConfig, ffi::Dnp3Error> {
+fn convert_config(config: ffi::MasterConfig) -> Result<MasterConfig, ffi::ParamError> {
     let address = EndpointAddress::from(config.address())?;
 
     Ok(MasterConfig {
@@ -652,26 +652,26 @@ impl From<ffi::TimeSyncMode> for TimeSyncProcedure {
     }
 }
 
-impl From<SpecialAddressError> for ffi::Dnp3Error {
+impl From<SpecialAddressError> for ffi::ParamError {
     fn from(_: SpecialAddressError) -> Self {
-        ffi::Dnp3Error::InvalidDnp3Address
+        ffi::ParamError::InvalidDnp3Address
     }
 }
 
-impl From<AssociationError> for ffi::Dnp3Error {
+impl From<AssociationError> for ffi::ParamError {
     fn from(error: AssociationError) -> Self {
         match error {
-            AssociationError::Shutdown => ffi::Dnp3Error::MasterAlreadyShutdown,
-            AssociationError::DuplicateAddress(_) => ffi::Dnp3Error::AssociationDuplicateAddress,
+            AssociationError::Shutdown => ffi::ParamError::MasterAlreadyShutdown,
+            AssociationError::DuplicateAddress(_) => ffi::ParamError::AssociationDuplicateAddress,
         }
     }
 }
 
-impl From<PollError> for ffi::Dnp3Error {
+impl From<PollError> for ffi::ParamError {
     fn from(error: PollError) -> Self {
         match error {
-            PollError::Shutdown => ffi::Dnp3Error::MasterAlreadyShutdown,
-            PollError::NoSuchAssociation(_) => ffi::Dnp3Error::AssociationDoesNotExist,
+            PollError::Shutdown => ffi::ParamError::MasterAlreadyShutdown,
+            PollError::NoSuchAssociation(_) => ffi::ParamError::AssociationDoesNotExist,
         }
     }
 }

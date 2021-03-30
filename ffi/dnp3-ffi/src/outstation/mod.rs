@@ -36,8 +36,8 @@ pub unsafe fn tcpserver_new(
     runtime: *mut Runtime,
     link_error_mode: ffi::LinkErrorMode,
     address: &CStr,
-) -> Result<*mut TcpServer, ffi::Dnp3Error> {
-    let runtime = runtime.as_ref().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<*mut TcpServer, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let address = address.to_string_lossy().parse()?;
 
     let server = dnp3::tcp::TcpServer::new(link_error_mode.into(), address);
@@ -62,16 +62,19 @@ pub unsafe fn tcpserver_add_outstation(
     information: ffi::OutstationInformation,
     control_handler: ffi::ControlHandler,
     filter: *mut AddressFilter,
-) -> Result<*mut Outstation, ffi::Dnp3Error> {
-    let server = server.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<*mut Outstation, ffi::ParamError> {
+    let server = server.as_mut().ok_or(ffi::ParamError::NullParameter)?;
 
     let server_handle = match &mut server.state {
         TcpServerState::Configuring(server) => server,
-        TcpServerState::Running(_) => return Err(ffi::Dnp3Error::ServerAlreadyStarted),
+        TcpServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),
     };
 
     let config = convert_outstation_config(config)?;
-    let filter = filter.as_ref().ok_or(ffi::Dnp3Error::NullParameter)?.into();
+    let filter = filter
+        .as_ref()
+        .ok_or(ffi::ParamError::NullParameter)?
+        .into();
 
     let (outstation, task) = server_handle.add_outstation(
         config,
@@ -90,15 +93,15 @@ pub unsafe fn tcpserver_add_outstation(
     })))
 }
 
-pub unsafe fn tcpserver_bind(server: *mut TcpServer) -> Result<(), ffi::Dnp3Error> {
+pub unsafe fn tcpserver_bind(server: *mut TcpServer) -> Result<(), ffi::ParamError> {
     if server.is_null() {
-        return Err(ffi::Dnp3Error::NullParameter);
+        return Err(ffi::ParamError::NullParameter);
     }
     let mut server = Box::from_raw(server);
 
     let server_handle = match server.state {
         TcpServerState::Configuring(server) => server,
-        TcpServerState::Running(_) => return Err(ffi::Dnp3Error::ServerAlreadyStarted),
+        TcpServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),
     };
 
     let (handle, task) = server.runtime.block_on(server_handle.bind())??;
@@ -125,10 +128,10 @@ pub unsafe fn outstation_create_serial_session(
     application: ffi::OutstationApplication,
     information: ffi::OutstationInformation,
     control_handler: ffi::ControlHandler,
-) -> Result<*mut crate::Outstation, ffi::Dnp3Error> {
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
     let runtime = runtime
         .as_ref()
-        .ok_or(ffi::Dnp3Error::NullParameter)?
+        .ok_or(ffi::ParamError::NullParameter)?
         .handle();
     let serial_path = serial_path.to_string_lossy();
 
@@ -165,8 +168,8 @@ pub unsafe fn outstation_transaction(
 pub unsafe fn outstation_set_decode_level(
     outstation: *mut Outstation,
     level: ffi::DecodeLevel,
-) -> Result<(), ffi::Dnp3Error> {
-    let outstation = outstation.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+) -> Result<(), ffi::ParamError> {
+    let outstation = outstation.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     outstation
         .runtime
         .block_on(outstation.handle.set_decode_level(level.into()))??;
@@ -175,7 +178,7 @@ pub unsafe fn outstation_set_decode_level(
 
 fn convert_outstation_config(
     config: ffi::OutstationConfig,
-) -> Result<OutstationConfig, ffi::Dnp3Error> {
+) -> Result<OutstationConfig, ffi::ParamError> {
     let outstation_address = EndpointAddress::from(config.outstation_address())?;
     let master_address = EndpointAddress::from(config.master_address())?;
     let solicited_buffer_size = BufferSize::new(config.solicited_buffer_size() as usize)?;
@@ -263,27 +266,27 @@ impl From<ffi::LinkErrorMode> for LinkErrorMode {
     }
 }
 
-impl From<AddrParseError> for ffi::Dnp3Error {
+impl From<AddrParseError> for ffi::ParamError {
     fn from(_: AddrParseError) -> Self {
-        ffi::Dnp3Error::InvalidSocketAddress
+        ffi::ParamError::InvalidSocketAddress
     }
 }
 
-impl From<BufferSizeError> for ffi::Dnp3Error {
+impl From<BufferSizeError> for ffi::ParamError {
     fn from(_: BufferSizeError) -> Self {
-        ffi::Dnp3Error::InvalidBufferSize
+        ffi::ParamError::InvalidBufferSize
     }
 }
 
-impl From<FilterError> for ffi::Dnp3Error {
+impl From<FilterError> for ffi::ParamError {
     fn from(_: FilterError) -> Self {
-        ffi::Dnp3Error::AddressFilterConflict
+        ffi::ParamError::AddressFilterConflict
     }
 }
 
-impl From<std::io::Error> for ffi::Dnp3Error {
+impl From<std::io::Error> for ffi::ParamError {
     fn from(error: std::io::Error) -> Self {
         tracing::error!("IO error: {}", error);
-        ffi::Dnp3Error::ServerBindError
+        ffi::ParamError::ServerBindError
     }
 }

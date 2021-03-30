@@ -16,9 +16,9 @@ thread_local! {
 pub fn configure_logging(
     config: ffi::LoggingConfig,
     handler: ffi::Logger,
-) -> Result<(), ffi::Dnp3Error> {
+) -> Result<(), ffi::ParamError> {
     tracing::subscriber::set_global_default(adapter(config, handler))
-        .map_err(|_| ffi::Dnp3Error::LoggingAlreadyConfigured)
+        .map_err(|_| ffi::ParamError::LoggingAlreadyConfigured)
 }
 
 struct ThreadLocalBufferWriter;
