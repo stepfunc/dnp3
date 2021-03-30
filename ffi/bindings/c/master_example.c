@@ -135,7 +135,7 @@ void on_command_complete(command_result_t result, void *arg) { printf("CommandRe
 void on_timesync_complete(time_sync_result_t result, void *arg) { printf("TimeSyncResult: %s\n", TimeSyncResult_to_string(result)); }
 
 // Restart callback
-void on_restart_complete(restart_result_t result, void *arg) { printf("RestartResult: %s\n", RestartSuccess_to_string(result.success)); }
+void on_restart_complete(restart_result_t result, void *arg) { printf("RestartResult: %s\n", RestartError_to_string(result.error)); }
 
 void on_link_status_complete(link_status_result_t result, void *arg) { printf("LinkStatusResult: %s\n", LinkStatusResult_to_string(result)); }
 
