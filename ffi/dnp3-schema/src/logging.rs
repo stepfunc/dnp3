@@ -101,7 +101,7 @@ pub fn define(
         .fails_with(error_type)?
         .doc(
             doc("Set the callback that will receive all the log messages")
-            .details("There is only a single globally allocated logger. Calling this method a second time will result in a panic.")
+            .details("There is only a single globally allocated logger. Calling this method a second time will return an error.")
             .details("If this method is never called, no logging will be performed.")
         )?
         .build()?;

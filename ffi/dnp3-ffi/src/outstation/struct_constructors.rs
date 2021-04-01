@@ -34,7 +34,7 @@ pub fn address_filter_any() -> *mut AddressFilter {
     Box::into_raw(Box::new(AddressFilter::Any))
 }
 
-pub fn address_filter_new(address: &CStr) -> Result<*mut AddressFilter, ffi::Dnp3Error> {
+pub fn address_filter_new(address: &CStr) -> Result<*mut AddressFilter, ffi::ParamError> {
     let address = address.to_string_lossy().parse()?;
 
     let mut set = std::collections::HashSet::new();
@@ -46,10 +46,10 @@ pub fn address_filter_new(address: &CStr) -> Result<*mut AddressFilter, ffi::Dnp
 pub unsafe fn address_filter_add(
     address_filter: *mut AddressFilter,
     address: &CStr,
-) -> Result<(), ffi::Dnp3Error> {
+) -> Result<(), ffi::ParamError> {
     let address_filter = address_filter
         .as_mut()
-        .ok_or(ffi::Dnp3Error::NullParameter)?;
+        .ok_or(ffi::ParamError::NullParameter)?;
     let address = address.to_string_lossy().parse()?;
 
     match address_filter {

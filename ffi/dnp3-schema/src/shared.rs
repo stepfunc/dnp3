@@ -40,8 +40,8 @@ pub struct SharedDefinitions {
 pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingError> {
     let error_type = lib
         .define_error_type(
-            "Dnp3Error",
-            "Dnp3Exception",
+            "ParamError",
+            "ParamException",
             ExceptionType::UncheckedException,
         )?
         .add_error("NullParameter", "Null parameter")?
@@ -77,7 +77,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
             "Logging can only be configured once",
         )?
         .add_error("PointDoesNotExist", "Point does not exist")?
-        .doc("Global error type used throughout the library")?
+        .doc("Error type used throughout the library")?
         .build()?;
 
     crate::constants::define(lib)?;

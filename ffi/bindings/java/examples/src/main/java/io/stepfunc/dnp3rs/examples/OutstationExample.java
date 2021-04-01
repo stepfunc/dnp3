@@ -303,7 +303,7 @@ public class OutstationExample {
           case "bi": {
             binaryValue = !binaryValue;
             final boolean pointValue = binaryValue;
-            outstation.transaction((db) -> {
+            outstation.transaction(db -> {
               Binary value = new Binary(ushort(7), pointValue, onlineFlags,
                   Timestamp.synchronizedTimestamp(ulong(0)));
               db.updateBinary(value, new UpdateOptions());
@@ -315,7 +315,7 @@ public class OutstationExample {
                 doubleBitBinaryValue == DoubleBit.DETERMINED_OFF ? DoubleBit.DETERMINED_ON
                     : DoubleBit.DETERMINED_OFF;
             final DoubleBit pointValue = doubleBitBinaryValue;
-            outstation.transaction((db) -> {
+            outstation.transaction(db -> {
               DoubleBitBinary value = new DoubleBitBinary(ushort(7), pointValue, onlineFlags,
                   Timestamp.synchronizedTimestamp(ulong(0)));
               db.updateDoubleBitBinary(value, new UpdateOptions());
@@ -325,7 +325,7 @@ public class OutstationExample {
           case "bos": {
             binaryOutputStatusValue = !binaryOutputStatusValue;
             final boolean pointValue = binaryOutputStatusValue;
-            outstation.transaction((db) -> {
+            outstation.transaction(db -> {
               BinaryOutputStatus value = new BinaryOutputStatus(ushort(7), pointValue, onlineFlags,
                   Timestamp.synchronizedTimestamp(ulong(0)));
               db.updateBinaryOutputStatus(value, new UpdateOptions());
@@ -335,7 +335,7 @@ public class OutstationExample {
           case "co": {
             counterValue = ++counterValue;
             final long pointValue = counterValue;
-            outstation.transaction((db) -> {
+            outstation.transaction(db -> {
               Counter value = new Counter(ushort(7), uint(pointValue), onlineFlags,
                   Timestamp.synchronizedTimestamp(ulong(0)));
               db.updateCounter(value, new UpdateOptions());
@@ -345,7 +345,7 @@ public class OutstationExample {
           case "fco": {
             frozenCounterValue = ++frozenCounterValue;
             final long pointValue = frozenCounterValue;
-            outstation.transaction((db) -> {
+            outstation.transaction(db -> {
               FrozenCounter value = new FrozenCounter(ushort(7), uint(pointValue), onlineFlags,
                   Timestamp.synchronizedTimestamp(ulong(0)));
               db.updateFrozenCounter(value, new UpdateOptions());
@@ -355,7 +355,7 @@ public class OutstationExample {
           case "ai": {
             analogValue = ++analogValue;
             final double pointValue = analogValue;
-            outstation.transaction((db) -> {
+            outstation.transaction(db -> {
               Analog value = new Analog(ushort(7), pointValue, onlineFlags,
                   Timestamp.synchronizedTimestamp(ulong(0)));
               db.updateAnalog(value, new UpdateOptions());
@@ -365,7 +365,7 @@ public class OutstationExample {
           case "aos": {
             analogOutputStatusValue = ++analogOutputStatusValue;
             final double pointValue = analogOutputStatusValue;
-            outstation.transaction((db) -> {
+            outstation.transaction(db -> {
               AnalogOutputStatus value = new AnalogOutputStatus(ushort(7), pointValue, onlineFlags,
                   Timestamp.synchronizedTimestamp(ulong(0)));
               db.updateAnalogOutputStatus(value, new UpdateOptions());
@@ -373,7 +373,7 @@ public class OutstationExample {
             break;
           }
           case "os": {
-            outstation.transaction((db) -> {
+            outstation.transaction(db -> {
               // Some Friday poetry:
               // Arrays.asList requires an array of Object,
               // Arrays.stream does not overload for byte[], how abject.

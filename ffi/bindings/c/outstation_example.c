@@ -205,8 +205,8 @@ void octet_string_transaction(dnp3_database_t *db, void *context)
 }
 
 // ANCHOR: event_buffer_config
-event_buffer_config_t get_event_buffer_config() {
-    return event_buffer_config_init(
+dnp3_event_buffer_config_t get_event_buffer_config() {
+    return dnp3_event_buffer_config_init(
             10, // binary
             10, // double-bit binary
             10, // binary output status
@@ -234,15 +234,21 @@ int main()
     dnp3_tcp_server_t* server = NULL;
     dnp3_outstation_t* outstation = NULL;
 
+    // error code we'll reference elsewhere
+    dnp3_param_error_t err = DNP3_PARAM_ERROR_OK;
+
     // Create runtime
-    dnp3_runtime_config_t runtime_config = {
-        .num_core_threads = 4,
-    };
-    if (dnp3_runtime_new(runtime_config, &runtime)) {        
+    dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
+    runtime_config.num_core_threads = 4;
+    err = dnp3_runtime_new(runtime_config, &runtime);
+    if (err) {
+        printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
 
-    if (dnp3_tcpserver_new(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", &server)) {
+    err = dnp3_tcpserver_new(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", &server);
+    if (err) {
+        printf("unable to create server: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
 
@@ -302,17 +308,12 @@ int main()
         .on_destroy = NULL,
         .ctx = NULL,
     };
+
     dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
-    if (dnp3_tcpserver_add_outstation(
-            server,
-            config,
-            get_event_buffer_config(),
-            application,
-            information,
-            control_handler,
-            address_filter,
-            &outstation)) {
-        printf("unable to create outstation\n");
+    err = dnp3_tcpserver_add_outstation(server, config, get_event_buffer_config(), application, information, control_handler, address_filter, &outstation);
+    if (err) {
+        printf("unable to add outstation: %s \n", dnp3_param_error_to_string(err));
+        dnp3_address_filter_destroy(address_filter);
         goto cleanup;
     }        
     dnp3_address_filter_destroy(address_filter);
@@ -326,8 +327,9 @@ int main()
     dnp3_outstation_transaction(outstation, startup_transaction);
 
     // Start the outstation    
-    if (dnp3_tcpserver_bind(server)) {
-        printf("unable to bind server\n");
+    err = dnp3_tcpserver_bind(server);
+    if (err) {
+        printf("unable to bind server: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
 

@@ -48,13 +48,13 @@ macro_rules! implement_database_point_operations {
         pub unsafe fn $get_name(
             database: *mut Database,
             index: u16,
-        ) -> Result<$ffi_point_type, ffi::Dnp3Error> {
-            let database = database.as_mut().ok_or(ffi::Dnp3Error::NullParameter)?;
+        ) -> Result<$ffi_point_type, ffi::ParamError> {
+            let database = database.as_mut().ok_or(ffi::ParamError::NullParameter)?;
 
             if let Some(point) = Get::<$lib_point_type>::get(database, index) {
                 Ok(<$ffi_point_type>::new(index, point))
             } else {
-                Err(ffi::Dnp3Error::PointDoesNotExist)
+                Err(ffi::ParamError::PointDoesNotExist)
             }
         }
     };

@@ -170,17 +170,20 @@ int main()
     // ANCHOR_END: runtime_declare
     dnp3_master_t* master = NULL;
 
+    // error code we'll reference elsewhere
+    dnp3_param_error_t err = DNP3_PARAM_ERROR_OK;
+          
     // ANCHOR: runtime_init
     // create the runtime
-    dnp3_runtime_config_t runtime_config = {
-        .num_core_threads = 4,
-    };    
-    if (dnp3_runtime_new(runtime_config, &runtime)) {
-
+    dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
+    runtime_config.num_core_threads = 4;        
+    err = dnp3_runtime_new(runtime_config, &runtime);
+    if (err) {
+        printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
-    }        
+    }
     // ANCHOR_END: runtime_init
-
+        
     // Create the master
     dnp3_master_config_t master_config = dnp3_master_config_init(1);
     master_config.decode_level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
@@ -191,11 +194,13 @@ int main()
         .on_destroy = NULL,
         .ctx = NULL,
     };
-    
-    if (dnp3_master_create_tcp_session(runtime, DNP3_LINK_ERROR_MODE_CLOSE, master_config, endpoints, dnp3_retry_strategy_init(), 1000, listener, &master)) {
+        
+    err = dnp3_master_create_tcp_session(runtime, DNP3_LINK_ERROR_MODE_CLOSE, master_config, endpoints, dnp3_retry_strategy_init(), 1000, listener, &master);
+    if (err) {
+        printf("unable to create master: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
-
+    
     dnp3_endpoint_list_destroy(endpoints);
 
     // Create the association
