@@ -12,7 +12,10 @@ module.exports = {
         'api/logging',
         'api/runtime',
         {
-            Outstation: ['api/outstation/create']
+            Outstation: [
+                'api/outstation/configuration',
+                'api/outstation/controls'
+            ]
         }
     ],
     Examples: [

@@ -1,0 +1,122 @@
+---
+id: configuration
+title: Outstation Configuration
+sidebar_label: Configuration
+slug: /api/outstation/configuration
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Outstations are created using a few types of artifacts:
+
+* static configuration values
+* callback interfaces
+* transport specific configuration (e.g. TCP vs serial parameters)
+
+This section describes the static configuration required to create and outstation. The two other types of information are covered in subsequent sections.
+
+### OutstationConfig
+
+The `OutstationConfig` structure contains parameters that modify the behavior of the outstation. Refer to the generated API documentation for the meaning of
+each field. All of the fields, with the exception of the master and outstation link addresses, have default values. This does not mean that these defaults will
+function well for all use cases. The timeout parameters, for example, may need to be adjusted for higher latency links.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/outstation_tcp_server.rs:outstation_config}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/outstation_example.c:outstation_config}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/OutstationExample.java:outstation_config}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:outstation_config}}
+```
+
+</TabItem>
+</Tabs>
+
+### EventBufferConfig
+
+
+The `EventBufferConfig` struct controls how many events are buffered for each type that can be reported by the outstation. Space for
+each type is pre-allocated during outstation initialization. When all of the space in the buffer for a particular type has been exhausted, adding
+another event will cause the oldest event to be discarded and the outstation will assert IIN 2.3 (Event Buffer Overflow) per the specification.
+
+There is no "correct" number of events to configure. There is a fundamental tradeoff between saving events for future reporting and memory/CPU usage.
+You should scale your event buffer sizes based on several factors:
+
+1. How many measurements are contained in the outstation database and how often they change.
+2. How often and for how long the master may be disconnected or otherwise unable to empty the event queues via READ or unsolicited reporting.
+3. How important it is to never loose events for a particular type. For example, it may be more important to never miss binary state transitions
+but missing an analog or counter value might not matter at all.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+    {label: 'Rust', value: 'Rust'},
+    {label: 'C', value: 'C'},
+    {label: 'Java', value: 'Java'},
+    {label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+// Rust example only uses analogs so that's all we need to configure
+{{#include ../dnp3/examples/outstation_tcp_server.rs:event_buffer_config}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/outstation_example.c:event_buffer_config}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/OutstationExample.java:event_buffer_config}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:event_buffer_config}}
+```
+
+</TabItem>
+</Tabs>
+
+:::note
+Setting the number of events for a particular type to `0` ensures that events will never be recorded or reported for that type.
+:::
+
