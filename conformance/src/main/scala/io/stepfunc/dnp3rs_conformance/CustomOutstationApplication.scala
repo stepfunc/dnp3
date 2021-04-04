@@ -1,7 +1,7 @@
 package io.stepfunc.dnp3rs_conformance
 
 import io.stepfunc.dnp3rs._
-import org.joou.Unsigned.{ulong, ushort}
+import org.joou.Unsigned.{ulong, ushort, uint}
 import org.joou.{ULong, UShort}
 
 import java.time.{Duration, Instant}
