@@ -11,11 +11,10 @@ fn immediate_freeze_all_counters() {
 
     harness.test_request_response(&[0xC0, 0x07, 20, 0, 0x06], EMPTY_RESPONSE);
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Freeze(FreezeIndices::All, FreezeType::ImmediateFreeze),
-        Event::EndControls,
-    ]);
+    harness.check_events(&[Event::Freeze(
+        FreezeIndices::All,
+        FreezeType::ImmediateFreeze,
+    )]);
 }
 
 #[test]
@@ -24,11 +23,10 @@ fn immediate_freeze_range_of_counters() {
 
     harness.test_request_response(&[0xC0, 0x07, 20, 0, 0x00, 0, 10], EMPTY_RESPONSE);
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Freeze(FreezeIndices::Range(0, 10), FreezeType::ImmediateFreeze),
-        Event::EndControls,
-    ]);
+    harness.check_events(&[Event::Freeze(
+        FreezeIndices::Range(0, 10),
+        FreezeType::ImmediateFreeze,
+    )]);
 }
 
 #[test]
@@ -37,11 +35,10 @@ fn immediate_freeze_no_response_all_counters() {
 
     harness.test_request_no_response(&[0xC0, 0x08, 20, 0, 0x06]);
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Freeze(FreezeIndices::All, FreezeType::ImmediateFreeze),
-        Event::EndControls,
-    ]);
+    harness.check_events(&[Event::Freeze(
+        FreezeIndices::All,
+        FreezeType::ImmediateFreeze,
+    )]);
 }
 
 #[test]
@@ -50,11 +47,10 @@ fn immediate_freeze_no_response_range_of_counters() {
 
     harness.test_request_no_response(&[0xC0, 0x08, 20, 0, 0x00, 0, 10]);
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Freeze(FreezeIndices::Range(0, 10), FreezeType::ImmediateFreeze),
-        Event::EndControls,
-    ]);
+    harness.check_events(&[Event::Freeze(
+        FreezeIndices::Range(0, 10),
+        FreezeType::ImmediateFreeze,
+    )]);
 }
 
 #[test]
@@ -63,11 +59,10 @@ fn freeze_and_clear_all_counters() {
 
     harness.test_request_response(&[0xC0, 0x09, 20, 0, 0x06], EMPTY_RESPONSE);
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Freeze(FreezeIndices::All, FreezeType::FreezeAndClear),
-        Event::EndControls,
-    ]);
+    harness.check_events(&[Event::Freeze(
+        FreezeIndices::All,
+        FreezeType::FreezeAndClear,
+    )]);
 }
 
 #[test]
@@ -76,11 +71,10 @@ fn freeze_and_clear_range_of_counters() {
 
     harness.test_request_response(&[0xC0, 0x09, 20, 0, 0x00, 0, 10], EMPTY_RESPONSE);
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Freeze(FreezeIndices::Range(0, 10), FreezeType::FreezeAndClear),
-        Event::EndControls,
-    ]);
+    harness.check_events(&[Event::Freeze(
+        FreezeIndices::Range(0, 10),
+        FreezeType::FreezeAndClear,
+    )]);
 }
 
 #[test]
@@ -89,11 +83,10 @@ fn freeze_and_clear_no_response_all_counters() {
 
     harness.test_request_no_response(&[0xC0, 0x0A, 20, 0, 0x06]);
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Freeze(FreezeIndices::All, FreezeType::FreezeAndClear),
-        Event::EndControls,
-    ]);
+    harness.check_events(&[Event::Freeze(
+        FreezeIndices::All,
+        FreezeType::FreezeAndClear,
+    )]);
 }
 
 #[test]
@@ -102,11 +95,10 @@ fn freeze_and_clear_no_response_range_of_counters() {
 
     harness.test_request_no_response(&[0xC0, 0x0A, 20, 0, 0x00, 0, 10]);
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Freeze(FreezeIndices::Range(0, 10), FreezeType::FreezeAndClear),
-        Event::EndControls,
-    ]);
+    harness.check_events(&[Event::Freeze(
+        FreezeIndices::Range(0, 10),
+        FreezeType::FreezeAndClear,
+    )]);
 }
 
 #[test]
@@ -118,9 +110,8 @@ fn freeze_invalid_object() {
         EMPTY_RESPONSE_NO_FUNC_SUPPORTED,
     );
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Freeze(FreezeIndices::All, FreezeType::ImmediateFreeze),
-        Event::EndControls,
-    ]);
+    harness.check_events(&[Event::Freeze(
+        FreezeIndices::All,
+        FreezeType::ImmediateFreeze,
+    )]);
 }

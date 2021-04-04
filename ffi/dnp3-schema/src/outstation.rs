@@ -29,7 +29,7 @@ impl OutstationTypes {
             database: database.clone(),
             outstation_config: define_outstation_config(lib, shared_def)?,
             event_buffer_config: define_event_buffer_config(lib)?,
-            outstation_application: define_outstation_application(lib)?,
+            outstation_application: define_outstation_application(lib, &database)?,
             outstation_information: define_outstation_information(lib, shared_def)?,
             control_handler: define_control_handler(lib, &database, shared_def)?,
         })
@@ -454,6 +454,7 @@ fn define_event_buffer_config(
 
 fn define_outstation_application(
     lib: &mut LibraryBuilder,
+    database: &ClassHandle,
 ) -> Result<InterfaceHandle, BindingError> {
     let restart_delay_type = lib
         .define_native_enum("RestartDelayType")?
@@ -546,6 +547,23 @@ fn define_outstation_application(
         .doc("Write time result used by {interface:OutstationApplication.write_absolute_time()}")?
         .build()?;
 
+    let freeze_type = lib.define_native_enum("FreezeType")?
+        .push("ImmediateFreeze", "Copy the current value of a counter to the associated point")?
+        .push("FreezeAndClear", "Copy the current value of a counter to the associated point and clear the current value to 0.")?
+        .doc("Freeze operation type")?
+        .build()?;
+
+    let freeze_result = lib
+        .define_native_enum("FreezeResult")?
+        .push("Success", "Freeze operation was successful")?
+        .push("ParameterError", "One of the point is invalid")?
+        .push(
+            "NotSupported",
+            "The demanded freeze operation is not supported by this device",
+        )?
+        .doc("Result of a freeze operation")?
+        .build()?;
+
     lib.define_interface("OutstationApplication", "Dynamic information required by the outstation from the user application")?
         .callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
@@ -567,6 +585,18 @@ fn define_outstation_application(
         .callback("warm_restart", doc("Request that the outstation perform a warm restart (IEEE-1815 2012, p. 58)")
             .details("The outstation will not automatically restart. It is the responsibility of the user application to handle this request and take the appropriate action."))?
             .return_type(ReturnType::new(Type::Struct(restart_delay), "The restart delay"))?
+            .build()?
+        .callback("freeze_counters_all", "Freeze all the counters")?
+            .param("freeze_type", Type::Enum(freeze_type.clone()), "Type of freeze operation")?
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
+            .return_type(ReturnType::new(Type::Enum(freeze_result.clone()), "Result of the freeze operation"))?
+            .build()?
+        .callback("freeze_counters_range", "Freeze a range of counters")?
+            .param("start", Type::Uint16, "Start index to freeze (inclusive)")?
+            .param("stop", Type::Uint16, "Stop index to freeze (inclusive)")?
+            .param("freeze_type", Type::Enum(freeze_type), "Type of freeze operation")?
+            .param("database", Type::ClassRef(database.declaration()), "Database")?
+            .return_type(ReturnType::new(Type::Enum(freeze_result), "Result of the freeze operation"))?
             .build()?
         .destroy_callback("on_destroy")?
         .build()
@@ -681,112 +711,165 @@ fn define_control_handler(
         .doc("Enumeration describing how the master requested the control operation")?
         .build()?;
 
-    let freeze_type = lib.define_native_enum("FreezeType")?
-        .push("ImmediateFreeze", "Copy the current value of a counter to the associated point")?
-        .push("FreezeAndClear", "Copy the current value of a counter to the associated point and clear the current value to 0.")?
-        .doc("Freeze operation type")?
-        .build()?;
-
-    let freeze_result = lib
-        .define_native_enum("FreezeResult")?
-        .push("Success", "Freeze operation was successful")?
-        .push("ParameterError", "One of the point is invalid")?
-        .push(
-            "NotSupported",
-            "The demanded freeze operation is not supported by this device",
-        )?
-        .doc("Result of a freeze operation")?
-        .build()?;
-
     let select_details_1 = "Implementors can think of this function as asking the question \"is this control supported\"?";
     let select_details_2 = "Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal.";
-    let select_g12_doc = doc("Select a CROB, but do not operate").details(select_details_1).details(select_details_2);
-    let select_g40_doc = doc("Select an analog output, but do not operate").details(select_details_1).details(select_details_2);
+    let select_g12_doc = doc("Select a CROB, but do not operate")
+        .details(select_details_1)
+        .details(select_details_2);
+    let select_g40_doc = doc("Select an analog output, but do not operate")
+        .details(select_details_1)
+        .details(select_details_2);
 
     lib.define_interface("ControlHandler", "Callbacks for handling controls")?
         .callback("begin_fragment", "Notifies the start of a command fragment")?
-            .return_type(ReturnType::void())?
-            .build()?
+        .return_type(ReturnType::void())?
+        .build()?
         .callback("end_fragment", "Notifies the end of a command fragment")?
-            .return_type(ReturnType::void())?
-            .build()?
+        .return_type(ReturnType::void())?
+        .build()?
         .callback("select_g12v1", select_g12_doc)?
-            .param("control", Type::Struct(shared_def.g12v1_struct.clone()), "Received CROB")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param(
+            "control",
+            Type::Struct(shared_def.g12v1_struct.clone()),
+            "Received CROB",
+        )?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("operate_g12v1", "Operate a control point")?
-            .param("control", Type::Struct(shared_def.g12v1_struct.clone()), "Received CROB")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param(
+            "control",
+            Type::Struct(shared_def.g12v1_struct.clone()),
+            "Received CROB",
+        )?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("select_g41v1", select_g40_doc.clone())?
-            .param("control", Type::Sint32, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param("control", Type::Sint32, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("operate_g41v1", "Operate a control point")?
-            .param("control", Type::Sint32, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param("control", Type::Sint32, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("select_g41v2", select_g40_doc.clone())?
-            .param("value", Type::Sint16, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param("value", Type::Sint16, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("operate_g41v2", "Operate a control point")?
-            .param("value", Type::Sint16, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param("value", Type::Sint16, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("select_g41v3", select_g40_doc.clone())?
-            .param("value", Type::Float, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param("value", Type::Float, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("operate_g41v3", "Operate a control point")?
-            .param("value", Type::Float, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param("value", Type::Float, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("select_g41v4", select_g40_doc)?
-            .param("value", Type::Double, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param("value", Type::Double, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("operate_g41v4", "Operate a control point")?
-            .param("value", Type::Double, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("op_type", Type::Enum(operate_type), "Operate type")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status), "Command status"))?
-            .build()?
-        .callback("freeze_counters_all", "Freeze all the counters")?
-            .param("freeze_type", Type::Enum(freeze_type.clone()), "Type of freeze operation")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(freeze_result.clone()), "Result of the freeze operation"))?
-            .build()?
-        .callback("freeze_counters_range", "Freeze a range of counters")?
-            .param("start", Type::Uint16, "Start index to freeze (inclusive)")?
-            .param("stop", Type::Uint16, "Stop index to freeze (inclusive)")?
-            .param("freeze_type", Type::Enum(freeze_type), "Type of freeze operation")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(freeze_result), "Result of the freeze operation"))?
-            .build()?
+        .param("value", Type::Double, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param("op_type", Type::Enum(operate_type), "Operate type")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status),
+            "Command status",
+        ))?
+        .build()?
         .destroy_callback("on_destroy")?
         .build()
 }

@@ -33,6 +33,32 @@ impl OutstationApplication for ffi::OutstationApplication {
             .map(|delay| delay.into())
             .flatten()
     }
+
+    fn freeze_counter(
+        &mut self,
+        indices: FreezeIndices,
+        freeze_type: FreezeType,
+        database: &mut Database,
+    ) -> FreezeResult {
+        match indices {
+            FreezeIndices::All => ffi::OutstationApplication::freeze_counters_all(
+                self,
+                freeze_type.into(),
+                database as *mut _,
+            )
+            .map(|res| res.into())
+            .unwrap_or(FreezeResult::NotSupported),
+            FreezeIndices::Range(start, stop) => ffi::OutstationApplication::freeze_counters_range(
+                self,
+                start,
+                stop,
+                freeze_type.into(),
+                database as *mut _,
+            )
+            .map(|res| res.into())
+            .unwrap_or(FreezeResult::NotSupported),
+        }
+    }
 }
 
 impl From<ffi::ApplicationIin> for ApplicationIin {
@@ -123,32 +149,6 @@ impl ControlHandler for ffi::ControlHandler {
 
     fn end_fragment(&mut self) {
         ffi::ControlHandler::end_fragment(self);
-    }
-
-    fn freeze_counter(
-        &mut self,
-        indices: FreezeIndices,
-        freeze_type: FreezeType,
-        database: &mut Database,
-    ) -> FreezeResult {
-        match indices {
-            FreezeIndices::All => ffi::ControlHandler::freeze_counters_all(
-                self,
-                freeze_type.into(),
-                database as *mut _,
-            )
-            .map(|res| res.into())
-            .unwrap_or(FreezeResult::NotSupported),
-            FreezeIndices::Range(start, stop) => ffi::ControlHandler::freeze_counters_range(
-                self,
-                start,
-                stop,
-                freeze_type.into(),
-                database as *mut _,
-            )
-            .map(|res| res.into())
-            .unwrap_or(FreezeResult::NotSupported),
-        }
     }
 }
 

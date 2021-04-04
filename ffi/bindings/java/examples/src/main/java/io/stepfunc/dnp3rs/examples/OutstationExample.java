@@ -49,6 +49,17 @@ class TestApplication implements OutstationApplication {
   public RestartDelay warmRestart() {
     return RestartDelay.notSupported();
   }
+
+  @Override
+  public FreezeResult freezeCountersAll(FreezeType freezeType, Database database) {
+    return FreezeResult.NOT_SUPPORTED;
+  }
+
+  @Override
+  public FreezeResult freezeCountersRange(UShort start, UShort stop, FreezeType freezeType,
+      Database database) {
+    return FreezeResult.NOT_SUPPORTED;
+  }
 }
 
 
@@ -181,17 +192,6 @@ class TestControlHandler implements ControlHandler {
   public CommandStatus operateG41v4(double value, UShort index, OperateType opType,
       Database database) {
     return CommandStatus.NOT_SUPPORTED;
-  }
-
-  @Override
-  public FreezeResult freezeCountersAll(FreezeType freezeType, Database database) {
-    return FreezeResult.NOT_SUPPORTED;
-  }
-
-  @Override
-  public FreezeResult freezeCountersRange(UShort start, UShort stop, FreezeType freezeType,
-      Database database) {
-    return FreezeResult.NOT_SUPPORTED;
   }
 }
 
