@@ -13,6 +13,7 @@ The `OutstationApplication` interface provides callbacks for dynamic events and 
 * Retrieving IIN bits controlled by user code
 * Callback for writing the time
 * Cold and warm restart operations
+* Counter freeze requests
 
 ## ApplicationIin
 
@@ -51,6 +52,20 @@ indicate that the operation is not supported. The timestamp will not be used.
 If you must implement this functionality due to conformance or customer requirements the callbacks for both cold and warm restart are available. Return
 `RestartDelay` with a time estimate of how long the restart will take in seconds or milliseconds. This delay isn't of any practical use to real world masters
 so don't worry too much about the accuracy of this value.
+
+## Freeze Requests
+
+`OutstationApplication` contains two methods related to freezing counters:
+
+* `freezeCountersAll` - called when a counter freeze operation is received using the All Points (0x06) qualifier
+* `freezeCountersRange` - called when a counter freeze operation is received using 8-bit (0x00) or 16-bit (0x01) range qualifiers
+
+The `FreezeType` parameter allows the user to discern between the two types of supported freeze operations:
+
+* `IMMEDIATE_FREEZE` - Copy the current value of a counter to the associated frozen counter point
+* `FREEZE_AND_CLEAR` - Copy the current value of a counter to the associated frozen counter point and clear the current value to 0.
+
+A reference to the `Database` is provided to allow the user to perform the requested freeze operations.
 
 
 
