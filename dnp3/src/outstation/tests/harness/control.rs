@@ -3,7 +3,6 @@ use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3,
 use crate::outstation::database::Database;
 use crate::outstation::tests::harness::{Control, Event, EventHandle};
 use crate::outstation::traits::{ControlHandler, ControlSupport, OperateType};
-use crate::outstation::{FreezeIndices, FreezeResult, FreezeType};
 
 pub(crate) struct MockControlHandler {
     events: EventHandle,
@@ -122,15 +121,5 @@ impl ControlHandler for MockControlHandler {
 
     fn end_fragment(&mut self) {
         self.events.push(Event::EndControls);
-    }
-
-    fn freeze_counter(
-        &mut self,
-        indices: FreezeIndices,
-        freeze_type: FreezeType,
-        _db: &mut Database,
-    ) -> FreezeResult {
-        self.events.push(Event::Freeze(indices, freeze_type));
-        FreezeResult::Success
     }
 }

@@ -1,9 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use crate::app::Timestamp;
+use crate::outstation::database::Database;
 use crate::outstation::tests::harness::{Event, EventHandle};
 use crate::outstation::traits::{OutstationApplication, RestartDelay};
-use crate::outstation::WriteTimeResult;
+use crate::outstation::{FreezeIndices, FreezeResult, FreezeType, WriteTimeResult};
 
 pub(crate) struct MockOutstationApplication {
     events: EventHandle,
@@ -53,5 +54,15 @@ impl OutstationApplication for MockOutstationApplication {
         let delay = self.data.lock().unwrap().restart_delay;
         self.events.push(Event::WarmRestart(delay));
         delay
+    }
+
+    fn freeze_counter(
+        &mut self,
+        indices: FreezeIndices,
+        freeze_type: FreezeType,
+        _db: &mut Database,
+    ) -> FreezeResult {
+        self.events.push(Event::Freeze(indices, freeze_type));
+        FreezeResult::Success
     }
 }

@@ -100,6 +100,16 @@ pub trait OutstationApplication: Sync + Send + 'static {
     fn warm_restart(&mut self) -> Option<RestartDelay> {
         None
     }
+
+    /// Perform a counter freeze operation
+    fn freeze_counter(
+        &mut self,
+        _indices: FreezeIndices,
+        _freeze_type: FreezeType,
+        _database: &mut Database,
+    ) -> FreezeResult {
+        FreezeResult::NotSupported
+    }
 }
 
 /// enumeration describing how the outstation processed a broadcast request
@@ -242,15 +252,6 @@ pub trait ControlHandler:
 {
     fn begin_fragment(&mut self) {}
     fn end_fragment(&mut self) {}
-
-    fn freeze_counter(
-        &mut self,
-        _indices: FreezeIndices,
-        _freeze_type: FreezeType,
-        _database: &mut Database,
-    ) -> FreezeResult {
-        FreezeResult::NotSupported
-    }
 }
 
 #[derive(Copy, Clone)]

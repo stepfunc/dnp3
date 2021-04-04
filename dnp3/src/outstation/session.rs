@@ -1616,25 +1616,22 @@ impl OutstationSession {
     ) -> Option<Response> {
         let mut iin = Iin::default();
         database.transaction(|db| {
-            self.control_handler.begin_fragment();
             for header in object_headers.iter() {
                 match header.details {
                     HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => {
-                        iin |= self.control_handler.freeze_counter(
-                            FreezeIndices::All,
-                            freeze_type,
-                            db,
-                        );
+                        iin |= self
+                            .application
+                            .freeze_counter(FreezeIndices::All, freeze_type, db);
                     }
                     HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                        iin |= self.control_handler.freeze_counter(
+                        iin |= self.application.freeze_counter(
                             FreezeIndices::Range(start as u16, stop as u16),
                             freeze_type,
                             db,
                         );
                     }
                     HeaderDetails::TwoByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                        iin |= self.control_handler.freeze_counter(
+                        iin |= self.application.freeze_counter(
                             FreezeIndices::Range(start, stop),
                             freeze_type,
                             db,
@@ -1645,7 +1642,6 @@ impl OutstationSession {
                     }
                 }
             }
-            self.control_handler.end_fragment();
         });
 
         if respond {
