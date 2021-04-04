@@ -254,6 +254,8 @@ int main()
         .get_application_iin = &get_application_iin,
         .cold_restart = &cold_restart,
         .warm_restart = &warm_restart,
+        .freeze_counters_all = &freeze_counters_all,
+        .freeze_counters_range = &freeze_counters_range,
         .on_destroy = NULL,
         .ctx = NULL,
     };
@@ -288,8 +290,6 @@ int main()
         .operate_g41v3 = &operate_g41v3,
         .select_g41v4 = &select_g41v4,
         .operate_g41v4 = &operate_g41v4,
-        .freeze_counters_all = &freeze_counters_all,
-        .freeze_counters_range = &freeze_counters_range,
         .on_destroy = NULL,
         .ctx = NULL,
     };
