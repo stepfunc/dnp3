@@ -8,7 +8,7 @@ slug: /api/outstation/application
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `OutstationApplication` provides callbacks for dynamic events and information that the outstation requires from the user application:
+The `OutstationApplication` interface provides callbacks for dynamic events and information that the outstation requires from the user application:
 
 * Retrieving IIN bits controlled by user code
 * Callback for writing the time
@@ -16,7 +16,7 @@ The `OutstationApplication` provides callbacks for dynamic events and informatio
 
 ## ApplicationIin
 
-The outstation will call `OutstationApplication::getApplicationIin()` whenever is performing a solicited or unsolicited response. It will merge
+The outstation will call `OutstationApplication::getApplicationIin()` whenever a solicited or unsolicited response is performed. It will merge
 private Internal Indication (IIN) bits with the bits returned in the `ApplicationIin` structure:
 
 The `ApplicationIin` structure contains 4 internal indication bits that are controllable by application code:
@@ -49,8 +49,8 @@ are likely sharing this server with other services should never implement this f
 indicate that the operation is not supported. The timestamp will not be used.
 
 If you must implement this functionality due to conformance or customer requirements the callbacks for both cold and warm restart are available. Return
-`RestartDelay` with a time estimate of how long the restart will take in seconds or milliseconds. This delay returned to the master isn't really of much
-practical use to real world masters so don't worry too much about the accuracy of this value.
+`RestartDelay` with a time estimate of how long the restart will take in seconds or milliseconds. This delay isn't of any practical use to real world masters
+so don't worry too much about the accuracy of this value.
 
 
 
