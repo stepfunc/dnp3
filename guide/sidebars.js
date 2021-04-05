@@ -16,6 +16,7 @@ module.exports = {
                 'api/outstation/configuration',
                 'api/outstation/controls',
                 'api/outstation/application',
+                'api/outstation/outstation_info',
             ]
         }
     ],
