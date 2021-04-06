@@ -1,0 +1,17 @@
+---
+id: database
+title: Database
+sidebar_label: Database
+slug: /api/outstation/database
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+The `Database` class is returned when allows users to manipulate the measurement types that the outstation exposes to the master. It is called a "database", but it is really just
+a thread-safe data structure.  The database API is transactional. A lock is acquired whenever the user wishes to make a change, and then a number of changes can be
+made together.
+
+## Adding Points
+
+Before the outstation
