@@ -7,6 +7,7 @@ module.exports = {
         'about/interop',
         'about/versioning',
         'about/license',
+        'about/dependencies',
     ],
     API: [
         'api/logging',
