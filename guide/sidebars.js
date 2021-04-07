@@ -3,14 +3,14 @@ module.exports = {
     About: [
         'about/guide',
         'about/dnp3',
-        'about/features',
         'about/interop',
         'about/versioning',
         'about/license',
         'about/dependencies',
     ],
     Languages: [
-        'languages/bindings'
+        'languages/bindings',
+        'languages/c_bindings',
     ],
     API: [
         'api/logging',
