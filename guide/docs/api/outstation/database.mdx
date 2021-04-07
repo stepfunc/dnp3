@@ -17,14 +17,16 @@ Before the outstation exposes any measurement data, points must be initialized. 
 adding points to a running outstation as well. Each measurement type has its own unique configuration except for Octet Strings which don't require any
 configuration.
 
-* Default static and event variations
+* An event class assignment for the point
+* Default static and event variations for the type
 * Type-specific dead-bands which default to zero (Binary points have no deadband)
 
 When a point is added, it is given a default value with `RESTART` flags:
 
 *  Binary points are set to `false`
-*  Numeric values are set to `0`.
+*  Numeric values are set to `0`
 *  OctetStrings are given the value of `[0x00]`
+*  Double-bit Binary points are set to `Indeterminate`
 
 You may also update the value right after adding the point if you don't want a connecting master to see `RESTART`.
 
@@ -76,6 +78,41 @@ values={[
 Prefer using statements in C# as Runtime implements *System.IDisposable*.
 :::
 
-
 </TabItem>
 </Tabs>
+
+## Updating Points
+
+Point values may also be updated in a transaction. They may even be updated in the same transaction in which they are created. This is useful if the outstation
+has local access to values (e.g. via a local ADC) at startup.
+
+
+
+:::tip
+The `UpdateOptions` parameter allows the user to precisely control how a point update is processed. The default constructor for this struct has the following
+behavior:
+
+* Update the static value
+* Produce an event if the point value changes in a way that exceeds the deadband or if the flags change
+
+Ignoring event creation is useful during startup initialization if you don't want to create an event for the initial value.
+:::
+
+## Getting Point Values
+
+Some applications may wish to use the `Database` as a cache of the most recent value. Getter methods are provided for each type to extract the value if present.
+
+:::note
+Since the point may not be defined, the getter can fail. This means that in Java and C#, an exception will be thrown if you attempt to retrieve a point that
+does not exist.
+:::
+
+## Removing Points
+
+Most applications will never need to remove points, but the capability is there in the event that you want to remove points from a running outstation. There is
+a type-specific function for removing every point type given its index.
+
+:::note
+Removing a point stops the outstation from reporting static data for that point. It does NOT remove any queued events for that point from
+the event buffer. Those events will remain in the event buffer until reported and cleared by confirmation.
+:::
