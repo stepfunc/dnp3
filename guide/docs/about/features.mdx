@@ -1,0 +1,32 @@
+---
+id: features
+title: Features
+sidebar_label: Features
+slug: /features
+---
+
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
+This library implements both DNP3 outstation and master functionality in a single package. The core library is written in [Rust](https://www.rust-lang.org/). We
+use a model-based approach to generate bindings for C, Java, and C# bindings.
+
+
+
+## Design goals
+
+* The library is memory-safe, and many potential defects are eliminated at compile-time including buffer overflows, use-after free, and dangling pointers.
+You can read more about Rust and our approach to secure software engineering on [our website](https://stepfunc.io/about/why-rust/).
+* CPU and memory efficiency:
+  * Heap allocations are avoided whenever possible
+  * Parsing is zero-copy and never allocates
+  * Thousands of concurrent communication sessions can execute on a single server
+* Provides a high-level API that makes writing DNP3 conformant applications easy, and non-comformant applications possible.
+* Seamless interoperability with non-Rust applications via Rust's FFI.
+
+## Non-goals
+
+* This library is not meant for implementing DNP3 outstations on microcontrollers. The library supports platforms and architectures supported by Rust
+and the [Tokio](https://tokio.rs/) Runtime. This generally means major operating systems with first class support for x86/x64 and 64-bit ARM.
+* Uncommon and/or unsound protocol features are not implemented. Secure authentication version v2 or v5 will never be implemented in this library and we discourage
+others from using them in production environments. TLS is always a better choice when IP communications is available. Secure authentication version 6 *may*
+be implemented in the future if the design proves to be sound.

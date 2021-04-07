@@ -1,34 +1,43 @@
 ---
-id: features
-title: Features
-sidebar_label: Features
-slug: /features
+id: bindings
+title: Rust and Bindings
+sidebar_label: Rust and Bindings
+slug: /bindings
 ---
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-This library implements both DNP3 outstation and master functionality in a single package. The core library is written in [Rust](https://www.rust-lang.org/). We
-use a model-based approach to generate bindings for C, Java, and C# bindings.
+The core library is written in idiomatic Rust without any real thought for how it will be bound into other languages. Consequently, the Rust API doesn't always
+correlate 100% with the various binding APIs. This guide is still helpful for Rust users, but readers should be aware that the guide is primarily written from
+the perspective of the bindings.
+
+## Terminology
+
+The guide use terms like `struct`, `interface`, and `class` frequently. These terms do not map directly to all languages. Refer to the following
+language-specific pages for how to interpret these terms. For example, Rust doesn't have inheritance, and therefore doesn't have an `interface` concept in the
+same way that C# and Java do. Rust users can assume that we're talking about a boxed trait object whenever we talk about an `interface`.
+
+The following language pages discuss how these abstract concepts map to language-specific implementations.
+
+## Methodology
+
+We use an internally developed binding generator we call [oo_bindgen](https://github.com/stepfunc/oo_bindgen/) to produce idiomatic bindings for each target
+language. You can read more about our approach to binding generation in this [blog post](https://stepfunc.io/blog/bindings/).
 
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 320"><g id="diagram" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"><path fill="#FFF" d="M0 0h420v320H0z"/><g id="Group" transform="translate(20 18)"><g id="tiles/modal" transform="translate(0 1)"><g id="modal"><rect id="Rectangle-8" stroke="#1787E0" stroke-width="2" fill="#E4F3FF" x="1" y="1" width="78" height="39" rx="5"/><text id="Modal" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="25.966" y="24.5">Java</tspan></text></g></g><g id="tiles/modal" transform="translate(0 241)"><g id="modal"><rect id="Rectangle-8" stroke="#1787E0" stroke-width="2" fill="#E4F3FF" x="1" y="1" width="58" height="39" rx="5"/><text id="Modal" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="19.176" y="24.5">TCP</tspan></text></g></g><g id="tiles/modal" transform="translate(70 241)"><g id="modal"><rect id="Rectangle-8" stroke="#1787E0" stroke-width="2" fill="#E4F3FF" x="1" y="1" width="58" height="39" rx="5"/><text id="Modal" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="18.664" y="24.5">UDP</tspan></text></g></g><g id="tiles/modal" transform="translate(140 241)"><g id="modal"><rect id="Rectangle-8" stroke="#1787E0" stroke-width="2" fill="#E4F3FF" x="1" y="1" width="58" height="39" rx="5"/><text id="Modal" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="20.875" y="24.5">TLS</tspan></text></g></g><g id="tiles/modal" transform="translate(210 241)"><g id="modal"><rect id="Rectangle-8" stroke="#1787E0" stroke-width="2" fill="#E4F3FF" x="1" y="1" width="58" height="39" rx="5"/><text id="Modal" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="13.835" y="24.5">Serial</tspan></text></g></g><g id="arrows/arrow-4" transform="matrix(-1 0 0 1 320 1)"><g id="arrow-4" transform="translate(20.165)"><path d="M18.835 3H9.417C4.217 3 0 7.215 0 12.421V78.58C0 83.782 4.215 88 9.417 88h9.418" id="Path-4" stroke="#1787E0"/><path id="Triangle-2-Copy-2" fill="#1787E0" d="M16.835 6V0l3 3z"/><path id="Triangle-2-Copy-4" fill="#1787E0" d="M16.835 91v-6l3 3z"/></g></g><g id="arrows/arrow-4" transform="matrix(-1 0 0 1 320 101)"><g id="arrow-4" transform="translate(20.67)"><path d="M19.33 3H9.666A9.662 9.662 0 000 12.665v154.67A9.665 9.665 0 009.665 177h9.666" id="Path-4" stroke="#1787E0"/><path id="Triangle-2-Copy-2" fill="#1787E0" d="M17.331 6V0l3 3z"/><path id="Triangle-2-Copy-4" fill="#1787E0" d="M17.331 180v-6l3 3z"/></g></g><g id="tiles/modal" transform="translate(90 1)"><g id="modal"><rect id="Rectangle-8" stroke="#1787E0" stroke-width="2" fill="#E4F3FF" x="1" y="1" width="78" height="39" rx="5"/><text id="Modal" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="28.523" y="24.5">.NET</tspan></text></g></g><g id="tiles/modal" transform="translate(180)"><g id="modal"><rect id="Rectangle-8" stroke="#1787E0" stroke-width="2" fill="#E4F3FF" x="1" y="1" width="88" height="39" rx="5"/><text id="Modal" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="34.324" y="24.5">C++</tspan></text></g></g><g id="tiles/modal" transform="translate(0 51)"><g id="modal"><rect id="Rectangle-8" stroke="#1787E0" stroke-width="2" fill="#E4F3FF" x="1" y="1" width="268" height="39" rx="5"/><text id="Modal" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="120.511" y="24.5">C API</tspan></text></g></g><text id="Generated-from-model" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="310" y="42">Generated </tspan> <tspan x="310" y="58">from model</tspan></text><text id="Rust" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="310" y="187">Rust</tspan></text><g id="tiles/modal" transform="translate(0 101)"><g id="modal"><rect id="Rectangle-8" stroke="#1787E0" stroke-width="2" fill="#E4F3FF" x="1" y="1" width="268" height="78" rx="5"/><text id="Modal" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="120.042" y="44">DNP3</tspan></text></g></g><g id="tiles/modal" transform="translate(0 191)"><g id="modal"><rect id="Rectangle-8" stroke="#1787E0" stroke-width="2" fill="#E4F3FF" x="1" y="1" width="268" height="38" rx="5"/><text id="Modal" font-family="Poppins-SemiBold, Poppins" font-size="11" font-weight="500" letter-spacing=".183" fill="#1787E0"><tspan x="91.882" y="24">Async Runtime</tspan></text></g></g></g><rect id="Rectangle" stroke="#1787E0" stroke-width="2" x="10" y="11" width="400" height="299" rx="2"/></g></svg>
 
-You can read more about our approach to binding generation in this [blog post](https://stepfunc.io/blog/bindings/).
+Using a Rust API we model the following constructs and their documentation:
 
-## Design goals
+* native functions
+* native structs
+* constants
+* abstract interfaces
+* iterators
+* classes
+   * constructor/destructor
+   * static methods
+   * instance methods
+   * asynchronous methods
 
-* The library is memory-safe, and many potential defects are eliminated at compile-time including buffer overflows, use-after free, and dangling pointers.
-You can read more about Rust and our approach to secure software engineering on [our website](https://stepfunc.io/about/why-rust/).
-* CPU and memory efficiency:
-  * Heap allocations are avoided whenever possible
-  * Parsing is zero-copy and never allocates
-  * Thousands of concurrent communication sessions can execute on a single server
-* Provides a high-level API that makes writing DNP3 conformant applications easy, and non-comformant applications possible.
-* Seamless interoperability with non-Rust applications via Rust's FFI.
+The model produced by this API is then consumed by language-specific code generators to emit idiomatic bindings for that language.
 
-## Non-goals
-
-* This library is not meant for implementing DNP3 outstations on microcontrollers. The library supports platforms and architectures supported by Rust
-and the [Tokio](https://tokio.rs/) Runtime. This generally means major operating systems with first class support for x86/x64 and 64-bit ARM.
-* Uncommon and/or unsound protocol features are not implemented. Secure authentication version v2 or v5 will never be implemented in this library and we discourage
-others from using them in production environments. TLS is always a better choice when IP communications is available. Secure authentication version 6 *may*
-be implemented in the future if the design proves to be sound.

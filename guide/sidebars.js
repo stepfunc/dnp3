@@ -9,6 +9,9 @@ module.exports = {
         'about/license',
         'about/dependencies',
     ],
+    Languages: [
+        'languages/bindings'
+    ],
     API: [
         'api/logging',
         'api/runtime',

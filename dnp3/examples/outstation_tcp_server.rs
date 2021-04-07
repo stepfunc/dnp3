@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut server = TcpServer::new(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
 
-    let handle = server.spawn_outstation(
+    let outstation = server.spawn_outstation(
         get_outstation_config(),
         // event buffer space for 100 analog events
         get_event_buffer_config(),
@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // setup the outstation's database before we spawn it
     // ANCHOR: database_init
-    handle.database.transaction(|db| {
+    outstation.database.transaction(|db| {
         for i in 0..10 {
             db.add(i, Some(EventClass::Class1), AnalogConfig::default());
             db.update(
@@ -78,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         tokio::time::sleep(Duration::from_secs(5)).await;
-        handle.database.transaction(|db| {
+        outstation.database.transaction(|db| {
             db.update(
                 7,
                 &Analog::new(value, Flags::new(0x01), Time::synchronized(1)),
