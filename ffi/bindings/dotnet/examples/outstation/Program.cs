@@ -154,10 +154,12 @@ class ExampleOutstation
                 );
 
                 // Setup initial points
+                // ANCHOR: database_init
                 outstation.Transaction(new OutstationTransaction((db) =>
                 {
                     for (ushort i = 0; i < 10; i++)
                     {
+                        // add points with default values
                         db.AddBinary(i, EventClass.Class1, new BinaryConfig());
                         db.AddDoubleBitBinary(i, EventClass.Class1, new DoubleBitBinaryConfig());
                         db.AddBinaryOutputStatus(i, EventClass.Class1, new BinaryOutputStatusConfig());
@@ -166,17 +168,9 @@ class ExampleOutstation
                         db.AddAnalog(i, EventClass.Class1, new AnalogConfig());
                         db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig());
                         db.AddOctetString(i, EventClass.Class1);
-
-                        var restart = new Flags(Flag.Restart);
-                        db.UpdateBinary(new Binary(i, false, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateDoubleBitBinary(new DoubleBitBinary(i, DoubleBit.Indeterminate, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateBinaryOutputStatus(new BinaryOutputStatus(i, false, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateCounter(new Counter(i, 0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateFrozenCounter(new FrozenCounter(i, 0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateAnalog(new Analog(i, 0.0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateAnalogOutputStatus(new AnalogOutputStatus(i, 0.0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
                     }
                 }));
+                // ANCHOR_END: database_init
 
                 // Start the outstation
                 server.Bind();

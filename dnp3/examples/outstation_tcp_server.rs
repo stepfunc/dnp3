@@ -58,6 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // setup the outstation's database before we spawn it
+    // ANCHOR: database_init
     handle.database.transaction(|db| {
         for i in 0..10 {
             db.add(i, Some(EventClass::Class1), AnalogConfig::default());
@@ -68,6 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     });
+    // ANCHOR_END: database_init
 
     // dropping the ServerHandle shuts down the server AND the outstation
     let _server_handle = server.bind_and_spawn().await?;

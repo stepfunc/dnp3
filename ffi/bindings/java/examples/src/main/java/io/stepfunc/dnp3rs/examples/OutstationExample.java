@@ -222,6 +222,7 @@ public class OutstationExample {
     }
   }
 
+  // ANCHOR: database_init_function
   public static void initializeDatabase(Database db) {
     for (int i = 0; i < 10; i++) {
       db.addBinary(ushort(i), EventClass.CLASS1, new BinaryConfig());
@@ -232,28 +233,9 @@ public class OutstationExample {
       db.addAnalog(ushort(i), EventClass.CLASS1, new AnalogConfig());
       db.addAnalogOutputStatus(ushort(i), EventClass.CLASS1, new AnalogOutputStatusConfig());
       db.addOctetString(ushort(i), EventClass.CLASS1);
-
-      Flags restart = new Flags(Flag.RESTART);
-
-      db.updateBinary(new Binary(ushort(i), false, restart, Timestamp.invalidTimestamp()),
-          new UpdateOptions());
-      db.updateDoubleBitBinary(new DoubleBitBinary(ushort(i), DoubleBit.INDETERMINATE, restart,
-          Timestamp.invalidTimestamp()), new UpdateOptions());
-      db.updateBinaryOutputStatus(
-          new BinaryOutputStatus(ushort(i), false, restart, Timestamp.invalidTimestamp()),
-          new UpdateOptions());
-      db.updateCounter(new Counter(ushort(i), uint(0), restart, Timestamp.invalidTimestamp()),
-          new UpdateOptions());
-      db.updateFrozenCounter(
-          new FrozenCounter(ushort(i), uint(0), restart, Timestamp.invalidTimestamp()),
-          new UpdateOptions());
-      db.updateAnalog(new Analog(ushort(i), 0.0, restart, Timestamp.invalidTimestamp()),
-          new UpdateOptions());
-      db.updateAnalogOutputStatus(
-          new AnalogOutputStatus(ushort(i), 0.0, restart, Timestamp.invalidTimestamp()),
-          new UpdateOptions());
     }
   }
+  // ANCHOR_END: database_init_function
 
   // ANCHOR: event_buffer_config
   private static EventBufferConfig getEventBufferConfig() {
@@ -278,7 +260,9 @@ public class OutstationExample {
             new TestOutstationInformation(), new TestControlHandler(), AddressFilter.any());
 
     // Setup initial points
+    // ANCHOR: database_init
     outstation.transaction((db) -> initializeDatabase(db));
+    // ANCHOR_END: database_init
 
     // Start the outstation
     server.bind();

@@ -8,10 +8,74 @@ slug: /api/outstation/database
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `Database` class is returned when allows users to manipulate the measurement types that the outstation exposes to the master. It is called a "database", but it is really just
-a thread-safe data structure.  The database API is transactional. A lock is acquired whenever the user wishes to make a change, and then a number of changes can be
-made together.
+The `Database` class is used to manipulate the measurement types that the outstation exposes to the master. It is called a "database", but it is really just
+a thread-safe data structure.
 
 ## Adding Points
 
-Before the outstation
+Before the outstation exposes any measurement data, points must be initialized. This is typically done once during program initialization, but can support
+adding points to a running outstation as well. Each measurement type has its own unique configuration except for Octet Strings which don't require any
+configuration.
+
+* Default static and event variations
+* Type-specific dead-bands which default to zero (Binary points have no deadband)
+
+When a point is added, it is given a default value with `RESTART` flags:
+
+*  Binary points are set to `false`
+*  Numeric values are set to `0`.
+*  OctetStrings are given the value of `[0x00]`
+
+You may also update the value right after adding the point if you don't want a connecting master to see `RESTART`.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/outstation_tcp_server.rs:database_init}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+// initialize 10 of every point type
+{{#include ../ffi/bindings/c/outstation_example.c:database_init_transaction}}
+
+// during program initialization - "outstation" already created
+{{#include ../ffi/bindings/c/outstation_example.c:database_init}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+// you can use a separate method or just initialize directly in the lambda expression
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/OutstationExample.java:database_init_function}}
+
+// during program initialization - "outstation" already created
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/OutstationExample.java:database_init}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:database_init}}
+```
+
+:::note
+Prefer using statements in C# as Runtime implements *System.IDisposable*.
+:::
+
+
+</TabItem>
+</Tabs>
