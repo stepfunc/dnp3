@@ -1955,7 +1955,8 @@ impl OutstationSession {
     }
 
     fn on_link_activity(&mut self) {
-        self.config
+        self.next_link_status = self
+            .config
             .keep_alive_timeout
             .map(|timeout| crate::tokio::time::Instant::now() + timeout);
     }
