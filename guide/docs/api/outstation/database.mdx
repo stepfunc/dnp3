@@ -86,16 +86,13 @@ Prefer using statements in C# as Runtime implements *System.IDisposable*.
 Point values may also be updated in a transaction. They may even be updated in the same transaction in which they are created. This is useful if the outstation
 has local access to values (e.g. via a local ADC) at startup.
 
-
-
-:::tip
-The `UpdateOptions` parameter allows the user to precisely control how a point update is processed. The default constructor for this struct has the following
-behavior:
+The `UpdateOptions` struct allows the user to precisely control how a point update is processed. The default constructor has the following behavior:
 
 * Update the static value
 * Produce an event if the point value changes in a way that exceeds the deadband or if the flags change
 
-Ignoring event creation is useful during startup initialization if you don't want to create an event for the initial value.
+:::tip
+Ignoring event creation is useful during startup initialization if you don't want to create events for the initial values.
 :::
 
 ## Getting Point Values
