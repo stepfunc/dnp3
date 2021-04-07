@@ -13,15 +13,17 @@ Rust's open-source ecosystem tends to factor libraries quite finely, and the num
 While this library only directly depends on a handful of 3rd party libraries, those libraries pull in dozens of sub-dependencies. Ensuring that all direct and
 indirect dependencies are properly and legally used is important to us and our customers.
 
-To ensure that our binary distributions meet the legal requirements of the OSS licenses of these dependencies, we have developed an automated tool called
+## Automated License Checking
+
+To ensure that our binary distributions meet the legal requirements of 3rd party open source licenses, we have developed an automated tool called
 `complicense` that performs the following tasks:
 
-* Analyzes each dependency's license against a whitelist. Our CI builds will fail if a dependency is added that is not allowed.
-* Uses the Github API is automatically retrieve the license file for each project hosted on Github. Only a few projects don't have the proper metadata and the
+* Analyzes each dependency's license against an allowed list of licenses. Our CI packaging will fail if a dependency is added that is not allowed.
+* Uses the Github API to automatically retrieve the license file for each project hosted on Github. Only a few projects don't have the proper metadata and the
 license name and content are specified manually in the `complicense` configuration.
 * Ignores projects that are 100% the copyright of Step Function I/O (e.g. the DNP3 library itself).
-* Produces a license report document called `licenses.txt` that rolls up all of the dependency and license information and is included in all of our binary
-distributions.
+* Produces a license report document called `licenses.txt` that rolls up all of the dependency and license information. This document is then included
+in all of our binary distributions for transparency and to meet the license requirements.
 
 ## Proprietary Compatible
 
@@ -31,7 +33,7 @@ such as the GPL. All of the licenses in use are also compatible with each-other.
 
 ## Licenses.txt
 
-The tool produces a verbose report called [licenses.txt](https://github.com/stepfunc/dnp3/blob/master/ffi/licenses.txt) that aggregates the following information for each license:
+`Complicense` produces a verbose report called [licenses.txt](https://github.com/stepfunc/dnp3/blob/master/ffi/licenses.txt) that aggregates the following information for each license:
 
 * Unique name of the library (Rust crate)
 * Repository URL at which the library is hosted
