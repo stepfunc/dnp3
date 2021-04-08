@@ -10,20 +10,33 @@ module.exports = {
     ],
     Languages: [
         'languages/bindings',
-        'languages/c_bindings',
-        'languages/java',
-        'languages/c_sharp',
+        {
+            Bindings: [
+                'languages/c_bindings',
+                'languages/java',
+                'languages/c_sharp',
+            ]
+        }
     ],
     API: [
         'api/logging',
         'api/runtime',
         {
             Outstation: [
-                'api/outstation/configuration',
-                'api/outstation/controls',
-                'api/outstation/application',
-                'api/outstation/outstation_info',
-                'api/outstation/database',
+                {
+                    Components: [
+                        'api/outstation/configuration',
+                        'api/outstation/controls',
+                        'api/outstation/application',
+                        'api/outstation/outstation_info',
+                    ],
+                    Creation: [
+
+                    ],
+                    Execution: [
+                        'api/outstation/database',
+                    ]
+                }
             ]
         }
     ],

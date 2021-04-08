@@ -7,15 +7,16 @@ slug: /c_bindings
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-C binding distributions are a zip file with the following directory layout:
+The C bindings are distributed as a zip file with the following directory layout:
 
 * single header file in `/include/dnp3rs.h`
 * cmake find package script in `/cmake/`
 * platform specific shared libraries in `/lib/<platform>`
+* 3rd party license information in `/lib/licenses.txt`
 
 ## CMake Usage
 
-Make the find package script discoverable by adding it to the prefix path. Then call `find_pacakge`:
+Make the find package script discoverable by adding it to the prefix path. Then call `find_package`:
 
 ```cmake
 set(CMAKE_PREFIX_PATH ${DISTRIBUTION_PATH}/cmake)

@@ -13,8 +13,8 @@ a thread-safe data structure.
 
 ## Adding Points
 
-Before the outstation exposes any measurement data, points must be initialized. This is typically done once during program initialization, but can support
-adding points to a running outstation as well. Each measurement type has its own unique configuration except for Octet Strings which don't require any
+Before the outstation exposes any measurement data, points must be initialized. This is typically done once after the outstation has been created, but
+points can be added to a running outstation as well. Each measurement type has its own unique configuration except for Octet Strings which don't require any
 configuration.
 
 * An event class assignment for the point
