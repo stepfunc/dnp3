@@ -82,6 +82,35 @@ If your implementation of an interface is stateless, you can initialize `ctx` an
 will do this by default if you don't specify a value for these fields.
 :::
 
+### Iterators
+
+Collections in the C bindings are always implemented as an opaque iterator type. You can think of them as a class with a single "next"
+method. Consider an iterator over bool values:
+
+```c
+// opaque iterator
+typedef struct bool_iterator_t;
+// next function
+bool* bool_iterator_next(bool_iterator_t* iter);
+```
+
+If you are given this iterator in a callback you can process the values in a loop:
+
+```c
+void my_callback(bool_iterator_t* iter. void* ctx)
+{
+    bool* value = NULL;
+    while(value = bool_iterator_next(iter))
+    {
+        // process value
+    }
+}
+```
+
+:::warning
+You should never use an iterator outside of the callback. Frequently, the iterator points to memory on the call stack
+and will result in undefined behavior if used after the callback has completed.
+:::
 
 
 
