@@ -11,6 +11,7 @@ module.exports = {
     Languages: [
         'languages/bindings',
         'languages/c_bindings',
+        'languages/java',
         'languages/c_sharp',
     ],
     API: [

@@ -1,0 +1,42 @@
+---
+id: java
+title: Java Bindings
+sidebar_label: Java
+slug: /java
+---
+
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
+The Java bindings are distributed as a JAR and target Java 8.  Native libraries are embedded in the JAR libraries for Windows and Linux in the `resources`. The
+correct native library is automatically loaded during static initialization. These native libraries wrap the underlying C API with a thin layer of
+[JNI](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/).
+
+## Mapping
+
+Java is an object-oriented language and has support for all of the abstract patterns modeled in the code generator. This section describes those mappings.
+
+### Iterators
+
+Iterators are transformed into `List<T>` by the code generator. This means that the collections returned by callbacks may be
+used outside the callback, e.g. sent to another thread for processing.
+
+### Structs
+
+Native structs are mapped to Java classes. They have public member visibility and the constructor ensures that all values are initialized properly.
+
+### Classes
+
+Abstract classes are mapped to Java classes. They have a private pointer to the underlying native resource. There are two types of generated classes in Java: ones that
+implement `AutoCloseable` and those that only have a `finalize` method.
+
+The types that implement `AutoCloseable` represent long-lived resources like a `Runtime`, `Master`, or `TCPServer`.  They may be manually shut down using a public
+`close` method or used in conjunction with the language's [try-with-resources statement](https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html).
+This allows the user to precisely control when the resource/task will be shut down.
+
+Types that do not implement `AutoCloseable` may only be automatically garbage collected. Native resources are deallocated in the class's finalize method. These
+types of classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`.
+
+### Asynchronous Methods
+
+Abstract asynchronous methods are transformed into methods that return `CompletionStage<T>`. Users may then chain then use the object in an asynchronous
+workflow or transform it into a `CompletableFuture<T>` and call `get()`.

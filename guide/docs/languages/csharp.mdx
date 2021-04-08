@@ -17,12 +17,12 @@ C# is an object-oriented language and has support for all of the abstract patter
 
 ### Iterators
 
-Iterators are transformed into `ICollection<T>` by the code generator. This means that the collections returned by callbacks may be used outside the callback.
-They could even be sent to another thread for processing.
+Iterators are transformed into `ICollection<T>` by the code generator. This means that the collections returned by callbacks may be
+used outside the callback, e.g. sent to another thread for processing.
 
 ### Structs
 
-Native structs are mapped to C# classes. They have public member visibility and a single constructor ensures that all values are initialized.
+Native structs are mapped to C# classes. They have public member visibility and the constructor ensures that all values are initialized properly.
 
 ### Classes
 
@@ -34,8 +34,8 @@ The types that implement `IDisposable` represent long-lived resources like a `Ru
 This allows the user to precisely control when the resource/task will be shut down.
 
 Types that do not implement `IDisposable` may only be automatically garbage collected. Native resources are deallocated in the class's finalizer. These types of
-classes are typically builder objects in the library such as `Commands`, `Request`, and `AddressFilter`.
+classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`.
 
 ### Asynchronous Methods
 
-Abstract asynchronous methods are transformed into methods that return `Task<T>`. Users may then block on the task or `await` it in an C# async method.
+Abstract asynchronous methods are transformed into methods that return `Task<T>`. Users may then block on the task or `await` it in an async method.
