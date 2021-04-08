@@ -7,5 +7,87 @@ slug: /c_bindings
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-The C bindings consist of
+C binding distributions are a zip file with the following directory layout:
+
+* single header file in `/include/dnp3rs.h`
+* cmake find package script in `/cmake/`
+* platform specific shared libraries in `/lib/<platform>`
+
+## CMake Usage
+
+Make the find package script discoverable by adding it to the prefix path. Then call `find_pacakge`:
+
+```cmake
+set(CMAKE_PREFIX_PATH ${DISTRIBUTION_PATH}/cmake)
+find_package(dnp3rs REQUIRED)
+```
+
+Then declare a dependency on the package:
+
+```cmake
+add_executable(my_awesome_project main.c)
+target_link_libraries(my_awesome_project PRIVATE dnp3rs)
+```
+
+## Idioms
+
+Many of the concepts built into higher-level languages are simply design patterns or idioms in C. When you see these higher levels patterns
+discussed in this guide, you can use the idioms here to understand how they map to C.
+
+### Classes
+
+C doesn't have classes with restricted member visibility. Instead, you can use opaque types to hide implementation details:
+
+```c
+typedef struct opaque_type_t;
+```
+
+You can then define `constructors` and `destructors` as functions:
+
+```c
+// constructor
+opaque_type_t* create_opaque_type();
+//destructor
+void destroy_opaque_type(opaque_type_t* instance);
+```
+
+Class "member functions" are simply functions that take a pointer to the opaque type as the first argument:
+
+```c
+int opaque_type_get_special_value(opaque_type_t* instance)
+```
+
+### Interfaces
+
+Function polymorphism in C is accomplished using function pointers. Interfaces are simply collections of functions pointers
+along with some optional context. For example, consider the following logging "interface" in the library:
+
+```c
+typedef struct dnp3_logger_t
+{
+    void (*on_message)(dnp3_log_level_t level, const char* message, void* ctx);
+    void (*on_destroy)(void* ctx);
+    void* ctx;
+} dnp3_logger_t;
+```
+
+* `ctx` is an opaque pointer to some state information required by the interface. It is passed into every method as the final argument.
+* `on_destroy` is the destructor that cleans up the `ctx`
+* `on_message` is a function pointer used to dispatch a log message.
+
+This interface only contains a single method, but other interfaces contain a number of methods.
+
+:::tip
+If your implementation of an interface is stateless, you can initialize `ctx` and `on_destroy` to NULL. C99 struct initialization syntax
+will do this by default if you don't specify a value for these fields.
+:::
+
+
+
+
+
+
+
+
+
 

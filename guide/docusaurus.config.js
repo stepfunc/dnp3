@@ -14,7 +14,7 @@ module.exports = {
   themeConfig: {
     prism: {
       theme: require('prism-react-renderer/themes/vsLight'),
-      additionalLanguages: ['rust', 'java', 'csharp'],
+      additionalLanguages: ['rust', 'java', 'csharp', 'cmake'],
     },
     colorMode: {
       defaultMode: 'light',
