@@ -31,7 +31,7 @@ module.exports = {
                         'api/outstation/outstation_info',
                     ],
                     Creation: [
-
+                        'api/outstation/tcp_server',
                     ],
                     Execution: [
                         'api/outstation/database',

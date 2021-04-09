@@ -41,7 +41,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(false)
         .init();
 
+    // ANCHOR: create_tcp_server
     let mut server = TcpServer::new(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
+    // ANCHOR_END: create_tcp_server
 
     let outstation = server.spawn_outstation(
         get_outstation_config(),

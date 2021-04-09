@@ -11,6 +11,18 @@ The Java bindings are distributed as a JAR and target Java 8.  Native libraries 
 correct native library is automatically loaded during static initialization. These native libraries wrap the underlying C API with a thin layer of
 [JNI](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/).
 
+## Maven
+
+Release artifacts are published to Maven central. You can use them within your projects:
+
+```xml
+<dependency>
+    <groupId>io.stepfunc</groupId>
+    <artifactId>dnp3rs</artifactId>
+    <version>${dnp3.version}</version>
+</dependency>
+```
+
 ## Mapping
 
 Java is an object-oriented language and has support for all of the abstract patterns modeled in the code generator. This section describes those mappings.

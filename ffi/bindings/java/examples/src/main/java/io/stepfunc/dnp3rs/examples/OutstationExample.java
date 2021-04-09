@@ -253,7 +253,9 @@ public class OutstationExample {
 
   public static void run(io.stepfunc.dnp3rs.Runtime runtime) {
 
+    // ANCHOR: create_tcp_server
     final TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
+    // ANCHOR_END: create_tcp_server
 
     final Outstation outstation =
         server.addOutstation(getOutstationConfig(), getEventBufferConfig(), new TestApplication(),
