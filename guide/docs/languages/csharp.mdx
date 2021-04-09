@@ -15,6 +15,15 @@ shared libraries for 64-bit Windows and Linux that are automatically loaded by t
 
 C# is an object-oriented language and has support for all of the abstract patterns modeled in the code generator. This section describes those mappings.
 
+### Errors
+
+C API errors are transformed into exceptions containing the error enum.
+
+:::warning
+Uncaught exceptions thrown in callbacks will cause the program to terminate. User code should always wrap callback logic with `try/catch` syntax if there
+is a possibility the callback will throw.
+:::
+
 ### Iterators
 
 Iterators are transformed into `ICollection<T>` by the code generator. This means that the collections returned by callbacks may be
