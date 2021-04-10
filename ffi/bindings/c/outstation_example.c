@@ -293,14 +293,15 @@ int main()
         .ctx = NULL,
     };
 
+    // ANCHOR: tcpserver_add_outstation
     dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
     err = dnp3_tcpserver_add_outstation(server, config, get_event_buffer_config(), application, information, control_handler, address_filter, &outstation);
+    dnp3_address_filter_destroy(address_filter);
     if (err) {
         printf("unable to add outstation: %s \n", dnp3_param_error_to_string(err));
-        dnp3_address_filter_destroy(address_filter);
         goto cleanup;
-    }        
-    dnp3_address_filter_destroy(address_filter);
+    }
+    // ANCHOR_END: tcpserver_add_outstation
 
     // setup initial points
     // ANCHOR: database_init

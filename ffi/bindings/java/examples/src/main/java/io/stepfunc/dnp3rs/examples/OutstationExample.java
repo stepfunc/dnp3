@@ -257,9 +257,11 @@ public class OutstationExample {
     final TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
     // ANCHOR_END: create_tcp_server
 
+    // ANCHOR: tcp_server_add_outstation
     final Outstation outstation =
         server.addOutstation(getOutstationConfig(), getEventBufferConfig(), new TestApplication(),
             new TestOutstationInformation(), new TestControlHandler(), AddressFilter.any());
+    // ANCHOR_END: tcp_server_add_outstation
 
     // Setup initial points
     // ANCHOR: database_init

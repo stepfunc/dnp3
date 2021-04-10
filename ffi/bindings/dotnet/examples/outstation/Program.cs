@@ -146,6 +146,7 @@ class ExampleOutstation
                 config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
                 // ANCHOR_END: outstation_config
 
+                // ANCHOR: tcp_server_add_outstation
                 var outstation = server.AddOutstation(
                     config,
                     GetEventBufferConfig(),
@@ -154,6 +155,7 @@ class ExampleOutstation
                     new TestControlHandler(),
                     AddressFilter.Any()
                 );
+                // ANCHOR_END: tcp_server_add_outstation
 
                 // Setup initial points
                 // ANCHOR: database_init

@@ -45,19 +45,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut server = TcpServer::new(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
     // ANCHOR_END: create_tcp_server
 
+    // ANCHOR: tcp_server_spawn_outstation
     let outstation = server.spawn_outstation(
         get_outstation_config(),
-        // event buffer space for 100 analog events
         get_event_buffer_config(),
-        // customizable trait that controls outstation behavior
         DefaultOutstationApplication::create(),
-        // customizable trait to receive events about what the outstation is doing
         DefaultOutstationInformation::create(),
-        // customizable trait to process control requests from the master
         DefaultControlHandler::with_status(CommandStatus::NotSupported),
         // filter that controls what IP address(es) may connect to this outstation instance
         AddressFilter::Any,
     )?;
+    // ANCHOR_END: tcp_server_spawn_outstation
 
     // setup the outstation's database before we spawn it
     // ANCHOR: database_init
