@@ -177,7 +177,9 @@ class ExampleOutstation
                 // ANCHOR_END: database_init
 
                 // Start the outstation
+                // ANCHOR: tcp_server_bind
                 server.Bind();
+                // ANCHOR_END: tcp_server_bind
 
                 var binaryValue = false;
                 var doubleBitBinaryValue = DoubleBit.DeterminedOff;

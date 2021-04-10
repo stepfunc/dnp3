@@ -138,3 +138,69 @@ if (err) {
 
 </TabItem>
 </Tabs>
+
+The examples above use `AddressFilter.any()` to allow any master IP address to connect:
+
+```mermaid
+graph LR
+A[Master] --> B[TCP Server ]
+subgraph Application
+B --*.*.*.*--> c[Outstation]
+end
+```
+
+If an outstation is already connected to a master, and another matching IP address attempts to connect, the existing connection will be closed and the
+outstation will begin a communication session with the new master.
+
+## Binding the Server
+
+When all of the outstation associated with the server have been added, it is time to bind the server and begin accepting connections.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/outstation_tcp_server.rs:server_bind}}
+```
+
+:::note
+The terminology differs here between Rust and bindings.
+:::
+
+</TabItem>
+<TabItem value="C">
+
+```c
+dnp3_param_error_t err = dnp3_tcpserver_bind(server);
+if (err) {
+    // handle error
+}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/OutstationExample.java:tcp_server_bind}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:tcp_server_bind}}
+```
+
+</TabItem>
+</Tabs>
+
+
+Binding may fail if the underlying socket bind/listen calls fail, e.g. if another process is already bound to that port.

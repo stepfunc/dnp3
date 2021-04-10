@@ -71,8 +71,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     // ANCHOR_END: database_init
 
-    // dropping the ServerHandle shuts down the server AND the outstation
+    // ANCHOR: server_bind
+    // dropping the ServerHandle shuts down the server and outstation(s)
     let _server_handle = server.bind_and_spawn().await?;
+    // ANCHOR_END: server_bind
 
     let mut value = 0.0;
 

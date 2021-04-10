@@ -268,8 +268,11 @@ public class OutstationExample {
     outstation.transaction((db) -> initializeDatabase(db));
     // ANCHOR_END: database_init
 
+
     // Start the outstation
+    // ANCHOR: tcp_server_bind
     server.bind();
+    // ANCHOR_END: tcp_server_bind
 
     boolean binaryValue = false;
     DoubleBit doubleBitBinaryValue = DoubleBit.DETERMINED_OFF;
