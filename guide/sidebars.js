@@ -32,6 +32,7 @@ module.exports = {
                     ],
                     Creation: [
                         'api/outstation/tcp_server',
+                        'api/outstation/serial_outstation',
                     ],
                     Execution: [
                         'api/outstation/database',
