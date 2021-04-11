@@ -1,18 +1,17 @@
 package io.stepfunc.dnp3rs.examples;
 
-import io.stepfunc.dnp3rs.Runtime;
-import io.stepfunc.dnp3rs.*;
-import org.joou.UByte;
-import org.joou.ULong;
-import org.joou.UShort;
+import static org.joou.Unsigned.*;
 
+import io.stepfunc.dnp3rs.*;
+import io.stepfunc.dnp3rs.Runtime;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-
-import static org.joou.Unsigned.*;
+import org.joou.UByte;
+import org.joou.ULong;
+import org.joou.UShort;
 
 class TestLogger implements Logger {
 
@@ -21,7 +20,6 @@ class TestLogger implements Logger {
     System.out.print(message);
   }
 }
-
 
 class TestApplication implements OutstationApplication {
 
@@ -56,88 +54,58 @@ class TestApplication implements OutstationApplication {
   }
 
   @Override
-  public FreezeResult freezeCountersRange(UShort start, UShort stop, FreezeType freezeType,
-      Database database) {
+  public FreezeResult freezeCountersRange(
+      UShort start, UShort stop, FreezeType freezeType, Database database) {
     return FreezeResult.NOT_SUPPORTED;
   }
 }
 
-
 class TestOutstationInformation implements OutstationInformation {
 
   @Override
-  public void processRequestFromIdle(RequestHeader header) {
-
-  }
+  public void processRequestFromIdle(RequestHeader header) {}
 
   @Override
-  public void broadcastReceived(FunctionCode functionCode, BroadcastAction action) {
-
-  }
+  public void broadcastReceived(FunctionCode functionCode, BroadcastAction action) {}
 
   @Override
-  public void enterSolicitedConfirmWait(UByte ecsn) {
-
-  }
+  public void enterSolicitedConfirmWait(UByte ecsn) {}
 
   @Override
-  public void solicitedConfirmTimeout(UByte ecsn) {
-
-  }
+  public void solicitedConfirmTimeout(UByte ecsn) {}
 
   @Override
-  public void solicitedConfirmReceived(UByte ecsn) {
-
-  }
+  public void solicitedConfirmReceived(UByte ecsn) {}
 
   @Override
-  public void solicitedConfirmWaitNewRequest() {
-
-  }
+  public void solicitedConfirmWaitNewRequest() {}
 
   @Override
-  public void wrongSolicitedConfirmSeq(UByte ecsn, UByte seq) {
-
-  }
+  public void wrongSolicitedConfirmSeq(UByte ecsn, UByte seq) {}
 
   @Override
-  public void unexpectedConfirm(boolean unsolicited, UByte seq) {
-
-  }
+  public void unexpectedConfirm(boolean unsolicited, UByte seq) {}
 
   @Override
-  public void enterUnsolicitedConfirmWait(UByte ecsn) {
-
-  }
+  public void enterUnsolicitedConfirmWait(UByte ecsn) {}
 
   @Override
-  public void unsolicitedConfirmTimeout(UByte ecsn, boolean retry) {
-
-  }
+  public void unsolicitedConfirmTimeout(UByte ecsn, boolean retry) {}
 
   @Override
-  public void unsolicitedConfirmed(UByte ecsn) {
-
-  }
+  public void unsolicitedConfirmed(UByte ecsn) {}
 
   @Override
-  public void clearRestartIin() {
-
-  }
+  public void clearRestartIin() {}
 }
-
 
 class TestControlHandler implements ControlHandler {
 
   @Override
-  public void beginFragment() {
-
-  }
+  public void beginFragment() {}
 
   @Override
-  public void endFragment() {
-
-  }
+  public void endFragment() {}
 
   @Override
   public CommandStatus selectG12v1(G12v1 control, UShort index, Database database) {
@@ -145,8 +113,8 @@ class TestControlHandler implements ControlHandler {
   }
 
   @Override
-  public CommandStatus operateG12v1(G12v1 control, UShort index, OperateType opType,
-      Database database) {
+  public CommandStatus operateG12v1(
+      G12v1 control, UShort index, OperateType opType, Database database) {
     return CommandStatus.NOT_SUPPORTED;
   }
 
@@ -156,8 +124,8 @@ class TestControlHandler implements ControlHandler {
   }
 
   @Override
-  public CommandStatus operateG41v1(int control, UShort index, OperateType opType,
-      Database database) {
+  public CommandStatus operateG41v1(
+      int control, UShort index, OperateType opType, Database database) {
     return CommandStatus.NOT_SUPPORTED;
   }
 
@@ -167,8 +135,8 @@ class TestControlHandler implements ControlHandler {
   }
 
   @Override
-  public CommandStatus operateG41v2(short value, UShort index, OperateType opType,
-      Database database) {
+  public CommandStatus operateG41v2(
+      short value, UShort index, OperateType opType, Database database) {
     return CommandStatus.NOT_SUPPORTED;
   }
 
@@ -178,8 +146,8 @@ class TestControlHandler implements ControlHandler {
   }
 
   @Override
-  public CommandStatus operateG41v3(float value, UShort index, OperateType opType,
-      Database database) {
+  public CommandStatus operateG41v3(
+      float value, UShort index, OperateType opType, Database database) {
     return CommandStatus.NOT_SUPPORTED;
   }
 
@@ -189,23 +157,23 @@ class TestControlHandler implements ControlHandler {
   }
 
   @Override
-  public CommandStatus operateG41v4(double value, UShort index, OperateType opType,
-      Database database) {
+  public CommandStatus operateG41v4(
+      double value, UShort index, OperateType opType, Database database) {
     return CommandStatus.NOT_SUPPORTED;
   }
 }
-
 
 public class OutstationExample {
 
   static OutstationConfig getOutstationConfig() {
     // ANCHOR: outstation_config
     // create an outstation configuration with default values
-    OutstationConfig config = new OutstationConfig(
-        // outstation address
-        ushort(1024),
-        // master address
-        ushort(1));
+    OutstationConfig config =
+        new OutstationConfig(
+            // outstation address
+            ushort(1024),
+            // master address
+            ushort(1));
     // override the default decode log level
     config.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
     // ANCHOR_END: outstation_config
@@ -239,7 +207,8 @@ public class OutstationExample {
 
   // ANCHOR: event_buffer_config
   private static EventBufferConfig getEventBufferConfig() {
-    return new EventBufferConfig(ushort(10), // binary
+    return new EventBufferConfig(
+        ushort(10), // binary
         ushort(10), // double-bit binary
         ushort(10), // binary output status
         ushort(5), // counter
@@ -247,7 +216,7 @@ public class OutstationExample {
         ushort(5), // analog
         ushort(5), // analog output status
         ushort(3) // octet string
-    );
+        );
   }
   // ANCHOR_END: event_buffer_config
 
@@ -259,15 +228,19 @@ public class OutstationExample {
 
     // ANCHOR: tcp_server_add_outstation
     final Outstation outstation =
-        server.addOutstation(getOutstationConfig(), getEventBufferConfig(), new TestApplication(),
-            new TestOutstationInformation(), new TestControlHandler(), AddressFilter.any());
+        server.addOutstation(
+            getOutstationConfig(),
+            getEventBufferConfig(),
+            new TestApplication(),
+            new TestOutstationInformation(),
+            new TestControlHandler(),
+            AddressFilter.any());
     // ANCHOR_END: tcp_server_add_outstation
 
     // Setup initial points
     // ANCHOR: database_init
     outstation.transaction((db) -> initializeDatabase(db));
     // ANCHOR_END: database_init
-
 
     // Start the outstation
     // ANCHOR: tcp_server_bind
@@ -291,94 +264,139 @@ public class OutstationExample {
         switch (line) {
           case "x":
             return;
-          case "bi": {
-            binaryValue = !binaryValue;
-            final boolean pointValue = binaryValue;
-            outstation.transaction(db -> {
-              Binary value = new Binary(ushort(7), pointValue, onlineFlags,
-                  Timestamp.synchronizedTimestamp(ulong(0)));
-              db.updateBinary(value, new UpdateOptions());
-            });
-            break;
-          }
-          case "dbbi": {
-            doubleBitBinaryValue =
-                doubleBitBinaryValue == DoubleBit.DETERMINED_OFF ? DoubleBit.DETERMINED_ON
-                    : DoubleBit.DETERMINED_OFF;
-            final DoubleBit pointValue = doubleBitBinaryValue;
-            outstation.transaction(db -> {
-              DoubleBitBinary value = new DoubleBitBinary(ushort(7), pointValue, onlineFlags,
-                  Timestamp.synchronizedTimestamp(ulong(0)));
-              db.updateDoubleBitBinary(value, new UpdateOptions());
-            });
-            break;
-          }
-          case "bos": {
-            binaryOutputStatusValue = !binaryOutputStatusValue;
-            final boolean pointValue = binaryOutputStatusValue;
-            outstation.transaction(db -> {
-              BinaryOutputStatus value = new BinaryOutputStatus(ushort(7), pointValue, onlineFlags,
-                  Timestamp.synchronizedTimestamp(ulong(0)));
-              db.updateBinaryOutputStatus(value, new UpdateOptions());
-            });
-            break;
-          }
-          case "co": {
-            counterValue = ++counterValue;
-            final long pointValue = counterValue;
-            outstation.transaction(db -> {
-              Counter value = new Counter(ushort(7), uint(pointValue), onlineFlags,
-                  Timestamp.synchronizedTimestamp(ulong(0)));
-              db.updateCounter(value, new UpdateOptions());
-            });
-            break;
-          }
-          case "fco": {
-            frozenCounterValue = ++frozenCounterValue;
-            final long pointValue = frozenCounterValue;
-            outstation.transaction(db -> {
-              FrozenCounter value = new FrozenCounter(ushort(7), uint(pointValue), onlineFlags,
-                  Timestamp.synchronizedTimestamp(ulong(0)));
-              db.updateFrozenCounter(value, new UpdateOptions());
-            });
-            break;
-          }
-          case "ai": {
-            analogValue = ++analogValue;
-            final double pointValue = analogValue;
-            outstation.transaction(db -> {
-              Analog value = new Analog(ushort(7), pointValue, onlineFlags,
-                  Timestamp.synchronizedTimestamp(ulong(0)));
-              db.updateAnalog(value, new UpdateOptions());
-            });
-            break;
-          }
-          case "aos": {
-            analogOutputStatusValue = ++analogOutputStatusValue;
-            final double pointValue = analogOutputStatusValue;
-            outstation.transaction(db -> {
-              AnalogOutputStatus value = new AnalogOutputStatus(ushort(7), pointValue, onlineFlags,
-                  Timestamp.synchronizedTimestamp(ulong(0)));
-              db.updateAnalogOutputStatus(value, new UpdateOptions());
-            });
-            break;
-          }
-          case "os": {
-            outstation.transaction(db -> {
-              // Some Friday poetry:
-              // Arrays.asList requires an array of Object,
-              // Arrays.stream does not overload for byte[], how abject.
-              // Java is poop
-              // So excuse me for that for loop
-              List<UByte> octetString = new ArrayList<>();
-              for (byte octet : "Hello".getBytes(StandardCharsets.US_ASCII)) {
-                octetString.add(ubyte(octet));
-              }
+          case "bi":
+            {
+              binaryValue = !binaryValue;
+              final boolean pointValue = binaryValue;
+              outstation.transaction(
+                  db -> {
+                    Binary value =
+                        new Binary(
+                            ushort(7),
+                            pointValue,
+                            onlineFlags,
+                            Timestamp.synchronizedTimestamp(ulong(0)));
+                    db.updateBinary(value, new UpdateOptions());
+                  });
+              break;
+            }
+          case "dbbi":
+            {
+              doubleBitBinaryValue =
+                  doubleBitBinaryValue == DoubleBit.DETERMINED_OFF
+                      ? DoubleBit.DETERMINED_ON
+                      : DoubleBit.DETERMINED_OFF;
+              final DoubleBit pointValue = doubleBitBinaryValue;
+              outstation.transaction(
+                  db -> {
+                    DoubleBitBinary value =
+                        new DoubleBitBinary(
+                            ushort(7),
+                            pointValue,
+                            onlineFlags,
+                            Timestamp.synchronizedTimestamp(ulong(0)));
+                    db.updateDoubleBitBinary(value, new UpdateOptions());
+                  });
+              break;
+            }
+          case "bos":
+            {
+              binaryOutputStatusValue = !binaryOutputStatusValue;
+              final boolean pointValue = binaryOutputStatusValue;
+              outstation.transaction(
+                  db -> {
+                    BinaryOutputStatus value =
+                        new BinaryOutputStatus(
+                            ushort(7),
+                            pointValue,
+                            onlineFlags,
+                            Timestamp.synchronizedTimestamp(ulong(0)));
+                    db.updateBinaryOutputStatus(value, new UpdateOptions());
+                  });
+              break;
+            }
+          case "co":
+            {
+              counterValue = ++counterValue;
+              final long pointValue = counterValue;
+              outstation.transaction(
+                  db -> {
+                    Counter value =
+                        new Counter(
+                            ushort(7),
+                            uint(pointValue),
+                            onlineFlags,
+                            Timestamp.synchronizedTimestamp(ulong(0)));
+                    db.updateCounter(value, new UpdateOptions());
+                  });
+              break;
+            }
+          case "fco":
+            {
+              frozenCounterValue = ++frozenCounterValue;
+              final long pointValue = frozenCounterValue;
+              outstation.transaction(
+                  db -> {
+                    FrozenCounter value =
+                        new FrozenCounter(
+                            ushort(7),
+                            uint(pointValue),
+                            onlineFlags,
+                            Timestamp.synchronizedTimestamp(ulong(0)));
+                    db.updateFrozenCounter(value, new UpdateOptions());
+                  });
+              break;
+            }
+          case "ai":
+            {
+              analogValue = ++analogValue;
+              final double pointValue = analogValue;
+              outstation.transaction(
+                  db -> {
+                    Analog value =
+                        new Analog(
+                            ushort(7),
+                            pointValue,
+                            onlineFlags,
+                            Timestamp.synchronizedTimestamp(ulong(0)));
+                    db.updateAnalog(value, new UpdateOptions());
+                  });
+              break;
+            }
+          case "aos":
+            {
+              analogOutputStatusValue = ++analogOutputStatusValue;
+              final double pointValue = analogOutputStatusValue;
+              outstation.transaction(
+                  db -> {
+                    AnalogOutputStatus value =
+                        new AnalogOutputStatus(
+                            ushort(7),
+                            pointValue,
+                            onlineFlags,
+                            Timestamp.synchronizedTimestamp(ulong(0)));
+                    db.updateAnalogOutputStatus(value, new UpdateOptions());
+                  });
+              break;
+            }
+          case "os":
+            {
+              outstation.transaction(
+                  db -> {
+                    // Some Friday poetry:
+                    // Arrays.asList requires an array of Object,
+                    // Arrays.stream does not overload for byte[], how abject.
+                    // Java is poop
+                    // So excuse me for that for loop
+                    List<UByte> octetString = new ArrayList<>();
+                    for (byte octet : "Hello".getBytes(StandardCharsets.US_ASCII)) {
+                      octetString.add(ubyte(octet));
+                    }
 
-              db.updateOctetString(ushort(7), octetString, new UpdateOptions());
-            });
-            break;
-          }
+                    db.updateOctetString(ushort(7), octetString, new UpdateOptions());
+                  });
+              break;
+            }
           default:
             System.out.println("Unknown command");
             break;
