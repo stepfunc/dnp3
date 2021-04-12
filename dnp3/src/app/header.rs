@@ -158,13 +158,21 @@ pub struct Iin {
 }
 
 impl Iin1 {
+    /// IIN1 struct with only the BROADCAST bit set
     pub const BROADCAST: Iin1 = Iin1::new(BIT_0.value);
+    /// IIN1 struct with only the CLASS_1_EVENTS bit set
     pub const CLASS_1_EVENTS: Iin1 = Iin1::new(BIT_1.value);
+    /// IIN1 struct with only the CLASS_2_EVENTS bit set
     pub const CLASS_2_EVENTS: Iin1 = Iin1::new(BIT_2.value);
+    /// IIN1 struct with only the CLASS_3_EVENTS bit set
     pub const CLASS_3_EVENTS: Iin1 = Iin1::new(BIT_3.value);
+    /// IIN1 struct with only the NEED_TIME bit set
     pub const NEED_TIME: Iin1 = Iin1::new(BIT_4.value);
+    /// IIN1 struct with only the LOCAL_CONTROL bit set
     pub const LOCAL_CONTROL: Iin1 = Iin1::new(BIT_5.value);
+    /// IIN1 struct with only the DEVICE_TROUBLE bit set
     pub const DEVICE_TROUBLE: Iin1 = Iin1::new(BIT_6.value);
+    /// IIN1 struct with only the RESTART bit set
     pub const RESTART: Iin1 = Iin1::new(BIT_7.value);
 
     /// Construct IIN1 from its underlying value
@@ -234,11 +242,17 @@ impl BitOrAssign<Iin1> for Iin1 {
 }
 
 impl Iin2 {
+    /// IIN2 struct with only the NO_FUNC_CODE_SUPPORT bit set
     pub const NO_FUNC_CODE_SUPPORT: Iin2 = Iin2::new(BIT_0.value);
+    /// IIN2 struct with only the OBJECT_UNKNOWN bit set
     pub const OBJECT_UNKNOWN: Iin2 = Iin2::new(BIT_1.value);
+    /// IIN2 struct with only the PARAMETER_ERROR bit set
     pub const PARAMETER_ERROR: Iin2 = Iin2::new(BIT_2.value);
+    /// IIN2 struct with only the EVENT_BUFFER_OVERFLOW bit set
     pub const EVENT_BUFFER_OVERFLOW: Iin2 = Iin2::new(BIT_3.value);
+    /// IIN2 struct with only the ALREADY_EXECUTING bit set
     pub const ALREADY_EXECUTING: Iin2 = Iin2::new(BIT_4.value);
+    /// IIN2 struct with only the CONFIG_CORRUPT bit set
     pub const CONFIG_CORRUPT: Iin2 = Iin2::new(BIT_5.value);
 
     /// Construct IIN2 from its underlying value
@@ -498,7 +512,9 @@ pub struct RequestHeader {
 /// Only 2 function codes allowed in responses
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ResponseFunction {
+    /// (solicited) response (0x81)
     Response,
+    /// unsolicited response (0x82)
     UnsolicitedResponse,
 }
 
@@ -514,6 +530,7 @@ pub struct ResponseHeader {
 }
 
 impl ResponseFunction {
+    /// test if the response function is unsolicited
     pub fn is_unsolicited(self) -> bool {
         match self {
             ResponseFunction::Response => false,
@@ -521,6 +538,7 @@ impl ResponseFunction {
         }
     }
 
+    /// map the response function to a `FunctionCode`
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
             ResponseFunction::Response => FunctionCode::Response,

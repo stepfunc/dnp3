@@ -22,6 +22,7 @@ impl ControlCode {
     const QU_MASK: u8 = 0b0001_0000;
     const OP_MASK: u8 = 0b0000_1111;
 
+    /// Create a `ControlCode` from its constituent parts. Initializes the `queue` field to false.
     pub fn new(tcc: TripCloseCode, op_type: OpType, clear: bool) -> Self {
         Self {
             tcc,
@@ -31,15 +32,22 @@ impl ControlCode {
         }
     }
 
+    /// Create a `ControlField` from an `OpType` only.
+    ///
+    /// `tcc` is set to Nul
+    /// `clear` is set to false
     pub fn from_op_type(value: OpType) -> Self {
         Self::new(TripCloseCode::Nul, value, false)
     }
 
+    /// Create a `ControlField` from a `TripCloseCode` and an `OpType`
+    ///
+    /// `clear` is set to false
     pub fn from_tcc_and_op_type(tcc: TripCloseCode, op_type: OpType) -> Self {
         Self::new(tcc, op_type, false)
     }
 
-    pub fn from(x: u8) -> Self {
+    pub(crate) fn from(x: u8) -> Self {
         Self {
             tcc: TripCloseCode::from((x & Self::TCC_MASK) >> 6),
             clear: x & Self::CR_MASK != 0,
@@ -47,7 +55,8 @@ impl ControlCode {
             op_type: OpType::from(x & Self::OP_MASK),
         }
     }
-    pub fn as_u8(self) -> u8 {
+
+    pub(crate) fn as_u8(self) -> u8 {
         let mut x = 0;
         x |= self.tcc.as_u8() << 6;
         if self.clear {
