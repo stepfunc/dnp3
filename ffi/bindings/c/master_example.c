@@ -165,13 +165,14 @@ int main()
     // ANCHOR_END: logging_init
 
     // long-lived types that must be freed before exit
+    // ANCHOR: runtime_declare
     dnp3_runtime_t* runtime = NULL;
+    // ANCHOR_END: runtime_declare
     dnp3_master_t* master = NULL;
 
     // error code we'll reference elsewhere
     dnp3_param_error_t err = DNP3_PARAM_ERROR_OK;
-          
-    // ANCHOR: runtime_init
+
     // create the runtime
     dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
     runtime_config.num_core_threads = 4;        
@@ -180,7 +181,6 @@ int main()
         printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
-    // ANCHOR_END: runtime_init
         
     // Create the master
     dnp3_master_config_t master_config = dnp3_master_config_init(1);

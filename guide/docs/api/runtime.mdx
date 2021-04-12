@@ -58,12 +58,21 @@ values={[
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/master_example.c:runtime_init}}
+dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
+runtime_config.num_core_threads = 4;
+
+// create the runtime
+dnp3_runtime_t* runtime = NULL;
+dnp3_param_error_t err = dnp3_runtime_new(runtime_config, &runtime);
+if (err) {
+    // technically, runtime creation can fail, but would require OS
+    // resource exhaustion to do so.
+}
 
 // ----- run your program ------
 
 // destroy the runtime before the program exits
-{{#include ../ffi/bindings/c/master_example.c:runtime_destroy}}
+dnp3_runtime_destroy(runtime);
 ```
 
 </TabItem>
@@ -114,4 +123,3 @@ should defer blocking calls to dedicated worker threads, e.g. a user-managed thr
 In cases where some blocking is unavoidable, it can be useful to set the number of worker threads to a multiple of the number of system cores,
 e.g. 2x or 3x the number of system cores.
 :::
-

@@ -94,7 +94,7 @@ dnp3_freeze_result_t freeze_counters_range(uint16_t start, uint16_t stop, dnp3_f
     return DNP3_FREEZE_RESULT_NOT_SUPPORTED;
 }
 
-// Transactions
+// ANCHOR: database_init_transaction
 void outstation_transaction_startup(dnp3_database_t *db, void *context)
 {
     for (uint16_t i = 0; i < 10; ++i) {
@@ -107,25 +107,9 @@ void outstation_transaction_startup(dnp3_database_t *db, void *context)
         dnp3_database_add_analog(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_analog_config_init());
         dnp3_database_add_analog_output_status(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_analog_output_status_config_init());
         dnp3_database_add_octet_string(db, i, DNP3_EVENT_CLASS_CLASS1);
-
-        // Set initial values
-        dnp3_flags_t restart = dnp3_flags_init(DNP3_FLAG_RESTART);
-
-        dnp3_database_update_binary(db, dnp3_binary_init(i, false, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
-
-        dnp3_database_update_double_bit_binary(db, dnp3_double_bit_binary_init(i, DNP3_DOUBLE_BIT_DETERMINED_OFF, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
-
-        dnp3_database_update_binary_output_status(db, dnp3_binary_output_status_init(i, false, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
-
-        dnp3_database_update_counter(db, dnp3_counter_init(i, 0, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
-
-        dnp3_database_update_frozen_counter(db, dnp3_frozen_counter_init(i, 0, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
-
-        dnp3_database_update_analog(db, dnp3_analog_init(i, 0.0, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
-
-        dnp3_database_update_analog_output_status(db, dnp3_analog_output_status_init(i, 0.0, restart, dnp3_timestamp_invalid()), dnp3_update_options_init());
     }
 }
+// ANCHOR_END: database_init_transaction
 
 typedef struct database_points_t {
     bool binaryValue;
@@ -203,6 +187,21 @@ void octet_string_transaction(dnp3_database_t *db, void *context)
 
     dnp3_octet_string_destroy(octet_string);
 }
+
+// ANCHOR: event_buffer_config
+dnp3_event_buffer_config_t get_event_buffer_config() {
+    return dnp3_event_buffer_config_init(
+            10, // binary
+            10, // double-bit binary
+            10, // binary output status
+            5,  // counter
+            5,  // frozen counter
+            5,  // analog
+            5,  // analog output status
+            3   // octet string
+    );
+}
+// ANCHOR_END: event_buffer_config
 
 int main()
 {
@@ -293,21 +292,26 @@ int main()
         .on_destroy = NULL,
         .ctx = NULL,
     };
+
+    // ANCHOR: tcpserver_add_outstation
     dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
-    err = dnp3_tcpserver_add_outstation(server, config, dnp3_event_buffer_config_all_types(10), application, information, control_handler, address_filter, &outstation);
+    err = dnp3_tcpserver_add_outstation(server, config, get_event_buffer_config(), application, information, control_handler, address_filter, &outstation);
+    dnp3_address_filter_destroy(address_filter);
     if (err) {
         printf("unable to add outstation: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
-    }        
-    dnp3_address_filter_destroy(address_filter);
+    }
+    // ANCHOR_END: tcpserver_add_outstation
 
-    // Setup initial points
+    // setup initial points
+    // ANCHOR: database_init
     dnp3_outstation_transaction_t startup_transaction = {
         .execute = &outstation_transaction_startup,
         .on_destroy = NULL,
         .ctx = NULL,
     };
     dnp3_outstation_transaction(outstation, startup_transaction);
+    // ANCHOR_END: database_init
 
     // Start the outstation    
     err = dnp3_tcpserver_bind(server);

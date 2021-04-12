@@ -2,7 +2,8 @@ import React, { useEffect } from "react";
 import mermaid from "mermaid";
 
 mermaid.initialize({
-	startOnLoad: true
+	startOnLoad: true,
+	theme: 'neutral',
 });
 
 const Mermaid = ({ chart }) => {

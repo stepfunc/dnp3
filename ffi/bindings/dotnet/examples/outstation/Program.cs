@@ -100,9 +100,25 @@ class ExampleOutstation
     }
 
     public static void Main(string[] args)
-    {   
-            MainAsync().GetAwaiter().GetResult();
+    {
+        MainAsync().GetAwaiter().GetResult();
     }
+
+    // ANCHOR: event_buffer_config
+    private static EventBufferConfig GetEventBufferConfig()
+    {
+        return new EventBufferConfig(
+            10, // binary
+            10, // double-bit binary
+            10, // binary output status
+            5,  // counter
+            5,  // frozen counter
+            5,  // analog
+            5,  // analog output status
+            3   // octet string
+        );
+    }
+    // ANCHOR_END: event_buffer_config
 
     private static async Task MainAsync()
     {
@@ -114,7 +130,9 @@ class ExampleOutstation
 
         using (var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 }))
         {
+            // ANCHOR: create_tcp_server
             using (var server = new TcpServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000"))
+            // ANCHOR_END: create_tcp_server
             {
                 // ANCHOR: outstation_config
                 // create an outstation configuration with default values
@@ -128,17 +146,24 @@ class ExampleOutstation
                 config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
                 // ANCHOR_END: outstation_config
 
-                var application = new TestOutstationApplication();
-                var information = new TestOutstationInformation();
-                var controlHandler = new TestControlHandler();
-                var addressFilter = AddressFilter.Any();
-                var outstation = server.AddOutstation(config, EventBufferConfig.AllTypes(10), application, information, controlHandler, addressFilter);
+                // ANCHOR: tcp_server_add_outstation
+                var outstation = server.AddOutstation(
+                    config,
+                    GetEventBufferConfig(),
+                    new TestOutstationApplication(),
+                    new TestOutstationInformation(),
+                    new TestControlHandler(),
+                    AddressFilter.Any()
+                );
+                // ANCHOR_END: tcp_server_add_outstation
 
                 // Setup initial points
+                // ANCHOR: database_init
                 outstation.Transaction(new OutstationTransaction((db) =>
                 {
-                    for(ushort i = 0; i < 10; i++)
+                    for (ushort i = 0; i < 10; i++)
                     {
+                        // add points with default values
                         db.AddBinary(i, EventClass.Class1, new BinaryConfig());
                         db.AddDoubleBitBinary(i, EventClass.Class1, new DoubleBitBinaryConfig());
                         db.AddBinaryOutputStatus(i, EventClass.Class1, new BinaryOutputStatusConfig());
@@ -147,20 +172,14 @@ class ExampleOutstation
                         db.AddAnalog(i, EventClass.Class1, new AnalogConfig());
                         db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig());
                         db.AddOctetString(i, EventClass.Class1);
-
-                        var restart = new Flags(Flag.Restart);
-                        db.UpdateBinary(new Binary(i, false, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateDoubleBitBinary(new DoubleBitBinary(i, DoubleBit.Indeterminate, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateBinaryOutputStatus(new BinaryOutputStatus(i, false, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateCounter(new Counter(i, 0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateFrozenCounter(new FrozenCounter(i, 0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateAnalog(new Analog(i, 0.0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
-                        db.UpdateAnalogOutputStatus(new AnalogOutputStatus(i, 0.0, restart, Timestamp.InvalidTimestamp()), new UpdateOptions());
                     }
                 }));
+                // ANCHOR_END: database_init
 
                 // Start the outstation
+                // ANCHOR: tcp_server_bind
                 server.Bind();
+                // ANCHOR_END: tcp_server_bind
 
                 var binaryValue = false;
                 var doubleBitBinaryValue = DoubleBit.DeterminedOff;

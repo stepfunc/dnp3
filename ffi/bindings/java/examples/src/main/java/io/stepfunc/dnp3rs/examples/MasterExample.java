@@ -1,14 +1,13 @@
 package io.stepfunc.dnp3rs.examples;
 
+import static org.joou.Unsigned.*;
+
 import io.stepfunc.dnp3rs.*;
 import io.stepfunc.dnp3rs.Runtime;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.Duration;
 import java.util.List;
-
-import static org.joou.Unsigned.*;
 
 // ANCHOR: logging_interface
 // callback interface used to receive log messages
@@ -21,7 +20,6 @@ class ConsoleLogger implements Logger {
 }
 // ANCHOR_END: logging_interface
 
-
 class TestListener implements ClientStateListener {
 
   @Override
@@ -29,7 +27,6 @@ class TestListener implements ClientStateListener {
     System.out.println(state);
   }
 }
-
 
 class TestReadHandler implements ReadHandler {
 
@@ -50,10 +47,21 @@ class TestReadHandler implements ReadHandler {
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
 
-    it.forEach(val -> {
-      System.out.println("BI " + val.index + ": Value=" + val.value + " Flags=" + val.flags.value
-          + " Time=" + val.time.value + " (" + val.time.quality + ")");
-    });
+    it.forEach(
+        val -> {
+          System.out.println(
+              "BI "
+                  + val.index
+                  + ": Value="
+                  + val.value
+                  + " Flags="
+                  + val.flags.value
+                  + " Time="
+                  + val.time.value
+                  + " ("
+                  + val.time.quality
+                  + ")");
+        });
   }
 
   @Override
@@ -62,10 +70,21 @@ class TestReadHandler implements ReadHandler {
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
 
-    it.forEach(val -> {
-      System.out.println("DBBI " + val.index + ": Value=" + val.value + " Flags=" + val.flags.value
-          + " Time=" + val.time.value + " (" + val.time.quality + ")");
-    });
+    it.forEach(
+        val -> {
+          System.out.println(
+              "DBBI "
+                  + val.index
+                  + ": Value="
+                  + val.value
+                  + " Flags="
+                  + val.flags.value
+                  + " Time="
+                  + val.time.value
+                  + " ("
+                  + val.time.quality
+                  + ")");
+        });
   }
 
   @Override
@@ -74,10 +93,21 @@ class TestReadHandler implements ReadHandler {
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
 
-    it.forEach(val -> {
-      System.out.println("BOS " + val.index + ": Value=" + val.value + " Flags=" + val.flags.value
-          + " Time=" + val.time.value + " (" + val.time.quality + ")");
-    });
+    it.forEach(
+        val -> {
+          System.out.println(
+              "BOS "
+                  + val.index
+                  + ": Value="
+                  + val.value
+                  + " Flags="
+                  + val.flags.value
+                  + " Time="
+                  + val.time.value
+                  + " ("
+                  + val.time.quality
+                  + ")");
+        });
   }
 
   @Override
@@ -86,10 +116,21 @@ class TestReadHandler implements ReadHandler {
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
 
-    it.forEach(val -> {
-      System.out.println("Counter " + val.index + ": Value=" + val.value + " Flags="
-          + val.flags.value + " Time=" + val.time.value + " (" + val.time.quality + ")");
-    });
+    it.forEach(
+        val -> {
+          System.out.println(
+              "Counter "
+                  + val.index
+                  + ": Value="
+                  + val.value
+                  + " Flags="
+                  + val.flags.value
+                  + " Time="
+                  + val.time.value
+                  + " ("
+                  + val.time.quality
+                  + ")");
+        });
   }
 
   @Override
@@ -98,10 +139,21 @@ class TestReadHandler implements ReadHandler {
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
 
-    it.forEach(val -> {
-      System.out.println("Frozen Counter " + val.index + ": Value=" + val.value + " Flags="
-          + val.flags.value + " Time=" + val.time.value + " (" + val.time.quality + ")");
-    });
+    it.forEach(
+        val -> {
+          System.out.println(
+              "Frozen Counter "
+                  + val.index
+                  + ": Value="
+                  + val.value
+                  + " Flags="
+                  + val.flags.value
+                  + " Time="
+                  + val.time.value
+                  + " ("
+                  + val.time.quality
+                  + ")");
+        });
   }
 
   @Override
@@ -110,10 +162,21 @@ class TestReadHandler implements ReadHandler {
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
 
-    it.forEach(val -> {
-      System.out.println("AI " + val.index + ": Value=" + val.value + " Flags=" + val.flags.value
-          + " Time=" + val.time.value + " (" + val.time.quality + ")");
-    });
+    it.forEach(
+        val -> {
+          System.out.println(
+              "AI "
+                  + val.index
+                  + ": Value="
+                  + val.value
+                  + " Flags="
+                  + val.flags.value
+                  + " Time="
+                  + val.time.value
+                  + " ("
+                  + val.time.quality
+                  + ")");
+        });
   }
 
   @Override
@@ -122,10 +185,21 @@ class TestReadHandler implements ReadHandler {
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
 
-    it.forEach(val -> {
-      System.out.println("AOS " + val.index + ": Value=" + val.value + " Flags=" + val.flags.value
-          + " Time=" + val.time.value + " (" + val.time.quality + ")");
-    });
+    it.forEach(
+        val -> {
+          System.out.println(
+              "AOS "
+                  + val.index
+                  + ": Value="
+                  + val.value
+                  + " Flags="
+                  + val.flags.value
+                  + " Time="
+                  + val.time.value
+                  + " ("
+                  + val.time.quality
+                  + ")");
+        });
   }
 
   @Override
@@ -134,14 +208,15 @@ class TestReadHandler implements ReadHandler {
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
 
-    it.forEach(val -> {
-      System.out.print("Octet String " + val.index + ": Value=");
-      val.value.forEach(b -> System.out.print(String.format("%02X", b.value.byteValue()) + " "));
-      System.out.println();
-    });
+    it.forEach(
+        val -> {
+          System.out.print("Octet String " + val.index + ": Value=");
+          val.value.forEach(
+              b -> System.out.print(String.format("%02X", b.value.byteValue()) + " "));
+          System.out.println();
+        });
   }
 }
-
 
 class TestTimeProvider implements TimeProvider {
   @Override
@@ -149,7 +224,6 @@ class TestTimeProvider implements TimeProvider {
     return TimeProviderTimestamp.valid(ulong(System.currentTimeMillis()));
   }
 }
-
 
 public class MasterExample {
 
@@ -177,22 +251,31 @@ public class MasterExample {
     MasterConfig masterConfig = new MasterConfig(ushort(1));
     masterConfig.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
 
-    Master master = Master.createTcpSession(runtime, LinkErrorMode.CLOSE, masterConfig,
-        new EndpointList("127.0.0.1:20000"), new RetryStrategy(), Duration.ofSeconds(1),
-        new TestListener());
+    Master master =
+        Master.createTcpSession(
+            runtime,
+            LinkErrorMode.CLOSE,
+            masterConfig,
+            new EndpointList("127.0.0.1:20000"),
+            new RetryStrategy(),
+            Duration.ofSeconds(1),
+            new TestListener());
 
     // Create the association
-    AssociationConfig associationConfig = new AssociationConfig(EventClasses.all(),
-        EventClasses.all(), Classes.all(), EventClasses.none());
+    AssociationConfig associationConfig =
+        new AssociationConfig(
+            EventClasses.all(), EventClasses.all(), Classes.all(), EventClasses.none());
     associationConfig.autoTimeSync = AutoTimeSync.LAN;
     associationConfig.keepAliveTimeout = Duration.ofSeconds(60);
 
-    AssociationId association = master.addAssociation(ushort(1024), associationConfig,
-        new TestReadHandler(), new TestTimeProvider());
+    AssociationId association =
+        master.addAssociation(
+            ushort(1024), associationConfig, new TestReadHandler(), new TestTimeProvider());
 
     // Create a periodic poll
-    PollId poll = master.addPoll(association, Request.classRequest(false, true, true, true),
-        Duration.ofSeconds(5));
+    PollId poll =
+        master.addPoll(
+            association, Request.classRequest(false, true, true, true), Duration.ofSeconds(5));
 
     // start communications
     master.enable();
@@ -218,63 +301,81 @@ public class MasterExample {
           level.application = AppDecodeLevel.OBJECT_VALUES;
           master.setDecodeLevel(level);
           break;
-        case "rao": {
-          Request request = new Request();
-          request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-          ReadResult result = master.read(association, request).toCompletableFuture().get();
-          System.out.println("Result: " + result);
-          break;
-        }
-        case "rmo": {
-          Request request = new Request();
-          request.addAllObjectsHeader(Variation.GROUP10_VAR0);
-          request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-          ReadResult result = master.read(association, request).toCompletableFuture().get();
-          System.out.println("Result: " + result);
-          break;
-        }
-        case "cmd": {
-          Commands commands = new Commands();
-          G12v1 g12v1 = new G12v1(new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
-              ubyte(1), uint(1000), uint(1000));
-          commands.addG12v1u16(ushort(3), g12v1);
-          CommandResult result =
-              master.operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
-                  .toCompletableFuture().get();
-          System.out.println("Result: " + result);
-          break;
-        }
+        case "rao":
+          {
+            Request request = new Request();
+            request.addAllObjectsHeader(Variation.GROUP40_VAR0);
+            ReadResult result = master.read(association, request).toCompletableFuture().get();
+            System.out.println("Result: " + result);
+            break;
+          }
+        case "rmo":
+          {
+            Request request = new Request();
+            request.addAllObjectsHeader(Variation.GROUP10_VAR0);
+            request.addAllObjectsHeader(Variation.GROUP40_VAR0);
+            ReadResult result = master.read(association, request).toCompletableFuture().get();
+            System.out.println("Result: " + result);
+            break;
+          }
+        case "cmd":
+          {
+            Commands commands = new Commands();
+            G12v1 g12v1 =
+                new G12v1(
+                    new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
+                    ubyte(1),
+                    uint(1000),
+                    uint(1000));
+            commands.addG12v1u16(ushort(3), g12v1);
+            CommandResult result =
+                master
+                    .operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
+                    .toCompletableFuture()
+                    .get();
+            System.out.println("Result: " + result);
+            break;
+          }
         case "evt":
           master.demandPoll(poll);
           break;
 
-        case "lts": {
-          TimeSyncResult result =
-              master.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
-          System.out.println("Result: " + result);
-          break;
-        }
-        case "nts": {
-          TimeSyncResult result =
-              master.synchronizeTime(association, TimeSyncMode.NON_LAN).toCompletableFuture().get();
-          System.out.println("Result: " + result);
-          break;
-        }
-        case "crt": {
-          RestartResult result = master.coldRestart(association).toCompletableFuture().get();
-          System.out.println("Result: " + result);
-          break;
-        }
-        case "wrt": {
-          RestartResult result = master.warmRestart(association).toCompletableFuture().get();
-          System.out.println("Result: " + result);
-          break;
-        }
-        case "lsr": {
-          LinkStatusResult result = master.checkLinkStatus(association).toCompletableFuture().get();
-          System.out.println("Result: " + result);
-          break;
-        }
+        case "lts":
+          {
+            TimeSyncResult result =
+                master.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
+            System.out.println("Result: " + result);
+            break;
+          }
+        case "nts":
+          {
+            TimeSyncResult result =
+                master
+                    .synchronizeTime(association, TimeSyncMode.NON_LAN)
+                    .toCompletableFuture()
+                    .get();
+            System.out.println("Result: " + result);
+            break;
+          }
+        case "crt":
+          {
+            RestartResult result = master.coldRestart(association).toCompletableFuture().get();
+            System.out.println("Result: " + result);
+            break;
+          }
+        case "wrt":
+          {
+            RestartResult result = master.warmRestart(association).toCompletableFuture().get();
+            System.out.println("Result: " + result);
+            break;
+          }
+        case "lsr":
+          {
+            LinkStatusResult result =
+                master.checkLinkStatus(association).toCompletableFuture().get();
+            System.out.println("Result: " + result);
+            break;
+          }
         default:
           System.out.println("Unknown command");
           break;

@@ -1,0 +1,54 @@
+---
+id: dependencies
+title: Open Source Dependencies
+sidebar_label: Dependency Licenses
+slug: /dependencies
+---
+
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
+Rust has an excellent package manager called `cargo` that makes it easy to work with external dependencies. The downside to this capable tooling is that
+Rust's open-source ecosystem tends to factor libraries quite finely, and the number of dependencies can grow quickly.
+
+While this library only directly depends on a handful of 3rd party libraries, those libraries pull in dozens of sub-dependencies. Ensuring that all direct and
+indirect dependencies are properly and legally used is important to us and our customers.
+
+## Automated License Checking
+
+To ensure that our binary distributions meet the legal requirements of 3rd party open source licenses, we have developed an automated tool called
+`complicense` that performs the following tasks:
+
+* Analyzes each dependency's license against an allowed list of licenses. Our CI packaging will fail if a dependency is added that is not allowed.
+* Uses the Github API to automatically retrieve the license file for each project hosted on Github. Only a few projects don't have the proper metadata and the
+license name and content are specified manually in the `complicense` configuration.
+* Ignores projects that are 100% the copyright of Step Function I/O (e.g. the DNP3 library itself).
+* Produces a license report document called `licenses.txt` that rolls up all of the dependency and license information. This document is then included
+in all of our binary distributions for transparency and to meet the license requirements.
+
+## Proprietary Compatible
+
+All of library's dependencies use licenses that are compatible with commercial/proprietary products. We don't allow the incorporation of strong copyleft licenses
+such as the GPL. All of the licenses in use are also compatible with each-other. You can see all of the allowed licenses in
+[ffi/license_config.json](https://github.com/stepfunc/dnp3/blob/master/ffi/license_config.json).
+
+## Licenses.txt
+
+`Complicense` produces a verbose report called [licenses.txt](https://github.com/stepfunc/dnp3/blob/master/ffi/licenses.txt) that aggregates the following
+information for each dependency:
+
+* Unique name of the library (Rust crate)
+* Repository URL at which the library is hosted
+* Authors of the library as specified on [crates.io](https://crates.io/).
+* Description of the library
+* Name of the license(s) that apply to the crate
+* Full license text including any copyright notices present
+
+Some libraries choose to dual license under multiple licenses and give users the choice of which license to use. In this case the report only includes the text
+of one of these licenses returned by the Github API.
+
+## Disclaimer
+
+This information and the provided `licenses.txt` do not constitute legal advice.  It is meant to be a starting point for library users to perform their own due
+diligence and to demonstrate that open source license compliance is taken seriously.
+
+

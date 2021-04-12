@@ -120,7 +120,7 @@ impl Pair {
     const LOCALHOST: std::net::IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
 
     fn update_values(&mut self) {
-        self.outstation.database.transaction(|db| {
+        self.outstation.transaction(|db| {
             for x in self.values.once() {
                 x.apply(db)
             }
@@ -164,7 +164,7 @@ impl Pair {
         tokio::spawn(task);
 
         // set up the database
-        outstation.database.transaction(|db| {
+        outstation.transaction(|db| {
             for i in 0..=config.max_index {
                 db.add(
                     i,

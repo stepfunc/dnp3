@@ -23,6 +23,16 @@ fn get_outstation_config() -> OutstationConfig {
     config
 }
 
+// ANCHOR: event_buffer_config
+fn get_event_buffer_config() -> EventBufferConfig {
+    // initialize the config to zero for every type
+    let mut config = EventBufferConfig::no_events();
+    // event buffer space for 100 analog events
+    config.max_analog = 100;
+    config
+}
+// ANCHOR_END: event_buffer_config
+
 /// example of using the outstation API asynchronously from within the Tokio runtime
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -31,24 +41,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(false)
         .init();
 
+    // ANCHOR: create_tcp_server
     let mut server = TcpServer::new(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
+    // ANCHOR_END: create_tcp_server
 
-    let handle = server.spawn_outstation(
+    // ANCHOR: tcp_server_spawn_outstation
+    let outstation = server.spawn_outstation(
         get_outstation_config(),
-        // event buffer space for 100 analog events
-        EventBufferConfig::new(0, 0, 0, 0, 0, 100, 0, 0),
-        // customizable trait that controls outstation behavior
+        get_event_buffer_config(),
         DefaultOutstationApplication::create(),
-        // customizable trait to receive events about what the outstation is doing
         DefaultOutstationInformation::create(),
-        // customizable trait to process control requests from the master
         DefaultControlHandler::with_status(CommandStatus::NotSupported),
         // filter that controls what IP address(es) may connect to this outstation instance
         AddressFilter::Any,
     )?;
+    // ANCHOR_END: tcp_server_spawn_outstation
 
     // setup the outstation's database before we spawn it
-    handle.database.transaction(|db| {
+    // ANCHOR: database_init
+    outstation.transaction(|db| {
         for i in 0..10 {
             db.add(i, Some(EventClass::Class1), AnalogConfig::default());
             db.update(
@@ -58,15 +69,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     });
+    // ANCHOR_END: database_init
 
-    // dropping the ServerHandle shuts down the server AND the outstation
+    // ANCHOR: server_bind
+    // dropping the ServerHandle shuts down the server and outstation(s)
     let _server_handle = server.bind_and_spawn().await?;
+    // ANCHOR_END: server_bind
 
     let mut value = 0.0;
 
     loop {
         tokio::time::sleep(Duration::from_secs(5)).await;
-        handle.database.transaction(|db| {
+        outstation.transaction(|db| {
             db.update(
                 7,
                 &Analog::new(value, Flags::new(0x01), Time::synchronized(1)),

@@ -711,88 +711,165 @@ fn define_control_handler(
         .doc("Enumeration describing how the master requested the control operation")?
         .build()?;
 
+    let select_details_1 = "Implementors can think of this function as asking the question \"is this control supported\"?";
+    let select_details_2 = "Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal.";
+    let select_g12_doc = doc("Select a CROB, but do not operate")
+        .details(select_details_1)
+        .details(select_details_2);
+    let select_g40_doc = doc("Select an analog output, but do not operate")
+        .details(select_details_1)
+        .details(select_details_2);
+
     lib.define_interface("ControlHandler", "Callbacks for handling controls")?
         .callback("begin_fragment", "Notifies the start of a command fragment")?
-            .return_type(ReturnType::void())?
-            .build()?
+        .return_type(ReturnType::void())?
+        .build()?
         .callback("end_fragment", "Notifies the end of a command fragment")?
-            .return_type(ReturnType::void())?
-            .build()?
-        .callback("select_g12v1", doc("Select a CROB, but do not operate")
-            .details("Implementors can think of this function ask the question \"is this control supported\"?")
-            .details("Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal."))?
-            .param("control", Type::Struct(shared_def.g12v1_struct.clone()), "Received CROB")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .return_type(ReturnType::void())?
+        .build()?
+        .callback("select_g12v1", select_g12_doc)?
+        .param(
+            "control",
+            Type::Struct(shared_def.g12v1_struct.clone()),
+            "Received CROB",
+        )?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("operate_g12v1", "Operate a control point")?
-            .param("control", Type::Struct(shared_def.g12v1_struct.clone()), "Received CROB")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
-        .callback("select_g41v1", doc("Select an analog output, but do not operate")
-            .details("Implementors can think of this function ask the question \"is this control supported\"?")
-            .details("Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal."))?
-            .param("control", Type::Sint32, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param(
+            "control",
+            Type::Struct(shared_def.g12v1_struct.clone()),
+            "Received CROB",
+        )?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
+        .callback("select_g41v1", select_g40_doc.clone())?
+        .param("control", Type::Sint32, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("operate_g41v1", "Operate a control point")?
-            .param("control", Type::Sint32, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
-        .callback("select_g41v2", doc("Select an analog output, but do not operate")
-            .details("Implementors can think of this function ask the question \"is this control supported\"?")
-            .details("Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal."))?
-            .param("value", Type::Sint16, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param("control", Type::Sint32, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
+        .callback("select_g41v2", select_g40_doc.clone())?
+        .param("value", Type::Sint16, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("operate_g41v2", "Operate a control point")?
-            .param("value", Type::Sint16, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
-        .callback("select_g41v3", doc("Select an analog output, but do not operate")
-            .details("Implementors can think of this function ask the question \"is this control supported\"?")
-            .details("Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal."))?
-            .param("value", Type::Float, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param("value", Type::Sint16, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
+        .callback("select_g41v3", select_g40_doc.clone())?
+        .param("value", Type::Float, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("operate_g41v3", "Operate a control point")?
-            .param("value", Type::Float, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
-        .callback("select_g41v4", doc("Select an analog output, but do not operate")
-            .details("Implementors can think of this function ask the question \"is this control supported\"?")
-            .details("Most implementations should not alter the database in this method. It is only provided in the event that some event counters reflected via the API get updated on SELECT, but this would be highly abnormal."))?
-            .param("value", Type::Double, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status.clone()), "Command status"))?
-            .build()?
+        .param("value", Type::Float, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
+        .callback("select_g41v4", select_g40_doc)?
+        .param("value", Type::Double, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status.clone()),
+            "Command status",
+        ))?
+        .build()?
         .callback("operate_g41v4", "Operate a control point")?
-            .param("value", Type::Double, "Received analog output value")?
-            .param("index", Type::Uint16, "Index of the point")?
-            .param("op_type", Type::Enum(operate_type), "Operate type")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(command_status), "Command status"))?
-            .build()?
+        .param("value", Type::Double, "Received analog output value")?
+        .param("index", Type::Uint16, "Index of the point")?
+        .param("op_type", Type::Enum(operate_type), "Operate type")?
+        .param(
+            "database",
+            Type::ClassRef(database.declaration()),
+            "Database",
+        )?
+        .return_type(ReturnType::new(
+            Type::Enum(command_status),
+            "Command status",
+        ))?
+        .build()?
         .destroy_callback("on_destroy")?
         .build()
 }

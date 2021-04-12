@@ -1,0 +1,50 @@
+---
+id: c_sharp
+title: C# Bindings
+sidebar_label: C#
+slug: /c_sharp
+---
+
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
+The C# bindings are distributed as as a multi-platform [Nuget package](https:://TODO).  The C# FFI uses [P/Invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke)
+to call the same native library functions used by the C library. The main assembly only requires .NET standard 2.0. The package includes platform-specific
+shared libraries for 64-bit Windows and Linux that are automatically loaded by the .NET runtime.
+
+## Mapping
+
+C# is an object-oriented language and has support for all of the abstract patterns modeled in the code generator. This section describes those mappings.
+
+### Errors
+
+C API errors are transformed into exceptions containing the error enum.
+
+:::warning
+Uncaught exceptions thrown in callbacks will cause the program to terminate. User code should always wrap callback logic with `try/catch` syntax if there
+is a possibility the callback will throw.
+:::
+
+### Iterators
+
+Iterators are transformed into `ICollection<T>` by the code generator. This means that the collections returned by callbacks may be
+used outside the callback, e.g. sent to another thread for processing.
+
+### Structs
+
+Native structs are mapped to C# classes. They have public member visibility and the constructor ensures that all values are initialized properly.
+
+### Classes
+
+Abstract classes are mapped to C# classes. They have a private pointer to the underlying native resource. There are two types of generated classes in C#: ones that
+implement `IDisposable` and those that only have a private finalizer.
+
+The types that implement `IDisposable` represent long-lived resources like a `Runtime`, `Master`, or `TCPServer`.  They may be manually shut down using a public
+`Dispose` method or used in conjunction with the language's [using statement](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/using-statement).
+This allows the user to precisely control when the resource/task will be shut down.
+
+Types that do not implement `IDisposable` may only be automatically garbage collected. Native resources are deallocated in the class's finalizer. These types of
+classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`.
+
+### Asynchronous Methods
+
+Abstract asynchronous methods are transformed into methods that return `Task<T>`. Users may then block on the task or `await` it in an async method.

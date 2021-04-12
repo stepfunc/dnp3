@@ -159,7 +159,7 @@ pub unsafe fn outstation_transaction(
     callback: ffi::OutstationTransaction,
 ) {
     if let Some(outstation) = outstation.as_mut() {
-        outstation.handle.database.transaction(|database| {
+        outstation.handle.transaction(|database| {
             callback.execute(database as *mut _);
         });
     }
