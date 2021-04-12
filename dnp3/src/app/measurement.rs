@@ -18,7 +18,7 @@ pub enum DoubleBit {
     Indeterminate,
 }
 
-/// A DNP3 time value that may be Invalid, Synchronized, or NotSynchronized
+/// A DNP3 time value that may be Synchronized or NotSynchronized
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Time {
     /// The timestamp is UTC synchronized at the remote device
@@ -28,14 +28,17 @@ pub enum Time {
 }
 
 impl Time {
+    /// test if the `Time` is synchronized
     pub fn is_synchronized(&self) -> bool {
         std::matches!(self, Self::Synchronized(_))
     }
 
+    /// created a synchronized `Time` from a u64
     pub fn synchronized(ts: u64) -> Time {
         Self::Synchronized(Timestamp::new(ts))
     }
 
+    /// created a unsynchronized `Time` from a u64
     pub fn not_synchronized(ts: u64) -> Time {
         Self::NotSynchronized(Timestamp::new(ts))
     }
@@ -115,6 +118,7 @@ impl Time {
         }
     }
 
+    /// extract a `Timestamp` from a `Time` discarding synchronization information
     pub fn timestamp(&self) -> Timestamp {
         match self {
             Time::Synchronized(ts) => *ts,
@@ -135,18 +139,12 @@ pub struct Binary {
 }
 
 impl Binary {
+    /// construct a `Binary` from its fields
     pub fn new(value: bool, flags: Flags, time: Time) -> Self {
         Self {
             value,
             flags,
             time: Some(time),
-        }
-    }
-
-    pub fn normalize(self) -> Self {
-        Self {
-            flags: Flags::new(self.get_wire_flags()),
-            ..self
         }
     }
 }
@@ -163,6 +161,7 @@ pub struct DoubleBitBinary {
 }
 
 impl DoubleBitBinary {
+    /// construct a `DoubleBitBinary` from its fields
     pub fn new(value: DoubleBit, flags: Flags, time: Time) -> Self {
         Self {
             value,
@@ -184,6 +183,7 @@ pub struct BinaryOutputStatus {
 }
 
 impl BinaryOutputStatus {
+    /// construct a `BinaryOutputStatus` from its fields
     pub fn new(value: bool, flags: Flags, time: Time) -> Self {
         Self {
             value,
@@ -205,6 +205,7 @@ pub struct Counter {
 }
 
 impl Counter {
+    /// construct a `Counter` from its fields
     pub fn new(value: u32, flags: Flags, time: Time) -> Self {
         Self {
             value,
@@ -226,6 +227,7 @@ pub struct FrozenCounter {
 }
 
 impl FrozenCounter {
+    /// construct a `FrozenCounter` from its fields
     pub fn new(value: u32, flags: Flags, time: Time) -> Self {
         Self {
             value,
@@ -247,6 +249,7 @@ pub struct Analog {
 }
 
 impl Analog {
+    /// construct an `Analog` from its fields
     pub fn new(value: f64, flags: Flags, time: Time) -> Self {
         Self {
             value,
@@ -548,6 +551,7 @@ pub struct AnalogOutputStatus {
 }
 
 impl AnalogOutputStatus {
+    /// construct an `AnalogOutputStatus` from its fields
     pub fn new(value: f64, flags: Flags, time: Time) -> Self {
         Self {
             value,

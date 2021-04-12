@@ -11,51 +11,75 @@ use crate::app::variations::*;
 use crate::master::error::CommandResponseError;
 use crate::util::cursor::WriteError;
 
+/// Controls how a command request is issued
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommandMode {
+    /// Master will use the `DIRECT_OPERATE` function code in a single request/response
     DirectOperate,
+    /// Master will use the `SELECT` function code followed by `OPERATE` in two pass request/response
     SelectBeforeOperate,
 }
 
+/// Controls which time synchronization procedure is used
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TimeSyncProcedure {
+    /// Master will use the LAN procedure: RECORD_CURRENT_TIME followed by WRITE g50v3
     Lan,
+    /// Master will use the non-LAN procedure: DELAY_MEASUREMENT followed by WRITE g50v1
     NonLan,
 }
 
+/// struct recording which event classes are enabled
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct EventClasses {
+    /// enable Class 1
     pub class1: bool,
+    /// enable Class 2
     pub class2: bool,
+    /// enable Class 3
     pub class3: bool,
 }
 
+/// struct recording which event classes and class 0 are enabled
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Classes {
+    /// enable class zero
     pub class0: bool,
+    /// enabled event classes
     pub events: EventClasses,
 }
 
+/// struct representing a one-byte range scan
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OneByteRangeScan {
+    /// variation to READ
     pub variation: Variation,
+    /// start address of the READ
     pub start: u8,
+    /// stop address of the READ
     pub stop: u8,
 }
 
+/// struct representing a two-byte range scan
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct TwoByteRangeScan {
+    /// variation to READ
     pub variation: Variation,
+    /// start address of the READ
     pub start: u16,
+    /// stop address of the READ
     pub stop: u16,
 }
 
+/// struct representing an "all objects" (QC = 0x06) scan
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct AllObjectsScan {
+    /// variation to READ
     pub variation: Variation,
 }
 
 impl EventClasses {
+    /// construct an `EventClasses` from its fields
     pub fn new(class1: bool, class2: bool, class3: bool) -> Self {
         Self {
             class1,
@@ -64,14 +88,17 @@ impl EventClasses {
         }
     }
 
+    /// construct an `EventClasses` from its fields
     pub fn to_classes(self) -> Classes {
         Classes::new(false, self)
     }
 
+    /// test if any of the event classes are enabled
     pub fn any(self) -> bool {
         self.class1 || self.class2 || self.class3
     }
 
+    /// construct an `EventClasses` with all three classes enabled
     pub fn all() -> Self {
         Self {
             class1: true,
@@ -80,6 +107,7 @@ impl EventClasses {
         }
     }
 
+    /// construct an `EventClasses` with all three classes disabled
     pub fn none() -> Self {
         Self {
             class1: false,
@@ -115,27 +143,28 @@ impl BitAnd for EventClasses {
 }
 
 impl Classes {
+    /// construct a `Classes` from its fields
     pub fn new(class0: bool, events: EventClasses) -> Self {
         Self { class0, events }
     }
 
+    /// convert a `Classes` struct into a [ReadRequest](crate::master::ReadRequest)
     pub fn to_request(self) -> ReadRequest {
         ReadRequest::class_scan(self)
     }
 
-    pub fn events(events: EventClasses) -> Self {
-        Self::new(false, events)
-    }
-
+    /// construct a `Classes` with everything enabled
     pub fn integrity() -> Self {
         Self::new(true, EventClasses::all())
     }
 
+    /// construct a `Classes` with nothing enabled
     pub fn none() -> Self {
         Self::new(false, EventClasses::none())
     }
 
-    pub fn any(&self) -> bool {
+    /// test if any classes (0/1/2/3) are enabled
+    pub(crate) fn any(&self) -> bool {
         self.class0 || self.events.any()
     }
 
@@ -149,6 +178,7 @@ impl Classes {
 }
 
 impl OneByteRangeScan {
+    /// construct a `OneByteRangeScan` from its fields
     pub fn new(variation: Variation, start: u8, stop: u8) -> Self {
         Self {
             variation,
@@ -163,6 +193,7 @@ impl OneByteRangeScan {
 }
 
 impl TwoByteRangeScan {
+    /// construct a `TwoByteRangeScan` from its fields
     pub fn new(variation: Variation, start: u16, stop: u16) -> Self {
         Self {
             variation,
@@ -177,6 +208,7 @@ impl TwoByteRangeScan {
 }
 
 impl AllObjectsScan {
+    /// construct an `AllObjectsScan` from the variation
     pub fn new(variation: Variation) -> Self {
         Self { variation }
     }
@@ -186,22 +218,29 @@ impl AllObjectsScan {
     }
 }
 
+/// Enum representing all of the allowed scan types
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ReadHeader {
+    /// variant for one byte range scans
     Range8(OneByteRangeScan),
+    /// variant for two byte range scans
     Range16(TwoByteRangeScan),
+    /// variant for all objects scans
     AllObjects(AllObjectsScan),
 }
 
 impl ReadHeader {
+    /// construct a one byte range `ReadHeader`
     pub fn one_byte_range(variation: Variation, start: u8, stop: u8) -> Self {
         ReadHeader::Range8(OneByteRangeScan::new(variation, start, stop))
     }
 
+    /// construct a two range `ReadHeader`
     pub fn two_byte_range(variation: Variation, start: u16, stop: u16) -> Self {
         ReadHeader::Range16(TwoByteRangeScan::new(variation, start, stop))
     }
 
+    /// construct an all objects `ReadHeader`
     pub fn all_objects(variation: Variation) -> Self {
         ReadHeader::AllObjects(AllObjectsScan::new(variation))
     }
@@ -215,30 +254,39 @@ impl ReadHeader {
     }
 }
 
+/// Enum representing all of the READ request types available from the master API
 #[derive(Clone, Debug)]
 pub enum ReadRequest {
+    /// Read a single header
     SingleHeader(ReadHeader),
+    /// Read class data
     ClassScan(Classes),
+    /// Read multiple headers
     MultipleHeader(Vec<ReadHeader>),
 }
 
 impl ReadRequest {
+    /// construct a `ReadRequest` from a `Classes` instance
     pub fn class_scan(scan: Classes) -> Self {
         Self::ClassScan(scan)
     }
 
+    /// construct a `ReadRequest` consisting of a single one-byte range
     pub fn one_byte_range(variation: Variation, start: u8, stop: u8) -> Self {
         Self::SingleHeader(ReadHeader::one_byte_range(variation, start, stop))
     }
 
+    /// construct a `ReadRequest` consisting of a single two-byte range
     pub fn two_byte_range(variation: Variation, start: u16, stop: u16) -> Self {
         Self::SingleHeader(ReadHeader::two_byte_range(variation, start, stop))
     }
 
+    /// construct an all objects `ReadRequest` for a particular variation
     pub fn all_objects(variation: Variation) -> Self {
         Self::SingleHeader(ReadHeader::all_objects(variation))
     }
 
+    /// construct a `ReadRequest` consisting of multiple headers
     pub fn multiple_headers(headers: &[ReadHeader]) -> Self {
         Self::MultipleHeader(headers.to_vec())
     }
@@ -342,6 +390,7 @@ impl Command for Group41Var4 {
     }
 }
 
+/// Collection of command headers sent from the master API
 pub struct CommandHeaders {
     headers: Vec<CommandHeader>,
 }
@@ -379,20 +428,27 @@ impl CommandHeaders {
     }
 }
 
+/// Builder object used to create a [CommandHeaders](crate::master::CommandHeaders)
 #[derive(Clone)]
 pub struct CommandBuilder {
     headers: Vec<CommandHeader>,
     partial: Option<CommandHeader>,
 }
 
+/// Trait that provides builder support for a particular command type
 pub trait CommandSupport<T> {
+    /// add a command using one byte addressing
     fn add_u8(&mut self, command: T, index: u8);
+    /// add a command using two byte addressing
     fn add_u16(&mut self, command: T, index: u16);
+    /// construct a `CommandHeaders` instance consisting of single command with one byte addressing
     fn single_header_u8(command: T, index: u8) -> CommandHeaders;
+    /// construct a `CommandHeaders` instance consisting of single command with two byte addressing
     fn single_header_u16(command: T, index: u16) -> CommandHeaders;
 }
 
 impl CommandBuilder {
+    /// construct a new `CommandBuilder` instance
     pub fn new() -> Self {
         Self {
             headers: Vec::new(),
@@ -400,8 +456,9 @@ impl CommandBuilder {
         }
     }
 
-    /// manually complete any partially built header
-    /// this allows you to build multiple headers of the same type if desired,
+    /// Manually complete any partially built header.
+    ///
+    /// This allows for building multiple headers of the same type,
     /// e.g. two g12v1 values in two separate headers
     pub fn finish_header(&mut self) {
         if let Some(header) = self.partial.take() {
@@ -549,6 +606,7 @@ impl CommandBuilder {
         }
     }
 
+    /// Consume the instance and return a fully built `CommandHeaders`
     pub fn build(mut self) -> CommandHeaders {
         self.finish_header();
         CommandHeaders {

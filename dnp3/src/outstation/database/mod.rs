@@ -61,6 +61,7 @@ pub struct ClassZeroConfig {
 }
 
 impl ClassZeroConfig {
+    /// construct a `ClassZeroConfig` from its fields
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         binary: bool,

@@ -18,12 +18,13 @@ use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
 use crate::util::channel::Sender;
 
+/// Handle used to control a master
 #[derive(Debug, Clone)]
 pub struct MasterHandle {
     sender: Sender<Message>,
 }
 
-/// Handle used to make requests against
+/// Handle used to make requests against a particular outstation associated with the master
 #[derive(Clone, Debug)]
 pub struct AssociationHandle {
     address: EndpointAddress,
@@ -153,6 +154,7 @@ impl MasterHandle {
 }
 
 impl AssociationHandle {
+    /// constructor only used in the FFI
     #[cfg(feature = "ffi")]
     pub fn create(address: EndpointAddress, master: MasterHandle) -> Self {
         Self::new(address, master)
@@ -162,6 +164,7 @@ impl AssociationHandle {
         Self { address, master }
     }
 
+    /// retrieve the outstation address of the association
     pub fn address(&self) -> EndpointAddress {
         self.address
     }
@@ -185,6 +188,7 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Remove the association from the master
     pub async fn remove(mut self) -> Result<(), Shutdown> {
         self.master
             .send_master_message(MasterMsg::RemoveAssociation(self.address))
@@ -192,6 +196,9 @@ impl AssociationHandle {
         Ok(())
     }
 
+    /// Perform an asynchronous READ request
+    ///
+    /// If successful, the [ReadHandler](crate::master::ReadHandler) will process the received measurement data
     pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         let task = SingleReadTask::new(request, Promise::OneShot(tx));
@@ -199,6 +206,9 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Perform an asynchronous operate request
+    ///
+    /// The actual function code used depends on the value of the [CommandMode](crate::master::CommandMode).
     pub async fn operate(
         &mut self,
         mode: CommandMode,
@@ -210,6 +220,9 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Perform a WARM_RESTART operation
+    ///
+    /// Returns the delay from the outstation's response as a [Duration](std::time::Duration)
     pub async fn warm_restart(&mut self) -> Result<Duration, TaskError> {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
         let task = RestartTask::new(RestartType::WarmRestart, Promise::OneShot(tx));
@@ -217,6 +230,9 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Perform a COLD_RESTART operation
+    ///
+    /// Returns the delay from the outstation's response as a [Duration](std::time::Duration)
     pub async fn cold_restart(&mut self) -> Result<Duration, TaskError> {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
         let task = RestartTask::new(RestartType::ColdRestart, Promise::OneShot(tx));
@@ -224,6 +240,7 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Perform the specified time synchronization operation
     pub async fn synchronize_time(
         &mut self,
         procedure: TimeSyncProcedure,
@@ -234,6 +251,10 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Trigger the master to issue a REQUEST_LINK_STATUS function in advance of the link status timeout
+    ///
+    /// This function is provided for testing purposes. Using the configured link status timeout
+    /// is the preferred so that the master automatically issues these requests.
     pub async fn check_link_status(&mut self) -> Result<LinkStatusResult, TaskError> {
         let (tx, rx) =
             crate::tokio::sync::oneshot::channel::<Result<LinkStatusResult, TaskError>>();
@@ -344,33 +365,58 @@ pub enum ReadType {
     PeriodicPoll,
 }
 
+/// Trait used to process measurement data received from an outstation
 pub trait ReadHandler {
+    /// Called as the first action before any of the type-specific handle methods are invoked
+    ///
+    /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
+    /// `header` provides the full response header
     fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
+
+    /// Called as the last action after all of the type-specific handle methods have been invoked
+    ///
+    /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
+    /// `header` provides the full response header
     fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
 
+    /// Process an object header of `Binary` values
     fn handle_binary(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Binary, u16)>);
+
+    /// Process an object header of `DoubleBitBinary` values
     fn handle_double_bit_binary(
         &mut self,
         info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
     );
+
+    /// Process an object header of `BinaryOutputStatus` values
     fn handle_binary_output_status(
         &mut self,
         info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
     );
+
+    /// Process an object header of `Counter` values
     fn handle_counter(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Counter, u16)>);
+
+    /// Process an object header of `FrozenCounter` values
     fn handle_frozen_counter(
         &mut self,
         info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
     );
+
+    /// Process an object header of `Analog` values
     fn handle_analog(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Analog, u16)>);
+
+    /// Process an object header of `AnalogOutputStatus` values
     fn handle_analog_output_status(
         &mut self,
         info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
     );
+
+    /// Process an object header of octet string values
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,

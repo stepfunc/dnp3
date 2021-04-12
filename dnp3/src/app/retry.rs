@@ -12,6 +12,7 @@ pub struct ReconnectStrategy {
 }
 
 impl ReconnectStrategy {
+    /// construct a `ReconnectStrategy` from its fields
     pub fn new(retry_strategy: RetryStrategy, reconnect_delay: Option<Duration>) -> Self {
         Self {
             retry_strategy,
@@ -41,6 +42,10 @@ pub struct RetryStrategy {
 }
 
 impl RetryStrategy {
+    /// construct a `RetryStrategy`
+    ///
+    /// `min_delay` - the minimum amount of time for the retry
+    /// `max_delay` - the maximum amount of time for the retry
     pub fn new(min_delay: Duration, max_delay: Duration) -> Self {
         Self {
             min_delay,

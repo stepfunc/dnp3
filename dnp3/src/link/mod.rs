@@ -60,6 +60,7 @@ pub struct EndpointAddress {
 /// The specified address is special and may not be used as an EndpointAddress
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct SpecialAddressError {
+    /// reserved special address
     pub address: u16,
 }
 

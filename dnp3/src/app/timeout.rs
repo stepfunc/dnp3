@@ -17,17 +17,28 @@ pub enum RangeError {
 }
 
 impl Timeout {
+    /// minimum allowed timeout value as a duration
     pub const MIN: Duration = Duration::from_millis(1);
+    /// maximum allowed timeout value as a duration
     pub const MAX: Duration = Duration::from_secs(60 * 60); // one hour
 
+    /// try to construct a `Timeout` from a count of seconds
+    ///
+    /// returns a `RangeError` is < `Timeout::MIN` or > `Timeout::MAX`
     pub fn from_secs(x: u64) -> Result<Self, RangeError> {
         Self::from_duration(Duration::from_secs(x))
     }
 
+    /// try to construct a `Timeout` from a count of milliseconds
+    ///
+    /// returns a `RangeError` is < `Timeout::MIN` or > `Timeout::MAX`
     pub fn from_millis(x: u64) -> Result<Self, RangeError> {
         Self::from_duration(Duration::from_millis(x))
     }
 
+    /// try to construct a `Timeout` from a `Duration`
+    ///
+    /// returns a `RangeError` is < `Timeout::MIN` or > `Timeout::MAX`
     pub fn from_duration(value: Duration) -> Result<Self, RangeError> {
         if value < Self::MIN {
             return Err(RangeError::TooSmall(value));

@@ -28,6 +28,7 @@ mod traits;
 #[cfg(test)]
 mod tests;
 
+/// Handel used to control a running outstation task
 #[derive(Clone)]
 pub struct OutstationHandle {
     database: DatabaseHandle,
@@ -43,6 +44,7 @@ impl OutstationHandle {
         self.database.transaction(func)
     }
 
+    /// Set the decode level of the outstation
     pub async fn set_decode_level(&mut self, decode_level: DecodeLevel) -> Result<(), Shutdown> {
         self.sender
             .send(ConfigurationChange::SetDecodeLevel(decode_level).into())

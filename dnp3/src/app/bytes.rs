@@ -1,6 +1,7 @@
 /// Wrapper around an underlying u8 slice
 #[derive(Debug, PartialEq)]
 pub struct Bytes<'a> {
+    /// underlying slice
     pub value: &'a [u8],
 }
 

@@ -15,8 +15,9 @@ pub struct Timestamp {
 }
 
 impl Timestamp {
+    /// Maximum allowed DNP3 timestamp value (48-bits)
     pub const MAX_VALUE: u64 = 0x0000_FFFF_FFFF_FFFF;
-    pub const OUT_OF_RANGE: &'static str = "<out of range>";
+    pub(crate) const OUT_OF_RANGE: &'static str = "<out of range>";
 
     /// Create a timestamp from a count of milliseconds since epoch
     pub fn new(value: u64) -> Self {

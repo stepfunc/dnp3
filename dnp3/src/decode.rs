@@ -58,10 +58,12 @@ pub enum PhysDecodeLevel {
 }
 
 impl DecodeLevel {
+    /// construct a `DecodeLevel` with nothing enabled
     pub fn nothing() -> Self {
         Self::default()
     }
 
+    /// construct a `DecodeLevel` from its fields
     pub fn new(
         application: AppDecodeLevel,
         transport: TransportDecodeLevel,

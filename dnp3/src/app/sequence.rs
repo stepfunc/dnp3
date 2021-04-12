@@ -7,6 +7,7 @@ pub struct Sequence {
 impl Sequence {
     const MAX_VALUE: u8 = 0b0000_1111;
 
+    /// retrieve the underlying value of the sequence number
     pub fn value(&self) -> u8 {
         self.value
     }

@@ -1,7 +1,12 @@
+/// Address filter used to control which master address(es)
+/// may connect to an outstation
 #[derive(Clone, Debug, PartialEq)]
 pub enum AddressFilter {
+    /// allow any address
     Any,
+    /// allow a specific address
     Exact(std::net::IpAddr),
+    /// allow any of set of addresses
     AnyOf(std::collections::HashSet<std::net::IpAddr>),
 }
 

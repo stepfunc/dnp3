@@ -1,11 +1,17 @@
 pub use tokio_serial::{DataBits, FlowControl, Parity, StopBits};
 
+/// serial port settings
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct SerialSettings {
+    /// baud rate of the port
     pub baud_rate: u32,
+    /// number of data bits
     pub data_bits: DataBits,
+    /// types of flow control
     pub flow_control: FlowControl,
+    /// number of stop bits
     pub stop_bits: StopBits,
+    /// parity setting
     pub parity: Parity,
 }
 
