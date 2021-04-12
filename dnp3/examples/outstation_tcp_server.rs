@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // setup the outstation's database before we spawn it
     // ANCHOR: database_init
-    outstation.database.transaction(|db| {
+    outstation.transaction(|db| {
         for i in 0..10 {
             db.add(i, Some(EventClass::Class1), AnalogConfig::default());
             db.update(
@@ -80,7 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         tokio::time::sleep(Duration::from_secs(5)).await;
-        outstation.database.transaction(|db| {
+        outstation.transaction(|db| {
             db.update(
                 7,
                 &Analog::new(value, Flags::new(0x01), Time::synchronized(1)),

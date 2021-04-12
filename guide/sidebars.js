@@ -35,6 +35,7 @@ module.exports = {
                         'api/outstation/serial_outstation',
                     ],
                     Execution: [
+                        'api/outstation/outstation',
                         'api/outstation/database',
                     ]
                 }

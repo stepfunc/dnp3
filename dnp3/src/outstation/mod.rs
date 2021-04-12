@@ -3,7 +3,7 @@ pub use traits::*;
 
 use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
-use crate::outstation::database::DatabaseHandle;
+use crate::outstation::database::{Database, DatabaseHandle};
 use crate::outstation::task::{ConfigurationChange, OutstationMessage};
 use crate::util::channel::Sender;
 
@@ -30,11 +30,19 @@ mod tests;
 
 #[derive(Clone)]
 pub struct OutstationHandle {
-    pub database: DatabaseHandle,
+    database: DatabaseHandle,
     sender: Sender<OutstationMessage>,
 }
 
 impl OutstationHandle {
+    /// Perform a transaction on the underlying database using a closure
+    pub fn transaction<F, R>(&self, func: F) -> R
+    where
+        F: FnMut(&mut Database) -> R,
+    {
+        self.database.transaction(func)
+    }
+
     pub async fn set_decode_level(&mut self, decode_level: DecodeLevel) -> Result<(), Shutdown> {
         self.sender
             .send(ConfigurationChange::SetDecodeLevel(decode_level).into())
