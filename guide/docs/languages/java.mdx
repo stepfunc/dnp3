@@ -23,6 +23,34 @@ Release artifacts are published to Maven central. You can use them within your p
 </dependency>
 ```
 
+## Dependencies
+
+The Java bindings depend on two additional open source projects in addition to the Rust dependencies:
+
+* [joou-java-6](https://github.com/jOOQ/jOOU) - Apache 2.0 - Java Object Oriented Unsigned (JOOU) integer classes
+* [commons-lang3](https://github.com/apache/commons-lang) - Apache 2.0 - Java utility classes
+
+These libraries are not distributed by Step Function I/O directly and are only declared as a dependency for the package manager to retrieve.
+
+## Unsigned Integers
+
+Java does not support unsigned integers as part of the core language. To overcome this limitation, the Java code generator uses classes from the `JOOU` library
+in place of these missing primitives.  This ensures that numeric types crossing the Java/JNI boundary are always pre-validated to be within the correct range. User code
+that creates unsigned integers will need to import symbols from the `JOOU` library.
+
+It is particularly helpful to statically import the factory methods on `Unsigned` class:
+
+```java
+import static org.joou.Unsigned.*;
+import org.joou.UShort;
+```
+
+This allows the user to succinctly instantiate create instances of the unsigned classes:
+
+```java
+UShort value = ushort(65535);
+```
+
 ## Mapping
 
 Java is an object-oriented language and has support for all of the abstract patterns modeled in the code generator. This section describes those mappings.
