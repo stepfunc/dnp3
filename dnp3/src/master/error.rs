@@ -56,7 +56,7 @@ pub enum TaskError {
     Disabled,
 }
 
-// Errors that can occur when adding/modifying polls
+/// Errors that can occur when adding/modifying polls
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PollError {
     /// the master task has shutdown
@@ -85,13 +85,21 @@ pub enum CommandResponseError {
 /// Parent error type for time sync tasks
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TimeSyncError {
+    /// Error occurred during task execution
     Task(TaskError),
+    /// Clock rollback was detected
     ClockRollback,
+    /// System time could not be converted to a UNIX timestamp
     SystemTimeNotUnix,
+    /// Outstation time not return a value time delay
     BadOutstationTimeDelay(u16),
+    /// Time calculation would overflow its representation
     Overflow,
+    /// Outstation did not clear its NEED_TIME bit
     StillNeedsTime,
+    /// System time was not available to perform the synchronization
     SystemTimeNotAvailable,
+    /// Outstation returned an IIN.2 error
     IinError(Iin2),
 }
 

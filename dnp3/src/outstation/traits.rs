@@ -40,10 +40,14 @@ pub enum RestartDelay {
     Milliseconds(u16),
 }
 
+/// Enum describing the result of time synchronization request
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum WriteTimeResult {
+    /// outstation does not support time synchronization
     NotSupported,
+    /// outstation supports time synchronization but the supplied time value is invalid
     InvalidValue,
+    /// success
     Ok,
 }
 
@@ -250,42 +254,54 @@ pub trait ControlHandler:
     + Send
     + 'static
 {
+    /// called before any controls are processed
     fn begin_fragment(&mut self) {}
+    /// called after all controls have been processed
     fn end_fragment(&mut self) {}
 }
 
+/// Struct with a default implementation [OutstationApplication](crate::outstation::OutstationApplication)
 #[derive(Copy, Clone)]
 pub struct DefaultOutstationApplication;
 
 impl OutstationApplication for DefaultOutstationApplication {}
 
 impl DefaultOutstationApplication {
+    /// create a boxed implementation of [OutstationApplication](crate::outstation::OutstationApplication)
     pub fn create() -> Box<dyn OutstationApplication> {
         Box::new(DefaultOutstationApplication)
     }
 }
 
+/// Struct with a default implementation [OutstationInformation](crate::outstation::OutstationInformation)
 #[derive(Copy, Clone)]
 pub struct DefaultOutstationInformation;
 
 impl OutstationInformation for DefaultOutstationInformation {}
 
 impl DefaultOutstationInformation {
+    /// create a boxed implementation of [OutstationInformation](crate::outstation::OutstationInformation)
     pub fn create() -> Box<dyn OutstationInformation> {
         Box::new(DefaultOutstationInformation)
     }
 }
 
+/// Struct with a default implementation of [ControlHandler](crate::outstation::ControlHandler)
+/// that returns that same `CommandStatus` for every operation.
 #[derive(Copy, Clone)]
 pub struct DefaultControlHandler {
     status: CommandStatus,
 }
 
 impl DefaultControlHandler {
+    /// create a boxed implementation of [ControlHandler](crate::outstation::ControlHandler) that
+    /// returns [NotSupported](crate::app::control::CommandStatus::NotSupported) for every request.
     pub fn create() -> Box<dyn ControlHandler> {
         Self::with_status(CommandStatus::NotSupported)
     }
 
+    /// create a boxed implementation of [ControlHandler](crate::outstation::ControlHandler) that
+    /// returns the specified CommandStatus.
     pub fn with_status(status: CommandStatus) -> Box<dyn ControlHandler> {
         Box::new(DefaultControlHandler { status })
     }

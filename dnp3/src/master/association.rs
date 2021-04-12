@@ -24,7 +24,8 @@ use crate::master::ReadType;
 use crate::tokio::time::Instant;
 use crate::util::Smallest;
 
-#[derive(Copy, Clone)]
+/// Configuration for a master association
+#[derive(Debug, Copy, Clone)]
 pub struct AssociationConfig {
     /// The event classes to disable on startup
     pub disable_unsol_classes: EventClasses,
@@ -55,6 +56,8 @@ pub struct AssociationConfig {
 impl AssociationConfig {
     const DEFAULT_MAX_QUEUED_USER_REQUESTS: usize = 16;
 
+    /// Construct an `AssociationConfig` which will not perform any of the default handshaking
+    /// at the beginning of the communications session.
     pub fn quiet(auto_tasks_retry_strategy: RetryStrategy) -> Self {
         Self {
             disable_unsol_classes: EventClasses::none(),

@@ -33,6 +33,8 @@ pub struct ServerHandle {
 }
 
 impl TcpServer {
+    /// create a TCP server builder object that will eventually be bound
+    /// to the specified address
     pub fn new(link_error_mode: LinkErrorMode, address: std::net::SocketAddr) -> Self {
         Self {
             link_error_mode,
@@ -42,6 +44,7 @@ impl TcpServer {
         }
     }
 
+    /// associate an outstation with the TcpServer, but do not spawn it
     pub fn add_outstation(
         &mut self,
         config: OutstationConfig,
@@ -87,6 +90,7 @@ impl TcpServer {
         Ok((handle, future))
     }
 
+    /// associate an outstation with the TcpServer and spawn it on the Tokio runtime.
     pub fn spawn_outstation(
         &mut self,
         config: OutstationConfig,
@@ -108,6 +112,8 @@ impl TcpServer {
         Ok(handle)
     }
 
+    /// Consume the `TcpServer` builder object, bind it to pre-specified port, and return a (ServerHandle, Future)
+    /// tuple.
     pub async fn bind(
         mut self,
     ) -> Result<(ServerHandle, impl std::future::Future<Output = Shutdown>), crate::tokio::io::Error>
@@ -128,6 +134,9 @@ impl TcpServer {
         Ok((handle, task))
     }
 
+    /// Consume the `TcpServer` builder object, bind it to pre-specified port, and spawn the server
+    /// task onto the Tokio runtime. Returns a ServerHandle that will shut down the server and all
+    /// associated outstations when dropped.
     pub async fn bind_and_spawn(self) -> Result<ServerHandle, crate::tokio::io::Error> {
         let (handle, future) = self.bind().await?;
         crate::tokio::spawn(future);

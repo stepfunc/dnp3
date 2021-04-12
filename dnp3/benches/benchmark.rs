@@ -393,10 +393,24 @@ impl Random {
         }
     }
 
+    // make sure the value and flags are consistent
+    fn normalize_flags(binary: Binary) -> Binary {
+        if binary.value {
+            Binary::new(
+                binary.value,
+                binary.flags | Flags::new(0b1000_0000),
+                binary.time.unwrap(),
+            )
+        } else {
+            let raw = binary.flags.value & 0b0111_1111;
+            Binary::new(binary.value, Flags::new(raw), binary.time.unwrap())
+        }
+    }
+
     fn measurement(&mut self) -> Measurement {
         match self.inner.gen_range(0..=2) {
             0 => Measurement::Binary(
-                Binary::new(self.inner.gen(), self.flags(), self.time()).normalize(),
+                Self::normalize_flags(Binary::new(self.inner.gen(), self.flags(), self.time())),
                 self.index(),
             ),
             1 => Measurement::Counter(

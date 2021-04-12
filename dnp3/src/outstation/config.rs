@@ -9,6 +9,7 @@ pub struct BufferSize {
     size: usize,
 }
 
+/// Error type returned for invalid buffer sizes
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum BufferSizeError {
     /// provided size
@@ -16,21 +17,26 @@ pub enum BufferSizeError {
 }
 
 impl BufferSize {
-    pub const MIN: usize = 249; // 1 link frame
-    pub const DEFAULT: usize = 2048; // default max ASDU size for DNP3
+    /// minimum allowed outstation buffer size corresponding to the payload of a link frame
+    pub const MIN: usize = 249;
+    /// default outstation buffer size
+    pub const DEFAULT: usize = 2048;
 
     pub(crate) fn create_buffer(&self) -> Buffer {
         Buffer::new(self.size)
     }
 
+    /// get the underlying value
     pub fn value(&self) -> usize {
         self.size
     }
 
+    /// construct a `BufferSize` with the minimum value
     pub fn min() -> Self {
         Self { size: Self::MIN }
     }
 
+    /// attempt to construct a `BufferSize`
     pub fn new(size: usize) -> Result<Self, BufferSizeError> {
         if size < Self::MIN {
             return Err(BufferSizeError::TooSmall(size));
@@ -77,19 +83,34 @@ impl Default for Features {
     }
 }
 
+/// Outstation configuration parameters
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OutstationConfig {
+    /// address of the outstation
     pub outstation_address: EndpointAddress,
+    /// address of the master with which the outstation will communicate
     pub master_address: EndpointAddress,
+    /// buffer size for transmitted solicited responses
     pub solicited_buffer_size: BufferSize,
+    /// buffer size for transmitted unsolicited responses
     pub unsolicited_buffer_size: BufferSize,
+    /// buffer size for received requests, i.e. the transport reassembly buffer
     pub rx_buffer_size: BufferSize,
+    /// initial decoding level
     pub decode_level: DecodeLevel,
+    /// confirm timeout for solicited and unsolicited responses
     pub confirm_timeout: std::time::Duration,
+    /// timeout after which a matching OPERATE will fail with SELECT_TIMEOUT
     pub select_timeout: std::time::Duration,
+    /// optional features that can be enabled
     pub features: Features,
+    /// number of non-regenerated unsolicited retries to perform
     pub max_unsolicited_retries: Option<usize>,
+    /// amount of time to wait after a failed unsolicited response series before starting another series
     pub unsolicited_retry_delay: std::time::Duration,
+    /// time without any link activity before the outstation will send REQUEST_LINK_STATES
+    ///
+    /// A value of `None` will disable this feature
     pub keep_alive_timeout: Option<std::time::Duration>,
     /// Maximum number of headers that will be processed
     /// in a READ request. Internally, this controls the size of a
@@ -115,9 +136,13 @@ impl Feature {
 }
 
 impl OutstationConfig {
+    /// Default number of object headers supported in a READ request
     pub const DEFAULT_MAX_READ_REQUEST_HEADERS: u16 = 64;
+    /// Default confirmation timeout
     pub const DEFAULT_CONFIRM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+    /// Default select timeout
     pub const DEFAULT_SELECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+    /// Default unsolicited retry delay between series
     pub const DEFAULT_UNSOLICITED_RETRY_DELAY: std::time::Duration =
         std::time::Duration::from_secs(5);
 

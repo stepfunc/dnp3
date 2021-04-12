@@ -140,6 +140,7 @@ impl PollMsg {
     }
 }
 
+/// Handle to a poll bound to a master association
 #[derive(Clone)]
 pub struct PollHandle {
     association: AssociationHandle,
@@ -147,11 +148,13 @@ pub struct PollHandle {
 }
 
 impl PollHandle {
+    /// FFI only
     #[cfg(feature = "ffi")]
     pub fn get_id(&self) -> u64 {
         self.id
     }
 
+    /// FFI only
     #[cfg(feature = "ffi")]
     pub fn create(association: AssociationHandle, id: u64) -> Self {
         Self::new(association, id)
@@ -161,12 +164,14 @@ impl PollHandle {
         Self { association, id }
     }
 
+    /// Flag the poll for immediate execution prior to its period elapsing
     pub async fn demand(&mut self) -> Result<(), Shutdown> {
         self.association
             .send_poll_message(PollMsg::Demand(self.id))
             .await
     }
 
+    /// Remove the poll from the association
     pub async fn remove(mut self) -> Result<(), Shutdown> {
         self.association
             .send_poll_message(PollMsg::RemovePoll(self.id))
