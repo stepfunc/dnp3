@@ -3,10 +3,17 @@
 //! # Features
 //!
 //! * Panic-free, zero-copy, zero-allocation parsing
-//! * Focus on maximal correctness and compliance to the specification
+//! * Fully automated level 2 outstation conformance tests
 //! * Automatic TCP connection management with configurable reconnect strategy
 //! * Scalable performance using Tokio's multi-threaded executor
-//! * Future and callback-based API modes
+//!
+//! # License
+//!
+//! This crate is made available under a non-commercial / non-production license.
+//!
+//! Please inquire about commercial licensing here:
+//!
+//! <https://stepfunc.io/contact/>
 
 #![deny(
 dead_code,
