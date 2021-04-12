@@ -69,10 +69,15 @@ object FixedSizeVariationModule extends Module {
   }
 
   private def structDefinition(gv : FixedSize)(implicit indent: Indentation): Iterator[String] = {
+    def field(f: FixedSizeField) : Iterator[String] = {
+      Iterator(s"/// ${f.name} field of the variation") ++
+      Iterator(s"pub${visibility(gv)} ${f.name}: ${getFieldType(f.typ)},")
+    }
+
     commented(gv.fullDesc).eol ++
     "#[derive(Copy, Clone, Debug, PartialEq)]".eol ++
     bracket(s"pub${visibility(gv)} struct ${gv.name}") {
-      gv.fields.map(f => s"pub${visibility(gv)} ${f.name}: ${getFieldType(f.typ)},").iterator
+      gv.fields.flatMap(f => field(f)).iterator
     }
   }
 
