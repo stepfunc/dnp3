@@ -383,11 +383,6 @@ public class OutstationExample {
             {
               outstation.transaction(
                   db -> {
-                    // Some Friday poetry:
-                    // Arrays.asList requires an array of Object,
-                    // Arrays.stream does not overload for byte[], how abject.
-                    // Java is poop
-                    // So excuse me for that for loop
                     List<UByte> octetString = new ArrayList<>();
                     for (byte octet : "Hello".getBytes(StandardCharsets.US_ASCII)) {
                       octetString.add(ubyte(octet));

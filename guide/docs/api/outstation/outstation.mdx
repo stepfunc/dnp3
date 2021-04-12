@@ -10,4 +10,7 @@ import TabItem from '@theme/TabItem';
 
 The `Outstation` class represents an asynchronous task that implements the DNP3 outstation state machine and responds
 to requests from a single master. It provides provides transactional access to the `Database` for configuring and modifying the values
-sent to the master.
+sent to the master. Database interaction is covered in the next section.
+
+In addition to accessing the Database, this class allows the user to modify the `DecodeLevel` of the running outstation. This can be extremely
+useful in production environments for debugging communications between a master and the outstation.
