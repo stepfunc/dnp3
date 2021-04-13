@@ -8,7 +8,7 @@ use crate::link::header::{FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::handle::{
-    AssociationHandle, AssociationHandler, HeaderInfo, MasterHandle, ReadHandler,
+    AssociationHandle, AssociationHandler, HeaderInfo, MasterChannel, ReadHandler,
 };
 use crate::master::session::{MasterSession, RunError};
 use crate::master::ReadType;
@@ -36,7 +36,7 @@ pub(crate) fn create_association(
         MasterSession::MIN_TX_BUFFER_SIZE,
         rx,
     );
-    let mut master = MasterHandle::new(tx);
+    let mut master = MasterChannel::new(tx);
 
     let (mut reader, mut writer) = create_master_transport_layer(
         LinkErrorMode::Close,
@@ -153,7 +153,7 @@ impl ReadHandler for CountHandler {
 
 pub(crate) struct TestHarness<F: Future<Output = RunError>> {
     pub(crate) session: Spawn<F>,
-    pub(crate) master: MasterHandle,
+    pub(crate) master: MasterChannel,
     pub(crate) association: AssociationHandle,
     pub(crate) num_requests: Arc<AtomicU64>,
     pub(crate) io: io::Handle,

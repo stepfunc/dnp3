@@ -7,7 +7,7 @@ use crate::app::Shutdown;
 use crate::app::{ExponentialBackOff, ReconnectStrategy};
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
-use crate::master::{Listener, MasterConfig, MasterHandle};
+use crate::master::{Listener, MasterConfig, MasterChannel};
 use crate::tcp::ClientState;
 use crate::tcp::EndpointList;
 use crate::tokio::net::TcpStream;
@@ -26,7 +26,7 @@ pub fn spawn_master_tcp_client(
     endpoints: EndpointList,
     reconnect: ReconnectStrategy,
     listener: Listener<ClientState>,
-) -> MasterHandle {
+) -> MasterChannel {
     let (future, handle) =
         create_master_tcp_client(link_error_mode, config, endpoints, reconnect, listener);
     crate::tokio::spawn(future);
@@ -47,7 +47,7 @@ pub fn create_master_tcp_client(
     endpoints: EndpointList,
     reconnect: ReconnectStrategy,
     listener: Listener<ClientState>,
-) -> (impl Future<Output = ()> + 'static, MasterHandle) {
+) -> (impl Future<Output = ()> + 'static, MasterChannel) {
     let main_addr = endpoints.main_addr().to_string();
     let (mut task, handle) =
         MasterTask::new(link_error_mode, endpoints, config, reconnect, listener);
@@ -76,7 +76,7 @@ impl MasterTask {
         config: MasterConfig,
         reconnect: ReconnectStrategy,
         listener: Listener<ClientState>,
-    ) -> (Self, MasterHandle) {
+    ) -> (Self, MasterChannel) {
         let (tx, rx) = crate::util::channel::request_channel();
         let session = MasterSession::new(
             false,
@@ -99,7 +99,7 @@ impl MasterTask {
             writer,
             listener,
         };
-        (task, MasterHandle::new(tx))
+        (task, MasterChannel::new(tx))
     }
 
     async fn run(&mut self) {

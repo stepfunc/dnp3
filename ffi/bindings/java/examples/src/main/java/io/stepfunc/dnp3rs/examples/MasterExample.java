@@ -251,8 +251,8 @@ public class MasterExample {
     MasterConfig masterConfig = new MasterConfig(ushort(1));
     masterConfig.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
 
-    Master master =
-        Master.createTcpSession(
+    MasterChannel channel =
+        MasterChannel.createTcpChannel(
             runtime,
             LinkErrorMode.CLOSE,
             masterConfig,
@@ -269,16 +269,16 @@ public class MasterExample {
     associationConfig.keepAliveTimeout = Duration.ofSeconds(60);
 
     AssociationId association =
-        master.addAssociation(
+        channel.addAssociation(
             ushort(1024), associationConfig, new TestReadHandler(), new TestTimeProvider());
 
     // Create a periodic poll
     PollId poll =
-        master.addPoll(
+        channel.addPoll(
             association, Request.classRequest(false, true, true, true), Duration.ofSeconds(5));
 
     // start communications
-    master.enable();
+    channel.enable();
 
     // Handle user input
     BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
@@ -288,24 +288,24 @@ public class MasterExample {
         case "x":
           return;
         case "enable":
-          master.enable();
+          channel.enable();
           break;
         case "disable":
-          master.disable();
+          channel.disable();
           break;
         case "dln":
-          master.setDecodeLevel(new DecodeLevel());
+          channel.setDecodeLevel(new DecodeLevel());
           break;
         case "dlv":
           DecodeLevel level = new DecodeLevel();
           level.application = AppDecodeLevel.OBJECT_VALUES;
-          master.setDecodeLevel(level);
+          channel.setDecodeLevel(level);
           break;
         case "rao":
           {
             Request request = new Request();
             request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-            ReadResult result = master.read(association, request).toCompletableFuture().get();
+            ReadResult result = channel.read(association, request).toCompletableFuture().get();
             System.out.println("Result: " + result);
             break;
           }
@@ -314,7 +314,7 @@ public class MasterExample {
             Request request = new Request();
             request.addAllObjectsHeader(Variation.GROUP10_VAR0);
             request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-            ReadResult result = master.read(association, request).toCompletableFuture().get();
+            ReadResult result = channel.read(association, request).toCompletableFuture().get();
             System.out.println("Result: " + result);
             break;
           }
@@ -329,7 +329,7 @@ public class MasterExample {
                     uint(1000));
             commands.addG12v1u16(ushort(3), g12v1);
             CommandResult result =
-                master
+                channel
                     .operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
                     .toCompletableFuture()
                     .get();
@@ -337,20 +337,20 @@ public class MasterExample {
             break;
           }
         case "evt":
-          master.demandPoll(poll);
+          channel.demandPoll(poll);
           break;
 
         case "lts":
           {
             TimeSyncResult result =
-                master.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
+                channel.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
             System.out.println("Result: " + result);
             break;
           }
         case "nts":
           {
             TimeSyncResult result =
-                master
+                channel
                     .synchronizeTime(association, TimeSyncMode.NON_LAN)
                     .toCompletableFuture()
                     .get();
@@ -359,20 +359,20 @@ public class MasterExample {
           }
         case "crt":
           {
-            RestartResult result = master.coldRestart(association).toCompletableFuture().get();
+            RestartResult result = channel.coldRestart(association).toCompletableFuture().get();
             System.out.println("Result: " + result);
             break;
           }
         case "wrt":
           {
-            RestartResult result = master.warmRestart(association).toCompletableFuture().get();
+            RestartResult result = channel.warmRestart(association).toCompletableFuture().get();
             System.out.println("Result: " + result);
             break;
           }
         case "lsr":
           {
             LinkStatusResult result =
-                master.checkLinkStatus(association).toCompletableFuture().get();
+                channel.checkLinkStatus(association).toCompletableFuture().get();
             System.out.println("Result: " + result);
             break;
           }

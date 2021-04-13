@@ -11,12 +11,12 @@ use dnp3::tcp::ClientState;
 
 use crate::ffi;
 
-pub struct Master {
+pub struct MasterChannel {
     pub(crate) runtime: crate::runtime::RuntimeHandle,
-    pub(crate) handle: MasterHandle,
+    pub(crate) handle: dnp3::master::MasterChannel,
 }
 
-pub(crate) unsafe fn master_create_tcp_session(
+pub(crate) unsafe fn master_channel_create_tcp(
     runtime: *mut crate::runtime::Runtime,
     link_error_mode: ffi::LinkErrorMode,
     config: ffi::MasterConfig,
@@ -24,7 +24,7 @@ pub(crate) unsafe fn master_create_tcp_session(
     connect_strategy: ffi::RetryStrategy,
     reconnect_delay: Duration,
     listener: ffi::ClientStateListener,
-) -> Result<*mut Master, ffi::ParamError> {
+) -> Result<*mut MasterChannel, ffi::ParamError> {
     let config = convert_config(config)?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let listener = ClientStateListenerAdapter::new(listener);
@@ -45,22 +45,22 @@ pub(crate) unsafe fn master_create_tcp_session(
 
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     runtime.inner.spawn(future);
-    let master = Master {
+    let channel = MasterChannel {
         runtime: runtime.handle(),
         handle,
     };
 
-    Ok(Box::into_raw(Box::new(master)))
+    Ok(Box::into_raw(Box::new(channel)))
 }
 
-pub(crate) unsafe fn master_create_serial_session(
+pub(crate) unsafe fn master_channel_create_serial(
     runtime: *mut crate::runtime::Runtime,
     config: ffi::MasterConfig,
     path: &CStr,
     serial_params: ffi::SerialPortSettings,
     retry_delay: Duration,
     listener: ffi::PortStateListener,
-) -> Result<*mut Master, ffi::ParamError> {
+) -> Result<*mut MasterChannel, ffi::ParamError> {
     let config = convert_config(config)?;
     let listener = PortStateListenerAdapter::new(listener);
 
@@ -75,40 +75,40 @@ pub(crate) unsafe fn master_create_serial_session(
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     runtime.inner.spawn(future);
 
-    let master = Master {
+    let channel = MasterChannel {
         runtime: runtime.handle(),
         handle,
     };
 
-    Ok(Box::into_raw(Box::new(master)))
+    Ok(Box::into_raw(Box::new(channel)))
 }
 
-pub unsafe fn master_destroy(master: *mut Master) {
-    if !master.is_null() {
-        Box::from_raw(master);
+pub unsafe fn master_channel_destroy(channel: *mut MasterChannel) {
+    if !channel.is_null() {
+        Box::from_raw(channel);
     }
 }
 
-pub unsafe fn master_enable(master: *mut crate::Master) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    master.runtime.block_on(master.handle.enable())??;
+pub unsafe fn master_channel_enable(channel: *mut crate::MasterChannel) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    channel.runtime.block_on(channel.handle.enable())??;
     Ok(())
 }
 
-pub unsafe fn master_disable(master: *mut crate::Master) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    master.runtime.block_on(master.handle.disable())??;
+pub unsafe fn master_channel_disable(channel: *mut crate::MasterChannel) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    channel.runtime.block_on(channel.handle.disable())??;
     Ok(())
 }
 
-pub unsafe fn master_add_association(
-    master: *mut Master,
+pub unsafe fn master_channel_add_association(
+    channel: *mut MasterChannel,
     address: u16,
     config: ffi::AssociationConfig,
     read_handler: ffi::ReadHandler,
     time_provider: ffi::TimeProvider,
 ) -> Result<ffi::AssociationId, ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(address)?;
 
     let config = AssociationConfig {
@@ -137,7 +137,7 @@ pub unsafe fn master_add_association(
         time_provider,
     };
 
-    master.runtime.block_on(master.handle.add_association(
+    channel.runtime.block_on(channel.handle.add_association(
         address,
         config,
         Box::new(handler),
@@ -147,32 +147,32 @@ pub unsafe fn master_add_association(
     })
 }
 
-pub(crate) unsafe fn master_remove_association(
-    master: *mut crate::Master,
+pub(crate) unsafe fn master_channel_remove_association(
+    channel: *mut crate::MasterChannel,
     id: ffi::AssociationId,
 ) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let endpoint = EndpointAddress::from(id.address)?;
 
-    master
+    channel
         .runtime
-        .block_on(master.handle.remove_association(endpoint))??;
+        .block_on(channel.handle.remove_association(endpoint))??;
 
     Ok(())
 }
 
-pub(crate) unsafe fn master_add_poll(
-    master: *mut Master,
+pub(crate) unsafe fn master_channel_add_poll(
+    channel: *mut MasterChannel,
     id: ffi::AssociationId,
     request: *mut crate::Request,
     period: std::time::Duration,
 ) -> Result<ffi::PollId, ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(id.address)?;
     let request = request.as_ref().ok_or(ffi::ParamError::NullParameter)?;
 
-    let mut association = AssociationHandle::create(address, master.handle.clone());
-    let handle = master
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let handle = channel
         .runtime
         .block_on(association.add_poll(request.build(), period))??;
 
@@ -182,54 +182,54 @@ pub(crate) unsafe fn master_add_poll(
     })
 }
 
-pub(crate) unsafe fn master_remove_poll(
-    master: *mut crate::Master,
+pub(crate) unsafe fn master_channel_remove_poll(
+    channel: *mut crate::MasterChannel,
     poll: ffi::PollId,
 ) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let endpoint = EndpointAddress::from(poll.association_id)?;
 
     let poll = PollHandle::create(
-        AssociationHandle::create(endpoint, master.handle.clone()),
+        AssociationHandle::create(endpoint, channel.handle.clone()),
         poll.id,
     );
 
-    master.runtime.block_on(poll.remove())??;
+    channel.runtime.block_on(poll.remove())??;
 
     Ok(())
 }
 
-pub unsafe fn master_demand_poll(
-    master: *mut crate::Master,
+pub unsafe fn master_channel_demand_poll(
+    channel: *mut crate::MasterChannel,
     poll: ffi::PollId,
 ) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let endpoint = EndpointAddress::from(poll.association_id)?;
 
     let mut poll = PollHandle::create(
-        AssociationHandle::create(endpoint, master.handle.clone()),
+        AssociationHandle::create(endpoint, channel.handle.clone()),
         poll.id,
     );
 
-    master.runtime.block_on(poll.demand())??;
+    channel.runtime.block_on(poll.demand())??;
 
     Ok(())
 }
 
-pub(crate) unsafe fn master_read(
-    master: *mut crate::Master,
+pub(crate) unsafe fn master_channel_read(
+    channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     request: *mut crate::Request,
     callback: ffi::ReadTaskCallback,
 ) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
     let request = request
         .as_ref()
         .ok_or(ffi::ParamError::NullParameter)?
         .build();
 
-    let mut handle = AssociationHandle::create(address, master.handle.clone());
+    let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
         let result = match handle.read(request).await {
@@ -240,18 +240,18 @@ pub(crate) unsafe fn master_read(
         callback.on_complete(result);
     };
 
-    master.runtime.spawn(task)?;
+    channel.runtime.spawn(task)?;
     Ok(())
 }
 
-pub unsafe fn master_operate(
-    master: *mut crate::Master,
+pub unsafe fn master_channel_operate(
+    channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     mode: ffi::CommandMode,
     commands: *mut crate::Commands,
     callback: ffi::CommandTaskCallback,
 ) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
     let headers = commands
         .as_ref()
@@ -259,7 +259,7 @@ pub unsafe fn master_operate(
         .clone()
         .build();
 
-    let mut handle = AssociationHandle::create(address, master.handle.clone());
+    let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
         let result = match handle.operate(mode.into(), headers).await {
@@ -278,20 +278,20 @@ pub unsafe fn master_operate(
         callback.on_complete(result);
     };
 
-    master.runtime.spawn(task)?;
+    channel.runtime.spawn(task)?;
     Ok(())
 }
 
-pub(crate) unsafe fn master_sync_time(
-    master: *mut crate::Master,
+pub(crate) unsafe fn master_channel_sync_time(
+    channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     mode: ffi::TimeSyncMode,
     callback: ffi::TimeSyncTaskCallback,
 ) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
 
-    let mut association = AssociationHandle::create(address, master.handle.clone());
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
         let result = match association.synchronize_time(mode.into()).await {
@@ -313,19 +313,19 @@ pub(crate) unsafe fn master_sync_time(
         callback.on_complete(result);
     };
 
-    master.runtime.spawn(task)?;
+    channel.runtime.spawn(task)?;
     Ok(())
 }
 
-pub(crate) unsafe fn master_cold_restart(
-    master: *mut crate::Master,
+pub(crate) unsafe fn master_channel_cold_restart(
+    channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     callback: ffi::RestartTaskCallback,
 ) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
 
-    let mut association = AssociationHandle::create(address, master.handle.clone());
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
         let result = match association.cold_restart().await {
@@ -336,19 +336,19 @@ pub(crate) unsafe fn master_cold_restart(
         callback.on_complete(result);
     };
 
-    master.runtime.spawn(task)?;
+    channel.runtime.spawn(task)?;
     Ok(())
 }
 
-pub(crate) unsafe fn master_warm_restart(
-    master: *mut crate::Master,
+pub(crate) unsafe fn master_channel_warm_restart(
+    channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     callback: ffi::RestartTaskCallback,
 ) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
 
-    let mut association = AssociationHandle::create(address, master.handle.clone());
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
         let result = match association.warm_restart().await {
@@ -359,19 +359,19 @@ pub(crate) unsafe fn master_warm_restart(
         callback.on_complete(result);
     };
 
-    master.runtime.spawn(task)?;
+    channel.runtime.spawn(task)?;
     Ok(())
 }
 
-pub(crate) unsafe fn master_check_link_status(
-    master: *mut crate::Master,
+pub(crate) unsafe fn master_channel_check_link_status(
+    channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     callback: ffi::LinkStatusCallback,
 ) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(association.address)?;
 
-    let mut association = AssociationHandle::create(address, master.handle.clone());
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
         let result = match association.check_link_status().await {
@@ -383,29 +383,29 @@ pub(crate) unsafe fn master_check_link_status(
         callback.on_complete(result);
     };
 
-    master.runtime.spawn(task)?;
+    channel.runtime.spawn(task)?;
     Ok(())
 }
 
-pub(crate) unsafe fn master_set_decode_level(
-    master: *mut Master,
+pub(crate) unsafe fn master_channel_set_decode_level(
+    channel: *mut MasterChannel,
     level: ffi::DecodeLevel,
 ) -> Result<(), ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    master
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    channel
         .runtime
-        .spawn(master.handle.set_decode_level(level.into()))?;
+        .spawn(channel.handle.set_decode_level(level.into()))?;
     Ok(())
 }
 
-pub(crate) unsafe fn master_get_decode_level(
-    master: *mut Master,
+pub(crate) unsafe fn master_channel_get_decode_level(
+    channel: *mut MasterChannel,
 ) -> Result<ffi::DecodeLevel, ffi::ParamError> {
-    let master = master.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
 
-    let result = master
+    let result = channel
         .runtime
-        .block_on(master.handle.get_decode_level())??;
+        .block_on(channel.handle.get_decode_level())??;
 
     Ok(result.into())
 }
