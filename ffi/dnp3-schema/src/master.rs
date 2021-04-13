@@ -430,7 +430,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .async_method("CheckLinkStatus", &check_link_status_fn)?
         .manual_destroy()?
         .doc(
-            doc("Master channel of communication")
+            doc("Represents a communication channel for a master station")
             .details("To communicate with a particular outstation, you need to add an association with {class:Master.AddAssociation()}.")
             .warning("This cannot be called from within a callback.")
         )?

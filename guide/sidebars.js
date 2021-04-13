@@ -40,6 +40,14 @@ module.exports = {
                     ]
                 }
             ]
+        },
+        {
+            Master: [
+                'api/master/terminology',
+                {
+                    Components: []
+                }
+            ]
         }
     ],
     Examples: [
