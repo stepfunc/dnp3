@@ -1,8 +1,9 @@
 const samplePlugin = require('./plugins/sample');
 const mermaidPlugin = require('./plugins/mermaid');
+const sitedata = require('./sitedata.json');
 
 module.exports = {
-  title: 'DNP3 0.9.0',
+  title: `DNP3 ${sitedata.version}`,
   tagline: 'Pretty sure we don\'t need this page, just the docs',
   url: 'https://your-docusaurus-test-site.com',
   baseUrl: '/',
@@ -21,7 +22,7 @@ module.exports = {
       disableSwitch: true,
     },
     navbar: {
-      title: 'DNP3 0.9.0',
+      title: `DNP3 ${sitedata.version}`,
       logo: {
         alt: 'Logo',
         src: 'images/brand/logo.svg',
