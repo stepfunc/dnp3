@@ -86,13 +86,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .param(
             "channel",
             Type::ClassRef(master_channel_class.clone()),
-            "Master to destroy",
+            "{class:MasterChannel} to destroy",
         )?
         .return_type(ReturnType::void())?
-        .doc(
-            doc("Remove and destroy a master.")
-                .warning("This method must NOT be called from within the {class:Runtime} thread."),
-        )?
+        .doc("Shutdown a {class:MasterChannel} and release all resources")?
         .build()?;
 
     let enable_fn = lib
@@ -194,7 +191,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .doc(
             doc("Add a periodic poll to an association")
                 .details("Each result of the poll will be sent to the {interface:ReadHandler} of the association.")
-                .warning("This cannot be called from within a callback.")
         )?
         .build()?;
 
@@ -210,7 +206,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .doc(
             doc("Add a periodic poll to an association")
                 .details("Each result of the poll will be sent to the {interface:ReadHandler} of the association.")
-                .warning("This cannot be called from within a callback.")
         )?
         .build()?;
 
@@ -244,7 +239,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .return_type(ReturnType::void())?
         .fails_with(shared.error_type.clone())?
-        .doc("Set the master decoding level for log messages")?
+        .doc("Set the decoding level for the channel")?
         .build()?;
 
     let get_decode_level_fn = lib
@@ -252,17 +247,14 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .param(
             "channel",
             Type::ClassRef(master_channel_class.clone()),
-            "{class:MasterChannel} to get the decode level from",
+            "{class:MasterChannel} on which to apply the operation",
         )?
         .return_type(ReturnType::new(
             Type::Struct(shared.decode_level.clone()),
             "Decode level",
         ))?
         .fails_with(shared.error_type.clone())?
-        .doc(
-            doc("Get the master decoding level for log messages")
-                .warning("This cannot be called from within a callback."),
-        )?
+        .doc("Get the decoding level for the channel")?
         .build()?;
 
     let read_callback = define_read_callback(lib)?;
@@ -432,7 +424,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .doc(
             doc("Master communication channel")
             .details("To communicate with a particular outstation, you need to add an association with {class:MasterChannel.AddAssociation()}.")
-            .warning("This cannot be called from within a callback.")
+            .warning("The class methods that return a value (e.g. as {class:MasterChannel.AddAssociation()}) cannot be called from within a callback.")
         )?
         .build()?;
 
