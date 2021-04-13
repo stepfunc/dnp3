@@ -1,3 +1,4 @@
+const path = require('path');
 const samplePlugin = require('./plugins/sample');
 const mermaidPlugin = require('./plugins/mermaid');
 const sitedata = require('./sitedata.json');
@@ -53,8 +54,8 @@ module.exports = {
           title: 'Library',
           items: [
             {
-              label: 'Github',
-              href: 'https://stackoverflow.com/questions/tagged/docusaurus',
+              label: 'GitHub',
+              href: sitedata.github_url,
             },
             {
               label: 'Homepage',
@@ -96,4 +97,5 @@ module.exports = {
       },
     ],
   ],
+  plugins: [path.resolve(__dirname, './plugins/changelog')],
 };
