@@ -31,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // spawn the master channel onto another task
     let mut channel = spawn_master_tcp_client(
         LinkErrorMode::Close,
-        MasterConfig::new(
+        MasterChannelConfig::new(
             EndpointAddress::from(1)?,
             AppDecodeLevel::ObjectValues.into(),
             Timeout::from_secs(1)?,

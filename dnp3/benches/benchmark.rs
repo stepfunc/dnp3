@@ -249,8 +249,8 @@ impl Pair {
         EndpointAddress::from(1).unwrap()
     }
 
-    fn get_master_config(level: DecodeLevel) -> MasterConfig {
-        MasterConfig::new(
+    fn get_master_config(level: DecodeLevel) -> MasterChannelConfig {
+        MasterChannelConfig::new(
             Self::master_address(),
             level,
             Timeout::from_secs(5).unwrap(),

@@ -182,9 +182,9 @@ int main()
         goto cleanup;
     }
         
-    // Create the master
-    dnp3_master_config_t master_config = dnp3_master_config_init(1);
-    master_config.decode_level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
+    // Create the master channel
+    dnp3_master_channel_config_t channel_config = dnp3_master_channel_config_init(1);
+    channel_config.decode_level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
 
     dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_new("127.0.0.1:20000");
     dnp3_client_state_listener_t listener = {
@@ -193,7 +193,7 @@ int main()
         .ctx = NULL,
     };
         
-    err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, master_config, endpoints, dnp3_retry_strategy_init(), 1000, listener, &channel);
+    err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, channel_config, endpoints, dnp3_retry_strategy_init(), 1000, listener, &channel);
     if (err) {
         printf("unable to create master: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;

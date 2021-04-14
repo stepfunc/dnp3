@@ -18,7 +18,7 @@ use crate::util::phys::PhysLayer;
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
 pub fn spawn_master_serial(
-    config: MasterConfig,
+    config: MasterChannelConfig,
     path: &str,
     serial_settings: SerialSettings,
     retry_delay: Duration,
@@ -39,7 +39,7 @@ pub fn spawn_master_serial(
 /// tasks instead of within the context of a runtime, e.g. in applications that cannot use
 /// `[tokio::main]` such as C language bindings.
 pub fn create_master_serial(
-    config: MasterConfig,
+    config: MasterChannelConfig,
     path: &str,
     settings: SerialSettings,
     retry_delay: Duration,
@@ -70,7 +70,7 @@ impl MasterTask {
     fn new(
         path: &str,
         serial_settings: SerialSettings,
-        config: MasterConfig,
+        config: MasterChannelConfig,
         retry_delay: Duration,
         listener: Listener<PortState>,
     ) -> (Self, MasterChannel) {

@@ -35,9 +35,9 @@ pub struct AssociationHandle {
     master: MasterChannel,
 }
 
-/// Master configuration
+/// Configuration for a MasterChannel
 #[derive(Copy, Clone, Debug)]
-pub struct MasterConfig {
+pub struct MasterChannelConfig {
     /// Local DNP3 master address
     pub address: EndpointAddress,
     /// Decode-level for DNP3 objects
@@ -46,15 +46,15 @@ pub struct MasterConfig {
     pub response_timeout: Timeout,
     /// TX buffer size
     ///
-    /// Should be at least 249.
+    /// Must be at least 249.
     pub tx_buffer_size: usize,
     /// RX buffer size
     ///
-    /// Should be at least 2048.
+    /// Must be at least 2048.
     pub rx_buffer_size: usize,
 }
 
-impl MasterConfig {
+impl MasterChannelConfig {
     /// Create a configuration with default buffer sizes
     pub fn new(
         address: EndpointAddress,

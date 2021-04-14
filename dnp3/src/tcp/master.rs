@@ -7,7 +7,7 @@ use crate::app::Shutdown;
 use crate::app::{ExponentialBackOff, ReconnectStrategy};
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
-use crate::master::{Listener, MasterChannel, MasterConfig};
+use crate::master::{Listener, MasterChannel, MasterChannelConfig};
 use crate::tcp::ClientState;
 use crate::tcp::EndpointList;
 use crate::tokio::net::TcpStream;
@@ -22,7 +22,7 @@ use crate::util::phys::PhysLayer;
 /// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
 pub fn spawn_master_tcp_client(
     link_error_mode: LinkErrorMode,
-    config: MasterConfig,
+    config: MasterChannelConfig,
     endpoints: EndpointList,
     reconnect: ReconnectStrategy,
     listener: Listener<ClientState>,
@@ -43,7 +43,7 @@ pub fn spawn_master_tcp_client(
 /// `[tokio::main]` such as C language bindings.
 pub fn create_master_tcp_client(
     link_error_mode: LinkErrorMode,
-    config: MasterConfig,
+    config: MasterChannelConfig,
     endpoints: EndpointList,
     reconnect: ReconnectStrategy,
     listener: Listener<ClientState>,
@@ -73,7 +73,7 @@ impl MasterTask {
     fn new(
         link_error_mode: LinkErrorMode,
         endpoints: EndpointList,
-        config: MasterConfig,
+        config: MasterChannelConfig,
         reconnect: ReconnectStrategy,
         listener: Listener<ClientState>,
     ) -> (Self, MasterChannel) {

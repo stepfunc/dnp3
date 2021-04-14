@@ -227,6 +227,12 @@ class TestTimeProvider implements TimeProvider {
 
 public class MasterExample {
 
+  private static MasterChannelConfig getMasterChannelConfig() {
+    MasterChannelConfig config = new MasterChannelConfig(ushort(1));
+    config.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
+    return config;
+  }
+
   public static void main(String[] args) {
     // ANCHOR: logging_init
     // Initialize logging with the default configuration
@@ -247,15 +253,13 @@ public class MasterExample {
   }
 
   private static void run(Runtime runtime) throws Exception {
-    // Create the master
-    MasterConfig masterConfig = new MasterConfig(ushort(1));
-    masterConfig.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
 
+    // Create the master channel
     MasterChannel channel =
         MasterChannel.createTcpChannel(
             runtime,
             LinkErrorMode.CLOSE,
-            masterConfig,
+            getMasterChannelConfig(),
             new EndpointList("127.0.0.1:20000"),
             new RetryStrategy(),
             Duration.ofSeconds(1),

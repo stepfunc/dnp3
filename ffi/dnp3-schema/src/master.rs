@@ -14,7 +14,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
 
     let endpoint_list = define_endpoint_list(lib)?;
 
-    let master_config = define_master_config(lib, shared)?;
+    let master_channel_config = define_master_channel_config(lib, shared)?;
 
     let tcp_client_state_listener = define_tcp_client_state_listener(lib)?;
 
@@ -34,8 +34,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param(
             "config",
-            Type::Struct(master_config.clone()),
-            "Master configuration",
+            Type::Struct(master_channel_config.clone()),
+            "Generic configuration for the channel",
         )?
         .param(
             "endpoints",
@@ -68,7 +68,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     let master_channel_create_serial_fn = lib
         .declare_native_function("master_channel_create_serial")?
         .param("runtime", Type::ClassRef(shared.runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
-        .param("config", Type::Struct(master_config), "Master configuration")?
+        .param("config", Type::Struct(master_channel_config), "Generic configuration for the channel")?
         .param("path", Type::String, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
         .param("serial_params", Type::Struct(shared.serial_port_settings.clone()), "Serial port settings")?
         .param("open_retry_delay", Type::Duration(DurationMapping::Milliseconds), "delay between attempts to open the serial port")?
@@ -595,12 +595,12 @@ fn define_tcp_client_state_listener(
     .build()
 }
 
-fn define_master_config(
+fn define_master_channel_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> std::result::Result<NativeStructHandle, BindingError> {
-    let master_config = lib.declare_native_struct("MasterConfig")?;
-    lib.define_native_struct(&master_config)?
+    let config = lib.declare_native_struct("MasterChannelConfig")?;
+    lib.define_native_struct(&config)?
         .add("address", Type::Uint16, "Local DNP3 data-link address")?
         .add("decode_level", StructElementType::Struct(shared.decode_level.clone()), "Decoding level for this master. You can modify this later on with {class:MasterChannel.SetDecodeLevel()}.")?
         .add(
@@ -608,9 +608,9 @@ fn define_master_config(
             StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(5))),
             "Timeout for receiving a response"
         )?
-        .add("tx_buffer_size", StructElementType::Uint16(Some(2048)), doc("TX buffer size").details("Should be at least 249"))?
-        .add("rx_buffer_size", StructElementType::Uint16(Some(2048)), doc("RX buffer size").details("Should be at least 2048"))?
-        .doc("Master configuration")?
+        .add("tx_buffer_size", StructElementType::Uint16(Some(2048)), doc("TX buffer size").details("Must be at least 249"))?
+        .add("rx_buffer_size", StructElementType::Uint16(Some(2048)), doc("RX buffer size").details("Must be at least 2048"))?
+        .doc("Generic configuration for a MasterChannel")?
         .build()
 }
 

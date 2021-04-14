@@ -19,7 +19,7 @@ pub struct MasterChannel {
 pub(crate) unsafe fn master_channel_create_tcp(
     runtime: *mut crate::runtime::Runtime,
     link_error_mode: ffi::LinkErrorMode,
-    config: ffi::MasterConfig,
+    config: ffi::MasterChannelConfig,
     endpoints: *const crate::EndpointList,
     connect_strategy: ffi::RetryStrategy,
     reconnect_delay: Duration,
@@ -55,7 +55,7 @@ pub(crate) unsafe fn master_channel_create_tcp(
 
 pub(crate) unsafe fn master_channel_create_serial(
     runtime: *mut crate::runtime::Runtime,
-    config: ffi::MasterConfig,
+    config: ffi::MasterChannelConfig,
     path: &CStr,
     serial_params: ffi::SerialPortSettings,
     retry_delay: Duration,
@@ -592,10 +592,12 @@ pub(crate) unsafe fn endpoint_list_add(list: *mut EndpointList, endpoint: &CStr)
     }
 }
 
-fn convert_config(config: ffi::MasterConfig) -> Result<MasterConfig, ffi::ParamError> {
+fn convert_config(
+    config: ffi::MasterChannelConfig,
+) -> Result<MasterChannelConfig, ffi::ParamError> {
     let address = EndpointAddress::from(config.address())?;
 
-    Ok(MasterConfig {
+    Ok(MasterChannelConfig {
         address,
         decode_level: config.decode_level().clone().into(),
         response_timeout: Timeout::from_duration(config.response_timeout()).unwrap(),

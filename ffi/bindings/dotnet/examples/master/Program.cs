@@ -165,10 +165,10 @@ class MainClass
         }
     }
 
-    private static MasterConfig GetMasterConfig()
+    private static MasterChannelConfig GetMasterChannelConfig()
     {
         // create a default configuration with a master address of "1"
-        var config = new MasterConfig(1);
+        var config = new MasterChannelConfig(1);
         
         config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
 
@@ -181,7 +181,7 @@ class MainClass
         var channel = MasterChannel.CreateTcpChannel(
             runtime,
             LinkErrorMode.Close,
-            GetMasterConfig(),
+            GetMasterChannelConfig(),
             new EndpointList("127.0.0.1:20000"),
             new RetryStrategy(),
             TimeSpan.FromSeconds(1),
