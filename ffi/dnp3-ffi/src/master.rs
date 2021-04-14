@@ -89,13 +89,17 @@ pub unsafe fn master_channel_destroy(channel: *mut MasterChannel) {
     }
 }
 
-pub unsafe fn master_channel_enable(channel: *mut crate::MasterChannel) -> Result<(), ffi::ParamError> {
+pub unsafe fn master_channel_enable(
+    channel: *mut crate::MasterChannel,
+) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     channel.runtime.block_on(channel.handle.enable())??;
     Ok(())
 }
 
-pub unsafe fn master_channel_disable(channel: *mut crate::MasterChannel) -> Result<(), ffi::ParamError> {
+pub unsafe fn master_channel_disable(
+    channel: *mut crate::MasterChannel,
+) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     channel.runtime.block_on(channel.handle.disable())??;
     Ok(())
