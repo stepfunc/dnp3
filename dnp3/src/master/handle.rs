@@ -18,22 +18,26 @@ use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
 use crate::util::channel::Sender;
 
-/// Handle used to control a master
+/// Handle to a master communication channel. This handle controls
+/// a task running on the Tokio Runtime.
+///
+/// It provides a uniform API for all of the various types of communication channels supported
+/// by the library.
 #[derive(Debug, Clone)]
-pub struct MasterHandle {
+pub struct MasterChannel {
     sender: Sender<Message>,
 }
 
-/// Handle used to make requests against a particular outstation associated with the master
+/// Handle used to make requests against a particular outstation associated with the master channel
 #[derive(Clone, Debug)]
 pub struct AssociationHandle {
     address: EndpointAddress,
-    master: MasterHandle,
+    master: MasterChannel,
 }
 
-/// Master configuration
+/// Configuration for a MasterChannel
 #[derive(Copy, Clone, Debug)]
-pub struct MasterConfig {
+pub struct MasterChannelConfig {
     /// Local DNP3 master address
     pub address: EndpointAddress,
     /// Decode-level for DNP3 objects
@@ -42,15 +46,15 @@ pub struct MasterConfig {
     pub response_timeout: Timeout,
     /// TX buffer size
     ///
-    /// Should be at least 249.
+    /// Must be at least 249.
     pub tx_buffer_size: usize,
     /// RX buffer size
     ///
-    /// Should be at least 2048.
+    /// Must be at least 2048.
     pub rx_buffer_size: usize,
 }
 
-impl MasterConfig {
+impl MasterChannelConfig {
     /// Create a configuration with default buffer sizes
     pub fn new(
         address: EndpointAddress,
@@ -67,7 +71,7 @@ impl MasterConfig {
     }
 }
 
-impl MasterHandle {
+impl MasterChannel {
     pub(crate) fn new(sender: Sender<Message>) -> Self {
         Self { sender }
     }
@@ -156,11 +160,11 @@ impl MasterHandle {
 impl AssociationHandle {
     /// constructor only used in the FFI
     #[cfg(feature = "ffi")]
-    pub fn create(address: EndpointAddress, master: MasterHandle) -> Self {
+    pub fn create(address: EndpointAddress, master: MasterChannel) -> Self {
         Self::new(address, master)
     }
 
-    pub(crate) fn new(address: EndpointAddress, master: MasterHandle) -> Self {
+    pub(crate) fn new(address: EndpointAddress, master: MasterChannel) -> Self {
         Self { address, master }
     }
 

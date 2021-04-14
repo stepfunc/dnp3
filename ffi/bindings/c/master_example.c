@@ -168,7 +168,7 @@ int main()
     // ANCHOR: runtime_declare
     dnp3_runtime_t* runtime = NULL;
     // ANCHOR_END: runtime_declare
-    dnp3_master_t* master = NULL;
+    dnp3_master_channel_t* channel = NULL;
 
     // error code we'll reference elsewhere
     dnp3_param_error_t err = DNP3_PARAM_ERROR_OK;
@@ -182,9 +182,9 @@ int main()
         goto cleanup;
     }
         
-    // Create the master
-    dnp3_master_config_t master_config = dnp3_master_config_init(1);
-    master_config.decode_level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
+    // Create the master channel
+    dnp3_master_channel_config_t channel_config = dnp3_master_channel_config_init(1);
+    channel_config.decode_level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
 
     dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_new("127.0.0.1:20000");
     dnp3_client_state_listener_t listener = {
@@ -193,7 +193,7 @@ int main()
         .ctx = NULL,
     };
         
-    err = dnp3_master_create_tcp_session(runtime, DNP3_LINK_ERROR_MODE_CLOSE, master_config, endpoints, dnp3_retry_strategy_init(), 1000, listener, &master);
+    err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, channel_config, endpoints, dnp3_retry_strategy_init(), 1000, listener, &channel);
     if (err) {
         printf("unable to create master: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
@@ -235,18 +235,18 @@ int main()
         .ctx = NULL,
     };
     dnp3_association_id_t association_id;
-    if (dnp3_master_add_association(master, 1024, association_config, read_handler, time_provider, &association_id)) {
+    if (dnp3_master_channel_add_association(channel, 1024, association_config, read_handler, time_provider, &association_id)) {
         goto cleanup;
     }
 
     // Add an event poll
     dnp3_request_t *poll_request = dnp3_request_new_class(false, true, true, true);
     dnp3_poll_id_t poll_id;
-    dnp3_master_add_poll(master, association_id, poll_request, 5000, &poll_id);
+    dnp3_master_channel_add_poll(channel, association_id, poll_request, 5000, &poll_id);
     dnp3_request_destroy(poll_request);
 
     // start communications
-    dnp3_master_enable(master);
+    dnp3_master_channel_enable(channel);
 
     char cbuf[10];
     while (true) {
@@ -257,19 +257,19 @@ int main()
         }
         else if (strcmp(cbuf, "enable\n") == 0) {
             printf("calling enable\n");
-            dnp3_master_enable(master);
+            dnp3_master_channel_enable(channel);
         }
         else if (strcmp(cbuf, "disable\n") == 0) {
             printf("calling disable\n");
-            dnp3_master_disable(master);
+            dnp3_master_channel_disable(channel);
         }
         else if (strcmp(cbuf, "dln\n") == 0) {
-            dnp3_master_set_decode_level(master, dnp3_decode_level_init());
+            dnp3_master_channel_set_decode_level(channel, dnp3_decode_level_init());
         }
         else if (strcmp(cbuf, "dlv\n") == 0) {
             dnp3_decode_level_t level = dnp3_decode_level_init();
             level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
-            dnp3_master_set_decode_level(master, level);
+            dnp3_master_channel_set_decode_level(channel, level);
         }
         else if (strcmp(cbuf, "rao\n") == 0) {
             dnp3_request_t *request = dnp3_request_new();
@@ -280,7 +280,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
-            dnp3_master_read(master, association_id, request, cb);
+            dnp3_master_channel_read(channel, association_id, request, cb);
 
             dnp3_request_destroy(request);
         }
@@ -294,7 +294,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
-            dnp3_master_read(master, association_id, request, cb);
+            dnp3_master_channel_read(channel, association_id, request, cb);
 
             dnp3_request_destroy(request);
         }
@@ -309,12 +309,12 @@ int main()
                 .ctx = NULL,
             };
 
-            dnp3_master_operate(master, association_id, DNP3_COMMAND_MODE_SELECT_BEFORE_OPERATE, commands, cb);
+            dnp3_master_channel_operate(channel, association_id, DNP3_COMMAND_MODE_SELECT_BEFORE_OPERATE, commands, cb);
 
             dnp3_commands_destroy(commands);
         }
         else if (strcmp(cbuf, "evt\n") == 0) {
-            dnp3_master_demand_poll(master, poll_id);
+            dnp3_master_channel_demand_poll(channel, poll_id);
         }
         else if (strcmp(cbuf, "lts\n") == 0) {
             dnp3_time_sync_task_callback_t cb = {
@@ -322,7 +322,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
-            dnp3_master_sync_time(master, association_id, DNP3_TIME_SYNC_MODE_LAN, cb);
+            dnp3_master_channel_sync_time(channel, association_id, DNP3_TIME_SYNC_MODE_LAN, cb);
         }
         else if (strcmp(cbuf, "nts\n") == 0) {
             dnp3_time_sync_task_callback_t cb = {
@@ -330,7 +330,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
-            dnp3_master_sync_time(master, association_id, DNP3_TIME_SYNC_MODE_NON_LAN, cb);
+            dnp3_master_channel_sync_time(channel, association_id, DNP3_TIME_SYNC_MODE_NON_LAN, cb);
         }
         else if (strcmp(cbuf, "crt\n") == 0) {
             dnp3_restart_task_callback_t cb = {
@@ -338,7 +338,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
-            dnp3_master_cold_restart(master, association_id, cb);
+            dnp3_master_channel_cold_restart(channel, association_id, cb);
         }
         else if (strcmp(cbuf, "wrt\n") == 0) {
             dnp3_restart_task_callback_t cb = {
@@ -346,7 +346,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
-            dnp3_master_warm_restart(master, association_id, cb);
+            dnp3_master_channel_warm_restart(channel, association_id, cb);
         }
         else if (strcmp(cbuf, "lsr\n") == 0) {
             dnp3_link_status_callback_t cb = {
@@ -354,7 +354,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
-            dnp3_master_check_link_status(master, association_id, cb);
+            dnp3_master_channel_check_link_status(channel, association_id, cb);
         }
         else {
             printf("Unknown command\n");
@@ -363,7 +363,7 @@ int main()
     
 // all of the destroy functions are NULL-safe
 cleanup:    
-    dnp3_master_destroy(master);
+    dnp3_master_channel_destroy(channel);
     // ANCHOR: runtime_destroy
     dnp3_runtime_destroy(runtime);
     // ANCHOR_END: runtime_destroy

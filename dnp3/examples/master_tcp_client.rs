@@ -28,10 +28,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
     // ANCHOR_END: logging
 
-    // spawn the master onto another task
-    let mut master = spawn_master_tcp_client(
+    // spawn the master channel onto another task
+    let mut channel = spawn_master_tcp_client(
         LinkErrorMode::Close,
-        MasterConfig::new(
+        MasterChannelConfig::new(
             EndpointAddress::from(1)?,
             AppDecodeLevel::ObjectValues.into(),
             Timeout::from_secs(1)?,
@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.enable_unsol_classes = EventClasses::none();
     config.auto_time_sync = Some(TimeSyncProcedure::Lan);
     config.keep_alive_timeout = Some(Duration::from_secs(60));
-    let mut association = master
+    let mut association = channel
         .add_association(EndpointAddress::from(1024)?, config, NullHandler::boxed())
         .await?;
 
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    master.enable().await?;
+    channel.enable().await?;
 
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
@@ -66,16 +66,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
             "enable" => {
-                master.enable().await?;
+                channel.enable().await?;
             }
             "disable" => {
-                master.disable().await?;
+                channel.disable().await?;
             }
             "dln" => {
-                master.set_decode_level(DecodeLevel::nothing()).await?;
+                channel.set_decode_level(DecodeLevel::nothing()).await?;
             }
             "dlv" => {
-                master
+                channel
                     .set_decode_level(AppDecodeLevel::ObjectValues.into())
                     .await?;
             }

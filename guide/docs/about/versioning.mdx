@@ -8,6 +8,12 @@ slug: /versioning
 This library follows the [semantic versioning](https://semver.org/) specification. Refer to the specification for the meaning of the `<major>.<minor>.<patch>`
 fields of the version number.
 
-## Change Log
+import sitedata from '../../sitedata.json'
 
-TODO: import the changelog here from the source
+<>The latest release (version {sitedata.version}) is available <a href={`${sitedata.github_url}/releases/tag/${sitedata.version}`}>here</a>.</>
+
+## Changelog
+
+import Changelog from '../CHANGELOG.md';
+
+<Changelog />
