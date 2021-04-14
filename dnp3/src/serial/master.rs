@@ -23,7 +23,7 @@ pub fn spawn_master_serial(
     serial_settings: SerialSettings,
     retry_delay: Duration,
     listener: Listener<PortState>,
-) -> MasterHandle {
+) -> MasterChannel {
     let (future, handle) =
         create_master_serial(config, path, serial_settings, retry_delay, listener);
     crate::tokio::spawn(future);
@@ -44,7 +44,7 @@ pub fn create_master_serial(
     settings: SerialSettings,
     retry_delay: Duration,
     listener: Listener<PortState>,
-) -> (impl Future<Output = ()> + 'static, MasterHandle) {
+) -> (impl Future<Output = ()> + 'static, MasterChannel) {
     let log_path = path.to_owned();
     let (mut task, handle) = MasterTask::new(path, settings, config, retry_delay, listener);
     let future = async move {
@@ -73,7 +73,7 @@ impl MasterTask {
         config: MasterConfig,
         retry_delay: Duration,
         listener: Listener<PortState>,
-    ) -> (Self, MasterHandle) {
+    ) -> (Self, MasterChannel) {
         let (tx, rx) = crate::util::channel::request_channel();
         let session = MasterSession::new(
             false,
@@ -97,7 +97,7 @@ impl MasterTask {
             writer,
             listener,
         };
-        (task, MasterHandle::new(tx))
+        (task, MasterChannel::new(tx))
     }
 
     async fn run(&mut self) {

@@ -109,7 +109,7 @@ struct Pair {
     // have to hold onto this to keep TCP server alive
     _server: ServerHandle,
     // have to hold onto this to keep master alive
-    _master: MasterHandle,
+    _master: MasterChannel,
     // count of matching measurements received
     rx: tokio::sync::mpsc::Receiver<usize>,
     // used to update the database
@@ -205,7 +205,7 @@ impl Pair {
         port: u16,
         config: TestConfig,
     ) -> (
-        MasterHandle,
+        MasterChannel,
         Measurements,
         tokio::sync::mpsc::Receiver<usize>,
     ) {

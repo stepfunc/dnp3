@@ -178,7 +178,7 @@ class MainClass
     private static async Task MainAsync(Runtime runtime)
     {
 
-        var master = Master.CreateTcpSession(
+        var channel = MasterChannel.CreateTcpChannel(
             runtime,
             LinkErrorMode.Close,
             GetMasterConfig(),
@@ -188,7 +188,7 @@ class MainClass
             new TestListener()
         );
         
-        var association = master.AddAssociation(
+        var association = channel.AddAssociation(
             1024,
             new AssociationConfig(EventClasses.All(), EventClasses.All(), Classes.All(), EventClasses.None())
             {
@@ -204,10 +204,10 @@ class MainClass
             new TestTimeProvider()
         );
         
-        var poll = master.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
+        var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
 
         // start communications
-        master.Enable();
+        channel.Enable();
 
         while (true)
         {
@@ -217,29 +217,29 @@ class MainClass
                     return;
                 case "enable":
                     {
-                        master.Enable();
+                        channel.Enable();
                         break;
                     }
                 case "disable":
                     {
-                        master.Disable();
+                        channel.Disable();
                         break;
                     }
                 case "dln":
                     {
-                        master.SetDecodeLevel(new DecodeLevel());
+                        channel.SetDecodeLevel(new DecodeLevel());
                         break;
                     }
                 case "dlv":
-                    {                        
-                        master.SetDecodeLevel(new DecodeLevel() { Application = AppDecodeLevel.ObjectValues });
+                    {
+                        channel.SetDecodeLevel(new DecodeLevel() { Application = AppDecodeLevel.ObjectValues });
                         break;
                     }
                 case "rao":
                     {
                         var request = new Request();
                         request.AddAllObjectsHeader(Variation.Group40Var0);
-                        var result = await master.Read(association, request);
+                        var result = await channel.Read(association, request);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
@@ -248,7 +248,7 @@ class MainClass
                         var request = new Request();
                         request.AddAllObjectsHeader(Variation.Group10Var0);
                         request.AddAllObjectsHeader(Variation.Group40Var0);
-                        var result = await master.Read(association, request);
+                        var result = await channel.Read(association, request);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
@@ -256,42 +256,42 @@ class MainClass
                     {
                         var commands = new Commands();
                         commands.AddG12v1u8(3, new G12v1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
-                        var result = await master.Operate(association, CommandMode.SelectBeforeOperate, commands);
+                        var result = await channel.Operate(association, CommandMode.SelectBeforeOperate, commands);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
                 case "evt":
                     {
-                        master.DemandPoll(poll);                        
+                        channel.DemandPoll(poll);                        
                         break;
                     }                    
                 case "lts":
                     {
-                        var result = await master.SynchronizeTime(association, TimeSyncMode.Lan);
+                        var result = await channel.SynchronizeTime(association, TimeSyncMode.Lan);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
                 case "nts":
                     {
-                        var result = await master.SynchronizeTime(association, TimeSyncMode.NonLan);
+                        var result = await channel.SynchronizeTime(association, TimeSyncMode.NonLan);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
                 case "crt":
                     {
-                        var result = await master.ColdRestart(association);
+                        var result = await channel.ColdRestart(association);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
                 case "wrt":
                     {
-                        var result = await master.WarmRestart(association);
+                        var result = await channel.WarmRestart(association);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }
                 case "lsr":
                     {
-                        var result = await master.CheckLinkStatus(association);
+                        var result = await channel.CheckLinkStatus(association);
                         Console.WriteLine($"Result: {result}");
                         break;
                     }                    
