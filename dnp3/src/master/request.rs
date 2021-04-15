@@ -154,7 +154,7 @@ impl Classes {
     }
 
     /// construct a `Classes` with everything enabled
-    pub fn integrity() -> Self {
+    pub fn all() -> Self {
         Self::new(true, EventClasses::all())
     }
 

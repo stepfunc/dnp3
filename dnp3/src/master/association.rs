@@ -56,15 +56,38 @@ pub struct AssociationConfig {
 impl AssociationConfig {
     const DEFAULT_MAX_QUEUED_USER_REQUESTS: usize = 16;
 
+    /// Construct an `AssociationConfig` specifying the unsolicited, integrity, and auto event scan behaviors
+    ///
+    /// Other fields are set to defaults
+    pub fn new(
+        disable_unsol_classes: EventClasses,
+        enable_unsol_classes: EventClasses,
+        startup_integrity_classes: Classes,
+        event_scan_on_events_available: EventClasses,
+    ) -> Self {
+        Self {
+            disable_unsol_classes,
+            enable_unsol_classes,
+            startup_integrity_classes,
+            auto_time_sync: None,
+            auto_tasks_retry_strategy: RetryStrategy::default(),
+            keep_alive_timeout: None,
+            auto_integrity_scan_on_buffer_overflow: false,
+            event_scan_on_events_available,
+            max_queued_user_requests: Self::DEFAULT_MAX_QUEUED_USER_REQUESTS,
+        }
+    }
+
+
     /// Construct an `AssociationConfig` which will not perform any of the default handshaking
     /// at the beginning of the communications session.
-    pub fn quiet(auto_tasks_retry_strategy: RetryStrategy) -> Self {
+    pub fn quiet() -> Self {
         Self {
             disable_unsol_classes: EventClasses::none(),
             enable_unsol_classes: EventClasses::none(),
             startup_integrity_classes: Classes::none(),
             auto_time_sync: None,
-            auto_tasks_retry_strategy,
+            auto_tasks_retry_strategy: RetryStrategy::default(),
             keep_alive_timeout: None,
             auto_integrity_scan_on_buffer_overflow: false,
             event_scan_on_events_available: EventClasses::none(),
@@ -78,7 +101,7 @@ impl Default for AssociationConfig {
         Self {
             disable_unsol_classes: EventClasses::all(),
             enable_unsol_classes: EventClasses::all(),
-            startup_integrity_classes: Classes::integrity(),
+            startup_integrity_classes: Classes::all(),
             auto_time_sync: None,
             auto_tasks_retry_strategy: RetryStrategy::default(),
             keep_alive_timeout: None,

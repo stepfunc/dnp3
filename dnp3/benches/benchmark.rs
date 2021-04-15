@@ -256,7 +256,7 @@ impl Pair {
     }
 
     fn get_association_config() -> AssociationConfig {
-        let mut config = AssociationConfig::quiet(RetryStrategy::default());
+        let mut config = AssociationConfig::quiet();
         config.enable_unsol_classes = EventClasses::all();
         config
     }

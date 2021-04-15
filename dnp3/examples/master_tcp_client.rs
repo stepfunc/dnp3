@@ -20,8 +20,16 @@ fn get_master_channel_config() -> Result<MasterChannelConfig, Box<dyn std::error
 
 // ANCHOR: association_config
 fn get_association_config() -> AssociationConfig {
-    let mut config = AssociationConfig::default();
-    config.enable_unsol_classes = EventClasses::none();
+    let mut config = AssociationConfig::new(
+        // disable unsolicited first (Class 1/2/3)
+        EventClasses::all(),
+        // after the integrity poll, enable unsolicited (Class 1/2/3)
+        EventClasses::all(),
+        // perform startup integrity poll with Class 1/2/3/0
+        Classes::all(),
+        // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
+        EventClasses::none(),
+    );
     config.auto_time_sync = Some(TimeSyncProcedure::Lan);
     config.keep_alive_timeout = Some(Duration::from_secs(60));
     config
