@@ -229,3 +229,27 @@ jobs:
         with:
           name: java-bindings
           path: ffi/bindings/java/dnp3rs/target/*.jar
+  release:
+    needs: packaging
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v2
+        with:
+          path: artifacts
+      - name: Package C bindings
+        shell: bash
+        run: >
+          mkdir release &&
+          for i in artifacts/c-bindings/*; do (cd $i && zip -r ../../../release/foo-${GITHUB_REF##*/}-$(basename $i).zip .); done
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          files: |
+            release/*.zip
+            artifacts/dotnet-bindings/dnp3rs*
+            artifacts/java-bindings/*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
