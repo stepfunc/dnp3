@@ -18,6 +18,16 @@ fn get_master_channel_config() -> Result<MasterChannelConfig, Box<dyn std::error
 }
 // ANCHOR_END: master_channel_config
 
+// ANCHOR: association_config
+fn get_association_config() -> AssociationConfig {
+    let mut config = AssociationConfig::default();
+    config.enable_unsol_classes = EventClasses::none();
+    config.auto_time_sync = Some(TimeSyncProcedure::Lan);
+    config.keep_alive_timeout = Some(Duration::from_secs(60));
+    config
+}
+// ANCHOR_END: association_config
+
 /*
   Example of using the master API from within the Tokio runtime.
   The program initializes a master and then enters a loop reading console input
@@ -45,16 +55,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Listener::None,
     );
 
-    // Create the association
-    let mut config = AssociationConfig::default();
-    config.enable_unsol_classes = EventClasses::none();
-    config.auto_time_sync = Some(TimeSyncProcedure::Lan);
-    config.keep_alive_timeout = Some(Duration::from_secs(60));
+    // create the association
     let mut association = channel
-        .add_association(EndpointAddress::from(1024)?, config, NullHandler::boxed())
+        .add_association(
+            EndpointAddress::from(1024)?,
+            get_association_config(),
+            NullHandler::boxed(),
+        )
         .await?;
 
-    // Create event poll
+    // create event poll
     let mut poll = association
         .add_poll(
             EventClasses::all().to_classes().to_request(),
@@ -62,6 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
+    // enable communications
     channel.enable().await?;
 
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());

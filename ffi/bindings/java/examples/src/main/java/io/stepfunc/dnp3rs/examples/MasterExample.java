@@ -235,6 +235,24 @@ public class MasterExample {
   }
   // ANCHOR_END: master_channel_config
 
+  // ANCHOR: association_config
+  private static AssociationConfig getAssociationConfig() {
+      AssociationConfig config = new AssociationConfig(
+          // disable unsolicited first (Class 1/2/3)
+          EventClasses.all(),
+          // after the integrity poll, enable unsolicited (Class 1/2/3)
+          EventClasses.all(),
+          // perform startup integrity poll with Class 1/2/3/0
+          Classes.all(),
+          // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
+          EventClasses.none()
+      );
+      config.autoTimeSync = AutoTimeSync.LAN;
+      config.keepAliveTimeout = Duration.ofSeconds(60);
+      return config;
+  }
+  // ANCHOR_END: association_config
+
   public static void main(String[] args) {
     // ANCHOR: logging_init
     // Initialize logging with the default configuration
@@ -268,15 +286,7 @@ public class MasterExample {
             new TestListener());
 
     // Create the association
-    AssociationConfig associationConfig =
-        new AssociationConfig(
-            EventClasses.all(), EventClasses.all(), Classes.all(), EventClasses.none());
-    associationConfig.autoTimeSync = AutoTimeSync.LAN;
-    associationConfig.keepAliveTimeout = Duration.ofSeconds(60);
-
-    AssociationId association =
-        channel.addAssociation(
-            ushort(1024), associationConfig, new TestReadHandler(), new TestTimeProvider());
+    AssociationId association = channel.addAssociation(ushort(1024), getAssociationConfig(), new TestReadHandler(), new TestTimeProvider());
 
     // Create a periodic poll
     PollId poll =

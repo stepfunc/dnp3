@@ -174,6 +174,25 @@ class MainClass
     }
     // ANCHOR_END: master_channel_config
 
+    // ANCHOR: association_config
+    private static AssociationConfig GetAssociationConfig()
+    {
+        var config new AssociationConfig(
+            // disable unsolicited first (Class 1/2/3)
+            EventClasses.All(),
+            // after the integrity poll, enable unsolicited (Class 1/2/3)
+            EventClasses.All(),
+            // perform startup integrity poll with Class 1/2/3/0
+            Classes.All(),
+            // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
+            EventClasses.None()
+        );
+        config.AutoTimeSync = AutoTimeSync.Lan;
+        config.KeepAliveTimeout = TimeSpan.FromSeconds(60);
+        return config;
+    }
+    // ANCHOR_END: association_config
+
     private static async Task MainAsync(Runtime runtime)
     {
 
@@ -189,16 +208,7 @@ class MainClass
         
         var association = channel.AddAssociation(
             1024,
-            new AssociationConfig(EventClasses.All(), EventClasses.All(), Classes.All(), EventClasses.None())
-            {
-                AutoTimeSync = AutoTimeSync.Lan,
-                AutoTasksRetryStrategy = new RetryStrategy
-                {
-                    MinDelay = TimeSpan.FromSeconds(1),
-                    MaxDelay = TimeSpan.FromSeconds(5),
-                },
-                KeepAliveTimeout = TimeSpan.FromSeconds(60),
-            },
+            GetAssociationConfig(),
             new TestReadHandler(),            
             new TestTimeProvider()
         );
