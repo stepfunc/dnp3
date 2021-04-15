@@ -227,11 +227,13 @@ class TestTimeProvider implements TimeProvider {
 
 public class MasterExample {
 
+  // ANCHOR: master_channel_config
   private static MasterChannelConfig getMasterChannelConfig() {
     MasterChannelConfig config = new MasterChannelConfig(ushort(1));
     config.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
     return config;
   }
+  // ANCHOR_END: master_channel_config
 
   public static void main(String[] args) {
     // ANCHOR: logging_init

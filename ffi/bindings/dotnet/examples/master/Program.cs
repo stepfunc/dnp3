@@ -165,15 +165,14 @@ class MainClass
         }
     }
 
+    // ANCHOR: master_channel_config
     private static MasterChannelConfig GetMasterChannelConfig()
     {
-        // create a default configuration with a master address of "1"
         var config = new MasterChannelConfig(1);
-        
         config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
-
         return config;
     }
+    // ANCHOR_END: master_channel_config
 
     private static async Task MainAsync(Runtime runtime)
     {
