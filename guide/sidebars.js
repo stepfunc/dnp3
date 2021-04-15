@@ -23,18 +23,18 @@ module.exports = {
         'api/runtime',
         {
             Outstation: [
+                'api/outstation/configuration',
                 {
-                    Components: [
-                        'api/outstation/configuration',
+                    Interfaces: [
                         'api/outstation/controls',
                         'api/outstation/application',
                         'api/outstation/outstation_info',
                     ],
-                    Creation: [
+                    Transports: [
                         'api/outstation/tcp_server',
                         'api/outstation/serial_outstation',
                     ],
-                    Execution: [
+                    Running: [
                         'api/outstation/outstation',
                         'api/outstation/database',
                     ]
@@ -45,7 +45,10 @@ module.exports = {
             Master: [
                 'api/master/terminology',
                 {
-                    Components: []
+                    Configuration: [
+                        'api/master/channel_config',
+                        'api/master/assoc_config',
+                    ]
                 }
             ]
         }

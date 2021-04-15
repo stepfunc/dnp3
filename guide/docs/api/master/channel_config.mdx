@@ -1,0 +1,62 @@
+---
+id: channel_config
+title: MasterChannelConfig
+sidebar_label: MasterChannelConfig
+slug: /api/master/channel/config
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+The `MasterChannelConfig` struct contains generic settings common to all communication channels:
+
+* Address of the master station (different addresses may be used for different channels)
+* Initial decoding level
+* Timeout for responses from the outstation(s)
+* Transmit and receive buffer sizes
+
+The constructor takes the master address and has reasonable defaults for all of the other settings. The default response timeout of 5 seconds
+may need to need to be increased for high-latency communication links.  The default buffer sizes of 2048 bytes should only need to be adjusted
+if an outstation has a non-standard configuration.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/outstation_tcp_server.rs:outstation_config}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/outstation_example.c:outstation_config}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/OutstationExample.java:outstation_config}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:outstation_config}}
+```
+
+</TabItem>
+</Tabs>
+
+
+

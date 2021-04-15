@@ -1,0 +1,17 @@
+---
+id: assoc_config
+title: AssociationConfig
+sidebar_label: AssociationConfig
+slug: /api/master/association/config
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+The `AssocationConfig` struct provides configuration information needed to communicate with a particular outstation on the communication channel including:
+
+* Whether to enable/disable unsolicited reporting when initializing communication
+* If and how to perform time synchronization
+* Per-association task queue size
+
+The outstation address is supplied as a separate argument when adding an association to a channel.
