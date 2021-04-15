@@ -87,7 +87,7 @@ impl MasterTask {
         );
         let (reader, writer) = crate::transport::create_master_transport_layer(
             link_error_mode,
-            config.address,
+            config.master_address,
             config.rx_buffer_size,
         );
         let task = Self {

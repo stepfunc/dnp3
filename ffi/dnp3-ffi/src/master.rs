@@ -598,7 +598,7 @@ fn convert_config(
     let address = EndpointAddress::from(config.address())?;
 
     Ok(MasterChannelConfig {
-        address,
+        master_address: address,
         decode_level: config.decode_level().clone().into(),
         response_timeout: Timeout::from_duration(config.response_timeout()).unwrap(),
         tx_buffer_size: config.tx_buffer_size() as usize,

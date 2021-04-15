@@ -10,6 +10,13 @@ use dnp3::link::*;
 use dnp3::master::*;
 use dnp3::tcp::*;
 
+fn get_master_channel_config() -> Result<MasterChannelConfig, Box<dyn std::error::Error>> {
+    let mut config = MasterChannelConfig::new(EndpointAddress::from(1)?);
+    config.decode_level = AppDecodeLevel::ObjectValues.into();
+    config.response_timeout = Timeout::from_secs(1)?;
+    Ok(config)
+}
+
 /*
   Example of using the master API from within the Tokio runtime.
   The program initializes a master and then enters a loop reading console input
@@ -31,11 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // spawn the master channel onto another task
     let mut channel = spawn_master_tcp_client(
         LinkErrorMode::Close,
-        MasterChannelConfig::new(
-            EndpointAddress::from(1)?,
-            AppDecodeLevel::ObjectValues.into(),
-            Timeout::from_secs(1)?,
-        ),
+        get_master_channel_config()?,
         EndpointList::new("127.0.0.1:20000".to_owned(), &[]),
         ReconnectStrategy::default(),
         Listener::None,
