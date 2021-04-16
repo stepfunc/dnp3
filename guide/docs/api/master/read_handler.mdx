@@ -17,4 +17,16 @@ When a response or unsolicited response is parsed and determined to carry measur
 2. `ReadHandler::handle<TYPE>` for each object header in the message.
 3. `ReadHandler::endFragment`
 
-The begin/end methods provide useful information
+The begin/end methods provide useful information:
+
+* The full header of the response
+* Context regarding what triggered the response, e.g. unsolicited, startup integrity scan, periodic poll, etc
+
+:::tip
+It is common to maintain a list of measurement values in your `ReadHandler` implementation and then use the `endFragment` method as a trigger for publishing them.
+Since responses may consist of multiple fragments, you may also with to check that `ResponseHeader.Control.Fin` is set to `true` indicating that the current
+fragment is the final fragment in the response series.
+:::
+
+The example programs demonstrate how to iterate over measurement values to print them to the console:
+
