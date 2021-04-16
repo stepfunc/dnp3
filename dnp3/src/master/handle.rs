@@ -109,13 +109,15 @@ impl MasterChannel {
         &mut self,
         address: EndpointAddress,
         config: AssociationConfig,
-        handler: Box<dyn AssociationHandler>,
+        read_handler: Box<dyn ReadHandler>,
+        assoc_handler: Box<dyn AssociationHandler>,
     ) -> Result<AssociationHandle, AssociationError> {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
         self.send_master_message(MasterMsg::AddAssociation(
             address,
             config,
-            handler,
+            read_handler,
+            assoc_handler,
             Promise::OneShot(tx),
         ))
         .await?;
@@ -329,9 +331,6 @@ pub trait AssociationHandler: Send {
     fn get_system_time(&self) -> Option<Timestamp> {
         Timestamp::try_from_system_time(SystemTime::now())
     }
-
-    /// retrieve a handler used to process received measurement data
-    fn get_read_handler(&mut self) -> &mut dyn ReadHandler;
 }
 
 /// Information about the object header from which the measurement values were mapped
@@ -366,7 +365,7 @@ pub enum ReadType {
 }
 
 /// Trait used to process measurement data received from an outstation
-pub trait ReadHandler {
+pub trait ReadHandler: Send {
     /// Called as the first action before any of the type-specific handle methods are invoked
     ///
     /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
@@ -489,8 +488,4 @@ impl ReadHandler for NullHandler {
     }
 }
 
-impl AssociationHandler for NullHandler {
-    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-}
+impl AssociationHandler for NullHandler {}

@@ -11,7 +11,7 @@ The core library is written in idiomatic Rust without any real thought for how i
 correlate 100% with the various binding APIs. This guide is still helpful for Rust users, but readers should be aware that the guide is primarily written from
 the perspective of the bindings.
 
-## Terminology
+## Generic Terminology
 
 The guide use terms like `struct`, `interface`, and `class` frequently. These terms do not map directly to all languages. Refer to the following
 language-specific pages for how to interpret these terms. For example, Rust doesn't have inheritance, and therefore doesn't have an interface concept in the
@@ -21,7 +21,7 @@ The following language pages discuss how these abstract concepts map to language
 
 ## Model
 
-We use an internally developed binding generator we call [oo_bindgen](https://github.com/stepfunc/oo_bindgen/) to produce idiomatic bindings for each target
+We use an internally developed binding generator called [oo_bindgen](https://github.com/stepfunc/oo_bindgen/) to produce idiomatic bindings for each target
 language. You can read more about our approach to binding generation in this [blog post](https://stepfunc.io/blog/bindings/).
 
 Using a Rust API, we model the following constructs and their documentation:

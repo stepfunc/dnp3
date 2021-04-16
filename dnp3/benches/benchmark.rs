@@ -232,6 +232,7 @@ impl Pair {
                 Self::outstation_address(),
                 Self::get_association_config(),
                 Box::new(handler),
+                NullHandler::boxed(),
             )
             .await
             .unwrap();
@@ -352,11 +353,7 @@ impl ReadHandler for TestHandler {
     }
 }
 
-impl AssociationHandler for TestHandler {
-    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-}
+impl AssociationHandler for TestHandler {}
 
 // don't need to send every type
 #[derive(Copy, Clone, PartialEq, Debug)]

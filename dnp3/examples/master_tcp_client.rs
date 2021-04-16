@@ -69,6 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             EndpointAddress::from(1024)?,
             get_association_config(),
             NullHandler::boxed(),
+            NullHandler::boxed(),
         )
         .await?;
 

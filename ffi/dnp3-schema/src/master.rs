@@ -654,15 +654,15 @@ fn define_endpoint_list(
 }
 
 fn define_time_provider(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
-    let timestamp_struct = lib.declare_native_struct("TimeProviderTimestamp")?;
+    let timestamp_struct = lib.declare_native_struct("TimestampUtc")?;
     let timestamp_struct = lib.define_native_struct(&timestamp_struct)?
         .add("value", Type::Uint64, doc("Value of the timestamp (in milliseconds from UNIX Epoch).").warning("Only 48 bits are available for timestamps."))?
         .add("is_valid", Type::Bool, "True if the timestamp is valid, false otherwise.")?
-        .doc(doc("Timestamp value returned by {interface:TimeProvider}.").details("{struct:TimeProviderTimestamp.value} is only valid if {struct:TimeProviderTimestamp.is_valid} is true."))?
+        .doc(doc("Timestamp value returned by {interface:AssociationHandler.get_current_time()}.").details("{struct:TimestampUtc.value} is only valid if {struct:TimestampUtc.is_valid} is true."))?
         .build()?;
 
     let valid_constructor = lib
-        .declare_native_function("timeprovidertimestamp_valid")?
+        .declare_native_function("timestamp_utc_valid")?
         .param(
             "value",
             Type::Uint64,
@@ -676,7 +676,7 @@ fn define_time_provider(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, Bin
         .build()?;
 
     let invalid_constructor = lib
-        .declare_native_function("timeprovidertimestamp_invalid")?
+        .declare_native_function("timestamp_utc_invalid")?
         .return_type(ReturnType::new(
             Type::Struct(timestamp_struct.clone()),
             "Timestamp",
@@ -689,22 +689,23 @@ fn define_time_provider(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, Bin
         .static_method("invalid", &invalid_constructor)?
         .build();
 
-    lib.define_interface("TimeProvider", "Current time provider")?
-        .callback(
-            "get_time",
-            doc("Returns the current time of the system.")
-                .details("This callback is called when time synchronization is performed.")
-                .details(
-                    "This can use external clock synchronization or the system clock for example.",
-                ),
-        )?
-        .return_type(ReturnType::new(
-            Type::Struct(timestamp_struct),
-            "The current time",
-        ))?
-        .build()?
-        .destroy_callback("on_destroy")?
-        .build()
+    lib.define_interface(
+        "AssociationHandler",
+        "Callbacks for a particular outstation association",
+    )?
+    .callback(
+        "get_current_time",
+        doc("Returns the current time or an invalid time if none is available")
+            .details("This callback is used when the master performs time synchronization for a particular outstation.")
+            .details("This could return the system clock or some other clock's time"),
+    )?
+    .return_type(ReturnType::new(
+        Type::Struct(timestamp_struct),
+        "The current time",
+    ))?
+    .build()?
+    .destroy_callback("on_destroy")?
+    .build()
 }
 
 fn define_event_classes(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {

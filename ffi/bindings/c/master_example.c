@@ -148,7 +148,6 @@ dnp3_master_channel_config_t get_master_channel_config()
 }
 // ANCHOR_END: master_channel_config
 
-
 // ANCHOR: association_config
 dnp3_association_config_t get_association_config()
 {

@@ -6,7 +6,7 @@ use crate::master::error::{AssociationError, TaskError};
 use crate::master::handle::Promise;
 use crate::master::poll::PollMsg;
 use crate::master::tasks::Task;
-use crate::master::{AssociationConfig, AssociationHandler};
+use crate::master::{AssociationConfig, AssociationHandler, ReadHandler};
 
 /// Messages sent from the handles to the master task via an mpsc.
 pub(crate) enum Message {
@@ -23,6 +23,7 @@ pub(crate) enum MasterMsg {
     AddAssociation(
         EndpointAddress,
         AssociationConfig,
+        Box<dyn ReadHandler>,
         Box<dyn AssociationHandler>,
         Promise<Result<(), AssociationError>>,
     ),

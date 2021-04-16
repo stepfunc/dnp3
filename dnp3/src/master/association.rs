@@ -20,7 +20,7 @@ use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::NonReadTask::TimeSync;
 use crate::master::tasks::{AssociationTask, ReadTask, Task};
-use crate::master::ReadType;
+use crate::master::{ReadHandler, ReadType};
 use crate::tokio::time::Instant;
 use crate::util::Smallest;
 
@@ -77,7 +77,6 @@ impl AssociationConfig {
             max_queued_user_requests: Self::DEFAULT_MAX_QUEUED_USER_REQUESTS,
         }
     }
-
 
     /// Construct an `AssociationConfig` which will not perform any of the default handshaking
     /// at the beginning of the communications session.
@@ -276,7 +275,8 @@ pub(crate) struct Association {
     request_queue: VecDeque<Task>,
     max_request_queue_size: usize,
     auto_tasks: TaskStates,
-    handler: Box<dyn AssociationHandler>,
+    read_handler: Box<dyn ReadHandler>,
+    assoc_handler: Box<dyn AssociationHandler>,
     config: AssociationConfig,
     polls: PollMap,
     next_link_status: Option<Instant>,
@@ -288,7 +288,8 @@ impl Association {
     pub(crate) fn new(
         address: EndpointAddress,
         config: AssociationConfig,
-        handler: Box<dyn AssociationHandler>,
+        read_handler: Box<dyn ReadHandler>,
+        assoc_handler: Box<dyn AssociationHandler>,
     ) -> Self {
         Self {
             address,
@@ -297,7 +298,8 @@ impl Association {
             request_queue: VecDeque::new(),
             max_request_queue_size: config.max_queued_user_requests,
             auto_tasks: TaskStates::new(),
-            handler,
+            read_handler,
+            assoc_handler,
             config,
             polls: PollMap::new(),
             next_link_status: config
@@ -358,7 +360,7 @@ impl Association {
     }
 
     pub(crate) fn get_system_time(&self) -> Option<Timestamp> {
-        self.handler.get_system_time()
+        self.assoc_handler.get_system_time()
     }
 
     pub(crate) fn complete_poll(&mut self, id: u64) {
@@ -505,7 +507,7 @@ impl Association {
                     ReadType::Unsolicited,
                     response.header,
                     objects,
-                    self.handler.get_read_handler(),
+                    self.read_handler.as_mut(),
                 );
             }
 
@@ -527,7 +529,7 @@ impl Association {
             ReadType::StartupIntegrity,
             header,
             objects,
-            self.handler.get_read_handler(),
+            self.read_handler.as_mut(),
         );
     }
 
@@ -540,7 +542,7 @@ impl Association {
             ReadType::PeriodicPoll,
             header,
             objects,
-            self.handler.get_read_handler(),
+            self.read_handler.as_mut(),
         );
     }
 
@@ -553,7 +555,7 @@ impl Association {
             ReadType::PeriodicPoll,
             header,
             objects,
-            self.handler.get_read_handler(),
+            self.read_handler.as_mut(),
         );
     }
 
@@ -566,7 +568,7 @@ impl Association {
             ReadType::SinglePoll,
             header,
             objects,
-            self.handler.get_read_handler(),
+            self.read_handler.as_mut(),
         );
     }
 

@@ -49,6 +49,11 @@ module.exports = {
                         'api/master/channel_config',
                         'api/master/assoc_config',
                     ]
+                },
+                {
+                    Interfaces: [
+                        'api/master/read_handler',
+                    ]
                 }
             ]
         }

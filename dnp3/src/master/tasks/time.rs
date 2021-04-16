@@ -315,7 +315,7 @@ mod tests {
     use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
     use crate::app::Sequence;
     use crate::app::*;
-    use crate::master::handle::{AssociationHandler, NullHandler, ReadHandler};
+    use crate::master::handle::{AssociationHandler, NullHandler};
     use crate::master::tasks::RequestWriter;
     use crate::util::cursor::WriteCursor;
 
@@ -342,10 +342,6 @@ mod tests {
     impl AssociationHandler for SingleTimestampTestHandler {
         fn get_system_time(&self) -> Option<Timestamp> {
             self.time.take()
-        }
-
-        fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
-            &mut self.handler
         }
     }
 
@@ -378,10 +374,6 @@ mod tests {
         impl AssociationHandler for TestHandler {
             fn get_system_time(&self) -> Option<Timestamp> {
                 Some(self.time)
-            }
-
-            fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
-                &mut self.handler
             }
         }
 
@@ -591,6 +583,7 @@ mod tests {
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
                 AssociationConfig::default(),
+                NullHandler::boxed(),
                 Box::new(TestHandler::new(system_time)),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
@@ -614,6 +607,7 @@ mod tests {
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
                 AssociationConfig::default(),
+                NullHandler::boxed(),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
@@ -864,6 +858,7 @@ mod tests {
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
                 AssociationConfig::default(),
+                NullHandler::boxed(),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();

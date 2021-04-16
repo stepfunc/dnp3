@@ -48,7 +48,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.auto_time_sync = Some(TimeSyncProcedure::Lan);
     config.keep_alive_timeout = Some(Duration::from_secs(60));
     let mut association = master
-        .add_association(EndpointAddress::from(1024)?, config, NullHandler::boxed())
+        .add_association(
+            EndpointAddress::from(1024)?,
+            config,
+            NullHandler::boxed(),
+            NullHandler::boxed(),
+        )
         .await?;
 
     // Create event poll

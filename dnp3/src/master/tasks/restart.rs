@@ -131,6 +131,7 @@ mod tests {
             EndpointAddress::from(1).unwrap(),
             AssociationConfig::default(),
             NullHandler::boxed(),
+            NullHandler::boxed(),
         );
         let (tx, mut rx) = crate::tokio::sync::oneshot::channel();
         let task = NonReadTask::Restart(RestartTask::new(
@@ -176,6 +177,7 @@ mod tests {
         let mut association = Association::new(
             EndpointAddress::from(1).unwrap(),
             AssociationConfig::default(),
+            NullHandler::boxed(),
             NullHandler::boxed(),
         );
         let (tx, mut rx) = crate::tokio::sync::oneshot::channel();
