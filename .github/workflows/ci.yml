@@ -5,6 +5,7 @@ on:
       - master
   pull_request:
 jobs:
+  # Run the unit tests on Windows and Linux
   test:
     strategy:
       fail-fast: false
@@ -43,6 +44,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+  # Check formatting and run clippy lints
   linting:
     strategy:
       fail-fast: false
@@ -71,13 +73,14 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+  # Build bindings on Windows x64 and Linux x64
   bindings:
     strategy:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
-          - windows-latest
+          - ubuntu-latest # 64-bit Linux (kernel 2.6.32+, glibc 2.11+) (x86_64-unknown-linux-gnu)
+          - windows-latest # 64-bit MSVC (Windows 7+) (x86_64-pc-windows-msvc)
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -122,18 +125,69 @@ jobs:
         with:
           command: run
           args: --release --bin dnp3-bindings -- --java
-      - name: Upload compiled C bindings
+      - name: Upload compiled C bindings (Windows)
+        if: ${{ runner.os == 'Windows' }}
         uses: actions/upload-artifact@v2
         with:
           name: ffi-modules
-          path: ffi/bindings/c/generated/lib
+          path: ffi/bindings/c/generated/x86_64-pc-windows-msvc/lib
+      - name: Upload compiled C bindings (Linux)
+        if: ${{ runner.os == 'Linux' }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/c/generated/x86_64-unknown-linux-gnu/lib
       - name: Upload compiled Java bindings
         uses: actions/upload-artifact@v2
         with:
           name: ffi-modules
           path: ffi/bindings/java/dnp3rs/src/main/resources
+  # Cross-compilation for ARM devices and produce C bindings
+  cross:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - arm-unknown-linux-gnueabi # ARMv6 Linux (kernel 3.2, glibc 2.17)
+          - arm-unknown-linux-gnueabihf # ARMv6 Linux, hardfloat (kernel 3.2, glibc 2.17)
+          - armv7-unknown-linux-gnueabihf # ARMv7 Linux, hardfloat (kernel 3.2, glibc 2.17)
+          - aarch64-unknown-linux-gnu # ARM64 Linux (kernel 4.2, glibc 2.17+)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+      - name: Update dependencies
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: update
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target ${{ matrix.target }}
+      - name: C bindings
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: run
+          args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --c --no-tests
+      - name: Upload compiled C bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/c/generated/${{ matrix.target }}/lib
+  # Package all the generated bindings
   packaging:
-    needs: bindings
+    needs: [bindings, cross]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -175,39 +229,27 @@ jobs:
         with:
           name: java-bindings
           path: ffi/bindings/java/dnp3rs/target/*.jar
-  conformance:
+  release:
     needs: packaging
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          path: dnp3rs
-      - name: Download pre-built Java bindings
+      - name: Download all artifacts
         uses: actions/download-artifact@v2
         with:
-          name: java-bindings
-          path: java-bindings
-      - name: Install Java bindings
+          path: artifacts
+      - name: Package C bindings
+        shell: bash
         run: >
-          jarfile=( java-bindings/*.jar ) &&
-          sudo mvn --batch-mode org.apache.maven.plugins:maven-install-plugin:3.0.0-M1:install-file -Dfile=$jarfile
-      - name: Checkout dnp4s
-        uses: actions/checkout@v2
+          mkdir release &&
+          for i in artifacts/c-bindings/*; do (cd $i && zip -r ../../../release/foo-${GITHUB_REF##*/}-$(basename $i).zip .); done
+      - name: Create release
+        uses: softprops/action-gh-release@v1
         with:
-          repository: stepfunc/dnp4s
-          ssh-key: ${{ secrets.DNP4S_SSH_KEY }}
-          ref: scala-2.13
-          path: dnp4s
-      - name: Build dnp4s
-        working-directory: dnp4s
-        run: sudo mvn --batch-mode install
-      - name: Run the conformance tests
-        working-directory: dnp3rs/conformance
-        run: sudo mvn --batch-mode scala:run
-      - name: Upload conformance test results
-        if: always()
-        uses: actions/upload-artifact@v2
-        with:
-          name: conformance-results
-          path: dnp3rs/conformance/results
+          draft: true
+          files: |
+            release/*.zip
+            artifacts/dotnet-bindings/dnp3rs*
+            artifacts/java-bindings/*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
