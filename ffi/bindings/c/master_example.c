@@ -168,11 +168,20 @@ dnp3_association_config_t get_association_config()
 // ANCHOR_END: association_config
 
 // Timestamp callback
-dnp3_time_provider_timestamp_t get_time(void *arg)
+dnp3_timestamp_utc_t get_system_time(void *arg)
 {
     time_t timer = time(NULL);
 
-    return dnp3_timeprovidertimestamp_valid(timer * 1000);
+    return dnp3_timestamp_utc_valid(timer * 1000);
+}
+
+dnp3_association_handler_t get_association_handler()
+{
+    return (dnp3_association_handler_t) {
+        .get_current_time = get_system_time,
+        .on_destroy = NULL,
+        .ctx = NULL,
+    };
 }
 
 int main()
@@ -241,14 +250,9 @@ int main()
         .on_destroy = NULL,
         .ctx = NULL,
     };
-
-    dnp3_time_provider_t time_provider = {
-        .get_time = get_time,
-        .on_destroy = NULL,
-        .ctx = NULL,
-    };
+    
     dnp3_association_id_t association_id;
-    if (dnp3_master_channel_add_association(channel, 1024, get_association_config(), read_handler, time_provider, &association_id)) {
+    if (dnp3_master_channel_add_association(channel, 1024, get_association_config(), read_handler, get_association_handler(), &association_id)) {
         goto cleanup;
     }
 

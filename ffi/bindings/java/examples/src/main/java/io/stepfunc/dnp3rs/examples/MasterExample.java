@@ -218,10 +218,10 @@ class TestReadHandler implements ReadHandler {
   }
 }
 
-class TestTimeProvider implements TimeProvider {
+class TestAssociationHandler implements AssociationHandler {
   @Override
-  public TimeProviderTimestamp getTime() {
-    return TimeProviderTimestamp.valid(ulong(System.currentTimeMillis()));
+  public TimestampUtc getCurrentTime() {
+    return TimestampUtc.valid(ulong(System.currentTimeMillis()));
   }
 }
 
@@ -237,19 +237,19 @@ public class MasterExample {
 
   // ANCHOR: association_config
   private static AssociationConfig getAssociationConfig() {
-      AssociationConfig config = new AssociationConfig(
-          // disable unsolicited first (Class 1/2/3)
-          EventClasses.all(),
-          // after the integrity poll, enable unsolicited (Class 1/2/3)
-          EventClasses.all(),
-          // perform startup integrity poll with Class 1/2/3/0
-          Classes.all(),
-          // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
-          EventClasses.none()
-      );
-      config.autoTimeSync = AutoTimeSync.LAN;
-      config.keepAliveTimeout = Duration.ofSeconds(60);
-      return config;
+    AssociationConfig config =
+        new AssociationConfig(
+            // disable unsolicited first (Class 1/2/3)
+            EventClasses.all(),
+            // after the integrity poll, enable unsolicited (Class 1/2/3)
+            EventClasses.all(),
+            // perform startup integrity poll with Class 1/2/3/0
+            Classes.all(),
+            // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
+            EventClasses.none());
+    config.autoTimeSync = AutoTimeSync.LAN;
+    config.keepAliveTimeout = Duration.ofSeconds(60);
+    return config;
   }
   // ANCHOR_END: association_config
 
@@ -286,7 +286,12 @@ public class MasterExample {
             new TestListener());
 
     // Create the association
-    AssociationId association = channel.addAssociation(ushort(1024), getAssociationConfig(), new TestReadHandler(), new TestTimeProvider());
+    AssociationId association =
+        channel.addAssociation(
+            ushort(1024),
+            getAssociationConfig(),
+            new TestReadHandler(),
+            new TestAssociationHandler());
 
     // Create a periodic poll
     PollId poll =

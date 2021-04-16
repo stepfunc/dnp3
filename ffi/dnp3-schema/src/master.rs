@@ -121,7 +121,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
 
     let association_config = define_association_config(lib, shared)?;
 
-    let time_provider_interface = define_time_provider(lib)?;
+    let association_handler_interface = define_association_handler(lib)?;
 
     let request_class = crate::request::define(lib, shared)?;
 
@@ -148,9 +148,9 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             "Interface uses to load measurement data",
         )?
         .param(
-            "time_provider",
-            Type::Interface(time_provider_interface),
-            "Time provider for the association",
+            "association_handler",
+            Type::Interface(association_handler_interface),
+            "Association specific callbacks such as time synchronization",
         )?
         .return_type(ReturnType::new(
             Type::Struct(association_id.clone()),
@@ -653,7 +653,7 @@ fn define_endpoint_list(
     Ok(endpoint_list_class)
 }
 
-fn define_time_provider(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
+fn define_association_handler(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let timestamp_struct = lib.declare_native_struct("TimestampUtc")?;
     let timestamp_struct = lib.define_native_struct(&timestamp_struct)?
         .add("value", Type::Uint64, doc("Value of the timestamp (in milliseconds from UNIX Epoch).").warning("Only 48 bits are available for timestamps."))?

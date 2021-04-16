@@ -138,11 +138,11 @@ class MainClass
         }
     }
 
-    class TestTimeProvider : ITimeProvider
+    class TestAssocationHandler : IAssociationHandler
     {
-        public TimeProviderTimestamp GetTime()
+        public TimestampUtc GetCurrentTime()
         {
-            return TimeProviderTimestamp.Valid((ulong)DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
+            return TimestampUtc.Valid((ulong)DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
         }
     }
 
@@ -177,7 +177,7 @@ class MainClass
     // ANCHOR: association_config
     private static AssociationConfig GetAssociationConfig()
     {
-        var config new AssociationConfig(
+        var config = new AssociationConfig(
             // disable unsolicited first (Class 1/2/3)
             EventClasses.All(),
             // after the integrity poll, enable unsolicited (Class 1/2/3)
@@ -210,7 +210,7 @@ class MainClass
             1024,
             GetAssociationConfig(),
             new TestReadHandler(),            
-            new TestTimeProvider()
+            new TestAssocationHandler()
         );
         
         var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
