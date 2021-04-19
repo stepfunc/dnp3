@@ -12,7 +12,7 @@ mod shared;
 mod variation;
 
 pub fn build_lib() -> Result<Library, BindingError> {
-    let mut builder = LibraryBuilder::new("dnp3rs", Version::parse("0.1.0").unwrap());
+    let mut builder = LibraryBuilder::new("dnp3rs", Version::parse(dnp3::VERSION).unwrap());
     builder.c_ffi_prefix("dnp3")?;
     builder.description("Safe and fast DNP3 library")?;
     builder.license(
