@@ -24,9 +24,7 @@ The begin/end methods provide useful information:
 
 :::tip
 It is common to maintain a list of measurement values in your `ReadHandler` implementation and then use the `endFragment` method as a trigger for publishing them.
-Since responses may consist of multiple fragments, you may also with to check that `ResponseHeader.Control.Fin` is set to `true` indicating that the current
+Since responses may consist of multiple fragments, you may also want to check that `ResponseHeader.Control.Fin` is set to `true` indicating that the current
 fragment is the final fragment in the response series.
 :::
-
-The example programs demonstrate how to iterate over measurement values to print them to the console:
 

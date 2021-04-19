@@ -425,16 +425,29 @@ pub trait ReadHandler: Send {
 
 /// no-op default association handler type
 #[derive(Copy, Clone)]
-pub struct NullHandler;
+pub struct DefaultAssociationHandler;
 
-impl NullHandler {
-    /// create a default boxed instance of the NullHandler
-    pub fn boxed() -> Box<NullHandler> {
+impl AssociationHandler for DefaultAssociationHandler {}
+
+impl DefaultAssociationHandler {
+    /// create a boxed instance of the DefaultAssociationHandler
+    pub fn boxed() -> Box<dyn AssociationHandler> {
         Box::new(Self {})
     }
 }
 
-impl ReadHandler for NullHandler {
+/// read handler that does nothing
+#[derive(Copy, Clone)]
+pub struct NullReadHandler;
+
+impl NullReadHandler {
+    /// create a boxed instance of the NullReadHandler
+    pub fn boxed() -> Box<dyn ReadHandler> {
+        Box::new(Self {})
+    }
+}
+
+impl ReadHandler for NullReadHandler {
     fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
     fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
@@ -487,5 +500,3 @@ impl ReadHandler for NullHandler {
     ) {
     }
 }
-
-impl AssociationHandler for NullHandler {}

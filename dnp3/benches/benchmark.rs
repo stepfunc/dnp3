@@ -232,7 +232,7 @@ impl Pair {
                 Self::outstation_address(),
                 Self::get_association_config(),
                 Box::new(handler),
-                NullHandler::boxed(),
+                DefaultAssociationHandler::boxed(),
             )
             .await
             .unwrap();

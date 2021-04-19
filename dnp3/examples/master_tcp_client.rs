@@ -68,8 +68,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_association(
             EndpointAddress::from(1024)?,
             get_association_config(),
-            NullHandler::boxed(),
-            NullHandler::boxed(),
+            NullReadHandler::boxed(),
+            DefaultAssociationHandler::boxed(),
         )
         .await?;
 

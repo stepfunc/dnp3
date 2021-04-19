@@ -8,9 +8,9 @@ slug: /api/master/association/config
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `AssocationConfig` struct provides configuration information needed to communicate with a particular outstation on the communication channel including:
+The `AssociationConfig` struct provides configuration information needed to communicate with a particular outstation on the communication channel including:
 
-* Whether to enable/disable unsolicited reporting when initializing communication
+* Startup handshaking
 * If and how to perform time synchronization
 * Per-association task queue size
 
@@ -54,3 +54,17 @@ values={[
 
 </TabItem>
 </Tabs>
+
+## Handshaking
+
+The DNP3 standard requires that the master perform certain actions, during initialization, before normal polling occurs.
+
+```mermaid
+sequenceDiagram
+    Master->>Outstation: Disable Unsolicited Reporting;
+    Outstation->>Master: Response;
+    Master->>Outstation: READ Class 3,2,1,0; 
+    Note over Master,Outstation: multiple responses/ACK possible here;
+    Master->>Outstation: Enable Unsolicited Reporting;
+    Outstation->>Master: Response;
+```

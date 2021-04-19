@@ -315,7 +315,7 @@ mod tests {
     use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
     use crate::app::Sequence;
     use crate::app::*;
-    use crate::master::handle::{AssociationHandler, NullHandler};
+    use crate::master::handle::{AssociationHandler, NullReadHandler};
     use crate::master::tasks::RequestWriter;
     use crate::util::cursor::WriteCursor;
 
@@ -327,14 +327,12 @@ mod tests {
 
     struct SingleTimestampTestHandler {
         time: Cell<Option<Timestamp>>,
-        handler: NullHandler,
     }
 
     impl SingleTimestampTestHandler {
         fn new(time: Timestamp) -> Self {
             Self {
                 time: Cell::new(Some(time)),
-                handler: NullHandler,
             }
         }
     }
@@ -359,15 +357,11 @@ mod tests {
 
         struct TestHandler {
             time: Timestamp,
-            handler: NullHandler,
         }
 
         impl TestHandler {
             fn new(time: Timestamp) -> Self {
-                Self {
-                    time: time,
-                    handler: NullHandler,
-                }
+                Self { time }
             }
         }
 
@@ -583,7 +577,7 @@ mod tests {
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
                 AssociationConfig::default(),
-                NullHandler::boxed(),
+                NullReadHandler::boxed(),
                 Box::new(TestHandler::new(system_time)),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
@@ -607,7 +601,7 @@ mod tests {
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
                 AssociationConfig::default(),
-                NullHandler::boxed(),
+                NullReadHandler::boxed(),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
@@ -858,7 +852,7 @@ mod tests {
             let association = Association::new(
                 EndpointAddress::from(1).unwrap(),
                 AssociationConfig::default(),
-                NullHandler::boxed(),
+                NullReadHandler::boxed(),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
