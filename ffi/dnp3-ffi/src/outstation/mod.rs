@@ -56,6 +56,7 @@ pub unsafe fn tcpserver_destroy(server: *mut TcpServer) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub unsafe fn tcpserver_add_outstation(
     server: *mut TcpServer,
     config: ffi::OutstationConfig,
