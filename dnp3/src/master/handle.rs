@@ -302,18 +302,6 @@ impl<T> Promise<T> {
     }
 }
 
-impl<T> Listener<T> {
-    pub(crate) fn update(&mut self, value: T) {
-        match self {
-            Listener::None => {}
-            Listener::BoxedFn(func) => func(value),
-            Listener::Watch(s) => {
-                s.send(value).ok();
-            }
-        }
-    }
-}
-
 /// callbacks associated with a single master to outstation association
 pub trait AssociationHandler: Send {
     /// Retrieve the system time used for time synchronization

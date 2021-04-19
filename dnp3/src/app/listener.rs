@@ -8,3 +8,15 @@ pub enum Listener<T> {
     /// listener is a broadcast channel
     Watch(crate::tokio::sync::broadcast::Sender<T>),
 }
+
+impl<T> Listener<T> {
+    pub(crate) fn update(&mut self, value: T) {
+        match self {
+            Listener::None => {}
+            Listener::BoxedFn(func) => func(value),
+            Listener::Watch(s) => {
+                s.send(value).ok();
+            }
+        }
+    }
+}

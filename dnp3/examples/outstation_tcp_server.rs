@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         DefaultOutstationApplication::create(),
         DefaultOutstationInformation::create(),
         DefaultControlHandler::with_status(CommandStatus::NotSupported),
-        Listener::None,
+        Listener::BoxedFn(Box::new(|state| println!("Connection: {:?}", state))),
         // filter that controls what IP address(es) may connect to this outstation instance
         AddressFilter::Any,
     )?;
