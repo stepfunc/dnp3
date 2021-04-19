@@ -99,6 +99,14 @@ class ExampleOutstation
         public CommandStatus OperateG41v4(double value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }       
     }
 
+    class TestListener : IConnectionStateListener
+    {
+        public void OnChange(ConnectionState state)
+        {
+            Console.WriteLine("Connection state change: " + state);
+        }
+    }
+
     public static void Main(string[] args)
     {
         MainAsync().GetAwaiter().GetResult();
@@ -153,6 +161,7 @@ class ExampleOutstation
                     new TestOutstationApplication(),
                     new TestOutstationInformation(),
                     new TestControlHandler(),
+                    new TestListener(),
                     AddressFilter.Any()
                 );
                 // ANCHOR_END: tcp_server_add_outstation

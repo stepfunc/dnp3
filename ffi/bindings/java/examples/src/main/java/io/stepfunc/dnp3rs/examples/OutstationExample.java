@@ -163,6 +163,13 @@ class TestControlHandler implements ControlHandler {
   }
 }
 
+class TestConnectionStateListener implements ConnectionStateListener {
+  @Override
+  public void onChange(ConnectionState state) {
+    System.out.println("Connection state change: " + state);
+  }
+}
+
 public class OutstationExample {
 
   static OutstationConfig getOutstationConfig() {
@@ -234,6 +241,7 @@ public class OutstationExample {
             new TestApplication(),
             new TestOutstationInformation(),
             new TestControlHandler(),
+            new TestConnectionStateListener(),
             AddressFilter.any());
     // ANCHOR_END: tcp_server_add_outstation
 
