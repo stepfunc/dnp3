@@ -11,7 +11,7 @@ use dnp3::tcp::{FilterError, ServerHandle};
 pub use struct_constructors::*;
 
 use crate::{ffi, Runtime, RuntimeHandle};
-use dnp3::app::Listener;
+use dnp3::app::NullListener;
 use dnp3::serial::create_outstation_serial;
 
 mod adapters;
@@ -83,7 +83,7 @@ pub unsafe fn tcpserver_add_outstation(
         Box::new(application),
         Box::new(information),
         Box::new(control_handler),
-        Listener::None,
+        NullListener::create(),
         filter,
     )?;
 

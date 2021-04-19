@@ -60,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         get_master_channel_config()?,
         EndpointList::new("127.0.0.1:20000".to_owned(), &[]),
         ReconnectStrategy::default(),
-        Listener::None,
+        NullListener::create(),
     );
 
     // create the association

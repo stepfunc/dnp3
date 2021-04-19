@@ -25,7 +25,6 @@ pub(crate) unsafe fn master_channel_create_tcp(
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
     let config = convert_config(config)?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    let listener = ClientStateListenerAdapter::new(listener);
 
     let reconnect_delay = if reconnect_delay == Duration::from_millis(0) {
         None
@@ -38,7 +37,7 @@ pub(crate) unsafe fn master_channel_create_tcp(
         config,
         endpoints.clone(),
         ReconnectStrategy::new(connect_strategy.into(), reconnect_delay),
-        listener.into_listener(),
+        ClientStateListenerAdapter::create(listener),
     );
 
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
@@ -60,14 +59,13 @@ pub(crate) unsafe fn master_channel_create_serial(
     listener: ffi::PortStateListener,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
     let config = convert_config(config)?;
-    let listener = PortStateListenerAdapter::new(listener);
 
     let (future, handle) = create_master_serial(
         config,
         &path.to_string_lossy().to_string(),
         serial_params.into(),
         retry_delay,
-        listener.into_listener(),
+        PortStateListenerAdapter::create(listener),
     );
 
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
@@ -508,22 +506,22 @@ struct ClientStateListenerAdapter {
 }
 
 impl ClientStateListenerAdapter {
-    fn new(native_cb: ffi::ClientStateListener) -> Self {
-        Self { native_cb }
+    fn create(native_cb: ffi::ClientStateListener) -> Box<dyn Listener<ClientState>> {
+        Box::new(Self { native_cb })
     }
+}
 
-    fn into_listener(self) -> Listener<ClientState> {
-        Listener::BoxedFn(Box::new(move |value| {
-            let value = match value {
-                ClientState::Disabled => ffi::ClientState::Disabled,
-                ClientState::Connecting => ffi::ClientState::Connecting,
-                ClientState::Connected => ffi::ClientState::Connected,
-                ClientState::WaitAfterFailedConnect(_) => ffi::ClientState::WaitAfterFailedConnect,
-                ClientState::WaitAfterDisconnect(_) => ffi::ClientState::WaitAfterDisconnect,
-                ClientState::Shutdown => ffi::ClientState::Shutdown,
-            };
-            self.native_cb.on_change(value);
-        }))
+impl Listener<ClientState> for ClientStateListenerAdapter {
+    fn update(&mut self, value: ClientState) {
+        let value = match value {
+            ClientState::Disabled => ffi::ClientState::Disabled,
+            ClientState::Connecting => ffi::ClientState::Connecting,
+            ClientState::Connected => ffi::ClientState::Connected,
+            ClientState::WaitAfterFailedConnect(_) => ffi::ClientState::WaitAfterFailedConnect,
+            ClientState::WaitAfterDisconnect(_) => ffi::ClientState::WaitAfterDisconnect,
+            ClientState::Shutdown => ffi::ClientState::Shutdown,
+        };
+        self.native_cb.on_change(value)
     }
 }
 
@@ -532,20 +530,20 @@ struct PortStateListenerAdapter {
 }
 
 impl PortStateListenerAdapter {
-    fn new(native_cb: ffi::PortStateListener) -> Self {
-        Self { native_cb }
+    fn create(native_cb: ffi::PortStateListener) -> Box<dyn Listener<PortState>> {
+        Box::new(Self { native_cb })
     }
+}
 
-    fn into_listener(self) -> Listener<PortState> {
-        Listener::BoxedFn(Box::new(move |value| {
-            let value = match value {
-                PortState::Disabled => ffi::PortState::Disabled,
-                PortState::Wait(_) => ffi::PortState::Wait,
-                PortState::Open => ffi::PortState::Open,
-                PortState::Shutdown => ffi::PortState::Shutdown,
-            };
-            self.native_cb.on_change(value);
-        }))
+impl Listener<PortState> for PortStateListenerAdapter {
+    fn update(&mut self, value: PortState) {
+        let value = match value {
+            PortState::Disabled => ffi::PortState::Disabled,
+            PortState::Wait(_) => ffi::PortState::Wait,
+            PortState::Open => ffi::PortState::Open,
+            PortState::Shutdown => ffi::PortState::Shutdown,
+        };
+        self.native_cb.on_change(value);
     }
 }
 

@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &get_serial_port_path(),
         SerialSettings::default(),
         Duration::from_secs(1),
-        Listener::None,
+        NullListener::create(),
     );
 
     // Create the association

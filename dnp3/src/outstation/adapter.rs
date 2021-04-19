@@ -26,13 +26,13 @@ impl NewSession {
 pub(crate) struct OutstationTaskAdapter {
     receiver: Receiver<NewSession>,
     task: OutstationTask,
-    listener: Listener<ConnectionState>,
+    listener: Box<dyn Listener<ConnectionState>>,
 }
 
 impl OutstationTaskAdapter {
     pub(crate) fn create(
         task: OutstationTask,
-        listener: Listener<ConnectionState>,
+        listener: Box<dyn Listener<ConnectionState>>,
     ) -> (Self, Sender<NewSession>) {
         let (tx, rx) = request_channel();
         (

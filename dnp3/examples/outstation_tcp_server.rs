@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use dnp3::app::control::*;
 use dnp3::app::measurement::*;
-use dnp3::app::Listener;
+use dnp3::app::NullListener;
 use dnp3::decode::*;
 use dnp3::link::*;
 use dnp3::outstation::database::*;
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         DefaultOutstationApplication::create(),
         DefaultOutstationInformation::create(),
         DefaultControlHandler::with_status(CommandStatus::NotSupported),
-        Listener::BoxedFn(Box::new(|state| println!("Connection: {:?}", state))),
+        NullListener::create(),
         // filter that controls what IP address(es) may connect to this outstation instance
         AddressFilter::Any,
     )?;

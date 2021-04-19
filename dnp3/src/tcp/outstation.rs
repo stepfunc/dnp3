@@ -53,7 +53,7 @@ impl TcpServer {
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
-        listener: Listener<ConnectionState>,
+        listener: Box<dyn Listener<ConnectionState>>,
         filter: AddressFilter,
     ) -> Result<(OutstationHandle, impl std::future::Future<Output = ()>), FilterError> {
         for item in self.outstations.iter() {
@@ -101,7 +101,7 @@ impl TcpServer {
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
-        listener: Listener<ConnectionState>,
+        listener: Box<dyn Listener<ConnectionState>>,
         filter: AddressFilter,
     ) -> Result<OutstationHandle, FilterError> {
         let (handle, future) = self.add_outstation(
