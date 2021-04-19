@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use tracing::Instrument;
 
-use crate::app::Shutdown;
+use crate::app::{Listener, Shutdown};
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::*;

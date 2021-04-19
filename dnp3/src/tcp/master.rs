@@ -4,10 +4,10 @@ use std::time::Duration;
 use tracing::Instrument;
 
 use crate::app::Shutdown;
-use crate::app::{ExponentialBackOff, ReconnectStrategy};
+use crate::app::{ExponentialBackOff, Listener, ReconnectStrategy};
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
-use crate::master::{Listener, MasterChannel, MasterChannelConfig};
+use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::tcp::ClientState;
 use crate::tcp::EndpointList;
 use crate::tokio::net::TcpStream;

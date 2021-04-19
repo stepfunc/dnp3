@@ -1,9 +1,7 @@
 use std::ffi::CStr;
 use std::time::Duration;
 
-use dnp3::app::Timeout;
-use dnp3::app::Timestamp;
-use dnp3::app::{ReconnectStrategy, RetryStrategy};
+use dnp3::app::{Listener, ReconnectStrategy, RetryStrategy, Timeout, Timestamp};
 use dnp3::link::{EndpointAddress, LinkStatusResult, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::serial::*;
