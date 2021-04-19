@@ -51,7 +51,7 @@ pub enum WriteTimeResult {
     Ok,
 }
 
-/// Outstation state for connection oriented transports, e.g. TCP
+/// Outstation connection state for connection-oriented transports, e.g. TCP
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ConnectionState {
     /// Connected to the master
