@@ -1,0 +1,70 @@
+---
+id: assoc_config
+title: AssociationConfig
+sidebar_label: AssociationConfig
+slug: /api/master/association/config
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+The `AssociationConfig` struct provides configuration information needed to communicate with a particular outstation on the communication channel including:
+
+* Startup handshaking
+* If and how to perform time synchronization
+* Per-association task queue size
+
+The outstation address is supplied as a separate argument when adding an association to a channel.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master_tcp_client.rs:association_config}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:association_config}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:association_config}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:association_config}}
+```
+
+</TabItem>
+</Tabs>
+
+## Handshaking
+
+The DNP3 standard requires that the master perform certain actions, during initialization, before normal polling occurs.
+
+```mermaid
+sequenceDiagram
+    Master->>Outstation: Disable Unsolicited Reporting;
+    Outstation->>Master: Response;
+    Master->>Outstation: READ Class 3,2,1,0; 
+    Note over Master,Outstation: multiple responses/ACK possible here;
+    Master->>Outstation: Enable Unsolicited Reporting;
+    Outstation->>Master: Response;
+```

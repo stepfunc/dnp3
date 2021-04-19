@@ -1,0 +1,30 @@
+---
+id: read_handler
+title: ReadHandler
+sidebar_label: ReadHandler
+slug: /api/master/read_handler
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+The `ReadHandler` interface is the mechanism by which measurement data received from the outstation is passed to user code. This callback interface is specified
+for each association created. It is invoked for unsolicited and responses to polls.
+
+When a response or unsolicited response is parsed and determined to carry measurement data, callbacks are made in the following order:
+
+1. `ReadHandler::beginFragment`
+2. `ReadHandler::handle<TYPE>` for each object header in the message.
+3. `ReadHandler::endFragment`
+
+The begin/end methods provide useful information:
+
+* The full header of the response
+* Context regarding what triggered the response, e.g. unsolicited, startup integrity scan, periodic poll, etc
+
+:::tip
+It is common to maintain a list of measurement values in your `ReadHandler` implementation and then use the `endFragment` method as a trigger for publishing them.
+Since responses may consist of multiple fragments, you may also want to check that `ResponseHeader.Control.Fin` is set to `true` indicating that the current
+fragment is the final fragment in the response series.
+:::
+

@@ -85,7 +85,7 @@ impl MasterTask {
         let (reader, writer) = crate::transport::create_master_transport_layer(
             // serial ports always discard link parsing errors
             LinkErrorMode::Discard,
-            config.address,
+            config.master_address,
             config.rx_buffer_size,
         );
         let task = Self {

@@ -1,9 +1,19 @@
 use dnp3::app::measurement::*;
 use dnp3::app::*;
 use dnp3::app::{Iin1, Iin2, ResponseFunction, ResponseHeader};
-use dnp3::master::{HeaderInfo, ReadHandler, ReadType};
+use dnp3::master::{AssociationHandler, HeaderInfo, ReadHandler, ReadType};
 
 use crate::ffi;
+
+impl AssociationHandler for ffi::AssociationHandler {
+    fn get_system_time(&self) -> Option<Timestamp> {
+        if let Some(time) = self.get_current_time() {
+            time.into()
+        } else {
+            None
+        }
+    }
+}
 
 impl ReadHandler for ffi::ReadHandler {
     fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) {

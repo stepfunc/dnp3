@@ -7,6 +7,14 @@ pub struct Timeout {
     value: Duration,
 }
 
+impl Default for Timeout {
+    fn default() -> Self {
+        Self {
+            value: Duration::from_secs(5),
+        }
+    }
+}
+
 /// Error type returned when a Timeout is constructed with an out-of-range value
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum RangeError {

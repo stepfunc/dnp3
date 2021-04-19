@@ -19,6 +19,13 @@ fn get_serial_port_path() -> String {
     }
 }
 
+fn get_master_channel_config() -> Result<MasterChannelConfig, Box<dyn std::error::Error>> {
+    let mut config = MasterChannelConfig::new(EndpointAddress::from(1)?);
+    config.decode_level = AppDecodeLevel::ObjectValues.into();
+    config.response_timeout = Timeout::from_secs(1)?;
+    Ok(config)
+}
+
 /// example of using the master from within the Tokio runtime
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,11 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // spawn the master onto another task
     let mut master = spawn_master_serial(
-        MasterChannelConfig::new(
-            EndpointAddress::from(1)?,
-            AppDecodeLevel::ObjectValues.into(),
-            Timeout::from_secs(1)?,
-        ),
+        get_master_channel_config()?,
         &get_serial_port_path(),
         SerialSettings::default(),
         Duration::from_secs(1),
@@ -45,7 +48,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.auto_time_sync = Some(TimeSyncProcedure::Lan);
     config.keep_alive_timeout = Some(Duration::from_secs(60));
     let mut association = master
-        .add_association(EndpointAddress::from(1024)?, config, NullHandler::boxed())
+        .add_association(
+            EndpointAddress::from(1024)?,
+            config,
+            NullReadHandler::boxed(),
+            DefaultAssociationHandler::boxed(),
+        )
         .await?;
 
     // Create event poll

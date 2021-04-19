@@ -273,11 +273,13 @@ impl MasterSession {
                 }
                 self.enabled = enable;
             }
-            MasterMsg::AddAssociation(address, config, handler, callback) => {
-                callback.complete(
-                    self.associations
-                        .register(Association::new(address, config, handler)),
-                );
+            MasterMsg::AddAssociation(address, config, read_handler, assoc_handler, callback) => {
+                callback.complete(self.associations.register(Association::new(
+                    address,
+                    config,
+                    read_handler,
+                    assoc_handler,
+                )));
             }
             MasterMsg::RemoveAssociation(address) => {
                 self.associations.remove(address);

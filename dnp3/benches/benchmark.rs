@@ -232,6 +232,7 @@ impl Pair {
                 Self::outstation_address(),
                 Self::get_association_config(),
                 Box::new(handler),
+                DefaultAssociationHandler::boxed(),
             )
             .await
             .unwrap();
@@ -250,15 +251,13 @@ impl Pair {
     }
 
     fn get_master_config(level: DecodeLevel) -> MasterChannelConfig {
-        MasterChannelConfig::new(
-            Self::master_address(),
-            level,
-            Timeout::from_secs(5).unwrap(),
-        )
+        let mut config = MasterChannelConfig::new(EndpointAddress::from(1).unwrap());
+        config.decode_level = level;
+        config
     }
 
     fn get_association_config() -> AssociationConfig {
-        let mut config = AssociationConfig::quiet(RetryStrategy::default());
+        let mut config = AssociationConfig::quiet();
         config.enable_unsol_classes = EventClasses::all();
         config
     }
@@ -354,11 +353,7 @@ impl ReadHandler for TestHandler {
     }
 }
 
-impl AssociationHandler for TestHandler {
-    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
-        self
-    }
-}
+impl AssociationHandler for TestHandler {}
 
 // don't need to send every type
 #[derive(Copy, Clone, PartialEq, Debug)]

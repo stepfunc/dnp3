@@ -39,7 +39,7 @@ pub struct AssociationHandle {
 #[derive(Copy, Clone, Debug)]
 pub struct MasterChannelConfig {
     /// Local DNP3 master address
-    pub address: EndpointAddress,
+    pub master_address: EndpointAddress,
     /// Decode-level for DNP3 objects
     pub decode_level: DecodeLevel,
     /// Response timeout
@@ -55,16 +55,12 @@ pub struct MasterChannelConfig {
 }
 
 impl MasterChannelConfig {
-    /// Create a configuration with default buffer sizes
-    pub fn new(
-        address: EndpointAddress,
-        decode_level: DecodeLevel,
-        response_timeout: Timeout,
-    ) -> Self {
+    /// Create a configuration with default buffer sizes, no decoding, and a default timeout of 5 seconds
+    pub fn new(master_address: EndpointAddress) -> Self {
         Self {
-            address,
-            decode_level,
-            response_timeout,
+            master_address,
+            decode_level: DecodeLevel::nothing(),
+            response_timeout: Timeout::default(),
             tx_buffer_size: MasterSession::DEFAULT_TX_BUFFER_SIZE,
             rx_buffer_size: MasterSession::DEFAULT_RX_BUFFER_SIZE,
         }
@@ -113,13 +109,15 @@ impl MasterChannel {
         &mut self,
         address: EndpointAddress,
         config: AssociationConfig,
-        handler: Box<dyn AssociationHandler>,
+        read_handler: Box<dyn ReadHandler>,
+        assoc_handler: Box<dyn AssociationHandler>,
     ) -> Result<AssociationHandle, AssociationError> {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
         self.send_master_message(MasterMsg::AddAssociation(
             address,
             config,
-            handler,
+            read_handler,
+            assoc_handler,
             Promise::OneShot(tx),
         ))
         .await?;
@@ -333,9 +331,6 @@ pub trait AssociationHandler: Send {
     fn get_system_time(&self) -> Option<Timestamp> {
         Timestamp::try_from_system_time(SystemTime::now())
     }
-
-    /// retrieve a handler used to process received measurement data
-    fn get_read_handler(&mut self) -> &mut dyn ReadHandler;
 }
 
 /// Information about the object header from which the measurement values were mapped
@@ -370,7 +365,7 @@ pub enum ReadType {
 }
 
 /// Trait used to process measurement data received from an outstation
-pub trait ReadHandler {
+pub trait ReadHandler: Send {
     /// Called as the first action before any of the type-specific handle methods are invoked
     ///
     /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
@@ -430,16 +425,29 @@ pub trait ReadHandler {
 
 /// no-op default association handler type
 #[derive(Copy, Clone)]
-pub struct NullHandler;
+pub struct DefaultAssociationHandler;
 
-impl NullHandler {
-    /// create a default boxed instance of the NullHandler
-    pub fn boxed() -> Box<NullHandler> {
+impl AssociationHandler for DefaultAssociationHandler {}
+
+impl DefaultAssociationHandler {
+    /// create a boxed instance of the DefaultAssociationHandler
+    pub fn boxed() -> Box<dyn AssociationHandler> {
         Box::new(Self {})
     }
 }
 
-impl ReadHandler for NullHandler {
+/// read handler that does nothing
+#[derive(Copy, Clone)]
+pub struct NullReadHandler;
+
+impl NullReadHandler {
+    /// create a boxed instance of the NullReadHandler
+    pub fn boxed() -> Box<dyn ReadHandler> {
+        Box::new(Self {})
+    }
+}
+
+impl ReadHandler for NullReadHandler {
     fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
     fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
@@ -490,11 +498,5 @@ impl ReadHandler for NullHandler {
         _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>,
     ) {
-    }
-}
-
-impl AssociationHandler for NullHandler {
-    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
-        self
     }
 }

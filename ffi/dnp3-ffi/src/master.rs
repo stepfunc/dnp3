@@ -110,7 +110,7 @@ pub unsafe fn master_channel_add_association(
     address: u16,
     config: ffi::AssociationConfig,
     read_handler: ffi::ReadHandler,
-    time_provider: ffi::TimeProvider,
+    assoc_handler: ffi::AssociationHandler,
 ) -> Result<ffi::AssociationId, ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::from(address)?;
@@ -136,15 +136,11 @@ pub unsafe fn master_channel_add_association(
         max_queued_user_requests: config.max_queued_user_requests as usize,
     };
 
-    let handler = AssociationHandlerAdapter {
-        read_handler,
-        time_provider,
-    };
-
     channel.runtime.block_on(channel.handle.add_association(
         address,
         config,
-        Box::new(handler),
+        Box::new(read_handler),
+        Box::new(assoc_handler),
     ))??;
     Ok(ffi::AssociationId {
         address: address.raw_value(),
@@ -485,41 +481,22 @@ fn convert_auto_time_sync(config: &ffi::AutoTimeSync) -> Option<TimeSyncProcedur
     }
 }
 
-struct AssociationHandlerAdapter {
-    read_handler: ffi::ReadHandler,
-    time_provider: ffi::TimeProvider,
-}
-
-impl AssociationHandler for AssociationHandlerAdapter {
-    fn get_system_time(&self) -> Option<Timestamp> {
-        if let Some(time) = self.time_provider.get_time() {
-            time.into()
-        } else {
-            None
-        }
-    }
-
-    fn get_read_handler(&mut self) -> &mut dyn ReadHandler {
-        &mut self.read_handler
-    }
-}
-
-pub fn timeprovidertimestamp_valid(value: u64) -> ffi::TimeProviderTimestamp {
-    ffi::TimeProviderTimestamp {
+pub fn timestamp_utc_valid(value: u64) -> ffi::TimestampUtc {
+    ffi::TimestampUtc {
         value,
         is_valid: true,
     }
 }
 
-pub fn timeprovidertimestamp_invalid() -> ffi::TimeProviderTimestamp {
-    ffi::TimeProviderTimestamp {
+pub fn timestamp_utc_invalid() -> ffi::TimestampUtc {
+    ffi::TimestampUtc {
         value: 0,
         is_valid: false,
     }
 }
 
-impl From<ffi::TimeProviderTimestamp> for Option<Timestamp> {
-    fn from(from: ffi::TimeProviderTimestamp) -> Self {
+impl From<ffi::TimestampUtc> for Option<Timestamp> {
+    fn from(from: ffi::TimestampUtc) -> Self {
         if from.is_valid {
             Some(Timestamp::new(from.value))
         } else {
@@ -598,7 +575,7 @@ fn convert_config(
     let address = EndpointAddress::from(config.address())?;
 
     Ok(MasterChannelConfig {
-        address,
+        master_address: address,
         decode_level: config.decode_level().clone().into(),
         response_timeout: Timeout::from_duration(config.response_timeout()).unwrap(),
         tx_buffer_size: config.tx_buffer_size() as usize,

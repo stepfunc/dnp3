@@ -139,12 +139,49 @@ void on_restart_complete(dnp3_restart_result_t result, void *arg) { printf("Rest
 
 void on_link_status_complete(dnp3_link_status_result_t result, void *arg) { printf("LinkStatusResult: %s\n", dnp3_link_status_result_to_string(result)); }
 
+// ANCHOR: master_channel_config
+dnp3_master_channel_config_t get_master_channel_config()
+{
+    dnp3_master_channel_config_t config = dnp3_master_channel_config_init(1);
+    config.decode_level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
+    return config;
+}
+// ANCHOR_END: master_channel_config
+
+// ANCHOR: association_config
+dnp3_association_config_t get_association_config()
+{
+    dnp3_association_config_t config = dnp3_association_config_init(
+            // disable unsolicited first (Class 1/2/3)
+            dnp3_event_classes_all(),
+            // after the integrity poll, enable unsolicited (Class 1/2/3)
+            dnp3_event_classes_all(),
+            // perform startup integrity poll with Class 1/2/3/0
+            dnp3_classes_all(),
+            // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
+            dnp3_event_classes_none());
+
+    config.auto_time_sync = DNP3_AUTO_TIME_SYNC_LAN;
+    config.keep_alive_timeout = 60;
+    return config;
+}
+// ANCHOR_END: association_config
+
 // Timestamp callback
-dnp3_time_provider_timestamp_t get_time(void *arg)
+dnp3_timestamp_utc_t get_system_time(void *arg)
 {
     time_t timer = time(NULL);
 
-    return dnp3_timeprovidertimestamp_valid(timer * 1000);
+    return dnp3_timestamp_utc_valid(timer * 1000);
+}
+
+dnp3_association_handler_t get_association_handler()
+{
+    return (dnp3_association_handler_t) {
+        .get_current_time = get_system_time,
+        .on_destroy = NULL,
+        .ctx = NULL,
+    };
 }
 
 int main()
@@ -181,10 +218,6 @@ int main()
         printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
-        
-    // Create the master channel
-    dnp3_master_channel_config_t channel_config = dnp3_master_channel_config_init(1);
-    channel_config.decode_level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
 
     dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_new("127.0.0.1:20000");
     dnp3_client_state_listener_t listener = {
@@ -192,8 +225,9 @@ int main()
         .on_destroy = NULL,
         .ctx = NULL,
     };
-        
-    err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, channel_config, endpoints, dnp3_retry_strategy_init(), 1000, listener, &channel);
+
+    // Create the master channel
+    err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, get_master_channel_config(), endpoints, dnp3_retry_strategy_init(), 1000, listener, &channel);
     if (err) {
         printf("unable to create master: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
@@ -216,26 +250,9 @@ int main()
         .on_destroy = NULL,
         .ctx = NULL,
     };
-
-    dnp3_association_config_t association_config = dnp3_association_config_init(
-        // disable unsolicited (Class 1/2/3)
-        dnp3_event_classes_all(),
-        // after the integrity poll, enable unsolicited (Class 1/2/3)
-        dnp3_event_classes_all(),
-        // perform an integrity poll with Class 1/2/3/0
-        dnp3_classes_all(),
-        // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
-        dnp3_event_classes_none());
-    association_config.auto_time_sync = DNP3_AUTO_TIME_SYNC_LAN;
-    association_config.keep_alive_timeout = 60;
-
-    dnp3_time_provider_t time_provider = {
-        .get_time = get_time,
-        .on_destroy = NULL,
-        .ctx = NULL,
-    };
+    
     dnp3_association_id_t association_id;
-    if (dnp3_master_channel_add_association(channel, 1024, association_config, read_handler, time_provider, &association_id)) {
+    if (dnp3_master_channel_add_association(channel, 1024, get_association_config(), read_handler, get_association_handler(), &association_id)) {
         goto cleanup;
     }
 

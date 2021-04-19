@@ -138,11 +138,11 @@ class MainClass
         }
     }
 
-    class TestTimeProvider : ITimeProvider
+    class TestAssocationHandler : IAssociationHandler
     {
-        public TimeProviderTimestamp GetTime()
+        public TimestampUtc GetCurrentTime()
         {
-            return TimeProviderTimestamp.Valid((ulong)DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
+            return TimestampUtc.Valid((ulong)DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
         }
     }
 
@@ -165,15 +165,33 @@ class MainClass
         }
     }
 
+    // ANCHOR: master_channel_config
     private static MasterChannelConfig GetMasterChannelConfig()
     {
-        // create a default configuration with a master address of "1"
         var config = new MasterChannelConfig(1);
-        
         config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
-
         return config;
     }
+    // ANCHOR_END: master_channel_config
+
+    // ANCHOR: association_config
+    private static AssociationConfig GetAssociationConfig()
+    {
+        var config = new AssociationConfig(
+            // disable unsolicited first (Class 1/2/3)
+            EventClasses.All(),
+            // after the integrity poll, enable unsolicited (Class 1/2/3)
+            EventClasses.All(),
+            // perform startup integrity poll with Class 1/2/3/0
+            Classes.All(),
+            // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
+            EventClasses.None()
+        );
+        config.AutoTimeSync = AutoTimeSync.Lan;
+        config.KeepAliveTimeout = TimeSpan.FromSeconds(60);
+        return config;
+    }
+    // ANCHOR_END: association_config
 
     private static async Task MainAsync(Runtime runtime)
     {
@@ -190,18 +208,9 @@ class MainClass
         
         var association = channel.AddAssociation(
             1024,
-            new AssociationConfig(EventClasses.All(), EventClasses.All(), Classes.All(), EventClasses.None())
-            {
-                AutoTimeSync = AutoTimeSync.Lan,
-                AutoTasksRetryStrategy = new RetryStrategy
-                {
-                    MinDelay = TimeSpan.FromSeconds(1),
-                    MaxDelay = TimeSpan.FromSeconds(5),
-                },
-                KeepAliveTimeout = TimeSpan.FromSeconds(60),
-            },
+            GetAssociationConfig(),
             new TestReadHandler(),            
-            new TestTimeProvider()
+            new TestAssocationHandler()
         );
         
         var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
