@@ -158,6 +158,7 @@ impl Pair {
                 DefaultOutstationApplication::create(),
                 DefaultOutstationInformation::create(),
                 DefaultControlHandler::create(),
+                Listener::None,
                 AddressFilter::Any,
             )
             .unwrap();
