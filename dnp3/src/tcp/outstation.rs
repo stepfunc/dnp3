@@ -1,6 +1,6 @@
 use tracing::Instrument;
 
-use crate::app::Shutdown;
+use crate::app::{Listener, Shutdown};
 use crate::link::LinkErrorMode;
 use crate::outstation::database::EventBufferConfig;
 use crate::outstation::task::OutstationTask;
@@ -45,6 +45,7 @@ impl TcpServer {
     }
 
     /// associate an outstation with the TcpServer, but do not spawn it
+    #[allow(clippy::too_many_arguments)]
     pub fn add_outstation(
         &mut self,
         config: OutstationConfig,
@@ -52,6 +53,7 @@ impl TcpServer {
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
+        listener: Box<dyn Listener<ConnectionState>>,
         filter: AddressFilter,
     ) -> Result<(OutstationHandle, impl std::future::Future<Output = ()>), FilterError> {
         for item in self.outstations.iter() {
@@ -69,7 +71,7 @@ impl TcpServer {
             control_handler,
         );
 
-        let (mut adapter, tx) = OutstationTaskAdapter::create(task);
+        let (mut adapter, tx) = OutstationTaskAdapter::create(task, listener);
 
         let outstation = OutstationInfo {
             filter,
@@ -91,6 +93,7 @@ impl TcpServer {
     }
 
     /// associate an outstation with the TcpServer and spawn it on the Tokio runtime.
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn_outstation(
         &mut self,
         config: OutstationConfig,
@@ -98,6 +101,7 @@ impl TcpServer {
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
+        listener: Box<dyn Listener<ConnectionState>>,
         filter: AddressFilter,
     ) -> Result<OutstationHandle, FilterError> {
         let (handle, future) = self.add_outstation(
@@ -106,6 +110,7 @@ impl TcpServer {
             application,
             information,
             control_handler,
+            listener,
             filter,
         )?;
         crate::tokio::spawn(future);

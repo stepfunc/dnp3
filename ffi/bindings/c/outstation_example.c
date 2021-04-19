@@ -188,6 +188,20 @@ void octet_string_transaction(dnp3_database_t *db, void *context)
     dnp3_octet_string_destroy(octet_string);
 }
 
+void on_connection_state_change(dnp3_connection_state_t state, void* ctx)
+{
+    printf("Connection state change: %s\n", dnp3_connection_state_to_string(state));
+}
+
+dnp3_connection_state_listener_t get_connection_state_listener()
+{
+    return (dnp3_connection_state_listener_t) {
+        .on_change = &on_connection_state_change,
+        .on_destroy = NULL,
+        .ctx = NULL,
+    };
+}
+
 // ANCHOR: event_buffer_config
 dnp3_event_buffer_config_t get_event_buffer_config() {
     return dnp3_event_buffer_config_init(
@@ -295,7 +309,16 @@ int main()
 
     // ANCHOR: tcpserver_add_outstation
     dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
-    err = dnp3_tcpserver_add_outstation(server, config, get_event_buffer_config(), application, information, control_handler, address_filter, &outstation);
+    err = dnp3_tcpserver_add_outstation(
+        server,
+        config,
+        get_event_buffer_config(),
+        application, information,
+        control_handler,
+        get_connection_state_listener(),
+        address_filter,
+        &outstation
+    );
     dnp3_address_filter_destroy(address_filter);
     if (err) {
         printf("unable to add outstation: %s \n", dnp3_param_error_to_string(err));

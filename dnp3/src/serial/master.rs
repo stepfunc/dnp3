@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use tracing::Instrument;
 
-use crate::app::Shutdown;
+use crate::app::{Listener, Shutdown};
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::*;
@@ -22,7 +22,7 @@ pub fn spawn_master_serial(
     path: &str,
     serial_settings: SerialSettings,
     retry_delay: Duration,
-    listener: Listener<PortState>,
+    listener: Box<dyn Listener<PortState>>,
 ) -> MasterChannel {
     let (future, handle) =
         create_master_serial(config, path, serial_settings, retry_delay, listener);
@@ -43,7 +43,7 @@ pub fn create_master_serial(
     path: &str,
     settings: SerialSettings,
     retry_delay: Duration,
-    listener: Listener<PortState>,
+    listener: Box<dyn Listener<PortState>>,
 ) -> (impl Future<Output = ()> + 'static, MasterChannel) {
     let log_path = path.to_owned();
     let (mut task, handle) = MasterTask::new(path, settings, config, retry_delay, listener);
@@ -63,7 +63,7 @@ struct MasterTask {
     session: MasterSession,
     reader: TransportReader,
     writer: TransportWriter,
-    listener: Listener<PortState>,
+    listener: Box<dyn Listener<PortState>>,
 }
 
 impl MasterTask {
@@ -72,7 +72,7 @@ impl MasterTask {
         serial_settings: SerialSettings,
         config: MasterChannelConfig,
         retry_delay: Duration,
-        listener: Listener<PortState>,
+        listener: Box<dyn Listener<PortState>>,
     ) -> (Self, MasterChannel) {
         let (tx, rx) = crate::util::channel::request_channel();
         let session = MasterSession::new(

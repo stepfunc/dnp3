@@ -51,6 +51,15 @@ pub enum WriteTimeResult {
     Ok,
 }
 
+/// Outstation connection state for connection-oriented transports, e.g. TCP
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ConnectionState {
+    /// Connected to the master
+    Connected,
+    /// Disconnected from the master
+    Disconnected,
+}
+
 /// dynamic information required by the outstation from the user application
 pub trait OutstationApplication: Sync + Send + 'static {
     /// The value returned by this method is used in conjunction with the `Delay Measurement`

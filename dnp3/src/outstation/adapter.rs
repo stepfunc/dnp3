@@ -1,8 +1,9 @@
 use tracing::Instrument;
 
-use crate::app::Shutdown;
+use crate::app::{Listener, Shutdown};
 use crate::outstation::session::RunError;
 use crate::outstation::task::OutstationTask;
+use crate::outstation::ConnectionState;
 use crate::util::channel::{request_channel, Receiver, Sender};
 use crate::util::phys::PhysLayer;
 
@@ -25,13 +26,23 @@ impl NewSession {
 pub(crate) struct OutstationTaskAdapter {
     receiver: Receiver<NewSession>,
     task: OutstationTask,
+    listener: Box<dyn Listener<ConnectionState>>,
 }
 
 impl OutstationTaskAdapter {
-    pub(crate) fn create(task: OutstationTask) -> (Self, Sender<NewSession>) {
+    pub(crate) fn create(
+        task: OutstationTask,
+        listener: Box<dyn Listener<ConnectionState>>,
+    ) -> (Self, Sender<NewSession>) {
         let (tx, rx) = request_channel();
-
-        (Self { receiver: rx, task }, tx)
+        (
+            Self {
+                receiver: rx,
+                task,
+                listener,
+            },
+            tx,
+        )
     }
 
     async fn wait_for_session(&mut self) -> Result<NewSession, Shutdown> {
@@ -69,10 +80,12 @@ impl OutstationTaskAdapter {
                 Some(mut s) => {
                     let id = s.id;
 
+                    self.listener.update(ConnectionState::Connected);
                     let result = self
                         .run_one_session(&mut s.phys)
                         .instrument(tracing::info_span!("Session", "id" = id))
                         .await;
+                    self.listener.update(ConnectionState::Disconnected);
 
                     // reset outstation state in between sessions
                     self.task.reset();

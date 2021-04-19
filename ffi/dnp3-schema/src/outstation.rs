@@ -16,6 +16,7 @@ struct OutstationTypes {
     outstation_application: InterfaceHandle,
     outstation_information: InterfaceHandle,
     control_handler: InterfaceHandle,
+    connection_state_listener: InterfaceHandle,
 }
 
 impl OutstationTypes {
@@ -32,6 +33,7 @@ impl OutstationTypes {
             outstation_application: define_outstation_application(lib, &database)?,
             outstation_information: define_outstation_information(lib, shared_def)?,
             control_handler: define_control_handler(lib, &database, shared_def)?,
+            connection_state_listener: define_connection_state_listener(lib)?,
         })
     }
 }
@@ -87,6 +89,7 @@ pub fn define(
         .param("application", Type::Interface(types.outstation_application), "Outstation application callbacks")?
         .param("information", Type::Interface(types.outstation_information), "Outstation information callbacks")?
         .param("control_handler", Type::Interface(types.control_handler), "Outstation control handler")?
+        .param("listener", Type::Interface(types.connection_state_listener), "Listener for the connection state")?
         .param("filter", Type::ClassRef(address_filter.declaration()), "Address filter")?
         .return_type(ReturnType::new(Type::ClassRef(outstation.declaration()), "Outstation handle"))?
         .fails_with(shared_def.error_type.clone())?
@@ -872,6 +875,28 @@ fn define_control_handler(
         .build()?
         .destroy_callback("on_destroy")?
         .build()
+}
+
+fn define_connection_state_listener(
+    lib: &mut LibraryBuilder,
+) -> Result<InterfaceHandle, BindingError> {
+    let state = lib
+        .define_native_enum("ConnectionState")?
+        .push("Connected", "Connected to the master")?
+        .push("Disconnected", "Disconnected from the master")?
+        .doc("Outstation connection state for connection-oriented transports, e.g. TCP")?
+        .build()?;
+
+    lib.define_interface(
+        "ConnectionStateListener",
+        "Callback interface for connection state events",
+    )?
+    .callback("on_change", "Called when the connection state changes")?
+    .param("state", Type::Enum(state), "New state of the connection")?
+    .return_type(ReturnType::Void)?
+    .build()?
+    .destroy_callback("on_destroy")?
+    .build()
 }
 
 fn define_address_filter(

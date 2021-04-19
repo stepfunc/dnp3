@@ -158,6 +158,7 @@ impl Pair {
                 DefaultOutstationApplication::create(),
                 DefaultOutstationInformation::create(),
                 DefaultControlHandler::create(),
+                NullListener::create(),
                 AddressFilter::Any,
             )
             .unwrap();
@@ -214,7 +215,7 @@ impl Pair {
             Self::get_master_config(config.master_level),
             EndpointList::single(format!("127.0.0.1:{}", port)),
             ReconnectStrategy::default(),
-            Listener::None,
+            NullListener::create(),
         );
 
         let measurements = Measurements::new(config.max_index, config.num_values);
