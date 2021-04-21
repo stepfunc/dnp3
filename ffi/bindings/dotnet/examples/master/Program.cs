@@ -161,7 +161,10 @@ class MainClass
         using (var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 }))
         // ANCHOR_END: runtime_init
         {
-            MainAsync(runtime).GetAwaiter().GetResult();
+            using (var channel = MasterChannel.CreateTcpChannel(runtime, LinkErrorMode.Close, GetMasterChannelConfig(), new EndpointList("127.0.0.1:20000"), new RetryStrategy(), TimeSpan.FromSeconds(1), new TestListener()))
+            {
+                RunChannel(channel).GetAwaiter().GetResult();
+            }
         }
     }
 
@@ -193,26 +196,15 @@ class MainClass
     }
     // ANCHOR_END: association_config
 
-    private static async Task MainAsync(Runtime runtime)
+    private static async Task RunChannel(MasterChannel channel)
     {
-
-        var channel = MasterChannel.CreateTcpChannel(
-            runtime,
-            LinkErrorMode.Close,
-            GetMasterChannelConfig(),
-            new EndpointList("127.0.0.1:20000"),
-            new RetryStrategy(),
-            TimeSpan.FromSeconds(1),
-            new TestListener()
-        );
-        
         var association = channel.AddAssociation(
             1024,
             GetAssociationConfig(),
-            new TestReadHandler(),            
+            new TestReadHandler(),
             new TestAssocationHandler()
         );
-        
+
         var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
 
         // start communications
@@ -271,9 +263,9 @@ class MainClass
                     }
                 case "evt":
                     {
-                        channel.DemandPoll(poll);                        
+                        channel.DemandPoll(poll);
                         break;
-                    }                    
+                    }
                 case "lts":
                     {
                         var result = await channel.SynchronizeTime(association, TimeSyncMode.Lan);
@@ -303,7 +295,7 @@ class MainClass
                         var result = await channel.CheckLinkStatus(association);
                         Console.WriteLine($"Result: {result}");
                         break;
-                    }                    
+                    }
                 default:
                     Console.WriteLine("Unknown command");
                     break;

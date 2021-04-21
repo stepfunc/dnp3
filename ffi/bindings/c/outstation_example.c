@@ -229,11 +229,17 @@ int main()
 
     // types that get heap allocated and must be freed in "cleanup"
     dnp3_runtime_t* runtime = NULL;
+    // ANCHOR: tcp_server_decl
     dnp3_tcp_server_t* server = NULL;
+    // ANCHOR_END: tcp_server_decl
+    // ANCHOR: outstation_decl
     dnp3_outstation_t* outstation = NULL;
+    // ANCHOR_END: outstation_decl
 
     // error code we'll reference elsewhere
+    // ANCHOR: common_error_code
     dnp3_param_error_t err = DNP3_PARAM_ERROR_OK;
+    // ANCHOR_END: common_error_code
 
     // Create runtime
     dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
@@ -244,7 +250,9 @@ int main()
         goto cleanup;
     }
 
+    // ANCHOR: create_tcp_server
     err = dnp3_tcpserver_new(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", &server);
+    // ANCHOR_END: create_tcp_server
     if (err) {
         printf("unable to create server: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
@@ -307,7 +315,7 @@ int main()
         .ctx = NULL,
     };
 
-    // ANCHOR: tcpserver_add_outstation
+    // ANCHOR: tcp_server_add_outstation
     dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
     err = dnp3_tcpserver_add_outstation(
         server,
@@ -320,11 +328,11 @@ int main()
         &outstation
     );
     dnp3_address_filter_destroy(address_filter);
+    // ANCHOR_END: tcp_server_add_outstation
     if (err) {
         printf("unable to add outstation: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
-    // ANCHOR_END: tcpserver_add_outstation
 
     // setup initial points
     // ANCHOR: database_init
@@ -336,8 +344,10 @@ int main()
     dnp3_outstation_transaction(outstation, startup_transaction);
     // ANCHOR_END: database_init
 
-    // Start the outstation    
+    // Start the outstation
+    // ANCHOR: tcp_server_bind
     err = dnp3_tcpserver_bind(server);
+    // ANCHOR_END: tcp_server_bind
     if (err) {
         printf("unable to bind server: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;

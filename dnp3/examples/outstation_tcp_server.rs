@@ -54,7 +54,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         DefaultOutstationInformation::create(),
         DefaultControlHandler::with_status(CommandStatus::NotSupported),
         NullListener::create(),
-        // filter that controls what IP address(es) may connect to this outstation instance
         AddressFilter::Any,
     )?;
     // ANCHOR_END: tcp_server_spawn_outstation
