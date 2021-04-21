@@ -1,4 +1,4 @@
-**Work in progress. First official release expected Q1 2021**
+Commercial library by [Step Function I/O](https://stepfunc.io/)
 
 # dnp3
 
