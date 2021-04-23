@@ -5,6 +5,35 @@ on:
       - master
   pull_request:
 jobs:
+  # Check formatting and run clippy lints
+  linting:
+    strategy:
+      fail-fast: false
+      matrix:
+        rust:
+          - stable
+          - beta
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust ${{ matrix.rust }}
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: rustfmt, clippy
+      - name: Format
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+      - name: Clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
   # Lock the dependencies
   lock:
     runs-on: ubuntu-latest
@@ -88,35 +117,6 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-  # Check formatting and run clippy lints
-  linting:
-    strategy:
-      fail-fast: false
-      matrix:
-        rust:
-          - stable
-          - beta
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Install Rust ${{ matrix.rust }}
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          override: true
-          components: rustfmt, clippy
-      - name: Format
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-      - name: Clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
   # Build bindings on Windows x64 and Linux x64
   bindings:
     needs: lock
@@ -279,8 +279,58 @@ jobs:
         with:
           name: java-bindings
           path: ffi/bindings/java/dnp3/pom.xml
+  # Run the conformance tests
+  conformance:
+    needs: lock
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Copy Linux config
+        if: ${{ runner.os == 'Linux' }}
+        shell: pwsh
+        run: Copy-Item -Path .cargo/config-linux.toml -Destination .cargo/config.toml
+      - name: Caching
+        uses: Swatinem/rust-cache@v1
+      - name: Download Cargo.lock
+        uses: actions/download-artifact@v2
+        with:
+          name: dependencies
+      - name: Build Java bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --java
+      - name: Install Java bindings
+        shell: bash
+        run: (cd ffi/bindings/java/dnp3 && sudo mvn install)
+      - name: Checkout dnp4s
+        uses: actions/checkout@v2
+        with:
+          repository: stepfunc/dnp4s
+          ssh-key: ${{ secrets.DNP4S_SSH_KEY }}
+          ref: scala-2.13
+          path: dnp4s
+      - name: Build dnp4s
+        working-directory: dnp4s
+        run: sudo mvn --batch-mode install
+      - name: Run the conformance tests
+        working-directory: conformance
+        run: sudo mvn --batch-mode scala:run
+      - name: Upload conformance test results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: conformance-results
+          path: conformance/results
   release:
-    needs: packaging
+    needs: [packaging, conformance]
     runs-on: ubuntu-latest
     #if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -297,13 +347,13 @@ jobs:
         uses: whelk-io/maven-settings-xml-action@v14
         with:
           servers: '[{ "id": "ossrh", "username": "${{ secrets.SFIO_OSSRH_USERNAME }}", "password": "${{ secrets.SFIO_OSSRH_PASSWORD }}" }]'
-      - name: Deploy Java
-        shell: bash
-        working-directory: artifacts/java-bindings
-        run: >
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?.jar) &&
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?-sources.jar) -Dclassifier=sources &&
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?-javadoc.jar) -Dclassifier=javadoc
+      #- name: Deploy Java
+      #  shell: bash
+      #  working-directory: artifacts/java-bindings
+      #  run: >
+      #    mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?.jar) &&
+      #    mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?-sources.jar) -Dclassifier=sources &&
+      #    mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?-javadoc.jar) -Dclassifier=javadoc
       #- name: Publish NuGet package
       #  shell: bash
       #  run: dotnet nuget push $(find artifacts/dotnet-bindings/dnp3*.nupkg) -s https://api.nuget.org/v3/index.json -k ${{ secrets.SFIO_NUGET_KEY }}
@@ -311,16 +361,22 @@ jobs:
         shell: bash
         run: >
           mkdir release &&
-          for i in artifacts/c-bindings/*; do (cd $i && zip -r ../../../release/foo-${GITHUB_REF##*/}-$(basename $i).zip .); done
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v1
+          for i in artifacts/c-bindings/*; do (cd $i && zip -r ../../../release/foo-${GITHUB_REF##*/}-$(basename $i).zip .); done &&
+          (cd artifacts/conformance-results && zip -r ../../release/conformance-results.zip .)
+      - name: TEMPORARY REMOVE THIS
+        uses: actions/upload-artifact@v2
         with:
-          draft: true
-          files: |
-            release/*.zip
-            artifacts/dotnet-bindings/dnp3*
-            artifacts/java-bindings/*
-            dependencies/dependencies.txt
-            dependencies/dependencies.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: test
+          path: release/*.zip
+      #- name: Create GitHub release
+      #  uses: softprops/action-gh-release@v1
+      #  with:
+      #    draft: true
+      #    files: |
+      #      release/*.zip
+      #      artifacts/dotnet-bindings/dnp3*
+      #      artifacts/java-bindings/*
+      #      dependencies/dependencies.txt
+      #      dependencies/dependencies.json
+      #  env:
+      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
