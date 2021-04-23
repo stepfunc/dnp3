@@ -5,10 +5,19 @@
 #include <string.h>
 #include <time.h>
 
-// Logger callback
+// Logger inteface
 void on_log_message(dnp3_log_level_t level, const char *msg, void *arg) { printf("%s", msg); }
 
-// Application callbacks
+dnp3_logger_t get_logger()
+{
+    return (dnp3_logger_t) {
+        .on_message = &on_log_message,
+        .on_destroy = NULL,
+        .ctx = NULL,
+    };
+}
+
+// OutstationApplication interface
 uint16_t get_processing_delay_ms(void *context) { return 0; }
 
 dnp3_write_time_result_t write_absolute_time(uint64_t time, void* context) { return DNP3_WRITE_TIME_RESULT_NOT_SUPPORTED; }
@@ -19,7 +28,32 @@ dnp3_restart_delay_t cold_restart(void *context) { return dnp3_restart_delay_sec
 
 dnp3_restart_delay_t warm_restart(void *context) { return dnp3_restart_delay_not_supported(); }
 
-// Outstation information callbacks
+dnp3_freeze_result_t freeze_counters_all(dnp3_freeze_type_t freeze_type, dnp3_database_t* database, void* context)
+{
+    return DNP3_FREEZE_RESULT_NOT_SUPPORTED;
+}
+
+dnp3_freeze_result_t freeze_counters_range(uint16_t start, uint16_t stop, dnp3_freeze_type_t freeze_type, dnp3_database_t* database, void* context)
+{
+    return DNP3_FREEZE_RESULT_NOT_SUPPORTED;
+}
+
+dnp3_outstation_application_t get_outstation_application() {
+    return (dnp3_outstation_application_t)  {
+            .get_processing_delay_ms = &get_processing_delay_ms,
+            .write_absolute_time = &write_absolute_time,
+            .get_application_iin = &get_application_iin,
+            .cold_restart = &cold_restart,
+            .warm_restart = &warm_restart,
+            .freeze_counters_all = &freeze_counters_all,
+            .freeze_counters_range = &freeze_counters_range,
+            .on_destroy = NULL,
+            .ctx = NULL,
+    };
+}
+
+
+// OutstationInformation interface
 void process_request_from_idle(dnp3_request_header_t header, void *context) {}
 
 void broadcast_received(dnp3_function_code_t function_code, dnp3_broadcast_action_t action, void *context) {}
@@ -44,7 +78,26 @@ void unsolicited_confirmed(uint8_t ecsn, void *context) {}
 
 void clear_restart_iin(void *context) {}
 
-// Control handler callbacks
+dnp3_outstation_information_t get_outstation_information() {        
+    return (dnp3_outstation_information_t) {
+        .process_request_from_idle = &process_request_from_idle,
+            .broadcast_received = &broadcast_received,
+            .enter_solicited_confirm_wait = &enter_solicited_confirm_wait,
+            .solicited_confirm_timeout = &solicited_confirm_timeout,
+            .solicited_confirm_received = &solicited_confirm_received,
+            .solicited_confirm_wait_new_request = &solicited_confirm_wait_new_request,
+            .wrong_solicited_confirm_seq = &wrong_solicited_confirm_seq,
+            .unexpected_confirm = &unexpected_confirm,
+            .enter_unsolicited_confirm_wait = &enter_unsolicited_confirm_wait,
+            .unsolicited_confirm_timeout = &unsolicited_confirm_timeout,
+            .unsolicited_confirmed = &unsolicited_confirmed,
+            .clear_restart_iin = &clear_restart_iin,
+            .on_destroy = NULL,
+            .ctx = NULL
+    };
+}
+
+// ControlHandler interface
 void begin_fragment(void *context) {}
 
 void end_fragment(void *context) {}
@@ -84,14 +137,24 @@ dnp3_command_status_t operate_g41v4(double control, uint16_t index, dnp3_operate
     return DNP3_COMMAND_STATUS_NOT_SUPPORTED;
 }
 
-dnp3_freeze_result_t freeze_counters_all(dnp3_freeze_type_t freeze_type, dnp3_database_t* database, void* context)
+dnp3_control_handler_t get_control_handler()
 {
-    return DNP3_FREEZE_RESULT_NOT_SUPPORTED;
-}
-
-dnp3_freeze_result_t freeze_counters_range(uint16_t start, uint16_t stop, dnp3_freeze_type_t freeze_type, dnp3_database_t* database, void* context)
-{
-    return DNP3_FREEZE_RESULT_NOT_SUPPORTED;
+    return (dnp3_control_handler_t) {
+       .begin_fragment = &begin_fragment,
+       .end_fragment = &end_fragment,
+       .select_g12v1 = &select_g12v1,
+       .operate_g12v1 = &operate_g12v1,
+       .select_g41v1 = &select_g41v1,
+       .operate_g41v1 = &operate_g41v1,
+       .select_g41v2 = &select_g41v2,
+       .operate_g41v2 = &operate_g41v2,
+       .select_g41v3 = &select_g41v3,
+       .operate_g41v3 = &operate_g41v3,
+       .select_g41v4 = &select_g41v4,
+       .operate_g41v4 = &operate_g41v4,
+       .on_destroy = NULL,
+       .ctx = NULL,
+    };
 }
 
 // ANCHOR: database_init_transaction
@@ -218,14 +281,9 @@ dnp3_event_buffer_config_t get_event_buffer_config() {
 // ANCHOR_END: event_buffer_config
 
 int main()
-{
-    // Setup logging
-    dnp3_logger_t logger = {
-        .on_message = &on_log_message,
-        .ctx = NULL,
-    };
+{    
     // initialize logging with the default configuration
-    dnp3_configure_logging(dnp3_logging_config_init(), logger);
+    dnp3_configure_logging(dnp3_logging_config_init(), get_logger());
 
     // types that get heap allocated and must be freed in "cleanup"
     dnp3_runtime_t* runtime = NULL;
@@ -267,53 +325,7 @@ int main()
         1);
     // override the default application decoding level
     config.decode_level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
-    // ANCHOR_END: outstation_config
-
-    dnp3_outstation_application_t application = {
-        .get_processing_delay_ms = &get_processing_delay_ms,
-        .write_absolute_time = &write_absolute_time,
-        .get_application_iin = &get_application_iin,
-        .cold_restart = &cold_restart,
-        .warm_restart = &warm_restart,
-        .freeze_counters_all = &freeze_counters_all,
-        .freeze_counters_range = &freeze_counters_range,
-        .on_destroy = NULL,
-        .ctx = NULL,
-    };
-
-    dnp3_outstation_information_t information = {
-        .process_request_from_idle = &process_request_from_idle,
-        .broadcast_received = &broadcast_received,
-        .enter_solicited_confirm_wait = &enter_solicited_confirm_wait,
-        .solicited_confirm_timeout = &solicited_confirm_timeout,
-        .solicited_confirm_received = &solicited_confirm_received,
-        .solicited_confirm_wait_new_request = &solicited_confirm_wait_new_request,
-        .wrong_solicited_confirm_seq = &wrong_solicited_confirm_seq,
-        .unexpected_confirm = &unexpected_confirm,
-        .enter_unsolicited_confirm_wait = &enter_unsolicited_confirm_wait,
-        .unsolicited_confirm_timeout = &unsolicited_confirm_timeout,
-        .unsolicited_confirmed = &unsolicited_confirmed,
-        .clear_restart_iin = &clear_restart_iin,
-        .on_destroy = NULL,
-        .ctx = NULL,
-    };
-
-    dnp3_control_handler_t control_handler = {
-        .begin_fragment = &begin_fragment,
-        .end_fragment = &end_fragment,
-        .select_g12v1 = &select_g12v1,
-        .operate_g12v1 = &operate_g12v1,
-        .select_g41v1 = &select_g41v1,
-        .operate_g41v1 = &operate_g41v1,
-        .select_g41v2 = &select_g41v2,
-        .operate_g41v2 = &operate_g41v2,
-        .select_g41v3 = &select_g41v3,
-        .operate_g41v3 = &operate_g41v3,
-        .select_g41v4 = &select_g41v4,
-        .operate_g41v4 = &operate_g41v4,
-        .on_destroy = NULL,
-        .ctx = NULL,
-    };
+    // ANCHOR_END: outstation_config      
 
     // ANCHOR: tcp_server_add_outstation
     dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
@@ -321,8 +333,9 @@ int main()
         server,
         config,
         get_event_buffer_config(),
-        application, information,
-        control_handler,
+        get_outstation_application(),
+        get_outstation_information(),
+        get_control_handler(),
         get_connection_state_listener(),
         address_filter,
         &outstation
