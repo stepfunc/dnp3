@@ -25,14 +25,14 @@ ffi/bindings/c/build
 ffi/bindings/c/generated
 
 # Generated .NET lib
-ffi/bindings/dotnet/dnp3rs
+ffi/bindings/dotnet/dnp3
 ffi/bindings/dotnet/**/bin
 ffi/bindings/dotnet/**/obj
 ffi/bindings/dotnet/nupkg
 
 # Generated Java lib
 ffi/bindings/java/.idea
-ffi/bindings/java/dnp3rs
-ffi/bindings/java/dnp3rs-jni
+ffi/bindings/java/dnp3
+ffi/bindings/java/dnp3-jni
 ffi/bindings/java/*/target
 ffi/bindings/java/**/*.iml

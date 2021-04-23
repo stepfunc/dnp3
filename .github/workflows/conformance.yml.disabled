@@ -11,7 +11,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         with:
-          path: dnp3rs
+          path: dnp3
       - name: Download pre-built Java bindings
         uses: actions/download-artifact@v2
         with:
@@ -32,11 +32,11 @@ jobs:
         working-directory: dnp4s
         run: sudo mvn --batch-mode install
       - name: Run the conformance tests
-        working-directory: dnp3rs/conformance
+        working-directory: dnp3/conformance
         run: sudo mvn --batch-mode scala:run
       - name: Upload conformance test results
         if: always()
         uses: actions/upload-artifact@v2
         with:
           name: conformance-results
-          path: dnp3rs/conformance/results
+          path: dnp3/conformance/results

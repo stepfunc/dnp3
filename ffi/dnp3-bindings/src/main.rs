@@ -6,7 +6,6 @@ fn main() {
         ffi_path: Path::new("ffi/dnp3-ffi"),
         java_group_id: "io.stepfunc",
         destination_path: Path::new("ffi/bindings"),
-        license_path: Path::new("LICENSE.txt"),
         library: &dnp3_schema::build_lib().unwrap(),
     };
 

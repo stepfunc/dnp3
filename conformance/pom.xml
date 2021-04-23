@@ -5,13 +5,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.stepfunc</groupId>
-    <artifactId>dnp3rs-conformance</artifactId>
+    <artifactId>dnp3-conformance</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <scala.version>2.13.4</scala.version>
-        <dnp3rs.version>0.1.0</dnp3rs.version>
+        <dnp3.version>0.1.0</dnp3.version>
         <dnp4s.version>0.1.0-SNAPSHOT</dnp4s.version>
         <scala-maven-plugin.version>4.4.0</scala-maven-plugin.version>
     </properties>
@@ -41,7 +41,7 @@
                     <launchers>
                         <launcher>
                             <id>conformance</id>
-                            <mainClass>io.stepfunc.dnp3rs_conformance.Main</mainClass>
+                            <mainClass>io.stepfunc.dnp3_conformance.Main</mainClass>
                             <args>
                                 <arg>-config</arg>
                                 <arg>device.ini</arg>
@@ -69,8 +69,8 @@
         </dependency>
         <dependency>
             <groupId>io.stepfunc</groupId>
-            <artifactId>dnp3rs</artifactId>
-            <version>${dnp3rs.version}</version>
+            <artifactId>dnp3</artifactId>
+            <version>${dnp3.version}</version>
         </dependency>
     </dependencies>
 </project>

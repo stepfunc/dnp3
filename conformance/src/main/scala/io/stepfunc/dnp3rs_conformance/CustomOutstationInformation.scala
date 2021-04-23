@@ -1,6 +1,6 @@
-package io.stepfunc.dnp3rs_conformance
+package io.stepfunc.dnp3_conformance
 
-import io.stepfunc.dnp3rs.{BroadcastAction, FunctionCode, OutstationInformation, RequestHeader}
+import io.stepfunc.dnp3.{BroadcastAction, FunctionCode, OutstationInformation, RequestHeader}
 import org.joou.UByte
 
 class CustomOutstationInformation extends OutstationInformation {

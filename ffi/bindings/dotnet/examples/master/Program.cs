@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using dnp3rs;
+using dnp3;
 
 class MainClass
 {
