@@ -8,8 +8,8 @@ slug: /api/master/tcp_client
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Once created, a `MasterChannel` presents the same interface regardless of the underlying transport. This section describes how to create
-a TCP client channel.
+Once created, a `MasterChannel` presents the same interface regardless of the underlying transport. A TCP client channel is created using the runtime, some
+configuration, and a callback for observering to the status of the connection.
 
 <Tabs
 groupId="language"
@@ -25,6 +25,10 @@ values={[
 ```rust
 {{#include ../dnp3/examples/master_tcp_client.rs:create_master_channel}}
 ```
+
+:::note
+The function is called within the context of the Tokio runtime and is therefore implicit in Rust.
+:::
 
 </TabItem>
 <TabItem value="C">
@@ -49,10 +53,27 @@ values={[
 
 ```csharp
 {{#include ../ffi/bindings/dotnet/examples/master/Program.cs:create_master_channel}}
-{
-    // use the channel
-}
 ```
 
 </TabItem>
 </Tabs>
+
+## LinkErrorMode
+
+The `LinkErrorMode` controls what happens if framing error is detected at the link-layer. TCP is a lossless transport so the default behavior is to
+close the connection. You can, however, treat the TCP more like a serial port by changing this setting to `LinkErrorMode::Discard`.
+
+## EndpointList
+
+An `EndpointList` is a list of remote endpoints to which the master will try to connect. It must contain at least one entry and optionally additional backup
+addresses. The channel will round-robin through this list until a connection is established. The list may contain:
+
+Endpoints consist of a `<host>:<port>` tuple where "host" is one of the following:
+
+* IPv4 address
+* IPv6 address
+* domain name
+
+## ReconnectStrategy
+
+The `ReconnectStrategy` controls the rate at which the master retries failed connection attempts.

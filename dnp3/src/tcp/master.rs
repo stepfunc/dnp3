@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use tracing::Instrument;
 
-use crate::app::Shutdown;
-use crate::app::{ExponentialBackOff, Listener, ReconnectStrategy};
+use crate::app::{ExponentialBackOff, Listener};
+use crate::app::{RetryStrategy, Shutdown};
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::{MasterChannel, MasterChannelConfig};
@@ -24,11 +24,18 @@ pub fn spawn_master_tcp_client(
     link_error_mode: LinkErrorMode,
     config: MasterChannelConfig,
     endpoints: EndpointList,
-    reconnect: ReconnectStrategy,
+    retry_strategy: RetryStrategy,
+    reconnect_delay: Option<Duration>,
     listener: Box<dyn Listener<ClientState>>,
 ) -> MasterChannel {
-    let (future, handle) =
-        create_master_tcp_client(link_error_mode, config, endpoints, reconnect, listener);
+    let (future, handle) = create_master_tcp_client(
+        link_error_mode,
+        config,
+        endpoints,
+        retry_strategy,
+        reconnect_delay,
+        listener,
+    );
     crate::tokio::spawn(future);
     handle
 }
@@ -45,12 +52,19 @@ pub fn create_master_tcp_client(
     link_error_mode: LinkErrorMode,
     config: MasterChannelConfig,
     endpoints: EndpointList,
-    reconnect: ReconnectStrategy,
+    retry_strategy: RetryStrategy,
+    reconnect_delay: Option<Duration>,
     listener: Box<dyn Listener<ClientState>>,
 ) -> (impl Future<Output = ()> + 'static, MasterChannel) {
     let main_addr = endpoints.main_addr().to_string();
-    let (mut task, handle) =
-        MasterTask::new(link_error_mode, endpoints, config, reconnect, listener);
+    let (mut task, handle) = MasterTask::new(
+        link_error_mode,
+        endpoints,
+        config,
+        retry_strategy,
+        reconnect_delay,
+        listener,
+    );
     let future = async move {
         task.run()
             .instrument(tracing::info_span!("DNP3-Master-TCP", "endpoint" = ?main_addr))
@@ -74,7 +88,8 @@ impl MasterTask {
         link_error_mode: LinkErrorMode,
         endpoints: EndpointList,
         config: MasterChannelConfig,
-        reconnect: ReconnectStrategy,
+        retry_strategy: RetryStrategy,
+        reconnect_delay: Option<Duration>,
         listener: Box<dyn Listener<ClientState>>,
     ) -> (Self, MasterChannel) {
         let (tx, rx) = crate::util::channel::request_channel();
@@ -92,8 +107,8 @@ impl MasterTask {
         );
         let task = Self {
             endpoints,
-            back_off: ExponentialBackOff::new(reconnect.retry_strategy),
-            reconnect_delay: reconnect.reconnect_delay,
+            back_off: ExponentialBackOff::new(retry_strategy),
+            reconnect_delay,
             session,
             reader,
             writer,

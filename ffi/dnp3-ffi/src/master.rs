@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use std::time::Duration;
 
-use dnp3::app::{Listener, ReconnectStrategy, RetryStrategy, Timeout, Timestamp};
+use dnp3::app::{Listener, RetryStrategy, Timeout, Timestamp};
 use dnp3::link::{EndpointAddress, LinkStatusResult, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::serial::*;
@@ -19,7 +19,7 @@ pub(crate) unsafe fn master_channel_create_tcp(
     link_error_mode: ffi::LinkErrorMode,
     config: ffi::MasterChannelConfig,
     endpoints: *const crate::EndpointList,
-    connect_strategy: ffi::RetryStrategy,
+    retry_strategy: ffi::RetryStrategy,
     reconnect_delay: Duration,
     listener: ffi::ClientStateListener,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
@@ -36,7 +36,8 @@ pub(crate) unsafe fn master_channel_create_tcp(
         link_error_mode.into(),
         config,
         endpoints.clone(),
-        ReconnectStrategy::new(connect_strategy.into(), reconnect_delay),
+        retry_strategy.into(),
+        reconnect_delay,
         Box::new(listener),
     );
 

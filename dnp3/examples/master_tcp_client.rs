@@ -60,7 +60,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         LinkErrorMode::Close,
         get_master_channel_config()?,
         EndpointList::new("127.0.0.1:20000".to_owned(), &[]),
-        ReconnectStrategy::default(),
+        RetryStrategy::default(),
+        Some(Duration::from_secs(1)),
         NullListener::create(),
     );
     // ANCHOR_END: create_master_channel
