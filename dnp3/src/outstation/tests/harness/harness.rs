@@ -110,18 +110,26 @@ where
 pub(crate) fn new_harness(
     config: OutstationConfig,
 ) -> OutstationTestHarness<impl std::future::Future<Output = RunError>> {
-    new_harness_impl(config, None)
+    new_harness_impl(config, None, None)
+}
+
+pub(crate) fn new_harness_with_custom_event_buffers(
+    config: OutstationConfig,
+    event_config: EventBufferConfig,
+) -> OutstationTestHarness<impl std::future::Future<Output = RunError>> {
+    new_harness_impl(config, Some(event_config), None)
 }
 
 pub(crate) fn new_harness_for_broadcast(
     config: OutstationConfig,
     broadcast: BroadcastConfirmMode,
 ) -> OutstationTestHarness<impl std::future::Future<Output = RunError>> {
-    new_harness_impl(config, Some(broadcast))
+    new_harness_impl(config, None, Some(broadcast))
 }
 
 fn new_harness_impl(
     config: OutstationConfig,
+    event_config: Option<EventBufferConfig>,
     broadcast: Option<BroadcastConfirmMode>,
 ) -> OutstationTestHarness<impl std::future::Future<Output = RunError>> {
     let events = EventHandle::new();
@@ -131,7 +139,7 @@ fn new_harness_impl(
     let (task, handle) = OutstationTask::create(
         LinkErrorMode::Close,
         config,
-        EventBufferConfig::all_types(5),
+        event_config.unwrap_or(EventBufferConfig::all_types(5)),
         application,
         MockOutstationInformation::new(events.clone()),
         MockControlHandler::new(events.clone()),

@@ -783,6 +783,7 @@ class Dnp3rsIntegrationPlugin extends IntegrationPlugin {
     val app = new CustomOutstationApplication(config.testDatabaseConfig.isGlobalLocalControl || config.testDatabaseConfig.isSingleLocalControl)
     val information = new CustomOutstationInformation
     this.controlHandler = new QueuedControlHandler(config.commandHandlerConfig.disableBinaryOutput, config.commandHandlerConfig.disableAnalogOutput)
+    val listener = new CustomConnectionStateListener
 
     val dnp3Config = new io.stepfunc.dnp3rs.OutstationConfig(ushort(config.linkConfig.source), ushort(config.linkConfig.destination))
 
@@ -804,7 +805,7 @@ class Dnp3rsIntegrationPlugin extends IntegrationPlugin {
     dnp3Config.maxUnsolicitedRetries = config.unsolicitedResponseConfig.maxNumRetries.map(x => uint(x)).getOrElse(UInteger.MAX)
 
     // Create the outstation
-    this.outstation = server.addOutstation(dnp3Config, EventBufferConfig.allTypes(ushort(200)), app, information, controlHandler, AddressFilter.any())
+    this.outstation = server.addOutstation(dnp3Config, EventBufferConfig.allTypes(ushort(200)), app, information, controlHandler, listener, AddressFilter.any())
 
     // Create the database
     this.trackingDatabase = new TrackingDatabase(app, this.outstation, config.testDatabaseConfig)

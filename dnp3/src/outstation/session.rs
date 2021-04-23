@@ -223,7 +223,6 @@ impl SessionState {
     fn reset(&mut self) {
         self.last_valid_request = None;
         self.select = None;
-        self.unsolicited_seq = Sequence::default();
         self.deferred_read.clear();
     }
 }
@@ -1381,7 +1380,7 @@ impl OutstationSession {
         };
 
         // Calculate IIN and return it
-        let mut iin = self.get_response_iin(database);
+        let mut iin = Iin::default();
 
         if let Ok(CommandStatus::NotSupported) = result {
             iin |= Iin2::PARAMETER_ERROR;
@@ -1512,7 +1511,7 @@ impl OutstationSession {
         }
 
         // Calculate IIN and return response
-        let mut iin = self.get_response_iin(database);
+        let mut iin = Iin::default();
 
         if let Ok(CommandStatus::NotSupported) = result {
             iin |= Iin2::PARAMETER_ERROR;
@@ -1592,7 +1591,7 @@ impl OutstationSession {
         };
 
         // Calculate IIN and return it
-        let mut iin = self.get_response_iin(database);
+        let mut iin = Iin::default();
 
         if status == CommandStatus::NotSupported {
             iin |= Iin2::PARAMETER_ERROR;

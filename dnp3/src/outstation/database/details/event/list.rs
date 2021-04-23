@@ -59,19 +59,8 @@ impl<T> Entry<T> {
         }
     }
 
-    fn create_entry_ref(&self, idx: usize) -> EntryRef {
-        EntryRef::new(self.metadata.create_index(idx), self.metadata)
-    }
-}
-
-struct EntryRef {
-    index: Index,
-    metadata: MetaData,
-}
-
-impl EntryRef {
-    fn new(index: Index, metadata: MetaData) -> Self {
-        Self { index, metadata }
+    fn create_index(&self, idx: usize) -> Index {
+        Index::new(self.metadata.version, idx)
     }
 }
 
@@ -207,42 +196,53 @@ impl<T> VecList<T> {
     where
         F: Fn(&T) -> bool,
     {
-        let entry = match self.find_first(&predicate) {
+        let index = match self.find_first(&predicate) {
             None => return None,
             Some(x) => x,
         };
 
-        if self.remove_at(entry.index) {
-            return self.storage.get(entry.index.value).map(|x| &x.data);
+        if self.remove_at(index) {
+            return self.storage.get(index.value).map(|x| &x.data);
         }
 
         None
     }
 
-    pub(crate) fn remove_all<F>(&mut self, predicate: F) -> usize
+    pub(crate) fn remove_all<F>(&mut self, mut predicate: F) -> usize
     where
-        F: Fn(&T) -> bool,
+        F: FnMut(&T) -> bool,
     {
+        let mut count = 0;
         let mut current = match self.state {
-            None => return 0,
+            None => return count,
             Some(x) => x.head,
         };
 
-        let mut count = 0;
+        loop {
+            let (next, entry_to_remove) = {
+                let entry = &self.storage[current];
+                let entry_to_delete = match predicate(&entry.data) {
+                    true => Some(entry.create_index(current)),
+                    false => None,
+                };
+                (entry.metadata.next, entry_to_delete)
+            };
 
-        while let Some(x) = self.find_first_from(current, &predicate) {
-            count += 1;
-            self.remove_at(x.index);
-            match x.metadata.next {
-                Some(next) => current = next,
+            if let Some(index) = entry_to_remove {
+                self.remove_at(index);
+                count += 1;
+            }
+
+            match next {
+                Some(next) => {
+                    current = next;
+                }
                 None => return count,
             }
         }
-
-        count
     }
 
-    fn find_first<F>(&self, predicate: &F) -> Option<EntryRef>
+    fn find_first<F>(&self, predicate: &F) -> Option<Index>
     where
         F: Fn(&T) -> bool,
     {
@@ -250,7 +250,7 @@ impl<T> VecList<T> {
             .and_then(|x| self.find_first_from(x.head, predicate))
     }
 
-    fn find_first_from<F>(&self, start: usize, predicate: &F) -> Option<EntryRef>
+    fn find_first_from<F>(&self, start: usize, predicate: &F) -> Option<Index>
     where
         F: Fn(&T) -> bool,
     {
@@ -259,7 +259,7 @@ impl<T> VecList<T> {
         loop {
             let entry = &self.storage[current];
             if predicate(&entry.data) {
-                return Some(entry.create_entry_ref(current));
+                return Some(entry.create_index(current));
             }
 
             match entry.metadata.next {

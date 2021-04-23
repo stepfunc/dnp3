@@ -202,23 +202,6 @@ impl TypeCounter {
             Event::OctetString(_, _) => op(&mut self.num_octet_string),
         }
     }
-
-    fn subtract(&self, other: &Self) -> Self {
-        Self {
-            num_binary: self.num_binary.subtract(&other.num_binary),
-            num_double_binary: self.num_double_binary.subtract(&other.num_double_binary),
-            num_binary_output_status: self
-                .num_binary_output_status
-                .subtract(&other.num_binary_output_status),
-            num_counter: self.num_counter.subtract(&other.num_counter),
-            num_frozen_counter: self.num_frozen_counter.subtract(&other.num_frozen_counter),
-            num_analog: self.num_analog.subtract(&other.num_analog),
-            num_analog_output_status: self
-                .num_analog_output_status
-                .subtract(&other.num_analog_output_status),
-            num_octet_string: self.num_octet_string.subtract(&other.num_octet_string),
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -240,16 +223,23 @@ impl Counters {
         self.classes.zero();
     }
 
-    fn subtract(&self, other: &Counters) -> Self {
-        Self {
-            types: self.types.subtract(&other.types),
-            classes: self.classes.subtract(&other.classes),
-        }
-    }
-
     fn increment(&mut self, record: &EventRecord) {
         self.types.increment(&record.event);
         self.classes.increment(record.class);
+    }
+
+    fn decrement(&mut self, record: &EventRecord) {
+        self.classes.decrement(record.class);
+        match record.event {
+            Event::Binary(_, _) => self.types.num_binary.decrement(),
+            Event::DoubleBitBinary(_, _) => self.types.num_double_binary.decrement(),
+            Event::BinaryOutputStatus(_, _) => self.types.num_binary_output_status.decrement(),
+            Event::Counter(_, _) => self.types.num_counter.decrement(),
+            Event::FrozenCounter(_, _) => self.types.num_frozen_counter.decrement(),
+            Event::Analog(_, _) => self.types.num_analog.decrement(),
+            Event::AnalogOutputStatus(_, _) => self.types.num_analog_output_status.decrement(),
+            Event::OctetString(_, _) => self.types.num_octet_string.decrement(),
+        }
     }
 }
 
@@ -576,10 +566,16 @@ impl EventBuffer {
     }
 
     pub(crate) fn clear_written(&mut self) -> usize {
-        let count = self
-            .events
-            .remove_all(|e| e.state.get() == EventState::Written);
-        self.total = self.total.subtract(&self.written);
+        let total = &mut self.total;
+        let count = self.events.remove_all(|event| {
+            if event.state.get() == EventState::Written {
+                total.decrement(event);
+                true
+            } else {
+                false
+            }
+        });
+
         self.written.zero();
         if !self.is_any_full() {
             self.is_overflown = false;
