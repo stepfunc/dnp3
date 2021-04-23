@@ -1,0 +1,53 @@
+---
+id: association_handler
+title: AssociationHandler
+sidebar_label: AssociationHandler
+slug: /api/master/association_handler
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+The `AssociationHandler` interface handles all of the per-association callbacks not related to measurement data. It contains a single method (`get_current_time`)
+for getting a UTC timestamp for synchronizing the outstation.  The implementation of this method would usually be the same for all outstations.
+
+Typically, the implementation of `get_current_time` would use the system clock which is being synchronized by the OS via NTP. It can be overridden, however, to use
+a different clock. For example, data concentrators might receive their time from an upstream DNP3 master and maintain an offset from their time since boot. The
+examples below demonstrate implementing an `AssociationHandler` that retrieves the system time.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+// Rust's `AssociationHandler` trait gets the system time by default, but can be overridden
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:association_handler}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:association_handler}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:association_handler}}
+```
+
+</TabItem>
+</Tabs>

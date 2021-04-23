@@ -138,6 +138,7 @@ class MainClass
         }
     }
 
+    // ANCHOR: association_handler
     class TestAssocationHandler : IAssociationHandler
     {
         public TimestampUtc GetCurrentTime()
@@ -145,6 +146,7 @@ class MainClass
             return TimestampUtc.Valid((ulong)DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
         }
     }
+    // ANCHOR_END: association_handler
 
     public static void Main(string[] args)
     {

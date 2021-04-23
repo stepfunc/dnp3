@@ -218,12 +218,14 @@ class TestReadHandler implements ReadHandler {
   }
 }
 
+// ANCHOR: association_handler
 class TestAssociationHandler implements AssociationHandler {
   @Override
   public TimestampUtc getCurrentTime() {
     return TimestampUtc.valid(ulong(System.currentTimeMillis()));
   }
 }
+// ANCHOR_END: association_handler
 
 public class MasterExample {
 

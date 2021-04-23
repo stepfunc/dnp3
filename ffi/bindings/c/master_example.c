@@ -167,7 +167,7 @@ dnp3_association_config_t get_association_config()
 }
 // ANCHOR_END: association_config
 
-// Timestamp callback
+// ANCHOR: association_handler
 dnp3_timestamp_utc_t get_system_time(void *arg)
 {
     time_t timer = time(NULL);
@@ -183,6 +183,7 @@ dnp3_association_handler_t get_association_handler()
         .ctx = NULL,
     };
 }
+// ANCHOR_END: association_handler
 
 int main()
 {
