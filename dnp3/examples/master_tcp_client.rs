@@ -55,6 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR_END: logging
 
     // spawn the master channel onto another task
+    // ANCHOR: create_master_channel
     let mut channel = spawn_master_tcp_client(
         LinkErrorMode::Close,
         get_master_channel_config()?,
@@ -62,6 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ReconnectStrategy::default(),
         NullListener::create(),
     );
+    // ANCHOR_END: create_master_channel
 
     // create the association
     let mut association = channel

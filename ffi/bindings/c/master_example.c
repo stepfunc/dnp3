@@ -232,28 +232,33 @@ int main()
     // ANCHOR_END: logging_init
 
     // long-lived types that must be freed before exit
-    // ANCHOR: runtime_declare
+    // ANCHOR: runtime_decl
     dnp3_runtime_t *runtime = NULL;
-    // ANCHOR_END: runtime_declare
+    // ANCHOR_END: runtime_decl
+    // ANCHOR: channel_decl
     dnp3_master_channel_t *channel = NULL;
-
-    // error code we'll reference elsewhere
+    // ANCHOR_END: channel_decl
+    // ANCHOR: error_decl
     dnp3_param_error_t err = DNP3_PARAM_ERROR_OK;
+    // ANCHOR_END: error_decl
 
     // create the runtime
+    // ANCHOR: runtime_create
     dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
     runtime_config.num_core_threads = 4;
     err = dnp3_runtime_new(runtime_config, &runtime);
+    // ANCHOR_END: runtime_create
     if (err) {
         printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
 
+    // ANCHOR: create_master_channel
     dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_new("127.0.0.1:20000");
-    // Create the master channel
     err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, get_master_channel_config(), endpoints, dnp3_retry_strategy_init(), 1000,
                                          get_client_state_listener(), &channel);
     dnp3_endpoint_list_destroy(endpoints);
+    // ANCHOR_END: create_master_channel
 
     if (err) {
         printf("unable to create master: %s \n", dnp3_param_error_to_string(err));

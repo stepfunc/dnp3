@@ -192,8 +192,12 @@ public class OutstationExample {
     Logging.configure(new LoggingConfig(), new TestLogger());
 
     // Create the Tokio runtime
-    try (Runtime runtime = new Runtime(new RuntimeConfig())) {
-      run(runtime);
+    try (Runtime runtime = new Runtime(new RuntimeConfig());
+        // ANCHOR: create_tcp_server
+        TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000")
+        // ANCHOR_END: create_tcp_server
+        ) {
+      run(server);
     }
   }
 
@@ -227,11 +231,7 @@ public class OutstationExample {
   }
   // ANCHOR_END: event_buffer_config
 
-  public static void run(io.stepfunc.dnp3rs.Runtime runtime) {
-
-    // ANCHOR: create_tcp_server
-    final TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
-    // ANCHOR_END: create_tcp_server
+  public static void run(TcpServer server) {
 
     // ANCHOR: tcp_server_add_outstation
     final Outstation outstation =

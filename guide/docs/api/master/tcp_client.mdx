@@ -1,0 +1,58 @@
+---
+id: tcp_client
+title: TCP Client
+sidebar_label: TCP Client
+slug: /api/master/tcp_client
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Once created, a `MasterChannel` presents the same interface regardless of the underlying transport. This section describes how to create
+a TCP client channel.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master_tcp_client.rs:create_master_channel}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:channel_decl}}
+{{#include ../ffi/bindings/c/master_example.c:error_decl}}
+
+{{#include ../ffi/bindings/c/master_example.c:create_master_channel}}
+// check error
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:create_master_channel}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:create_master_channel}}
+{
+    // use the channel
+}
+```
+
+</TabItem>
+</Tabs>

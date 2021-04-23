@@ -255,6 +255,15 @@ public class MasterExample {
   }
   // ANCHOR_END: association_config
 
+  // ANCHOR: runtime_config
+  public static RuntimeConfig getRuntimeConfig()
+  {
+    RuntimeConfig config = new RuntimeConfig();
+    config.numCoreThreads = ushort(4);
+    return config;
+  }
+  // ANCHOR_END: runtime_config
+
   public static void main(String[] args) {
     // ANCHOR: logging_init
     // Initialize logging with the default configuration
@@ -262,30 +271,30 @@ public class MasterExample {
     Logging.configure(new LoggingConfig(), new ConsoleLogger());
     // ANCHOR_END: logging_init
 
-    // ANCHOR: runtime
-    // Create the Tokio runtime
-    RuntimeConfig runtimeConfig = new RuntimeConfig();
-    runtimeConfig.numCoreThreads = ushort(4);
-    try (Runtime runtime = new Runtime(runtimeConfig)) {
-      // ANCHOR_END: runtime
-      run(runtime);
+    try (
+            // ANCHOR: runtime
+            Runtime runtime = new Runtime(getRuntimeConfig());
+            // ANCHOR_END: runtime
+            // ANCHOR: create_master_channel
+            MasterChannel channel =
+                    MasterChannel.createTcpChannel(
+                            runtime,
+                            LinkErrorMode.CLOSE,
+                            getMasterChannelConfig(),
+                            new EndpointList("127.0.0.1:20000"),
+                            new RetryStrategy(),
+                            Duration.ofSeconds(1),
+                            new TestListener())
+            // ANCHOR_END: create_master_channel
+            ) {
+
+      run(channel);
     } catch (Exception ex) {
       System.out.println(ex.getMessage());
     }
   }
 
-  private static void run(Runtime runtime) throws Exception {
-
-    // Create the master channel
-    MasterChannel channel =
-        MasterChannel.createTcpChannel(
-            runtime,
-            LinkErrorMode.CLOSE,
-            getMasterChannelConfig(),
-            new EndpointList("127.0.0.1:20000"),
-            new RetryStrategy(),
-            Duration.ofSeconds(1),
-            new TestListener());
+  private static void run(MasterChannel channel) throws Exception {
 
     // Create the association
     AssociationId association =

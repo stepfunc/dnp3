@@ -55,7 +55,12 @@ module.exports = {
                         'api/master/read_handler',
                         'api/master/association_handler',
                     ]
-                }
+                },
+                {
+                    Channels: [
+                        'api/master/tcp_client',
+                    ]
+                },
             ]
         }
     ],

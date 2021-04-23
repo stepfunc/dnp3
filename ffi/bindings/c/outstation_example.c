@@ -281,7 +281,10 @@ int main()
     dnp3_configure_logging(dnp3_logging_config_init(), get_logger());
 
     // types that get heap allocated and must be freed in "cleanup"
+
+    // ANCHOR: runtime_decl
     dnp3_runtime_t *runtime = NULL;
+    // ANCHOR_END: runtime_decl
     // ANCHOR: tcp_server_decl
     dnp3_tcp_server_t *server = NULL;
     // ANCHOR_END: tcp_server_decl

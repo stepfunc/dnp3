@@ -159,11 +159,20 @@ class MainClass
         );
         // ANCHOR_END: logging_init
 
+
+        using (
         // ANCHOR: runtime_init
-        using (var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 }))
+        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 })
         // ANCHOR_END: runtime_init
+        )
         {
-            using (var channel = MasterChannel.CreateTcpChannel(runtime, LinkErrorMode.Close, GetMasterChannelConfig(), new EndpointList("127.0.0.1:20000"), new RetryStrategy(), TimeSpan.FromSeconds(1), new TestListener()))
+
+            using (
+            // ANCHOR: create_master_channel
+            var channel = MasterChannel.CreateTcpChannel(runtime, LinkErrorMode.Close, GetMasterChannelConfig(), new EndpointList("127.0.0.1:20000"), new RetryStrategy(), TimeSpan.FromSeconds(1), new TestListener())
+            // ANCHOR_END: create_master_channel
+            )
+
             {
                 RunChannel(channel).GetAwaiter().GetResult();
             }

@@ -58,30 +58,19 @@ values={[
 <TabItem value="C">
 
 ```c
-dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
-runtime_config.num_core_threads = 4;
+{{#include ../ffi/bindings/c/master_example.c:runtime_decl}}
+{{#include ../ffi/bindings/c/master_example.c:error_decl}}
 
-// create the runtime
-dnp3_runtime_t* runtime = NULL;
-dnp3_param_error_t err = dnp3_runtime_new(runtime_config, &runtime);
-if (err) {
-    // technically, runtime creation can fail, but would require OS
-    // resource exhaustion to do so.
-}
-
-// ----- run your program ------
-
-// destroy the runtime before the program exits
-dnp3_runtime_destroy(runtime);
+{{#include ../ffi/bindings/c/master_example.c:runtime_create}}
 ```
 
 </TabItem>
 <TabItem value="Java">
 
 ```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:runtime_config}}
+
 {{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:runtime}}
-    // --- run the program using the runtime
-}
 ```
 :::note
 Prefer try-with-resources syntax in Java as Runtime implements *java.lang.AutoCloseable*.
@@ -92,15 +81,11 @@ Prefer try-with-resources syntax in Java as Runtime implements *java.lang.AutoCl
 
 ```csharp
 {{#include ../ffi/bindings/dotnet/examples/master/Program.cs:runtime_init}}
-{
-    // --- run the program using the runtime
-}
 ```
 
 :::note
 Prefer using statements in C# as Runtime implements *System.IDisposable*.
 :::
-
 
 </TabItem>
 </Tabs>
