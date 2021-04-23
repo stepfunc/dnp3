@@ -1,10 +1,10 @@
 #include "dnp3rs.h"
 
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <inttypes.h>
 
 // ANCHOR: logging_callback
 // callback which will receive log messages
@@ -152,14 +152,14 @@ dnp3_master_channel_config_t get_master_channel_config()
 dnp3_association_config_t get_association_config()
 {
     dnp3_association_config_t config = dnp3_association_config_init(
-            // disable unsolicited first (Class 1/2/3)
-            dnp3_event_classes_all(),
-            // after the integrity poll, enable unsolicited (Class 1/2/3)
-            dnp3_event_classes_all(),
-            // perform startup integrity poll with Class 1/2/3/0
-            dnp3_classes_all(),
-            // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
-            dnp3_event_classes_none());
+        // disable unsolicited first (Class 1/2/3)
+        dnp3_event_classes_all(),
+        // after the integrity poll, enable unsolicited (Class 1/2/3)
+        dnp3_event_classes_all(),
+        // perform startup integrity poll with Class 1/2/3/0
+        dnp3_classes_all(),
+        // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
+        dnp3_event_classes_none());
 
     config.auto_time_sync = DNP3_AUTO_TIME_SYNC_LAN;
     config.keep_alive_timeout = 60;
@@ -177,7 +177,7 @@ dnp3_timestamp_utc_t get_system_time(void *arg)
 
 dnp3_association_handler_t get_association_handler()
 {
-    return (dnp3_association_handler_t) {
+    return (dnp3_association_handler_t){
         .get_current_time = get_system_time,
         .on_destroy = NULL,
         .ctx = NULL,
@@ -204,16 +204,16 @@ int main()
 
     // long-lived types that must be freed before exit
     // ANCHOR: runtime_declare
-    dnp3_runtime_t* runtime = NULL;
+    dnp3_runtime_t *runtime = NULL;
     // ANCHOR_END: runtime_declare
-    dnp3_master_channel_t* channel = NULL;
+    dnp3_master_channel_t *channel = NULL;
 
     // error code we'll reference elsewhere
     dnp3_param_error_t err = DNP3_PARAM_ERROR_OK;
 
     // create the runtime
     dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
-    runtime_config.num_core_threads = 4;        
+    runtime_config.num_core_threads = 4;
     err = dnp3_runtime_new(runtime_config, &runtime);
     if (err) {
         printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
@@ -228,12 +228,13 @@ int main()
     };
 
     // Create the master channel
-    err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, get_master_channel_config(), endpoints, dnp3_retry_strategy_init(), 1000, listener, &channel);
+    err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, get_master_channel_config(), endpoints, dnp3_retry_strategy_init(), 1000,
+                                         listener, &channel);
     if (err) {
         printf("unable to create master: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
-    
+
     dnp3_endpoint_list_destroy(endpoints);
 
     // Create the association
@@ -251,7 +252,7 @@ int main()
         .on_destroy = NULL,
         .ctx = NULL,
     };
-    
+
     dnp3_association_id_t association_id;
     if (dnp3_master_channel_add_association(channel, 1024, get_association_config(), read_handler, get_association_handler(), &association_id)) {
         goto cleanup;
@@ -378,9 +379,9 @@ int main()
             printf("Unknown command\n");
         }
     }
-    
+
 // all of the destroy functions are NULL-safe
-cleanup:    
+cleanup:
     dnp3_master_channel_destroy(channel);
     // ANCHOR: runtime_destroy
     dnp3_runtime_destroy(runtime);
