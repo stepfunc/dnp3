@@ -1,4 +1,4 @@
-use crate::app::measurement::*;
+use crate::app::{measurement::*, Timestamp};
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
 use crate::outstation::session::RunError;
@@ -275,4 +275,67 @@ fn handles_disable_unsolicited_during_unsolicited_confirm_wait() {
     harness.poll_pending();
     harness.check_no_events();
     harness.check_all_io_consumed();
+}
+
+#[test]
+fn buffer_overflow_issue() {
+    let config = get_default_unsolicited_config();
+    let mut harness =
+        new_harness_with_custom_event_buffers(config, EventBufferConfig::all_types(1));
+    confirm_null_unsolicited(&mut harness);
+    enable_unsolicited(&mut harness);
+
+    fn generate_overflow(database: &mut DatabaseHandle) {
+        database.transaction(|database| {
+            database.update(
+                0,
+                &Binary::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+                UpdateOptions::default(),
+            );
+            database.update(
+                0,
+                &Binary::new(false, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+                UpdateOptions::default(),
+            );
+        });
+    }
+
+    // Add the point
+    harness.handle.database.transaction(|database| {
+        database.add(0, Some(EventClass::Class1), BinaryConfig::default());
+    });
+
+    generate_overflow(&mut harness.handle.database);
+
+    // Unsolicited response with event data and EVENT_BUFFER_OVERFLOW
+    harness.expect_response(&[
+        0xF1, 0x82, 0x80, 0x08, // DEVICE_RESTART and EVENT_BUFFER_OVERFLOW asserted
+        0x02, 0x01, 0x28, 0x01, 0x00, // 1 event g2v1 only
+        0x00, 0x00, 0x01,
+    ]);
+
+    // THIS USED TO GENERATE A SUBTRACT OVERFLOW IN THE EVENT BUFFER (the panic occured in the next line)
+    generate_overflow(&mut harness.handle.database);
+
+    harness.send(&[0xD1, 0x00]);
+
+    // New unsolicited response with a single event
+    harness.expect_response(&[
+        0xF2, 0x82, 0x80, 0x08, // DEVICE_RESTART and EVENT_BUFFER_OVERFLOW asserted
+        0x02, 0x01, 0x28, 0x01, 0x00, // 1 event g2v1 only
+        0x00, 0x00, 0x01,
+    ]);
+    harness.send(&[0xD2, 0x00]);
+
+    // Integrity poll response should not contain EVENT_BUFFER_OVERFLOW flag anymore
+    harness.test_request_response(
+        &[
+            0xC0, 0x01, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06, 60, 1, 0x06,
+        ],
+        &[
+            0xC0, 0x81, 0x80, 0x00, // Only DEVICE_RESTART
+            0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, // g1v1 [0, 0]
+            0x00, // Current value
+        ],
+    );
 }
