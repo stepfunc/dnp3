@@ -332,7 +332,7 @@ jobs:
   release:
     needs: [packaging, conformance]
     runs-on: ubuntu-latest
-    #if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v2
@@ -347,36 +347,31 @@ jobs:
         uses: whelk-io/maven-settings-xml-action@v14
         with:
           servers: '[{ "id": "ossrh", "username": "${{ secrets.SFIO_OSSRH_USERNAME }}", "password": "${{ secrets.SFIO_OSSRH_PASSWORD }}" }]'
-      #- name: Deploy Java
-      #  shell: bash
-      #  working-directory: artifacts/java-bindings
-      #  run: >
-      #    mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?.jar) &&
-      #    mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?-sources.jar) -Dclassifier=sources &&
-      #    mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?-javadoc.jar) -Dclassifier=javadoc
-      #- name: Publish NuGet package
-      #  shell: bash
-      #  run: dotnet nuget push $(find artifacts/dotnet-bindings/dnp3*.nupkg) -s https://api.nuget.org/v3/index.json -k ${{ secrets.SFIO_NUGET_KEY }}
-      - name: Package C bindings
+      - name: Deploy Java
+        shell: bash
+        working-directory: artifacts/java-bindings
+        run: >
+          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?.jar) &&
+          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?-sources.jar) -Dclassifier=sources &&
+          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?-javadoc.jar) -Dclassifier=javadoc
+      - name: Publish NuGet package
+        shell: bash
+        run: dotnet nuget push $(find artifacts/dotnet-bindings/dnp3*.nupkg) -s https://api.nuget.org/v3/index.json -k ${{ secrets.SFIO_NUGET_KEY }}
+      - name: Package C bindings and conformance results
         shell: bash
         run: >
           mkdir release &&
           for i in artifacts/c-bindings/*; do (cd $i && zip -r ../../../release/foo-${GITHUB_REF##*/}-$(basename $i).zip .); done &&
           (cd artifacts/conformance-results && zip -r ../../release/conformance-results.zip .)
-      - name: TEMPORARY REMOVE THIS
-        uses: actions/upload-artifact@v2
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v1
         with:
-          name: test
-          path: release/*.zip
-      #- name: Create GitHub release
-      #  uses: softprops/action-gh-release@v1
-      #  with:
-      #    draft: true
-      #    files: |
-      #      release/*.zip
-      #      artifacts/dotnet-bindings/dnp3*
-      #      artifacts/java-bindings/*
-      #      dependencies/dependencies.txt
-      #      dependencies/dependencies.json
-      #  env:
-      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          draft: true
+          files: |
+            release/*.zip
+            artifacts/dotnet-bindings/dnp3*
+            artifacts/java-bindings/*
+            dependencies/dependencies.txt
+            dependencies/dependencies.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
