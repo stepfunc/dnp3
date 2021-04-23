@@ -9,12 +9,33 @@
 // ANCHOR: logging_callback
 // callback which will receive log messages
 void on_log_message(dnp3_log_level_t level, const char *msg, void *ctx) { printf("%s", msg); }
+
+dnp3_logger_t get_logger()
+{
+    return (dnp3_logger_t){
+        // function pointer where log messages will be sent
+        .on_message = &on_log_message,
+        // no context to free
+        .on_destroy = NULL,
+        // optional context argument applied to all log callbacks
+        .ctx = NULL,
+    };
+}
 // ANCHOR_END: logging_callback
 
 // ClientState listener callback
 void client_state_on_change(dnp3_client_state_t state, void *arg) { printf("ClientState = %s\n", dnp3_client_state_to_string(state)); }
 
-// ReadHandler callbacks
+dnp3_client_state_listener_t get_client_state_listener()
+{
+    return (dnp3_client_state_listener_t){
+        .on_change = &client_state_on_change,
+        .on_destroy = NULL,
+        .ctx = NULL,
+    };
+}
+
+// ReadHandler
 void begin_fragment(dnp3_read_type_t read_type, dnp3_response_header_t header, void *arg)
 {
     printf("Beginning fragment (broadcast: %u)\n", dnp3_iin1_is_set(&header.iin.iin1, DNP3_IIN1_FLAG_BROADCAST));
@@ -125,6 +146,24 @@ void handle_octet_strings(dnp3_header_info_t info, dnp3_octet_string_iterator_t 
     }
 }
 
+dnp3_read_handler_t get_read_handler()
+{
+    return (dnp3_read_handler_t){
+        .begin_fragment = &begin_fragment,
+        .end_fragment = &end_fragment,
+        .handle_binary = &handle_binary,
+        .handle_double_bit_binary = &handle_double_bit_binary,
+        .handle_binary_output_status = &handle_binary_output_status,
+        .handle_counter = &handle_counter,
+        .handle_frozen_counter = &handle_frozen_counter,
+        .handle_analog = &handle_analog,
+        .handle_analog_output_status = &handle_analog_output_status,
+        .handle_octet_string = &handle_octet_strings,
+        .on_destroy = NULL,
+        .ctx = NULL,
+    };
+}
+
 // Single read callback
 void on_read_complete(dnp3_read_result_t result, void *arg) { printf("ReadResult: %s\n", dnp3_read_result_to_string(result)); }
 
@@ -188,18 +227,8 @@ dnp3_association_handler_t get_association_handler()
 int main()
 {
     // ANCHOR: logging_init
-    // define logger callback "interface"
-    dnp3_logger_t logger = {
-        // function pointer where log messages will be sent
-        .on_message = &on_log_message,
-        // no context to free
-        .on_destroy = NULL,
-        // optional context argument applied to all log callbacks
-        .ctx = NULL,
-    };
-
     // initialize logging with the default configuration
-    dnp3_configure_logging(dnp3_logging_config_init(), logger);
+    dnp3_configure_logging(dnp3_logging_config_init(), get_logger());
     // ANCHOR_END: logging_init
 
     // long-lived types that must be freed before exit
@@ -221,48 +250,31 @@ int main()
     }
 
     dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_new("127.0.0.1:20000");
-    dnp3_client_state_listener_t listener = {
-        .on_change = &client_state_on_change,
-        .on_destroy = NULL,
-        .ctx = NULL,
-    };
-
     // Create the master channel
     err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, get_master_channel_config(), endpoints, dnp3_retry_strategy_init(), 1000,
-                                         listener, &channel);
+                                         get_client_state_listener(), &channel);
+    dnp3_endpoint_list_destroy(endpoints);
+
     if (err) {
         printf("unable to create master: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
 
-    dnp3_endpoint_list_destroy(endpoints);
-
     // Create the association
-    dnp3_read_handler_t read_handler = {
-        .begin_fragment = &begin_fragment,
-        .end_fragment = &end_fragment,
-        .handle_binary = &handle_binary,
-        .handle_double_bit_binary = &handle_double_bit_binary,
-        .handle_binary_output_status = &handle_binary_output_status,
-        .handle_counter = &handle_counter,
-        .handle_frozen_counter = &handle_frozen_counter,
-        .handle_analog = &handle_analog,
-        .handle_analog_output_status = &handle_analog_output_status,
-        .handle_octet_string = &handle_octet_strings,
-        .on_destroy = NULL,
-        .ctx = NULL,
-    };
-
     dnp3_association_id_t association_id;
-    if (dnp3_master_channel_add_association(channel, 1024, get_association_config(), read_handler, get_association_handler(), &association_id)) {
+    if (dnp3_master_channel_add_association(channel, 1024, get_association_config(), get_read_handler(), get_association_handler(), &association_id)) {
         goto cleanup;
     }
 
     // Add an event poll
     dnp3_request_t *poll_request = dnp3_request_new_class(false, true, true, true);
     dnp3_poll_id_t poll_id;
-    dnp3_master_channel_add_poll(channel, association_id, poll_request, 5000, &poll_id);
+    err = dnp3_master_channel_add_poll(channel, association_id, poll_request, 5000, &poll_id);
     dnp3_request_destroy(poll_request);
+    if (err) {
+        printf("unable to add poll: %s \n", dnp3_param_error_to_string(err));
+        goto cleanup;
+    }
 
     // start communications
     dnp3_master_channel_enable(channel);
