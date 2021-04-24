@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30128.74
 MinimumVisualStudioVersion = 15.0.26124.0
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "dnp3rs", "dnp3rs\dnp3rs.csproj", "{0D8CEB91-C55F-4C86-9FFC-BB5130634B73}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "dnp3", "dnp3\dnp3.csproj", "{0D8CEB91-C55F-4C86-9FFC-BB5130634B73}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Master", "examples\master\Master.csproj", "{DA15A95F-F729-4300-8337-E239ABFD909C}"
 EndProject
