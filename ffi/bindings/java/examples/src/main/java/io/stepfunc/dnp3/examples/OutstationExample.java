@@ -192,12 +192,17 @@ public class OutstationExample {
     Logging.configure(new LoggingConfig(), new TestLogger());
 
     // Create the Tokio runtime
-    try (Runtime runtime = new Runtime(new RuntimeConfig());
-        // ANCHOR: create_tcp_server
-        TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000")
-        // ANCHOR_END: create_tcp_server
-        ) {
+    Runtime runtime = new Runtime(new RuntimeConfig());
+
+    // ANCHOR: create_tcp_server
+    TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
+    // ANCHOR_END: create_tcp_server
+
+    try {
       run(server);
+    }
+    finally {
+      runtime.close();
     }
   }
 

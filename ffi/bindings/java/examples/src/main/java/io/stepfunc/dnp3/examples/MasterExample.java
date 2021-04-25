@@ -263,34 +263,34 @@ public class MasterExample {
   }
   // ANCHOR_END: runtime_config
 
-  public static void main(String[] args) {
-    // ANCHOR: logging_init
+  public static void main(String[] args) throws Exception {
     // Initialize logging with the default configuration
     // This may only be called once during program initialization
+    // ANCHOR: logging_init
     Logging.configure(new LoggingConfig(), new ConsoleLogger());
     // ANCHOR_END: logging_init
 
-    try (
     // ANCHOR: runtime
     Runtime runtime = new Runtime(getRuntimeConfig());
-        // ANCHOR_END: runtime
+    // ANCHOR_END: runtime
 
-        // ANCHOR: create_master_channel
-        MasterChannel channel =
+    // ANCHOR: create_master_channel
+    MasterChannel channel =
             MasterChannel.createTcpChannel(
-                runtime,
-                LinkErrorMode.CLOSE,
-                getMasterChannelConfig(),
-                new EndpointList("127.0.0.1:20000"),
-                new RetryStrategy(),
-                Duration.ofSeconds(1),
-                new TestListener())
-        // ANCHOR_END: create_master_channel
-        ) {
+                    runtime,
+                    LinkErrorMode.CLOSE,
+                    getMasterChannelConfig(),
+                    new EndpointList("127.0.0.1:20000"),
+                    new RetryStrategy(),
+                    Duration.ofSeconds(1),
+                    new TestListener());
+    // ANCHOR_END: create_master_channel
 
+    try {
       run(channel);
-    } catch (Exception ex) {
-      System.out.println(ex.getMessage());
+    }
+    finally {
+      runtime.close();
     }
   }
 

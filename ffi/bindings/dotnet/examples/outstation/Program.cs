@@ -115,16 +115,19 @@ class ExampleOutstation
             new TestLogger()
         );
 
-        using (var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 }))
-        {
-            // ANCHOR: create_tcp_server
-            using (var server = new TcpServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000"))
-            // ANCHOR_END: create_tcp_server
-            {
-                RunServer(server);
-            }
-        }
+        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
+        // ANCHOR: create_tcp_server
+        var server = new TcpServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000");
+        // ANCHOR_END: create_tcp_server
 
+        try
+        {
+            RunServer(server);
+        }
+        finally
+        {            
+            runtime.Dispose();
+        }        
     }
 
     // ANCHOR: event_buffer_config
