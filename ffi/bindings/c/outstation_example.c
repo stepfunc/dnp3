@@ -1,4 +1,4 @@
-#include "dnp3rs.h"
+#include "dnp3.h"
 
 #include <stddef.h>
 #include <stdio.h>

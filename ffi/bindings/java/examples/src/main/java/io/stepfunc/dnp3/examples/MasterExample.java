@@ -1,9 +1,9 @@
-package io.stepfunc.dnp3rs.examples;
+package io.stepfunc.dnp3.examples;
 
 import static org.joou.Unsigned.*;
 
-import io.stepfunc.dnp3rs.*;
-import io.stepfunc.dnp3rs.Runtime;
+import io.stepfunc.dnp3.*;
+import io.stepfunc.dnp3.Runtime;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.Duration;
@@ -256,8 +256,7 @@ public class MasterExample {
   // ANCHOR_END: association_config
 
   // ANCHOR: runtime_config
-  public static RuntimeConfig getRuntimeConfig()
-  {
+  public static RuntimeConfig getRuntimeConfig() {
     RuntimeConfig config = new RuntimeConfig();
     config.numCoreThreads = ushort(4);
     return config;
@@ -272,21 +271,22 @@ public class MasterExample {
     // ANCHOR_END: logging_init
 
     try (
-            // ANCHOR: runtime
-            Runtime runtime = new Runtime(getRuntimeConfig());
-            // ANCHOR_END: runtime
-            // ANCHOR: create_master_channel
-            MasterChannel channel =
-                    MasterChannel.createTcpChannel(
-                            runtime,
-                            LinkErrorMode.CLOSE,
-                            getMasterChannelConfig(),
-                            new EndpointList("127.0.0.1:20000"),
-                            new RetryStrategy(),
-                            Duration.ofSeconds(1),
-                            new TestListener())
-            // ANCHOR_END: create_master_channel
-            ) {
+    // ANCHOR: runtime
+    Runtime runtime = new Runtime(getRuntimeConfig());
+        // ANCHOR_END: runtime
+
+        // ANCHOR: create_master_channel
+        MasterChannel channel =
+            MasterChannel.createTcpChannel(
+                runtime,
+                LinkErrorMode.CLOSE,
+                getMasterChannelConfig(),
+                new EndpointList("127.0.0.1:20000"),
+                new RetryStrategy(),
+                Duration.ofSeconds(1),
+                new TestListener())
+        // ANCHOR_END: create_master_channel
+        ) {
 
       run(channel);
     } catch (Exception ex) {

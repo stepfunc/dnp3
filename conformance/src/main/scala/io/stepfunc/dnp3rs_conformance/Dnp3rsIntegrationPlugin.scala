@@ -1,9 +1,9 @@
-package io.stepfunc.dnp3rs_conformance
+package io.stepfunc.dnp3_conformance
 
 import com.automatak.dnp4s.dnp3.app._
 import com.automatak.dnp4s.dnp3.{IntegrationPlugin, PluginReporter}
 import com.automatak.dnp4s.protocol.parsing.UInt8
-import io.stepfunc.dnp3rs.{AddressFilter, Analog, AnalogOutputStatus, Binary, BinaryOutputStatus, Counter, DoubleBit, DoubleBitBinary, EventBufferConfig, FrozenCounter, LinkErrorMode, Outstation, Runtime, RuntimeConfig, TcpServer}
+import io.stepfunc.dnp3.{AddressFilter, Analog, AnalogOutputStatus, Binary, BinaryOutputStatus, Counter, DoubleBit, DoubleBitBinary, EventBufferConfig, FrozenCounter, LinkErrorMode, Outstation, Runtime, RuntimeConfig, TcpServer}
 import org.joou.UInteger
 import org.joou.Unsigned.{uint, ushort}
 
@@ -11,7 +11,7 @@ import java.time.Duration
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-class Dnp3rsIntegrationPlugin extends IntegrationPlugin {
+class Dnp3IntegrationPlugin extends IntegrationPlugin {
   private var runtime: Runtime = _
   private var server: TcpServer = _
   private var outstation: Outstation = _
@@ -39,7 +39,7 @@ class Dnp3rsIntegrationPlugin extends IntegrationPlugin {
 
   override def setLinkLayerConfirm(reporter: PluginReporter, value: Boolean): Unit = {
     if(value) {
-      throw new RuntimeException("Confirmed link-layer is not supported by dnp3rs")
+      throw new RuntimeException("Confirmed link-layer is not supported by dnp3")
     }
   }
 
@@ -785,7 +785,7 @@ class Dnp3rsIntegrationPlugin extends IntegrationPlugin {
     this.controlHandler = new QueuedControlHandler(config.commandHandlerConfig.disableBinaryOutput, config.commandHandlerConfig.disableAnalogOutput)
     val listener = new CustomConnectionStateListener
 
-    val dnp3Config = new io.stepfunc.dnp3rs.OutstationConfig(ushort(config.linkConfig.source), ushort(config.linkConfig.destination))
+    val dnp3Config = new io.stepfunc.dnp3.OutstationConfig(ushort(config.linkConfig.source), ushort(config.linkConfig.destination))
 
     // Outstation config
     dnp3Config.features.selfAddress = config.linkConfig.selfAddressSupport

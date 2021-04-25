@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\dnp3rs\dnp3rs.csproj" />
+    <ProjectReference Include="..\..\dnp3\dnp3.csproj" />
   </ItemGroup>
 
 </Project>

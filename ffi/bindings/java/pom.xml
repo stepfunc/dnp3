@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.stepfunc</groupId>
-    <artifactId>dnp3rs-parent</artifactId>
+    <artifactId>dnp3-parent</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
 
@@ -39,7 +39,7 @@
     </build>
 
     <modules>
-        <module>dnp3rs</module>
+        <module>dnp3</module>
         <module>examples</module>
     </modules>
 </project>

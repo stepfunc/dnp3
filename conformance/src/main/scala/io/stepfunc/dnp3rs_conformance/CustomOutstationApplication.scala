@@ -1,6 +1,6 @@
-package io.stepfunc.dnp3rs_conformance
+package io.stepfunc.dnp3_conformance
 
-import io.stepfunc.dnp3rs._
+import io.stepfunc.dnp3._
 import org.joou.Unsigned.{ulong, ushort, uint}
 import org.joou.{ULong, UShort}
 

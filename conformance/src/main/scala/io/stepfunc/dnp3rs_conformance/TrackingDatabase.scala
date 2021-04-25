@@ -1,7 +1,7 @@
-package io.stepfunc.dnp3rs_conformance
+package io.stepfunc.dnp3_conformance
 
 import com.automatak.dnp4s.dnp3.app.EventClass
-import io.stepfunc.dnp3rs._
+import io.stepfunc.dnp3._
 import org.joou.Unsigned.{ubyte, uint, ushort}
 
 import scala.collection.mutable
@@ -71,7 +71,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       val binaryConfig = new BinaryConfig()
 
       this.binaryPoints.values.foreach(e => {
-        db.addBinary(e.index, io.stepfunc.dnp3rs.EventClass.CLASS1, binaryConfig)
+        db.addBinary(e.index, io.stepfunc.dnp3.EventClass.CLASS1, binaryConfig)
         db.updateBinary(e, updateOptions)
       })
     }
@@ -80,7 +80,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       val doubleBitBinaryConfig = new DoubleBitBinaryConfig()
 
       this.doubleBitPoints.values.foreach(e => {
-        db.addDoubleBitBinary(e.index, io.stepfunc.dnp3rs.EventClass.CLASS1, doubleBitBinaryConfig)
+        db.addDoubleBitBinary(e.index, io.stepfunc.dnp3.EventClass.CLASS1, doubleBitBinaryConfig)
         db.updateDoubleBitBinary(e, updateOptions)
       })
     }
@@ -93,11 +93,11 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       frozenCounterConfig.staticVariation = StaticFrozenCounterVariation.GROUP21_VAR2
 
       this.counters.values.foreach(e => {
-        db.addCounter(e.index, io.stepfunc.dnp3rs.EventClass.CLASS2, counterConfig)
+        db.addCounter(e.index, io.stepfunc.dnp3.EventClass.CLASS2, counterConfig)
         db.updateCounter(e, updateOptions)
 
         val frozenCounter = new FrozenCounter(e.index, e.value, e.flags, e.time)
-        db.addFrozenCounter(e.index, io.stepfunc.dnp3rs.EventClass.CLASS1, frozenCounterConfig)
+        db.addFrozenCounter(e.index, io.stepfunc.dnp3.EventClass.CLASS1, frozenCounterConfig)
         db.updateFrozenCounter(frozenCounter, updateOptions)
       })
     }
@@ -106,7 +106,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       val aiConfig = new AnalogConfig()
       aiConfig.staticVariation = StaticAnalogVariation.GROUP30_VAR2
 
-      db.addAnalog(e.index, io.stepfunc.dnp3rs.EventClass.CLASS3, aiConfig)
+      db.addAnalog(e.index, io.stepfunc.dnp3.EventClass.CLASS3, aiConfig)
       db.updateAnalog(e, updateOptions)
     })
 
@@ -114,7 +114,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       val boConfig = new BinaryOutputStatusConfig()
       boConfig.staticVariation = StaticBinaryOutputStatusVariation.GROUP10_VAR2
 
-      db.addBinaryOutputStatus(e.index, io.stepfunc.dnp3rs.EventClass.NONE, boConfig)
+      db.addBinaryOutputStatus(e.index, io.stepfunc.dnp3.EventClass.NONE, boConfig)
       db.updateBinaryOutputStatus(e, updateOptions)
     })
 
@@ -122,7 +122,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       val aoConfig = new AnalogOutputStatusConfig()
       aoConfig.staticVariation = StaticAnalogOutputStatusVariation.GROUP40_VAR2
 
-      db.addAnalogOutputStatus(e.index, io.stepfunc.dnp3rs.EventClass.CLASS1, aoConfig)
+      db.addAnalogOutputStatus(e.index, io.stepfunc.dnp3.EventClass.CLASS1, aoConfig)
       db.updateAnalogOutputStatus(e, updateOptions)
     })
   })

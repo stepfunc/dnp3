@@ -1,9 +1,9 @@
-package io.stepfunc.dnp3rs.examples;
+package io.stepfunc.dnp3.examples;
 
 import static org.joou.Unsigned.*;
 
-import io.stepfunc.dnp3rs.*;
-import io.stepfunc.dnp3rs.Runtime;
+import io.stepfunc.dnp3.*;
+import io.stepfunc.dnp3.Runtime;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;

@@ -9,7 +9,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 The C bindings are distributed as a zip file with the following directory layout:
 
-* single header file in `/include/dnp3rs.h`
+* single header file in `/include/dnp3.h`
 * cmake find package script in `/cmake/`
 * platform specific shared libraries in `/lib/<platform>`
 * 3rd party license information in `/lib/licenses.txt`
@@ -20,14 +20,14 @@ Make the find package script discoverable by adding it to the prefix path. Then 
 
 ```cmake
 set(CMAKE_PREFIX_PATH ${DISTRIBUTION_PATH}/cmake)
-find_package(dnp3rs REQUIRED)
+find_package(dnp3 REQUIRED)
 ```
 
 Then declare a dependency on the package:
 
 ```cmake
 add_executable(my_awesome_project main.c)
-target_link_libraries(my_awesome_project PRIVATE dnp3rs)
+target_link_libraries(my_awesome_project PRIVATE dnp3)
 ```
 
 ## Mapping
