@@ -45,7 +45,7 @@ The function is called within the context of the Tokio runtime and is therefore 
 <TabItem value="Java">
 
 ```java
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples/MasterExample.java:create_master_channel}}
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:create_master_channel}}
 ```
 
 </TabItem>
@@ -74,6 +74,6 @@ Endpoints consist of a `<host>:<port>` tuple where "host" is one of the followin
 * IPv6 address
 * domain name
 
-## ReconnectStrategy
+## ConnectStrategy
 
-The `ReconnectStrategy` controls the rate at which the master retries failed connection attempts.
+The `ConnectStrategy` controls the rate at which the master retries failed connection attempts.
