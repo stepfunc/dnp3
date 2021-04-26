@@ -255,8 +255,7 @@ int main()
 
     // ANCHOR: create_master_channel
     dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_new("127.0.0.1:20000");
-    err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, get_master_channel_config(), endpoints, dnp3_retry_strategy_init(), 1000,
-                                         get_client_state_listener(), &channel);
+    err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, get_master_channel_config(), endpoints, dnp3_connect_strategy_init(), get_client_state_listener(), &channel);
     dnp3_endpoint_list_destroy(endpoints);
     // ANCHOR_END: create_master_channel
 

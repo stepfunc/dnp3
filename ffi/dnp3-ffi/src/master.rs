@@ -19,24 +19,28 @@ pub(crate) unsafe fn master_channel_create_tcp(
     link_error_mode: ffi::LinkErrorMode,
     config: ffi::MasterChannelConfig,
     endpoints: *const crate::EndpointList,
-    retry_strategy: ffi::RetryStrategy,
-    reconnect_delay: Duration,
+    connect_strategy: ffi::ConnectStrategy,
     listener: ffi::ClientStateListener,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
     let config = convert_config(config)?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
 
-    let reconnect_delay = if reconnect_delay == Duration::from_millis(0) {
+    let reconnect_delay = if connect_strategy.reconnect_delay == 0 {
         None
     } else {
-        Some(reconnect_delay)
+        Some(connect_strategy.reconnect_delay())
     };
+
+    let retry_strategy = RetryStrategy::new(
+        connect_strategy.min_connect_delay(),
+        connect_strategy.max_connect_delay(),
+    );
 
     let (future, handle) = dnp3::tcp::create_master_tcp_client(
         link_error_mode.into(),
         config,
         endpoints.clone(),
-        retry_strategy.into(),
+        retry_strategy,
         reconnect_delay,
         Box::new(listener),
     );

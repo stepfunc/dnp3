@@ -276,20 +276,18 @@ public class MasterExample {
 
     // ANCHOR: create_master_channel
     MasterChannel channel =
-            MasterChannel.createTcpChannel(
-                    runtime,
-                    LinkErrorMode.CLOSE,
-                    getMasterChannelConfig(),
-                    new EndpointList("127.0.0.1:20000"),
-                    new RetryStrategy(),
-                    Duration.ofSeconds(1),
-                    new TestListener());
+        MasterChannel.createTcpChannel(
+            runtime,
+            LinkErrorMode.CLOSE,
+            getMasterChannelConfig(),
+            new EndpointList("127.0.0.1:20000"),
+            new ConnectStrategy(),
+            new TestListener());
     // ANCHOR_END: create_master_channel
 
     try {
       run(channel);
-    }
-    finally {
+    } finally {
       runtime.close();
     }
   }

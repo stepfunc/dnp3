@@ -200,8 +200,7 @@ public class OutstationExample {
 
     try {
       run(server);
-    }
-    finally {
+    } finally {
       runtime.close();
     }
   }

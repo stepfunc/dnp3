@@ -165,11 +165,11 @@ class MainClass
 
         // ANCHOR: create_master_channel
         var channel = MasterChannel.CreateTcpChannel(
-            runtime, LinkErrorMode.Close,
+            runtime,
+            LinkErrorMode.Close,
             GetMasterChannelConfig(),
             new EndpointList("127.0.0.1:20000"),
-            new RetryStrategy(),
-            TimeSpan.FromSeconds(1),
+            new ConnectStrategy(),            
             new TestListener()
         );
         // ANCHOR_END: create_master_channel
