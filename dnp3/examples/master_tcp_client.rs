@@ -65,7 +65,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     // ANCHOR_END: create_master_channel
 
-    // create the association
+
+    // ANCHOR: association_create
     let mut association = channel
         .add_association(
             EndpointAddress::from(1024)?,
@@ -74,6 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             DefaultAssociationHandler::boxed(),
         )
         .await?;
+    // ANCHOR_END: association_create
 
     // create event poll
     let mut poll = association

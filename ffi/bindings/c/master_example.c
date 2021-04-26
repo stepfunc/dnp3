@@ -265,10 +265,15 @@ int main()
     }
 
     // Create the association
+    // ANCHOR: association_create
     dnp3_association_id_t association_id;
-    if (dnp3_master_channel_add_association(channel, 1024, get_association_config(), get_read_handler(), get_association_handler(), &association_id)) {
+    err = dnp3_master_channel_add_association(channel, 1024, get_association_config(), get_read_handler(), get_association_handler(), &association_id);
+    // ANCHOR_END: association_create
+    if (err) {
+        printf("unable to add association: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
+
 
     // Add an event poll
     dnp3_request_t *poll_request = dnp3_request_new_class(false, true, true, true);

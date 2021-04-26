@@ -295,12 +295,14 @@ public class MasterExample {
   private static void run(MasterChannel channel) throws Exception {
 
     // Create the association
+    // ANCHOR: association_create
     AssociationId association =
         channel.addAssociation(
             ushort(1024),
             getAssociationConfig(),
             new TestReadHandler(),
             new TestAssociationHandler());
+    // ANCHOR_END: association_create
 
     // Create a periodic poll
     PollId poll =

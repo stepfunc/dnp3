@@ -62,6 +62,11 @@ module.exports = {
                         'api/master/serial_master',
                     ]
                 },
+                {
+                    Associations: [
+                        'api/master/assoc_create',
+                    ]
+                },
             ]
         }
     ],

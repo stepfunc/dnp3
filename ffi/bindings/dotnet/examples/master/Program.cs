@@ -214,12 +214,14 @@ class MainClass
 
     private static async Task RunChannel(MasterChannel channel)
     {
+        // ANCHOR: association_create
         var association = channel.AddAssociation(
             1024,
             GetAssociationConfig(),
             new TestReadHandler(),
             new TestAssocationHandler()
         );
+        // ANCHOR_END: association_create
 
         var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
 
