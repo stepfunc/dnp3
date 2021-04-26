@@ -816,7 +816,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
 
   private def shutdown(): Unit = {
     if(runtime != null) {
-      runtime.close()
+      runtime.shutdown()
       runtime = null
     }
   }
