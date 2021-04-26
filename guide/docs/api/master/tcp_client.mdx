@@ -76,4 +76,10 @@ Endpoints consist of a `<host>:<port>` tuple where "host" is one of the followin
 
 ## ConnectStrategy
 
-The `ConnectStrategy` controls the rate at which the master retries failed connection attempts.
+The `ConnectStrategy` controls the rate at which the master retries failed connection attempts. The master uses exponential backoff when attempting to establish
+a connection. The delay between attempts doubles from `minConnectDelay` up to `maxConnectDelay`. If a connection fails after being previously connected, it will
+wait `reconnectDelay` before the next attempt.
+
+## ClientStateListener
+
+The `ClientStateListener` interface has a single method that informs the application about the state of connection.
