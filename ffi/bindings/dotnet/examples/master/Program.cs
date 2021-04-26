@@ -275,10 +275,12 @@ class MainClass
                     }
                 case "cmd":
                     {
+                        // ANCHOR: assoc_control
                         var commands = new Commands();
                         commands.AddG12v1u8(3, new G12v1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
                         var result = await channel.Operate(association, CommandMode.SelectBeforeOperate, commands);
                         Console.WriteLine($"Result: {result}");
+                        // ANCHOR_END: assoc_control
                         break;
                     }
                 case "evt":

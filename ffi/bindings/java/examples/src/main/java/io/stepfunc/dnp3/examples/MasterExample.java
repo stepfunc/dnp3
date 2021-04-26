@@ -354,6 +354,7 @@ public class MasterExample {
           }
         case "cmd":
           {
+            // ANCHOR: assoc_control
             Commands commands = new Commands();
             G12v1 g12v1 =
                 new G12v1(
@@ -362,12 +363,15 @@ public class MasterExample {
                     uint(1000),
                     uint(1000));
             commands.addG12v1u16(ushort(3), g12v1);
+
             CommandResult result =
                 channel
                     .operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
                     .toCompletableFuture()
                     .get();
+
             System.out.println("Result: " + result);
+            // ANCHOR_END: assoc_control
             break;
           }
         case "evt":

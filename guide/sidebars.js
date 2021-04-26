@@ -66,6 +66,7 @@ module.exports = {
                     Associations: [
                         'api/master/assoc_create',
                         'api/master/assoc_polls',
+                        'api/master/assoc_controls',
                     ]
                 },
             ]

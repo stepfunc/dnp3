@@ -129,6 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "cmd" => {
+                // ANCHOR: assoc_control
                 if let Err(err) = association
                     .operate(
                         CommandMode::SelectBeforeOperate,
@@ -141,6 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 {
                     tracing::warn!("error: {}", err);
                 }
+                // ANCHOR_END: assoc_control
             }
             "evt" => poll.demand().await?,
             "lts" => {

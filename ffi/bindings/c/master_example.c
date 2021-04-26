@@ -168,7 +168,12 @@ dnp3_read_handler_t get_read_handler()
 void on_read_complete(dnp3_read_result_t result, void *arg) { printf("ReadResult: %s\n", dnp3_read_result_to_string(result)); }
 
 // Command callback
-void on_command_complete(dnp3_command_result_t result, void *arg) { printf("CommandResult: %s\n", dnp3_command_result_to_string(result)); }
+// ANCHOR: assoc_control_callback
+void on_command_complete(dnp3_command_result_t result, void *arg)
+{
+    printf("CommandResult: %s\n", dnp3_command_result_to_string(result));
+}
+// ANCHOR_END: assoc_control_callback
 
 // Timesync callback
 void on_timesync_complete(dnp3_time_sync_result_t result, void *arg) { printf("TimeSyncResult: %s\n", dnp3_time_sync_result_to_string(result)); }
@@ -341,6 +346,7 @@ int main()
             dnp3_request_destroy(request);
         }
         else if (strcmp(cbuf, "cmd\n") == 0) {
+            // ANCHOR: assoc_control
             dnp3_commands_t *commands = dnp3_commands_new();
             dnp3_g12v1_t g12v1 = dnp3_g12v1_init(dnp3_control_code_init(DNP3_TRIP_CLOSE_CODE_NUL, false, DNP3_OP_TYPE_LATCH_ON), 1, 1000, 1000);
             dnp3_commands_add_g12v1_u16(commands, 3, g12v1);
@@ -354,6 +360,7 @@ int main()
             dnp3_master_channel_operate(channel, association_id, DNP3_COMMAND_MODE_SELECT_BEFORE_OPERATE, commands, cb);
 
             dnp3_commands_destroy(commands);
+            // ANCHOR_END: assoc_control
         }
         else if (strcmp(cbuf, "evt\n") == 0) {
             dnp3_master_channel_demand_poll(channel, poll_id);
