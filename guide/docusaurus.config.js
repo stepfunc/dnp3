@@ -6,7 +6,7 @@ const sitedata = require('./sitedata.json');
 module.exports = {
   title: `DNP3 ${sitedata.version}`,
   tagline: 'Pretty sure we don\'t need this page, just the docs',
-  url: 'https://your-docusaurus-test-site.com',
+  url: 'https://docs.stepfunc.io',
   baseUrl: `/dnp3/${sitedata.version}/guide/`,
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
