@@ -58,6 +58,11 @@ The function is called within the context of the Tokio runtime and is therefore 
 </TabItem>
 </Tabs>
 
+## Enabling
+
+A `MasterChannel` will not begin communications until the `enable` method is called. This gives the user the chance to configure all of the
+associations on the channel as we'll discuss on the next page.  The user may also `disable` on the channel to put it in an inactive state.
+
 ## LinkErrorMode
 
 The `LinkErrorMode` controls what happens if framing error is detected at the link-layer. TCP is a lossless transport so the default behavior is to

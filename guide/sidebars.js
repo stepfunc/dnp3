@@ -59,6 +59,7 @@ module.exports = {
                 {
                     Channels: [
                         'api/master/tcp_client',
+                        'api/master/serial_master',
                     ]
                 },
             ]
