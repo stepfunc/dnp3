@@ -63,6 +63,7 @@ module.exports = {
                         },
                         'api/master/assoc_polls',
                         'api/master/assoc_controls',
+                        'api/master/assoc_other',
                     ]
                 },
             ]
