@@ -1,0 +1,59 @@
+---
+id: assoc_polls
+title: Periodic Polling
+sidebar_label: Polling
+slug: /api/master/association/polls
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Periodic polls are typically added to an association before calling `MasterChannel.enable()` but may be added or removed at any time. The user specifies the
+association to poll, the type of request, and the polling period.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master_tcp_client.rs:add_poll}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:add_poll}}
+// check error
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:add_poll}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:add_poll}}
+```
+
+</TabItem>
+</Tabs>
+
+The `Request` class is a builder type that allows the user to construct arbitrary READ requests including:
+
+* Class reads (0,1,2,3)
+* One or two byte range reads
+* All objects (qualifier 0x06) reads for arbitrary variations
+

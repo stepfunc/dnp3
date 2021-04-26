@@ -55,15 +55,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR_END: logging
 
     // spawn the master channel onto another task
+    // ANCHOR: create_master_channel
     let mut channel = spawn_master_tcp_client(
         LinkErrorMode::Close,
         get_master_channel_config()?,
         EndpointList::new("127.0.0.1:20000".to_owned(), &[]),
-        ReconnectStrategy::default(),
+        ConnectStrategy::default(),
         NullListener::create(),
     );
+    // ANCHOR_END: create_master_channel
 
-    // create the association
+    // ANCHOR: association_create
     let mut association = channel
         .add_association(
             EndpointAddress::from(1024)?,
@@ -72,14 +74,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             DefaultAssociationHandler::boxed(),
         )
         .await?;
+    // ANCHOR_END: association_create
 
-    // create event poll
+    // create an event poll
+    // ANCHOR: add_poll
     let mut poll = association
         .add_poll(
             EventClasses::all().to_classes().to_request(),
             Duration::from_secs(5),
         )
         .await?;
+    // ANCHOR_END: add_poll
 
     // enable communications
     channel.enable().await?;
@@ -123,6 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "cmd" => {
+                // ANCHOR: assoc_control
                 if let Err(err) = association
                     .operate(
                         CommandMode::SelectBeforeOperate,
@@ -135,6 +141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 {
                     tracing::warn!("error: {}", err);
                 }
+                // ANCHOR_END: assoc_control
             }
             "evt" => poll.demand().await?,
             "lts" => {

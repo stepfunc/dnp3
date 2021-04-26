@@ -1,38 +1,5 @@
 use std::time::Duration;
 
-/// Combines a `RetryStrategy` with an optional delay before reconnecting after a disconnection
-#[derive(Copy, Clone, Debug)]
-pub struct ReconnectStrategy {
-    /// Retry strategy when used between attempts to
-    /// establish a connection
-    pub retry_strategy: RetryStrategy,
-    /// Optional delay to wait before attempting a new connection
-    /// when an existing connection is lost
-    pub reconnect_delay: Option<Duration>,
-}
-
-impl ReconnectStrategy {
-    /// construct a `ReconnectStrategy` from its fields
-    pub fn new(retry_strategy: RetryStrategy, reconnect_delay: Option<Duration>) -> Self {
-        Self {
-            retry_strategy,
-            reconnect_delay,
-        }
-    }
-}
-
-impl From<RetryStrategy> for ReconnectStrategy {
-    fn from(from: RetryStrategy) -> Self {
-        Self::new(from, None)
-    }
-}
-
-impl Default for ReconnectStrategy {
-    fn default() -> Self {
-        Self::new(RetryStrategy::default(), None)
-    }
-}
-
 /// Parameterizes the minimum and maximum delays between retries
 /// for a retry strategy based on exponential backoff
 #[derive(Copy, Clone, Debug)]
@@ -51,6 +18,46 @@ impl RetryStrategy {
             min_delay,
             max_delay,
         }
+    }
+}
+
+/// Parameterizes connection attempts
+#[derive(Copy, Clone, Debug)]
+pub struct ConnectStrategy {
+    /// Minimum delay between two connection attempts, doubles up to the maximum delay
+    pub(crate) min_connect_delay: Duration,
+    /// Maximum delay between two connection attempts
+    pub(crate) max_connect_delay: Duration,
+    /// Delay before attempting a connection after a disconnect
+    pub(crate) reconnect_delay: Duration,
+}
+
+impl ConnectStrategy {
+    /// construct a `ConnectStrategy`
+    ///
+    /// `min_connect_delay` - Minimum delay between two connection attempts, doubles up to the maximum delay
+    /// `max_connect_delay` - Maximum delay between two connection attempts
+    /// `reconnect_delay` - Delay before attempting a connection after a disconnect
+    pub fn new(
+        min_connect_delay: Duration,
+        max_connect_delay: Duration,
+        reconnect_delay: Duration,
+    ) -> Self {
+        ConnectStrategy {
+            min_connect_delay,
+            max_connect_delay,
+            reconnect_delay,
+        }
+    }
+}
+
+impl Default for ConnectStrategy {
+    fn default() -> Self {
+        Self::new(
+            Duration::from_secs(1),
+            Duration::from_secs(10),
+            Duration::from_secs(1),
+        )
     }
 }
 

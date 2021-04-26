@@ -47,14 +47,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR_END: create_tcp_server
 
     // ANCHOR: tcp_server_spawn_outstation
-    let outstation = server.spawn_outstation(
+    let outstation = server.add_outstation(
         get_outstation_config(),
         get_event_buffer_config(),
         DefaultOutstationApplication::create(),
         DefaultOutstationInformation::create(),
         DefaultControlHandler::with_status(CommandStatus::NotSupported),
         NullListener::create(),
-        // filter that controls what IP address(es) may connect to this outstation instance
         AddressFilter::Any,
     )?;
     // ANCHOR_END: tcp_server_spawn_outstation
@@ -75,7 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ANCHOR: server_bind
     // dropping the ServerHandle shuts down the server and outstation(s)
-    let _server_handle = server.bind_and_spawn().await?;
+    let _server_handle = server.bind().await?;
     // ANCHOR_END: server_bind
 
     let mut value = 0.0;

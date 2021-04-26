@@ -1,0 +1,64 @@
+---
+id: assoc_create
+title: Creating Associations
+sidebar_label: Creating
+slug: /api/master/association/create
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Associations are created on a `MasterChannel` by specifying some configuration and callback interfaces.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master_tcp_client.rs:association_create}}
+```
+
+:::note
+The Rust API and the binding APIs differ with regard to associations. In the bindings, an association token is returned which is then used on the channel. In
+the Rust API, an object is returned which has its own methods for performing operations on the association.
+:::
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:association_create}}
+// check error
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:association_create}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:association_create}}
+```
+
+</TabItem>
+</Tabs>
+
+The `AssociationId` struct returned when adding an association is just a token. It is needed to perform operations on a particular outstation on the channel,
+but unlike the `MasterChannel`, you don't need to worry about keeping a reference to it around if its not needed. Allowing the `AssociationId` to be garbage
+collected won't cause the association to be removed from the channel.
+
+## Removing
+
+Associations may also be removed from a channel by calling `MasterChannel.removeAssociation` and passing in the `AssociationId`.

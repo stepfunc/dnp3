@@ -1,0 +1,60 @@
+---
+id: assoc_controls
+title: Executing Controls
+sidebar_label: Controls
+slug: /api/master/association/controls
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Arbitrary sequences of controls may be constructed using the `Commands` builder class.  The commands may then be sent to a particular outstation
+using the association id.
+
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master_tcp_client.rs:assoc_control}}
+```
+
+:::note
+The Rust API calls the builder class CommandBuilder
+:::
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:assoc_control_callback}}
+
+{{#include ../ffi/bindings/c/master_example.c:assoc_control}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:assoc_control}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:assoc_control}}
+```
+
+</TabItem>
+</Tabs>
+
+The asynchronous operation returns a single `CommandResult` enum indicating the result. `CommandResult.Success` means that the outstation responded with `Success` for all
+of the controls in the message. Consult the language specific documentation for the meaning of each of the error codes that may be returned.

@@ -46,7 +46,7 @@ impl TcpServer {
 
     /// associate an outstation with the TcpServer, but do not spawn it
     #[allow(clippy::too_many_arguments)]
-    pub fn add_outstation(
+    pub fn add_outstation_no_spawn(
         &mut self,
         config: OutstationConfig,
         event_config: EventBufferConfig,
@@ -92,9 +92,11 @@ impl TcpServer {
         Ok((handle, future))
     }
 
-    /// associate an outstation with the TcpServer and spawn it on the Tokio runtime.
+    /// associate an outstation with the TcpServer and spawn it
+    ///
+    /// Must be called from within the Tokio runtime
     #[allow(clippy::too_many_arguments)]
-    pub fn spawn_outstation(
+    pub fn add_outstation(
         &mut self,
         config: OutstationConfig,
         event_config: EventBufferConfig,
@@ -104,7 +106,7 @@ impl TcpServer {
         listener: Box<dyn Listener<ConnectionState>>,
         filter: AddressFilter,
     ) -> Result<OutstationHandle, FilterError> {
-        let (handle, future) = self.add_outstation(
+        let (handle, future) = self.add_outstation_no_spawn(
             config,
             event_config,
             application,
@@ -119,7 +121,9 @@ impl TcpServer {
 
     /// Consume the `TcpServer` builder object, bind it to pre-specified port, and return a (ServerHandle, Future)
     /// tuple.
-    pub async fn bind(
+    ///
+    /// This may be called outside the Tokio runtime and allows for manual spawning
+    pub async fn bind_no_spawn(
         mut self,
     ) -> Result<(ServerHandle, impl std::future::Future<Output = Shutdown>), crate::tokio::io::Error>
     {
@@ -142,8 +146,10 @@ impl TcpServer {
     /// Consume the `TcpServer` builder object, bind it to pre-specified port, and spawn the server
     /// task onto the Tokio runtime. Returns a ServerHandle that will shut down the server and all
     /// associated outstations when dropped.
-    pub async fn bind_and_spawn(self) -> Result<ServerHandle, crate::tokio::io::Error> {
-        let (handle, future) = self.bind().await?;
+    ///
+    /// This must be called from within the Tokio runtime
+    pub async fn bind(self) -> Result<ServerHandle, crate::tokio::io::Error> {
+        let (handle, future) = self.bind_no_spawn().await?;
         crate::tokio::spawn(future);
         Ok(handle)
     }

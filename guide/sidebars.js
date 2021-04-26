@@ -45,24 +45,32 @@ module.exports = {
             Master: [
                 'api/master/terminology',
                 {
-                    Configuration: [
+                    Channels: [
                         'api/master/channel_config',
-                        'api/master/assoc_config',
+                        'api/master/tcp_client',
+                        'api/master/serial_master',
                     ]
                 },
                 {
-                    Interfaces: [
-                        'api/master/read_handler',
+                    Associations: [
+                        'api/master/assoc_create',
+                        {
+                            Components: [
+                                'api/master/assoc_config',
+                                'api/master/read_handler',
+                                'api/master/association_handler',
+                            ]
+                        },
+                        'api/master/assoc_polls',
+                        'api/master/assoc_controls',
+                        'api/master/assoc_other',
                     ]
-                }
+                },
             ]
         }
     ],
     Examples: [
-        'examples/summary',
-        {
-            Rust: ['examples/rust/tcp_master', 'examples/rust/tcp_outstation'],
-        }
+        'examples/summary'
     ],
   },
 };

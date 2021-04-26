@@ -80,7 +80,7 @@ pub unsafe fn tcpserver_add_outstation(
         .ok_or(ffi::ParamError::NullParameter)?
         .into();
 
-    let (outstation, task) = server_handle.add_outstation(
+    let (outstation, task) = server_handle.add_outstation_no_spawn(
         config,
         event_config.into(),
         Box::new(application),
@@ -109,7 +109,7 @@ pub unsafe fn tcpserver_bind(server: *mut TcpServer) -> Result<(), ffi::ParamErr
         TcpServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),
     };
 
-    let (handle, task) = server.runtime.block_on(server_handle.bind())??;
+    let (handle, task) = server.runtime.block_on(server_handle.bind_no_spawn())??;
 
     server.runtime.spawn(task)?;
     server.state = TcpServerState::Running(handle);

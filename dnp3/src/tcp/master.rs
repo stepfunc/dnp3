@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use tracing::Instrument;
 
-use crate::app::Shutdown;
-use crate::app::{ExponentialBackOff, Listener, ReconnectStrategy};
+use crate::app::{ConnectStrategy, ExponentialBackOff, Listener};
+use crate::app::{RetryStrategy, Shutdown};
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::{MasterChannel, MasterChannelConfig};
@@ -24,11 +24,16 @@ pub fn spawn_master_tcp_client(
     link_error_mode: LinkErrorMode,
     config: MasterChannelConfig,
     endpoints: EndpointList,
-    reconnect: ReconnectStrategy,
+    connect_strategy: ConnectStrategy,
     listener: Box<dyn Listener<ClientState>>,
 ) -> MasterChannel {
-    let (future, handle) =
-        create_master_tcp_client(link_error_mode, config, endpoints, reconnect, listener);
+    let (future, handle) = create_master_tcp_client(
+        link_error_mode,
+        config,
+        endpoints,
+        connect_strategy,
+        listener,
+    );
     crate::tokio::spawn(future);
     handle
 }
@@ -45,12 +50,17 @@ pub fn create_master_tcp_client(
     link_error_mode: LinkErrorMode,
     config: MasterChannelConfig,
     endpoints: EndpointList,
-    reconnect: ReconnectStrategy,
+    connect_strategy: ConnectStrategy,
     listener: Box<dyn Listener<ClientState>>,
 ) -> (impl Future<Output = ()> + 'static, MasterChannel) {
     let main_addr = endpoints.main_addr().to_string();
-    let (mut task, handle) =
-        MasterTask::new(link_error_mode, endpoints, config, reconnect, listener);
+    let (mut task, handle) = MasterTask::new(
+        link_error_mode,
+        endpoints,
+        config,
+        connect_strategy,
+        listener,
+    );
     let future = async move {
         task.run()
             .instrument(tracing::info_span!("DNP3-Master-TCP", "endpoint" = ?main_addr))
@@ -62,7 +72,7 @@ pub fn create_master_tcp_client(
 struct MasterTask {
     endpoints: EndpointList,
     back_off: ExponentialBackOff,
-    reconnect_delay: Option<Duration>,
+    reconnect_delay: Duration,
     session: MasterSession,
     reader: TransportReader,
     writer: TransportWriter,
@@ -74,7 +84,7 @@ impl MasterTask {
         link_error_mode: LinkErrorMode,
         endpoints: EndpointList,
         config: MasterChannelConfig,
-        reconnect: ReconnectStrategy,
+        connect_strategy: ConnectStrategy,
         listener: Box<dyn Listener<ClientState>>,
     ) -> (Self, MasterChannel) {
         let (tx, rx) = crate::util::channel::request_channel();
@@ -92,8 +102,11 @@ impl MasterTask {
         );
         let task = Self {
             endpoints,
-            back_off: ExponentialBackOff::new(reconnect.retry_strategy),
-            reconnect_delay: reconnect.reconnect_delay,
+            back_off: ExponentialBackOff::new(RetryStrategy::new(
+                connect_strategy.min_connect_delay,
+                connect_strategy.max_connect_delay,
+            )),
+            reconnect_delay: connect_strategy.reconnect_delay,
             session,
             reader,
             writer,
@@ -170,11 +183,14 @@ impl MasterTask {
             RunError::State(s) => Err(s),
             RunError::Link(err) => {
                 tracing::warn!("connection lost - {}", err);
-                if let Some(delay) = self.reconnect_delay {
-                    tracing::warn!("waiting {} ms to reconnect", delay.as_millis());
+                if self.reconnect_delay > Duration::from_secs(0) {
+                    tracing::warn!(
+                        "waiting {} ms to reconnect",
+                        self.reconnect_delay.as_millis()
+                    );
                     self.listener
-                        .update(ClientState::WaitAfterDisconnect(delay));
-                    self.session.wait_for_retry(delay).await?;
+                        .update(ClientState::WaitAfterDisconnect(self.reconnect_delay));
+                    self.session.wait_for_retry(self.reconnect_delay).await?;
                 }
                 Ok(())
             }

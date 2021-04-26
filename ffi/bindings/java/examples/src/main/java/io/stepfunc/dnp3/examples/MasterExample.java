@@ -218,12 +218,14 @@ class TestReadHandler implements ReadHandler {
   }
 }
 
+// ANCHOR: association_handler
 class TestAssociationHandler implements AssociationHandler {
   @Override
   public TimestampUtc getCurrentTime() {
     return TimestampUtc.valid(ulong(System.currentTimeMillis()));
   }
 }
+// ANCHOR_END: association_handler
 
 public class MasterExample {
 
@@ -253,50 +255,61 @@ public class MasterExample {
   }
   // ANCHOR_END: association_config
 
-  public static void main(String[] args) {
-    // ANCHOR: logging_init
+  // ANCHOR: runtime_config
+  public static RuntimeConfig getRuntimeConfig() {
+    RuntimeConfig config = new RuntimeConfig();
+    config.numCoreThreads = ushort(4);
+    return config;
+  }
+  // ANCHOR_END: runtime_config
+
+  public static void main(String[] args) throws Exception {
     // Initialize logging with the default configuration
     // This may only be called once during program initialization
+    // ANCHOR: logging_init
     Logging.configure(new LoggingConfig(), new ConsoleLogger());
     // ANCHOR_END: logging_init
 
     // ANCHOR: runtime
-    // Create the Tokio runtime
-    RuntimeConfig runtimeConfig = new RuntimeConfig();
-    runtimeConfig.numCoreThreads = ushort(4);
-    try (Runtime runtime = new Runtime(runtimeConfig)) {
-      // ANCHOR_END: runtime
-      run(runtime);
-    } catch (Exception ex) {
-      System.out.println(ex.getMessage());
-    }
-  }
+    Runtime runtime = new Runtime(getRuntimeConfig());
+    // ANCHOR_END: runtime
 
-  private static void run(Runtime runtime) throws Exception {
-
-    // Create the master channel
+    // ANCHOR: create_master_channel
     MasterChannel channel =
         MasterChannel.createTcpChannel(
             runtime,
             LinkErrorMode.CLOSE,
             getMasterChannelConfig(),
             new EndpointList("127.0.0.1:20000"),
-            new RetryStrategy(),
-            Duration.ofSeconds(1),
+            new ConnectStrategy(),
             new TestListener());
+    // ANCHOR_END: create_master_channel
+
+    try {
+      run(channel);
+    } finally {
+      runtime.close();
+    }
+  }
+
+  private static void run(MasterChannel channel) throws Exception {
 
     // Create the association
+    // ANCHOR: association_create
     AssociationId association =
         channel.addAssociation(
             ushort(1024),
             getAssociationConfig(),
             new TestReadHandler(),
             new TestAssociationHandler());
+    // ANCHOR_END: association_create
 
     // Create a periodic poll
+    // ANCHOR: add_poll
     PollId poll =
         channel.addPoll(
             association, Request.classRequest(false, true, true, true), Duration.ofSeconds(5));
+    // ANCHOR_END: add_poll
 
     // start communications
     channel.enable();
@@ -341,6 +354,7 @@ public class MasterExample {
           }
         case "cmd":
           {
+            // ANCHOR: assoc_control
             Commands commands = new Commands();
             G12v1 g12v1 =
                 new G12v1(
@@ -349,12 +363,15 @@ public class MasterExample {
                     uint(1000),
                     uint(1000));
             commands.addG12v1u16(ushort(3), g12v1);
+
             CommandResult result =
                 channel
                     .operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
                     .toCompletableFuture()
                     .get();
+
             System.out.println("Result: " + result);
+            // ANCHOR_END: assoc_control
             break;
           }
         case "evt":

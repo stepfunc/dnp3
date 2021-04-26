@@ -96,10 +96,10 @@ class ExampleOutstation
 
         public CommandStatus SelectG41v4(double value, ushort index, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus OperateG41v4(double value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }       
+        public CommandStatus OperateG41v4(double value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
     }
 
-    class TestListener : IConnectionStateListener
+    class TestConnectionStateListener : IConnectionStateListener
     {
         public void OnChange(ConnectionState state)
         {
@@ -109,7 +109,25 @@ class ExampleOutstation
 
     public static void Main(string[] args)
     {
-        MainAsync().GetAwaiter().GetResult();
+        // Initialize logging with the default configuration
+        Logging.Configure(
+            new LoggingConfig(),
+            new TestLogger()
+        );
+
+        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
+        // ANCHOR: create_tcp_server
+        var server = new TcpServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000");
+        // ANCHOR_END: create_tcp_server
+
+        try
+        {
+            RunServer(server);
+        }
+        finally
+        {            
+            runtime.Dispose();
+        }        
     }
 
     // ANCHOR: event_buffer_config
@@ -128,160 +146,141 @@ class ExampleOutstation
     }
     // ANCHOR_END: event_buffer_config
 
-    private static async Task MainAsync()
+    private static void RunServer(TcpServer server)
     {
-        // Initialize logging with the default configuration
-        Logging.Configure(
-            new LoggingConfig(),
-            new TestLogger()
+        // ANCHOR: outstation_config
+        // create an outstation configuration with default values
+        var config = new OutstationConfig(
+            // outstation address
+            1024,
+            // master address
+            1
         );
+        // override the default application decoding level
+        config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
+        // ANCHOR_END: outstation_config
 
-        using (var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 }))
+        // ANCHOR: tcp_server_add_outstation
+        var outstation = server.AddOutstation(
+            config,
+            GetEventBufferConfig(),
+            new TestOutstationApplication(),
+            new TestOutstationInformation(),
+            new TestControlHandler(),
+            new TestConnectionStateListener(),
+            AddressFilter.Any()
+        );
+        // ANCHOR_END: tcp_server_add_outstation
+
+        // Setup initial points
+        // ANCHOR: database_init
+        outstation.Transaction(new OutstationTransaction((db) =>
         {
-            // ANCHOR: create_tcp_server
-            using (var server = new TcpServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000"))
-            // ANCHOR_END: create_tcp_server
+            for (ushort i = 0; i < 10; i++)
             {
-                // ANCHOR: outstation_config
-                // create an outstation configuration with default values
-                var config = new OutstationConfig(
-                    // outstation address
-                    1024,
-                    // master address
-                    1
-                );
-                // override the default application decoding level
-                config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
-                // ANCHOR_END: outstation_config
-
-                // ANCHOR: tcp_server_add_outstation
-                var outstation = server.AddOutstation(
-                    config,
-                    GetEventBufferConfig(),
-                    new TestOutstationApplication(),
-                    new TestOutstationInformation(),
-                    new TestControlHandler(),
-                    new TestListener(),
-                    AddressFilter.Any()
-                );
-                // ANCHOR_END: tcp_server_add_outstation
-
-                // Setup initial points
-                // ANCHOR: database_init
-                outstation.Transaction(new OutstationTransaction((db) =>
-                {
-                    for (ushort i = 0; i < 10; i++)
-                    {
                         // add points with default values
                         db.AddBinary(i, EventClass.Class1, new BinaryConfig());
-                        db.AddDoubleBitBinary(i, EventClass.Class1, new DoubleBitBinaryConfig());
-                        db.AddBinaryOutputStatus(i, EventClass.Class1, new BinaryOutputStatusConfig());
-                        db.AddCounter(i, EventClass.Class1, new CounterConfig());
-                        db.AddFrozenCounter(i, EventClass.Class1, new FrozenCounterConfig());
-                        db.AddAnalog(i, EventClass.Class1, new AnalogConfig());
-                        db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig());
-                        db.AddOctetString(i, EventClass.Class1);
-                    }
-                }));
-                // ANCHOR_END: database_init
+                db.AddDoubleBitBinary(i, EventClass.Class1, new DoubleBitBinaryConfig());
+                db.AddBinaryOutputStatus(i, EventClass.Class1, new BinaryOutputStatusConfig());
+                db.AddCounter(i, EventClass.Class1, new CounterConfig());
+                db.AddFrozenCounter(i, EventClass.Class1, new FrozenCounterConfig());
+                db.AddAnalog(i, EventClass.Class1, new AnalogConfig());
+                db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig());
+                db.AddOctetString(i, EventClass.Class1);
+            }
+        }));
+        // ANCHOR_END: database_init
 
-                // Start the outstation
-                // ANCHOR: tcp_server_bind
-                server.Bind();
-                // ANCHOR_END: tcp_server_bind
+        // Start the outstation
+        // ANCHOR: tcp_server_bind
+        server.Bind();
+        // ANCHOR_END: tcp_server_bind
 
-                var binaryValue = false;
-                var doubleBitBinaryValue = DoubleBit.DeterminedOff;
-                var binaryOutputStatusValue = false;
-                var counterValue = (uint)0;
-                var frozenCounterValue = (uint)0;
-                var analogValue = 0.0;
-                var analogOutputStatusValue = 0.0;
+        var binaryValue = false;
+        var doubleBitBinaryValue = DoubleBit.DeterminedOff;
+        var binaryOutputStatusValue = false;
+        var counterValue = (uint)0;
+        var frozenCounterValue = (uint)0;
+        var analogValue = 0.0;
+        var analogOutputStatusValue = 0.0;
 
-                while (true)
-                {
-                    switch (await GetInputAsync())
+        while (true)
+        {
+            switch (Console.ReadLine())
+            {
+                case "x":
+                    return;
+                case "bi":
                     {
-                        case "x":
-                            return;
-                        case "bi":
-                            {
-                                outstation.Transaction(new OutstationTransaction((db) =>
-                                {
-                                    binaryValue = !binaryValue;
-                                    db.UpdateBinary(new Binary(7, binaryValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                                }));
-                                break;
-                            }
-                        case "dbbi":
-                            {
-                                outstation.Transaction(new OutstationTransaction((db) =>
-                                {
-                                    doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DeterminedOff ? DoubleBit.DeterminedOn : DoubleBit.DeterminedOff;
-                                    db.UpdateDoubleBitBinary(new DoubleBitBinary(7, doubleBitBinaryValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                                }));
-                                break;
-                            }
-                        case "bos":
-                            {
-                                outstation.Transaction(new OutstationTransaction((db) =>
-                                {
-                                    binaryOutputStatusValue = !binaryOutputStatusValue;
-                                    db.UpdateBinaryOutputStatus(new BinaryOutputStatus(7, binaryOutputStatusValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                                }));
-                                break;
-                            }
-                        case "co":
-                            {
-                                outstation.Transaction(new OutstationTransaction((db) =>
-                                {
-                                    db.UpdateCounter(new Counter(7, ++counterValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                                }));
-                                break;
-                            }
-                        case "fco":
-                            {
-                                outstation.Transaction(new OutstationTransaction((db) =>
-                                {
-                                    db.UpdateFrozenCounter(new FrozenCounter(7, ++frozenCounterValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                                }));
-                                break;
-                            }
-                        case "ai":
-                            {
-                                outstation.Transaction(new OutstationTransaction((db) =>
-                                {
-                                    db.UpdateAnalog(new Analog(7, ++analogValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                                }));
-                                break;
-                            }
-                        case "aos":
-                            {
-                                outstation.Transaction(new OutstationTransaction((db) =>
-                                {
-                                    db.UpdateAnalogOutputStatus(new AnalogOutputStatus(7, ++analogOutputStatusValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                                }));
-                                break;
-                            }
-                        case "os":
-                            {
-                                outstation.Transaction(new OutstationTransaction((db) =>
-                                {
-                                    db.UpdateOctetString(7, System.Text.Encoding.ASCII.GetBytes("Hello"), new UpdateOptions());
-                                }));
-                                break;
-                            }
-                        default:
-                            Console.WriteLine("Unknown command");
-                            break;
+                        outstation.Transaction(new OutstationTransaction((db) =>
+                        {
+                            binaryValue = !binaryValue;
+                            db.UpdateBinary(new Binary(7, binaryValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                        }));
+                        break;
                     }
-                }
+                case "dbbi":
+                    {
+                        outstation.Transaction(new OutstationTransaction((db) =>
+                        {
+                            doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DeterminedOff ? DoubleBit.DeterminedOn : DoubleBit.DeterminedOff;
+                            db.UpdateDoubleBitBinary(new DoubleBitBinary(7, doubleBitBinaryValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                        }));
+                        break;
+                    }
+                case "bos":
+                    {
+                        outstation.Transaction(new OutstationTransaction((db) =>
+                        {
+                            binaryOutputStatusValue = !binaryOutputStatusValue;
+                            db.UpdateBinaryOutputStatus(new BinaryOutputStatus(7, binaryOutputStatusValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                        }));
+                        break;
+                    }
+                case "co":
+                    {
+                        outstation.Transaction(new OutstationTransaction((db) =>
+                        {
+                            db.UpdateCounter(new Counter(7, ++counterValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                        }));
+                        break;
+                    }
+                case "fco":
+                    {
+                        outstation.Transaction(new OutstationTransaction((db) =>
+                        {
+                            db.UpdateFrozenCounter(new FrozenCounter(7, ++frozenCounterValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                        }));
+                        break;
+                    }
+                case "ai":
+                    {
+                        outstation.Transaction(new OutstationTransaction((db) =>
+                        {
+                            db.UpdateAnalog(new Analog(7, ++analogValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                        }));
+                        break;
+                    }
+                case "aos":
+                    {
+                        outstation.Transaction(new OutstationTransaction((db) =>
+                        {
+                            db.UpdateAnalogOutputStatus(new AnalogOutputStatus(7, ++analogOutputStatusValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                        }));
+                        break;
+                    }
+                case "os":
+                    {
+                        outstation.Transaction(new OutstationTransaction((db) =>
+                        {
+                            db.UpdateOctetString(7, System.Text.Encoding.ASCII.GetBytes("Hello"), new UpdateOptions());
+                        }));
+                        break;
+                    }
+                default:
+                    Console.WriteLine("Unknown command");
+                    break;
             }
         }
-    }
-
-    private static Task<string> GetInputAsync()
-    {
-        return Task.Run(() => Console.ReadLine());
     }
 }

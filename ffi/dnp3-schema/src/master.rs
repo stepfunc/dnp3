@@ -20,6 +20,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
 
     let master_channel_class = lib.declare_class("MasterChannel")?;
 
+    let connect_strategy = define_connect_strategy(lib)?;
+
     let master_channel_create_tcp_fn = lib
         .declare_native_function("master_channel_create_tcp")?
         .param(
@@ -44,13 +46,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param(
             "connect_strategy",
-            Type::Struct(shared.retry_strategy.clone()),
-            "Connection retry strategy to use",
-        )?
-        .param(
-            "reconnect_delay",
-            Type::Duration(DurationMapping::Milliseconds),
-            "delay before reconnecting after a disconnect",
+            Type::Struct(connect_strategy),
+            "Controls the timing of (re)connection attempts",
         )?
         .param(
             "listener",
@@ -429,6 +426,37 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .build()?;
 
     Ok(())
+}
+
+fn define_connect_strategy(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
+    let strategy = lib.declare_native_struct("ConnectStrategy")?;
+    lib.define_native_struct(&strategy)?
+        .add(
+            "min_connect_delay",
+            StructElementType::Duration(
+                DurationMapping::Milliseconds,
+                Some(std::time::Duration::from_secs(1)),
+            ),
+            "Minimum delay between two connection attempts, doubles up to the maximum delay",
+        )?
+        .add(
+            "max_connect_delay",
+            StructElementType::Duration(
+                DurationMapping::Milliseconds,
+                Some(std::time::Duration::from_secs(10)),
+            ),
+            "Maximum delay between two connection attempts",
+        )?
+        .add(
+            "reconnect_delay",
+            StructElementType::Duration(
+                DurationMapping::Milliseconds,
+                Some(std::time::Duration::from_secs(1)),
+            ),
+            "Delay before attempting a connection after a disconnect",
+        )?
+        .doc("Timing parameters for connection attempts")?
+        .build()
 }
 
 fn define_association_id(

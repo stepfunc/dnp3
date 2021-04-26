@@ -138,6 +138,7 @@ class MainClass
         }
     }
 
+    // ANCHOR: association_handler
     class TestAssocationHandler : IAssociationHandler
     {
         public TimestampUtc GetCurrentTime()
@@ -145,6 +146,7 @@ class MainClass
             return TimestampUtc.Valid((ulong)DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
         }
     }
+    // ANCHOR_END: association_handler
 
     public static void Main(string[] args)
     {
@@ -158,11 +160,28 @@ class MainClass
         // ANCHOR_END: logging_init
 
         // ANCHOR: runtime_init
-        using (var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 }))
+        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
         // ANCHOR_END: runtime_init
+
+        // ANCHOR: create_master_channel
+        var channel = MasterChannel.CreateTcpChannel(
+            runtime,
+            LinkErrorMode.Close,
+            GetMasterChannelConfig(),
+            new EndpointList("127.0.0.1:20000"),
+            new ConnectStrategy(),            
+            new TestListener()
+        );
+        // ANCHOR_END: create_master_channel
+
+        try
         {
-            MainAsync(runtime).GetAwaiter().GetResult();
+            RunChannel(channel).GetAwaiter().GetResult();
         }
+        finally
+        {            
+            runtime.Dispose();
+        }        
     }
 
     // ANCHOR: master_channel_config
@@ -193,27 +212,20 @@ class MainClass
     }
     // ANCHOR_END: association_config
 
-    private static async Task MainAsync(Runtime runtime)
+    private static async Task RunChannel(MasterChannel channel)
     {
-
-        var channel = MasterChannel.CreateTcpChannel(
-            runtime,
-            LinkErrorMode.Close,
-            GetMasterChannelConfig(),
-            new EndpointList("127.0.0.1:20000"),
-            new RetryStrategy(),
-            TimeSpan.FromSeconds(1),
-            new TestListener()
-        );
-        
+        // ANCHOR: association_create
         var association = channel.AddAssociation(
             1024,
             GetAssociationConfig(),
-            new TestReadHandler(),            
+            new TestReadHandler(),
             new TestAssocationHandler()
         );
-        
+        // ANCHOR_END: association_create
+
+        // ANCHOR: add_poll
         var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
+        // ANCHOR_END: add_poll
 
         // start communications
         channel.Enable();
@@ -263,17 +275,19 @@ class MainClass
                     }
                 case "cmd":
                     {
+                        // ANCHOR: assoc_control
                         var commands = new Commands();
                         commands.AddG12v1u8(3, new G12v1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
                         var result = await channel.Operate(association, CommandMode.SelectBeforeOperate, commands);
                         Console.WriteLine($"Result: {result}");
+                        // ANCHOR_END: assoc_control
                         break;
                     }
                 case "evt":
                     {
-                        channel.DemandPoll(poll);                        
+                        channel.DemandPoll(poll);
                         break;
-                    }                    
+                    }
                 case "lts":
                     {
                         var result = await channel.SynchronizeTime(association, TimeSyncMode.Lan);
@@ -303,7 +317,7 @@ class MainClass
                         var result = await channel.CheckLinkStatus(association);
                         Console.WriteLine($"Result: {result}");
                         break;
-                    }                    
+                    }
                 default:
                     Console.WriteLine("Unknown command");
                     break;

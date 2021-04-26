@@ -53,8 +53,10 @@ values={[
 <TabItem value="C">
 
 ```c
-tcp_server_t server = NULL;
-dnp3_param_error_t err = dnp3_tcpserver_new(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", &server);
+{{#include ../ffi/bindings/c/outstation_example.c:tcp_server_decl}}
+{{#include ../ffi/bindings/c/outstation_example.c:common_error_code}}
+{{#include ../ffi/bindings/c/outstation_example.c:create_tcp_server}}
+// check error
 ```
 
 </TabItem>
@@ -112,14 +114,11 @@ The terminology differs here between Rust and bindings. The Rust API's add_outst
 <TabItem value="C">
 
 ```c
-dnp3_outstation_t outstation = NULL;
-dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
-dnp3_param_error_t = err = dnp3_tcpserver_add_outstation(server, config, get_event_buffer_config(), application, information, control_handler, address_filter, &outstation);
-dnp3_address_filter_destroy(address_filter);
-if (err) {
-    printf("unable to add outstation: %s \n", dnp3_param_error_to_string(err));
-    // handle error
-}
+{{#include ../ffi/bindings/c/outstation_example.c:tcp_server_decl}}
+{{#include ../ffi/bindings/c/outstation_example.c:common_error_code}}
+
+{{#include ../ffi/bindings/c/outstation_example.c:tcp_server_add_outstation}}
+// check error
 ```
 
 </TabItem>
@@ -152,6 +151,14 @@ end
 If an outstation is already connected to a master, and another matching IP address attempts to connect, the existing connection will be closed and the
 outstation will begin a communication session with the new master.
 
+## ConnectionStateListener
+
+The `ConnectionStateListener` interface is only specified for connection oriented transport (e.g. TCP) when adding an outstation to the server. It has a single
+method that informs user code when a TCP connection has been established to the outstation. The listener only fires a connected event when an IP address matching
+the `AddressFilter` is received. If the outstation is already connected and processing a connection, and another matching connection is received, then the listener
+will fire a disconnected event before firing a connected event.
+
+
 ## Binding the Server
 
 When all of the outstation associated with the server have been added, it is time to bind the server and begin accepting connections.
@@ -179,10 +186,9 @@ The terminology differs here between Rust and bindings.
 <TabItem value="C">
 
 ```c
-dnp3_param_error_t err = dnp3_tcpserver_bind(server);
-if (err) {
-    // handle error
-}
+{{#include ../ffi/bindings/c/outstation_example.c:common_error_code}}
+{{#include ../ffi/bindings/c/outstation_example.c:tcp_server_bind}}
+// check error
 ```
 
 </TabItem>

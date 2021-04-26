@@ -1,0 +1,33 @@
+---
+id: summary
+title: Example Programs
+sidebar_label: Links
+slug: /examples/summary
+---
+
+import sitedata from '../../sitedata.json'
+
+The source repository contains example programs that may be compiled and run interactively. Each program demonstrates the usage of various API features 
+by reading console input from the user.
+
+As you read through the examples, you may notice blocks of code surrounded by `ANCHOR` tags.
+
+```c
+// ANCHOR: logging
+
+code that configures the logging ...
+
+// ANCHOR_END: logging
+```
+
+These blocks of code are pulled from the example programs and used as snippets in this guide. This ensures that all of the snippets
+that you encounter when reading the documentation are always syntactically valid as they extracted from working programs.
+
+## Links
+
+The following links redirect to language-specific examples for the current version on Github:
+
+* <><a href={`${sitedata.github_url}/tree/${sitedata.version}/dnp3/examples`}>Rust</a></>
+* <><a href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/c`}>C</a></>
+* <><a href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/dotnet/examples`}>C#</a></>
+* <><a href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3rs/examples`}>Java</a></>
