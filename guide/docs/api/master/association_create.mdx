@@ -25,6 +25,11 @@ values={[
 {{#include ../dnp3/examples/master_tcp_client.rs:association_create}}
 ```
 
+:::note
+The Rust API and the binding APIs differ with regard to associations. In the bindings, an association token is returned which is then used on the channel. In
+the Rust API, an object is returned which has its own methods for performing operations on the association.
+:::
+
 </TabItem>
 <TabItem value="C">
 
@@ -50,3 +55,10 @@ values={[
 </TabItem>
 </Tabs>
 
+The `AssociationId` struct returned when adding an association is just a token. It is needed to perform operations on a particular outstation on the channel,
+but unlike the `MasterChannel`, you don't need to worry about keeping a reference to it around if its not needed. Allowing the `AssociationId` to be garbage
+collected won't cause the association to be removed from the channel.
+
+## Removing
+
+Associations may also be removed from a channel by calling `MasterChannel.removeAssociation` and passing in the `AssociationId`.

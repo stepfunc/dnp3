@@ -77,13 +77,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     // ANCHOR_END: association_create
 
-    // create event poll
+    // create an event poll
+    // ANCHOR: add_poll
     let mut poll = association
         .add_poll(
             EventClasses::all().to_classes().to_request(),
             Duration::from_secs(5),
         )
         .await?;
+    // ANCHOR_END: add_poll
 
     // enable communications
     channel.enable().await?;

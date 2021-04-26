@@ -223,7 +223,9 @@ class MainClass
         );
         // ANCHOR_END: association_create
 
+        // ANCHOR: add_poll
         var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
+        // ANCHOR_END: add_poll
 
         // start communications
         channel.Enable();

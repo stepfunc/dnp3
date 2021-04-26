@@ -305,9 +305,11 @@ public class MasterExample {
     // ANCHOR_END: association_create
 
     // Create a periodic poll
+    // ANCHOR: add_poll
     PollId poll =
         channel.addPoll(
             association, Request.classRequest(false, true, true, true), Duration.ofSeconds(5));
+    // ANCHOR_END: add_poll
 
     // start communications
     channel.enable();

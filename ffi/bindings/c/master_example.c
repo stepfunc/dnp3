@@ -276,10 +276,12 @@ int main()
 
 
     // Add an event poll
+    // ANCHOR: add_poll
     dnp3_request_t *poll_request = dnp3_request_new_class(false, true, true, true);
     dnp3_poll_id_t poll_id;
     err = dnp3_master_channel_add_poll(channel, association_id, poll_request, 5000, &poll_id);
     dnp3_request_destroy(poll_request);
+    // ANCHOR_END: add_poll
     if (err) {
         printf("unable to add poll: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
