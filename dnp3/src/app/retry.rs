@@ -21,6 +21,46 @@ impl RetryStrategy {
     }
 }
 
+/// Parameterizes connection attempts
+#[derive(Copy, Clone, Debug)]
+pub struct ConnectStrategy {
+    /// Minimum delay between two connection attempts, doubles up to the maximum delay
+    pub(crate) min_connect_delay: Duration,
+    /// Maximum delay between two connection attempts
+    pub(crate) max_connect_delay: Duration,
+    /// Delay before attempting a connection after a disconnect
+    pub(crate) reconnect_delay: Duration,
+}
+
+impl ConnectStrategy {
+    /// construct a `ConnectStrategy`
+    ///
+    /// `min_connect_delay` - Minimum delay between two connection attempts, doubles up to the maximum delay
+    /// `max_connect_delay` - Maximum delay between two connection attempts
+    /// `reconnect_delay` - Delay before attempting a connection after a disconnect
+    pub fn new(
+        min_connect_delay: Duration,
+        max_connect_delay: Duration,
+        reconnect_delay: Duration,
+    ) -> Self {
+        ConnectStrategy {
+            min_connect_delay,
+            max_connect_delay,
+            reconnect_delay,
+        }
+    }
+}
+
+impl Default for ConnectStrategy {
+    fn default() -> Self {
+        Self::new(
+            Duration::from_secs(1),
+            Duration::from_secs(10),
+            Duration::from_secs(1),
+        )
+    }
+}
+
 impl Default for RetryStrategy {
     fn default() -> Self {
         Self::new(Duration::from_secs(1), Duration::from_secs(10))

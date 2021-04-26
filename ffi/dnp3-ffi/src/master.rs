@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use std::time::Duration;
 
-use dnp3::app::{Listener, RetryStrategy, Timeout, Timestamp};
+use dnp3::app::{ConnectStrategy, Listener, RetryStrategy, Timeout, Timestamp};
 use dnp3::link::{EndpointAddress, LinkStatusResult, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::serial::*;
@@ -25,23 +25,17 @@ pub(crate) unsafe fn master_channel_create_tcp(
     let config = convert_config(config)?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
 
-    let reconnect_delay = if connect_strategy.reconnect_delay == 0 {
-        None
-    } else {
-        Some(connect_strategy.reconnect_delay())
-    };
-
-    let retry_strategy = RetryStrategy::new(
+    let connect_strategy = ConnectStrategy::new(
         connect_strategy.min_connect_delay(),
         connect_strategy.max_connect_delay(),
+        connect_strategy.reconnect_delay(),
     );
 
     let (future, handle) = dnp3::tcp::create_master_tcp_client(
         link_error_mode.into(),
         config,
         endpoints.clone(),
-        retry_strategy,
-        reconnect_delay,
+        connect_strategy,
         Box::new(listener),
     );
 

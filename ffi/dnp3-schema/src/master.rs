@@ -453,7 +453,7 @@ fn define_connect_strategy(lib: &mut LibraryBuilder) -> Result<NativeStructHandl
                 DurationMapping::Milliseconds,
                 Some(std::time::Duration::from_secs(1)),
             ),
-            "Maximum delay between two connection attempts",
+            "Delay before attempting a connection after a disconnect",
         )?
         .doc("Timing parameters for connection attempts")?
         .build()
