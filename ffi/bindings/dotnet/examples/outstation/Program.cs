@@ -125,9 +125,9 @@ class ExampleOutstation
             RunServer(server);
         }
         finally
-        {            
-            runtime.Dispose();
-        }        
+        {
+            runtime.Shutdown();
+        }
     }
 
     // ANCHOR: event_buffer_config

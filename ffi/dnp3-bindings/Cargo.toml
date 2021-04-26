@@ -1,10 +1,10 @@
 [package]
 name = "dnp3-bindings"
 version = "0.1.0"
-authors = ["Émile Grégoire <emile@automatak.com>"]
+authors = ["Émile Grégoire <emile@stepfunc.io>"]
 edition = "2018"
 
 [dependencies]
-ci-script = { git = "https://git@github.com/stepfunc/oo_bindgen.git" }
+ci-script = { git = "https://git@github.com/stepfunc/oo_bindgen.git", tag = "0.1.0" }
 dnp3-schema = { path = "../dnp3-schema" }
 dnp3-ffi = { path = "../dnp3-ffi" }

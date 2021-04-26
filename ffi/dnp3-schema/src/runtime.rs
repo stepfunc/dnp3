@@ -58,7 +58,7 @@ pub fn define(
         .define_class(&runtime_class)?
         .constructor(&new_fn)?
         .destructor(&destroy_fn)?
-        .manual_destroy()?
+        .custom_destroy("Shutdown")?
         .doc("Handle to the underlying runtime")?
         .build()?;
 

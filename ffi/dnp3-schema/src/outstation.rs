@@ -110,7 +110,7 @@ pub fn define(
         .destructor(&tcp_server_destroy_fn)?
         .method("add_outstation", &tcp_server_add_outstation_fn)?
         .method("bind", &tcp_server_bind_fn)?
-        .manual_destroy()?
+        .custom_destroy("Shutdown")?
         .doc(doc("TCP server that listens for connections and routes the messages to outstations.")
         .details("To add outstations to it, use {class:TCPServer.add_outstation()}. Once all the outstations are added, the server can be started with {class:TCPServer.bind()}.")
         .details("{class:TCPServer.[destructor]} is used to gracefully shutdown all the outstations and the server."))?

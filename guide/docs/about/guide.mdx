@@ -6,6 +6,7 @@ slug: /guide
 ---
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
+import sitedata from '../../sitedata.json'
 
 This guide is the primary documentation for Step Function I/O's DNP3 [library](https://github.com/stepfunc/dnp3). It covers:
 
@@ -18,10 +19,10 @@ This guide is the primary documentation for Step Function I/O's DNP3 [library](h
 The guide defers the exhaustive details of every field, method, and argument to the language-specific API documentation
 extracted from the source code itself:
 
-* rustdoc
-* doxygen (C)
-* javadoc
-* doxygen (C#)
+* <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/rust/dnp3/`}>Rust (rustdoc)</a>
+* <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/c/dnp3_8h.html`}>C (doxygen)</a>
+* <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/java/`}>Java (javadoc)</a>
+* <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/dotnet/namespacednp3.html`}>C# (doxygen)</a>
 
 In addition to the documentation, example programs may be found in the source repository that demonstrate the usage
 of the most common API features for each language.

@@ -417,7 +417,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .async_method("ColdRestart", &cold_restart_fn)?
         .async_method("WarmRestart", &warm_restart_fn)?
         .async_method("CheckLinkStatus", &check_link_status_fn)?
-        .manual_destroy()?
+        .custom_destroy("Shutdown")?
         .doc(
             doc("Represents a communication channel for a master station")
             .details("To communicate with a particular outstation, you need to add an association with {class:MasterChannel.AddAssociation()}.")

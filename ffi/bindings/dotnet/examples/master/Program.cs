@@ -179,9 +179,9 @@ class MainClass
             RunChannel(channel).GetAwaiter().GetResult();
         }
         finally
-        {            
-            runtime.Dispose();
-        }        
+        {
+            runtime.Shutdown();
+        }
     }
 
     // ANCHOR: master_channel_config

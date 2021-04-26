@@ -201,7 +201,7 @@ public class OutstationExample {
     try {
       run(server);
     } finally {
-      runtime.close();
+      runtime.shutdown();
     }
   }
 

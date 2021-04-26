@@ -7,7 +7,7 @@ module.exports = {
   title: `DNP3 ${sitedata.version}`,
   tagline: 'Pretty sure we don\'t need this page, just the docs',
   url: 'https://your-docusaurus-test-site.com',
-  baseUrl: '/',
+  baseUrl: `/dnp3/${sitedata.version}/guide/`,
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: 'images/brand/favicon.png',

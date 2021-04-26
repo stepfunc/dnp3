@@ -288,7 +288,7 @@ public class MasterExample {
     try {
       run(channel);
     } finally {
-      runtime.close();
+      runtime.shutdown();
     }
   }
 
