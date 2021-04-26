@@ -35,15 +35,14 @@ Native structs are mapped to C# classes. They have public member visibility and 
 
 ### Classes
 
-Abstract classes are mapped to C# classes. They have a private pointer to the underlying native resource. There are two types of generated classes in C#: ones that
-implement `IDisposable` and those that only have a private finalizer.
+Abstract classes are mapped to C# classes. They have a private pointer to the underlying native resource. There are two types of generated classes in C#: ones
+that only have a private finalizer and ones that also provide a public `Shutdown` method.
 
-The types that implement `IDisposable` represent long-lived resources like a `Runtime`, `Master`, or `TCPServer`.  They may be manually shut down using a public
-`Dispose` method or used in conjunction with the language's [using statement](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/using-statement).
-This allows the user to precisely control when the resource/task will be shut down.
+The types that provide a `Shutdown` method represent long-lived resources like a `Runtime`, `Master`, or `TCPServer`.  Under the hood, they map to an asynchronous
+Rust task executing on the Tokio runtime. The `Shutdown` method allows the user to precisely control when the resource/task will stop.
 
-Types that do not implement `IDisposable` may only be automatically garbage collected. Native resources are deallocated in the class's finalizer. These types of
-classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`.
+Types that do not provide a `Shutdown` method are automatically garbage collected, and native resources are deallocated in the class's finalize method. These
+types of classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`.
 
 ### Asynchronous Methods
 

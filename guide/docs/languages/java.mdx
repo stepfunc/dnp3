@@ -77,13 +77,12 @@ Native structs are mapped to Java classes. They have public member visibility an
 ### Classes
 
 Abstract classes are mapped to Java classes. They have a private pointer to the underlying native resource. There are two types of generated classes in Java: ones that
-implement `AutoCloseable` and those that only have a `finalize` method.
+that only have a `finalize` method and ones that also expose a public `shutdown` method that allows the user to proactively release native resources.
 
-The types that implement `AutoCloseable` represent long-lived resources like a `Runtime`, `Master`, or `TCPServer`.  They may be manually shut down using a public
-`close` method or used in conjunction with the language's [try-with-resources statement](https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html).
-This allows the user to precisely control when the resource/task will be shut down.
+The types that provide a `shutdown` method represent long-lived resources like a `Runtime`, `Master`, or `TCPServer`.  Under the hood, they map to an asynchronous
+Rust task executing on the Tokio runtime. The `shutdown` method allows the user to precisely control when the resource/task will stop.
 
-Types that do not implement `AutoCloseable` may only be automatically garbage collected. Native resources are deallocated in the class's finalize method. These
+Types that do not provide a `shutdown` method are automatically garbage collected, and native resources are deallocated in the class's finalize method. These
 types of classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`.
 
 ### Asynchronous Methods
