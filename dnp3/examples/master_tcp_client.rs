@@ -65,7 +65,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     // ANCHOR_END: create_master_channel
 
-
     // ANCHOR: association_create
     let mut association = channel
         .add_association(
