@@ -27,7 +27,7 @@ software in C/C++ because of the need to manually reason about object lifetimes 
 ## Lifetime
 
 A `Runtime` must be created before any communication can take place. It is a shared resource for multiple communication sessions. It is typically created just
-after initializing logging and is the last component to be shut down. Shutting down a `Runtime` will stop all of the communication sessions that were created with it.
+after initializing logging and is the last component to be shut down. Runtime shutdown is covered in the last section of this page.
 
 :::note
 Rust users may even share the runtime with other libraries that also use Tokio. The bindings currently do not allow for runtime sharing, but it may be possible
@@ -72,20 +72,12 @@ values={[
 
 {{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:runtime}}
 ```
-:::note
-Prefer try-with-resources syntax in Java as Runtime implements *java.lang.AutoCloseable*.
-:::
-
 </TabItem>
 <TabItem value="C#">
 
 ```csharp
 {{#include ../ffi/bindings/dotnet/examples/master/Program.cs:runtime_init}}
 ```
-
-:::note
-Prefer using statements in C# as Runtime implements *System.IDisposable*.
-:::
 
 </TabItem>
 </Tabs>
@@ -108,3 +100,57 @@ should defer blocking calls to dedicated worker threads, e.g. a user-managed thr
 In cases where some blocking is unavoidable, it can be useful to set the number of worker threads to a multiple of the number of system cores,
 e.g. 2x or 3x the number of system cores.
 :::
+
+## Shutdown
+
+Shutting down a `Runtime` will stop all of the master and outstation communication associated with it. This is typically the last DNP3-related
+operation your program should perform before exit.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+:::note
+Runtime shutdown is implicit in Rust when tokio::main returns.
+:::
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:runtime_destroy}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:runtime_shutdown}}
+```
+
+:::note
+If you don't call `shutdown` before exiting, the JVM will shutdown the runtime in its finalize method, however, garbage collection is not deterministic
+and your program may never properly exit. It is best to explicitly shut down the runtime before exiting.
+:::
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:runtime_shutdown}}
+```
+
+:::note
+If you don't call `Shutdown` before exiting, the .NET runtime will shut down the runtime in its finalizer (aka destructor), however, you shouldn't rely
+on this behavior. It is best to explicitly shut down the runtime before exiting.
+:::
+
+</TabItem>
+</Tabs>

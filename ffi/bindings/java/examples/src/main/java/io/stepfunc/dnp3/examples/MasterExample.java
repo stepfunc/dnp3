@@ -288,7 +288,9 @@ public class MasterExample {
     try {
       run(channel);
     } finally {
+      // ANCHOR: runtime_shutdown
       runtime.shutdown();
+      // ANCHOR_END: runtime_shutdown
     }
   }
 

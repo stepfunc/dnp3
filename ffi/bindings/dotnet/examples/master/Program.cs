@@ -180,7 +180,9 @@ class MainClass
         }
         finally
         {
+            // ANCHOR: runtime_shutdown
             runtime.Shutdown();
+            // ANCHOR_END: runtime_shutdown
         }
     }
 
