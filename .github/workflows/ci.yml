@@ -353,9 +353,9 @@ jobs:
         shell: bash
         working-directory: artifacts/java-bindings
         run: >
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?.jar) &&
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?-sources.jar) -Dclassifier=sources &&
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-?.?.?-javadoc.jar) -Dclassifier=javadoc
+          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-*.*.*.jar) &&
+          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-*.*.*-sources.jar) -Dclassifier=sources &&
+          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-*.*.*-javadoc.jar) -Dclassifier=javadoc
       - name: Publish NuGet package
         shell: bash
         run: dotnet nuget push $(find artifacts/dotnet-bindings/dnp3*.nupkg) -s https://api.nuget.org/v3/index.json -k ${{ secrets.SFIO_NUGET_KEY }}
@@ -363,7 +363,7 @@ jobs:
         shell: bash
         run: >
           mkdir release &&
-          for i in artifacts/c-bindings/*; do (cd $i && zip -r ../../../release/foo-${GITHUB_REF##*/}-$(basename $i).zip .); done &&
+          for i in artifacts/c-bindings/*; do (cd $i && zip -r ../../../release/dnp3-${GITHUB_REF##*/}-$(basename $i).zip .); done &&
           (cd artifacts/conformance-results && zip -r ../../release/conformance-results.zip .)
       - name: Create GitHub release
         uses: softprops/action-gh-release@v1
@@ -372,7 +372,7 @@ jobs:
           files: |
             release/*.zip
             artifacts/dotnet-bindings/dnp3*
-            artifacts/java-bindings/*
+            artifacts/java-bindings/*.jar
             dependencies/dependencies.txt
             dependencies/dependencies.json
         env:
