@@ -373,7 +373,7 @@ jobs:
             release/*.zip
             artifacts/dotnet-bindings/dnp3*
             artifacts/java-bindings/*.jar
-            dependencies/dependencies.txt
-            dependencies/dependencies.json
+            artifacts/dependencies/dependencies.txt
+            artifacts/dependencies/dependencies.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
