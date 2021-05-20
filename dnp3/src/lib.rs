@@ -56,7 +56,7 @@ clippy::all
 #![forbid(
     unsafe_code,
     broken_intra_doc_links,
-    safe_packed_borrows,
+    unaligned_references,
     while_true,
     bare_trait_objects
 )]

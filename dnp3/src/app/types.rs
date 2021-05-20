@@ -104,7 +104,7 @@ impl DoubleBit {
         }
     }
 
-    pub(crate) fn to_bit_pair(&self) -> BitPair {
+    pub(crate) fn to_bit_pair(self) -> BitPair {
         match self {
             DoubleBit::Intermediate => BitPair::new(false, false),
             DoubleBit::DeterminedOff => BitPair::new(false, true),
@@ -113,7 +113,7 @@ impl DoubleBit {
         }
     }
 
-    pub(crate) fn to_byte(&self) -> u8 {
+    pub(crate) fn to_byte(self) -> u8 {
         match self {
             DoubleBit::Intermediate => 0b00,
             DoubleBit::DeterminedOff => 0b01,

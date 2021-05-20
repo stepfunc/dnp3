@@ -90,7 +90,7 @@ impl<'a> ParsedFragment<'a> {
         }
     }
 
-    pub(crate) fn to_request(&self) -> Result<Request<'a>, RequestValidationError> {
+    pub(crate) fn to_request(self) -> Result<Request<'a>, RequestValidationError> {
         if self.iin.is_some() {
             return Err(RequestValidationError::UnexpectedFunction(self.function));
         }
@@ -111,7 +111,7 @@ impl<'a> ParsedFragment<'a> {
         })
     }
 
-    pub(crate) fn to_response(&self) -> Result<Response<'a>, ResponseValidationError> {
+    pub(crate) fn to_response(self) -> Result<Response<'a>, ResponseValidationError> {
         let (function, iin) = match (self.function, self.iin) {
             (FunctionCode::Response, Some(x)) => (ResponseFunction::Response, x),
             (FunctionCode::UnsolicitedResponse, Some(x)) => {

@@ -20,7 +20,7 @@ impl Header {
             seq: Sequence::new(value),
         }
     }
-    pub(crate) fn to_u8(&self) -> u8 {
+    pub(crate) fn to_u8(self) -> u8 {
         let mut acc: u8 = 0;
 
         if self.fin {
