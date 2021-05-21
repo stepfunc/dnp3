@@ -13,7 +13,7 @@ enum InternalState {
 }
 
 impl InternalState {
-    fn to_assembly_state(&self) -> AssemblyState {
+    fn to_assembly_state(self) -> AssemblyState {
         match self {
             InternalState::Complete(_, _) => AssemblyState::Complete,
             _ => AssemblyState::ReadMore,

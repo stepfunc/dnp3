@@ -151,7 +151,7 @@ impl Pair {
     async fn spawn_outstation(port: u16, config: TestConfig) -> (ServerHandle, OutstationHandle) {
         let mut server =
             TcpServer::new(LinkErrorMode::Close, SocketAddr::new(Self::LOCALHOST, port));
-        let (outstation, task) = server
+        let outstation = server
             .add_outstation(
                 Self::get_outstation_config(config.outstation_level),
                 EventBufferConfig::all_types(100),
@@ -162,7 +162,6 @@ impl Pair {
                 AddressFilter::Any,
             )
             .unwrap();
-        tokio::spawn(task);
 
         // set up the database
         outstation.transaction(|db| {
@@ -196,8 +195,7 @@ impl Pair {
             }
         });
 
-        let (server_handle, task) = server.bind().await.unwrap();
-        tokio::spawn(task);
+        let server_handle = server.bind().await.unwrap();
 
         (server_handle, outstation)
     }
@@ -214,7 +212,7 @@ impl Pair {
             LinkErrorMode::Close,
             Self::get_master_config(config.master_level),
             EndpointList::single(format!("127.0.0.1:{}", port)),
-            ReconnectStrategy::default(),
+            ConnectStrategy::default(),
             NullListener::create(),
         );
 

@@ -172,18 +172,23 @@ jobs:
         with:
           command: run
           args: --release --bin dnp3-bindings -- --java
-      - name: Upload compiled C bindings (Windows)
+      - name: Upload compiled FFI modules (Windows)
         if: ${{ runner.os == 'Windows' }}
         uses: actions/upload-artifact@v2
         with:
           name: ffi-modules
           path: ffi/bindings/c/generated/x86_64-pc-windows-msvc/lib
-      - name: Upload compiled C bindings (Linux)
+      - name: Upload compiled FFI modules (Linux)
         if: ${{ runner.os == 'Linux' }}
         uses: actions/upload-artifact@v2
         with:
           name: ffi-modules
           path: ffi/bindings/c/generated/x86_64-unknown-linux-gnu/lib
+      - name: Upload C bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: c-bindings
+          path: ffi/bindings/c/generated
       - name: Upload compiled Java bindings
         uses: actions/upload-artifact@v2
         with:
@@ -227,11 +232,16 @@ jobs:
           use-cross: true
           command: run
           args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --c --no-tests
-      - name: Upload compiled C bindings
+      - name: Upload compiled FFI modules
         uses: actions/upload-artifact@v2
         with:
           name: ffi-modules
           path: ffi/bindings/c/generated/${{ matrix.target }}/lib
+      - name: Upload C bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: c-bindings
+          path: ffi/bindings/c/generated
   # Package all the generated bindings
   packaging:
     needs: [lock, bindings, cross]
@@ -261,11 +271,6 @@ jobs:
         with:
           command: run
           args: --bin dnp3-bindings -- --package ./ffi-modules -f dependencies.txt
-      - name: Upload C bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: c-bindings
-          path: ffi/bindings/c/generated
       - name: Upload .NET bindings
         uses: actions/upload-artifact@v2
         with:
