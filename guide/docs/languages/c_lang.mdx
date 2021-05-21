@@ -23,7 +23,23 @@ set(CMAKE_PREFIX_PATH ${DISTRIBUTION_PATH}/cmake)
 find_package(dnp3 REQUIRED)
 ```
 
-Then declare a dependency on the package:
+This call will expose two targets:
+
+- `dnp3`: dynamically loaded library (a .dll or .so file). When using this target, the DLL or .so file must
+  be available to the executable. An easy way to get it copied automatically is by inserting the following CMake
+  statement:
+
+```cmake
+add_custom_command(TARGET my_awesome_project POST_BUILD 
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:dnp3> $<TARGET_FILE_DIR:my_awesome_project>
+)
+```
+
+- `dnp3_static`: static library. The CMake will take care of linking with all the required system dependencies.
+  ** Note for Windows **: To use the static library, you must link with the static release C runtime using the `/MT`
+  flag.
+
+Then, when you create your executable, declare the dependency like so:
 
 ```cmake
 add_executable(my_awesome_project main.c)
