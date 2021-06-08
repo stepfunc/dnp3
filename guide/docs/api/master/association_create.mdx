@@ -8,7 +8,7 @@ slug: /api/master/association/create
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Associations are created on a `MasterChannel` by specifying some configuration and callback interfaces.
+You can create associations on a `MasterChannel` by specifying configuration and callback interfaces.
 
 <Tabs
 groupId="language"
@@ -26,8 +26,9 @@ values={[
 ```
 
 :::note
-The Rust API and the binding APIs differ with regard to associations. In the bindings, an association token is returned which is then used on the channel. In
-the Rust API, an object is returned which has its own methods for performing operations on the association.
+The Rust API and the binding APIs handle associations in two different ways:
+* Bindings return an association token to use on the channel. 
+* Rust API returns an object that has its own methods for performing operations on the association.
 :::
 
 </TabItem>
@@ -55,10 +56,9 @@ the Rust API, an object is returned which has its own methods for performing ope
 </TabItem>
 </Tabs>
 
-The `AssociationId` struct returned when adding an association is just a token. It is needed to perform operations on a particular outstation on the channel,
-but unlike the `MasterChannel`, you don't need to worry about keeping a reference to it around if its not needed. Allowing the `AssociationId` to be garbage
-collected won't cause the association to be removed from the channel.
+The `AssociationId` struct that gets returned when adding an association is just a token. While it's required to perform operations on a particular outstation on the channel,
+you don't need to keep a reference to it. Allowing the `AssociationId` to be garbage collected won't remove the association from the channel.
 
 ## Removing
 
-Associations may also be removed from a channel by calling `MasterChannel.removeAssociation` and passing in the `AssociationId`.
+Remove associations from a channel by calling `MasterChannel.removeAssociation` and passing in the `AssociationId`.

@@ -8,7 +8,7 @@ slug: /api/master/association/polls
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Periodic polls are typically added to an association before calling `MasterChannel.enable()` but may be added or removed at any time. The user specifies the
+Associations usually add periodic polls before calling `MasterChannel.enable()`. However, you can also add or remove periodic polls at any time. You can specify the
 association to poll, the type of request, and the polling period.
 
 <Tabs
@@ -51,9 +51,9 @@ values={[
 </TabItem>
 </Tabs>
 
-The `Request` class is a builder type that allows the user to construct arbitrary READ requests including:
+The `Request` class is a builder type that lets you construct arbitrary READ requests, including:
 
 * Class reads (0,1,2,3)
-* One or two byte range reads
+* One- or two-byte range reads
 * All objects (qualifier 0x06) reads for arbitrary variations
 

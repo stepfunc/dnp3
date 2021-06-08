@@ -9,13 +9,12 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 :::warning
-Serial port support is currently only available on Linux. We are waiting for Windows support to stabilize in a downstream dependency.
+We currently only provide serial port support on Linux. We are waiting for Windows support to stabilize in a downstream dependency.
 :::
 
-Creating a channel bound to a serial port is done using the `MasterChannel::createSerialChannel` method. It takes the same serial port configuration
-parameters as the outstation serial port API.
+Use the `MasterChannel::createSerialChannel` method to create a channel bound to a serial port. It requires the same serial port configuration parameters as the outstation serial port API.
 
-Unlike the outstation API, the master API opens the serial port API lazily after `MasterChannel.enable()` is called and will reattempt to open the port
+Unlike the outstation API, the master API opens the serial port API lazily after `MasterChannel.enable()` is called. It will try to open the port
 if the operation fails.
 
 :::note

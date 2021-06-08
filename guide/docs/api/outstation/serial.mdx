@@ -9,21 +9,21 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 :::warning
-Serial port support is currently only available on Linux. We are waiting for Windows support to stabilize in a downstream dependency.
+We currently only provide serial port support on Linux. We are waiting for Windows support to stabilize in a downstream dependency.
 :::
 
-Creating an outstation bound to a serial port is done using the `Outstation::createSerialSession` method. In addition to the common components, this method takes
+Use the `Outstation::createSerialSession` method to create an outstation bound to a serial port. In addition to the common components, this method requires
 the following serial port parameters:
 
-* path of the serial device (e.g. `COM3` on windows or `/dev/ttyS3` on Linux)
+* Path of the serial device (e.g., `COM3` on Windows or `/dev/ttyS3` on Linux)
 * `SerialPortSettings` struct:
-  * baud rate
-  * data bits
-  * stop bits
-  * parity
-  * flow control
+  * Baud rate
+  * Data bits
+  * Stop bits
+  * Parity
+  * Flow control
 
-The method opens the port and will fail if the port doesn't exist or is already in use. The returned `Outstation` class behaves identically to other transports.
+The method will then either open the port or fail if the port doesn't exist or is already in use. The returned `Outstation` class behaves identically to other transports.
 
 :::note
 The `LinkErrorMode` is internally set to `Discard` for serial communication channels.

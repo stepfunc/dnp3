@@ -8,19 +8,18 @@ slug: /api/logging
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The library provides highly contextual logging using the [tracing](https://crates.io/crates/tracing) crate. Rust users should refer to the
+The library provides highly-contextual logging using the [tracing](https://crates.io/crates/tracing) crate. If you're using Rust, refer to the
 tracing documentation for details.
 
-The bindings expose a more rigid logging interface with a single callback method to record a message. Configurable options include:
+In comparison, the bindings use a rigid logging interface with a single callback method to record a message. Configurable options include:
 
-* `LogLevel` which will trigger messages to be generated
+* `LogLevel` that generates messages 
 * Inclusion of Rust module or level information as part of the message
-* How and if the time should be printed as part of the message
+* How and if to print the time as part of the message
 * Line or JSON based output
 
 :::note
-The LogLevel should be set to Info by default which will cause Info, Warn, and Error messages to be recorded. The Debug and Trace levels are
-generally only useful if debugging an issue with the underlying runtime.
+The LogLevel is set to Info by default. This will record Info, Warn, and Error messages. The Debug and Trace levels are generally only useful if debugging an issue with the underlying runtime.
 
 Protocol decoding is always logged at the Info level and is configured separately on a per session basis.
 :::
@@ -73,13 +72,13 @@ values={[
 </Tabs>
 
 :::note
-The bindings use the [tracing_subscriber](https://crates.io/crates/tracing-subscriber) crate internally. Rust users may pick which tracing backend they want to
+The bindings use the [tracing_subscriber](https://crates.io/crates/tracing-subscriber) crate internally. If you use Rust, you can pick which tracing backend to
 use.
 :::
 
 ## Example Output
 
-The logs provide a wealth of contextual metadata. This allows the user to:
+The logs provide a wealth of contextual metadata so you can:
 
 * Determine which communication session produced the message
 * Understand what state the software was in when the event occurred
@@ -95,16 +94,16 @@ INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsol
 
 ## Protocol Decoding
 
-Protocol decoding can be configured on a per-communication channel basis, e.g. all of the traffic on a TCP socket or a serial port. The user specifies the
-`DecodeLevel` when creating a master or outstation, but may adjust this at runtime. This struct controls the level of decoding (including none) that will take place for each layer of the
-protocol stack:
+Protocol decoding is configurable on a per-communication channel basis, such as all traffic on a TCP socket or a serial port. You can specify the
+`DecodeLevel` when you create a master or outstation or adjust it at runtime. This struct controls the level of decoding (including none) that takes place for each layer of the
+protocol stack, including:
 
 * Application-layer headers, object headers, and object values
 * Transport-layer header and payload
 * Link-layer header and payload
 * Physical-layer length and data bytes
 
-Refer to language specific API documentation for the meaning of each enumeration value. The decoding can even show the value of individual fields within objects:
+Refer to the language-specific API documentation for the meaning of each enumeration value. The decoding can even show the value of individual fields within objects:
 
 ```
 APP TX - ctrl: [fir: true fin: true con: false uns: false seq: 1] func: Write ... (len = 6)
@@ -113,8 +112,7 @@ index: 7 false
 ```
 
 :::note
-Protocol decoding is always output at the *Info* log level. It can be quite verbose in a production system if left enabled. When debugging a communication issue, users
-should first try adjusting the application-layer decoding to gain visibility in the messages being exchanged.
+Protocol decoding is always output at the *Info* log level. If left enabled, it can be extremely lengthy in a production system. When you're debugging a communication issue, try adjusting the application-layer decoding first to gain visibility into the messages exchanged.
 :::
 
 

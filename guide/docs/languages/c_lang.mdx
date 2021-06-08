@@ -7,23 +7,23 @@ slug: /c_bindings
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-The C bindings are distributed as a zip file with the following directory layout:
+We distribute C bindings as a Zip file with the following directory layout:
 
-* single header file in `/include/dnp3.h`
-* cmake find package script in `/cmake/`
-* platform specific shared libraries in `/lib/<platform>`
+* Single header file in `/include/dnp3.h`
+* CMake find package script in `/cmake/`
+* Platform-specific shared libraries in `/lib/<platform>`
 * 3rd party license information in `/lib/licenses.txt`
 
 ## CMake Usage
 
-Make the find package script discoverable by adding it to the prefix path. Then call `find_package`:
+Make the find package script discoverable by adding it to the prefix path. Next, call `find_package`:
 
 ```cmake
 set(CMAKE_PREFIX_PATH ${DISTRIBUTION_PATH}/cmake)
 find_package(dnp3 REQUIRED)
 ```
 
-Then declare a dependency on the package:
+Finally, declare a dependency on the package:
 
 ```cmake
 add_executable(my_awesome_project main.c)
@@ -32,8 +32,7 @@ target_link_libraries(my_awesome_project PRIVATE dnp3)
 
 ## Mapping
 
-Many of the concepts built into higher-level languages are simply design patterns or idioms in C. When you see these higher levels patterns
-discussed in this guide, you can use the idioms here to understand how they map to C.
+Many of the concepts built into higher-level languages are design patterns or idioms in C. When you see these higher levels patterns discussed in this guide, you can use the idioms to understand how they map to C.
 
 ### Classes
 
@@ -60,8 +59,7 @@ int opaque_type_get_special_value(opaque_type_t* instance)
 
 ### Interfaces
 
-Function polymorphism in C is accomplished using function pointers. Interfaces are simply collections of functions pointers
-along with some optional context. For example, consider the following logging "interface" in the library:
+C accomplishes function polymorphism using function pointers. Interfaces are simply collections of function pointers along with some optional context. For example, let's look at the following logging interface in the library:
 
 ```c
 typedef struct dnp3_logger_t
@@ -73,10 +71,10 @@ typedef struct dnp3_logger_t
 ```
 
 * `ctx` is an opaque pointer to some state information required by the interface. It is passed into every method as the final argument.
-* `on_destroy` is the destructor that cleans up the `ctx`
+* `on_destroy` is the destructor that cleans up the `ctx`.
 * `on_message` is a function pointer used to dispatch a log message.
 
-This interface only contains a single method, but other interfaces contain a number of methods.
+Keep in mind that this example only contains a single method. Other interfaces will contain several methods.
 
 :::tip
 If your implementation of an interface is stateless, you can initialize `ctx` and `on_destroy` to NULL. C99 struct initialization syntax
@@ -85,8 +83,7 @@ will do this by default if you don't specify a value for these fields.
 
 ### Iterators
 
-Collections in the C bindings are always implemented as an opaque iterator type. You can think of them as a class with a single "next"
-method. Consider an iterator over bool values:
+Collections in the C bindings are always implemented as an opaque iterator type. Think of them as a class with a single "next" method. For example, let's look at an iterator over bool values:
 
 ```c
 // opaque iterator
@@ -95,7 +92,7 @@ typedef struct bool_iterator_t;
 bool* bool_iterator_next(bool_iterator_t* iter);
 ```
 
-If you are given this iterator in a callback you can process the values in a loop:
+If you are given this iterator in a callback, you can process the values in a loop:
 
 ```c
 void my_callback(bool_iterator_t* iter. void* ctx)
@@ -109,14 +106,12 @@ void my_callback(bool_iterator_t* iter. void* ctx)
 ```
 
 :::warning
-You should never use an iterator outside of the callback. Frequently, the iterator points to memory on the call stack
-and will result in undefined behavior if used after the callback has completed.
+Never use an iterator outside of the callback. Frequently, the iterator points to memory on the call stack and will result in undefined behavior if it is used after the callback is complete.
 :::
 
 ### Error Handling
 
-Error handling in the C API is performed using error codes. An error code is always an enum value with the first value equal to zero and
-indicating success.
+C API errror handling is performed using error codes. An error code is always an enum value where the first value is equal to zero, indicating success.
 
 Consider an error enum and a function that parses a string as an `int` that can fail:
 
@@ -130,8 +125,7 @@ typedef enum my_error_t
 my_error_t parse_string(const char* string, int* out);
 ```
 
-When a function that can fail needs to return a value, it always does so using an out parameter as the last argument. User code should always check
-returned error values:
+When a function that can fail needs to return a value, it always does so using an out parameter as the last argument. Your code should always check for returned error values:
 
 ```c
 int value = 0;
@@ -143,7 +137,7 @@ if(err) {
 ```
 
 :::note
-Every enum generated by the C code generator also has a generated `*_to_string` helper method to aid in debugging.
+Every enum generated by the C code generator also has a generated `*_to_string` helper method for debugging.
 :::
 
 

@@ -8,9 +8,9 @@ slug: /api/outstation/tcp_server
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-One or more outstation instances may be bound to a TCP server using an `AddressFilter`. Unlike most server protocols, each outstation instance may only
-communicate with a single client at a time. This is because DNP3 is stateful and maintains event data for a *particular* master. If you need to support more than
-one master connection on the same port, you must preconfigure each master IP address and associate it with a particular outstation.
+You can bind one or more outstation instances to a TCP server using `AddressFilter`. Unlike most server protocols, each outstation instance can only
+communicate with one client at a time. This is because DNP3 is stateful and maintains event data for a specific master. If you need to support more than
+one master connection on the same port, you must preconfigure each master IP address and associate it with a specific outstation.
 
 ```mermaid
 graph TD
@@ -24,15 +24,12 @@ end
 
 ## Creating a server
 
-The first step is to create a `TcpServer` instance. Creating a server does not initiate `bind/listen`.
-
-Addresses may be any specified as any valid IPv4 or IPv6 local endpoint, e.g.:
+Begin by creating a `TCPServer` instance. Keep in mind that creating a server doesn't initiate `bind/listen`. Form your endpoint using `<address>:<port>` to avoid `TCPServer` failure. Addresses may be any specified as any valid IPv4 or IPv6 local endpoint, such as:
 
 * `127.0.0.1` for localhost only
 * `0.0.0.0` for all adapters
-* IP address of a particular adapter
+* The IP address for a particular adapter
 
-`TcpServer` creation can fail if the endpoint is not well formed: `<address>:<port>`.
 
 <Tabs
 groupId="language"
@@ -77,16 +74,13 @@ values={[
 </Tabs>
 
 :::tip
-The `LinkErrorMode` controls what happens when malformed link-layer frames are received. The typical behavior is to close the socket
-as data should never be corrupted over TCP.  This value may be set to `Discard` in which case the parser will discard errors and search for the start of the
-next frame. This behavior is required if you are connecting to a terminal server which bridges TCP to a serial port.
+`LinkErrorMode` controls what will happen if a malformed link-layer frame is received. Typically, it will close the socket to prevent transmission of corrupted data. However, you can set this value to `Discard` if you want the parser to discard errors and search for the start of the next frame. This behavior is required if you're connecting to a terminal server that bridges TCP to a serial port.
 :::
 
-## Adding Outstation(s)
+## Adding Outstations
 
-You can now associate one or more outstations with the `TcpServer`. The `TcpServer::addOutstation` method takes all of the components discussed in previous sections,
-followed by an `AddressFilter`. The filter controls which masters are allowed to associate with a particular outstation. If the filter overlaps with the filter
-of an existing outstation, i.e. they would both allow the same address, then `TcpServer::addOutstation` will fail.
+You can now associate one or more outstations with the `TCPServer`. The `TcpServer::addOutstation` method takes all of the components discussed in previous sections, followed by an `AddressFilter`. This filter determines which masters are allowed to associate with a specific outstation. If the filter overlaps with the filter
+of an existing outstation, such as allowing the same address, then `TcpServer::addOutstation` will fail.
 
 <Tabs
 groupId="language"
@@ -104,7 +98,7 @@ values={[
 ```
 
 :::note
-The terminology differs here between Rust and bindings. The Rust API's add_outstation method doesn't spawn it onto the runtime.
+The terminology differs here between Rust and the bindings. The Rust API's 'add_outstation' method doesn't spawn it onto the runtime.
 :::
 
 </TabItem>
@@ -135,7 +129,7 @@ The terminology differs here between Rust and bindings. The Rust API's add_outst
 </TabItem>
 </Tabs>
 
-The examples above use `AddressFilter.any()` to allow any master IP address to connect:
+The examples above use `AddressFilter.any()` to connect to any master IP address:
 
 ```mermaid
 graph LR
@@ -145,20 +139,19 @@ B --*.*.*.*--> c[Outstation]
 end
 ```
 
-If an outstation is already connected to a master, and another matching IP address attempts to connect, the existing connection will be closed and the
-outstation will begin a communication session with the new master.
+If you've already connected an outstation to a master and another matching IP address tries to connect, the existing connection will close. The outstation will then begin a communication session with the new master.
 
 ## ConnectionStateListener
 
-The `ConnectionStateListener` interface is only specified for connection oriented transport (e.g. TCP) when adding an outstation to the server. It has a single
-method that informs user code when a TCP connection has been established to the outstation. The listener only fires a connected event when an IP address matching
-the `AddressFilter` is received. If the outstation is already connected and processing a connection, and another matching connection is received, then the listener
+The `ConnectionStateListener` interface is only specified for connection-oriented transport such as TCP when adding an outstation to the server. It has a single
+method that informs your code when the outstation establishes a TCP connection. The listener only fires a connected event when it receives an IP address matching
+the `AddressFilter`. If the outstation that is already connected and processing a connection receives another matching connection, the listener
 will fire a disconnected event before firing a connected event.
 
 
 ## Binding the Server
 
-When all of the outstation associated with the server have been added, it is time to bind the server and begin accepting connections.
+Once you've added all the outstations associated with the server, you can then bind the server and start accepting connections.
 
 <Tabs
 groupId="language"
@@ -176,7 +169,7 @@ values={[
 ```
 
 :::note
-The terminology differs here between Rust and bindings.
+The terminology differs here between Rust and the bindings.
 :::
 
 </TabItem>
@@ -205,5 +198,6 @@ The terminology differs here between Rust and bindings.
 </TabItem>
 </Tabs>
 
-
-Binding may fail if the underlying socket bind/listen calls fail, e.g. if another process is already bound to that port.
+:::note
+Binding may fail if the underlying socket bind/listen calls fail, such as when another process is already bound to that port.
+:::
