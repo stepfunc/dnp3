@@ -7,13 +7,13 @@ slug: /java
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-The Java bindings are distributed as a JAR targeting Java 8. Native libraries are embedded in the JAR libraries for Windows and Linux in `resources`. The
-correct native library will automatically load during a static initialization. These native libraries wrap the underlying C API with a thin layer of
+The Java bindings are distributed as a JAR targeting Java 8. Native libraries for Windows and Linux are embedded in the JAR's `resources` directory. The
+correct native library will automatically load during static initialization. These native libraries wrap the underlying C API with a thin layer of
 [JNI](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/).
 
 ## Maven
 
-Release artifacts are published to Maven central. Add this code to incorporate them into your projects:
+Release artifacts are published to Maven central. Add this dependency to incorporate them into your projects:
 
 ```xml
 <dependency>
@@ -51,25 +51,25 @@ UShort value = ushort(65535);
 
 ## Mapping
 
-Java is an object-oriented language that support all the abstract patterns modeled in the code generator. This section describes those mappings.
+Java is an object-oriented language that supports all the abstract patterns modeled in the code generator. This section describes those mappings.
 
 ### Errors
 
 C API errors are transformed into exceptions containing the error enum. The exception class inherits from `RuntimeException`.
 
 :::warning
-Uncaught exceptions thrown in callbacks will terminate the program. Always wrap your code with callback logic using `try/catch` syntax if there's a possibility the callback will throw.
+Uncaught exceptions thrown in callbacks will terminate the program. Always wrap your callback logic using `try/catch` syntax if there's a possibility the callback will throw.
 :::
 
 
 ### Iterators
 
 Iterators are transformed into `List<T>` by the code generator. This means that the collections returned by callbacks may be
-used outside the callback, such as being sent to another thread for processing.
+used outside the callback. For example, you can send them to another thread for processing.
 
 ### Structs
 
-Native structs are mapped to Java classes. They have public member visibility, while the constructor ensures that all values are initialized properly.
+Native structs are mapped to Java classes. They have public member visibility, and the constructor ensures that all values are initialized.
 
 ### Classes
 

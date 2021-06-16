@@ -95,7 +95,7 @@ bool* bool_iterator_next(bool_iterator_t* iter);
 If you are given this iterator in a callback, you can process the values in a loop:
 
 ```c
-void my_callback(bool_iterator_t* iter. void* ctx)
+void my_callback(bool_iterator_t* iter, void* ctx)
 {
     bool* value = NULL;
     while(value = bool_iterator_next(iter))
@@ -106,12 +106,12 @@ void my_callback(bool_iterator_t* iter. void* ctx)
 ```
 
 :::warning
-Never use an iterator outside of the callback. Frequently, the iterator points to memory on the call stack and will result in undefined behavior if it is used after the callback is complete.
+Never use an iterator outside the callback. Frequently, the iterator points to memory on the stack and will result in undefined behavior if it is used after the callback is complete.
 :::
 
 ### Error Handling
 
-C API errror handling is performed using error codes. An error code is always an enum value where the first value is equal to zero, indicating success.
+C API error handling is performed using error codes. An error code is always an enum value where the first value is equal to zero, indicating success.
 
 Consider an error enum and a function that parses a string as an `int` that can fail:
 

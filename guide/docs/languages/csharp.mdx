@@ -7,9 +7,8 @@ slug: /c_sharp
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-We distribute the C# bindings as a [Nuget package](https://www.nuget.org/packages/dnp3), using [P/Invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke)
-to call the same native library functions that the C library uses. It is .NET standard 2.0 compatible and includes platform-specific
-shared libraries for 64-bit Windows and Linux that the .NET runtime will automatically load.
+We distribute the C# bindings as a [Nuget package](https://www.nuget.org/packages/dnp3). Internally, the C API is called using [P/Invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke)
+The bindings are .NET standard 2.0 compatible and include platform-specific shared libraries for 64-bit Windows and Linux. They are automatically loaded by the .NET runtime.
 
 ## Mapping
 
@@ -25,15 +24,15 @@ Uncaught exceptions thrown in callbacks will terminate the program. Your code sh
 
 ### Iterators
 
-The code generate transforms iterators into `ICollection<T>`. This means that the collections returned by callbacks may be used outside the callback, such as being sent to another thread for processing.
+The code generator transforms iterators into `ICollection<T>`. This means that the collections returned by callbacks may be used outside the callback. For example, you can send them to another thread for processing.
 
 ### Structs
 
-Native structs are mapped to C# classes. They have public member visibility, while the constructor ensures that all values are initialized properly.
+Native structs are mapped to C# classes. They have public member visibility, and the constructor ensures that all values are initialized.
 
 ### Classes
 
-Abstract classes are also mapped to C# classes. They have a private pointer to the underlying native resource. There are two types of generated classes in C#: 
+Abstract classes are mapped to C# classes. They have a private pointer to the underlying native resource. There are two types of generated classes in C#:
 * Generated classes that only have a private finalizer: These are automatically garbage collected, while native resources are deallocated in the class's finalize method. These
 types of classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`.
 * Generated classes that also provide a public `Shutdown` method: These represent long-lived resources such as `Runtime`, `Master`, or `TCPServer`. They map to an asynchronous
@@ -43,4 +42,4 @@ Rust task executing on the Tokio runtime. The `Shutdown` method lets you precise
 
 ### Asynchronous Methods
 
-Abstract asynchronous methods are transformed into methods that return `Task<T>`. You can then block on the task or `await` it in an async method.
+Abstract asynchronous methods are transformed into methods that return `Task<T>`. You can block on the task or `await` it in an async method.
