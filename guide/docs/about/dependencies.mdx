@@ -14,15 +14,16 @@ While Rust's package manager `cargo` makes it easy to work with external depende
 
 We developed an automated tool called `complicense` to ensure that our binary distributions meet the legal requirements for third-party open source licenses. This tool performs the following tasks:
 
-* Analyzes each dependency's license against an allowed list of licenses. Our CI packaging will fail if you add a dependency that is not allowed.
+* Analyzes each dependency's license against an allowed list of licenses. Our CI packaging will fail if add a dependency is added with a license that has not been pre-approved.
 * Uses the Github API to automatically retrieve the license file for each project hosted on Github. Only a few projects don't have the proper metadata; the
 license name and content for those are specified manually in the `complicense` configuration.
 * Ignores projects that are 100% copyrighted by Step Function I/O (e.g., the DNP3 library itself).
-* Produces a license report document called `dependencies.txt` that consolidates all the dependency and license information. We include this document in all of our binary distributions for transparency so you can ensure you meet all license requirements.
+* Produces a license report document called `dependencies.txt` that consolidates all the dependency and license information. We include this document in all of our binary distributions for transparency and to make it
+easy for you to comply with the open source licenses.
 
 ## Proprietary Compatible
 
-All of our library's dependencies use licenses that are compatible with commercial/proprietary products, along with being compatible with each other. We don't allow the incorporation of strong copyleft licenses such as the GPL. You can see a complete list of allowed licenses
+All of our library's dependencies use licenses that are mutually compatible and compatible with commercial/proprietary products. We don't allow the incorporation of strong copyleft licenses such as the GPL. You can see a complete list of allowed licenses
 in <a href={`${sitedata.github_url}/blob/${sitedata.version}/deps-config.json`}>deps-config.json</a>.
 
 ## Licenses.txt
