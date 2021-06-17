@@ -62,7 +62,7 @@ values={[
 ### EventBufferConfig
 
 
-The `EventBufferConfig` struct controls the number of events buffered for each type that the outstation can report. During the outstation initialization, you will pre-allocate space for each type. Once all the space in the buffer for a particular type is used, each new event will discard the oldest event. The outstation will then assert IIN 2.3 (Event Buffer Overflow) per the specification.
+The `EventBufferConfig` struct controls the number of events buffered for each type that the outstation can report. During the outstation initialization, space is internally pre-allocated for each type based on this configuration. When all the space in the buffer for a particular type has been used, adding another event will cause the oldest event to be discarded, and the outstation will assert IIN 2.3 (Event Buffer Overflow) per the specification.
 
 When determining how many events to configure, remember that there is a fundamental tradeoff between saving events for future reporting and your memory/CPU usage. Determine your event buffer sizes based on these factors:
 

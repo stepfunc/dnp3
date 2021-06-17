@@ -8,9 +8,9 @@ slug: /api/outstation/application
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `OutstationApplication` interface provides callbacks for dynamic events and information that the outstation requires from the user application:
+The `OutstationApplication` interface provides callbacks for dynamic events and information that the outstation requires from your application:
 
-* Retrieving Internal Indication (IIN) bits controlled by user code
+* Internal Indication (IIN) bits
 * Callback for writing the time
 * Cold and warm restart operations
 * Counter freeze requests
@@ -18,7 +18,7 @@ The `OutstationApplication` interface provides callbacks for dynamic events and 
 ## ApplicationIin
 
 The outstation will call `OutstationApplication::getApplicationIin()` whenever the system performs a solicited or unsolicited response. It will merge
-private IIN bits with the bits returned in the `ApplicationIin` structure, which contains four internal indication bits that are controllable by application code:
+private IIN bits with the bits returned by the `ApplicationIin` structure, which contains four internal indication bits that you can control:
 
 * `needTime`: Outstation requires time synchronization
 * `localControl`: Some output points are in local mode
@@ -27,13 +27,13 @@ private IIN bits with the bits returned in the `ApplicationIin` structure, which
 
 ## Time Synchronization
 
-DNP3 has two different procedures that a master can use to synchronize outstation time: `LAN` and `Non-LAN`. You don't need to worry about which procedure the master uses; both procedures will call `OutstationApplication::writeAbsoluteTime(..)`, with a timestamp representing the number of milliseconds since January 1st, 1970, 00:00:00 UTC.
+DNP3 has two different procedures for synchronizing the outstation's time: `LAN` and `Non-LAN`. You don't need to worry about which procedure the master uses; both procedures will call `OutstationApplication::writeAbsoluteTime(..)`, with a timestamp representing the number of milliseconds since January 1st, 1970, 00:00:00 UTC.
 
 Outstations that do not support DNP3 time synchronization should return `WriteTimeResult::NOT_SUPPORTED`.  Outstations that receive their time from another
 source, such as NTP or IRIG-B, won't typically accept time synchronization requests from DNP3 unless the other time source is unavailable.
 
 Outstations may notify the master that they require time synchronization by setting the `ApplicationIin.needTime` bit. Outstations must clear this bit
-immediately in the `writeAbsoluteTime(..)` callback. Otherwise, the master may interpret this as a failure, causing some DNP3 masters to enter an infinite loop of writing out the time.
+immediately in the `writeAbsoluteTime(..)` callback. Otherwise, the master may interpret this as a failure, causing some DNP3 masters to enter an infinite loop of writing the time.
 
 Typically, an outstation will assert this bit periodically, depending on its internal clock accuracy.
 
@@ -43,15 +43,15 @@ DNP3 requires that compliant outstations be capable of performing a full restart
 perform a denial of service, we recommend that you disable this functionality in most products. Software gateways and translators that run on a server shared with other services should never implement this functionality. Return `RestartDelay` with `RestartDelayType::NOT_SUPPORTED` to
 indicate that the operation is not supported so that the timestamp isn't used.
 
-If you must implement this functionality due to conformance or customer requirements, callbacks for both cold and warm restart are available. Return
-`RestartDelay` with a time estimate of how long the restart will take in seconds or milliseconds. This delay has no practical use for real-world masters, so don't worry about the accuracy of this value.
+If you must implement this functionality to pass conformance tests or due to customer requirements, callbacks for both cold and warm restart are available. Return
+`RestartDelay` with a time estimate of how long the restart will take in seconds or milliseconds. This delay has no practical use for real-world masters, so don't worry too much about the accuracy of this value.
 
 ## Freeze Requests
 
 `OutstationApplication` contains two methods related to freezing counters:
 
-* `freezeCountersAll`: This is called when the the All Points (0x06) qualifier delivers a counter freeze operation.
-* `freezeCountersRange`: This is called when an 8-bit (0x00) or 16-bit (0x01) range qualifiers delivers a counter freeze operation.
+* `freezeCountersAll`: This is called when a counter freeze operation is received using the All Points (0x06) qualifier.
+* `freezeCountersRange`: This is  called when a counter freeze operation is received using 8-bit (0x00) or 16-bit (0x01) range qualifiers.
 
 A provided reference to the `Database` lets you perform requested freeze operations. The `FreezeType` parameter lets you choose between two types of supported freeze operations:
 

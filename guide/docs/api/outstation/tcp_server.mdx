@@ -8,9 +8,9 @@ slug: /api/outstation/tcp_server
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-You can bind one or more outstation instances to a TCP server using `AddressFilter`. Unlike most server protocols, each outstation instance can only
+You can bind one or more outstation instances to a TCP server using an `AddressFilter`. Unlike most server protocols, each outstation instance can only
 communicate with one client at a time. This is because DNP3 is stateful and maintains event data for a specific master. If you need to support more than
-one master connection on the same port, you must preconfigure each master IP address and associate it with a specific outstation.
+one master connection on the same port, you must preconfigure each master IP address and associate it with a specific outstation instance.
 
 ```mermaid
 graph TD
@@ -24,7 +24,7 @@ end
 
 ## Creating a server
 
-Begin by creating a `TCPServer` instance. Keep in mind that creating a server doesn't initiate `bind/listen`. Form your endpoint using `<address>:<port>` to avoid `TCPServer` failure. Addresses may be any specified as any valid IPv4 or IPv6 local endpoint, such as:
+Begin by creating a `TCPServer` instance. Keep in mind that creating a server doesn't initiate `bind/listen` immediately. Endpoints are specified in the format `<address>:<port>`. Addresses may be any specified as any valid IPv4 or IPv6 local endpoint, such as:
 
 * `127.0.0.1` for localhost only
 * `0.0.0.0` for all adapters
@@ -79,8 +79,8 @@ values={[
 
 ## Adding Outstations
 
-You can now associate one or more outstations with the `TCPServer`. The `TcpServer::addOutstation` method takes all of the components discussed in previous sections, followed by an `AddressFilter`. This filter determines which masters are allowed to associate with a specific outstation. If the filter overlaps with the filter
-of an existing outstation, such as allowing the same address, then `TcpServer::addOutstation` will fail.
+You can now associate one or more outstations with the `TCPServer`. The `TcpServer::addOutstation` method takes all the components discussed in previous sections, followed by an `AddressFilter`. This filter determines which masters are allowed to associate with a specific outstation.
+If the filter allows the same address(es) as an existing outstation's filter, then `TcpServer::addOutstation` will fail.
 
 <Tabs
 groupId="language"
@@ -129,7 +129,7 @@ The terminology differs here between Rust and the bindings. The Rust API's 'add_
 </TabItem>
 </Tabs>
 
-The examples above use `AddressFilter.any()` to connect to any master IP address:
+The examples above use `AddressFilter.any()` which allows any master IP to connect.
 
 ```mermaid
 graph LR
@@ -139,19 +139,18 @@ B --*.*.*.*--> c[Outstation]
 end
 ```
 
-If you've already connected an outstation to a master and another matching IP address tries to connect, the existing connection will close. The outstation will then begin a communication session with the new master.
+If you've already connected a master to the outstation and another matching IP address tries to connect, the existing connection will close. The outstation will then begin a communication session with the new master.
 
 ## ConnectionStateListener
 
-The `ConnectionStateListener` interface is only specified for connection-oriented transport such as TCP when adding an outstation to the server. It has a single
-method that informs your code when the outstation establishes a TCP connection. The listener only fires a connected event when it receives an IP address matching
-the `AddressFilter`. If the outstation that is already connected and processing a connection receives another matching connection, the listener
-will fire a disconnected event before firing a connected event.
+The `ConnectionStateListener` interface is provided when adding an outstation to the TCP server. It has a single method that informs your code when the outstation accepts a TCP connection.
+The listener only fires a connected event when it receives an IP address matching the `AddressFilter`. If the outstation that is already connected and processing a connection receives
+another matching connection, the listener will fire a disconnected event before firing a connected event.
 
 
 ## Binding the Server
 
-Once you've added all the outstations associated with the server, you can then bind the server and start accepting connections.
+Once you've added all the outstations associated with the server, you can then bind the server which will cause it to start accepting connections.
 
 <Tabs
 groupId="language"
