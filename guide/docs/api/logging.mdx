@@ -13,8 +13,7 @@ tracing documentation for details.
 
 In comparison, the bindings use a rigid logging interface with a single callback method to record a message. Configurable options include:
 
-* `LogLevel` that generates messages 
-* Inclusion of Rust module or level information as part of the message
+* `LogLevel` that controls which messages are generated
 * How and if to print the time as part of the message
 * Line or JSON based output
 
@@ -112,7 +111,7 @@ index: 7 false
 ```
 
 :::note
-Protocol decoding is always output at the *Info* log level. If left enabled, it can be extremely lengthy in a production system. When you're debugging a communication issue, try adjusting the application-layer decoding first to gain visibility into the messages exchanged.
+Protocol decoding is always output at the *Info* log level. If left enabled, it can be too verbose in a production system. When you're debugging a communication issue, try adjusting the application-layer decoding first to gain visibility into the messages exchanged.
 :::
 
 
