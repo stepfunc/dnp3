@@ -8,25 +8,25 @@ slug: /api/outstation/database
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Use the `Database` class to manipulate the measurement types that the outstation exposes to the master. Note: while it's called a "database", it's really just
-a thread-safe data structure.
+You can use the `Database` class to manipulate the measurement types and values that the outstation exposes to the master. Note that while it's called a "database", it's really just
+a thread-safe data structure in memory.
 
 ## Adding Points
 
-You must initialize the points before the outstation exposes any measurement data. While you should do this when you create the outstation, you can add points to a running outstation as well. Except for Octet Strings that don't require conjuration, each measurement type has a unique configuration that accounts for:
+You must initialize the points before the outstation exposes any measurement data. While you should do this when you create the outstation, you can add points to a running outstation as well. Each measurement type has unique configuration including:
 
-* An event class assignment for the point
+* An optional event class assignment for the point
 * Default static and event variations for the type
 * Type-specific dead-bands that default to zero (Binary points have no deadband)
 
-When you add a point, it will have the following default value with `RESTART` flags:
+When you add a point, it is assigned the following default value with `RESTART` flags:
 
-* Binary points set to `false`
-* Numeric values set to `0`
-* Octet Strings set to the value of `[0x00]`
+* Binary points are set to `false`
+* Numeric values are set to `0`
 * Double-bit Binary points set to `Indeterminate`
+* Octet Strings are set to the value of `[0x00]`
 
-Update the value right after adding the point if you don't want a connecting master to see `RESTART`.
+Update the value after adding the point if you don't want a connecting master to see `RESTART`.
 
 <Tabs
 groupId="language"
@@ -77,7 +77,7 @@ values={[
 
 ## Updating Points
 
-You can update a point value in a new transaction or in the same transaction you use to create it. This is useful if the outstation
+You can update a point value in a new transaction or in the same transaction you used to initialize it. This is useful if the outstation
 has local access to values at startup, such as via a local ADC.
 
 The `UpdateOptions` struct lets you precisely control how a point update is processed. Use the default constructor to:
@@ -86,15 +86,15 @@ The `UpdateOptions` struct lets you precisely control how a point update is proc
 * Produce an event if the point value changes in a way that exceeds the deadband or if the flags change
 
 :::tip
-Ignore event creation during startup initialization if you don't want to create events for the initial values.
+Use the UpdateOptions to ignore event creation during startup initialization if you don't want to create events for the initial values.
 :::
 
 ## Getting Point Values
 
-Some applications may wish to use the `Database` as a cache of the most recent value. Each type has getter methods to extract the value if present.
+Some applications may wish to use the `Database` as a cache of the most recent value. Each type has a getter method to retrieve the most recently assigned value.
 
 :::note
-Since the point may not be defined, the getter can fail. If you try to retrieve a point that doesn't exist using Java and C#, it will create an exception.
+Since the point may not be defined, the getters can fail. If you try to retrieve a point that doesn't exist using Java and C#, an exception will be thrown.
 :::
 
 ## Removing Points

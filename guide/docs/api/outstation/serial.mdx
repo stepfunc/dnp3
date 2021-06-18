@@ -23,9 +23,9 @@ the following serial port parameters:
   * Parity
   * Flow control
 
-The method will then either open the port or fail if the port doesn't exist or is already in use. The returned `Outstation` class behaves identically to other transports.
+The method will then either open the port or fail if the port doesn't exist or is already in use. The returned `Outstation` class behaves identically to other transport types.
 
 :::note
-The `LinkErrorMode` is internally set to `Discard` for serial communication channels.
+The `LinkErrorMode` is internally set to `Discard` for serial communication channels since serial ports do not provide data integrity.
 :::
 
