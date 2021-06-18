@@ -56,9 +56,9 @@ The Rust API and the binding APIs handle associations in two different ways:
 </TabItem>
 </Tabs>
 
-The `AssociationId` struct that gets returned when adding an association is just a token. While it's required to perform operations on a particular outstation on the channel,
-you don't need to keep a reference to it. Allowing the `AssociationId` to be garbage collected won't remove the association from the channel.
+The `AssociationId` struct that is returned when adding an association is just a token. While it's required to perform operations on a particular outstation on the channel,
+you don't need to keep a reference to it unless you need it to perform operations later. Allowing the `AssociationId` to be garbage collected won't remove the association from the channel.
 
 ## Removing
 
-Remove associations from a channel by calling `MasterChannel.removeAssociation` and passing in the `AssociationId`.
+Remove associations from a channel by calling `MasterChannel.removeAssociation` and passing in the `AssociationId`. Doing so will stop all operations for that association.

@@ -8,16 +8,16 @@ slug: /api/master/terminology
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Master stations can typically communicate with multiple outstations over multiple communication channels. The API documentation describes how to talk to one or more outstations over a single communication channel. Talking over multiple channels is accomplished by invoking the API multiple times.
+Master stations typically communicate with multiple outstations over multiple communication channels. We'll describe in the following sections how you can create different channel types, each of which can be used to talk to multiple outstations on the channel.
 
 ## MasterChannel
 
-Our library creates a `MasterChannel` using generic configurations combined with transport-specific configurations. It provides a representation of the communication channel and how it will behave. Once created, all channel instances have the same API,
+You can create a `MasterChannel` using generic configuration combined with transport-specific options. Once created, all channel instances have the same API,
 regardless of the underlying transport.
 
 ## Association
 
-The standard defines an association as "a representation of a logical connection between a master and an outstation". In this library, you add an association to a `MasterChannel` to enable communication with a particular outstation address. Adding an association to a channel will return an `AssociationId`, which can then be used in conjunction with the channel to perform actions on that outstation.
+The DNP3 standard defines an association as "a representation of a logical connection between a master and an outstation". In this library, you add an association to a `MasterChannel` to enable communication with a particular outstation address. Adding an association to a channel will return an `AssociationId`, which can then be used in conjunction with the channel to perform actions on that outstation.
 
 ```mermaid
 graph TD
@@ -26,7 +26,7 @@ A --association #2--> C[Outstation #2]
 ```
 
 :::note
-It's typical to just have one association per channel over TCP. However, it's also possible to encounter virtual outstations on a single TCP endpoint. Serial channels are frequently part of a multi-drop network where a single serial interface communicates with multiple independent outstations.
+It's typical to just have one association per channel over TCP. However, it's also possible to encounter virtual outstations on a single TCP endpoint. Serial channels are frequently part of a multi-drop network where a single serial channel is used to communicate with multiple independent outstations.
 :::
 
 

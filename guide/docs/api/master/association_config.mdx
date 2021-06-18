@@ -14,7 +14,7 @@ The `AssociationConfig` struct provides the configuration information you need t
 * If and how to perform time synchronization
 * Per-association task queue size
 
-Note that it sends the outstation address as a separate argument when adding an association to a channel.
+Note that the outstation address is provided as a separate argument when adding an association to a channel.
 
 <Tabs
 groupId="language"
@@ -74,17 +74,17 @@ If your outstation doesn't support unsolicited reporting, you can turn the DISAB
 
 ## Scheduling
 
-The standard makes it simple to customize scheduling to meet your specific needs. Requests are scheduled on a channel using the following steps:
+The following algorithm is used to schedule requests within an association:
 
 1. User requests such as control operations get top priority.
-2. The system then considers automatic and initialization tasks in this order:
+2. The association then considers automatic and initialization tasks in this order:
    1. Clear the RESTART IIN bit if previously observed in a response.
    2. Disable unsolicited reporting if configured to do so during initialization.
    3. Perform an integrity scan if configured to do so during initialization.
-   4. Perform automatic time synchronization if configured and it observes the 'NEED_TIME IIN' bit in a response.
+   4. Perform automatic time synchronization if enabled, and the master observes the 'NEED_TIME IIN' bit in a response.
    5. Enable unsolicited reporting if configured to do so during initialization.
 3. Finally, the system will then execute periodic polls.
 
 :::note
-Each association maintains its own task queue. The channel uses a round-robin queue to ensure fairness across associations on the channel.
+The standard does not specify how requests should be scheduled for multiple associations on a channel. Our implementation uses a per-association task queue. The channel scheduler round-robins through the associations to ensure fair access.
 :::

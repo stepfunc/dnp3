@@ -9,7 +9,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 A `MasterChannel` presents the same interface once you create it, regardless of the underlying transport. You can create a TCP client channel using the runtime,
-configurations, and a callback to observe the status of the connection.
+configuration data, and a callback to observe the status of the connection.
 
 <Tabs
 groupId="language"
@@ -65,7 +65,7 @@ A `MasterChannel` won't start communicating until you call the `enable` method. 
 ## LinkErrorMode
 
 The `LinkErrorMode` controls what happens if it detects a framing error at the link-layer. TCP is a lossless transport, so the default behavior is to
-close the connection. However, you can treat the TCP like a serial port by changing the setting to `LinkErrorMode::Discard`.
+close the connection. However, you can treat a TCP channel like a serial port by changing the setting to `LinkErrorMode::Discard`.
 
 ## EndpointList
 
@@ -84,4 +84,4 @@ wait `reconnectDelay` before the next attempt.
 
 ## ClientStateListener
 
-The `ClientStateListener` interface has a single method to inform the application about the state of connection.
+The `ClientStateListener` interface has a single callback to inform the application about the state of connection.

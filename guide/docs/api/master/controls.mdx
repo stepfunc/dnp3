@@ -8,7 +8,7 @@ slug: /api/master/association/controls
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-You can construct arbitrary sequences of controls using the `Commands` builder class. This will send the commands to a particular outstation using the association id.
+You can construct arbitrary sequences of controls using the `Commands` builder class. You can then send these commands to a particular outstation using the association id.
 
 
 <Tabs
@@ -55,4 +55,5 @@ The Rust API calls the builder class 'CommandBuilder'.
 </TabItem>
 </Tabs>
 
-The asynchronous operation will return a single `CommandResult` enum that indicates the result. `CommandResult.Success` means the outstation responded with `Success` for all controls in the message. If it returns an error code, consult the language-specific documentation for the meaning.
+The asynchronous operation will return a single `CommandResult` enum that indicates the result. `CommandResult.Success` means the outstation responded with `Success` for all controls in the message. Consult the language-specific documentation for the meaning
+of each error code.
