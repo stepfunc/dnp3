@@ -7,13 +7,13 @@ slug: /java
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-The Java bindings are distributed as a JAR and target Java 8.  Native libraries are embedded in the JAR libraries for Windows and Linux in the `resources`. The
-correct native library is automatically loaded during static initialization. These native libraries wrap the underlying C API with a thin layer of
+The Java bindings are distributed as a JAR targeting Java 8. Native libraries for Windows and Linux are embedded in the JAR's `resources` directory. The
+correct native library will automatically load during static initialization. These native libraries wrap the underlying C API with a thin layer of
 [JNI](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/).
 
 ## Maven
 
-Release artifacts are published to Maven central. You can use them within your projects:
+Release artifacts are published to Maven central. Add this dependency to incorporate them into your projects:
 
 ```xml
 <dependency>
@@ -25,18 +25,16 @@ Release artifacts are published to Maven central. You can use them within your p
 
 ## Dependencies
 
-The Java bindings depend on two additional open source projects in addition to the Rust dependencies:
+In addition to the Rust dependencies, the Java bindings depend on these two open source projects:
 
 * [joou-java-6](https://github.com/jOOQ/jOOU) - Apache 2.0 - Java Object Oriented Unsigned (JOOU) integer classes
 * [commons-lang3](https://github.com/apache/commons-lang) - Apache 2.0 - Java utility classes
 
-These libraries are not distributed by Step Function I/O directly and are only declared as a dependency for the package manager to retrieve.
+These libraries are not distributed by Step Function I/O directly. They are only declared as a dependency for the package manager to retrieve.
 
 ## Unsigned Integers
 
-Java does not support unsigned integers as part of the core language. To overcome this limitation, the Java code generator uses classes from the `JOOU` library
-in place of these missing primitives.  This ensures that numeric types crossing the Java/JNI boundary are always pre-validated to be within the correct range. User code
-that creates unsigned integers will need to import symbols from the `JOOU` library.
+Java doesn't support unsigned integers as part of the core language. Instead, the Java code generator uses classes from the `JOOU` library. This ensures that numeric types crossing the Java/JNI boundary are pre-validated within the correct range. User code that creates unsigned integers will need to import symbols from the `JOOU` library.
 
 It is particularly helpful to statically import the factory methods on `Unsigned` class:
 
@@ -45,7 +43,7 @@ import static org.joou.Unsigned.*;
 import org.joou.UShort;
 ```
 
-This allows the user to succinctly instantiate create instances of the unsigned classes:
+This lets you create instances of the unsigned classes:
 
 ```java
 UShort value = ushort(65535);
@@ -53,39 +51,34 @@ UShort value = ushort(65535);
 
 ## Mapping
 
-Java is an object-oriented language and has support for all of the abstract patterns modeled in the code generator. This section describes those mappings.
+Java is an object-oriented language that supports all the abstract patterns modeled in the code generator. This section describes those mappings.
 
 ### Errors
 
 C API errors are transformed into exceptions containing the error enum. The exception class inherits from `RuntimeException`.
 
 :::warning
-Uncaught exceptions thrown in callbacks will cause the program to terminate. User code should always wrap callback logic with `try/catch` syntax if there
-is a possibility the callback will throw.
+Uncaught exceptions thrown in callbacks will terminate the program. Always wrap your callback logic using `try/catch` syntax if there's a possibility the callback will throw.
 :::
 
 
 ### Iterators
 
 Iterators are transformed into `List<T>` by the code generator. This means that the collections returned by callbacks may be
-used outside the callback, e.g. sent to another thread for processing.
+used outside the callback. For example, you can send them to another thread for processing.
 
 ### Structs
 
-Native structs are mapped to Java classes. They have public member visibility and the constructor ensures that all values are initialized properly.
+Native structs are mapped to Java classes. They have public member visibility, and the constructor ensures that all values are initialized.
 
 ### Classes
 
-Abstract classes are mapped to Java classes. They have a private pointer to the underlying native resource. There are two types of generated classes in Java: ones that
-that only have a `finalize` method and ones that also expose a public `shutdown` method that allows the user to proactively release native resources.
+Abstract classes are also mapped to Java classes. They have a private pointer to the underlying native resource. There are two types of generated classes in Java: 
+* Generated classes that only have a `finalize` method: These are automatically garbage collected, while native resources are deallocated in the class's finalize method. These types of classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`. 
+* Generated classes that also provide a public `Shutdown` method to proactively release native resources: These represent long-lived resources such as `Runtime`, `Master`, or `TCPServer`. They map to an asynchronous Rust task executing on the Tokio runtime. The `Shutdown` method lets you precisely control when the resource/task will stop.
 
-The types that provide a `shutdown` method represent long-lived resources like a `Runtime`, `Master`, or `TCPServer`.  Under the hood, they map to an asynchronous
-Rust task executing on the Tokio runtime. The `shutdown` method allows the user to precisely control when the resource/task will stop.
-
-Types that do not provide a `shutdown` method are automatically garbage collected, and native resources are deallocated in the class's finalize method. These
-types of classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`.
 
 ### Asynchronous Methods
 
-Abstract asynchronous methods are transformed into methods that return `CompletionStage<T>`. Users may then chain then use the object in an asynchronous
-workflow or transform it into a `CompletableFuture<T>` and call `get()`.
+Abstract asynchronous methods are transformed into methods that return `CompletionStage<T>`. You can then chain and use the object in an asynchronous
+workflow, or transform it into a `CompletableFuture<T>` and call `get()`.

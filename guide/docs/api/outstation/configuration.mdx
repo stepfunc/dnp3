@@ -8,19 +8,17 @@ slug: /api/outstation/configuration
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Outstations are created using a few types of components:
+You create outstations using three types of components:
 
-* static configuration values
-* callback interfaces
-* transport specific configuration (e.g. TCP vs serial parameters)
+* Static configuration values
+* Callback interfaces
+* Transport-specific configuration (e.g., TCP vs. serial parameters)
 
-This section describes the static configuration required to create and outstation. The two other types of information are covered in subsequent sections.
+Let's look at the static configuration required to create an outstation. 
 
 ### OutstationConfig
 
-The `OutstationConfig` structure contains parameters that modify the behavior of the outstation. Refer to the generated API documentation for the meaning of
-each field. All of the fields, with the exception of the master and outstation link addresses, have default values. This does not mean that these defaults will
-function well for all use cases. The timeout parameters, for example, may need to be adjusted for higher latency links.
+The `OutstationConfig` structure contains the parameters that modify the behavior of the outstation. The generated API documentation provides a definition for each field. All fields have default values except for the master and outstation link addresses. Keep in mind that we didn't optimize these default values for every use case; for example, you may need to adjust the timeout parameters for higher latency links.
 
 <Tabs
 groupId="language"
@@ -64,17 +62,18 @@ values={[
 ### EventBufferConfig
 
 
-The `EventBufferConfig` struct controls how many events are buffered for each type that can be reported by the outstation. Space for
-each type is pre-allocated during outstation initialization. When all of the space in the buffer for a particular type has been exhausted, adding
-another event will cause the oldest event to be discarded and the outstation will assert IIN 2.3 (Event Buffer Overflow) per the specification.
+The `EventBufferConfig` struct controls the number of events buffered for each type that the outstation can report. During the outstation initialization, space is internally pre-allocated for each type based on this configuration. When all the space in the buffer for a particular type has been used, adding another event will cause the oldest event to be discarded, and the outstation will assert IIN 2.3 (Event Buffer Overflow) per the specification.
 
-There is no "correct" number of events to configure. There is a fundamental tradeoff between saving events for future reporting and memory/CPU usage.
-You should scale your event buffer sizes based on several factors:
+When determining how many events to configure, remember that there is a fundamental tradeoff between saving events for future reporting and your memory/CPU usage. Determine your event buffer sizes based on these factors:
 
-1. How many measurements are contained in the outstation database and how often they change.
-2. How often and for how long the master may be disconnected or otherwise unable to empty the event queues via READ or unsolicited reporting.
-3. How important it is to never loose events for a particular type. For example, it may be more important to never miss binary state transitions
-but missing an analog or counter value might not matter at all.
+* How many measurements the outstation database contains
+* How often the measurements change
+* How often and for how long the master may be disconnected or otherwise unable to empty the event queues via READ or unsolicited reporting
+* How important it is to preserve events for a particular type. 
+
+:::tip
+Not all events are created equal. For example, it may be important to capture every binary state transition, while missing an analog or counter value might not matter at all.
+:::
 
 <Tabs
 groupId="language"
@@ -117,6 +116,6 @@ values={[
 </Tabs>
 
 :::note
-Setting the number of events for a particular type to `0` ensures that events will never be recorded or reported for that type.
+Setting the number of events for a particular type to `0` ensures that you will never record or report events for that type.
 :::
 

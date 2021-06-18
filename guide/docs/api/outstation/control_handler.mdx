@@ -8,14 +8,14 @@ slug: /api/outstation/controls
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `ControlHandler` interface allows application code to receive control requests. Each request begins with a call to `beginFragment` and ends
-with a call to `endFragment`. These two callbacks are useful if the application wishes to handle operations atomically or in batches of some sort.
+The `ControlHandler` interface lets application code receive control requests. Each request begins with a call to `beginFragment` and ends
+with a call to `endFragment`. These callbacks are helpful if you want the application to handle operations atomically or in batches of some sort. 
 
 
 ## Handling SELECT
 
-The `select*` methods of `ControlHandler` are invoked when a properly formatted `SELECT` function code is received from the master.  Selecting a control
-point should never cause the point to operate.  Implementors should think of this request from the master as meaning "Do you support this?".
+The `select*` methods of `ControlHandler` are called when a properly formatted `SELECT` messaged is received from the master.  Selecting a control
+point should never cause the point to operate.  Instead, think of this request from the master to mean, "Do you support this?"
 
 ```mermaid
 sequenceDiagram
@@ -25,23 +25,21 @@ sequenceDiagram
     Outstation->>Master: response;
 ```
 
-DNP3 masters may optionally use a "select-before-operate" strategy for executing controls. The rules for how outstations are required to process these
-two-pass control messages are complex. The library transparently handles all of the rules for you.
+DNP3 masters can also use a "select-before-operate" strategy to execute controls. The rules for how outstations process these
+two-pass control messages are complex. The library will handle all these rules for you automatically.
 
 ## Handling OPERATE
 
-The `operate*` methods of ControlHandler are invoked when the outstation receives either:
+The `operate*` methods of `ControlHandler` are called when the outstation receives either:
 
 * `OPERATE` function code preceded by a matching `SELECT`.
 * `DIRECT_OPERATE` function code (single-pass control with response).
 * `DIRECT_OPERATE_NO_RESPONSE` function code (single-pass control without a response).
 
-A reference to the `Database` is provided so that the outstation may update point values in response to a control request. This would
-typically be used to update `BinaryOutputStatus` and `AnalogOutputStatus` values but could be used to update other types if required by the application.
-
+A reference to the `Database` also lets you update point values in response to a control request. While you would typically use it to update `BinaryOutputStatus` and `AnalogOutputStatus` values, you can also use it to update other types if required by the application.
+For example, you might maintain the number of control operations performed in a DNP3 counter value.
 
 :::note
-The OperateType enum is provided which allows the user to tell which of the three operate function codes caused the method to be invoked. Most users
-should ignore this value. The specification requires that all three functions be supported and that the action the outstation takes be the same.
+The OperateType enum lets you identify which of the three operate function codes invoked the method. You can probably ignore this value. The specification requires all three control methodologies be supported and result in the same action.
 :::
 

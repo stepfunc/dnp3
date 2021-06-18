@@ -8,8 +8,8 @@ slug: /api/master/tcp_client
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Once created, a `MasterChannel` presents the same interface regardless of the underlying transport. A TCP client channel is created using the runtime, some
-configuration, and a callback for observering to the status of the connection.
+A `MasterChannel` presents the same interface once you create it, regardless of the underlying transport. You can create a TCP client channel using the runtime,
+configuration data, and a callback to observe the status of the connection.
 
 <Tabs
 groupId="language"
@@ -27,7 +27,7 @@ values={[
 ```
 
 :::note
-The function is called within the context of the Tokio runtime and is therefore implicit in Rust.
+The function is called within the context of the Tokio runtime, and is therefore implicit in Rust.
 :::
 
 </TabItem>
@@ -60,31 +60,28 @@ The function is called within the context of the Tokio runtime and is therefore 
 
 ## Enabling
 
-A `MasterChannel` will not begin communications until the `enable` method is called. This gives the user the chance to configure all of the
-associations on the channel as we'll discuss on the next page.  The user may also `disable` on the channel to put it in an inactive state.
+A `MasterChannel` won't start communicating until you call the `enable` method. This gives you the opportunity to configure all the associations on the channel, as discussed in the next section. You can also `disable` the channel to put it in an inactive state.
 
 ## LinkErrorMode
 
-The `LinkErrorMode` controls what happens if framing error is detected at the link-layer. TCP is a lossless transport so the default behavior is to
-close the connection. You can, however, treat the TCP more like a serial port by changing this setting to `LinkErrorMode::Discard`.
+The `LinkErrorMode` controls what happens if it detects a framing error at the link-layer. TCP is a lossless transport, so the default behavior is to
+close the connection. However, you can treat a TCP channel like a serial port by changing the setting to `LinkErrorMode::Discard`.
 
 ## EndpointList
 
-An `EndpointList` is a list of remote endpoints to which the master will try to connect. It must contain at least one entry and optionally additional backup
-addresses. The channel will round-robin through this list until a connection is established. The list may contain:
-
-Endpoints consist of a `<host>:<port>` tuple where "host" is one of the following:
+An `EndpointList` is a list of remote endpoints that the master will try to connect to. It must contain at least one entry, with the option to include additional backup
+addresses. The channel will round-robin through this list until it establishes a connection. The list may contain endpoints consisting of a `<host>:<port>` tuple where "host" is one of the following:
 
 * IPv4 address
 * IPv6 address
-* domain name
+* Domain name
 
 ## ConnectStrategy
 
 The `ConnectStrategy` controls the rate at which the master retries failed connection attempts. The master uses exponential backoff when attempting to establish
-a connection. The delay between attempts doubles from `minConnectDelay` up to `maxConnectDelay`. If a connection fails after being previously connected, it will
+a connection. The delay between attempts doubles from `minConnectDelay` up to `maxConnectDelay`. If a connection fails after previously connecting, it will
 wait `reconnectDelay` before the next attempt.
 
 ## ClientStateListener
 
-The `ClientStateListener` interface has a single method that informs the application about the state of connection.
+The `ClientStateListener` interface has a single callback to inform the application about the state of connection.

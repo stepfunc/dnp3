@@ -8,30 +8,20 @@ slug: /api/runtime
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Rust's asynchronous programming model is a form of [cooperative multitasking](https://docs.rs/tokio/1.0.2/tokio/task/index.html). Once a task reaches
-a point where it would normally block (e.g. reading from a socket), execution is instead released back to an executor so that another task may run. A pool of
-worker threads inside the executor can efficiently execute thousands of asynchronous tasks concurrently without the overhead of per-task call stacks or
-thread context-switching.
+Rust's asynchronous programming model is a form of [cooperative multitasking](https://docs.rs/tokio/1.0.2/tokio/task/index.html). Once a task gets to a point where it would typically block, such as reading from a socket, execution is instead released back to an executor so that another task may run. This lets a pool of worker threads inside the executor efficiently execute thousands of asynchronous tasks concurrently without the overhead of per-task call stacks or thread context-switching.
 
-Rust supports asynchronous programming using *async* functions and *async/await* syntax. The Rust compiler transforms synchronous-looking code into
-state machines that are just as efficient as what could be written by hand. Although Rust has this capability built into
-the compiler, it does not include a default runtime on which to execute the asynchronous programs. Instead, users are free to pick the runtime as an
-external library.
+Rust supports asynchronous programming using 'async' functions and 'async/await' syntax. The Rust compiler transforms synchronous-looking code into state machines that are just as efficient as what can be written by hand. Although Rust has this capability built into the compiler, it doesn't include a default runtime to execute the asynchronous programs. Instead, you are free to pick the runtime as an external library.
 
-The DNP3 library runs on top of the [Tokio](https://tokio.rs/) runtime which provides a state-of-the-art scheduler and platform-agnostic
-networking APIs. Under the hood, an efficient OS-specific mechanism is used, e.g. *epoll* on Linux or *IOCP* on Windows. Tokio
-is a modern evolution of libraries like [libuv (C)](https://libuv.org/) and [ASIO (C++)](https://think-async.com/Asio/). It leverages Rust's thread and
-memory safety to make asynchronous programs that are not only incredibly fast, but also correct.  It is particularly hard to write correct asynchronous
-software in C/C++ because of the need to manually reason about object lifetimes in callbacks.
+The DNP3 library runs on top of the [Tokio](https://tokio.rs/) runtime, providing a state-of-the-art scheduler and platform-agnostic networking APIs. The OS-specific mechanisms vary by platform, for example, *epoll* on Linux and *IOCP* on Windows.
+
+Tokio is a modern evolution of libraries like [libuv (C)](https://libuv.org/) and [ASIO (C++)](https://think-async.com/Asio/). It leverages Rust's thread and memory safety to deliver asynchronous programs that are not only incredibly fast, but also correct. This is extremely important since it is quite difficult to write correct asynchronous software in C/C++ due to the need to manually reason object lifetimes in callbacks.
 
 ## Lifetime
 
-A `Runtime` must be created before any communication can take place. It is a shared resource for multiple communication sessions. It is typically created just
-after initializing logging and is the last component to be shut down. Runtime shutdown is covered in the last section of this page.
+You must create a `Runtime` before any communication can take place. It is a shared resource for multiple communication sessions that is typically created just after initializing logging. It is also the last component to shut down; see below for more details about runtime shutdown.
 
 :::note
-Rust users may even share the runtime with other libraries that also use Tokio. The bindings currently do not allow for runtime sharing, but it may be possible
-in a future release.
+Rust users can share the runtime with other libraries that also use Tokio. The bindings don't currently support sharing a runtime, but this will be possible in a future release.
 :::
 
 ## Examples
@@ -83,28 +73,27 @@ values={[
 </Tabs>
 
 :::tip
-When using any of the bindings, setting the number of runtime threads to `0` will default to the number of system cores. This
-is a safe default that will lead to good multi-core utilization.
+Set the number of runtime threads to `0` to default to the number of system cores. This provides a safe default that will lead to good multi-core utilization.
 :::
 
 ## Callbacks
 
-Callbacks from the library to user code are invoked from the runtime's thread pool. This means that blocking during a callback will make an entire thread
-unavailable for task execution. If all of the thread-pool threads are blocked, no communication sessions will be able to execute.
+The runtime's thread pool invokes callbacks from the library to user code. If you block during a callback, an entire thread is made unavailable for task execution. If all threads in a thread pool are blocked, no communication sessions will execute until
+a thread becomes unblocked.
 
-Applications should try to avoid blocking whenever possible. For example, when a log message is received via a callback, a synchronous call to write the message
-to a file will block a thread. If this is occurring frequently on all of the pool threads, it can cause poor throughput or even task starvation. Applications
-should defer blocking calls to dedicated worker threads, e.g. a user-managed thread that writes log messages to file.
+For example, when you receive a log message via a callback, a synchronous call to write the message to a file will block a thread. If this frequently occurs on all your pool threads, it can cause poor throughput or even task starvation. 
+
+For best results, avoid blocking whenever possible in your applications. Instead, you should defer blocking calls to dedicated worker threads, such as a user-managed thread that write log messages to file.
+
+
 
 :::tip
-In cases where some blocking is unavoidable, it can be useful to set the number of worker threads to a multiple of the number of system cores,
-e.g. 2x or 3x the number of system cores.
+If you have a case where some blocking is unavoidable, set the number of worker threads to a multiple of the number of system cores, such as 2x or 3x.
 :::
 
 ## Shutdown
 
-Shutting down a `Runtime` will stop all of the master and outstation communication associated with it. This is typically the last DNP3-related
-operation your program should perform before exit.
+When you shut down a `Runtime`, it stops all tasks associated with it. This is typically the last operation your program should perform before exit.
 
 <Tabs
 groupId="language"
@@ -136,8 +125,7 @@ Runtime shutdown is implicit in Rust when tokio::main returns.
 ```
 
 :::note
-If you don't call `shutdown` before exiting, the JVM will shutdown the runtime in its finalize method, however, garbage collection is not deterministic
-and your program may never properly exit. It is best to explicitly shut down the runtime before exiting.
+If you don't call `Shutdown` before exiting, the JVM will shutdown the runtime in its finalize method. However, garbage collection is not deterministic, so your program may never properly exit. Make sure you explicitly shut down the runtime before exiting.
 :::
 
 </TabItem>
@@ -148,8 +136,7 @@ and your program may never properly exit. It is best to explicitly shut down the
 ```
 
 :::note
-If you don't call `Shutdown` before exiting, the .NET runtime will shut down the runtime in its finalizer (aka destructor), however, you shouldn't rely
-on this behavior. It is best to explicitly shut down the runtime before exiting.
+If you don't call `Shutdown` before exiting, the .NET runtime will shut down the runtime in its finalizer (also called the destructor). Again, you should explicitly shut down the runtime before exiting instead of relying on this behavior.
 :::
 
 </TabItem>

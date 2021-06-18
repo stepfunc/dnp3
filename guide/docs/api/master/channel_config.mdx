@@ -8,16 +8,14 @@ slug: /api/master/channel/config
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `MasterChannelConfig` struct contains generic settings common to all communication channels:
+The `MasterChannelConfig` struct contains the following generic settings that are common to all communication channels:
 
-* Address of the master station (different addresses may be used for different channels)
+* Master station address (different addresses may be used for different channels)
 * Initial decoding level
-* Timeout for responses from the outstation(s)
+* Timeout for responses from each outstation
 * Transmit and receive buffer sizes
 
-The constructor takes the master address and has reasonable defaults for all of the other settings. The default response timeout of 5 seconds
-may need to need to be increased for high-latency communication links.  The default buffer sizes of 2048 bytes should only need to be adjusted
-if an outstation has a non-standard configuration.
+The constructor takes the master address and has reasonable defaults for all other settings. The default response timeout is 5 seconds; you may need to increase it for high-latency communication links. You should only need to adjust the default buffer size of 2,048 bytes if an outstation has a non-standard configuration.
 
 <Tabs
 groupId="language"

@@ -1,6 +1,6 @@
 ---
 id: guide
-title: This Guide
+title: About This Guide
 sidebar_label: Guide
 slug: /guide
 ---
@@ -8,37 +8,38 @@ slug: /guide
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import sitedata from '../../sitedata.json'
 
-This guide is the primary documentation for Step Function I/O's DNP3 [library](https://github.com/stepfunc/dnp3). It covers:
+This guide provides the primary documentation for Step Function I/O's DNP3 [library](https://github.com/stepfunc/dnp3). Here you'll find:
 
-* What parts of DNP3 the library implements
+* Which parts of DNP3 the library implements
 * How to use the library's Application Programming Interface (API)
 * How the API maps to DNP3 concepts
-* Where to obtain pre-built binary distributions of the library for supported languages
-* How to build the core Rust library and the bindings from source
+* How to get pre-built binary distributions of the library for supported languages
+* How to build the core Rust library and bindings from the source
 
-The guide defers the exhaustive details of every field, method, and argument to the language-specific API documentation
-extracted from the source code itself:
+You can find exhaustive details for every field, method, and argument to the language-specific API documentation here:
 
 * <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/rust/dnp3/`}>Rust (rustdoc)</a>
 * <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/c/dnp3_8h.html`}>C (doxygen)</a>
 * <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/java/`}>Java (javadoc)</a>
 * <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/dotnet/namespacednp3.html`}>C# (doxygen)</a>
 
-In addition to the documentation, example programs may be found in the source repository that demonstrate the usage
-of the most common API features for each language.
+In addition to this documentation, you can find example programs in the source repository that demonstrate the most common API features for each language.
 
 ## IEEE-1815
 
-If you plan to develop a product that uses DNP3, a copy of the standard will be indispensable. A copy may be purchased from the
-[DNP3 Users Group](https://dnp.org) or [IEEE](https://standards.ieee.org/standard/1815-2012.html). We recommend that you join the user group to obtain a copy
-of the standard as this provides access to a wealth of additional documents and a forum.
+Please note that while this guide covers some DNP3 concepts, it doesn't replicate the DNP3 standard itself. If you plan to develop a product that uses DNP3, a copy of the standard is indispensable. Purchase your copy from [DNP3 Users Group](https://dnp.org) or [IEEE](https://standards.ieee.org/standard/1815-2012.html).
 
 <div style={{textAlign: 'center'}}>
-<a href="https://dnp.org"><img alt="DNP3 logo" src={useBaseUrl('img/dnp_logo.jpg')} /></a>
+    <a href="https://dnp.org"><img alt="DNP3 logo" src={useBaseUrl('img/dnp_logo.jpg')} /></a>
 </div>
 
-This guide is not a replacement for the DNP3 standard itself. While it covers some DNP3 concepts, the standard is over 800 pages in length and cannot be
-replicated here.
+:::tip
+If you join the user group to get your copy of the standard you'll also get access to additional valuable documentation along with a forum.
+:::
+
+
+
+
 
 
 

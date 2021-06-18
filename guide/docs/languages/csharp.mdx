@@ -7,43 +7,39 @@ slug: /c_sharp
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-The C# bindings are distributed as a [Nuget package](https://www.nuget.org/packages/dnp3) and uses [P/Invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke)
-to call the same native library functions used by the C library. The assembly only requires is .NET standard 2.0 compatible and includes platform-specific
-shared libraries for 64-bit Windows and Linux that are automatically loaded by the .NET runtime.
+We distribute the C# bindings as a [Nuget package](https://www.nuget.org/packages/dnp3). Internally, the C API is called using [P/Invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke)
+The bindings are .NET standard 2.0 compatible and include platform-specific shared libraries for 64-bit Windows and Linux. They are automatically loaded by the .NET runtime.
 
 ## Mapping
 
-C# is an object-oriented language and has support for all of the abstract patterns modeled in the code generator. This section describes those mappings.
+C# is an object-oriented language that supports all the abstract patterns modeled in the code generator. Here's what you need to know.
 
 ### Errors
 
-C API errors are transformed into exceptions containing the error enum.
+C API errors are transformed into exceptions that contain the error `enum`.
 
 :::warning
-Uncaught exceptions thrown in callbacks will cause the program to terminate. User code should always wrap callback logic with `try/catch` syntax if there
-is a possibility the callback will throw.
+Uncaught exceptions thrown in callbacks will terminate the program. Your code should always wrap callback logic with `try/catch` syntax if there's a chance that the callback will throw.
 :::
 
 ### Iterators
 
-Iterators are transformed into `ICollection<T>` by the code generator. This means that the collections returned by callbacks may be
-used outside the callback, e.g. sent to another thread for processing.
+The code generator transforms iterators into `ICollection<T>`. This means that the collections returned by callbacks may be used outside the callback. For example, you can send them to another thread for processing.
 
 ### Structs
 
-Native structs are mapped to C# classes. They have public member visibility and the constructor ensures that all values are initialized properly.
+Native structs are mapped to C# classes. They have public member visibility, and the constructor ensures that all values are initialized.
 
 ### Classes
 
-Abstract classes are mapped to C# classes. They have a private pointer to the underlying native resource. There are two types of generated classes in C#: ones
-that only have a private finalizer and ones that also provide a public `Shutdown` method.
-
-The types that provide a `Shutdown` method represent long-lived resources like a `Runtime`, `Master`, or `TCPServer`.  Under the hood, they map to an asynchronous
-Rust task executing on the Tokio runtime. The `Shutdown` method allows the user to precisely control when the resource/task will stop.
-
-Types that do not provide a `Shutdown` method are automatically garbage collected, and native resources are deallocated in the class's finalize method. These
+Abstract classes are mapped to C# classes. They have a private pointer to the underlying native resource. There are two types of generated classes in C#:
+* Generated classes that only have a private finalizer: These are automatically garbage collected, while native resources are deallocated in the class's finalize method. These
 types of classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`.
+* Generated classes that also provide a public `Shutdown` method: These represent long-lived resources such as `Runtime`, `Master`, or `TCPServer`. They map to an asynchronous
+Rust task executing on the Tokio runtime. The `Shutdown` method lets you precisely control when the resource/task will stop.
+
+
 
 ### Asynchronous Methods
 
-Abstract asynchronous methods are transformed into methods that return `Task<T>`. Users may then block on the task or `await` it in an async method.
+Abstract asynchronous methods are transformed into methods that return `Task<T>`. You can block on the task or `await` it in an async method.

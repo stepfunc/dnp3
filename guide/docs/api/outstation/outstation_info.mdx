@@ -8,12 +8,8 @@ slug: /api/outstation/information
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `OutstationInformation` interface provides informational callbacks about the state of the outstation. They can be used to assess
-communication health or counters of some sort. These callbacks don't provide any information that the outstations needs to operate and doing anything
-useful with them is purely optional.
-
-Among other things, user code can be informed when:
+The `OutstationInformation` interface delivers informational callbacks about the state of the outstation. While these callbacks don't provide any information that the outstation needs to operate, they can be used to assess communication health or other optional use cases. Examples include:
 
 * The outstation receives a request using a particular function code
 * A solicited or unsolicited confirmation timeout occurs
-* A confirm arrives after the timeout or in the wrong state (`unexpectedConfirm`)
+* A confirmation arrives after the timeout or in the wrong state

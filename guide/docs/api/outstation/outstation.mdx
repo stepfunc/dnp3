@@ -1,6 +1,6 @@
 ---
 id: outstation
-title: Outstation
+title: Outstation Class
 sidebar_label: Outstation
 slug: /api/outstation/outstation_handle
 ---
@@ -8,9 +8,12 @@ slug: /api/outstation/outstation_handle
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `Outstation` class represents an asynchronous task that implements the DNP3 outstation state machine and responds
-to requests from a single master. It provides provides transactional access to the `Database` for configuring and modifying the values
-sent to the master. Database interaction is covered in the next section.
+The `Outstation` class corresponds to an asynchronous task that implements the outstation state machine and responds to requests from a single master. In addition, it provides transactional access to the `Database` for configuring and modifying the values
+sent to the master. We'll cover database interaction in the next section.
 
-In addition to accessing the Database, this class allows the user to modify the `DecodeLevel` of the running outstation. This can be extremely
-useful in production environments for debugging communications between a master and the outstation.
+In addition to accessing the Database, this class lets you modify the `DecodeLevel` of the running outstation. This can be extremely useful in production environments for debugging communications between a master and the outstation.
+
+:::tip
+The Outstation class has the same interface regardless of which transport-specific method you used to create it. This allows you to treat an Outstation operating
+over TCP or serial identically.
+:::
