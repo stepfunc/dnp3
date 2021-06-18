@@ -1,6 +1,6 @@
 [package]
 name = "dnp3"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Adam Crain <adam@stepfunc.io>", "Émile Grégoire <emile@stepfunc.io>"]
 edition = "2018"
 
@@ -9,7 +9,7 @@ tracing = "0.1"
 chrono = "0.4"
 tokio-mock = { git = "https://github.com/stepfunc/tokio-mock.git", branch="master" }
 tokio-serial = { git = "https://github.com/stepfunc/tokio-serial.git", branch="v4.4.0", default-features = false }
-xxhash-rust = { version = "0.8.0-beta.5", features = ["xxh64"] }
+xxhash-rust = { version = "0.8.2", features = ["xxh64"] }
 
 [dev-dependencies]
 assert_matches = "1.2"

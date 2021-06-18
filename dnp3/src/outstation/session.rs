@@ -622,7 +622,7 @@ impl OutstationSession {
         Some(Response::new(header, cursor.written().len()))
     }
 
-    #[allow(clippy::clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     async fn perform_unsolicited_response_series(
         &mut self,
         database: &mut DatabaseHandle,
