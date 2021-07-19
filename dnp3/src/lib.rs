@@ -16,7 +16,6 @@
 //! <https://stepfunc.io/contact/>
 
 #![deny(
-dead_code,
 arithmetic_overflow,
 invalid_type_param_default,
 missing_fragment_specifier,

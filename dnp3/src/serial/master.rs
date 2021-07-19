@@ -118,40 +118,40 @@ impl MasterTask {
 
     async fn run_enabled(&mut self) -> Result<(), StateChange> {
         loop {
-            match crate::serial::open(self.path.as_str(), self.serial_settings) {
-                Err(err) => {
-                    tracing::warn!(
-                        "{} - waiting {} ms to re-open port",
-                        err,
-                        self.retry_delay.as_millis()
-                    );
-                    self.listener.update(PortState::Wait(self.retry_delay));
-                    self.session.wait_for_retry(self.retry_delay).await?;
-                }
-                Ok(serial) => {
-                    let mut io = PhysLayer::Serial(serial);
-                    tracing::info!("serial port open");
-                    self.listener.update(PortState::Open);
-                    match self
-                        .session
-                        .run(&mut io, &mut self.writer, &mut self.reader)
-                        .await
-                    {
-                        RunError::State(x) => {
-                            return Err(x);
-                        }
-                        RunError::Link(err) => {
-                            tracing::warn!("serial port error: {}", err);
-                            tracing::info!(
-                                "waiting {} ms to re-open",
-                                self.retry_delay.as_millis()
-                            );
-                            self.listener.update(PortState::Wait(self.retry_delay));
-                            self.session.wait_for_retry(self.retry_delay).await?;
-                        }
-                    }
-                }
-            }
+            // match crate::serial::open(self.path.as_str(), self.serial_settings) {
+            //     Err(err) => {
+            //         tracing::warn!(
+            //             "{} - waiting {} ms to re-open port",
+            //             err,
+            //             self.retry_delay.as_millis()
+            //         );
+            //         self.listener.update(PortState::Wait(self.retry_delay));
+            //         self.session.wait_for_retry(self.retry_delay).await?;
+            //     }
+            //     Ok(serial) => {
+            //         let mut io = PhysLayer::Serial(serial);
+            //         tracing::info!("serial port open");
+            //         self.listener.update(PortState::Open);
+            //         match self
+            //             .session
+            //             .run(&mut io, &mut self.writer, &mut self.reader)
+            //             .await
+            //         {
+            //             RunError::State(x) => {
+            //                 return Err(x);
+            //             }
+            //             RunError::Link(err) => {
+            //                 tracing::warn!("serial port error: {}", err);
+            //                 tracing::info!(
+            //                     "waiting {} ms to re-open",
+            //                     self.retry_delay.as_millis()
+            //                 );
+            //                 self.listener.update(PortState::Wait(self.retry_delay));
+            //                 self.session.wait_for_retry(self.retry_delay).await?;
+            //             }
+            //         }
+            //     }
+            // }
         }
     }
 }

@@ -16,17 +16,7 @@ pub struct SerialSettings {
 }
 
 impl SerialSettings {
-    pub(crate) fn apply(
-        &self,
-        builder: tokio_serial::SerialPortBuilder,
-    ) -> tokio_serial::SerialPortBuilder {
-        builder
-            .baud_rate(self.baud_rate)
-            .data_bits(self.data_bits)
-            .flow_control(self.flow_control)
-            .stop_bits(self.stop_bits)
-            .parity(self.parity)
-    }
+
 }
 
 impl Default for SerialSettings {
@@ -41,14 +31,9 @@ impl Default for SerialSettings {
     }
 }
 
-pub(crate) fn open(path: &str, settings: SerialSettings) -> tokio_serial::Result<TTYPort> {
-    let builder = settings.apply(tokio_serial::new(path, settings.baud_rate));
-    TTYPort::open(&builder)
-}
 
 pub use master::*;
 pub use outstation::*;
-use tokio_serial::TTYPort;
 
 mod master;
 mod outstation;

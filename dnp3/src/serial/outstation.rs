@@ -55,8 +55,8 @@ pub fn create_outstation_serial(
     application: Box<dyn OutstationApplication>,
     information: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
-) -> std::io::Result<(impl Future<Output = ()> + 'static, OutstationHandle)> {
-    let serial = crate::serial::open(path, settings)?;
+) -> std::io::Result<(impl Future<Output=()> + 'static, OutstationHandle)> {
+    // let serial = crate::serial::open(path, settings)?;
     let (mut task, handle) = OutstationTask::create(
         LinkErrorMode::Discard,
         config,
@@ -66,13 +66,13 @@ pub fn create_outstation_serial(
         control_handler,
     );
 
-    let log_path = path.to_owned();
+    // let log_path = path.to_owned();
     let future = async move {
-        let mut io = PhysLayer::Serial(serial);
-        let _ = task
-            .run(&mut io)
-            .instrument(tracing::info_span!("DNP3-Master-Serial", "port" = ?log_path))
-            .await;
+        // let mut io = PhysLayer::Serial(serial);
+        // let _ = task
+        //     .run(&mut io)
+        //     .instrument(tracing::info_span!("DNP3-Master-Serial", "port" = ?log_path))
+        //     .await;
     };
     Ok((future, handle))
 }
