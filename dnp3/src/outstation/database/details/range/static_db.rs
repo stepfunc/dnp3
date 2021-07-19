@@ -340,7 +340,7 @@ impl StaticDatabase {
                         x.config.class.map(|ec| (x.config.e_var, ec))
                     }
                     EventMode::Detect => {
-                        if x.config.detector.is_event(&x.last_event, &value) {
+                        if x.config.detector.is_event(&x.last_event, value) {
                             x.last_event = value.clone();
                             x.config.class.map(|ec| (x.config.e_var, ec))
                         } else {

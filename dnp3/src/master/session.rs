@@ -532,7 +532,7 @@ impl MasterSession {
                         match reader.pop_response() {
                             Some(TransportResponse::Response(source, response)) => {
                                 self.notify_link_activity(source);
-                                let action = self.process_read_response(destination, is_first, seq, &task, io, writer, source, response).await?;
+                                let action = self.process_read_response(destination, is_first, seq, task, io, writer, source, response).await?;
                                 match action {
                                     // continue reading responses on the inner loop
                                     ReadResponseAction::Ignore => continue,

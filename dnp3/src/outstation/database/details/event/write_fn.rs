@@ -80,7 +80,7 @@ pub(crate) fn write_octet_string(
     index: u16,
 ) -> Result<Continue, WriteError> {
     cursor.write_u16_le(index)?;
-    cursor.write(&event)?;
+    cursor.write(event)?;
     Ok(Continue::Ok)
 }
 

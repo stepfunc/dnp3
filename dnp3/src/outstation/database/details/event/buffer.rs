@@ -552,7 +552,7 @@ impl EventBuffer {
                 break; // out of space
             }
 
-            counters.increment(&record);
+            counters.increment(record);
             record.state.set(EventState::Written);
             count += 1;
         }
