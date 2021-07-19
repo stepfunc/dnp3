@@ -1,4 +1,4 @@
-pub use tokio_serial::{DataBits, FlowControl, Parity, StopBits};
+pub use tokio_serial::{DataBits, FlowControl, Parity, SerialStream, StopBits};
 
 /// serial port settings
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -41,14 +41,13 @@ impl Default for SerialSettings {
     }
 }
 
-pub(crate) fn open(path: &str, settings: SerialSettings) -> tokio_serial::Result<TTYPort> {
+pub(crate) fn open(path: &str, settings: SerialSettings) -> tokio_serial::Result<SerialStream> {
     let builder = settings.apply(tokio_serial::new(path, settings.baud_rate));
-    TTYPort::open(&builder)
+    SerialStream::open(&builder)
 }
 
 pub use master::*;
 pub use outstation::*;
-use tokio_serial::TTYPort;
 
 mod master;
 mod outstation;
