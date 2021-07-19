@@ -4,7 +4,7 @@ use crate::tokio::io::{AsyncReadExt, AsyncWriteExt};
 // encapsulates all possible physical layers as an enum
 pub(crate) enum PhysLayer {
     Tcp(crate::tokio::net::TcpStream),
-    Serial(tokio_serial::TTYPort),
+    Serial(tokio_serial::SerialStream),
     #[cfg(test)]
     Mock(tokio_mock::mock::test::io::MockIO),
 }
