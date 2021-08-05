@@ -4,6 +4,7 @@ use crate::tokio::io::{AsyncReadExt, AsyncWriteExt};
 // encapsulates all possible physical layers as an enum
 pub(crate) enum PhysLayer {
     Tcp(crate::tokio::net::TcpStream),
+    Tls(tokio_rustls::TlsStream<crate::tokio::net::TcpStream>),
     Serial(tokio_serial::SerialStream),
     #[cfg(test)]
     Mock(tokio_mock::mock::test::io::MockIO),
@@ -13,6 +14,7 @@ impl std::fmt::Debug for PhysLayer {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             PhysLayer::Tcp(_) => f.write_str("Tcp"),
+            PhysLayer::Tls(_) => f.write_str("TLS"),
             PhysLayer::Serial(_) => f.write_str("Serial"),
             #[cfg(test)]
             PhysLayer::Mock(_) => f.write_str("Mock"),
@@ -28,6 +30,7 @@ impl PhysLayer {
     ) -> Result<usize, std::io::Error> {
         let length = match self {
             Self::Tcp(x) => x.read(buffer).await?,
+            Self::Tls(x) => x.read(buffer).await?,
             Self::Serial(x) => x.read(buffer).await?,
             #[cfg(test)]
             Self::Mock(x) => x.read(buffer).await?,
@@ -53,6 +56,7 @@ impl PhysLayer {
 
         match self {
             Self::Tcp(x) => x.write_all(data).await,
+            Self::Tls(x) => x.write_all(data).await,
             Self::Serial(x) => x.write_all(data).await,
             #[cfg(test)]
             Self::Mock(x) => x.write_all(data).await,
