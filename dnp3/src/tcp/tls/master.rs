@@ -9,7 +9,7 @@ use tracing::Instrument;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::tcp::tls::TlsError;
+use crate::tcp::tls::{load_certs, load_private_key, TlsError};
 use crate::tcp::EndpointList;
 use crate::tcp::{ClientState, MasterTask, MasterTaskConnectionHandler};
 use crate::tokio::net::TcpStream;
@@ -80,7 +80,7 @@ pub fn create_master_tls_client(
 }
 
 impl TlsClientConfig {
-    /// Create a TLS config with TLS 1.2 and 1.3 support.
+    /// Create a TLS master config
     pub fn new(
         name: &str,
         peer_cert_path: &Path,
@@ -145,49 +145,5 @@ impl TlsClientConfig {
                 stream,
             )))),
         }
-    }
-}
-
-fn load_certs(path: &Path, is_local: bool) -> Result<Vec<rustls::Certificate>, TlsError> {
-    let map_error_fn = match is_local {
-        false => |err| TlsError::InvalidPeerCertificate(err),
-        true => |err| TlsError::InvalidLocalCertificate(err),
-    };
-
-    let f = std::fs::File::open(path).map_err(map_error_fn)?;
-    let mut f = io::BufReader::new(f);
-
-    let certs = rustls_pemfile::certs(&mut f)
-        .map_err(map_error_fn)?
-        .iter()
-        .map(|data| rustls::Certificate(data.clone()))
-        .collect::<Vec<_>>();
-
-    match certs.len() {
-        0 => Err(map_error_fn(io::Error::new(
-            ErrorKind::InvalidData,
-            "no certificate in pem file",
-        ))),
-        _ => Ok(certs),
-    }
-}
-
-fn load_private_key(path: &Path) -> Result<rustls::PrivateKey, TlsError> {
-    let f = std::fs::File::open(path).map_err(TlsError::InvalidPrivateKey)?;
-    let mut f = io::BufReader::new(f);
-
-    match rustls_pemfile::read_one(&mut f).map_err(TlsError::InvalidPrivateKey)? {
-        Some(rustls_pemfile::Item::RSAKey(key)) => Ok(rustls::PrivateKey(key)),
-        Some(rustls_pemfile::Item::PKCS8Key(key)) => Ok(rustls::PrivateKey(key)),
-        Some(rustls_pemfile::Item::X509Certificate(_)) => {
-            Err(TlsError::InvalidPrivateKey(io::Error::new(
-                ErrorKind::InvalidData,
-                "file contains cert, not private key",
-            )))
-        }
-        None => Err(TlsError::InvalidPrivateKey(io::Error::new(
-            ErrorKind::InvalidData,
-            "file does not contain private key",
-        ))),
     }
 }
