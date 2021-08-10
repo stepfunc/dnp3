@@ -1,21 +1,25 @@
 use std::future::Future;
-use std::sync::Arc;
-use std::time::Duration;
+use std::io::{self, ErrorKind};
+use std::net::SocketAddr;
+use std::path::Path;
 
+use tokio_rustls::{rustls, webpki};
 use tracing::Instrument;
 
-use crate::app::{ConnectStrategy, ExponentialBackOff, Listener};
-use crate::app::{RetryStrategy, Shutdown};
+use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
-use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::tcp::ClientState;
+use crate::tcp::tls::TlsError;
 use crate::tcp::EndpointList;
-use crate::tcp::tls::TlsConfig;
+use crate::tcp::{ClientState, MasterTask, MasterTaskConnectionHandler};
 use crate::tokio::net::TcpStream;
-use crate::transport::TransportReader;
-use crate::transport::TransportWriter;
 use crate::util::phys::PhysLayer;
+
+/// TLS configuration
+pub struct TlsClientConfig {
+    dns_name: webpki::DnsName,
+    config: std::sync::Arc<rustls::ClientConfig>,
+}
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.
@@ -26,7 +30,7 @@ pub fn spawn_master_tls_client(
     link_error_mode: LinkErrorMode,
     config: MasterChannelConfig,
     endpoints: EndpointList,
-    tls_config: TlsConfig,
+    tls_config: TlsClientConfig,
     connect_strategy: ConnectStrategy,
     listener: Box<dyn Listener<ClientState>>,
 ) -> MasterChannel {
@@ -54,7 +58,7 @@ pub fn create_master_tls_client(
     link_error_mode: LinkErrorMode,
     config: MasterChannelConfig,
     endpoints: EndpointList,
-    tls_config: TlsConfig,
+    tls_config: TlsClientConfig,
     connect_strategy: ConnectStrategy,
     listener: Box<dyn Listener<ClientState>>,
 ) -> (impl Future<Output = ()> + 'static, MasterChannel) {
@@ -63,167 +67,127 @@ pub fn create_master_tls_client(
         link_error_mode,
         endpoints,
         config,
-        tls_config,
         connect_strategy,
+        MasterTaskConnectionHandler::Tls(tls_config),
         listener,
     );
     let future = async move {
         task.run()
-            .instrument(tracing::info_span!("DNP3-Master-TCP", "endpoint" = ?main_addr))
+            .instrument(tracing::info_span!("DNP3-Master-TLS", "endpoint" = ?main_addr))
             .await;
     };
     (future, handle)
 }
 
-struct MasterTask {
-    endpoints: EndpointList,
-    back_off: ExponentialBackOff,
-    reconnect_delay: Duration,
-    session: MasterSession,
-    reader: TransportReader,
-    writer: TransportWriter,
-    tls_config: TlsConfig,
-    listener: Box<dyn Listener<ClientState>>,
+impl TlsClientConfig {
+    /// Create a TLS config with TLS 1.2 and 1.3 support.
+    pub fn new(
+        name: &str,
+        peer_cert_path: &Path,
+        local_cert_path: &Path,
+        private_key_path: &Path,
+        allow_tls_1_2: bool,
+    ) -> Result<Self, TlsError> {
+        let peer_certs = load_certs(peer_cert_path, false)?;
+        let local_certs = load_certs(local_cert_path, true)?;
+        let private_key = load_private_key(private_key_path)?;
+
+        let mut config = rustls::ClientConfig::new();
+
+        // Add peer certificates
+        for cert in &peer_certs {
+            config.root_store.add(cert).map_err(|err| {
+                TlsError::InvalidPeerCertificate(io::Error::new(
+                    ErrorKind::InvalidData,
+                    err.to_string(),
+                ))
+            })?;
+        }
+
+        // Set local cert chain
+        config
+            .set_single_client_cert(local_certs, private_key)
+            .map_err(|err| {
+                TlsError::InvalidLocalCertificate(io::Error::new(
+                    ErrorKind::InvalidData,
+                    err.to_string(),
+                ))
+            })?;
+
+        // Set allowed TLS versions
+        config.versions = vec![rustls::ProtocolVersion::TLSv1_3];
+        if allow_tls_1_2 {
+            config.versions.push(rustls::ProtocolVersion::TLSv1_2);
+        }
+
+        let dns_name = webpki::DnsNameRef::try_from_ascii_str(name)
+            .map_err(|_| TlsError::InvalidDnsName)?
+            .to_owned();
+
+        Ok(Self {
+            config: std::sync::Arc::new(config),
+            dns_name,
+        })
+    }
+
+    pub(crate) async fn handle_connection(
+        &mut self,
+        socket: TcpStream,
+        endpoint: &SocketAddr,
+    ) -> Result<PhysLayer, String> {
+        let connector = tokio_rustls::TlsConnector::from(self.config.clone());
+        match connector.connect(self.dns_name.as_ref(), socket).await {
+            Err(err) => Err(format!(
+                "failed to establish TLS session with {}: {}",
+                endpoint, err
+            )),
+            Ok(stream) => Ok(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
+                stream,
+            )))),
+        }
+    }
 }
 
-impl MasterTask {
-    fn new(
-        link_error_mode: LinkErrorMode,
-        endpoints: EndpointList,
-        config: MasterChannelConfig,
-        tls_config: TlsConfig,
-        connect_strategy: ConnectStrategy,
-        listener: Box<dyn Listener<ClientState>>,
-    ) -> (Self, MasterChannel) {
-        let (tx, rx) = crate::util::channel::request_channel();
-        let session = MasterSession::new(
-            false,
-            config.decode_level,
-            config.response_timeout,
-            config.tx_buffer_size,
-            rx,
-        );
-        let (reader, writer) = crate::transport::create_master_transport_layer(
-            link_error_mode,
-            config.master_address,
-            config.rx_buffer_size,
-        );
-        let task = Self {
-            endpoints,
-            back_off: ExponentialBackOff::new(RetryStrategy::new(
-                connect_strategy.min_connect_delay,
-                connect_strategy.max_connect_delay,
-            )),
-            reconnect_delay: connect_strategy.reconnect_delay,
-            session,
-            reader,
-            writer,
-            tls_config,
-            listener,
-        };
-        (task, MasterChannel::new(tx))
-    }
+fn load_certs(path: &Path, is_local: bool) -> Result<Vec<rustls::Certificate>, TlsError> {
+    let map_error_fn = match is_local {
+        false => |err| TlsError::InvalidPeerCertificate(err),
+        true => |err| TlsError::InvalidLocalCertificate(err),
+    };
 
-    async fn run(&mut self) {
-        let _ = self.run_impl().await;
-        self.session.shutdown().await;
-        self.listener.update(ClientState::Shutdown);
-    }
+    let f = std::fs::File::open(path).map_err(map_error_fn)?;
+    let mut f = io::BufReader::new(f);
 
-    async fn run_impl(&mut self) -> Result<(), Shutdown> {
-        loop {
-            self.listener.update(ClientState::Disabled);
-            self.session.wait_for_enabled().await?;
-            if let Err(StateChange::Shutdown) = self.run_connection().await {
-                return Err(Shutdown);
-            }
+    let certs = rustls_pemfile::certs(&mut f)
+        .map_err(map_error_fn)?
+        .iter()
+        .map(|data| rustls::Certificate(data.clone()))
+        .collect::<Vec<_>>();
+
+    match certs.len() {
+        0 => Err(map_error_fn(io::Error::new(
+            ErrorKind::InvalidData,
+            "no certificate in pem file",
+        ))),
+        _ => Ok(certs),
+    }
+}
+
+fn load_private_key(path: &Path) -> Result<rustls::PrivateKey, TlsError> {
+    let f = std::fs::File::open(path).map_err(TlsError::InvalidPrivateKey)?;
+    let mut f = io::BufReader::new(f);
+
+    match rustls_pemfile::read_one(&mut f).map_err(TlsError::InvalidPrivateKey)? {
+        Some(rustls_pemfile::Item::RSAKey(key)) => Ok(rustls::PrivateKey(key)),
+        Some(rustls_pemfile::Item::PKCS8Key(key)) => Ok(rustls::PrivateKey(key)),
+        Some(rustls_pemfile::Item::X509Certificate(_)) => {
+            Err(TlsError::InvalidPrivateKey(io::Error::new(
+                ErrorKind::InvalidData,
+                "file contains cert, not private key",
+            )))
         }
-    }
-
-    async fn run_connection(&mut self) -> Result<(), StateChange> {
-        loop {
-            self.run_one_connection().await?;
-        }
-    }
-
-    async fn run_one_connection(&mut self) -> Result<(), StateChange> {
-        if let Some(endpoint) = self.endpoints.next_address().await {
-            self.listener.update(ClientState::Connecting);
-            match TcpStream::connect(endpoint).await {
-                Err(err) => {
-                    let delay = self.back_off.on_failure();
-                    tracing::warn!(
-                        "failed to connect to {}: {} - waiting {} ms to retry",
-                        endpoint,
-                        err,
-                        delay.as_millis()
-                    );
-                    self.on_connection_failure(delay).await
-                }
-                Ok(socket) => {
-                    // Establish SSL session
-                    let config = self.tls_config.to_client_config();
-                    let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
-                    let dnsname = self.tls_config.dns_name();
-
-                    match connector.connect(dnsname, socket).await {
-                        Err(err) => {
-                            let delay = self.back_off.on_failure();
-                            tracing::warn!(
-                                "failed to establish TLS session with {}: {} - waiting {} ms to retry",
-                                endpoint,
-                                err,
-                                delay.as_millis()
-                            );
-                            self.on_connection_failure(delay).await
-                        }
-                        Ok(stream) => {
-                            tracing::info!("connected to {}", endpoint);
-                            self.endpoints.reset();
-                            self.back_off.on_success();
-                            self.listener.update(ClientState::Connected);
-                            self.run_socket(stream).await
-                        }
-                    }
-                }
-            }
-        } else {
-            let delay = self.back_off.on_failure();
-            tracing::warn!(
-                "Name resolution failure - waiting {} ms to retry",
-                delay.as_millis()
-            );
-            self.on_connection_failure(delay).await
-        }
-    }
-
-    async fn run_socket(&mut self, socket: tokio_rustls::client::TlsStream<TcpStream>) -> Result<(), StateChange> {
-        let mut io = PhysLayer::Tls(tokio_rustls::TlsStream::from(socket));
-        match self
-            .session
-            .run(&mut io, &mut self.writer, &mut self.reader)
-            .await
-        {
-            RunError::State(s) => Err(s),
-            RunError::Link(err) => {
-                tracing::warn!("connection lost - {}", err);
-                if self.reconnect_delay > Duration::from_secs(0) {
-                    tracing::warn!(
-                        "waiting {} ms to reconnect",
-                        self.reconnect_delay.as_millis()
-                    );
-                    self.listener
-                        .update(ClientState::WaitAfterDisconnect(self.reconnect_delay));
-                    self.session.wait_for_retry(self.reconnect_delay).await?;
-                }
-                Ok(())
-            }
-        }
-    }
-
-    async fn on_connection_failure(&mut self, delay: Duration) -> Result<(), StateChange> {
-        self.listener
-            .update(ClientState::WaitAfterFailedConnect(delay));
-        self.session.wait_for_retry(delay).await
+        None => Err(TlsError::InvalidPrivateKey(io::Error::new(
+            ErrorKind::InvalidData,
+            "file does not contain private key",
+        ))),
     }
 }
