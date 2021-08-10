@@ -6,3 +6,6 @@ members = [
     "ffi/dnp3-ffi",
     "ffi/dnp3-bindings",
 ]
+
+[patch.crates-io]
+webpki = { git = "https://github.com/stepfunc/webpki", commit = "deab578682fda0db6cfb941809b7d5f9c142fda4" }

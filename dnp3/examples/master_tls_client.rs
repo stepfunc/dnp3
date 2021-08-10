@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 use std::time::Duration;
 
 use tokio_stream::StreamExt;
@@ -9,8 +9,8 @@ use dnp3::app::*;
 use dnp3::decode::*;
 use dnp3::link::*;
 use dnp3::master::*;
-use dnp3::tcp::*;
 use dnp3::tcp::tls::*;
+use dnp3::tcp::*;
 
 // ANCHOR: master_channel_config
 fn get_master_channel_config() -> Result<MasterChannelConfig, Box<dyn std::error::Error>> {
@@ -56,10 +56,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
     // ANCHOR_END: logging
 
-    let tls_config = TlsConfig::new("test.com".to_owned(),
-    PathBuf::from("./certs/ca_chain/ca_cert.pem"),
-    PathBuf::from("./certs/ca_chain/entity1_cert.pem"),
-    PathBuf::from("./certs/ca_chain/entity1_key.pem"));
+    let tls_config = TlsClientConfig::new(
+        "test.com",
+        &Path::new("./certs/self_signed/entity2_cert.pem"),
+        &Path::new("./certs/self_signed/entity1_cert.pem"),
+        &Path::new("./certs/self_signed/entity1_key.pem"),
+        true,
+    )?;
 
     // spawn the master channel onto another task
     // ANCHOR: create_master_channel
@@ -76,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: association_create
     let mut association = channel
         .add_association(
-            EndpointAddress::from(1024)?,
+            EndpointAddress::from(10)?,
             get_association_config(),
             NullReadHandler::boxed(),
             DefaultAssociationHandler::boxed(),
