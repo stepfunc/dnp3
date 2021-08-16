@@ -42,6 +42,14 @@ target_link_libraries(master_example PRIVATE dnp3)
 add_executable(outstation_example outstation_example.c)
 target_link_libraries(outstation_example PRIVATE dnp3)
 
+# Master TLS example
+add_executable(master_tls_example master_tls_example.c)
+target_link_libraries(master_tls_example PRIVATE dnp3)
+
+# Outstation TLS example
+add_executable(outstation_tls_example outstation_tls_example.c)
+target_link_libraries(outstation_tls_example PRIVATE dnp3)
+
 # Copy the DLL after build
 add_custom_command(TARGET master_example POST_BUILD 
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:dnp3> $<TARGET_FILE_DIR:master_example>

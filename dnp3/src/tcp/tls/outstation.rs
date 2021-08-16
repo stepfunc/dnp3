@@ -3,7 +3,7 @@ use std::path::Path;
 
 use tokio_rustls::rustls;
 
-use crate::tcp::tls::{load_certs, load_private_key, TlsError};
+use crate::tcp::tls::{load_certs, load_private_key, MinTlsVersion, TlsError};
 use crate::tokio::net::TcpStream;
 use crate::util::phys::PhysLayer;
 
@@ -18,7 +18,7 @@ impl TlsServerConfig {
         peer_cert_path: &Path,
         local_cert_path: &Path,
         private_key_path: &Path,
-        allow_tls_1_2: bool,
+        min_tls_version: MinTlsVersion,
     ) -> Result<Self, TlsError> {
         let peer_certs = load_certs(peer_cert_path, false)?;
         let local_certs = load_certs(local_cert_path, true)?;
@@ -50,10 +50,7 @@ impl TlsServerConfig {
             })?;
 
         // Set allowed TLS versions
-        config.versions = vec![rustls::ProtocolVersion::TLSv1_3];
-        if allow_tls_1_2 {
-            config.versions.push(rustls::ProtocolVersion::TLSv1_2);
-        }
+        config.versions = min_tls_version.to_vec();
 
         Ok(Self {
             config: std::sync::Arc::new(config),

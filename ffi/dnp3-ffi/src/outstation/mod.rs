@@ -1,5 +1,6 @@
 use std::ffi::CStr;
 use std::net::AddrParseError;
+use std::path::Path;
 use std::time::Duration;
 
 pub use database::*;
@@ -8,6 +9,7 @@ use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::{BufferSize, ConnectionState, Feature, Features, OutstationConfig};
 use dnp3::outstation::{BufferSizeError, OutstationHandle};
+use dnp3::tcp::tls::TlsServerConfig;
 use dnp3::tcp::{FilterError, ServerHandle};
 pub use struct_constructors::*;
 
@@ -43,6 +45,30 @@ pub unsafe fn tcpserver_new(
     let address = address.to_string_lossy().parse()?;
 
     let server = dnp3::tcp::TcpServer::new(link_error_mode.into(), address);
+
+    Ok(Box::into_raw(Box::new(TcpServer {
+        runtime: runtime.handle(),
+        state: TcpServerState::Configuring(server),
+    })))
+}
+
+pub unsafe fn tcpserver_new_tls(
+    runtime: *mut Runtime,
+    link_error_mode: ffi::LinkErrorMode,
+    address: &CStr,
+    tls_config: ffi::TlsServerConfig,
+) -> Result<*mut TcpServer, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let address = address.to_string_lossy().parse()?;
+
+    let tls_config = TlsServerConfig::new(
+        Path::new(tls_config.peer_cert_path().to_string_lossy().as_ref()),
+        Path::new(tls_config.local_cert_path().to_string_lossy().as_ref()),
+        Path::new(tls_config.private_key_path().to_string_lossy().as_ref()),
+        tls_config.min_tls_version().into(),
+    )?;
+
+    let server = dnp3::tcp::TcpServer::new_tls_server(link_error_mode.into(), address, tls_config);
 
     Ok(Box::into_raw(Box::new(TcpServer {
         runtime: runtime.handle(),

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <Choose>
+    <When Condition="Exists('..\..\dnp3\dnp3.csproj')">
+      <ItemGroup>
+        <ProjectReference Include="..\..\dnp3\dnp3.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="dnp3" Version="0.9.1" />
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+</Project>

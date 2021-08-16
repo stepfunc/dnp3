@@ -58,10 +58,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let tls_config = TlsClientConfig::new(
         "test.com",
-        &Path::new("./certs/self_signed/entity2_cert.pem"),
-        &Path::new("./certs/self_signed/entity1_cert.pem"),
-        &Path::new("./certs/self_signed/entity1_key.pem"),
-        true,
+        &Path::new("./certs/ca_chain/ca_cert.pem"),
+        &Path::new("./certs/ca_chain/entity1_cert.pem"),
+        &Path::new("./certs/ca_chain/entity1_key.pem"),
+        MinTlsVersion::Tls1_2,
     )?;
 
     // spawn the master channel onto another task

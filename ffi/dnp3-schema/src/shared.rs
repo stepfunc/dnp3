@@ -16,6 +16,7 @@ pub struct SharedDefinitions {
     pub decode_level: NativeStructHandle,
     pub serial_port_settings: NativeStructHandle,
     pub link_error_mode: NativeEnumHandle,
+    pub min_tls_version: NativeEnumHandle,
     pub retry_strategy: NativeStructHandle,
     pub control_struct: NativeStructHandle,
     pub g12v1_struct: NativeStructHandle,
@@ -77,6 +78,10 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
             "Logging can only be configured once",
         )?
         .add_error("PointDoesNotExist", "Point does not exist")?
+        .add_error("InvalidPeerCertificate", "Invalid peer certificate file")?
+        .add_error("InvalidLocalCertificate", "Invalid local certificate file")?
+        .add_error("InvalidPrivateKey", "Invalid private key file")?
+        .add_error("InvalidDnsName", "Invalid DNS name")?
         .doc("Error type used throughout the library")?
         .build()?;
 
@@ -215,6 +220,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_params(lib)?,
         link_error_mode: define_link_error_mode(lib)?,
+        min_tls_version: define_min_tls_version(lib)?,
         control_struct,
         g12v1_struct,
         binary_point,
@@ -267,6 +273,14 @@ fn define_link_error_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, 
         .push("Discard", "Framing errors are discarded. The link-layer parser is reset on any error, and the parser begins scanning for 0x0564. This is always the behavior for serial ports.")?
         .push("Close", "Framing errors are bubbled up to calling code, closing the session. Suitable for physical layers that provide error correction like TCP.")?
         .doc("Controls how errors in parsed link-layer frames are handled. This behavior is configurable for physical layers with built-in error correction like TCP as the connection might be through a terminal server.")?
+        .build()
+}
+
+fn define_min_tls_version(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
+    lib.define_native_enum("MinTlsVersion")?
+        .push("Tls1_2", "TLS 1.2")?
+        .push("Tls1_3", "TLS 1.3")?
+        .doc("Minimum TLS version to allow")?
         .build()
 }
 
