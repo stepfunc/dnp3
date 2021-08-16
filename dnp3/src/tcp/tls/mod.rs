@@ -38,6 +38,27 @@ impl std::fmt::Display for TlsError {
 
 impl std::error::Error for TlsError {}
 
+/// Minimum TLS version to allow
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub enum MinTlsVersion {
+    /// TLS 1.2
+    Tls1_2,
+    /// TLS 1.3
+    Tls1_3,
+}
+
+impl MinTlsVersion {
+    fn to_vec(self) -> Vec<rustls::ProtocolVersion> {
+        match self {
+            Self::Tls1_2 => vec![
+                rustls::ProtocolVersion::TLSv1_3,
+                rustls::ProtocolVersion::TLSv1_2,
+            ],
+            Self::Tls1_3 => vec![rustls::ProtocolVersion::TLSv1_3],
+        }
+    }
+}
+
 fn load_certs(path: &Path, is_local: bool) -> Result<Vec<rustls::Certificate>, TlsError> {
     let map_error_fn = match is_local {
         false => |err| TlsError::InvalidPeerCertificate(err),

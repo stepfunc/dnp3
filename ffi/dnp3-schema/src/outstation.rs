@@ -47,6 +47,7 @@ pub fn define(
     let types = OutstationTypes::define(lib, shared_def)?;
     let outstation = define_outstation(lib, shared_def, &types)?;
     let address_filter = define_address_filter(lib, shared_def)?;
+    let tls_server_config = define_tls_server_config(lib, shared_def)?;
 
     // Define the TCP server
     let tcp_server = lib.declare_class("TCPServer")?;
@@ -74,6 +75,39 @@ pub fn define(
         ))?
         .fails_with(shared_def.error_type.clone())?
         .doc(doc("Create a new TCP server.").details("To start it, use {class:TCPServer.bind()}."))?
+        .build()?;
+
+    let tcp_server_new_tls_fn = lib
+        .declare_native_function("tcpserver_new_tls")?
+        .param(
+            "runtime",
+            Type::ClassRef(shared_def.runtime_class.clone()),
+            "Runtime to execute the server on",
+        )?
+        .param(
+            "link_error_mode",
+            Type::Enum(shared_def.link_error_mode.clone()),
+            "Controls how link errors are handled with respect to the TCP session",
+        )?
+        .param(
+            "address",
+            Type::String,
+            "Address to bind the server to e.g. 127.0.0.1:20000",
+        )?
+        .param(
+            "tls_config",
+            Type::Struct(tls_server_config),
+            "TLS server configuration",
+        )?
+        .return_type(ReturnType::new(
+            Type::ClassRef(tcp_server.clone()),
+            "New TCP TLS server instance",
+        ))?
+        .fails_with(shared_def.error_type.clone())?
+        .doc(
+            doc("Create a new TCP server with TLS configuration.")
+                .details("To start it, use {class:TCPServer.bind()}."),
+        )?
         .build()?;
 
     let tcp_server_destroy_fn = lib.declare_native_function("tcpserver_destroy")?
@@ -108,6 +142,7 @@ pub fn define(
     lib.define_class(&tcp_server)?
         .constructor(&tcp_server_new_fn)?
         .destructor(&tcp_server_destroy_fn)?
+        .static_method("create_tls_server", &tcp_server_new_tls_fn)?
         .method("add_outstation", &tcp_server_add_outstation_fn)?
         .method("bind", &tcp_server_bind_fn)?
         .custom_destroy("Shutdown")?
@@ -955,6 +990,36 @@ fn define_address_filter(
         .static_method("Any", &address_filter_any_fn)?
         .method("Add", &address_filter_add_fn)?
         .doc("Outstation address filter")?
+        .build()
+}
+
+fn define_tls_server_config(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> Result<NativeStructHandle, BindingError> {
+    let tls_client_config = lib.declare_native_struct("TlsServerConfig")?;
+    lib.define_native_struct(&tls_client_config)?
+        .add(
+            "peer_cert_path",
+            Type::String,
+            "Path to the PEM-encoded certificate of the peer",
+        )?
+        .add(
+            "local_cert_path",
+            Type::String,
+            "Path to the PEM-encoded local certificate",
+        )?
+        .add(
+            "private_key_path",
+            Type::String,
+            "Path to the the PEM-encoded private key",
+        )?
+        .add(
+            "min_tls_version",
+            StructElementType::Enum(shared.min_tls_version.clone(), Some("Tls1_2".to_owned())),
+            "Minimum TLS version allowed",
+        )?
+        .doc("TLS server configuration")?
         .build()
 }
 

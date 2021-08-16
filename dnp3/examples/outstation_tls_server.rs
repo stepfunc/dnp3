@@ -8,7 +8,7 @@ use dnp3::decode::*;
 use dnp3::link::*;
 use dnp3::outstation::database::*;
 use dnp3::outstation::*;
-use dnp3::tcp::tls::TlsServerConfig;
+use dnp3::tcp::tls::*;
 use dnp3::tcp::*;
 
 fn get_outstation_config() -> OutstationConfig {
@@ -45,10 +45,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let tls_config = TlsServerConfig::new(
-        &Path::new("./certs/self_signed/entity1_cert.pem"),
-        &Path::new("./certs/self_signed/entity2_cert.pem"),
-        &Path::new("./certs/self_signed/entity2_key.pem"),
-        true,
+        &Path::new("./certs/ca_chain/ca_cert.pem"),
+        &Path::new("./certs/ca_chain/entity2_cert.pem"),
+        &Path::new("./certs/ca_chain/entity2_key.pem"),
+        MinTlsVersion::Tls1_2,
     )?;
 
     // ANCHOR: create_tcp_server

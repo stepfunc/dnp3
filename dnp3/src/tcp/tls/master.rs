@@ -9,7 +9,7 @@ use tracing::Instrument;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::tcp::tls::{load_certs, load_private_key, TlsError};
+use crate::tcp::tls::{load_certs, load_private_key, MinTlsVersion, TlsError};
 use crate::tcp::EndpointList;
 use crate::tcp::{ClientState, MasterTask, MasterTaskConnectionHandler};
 use crate::tokio::net::TcpStream;
@@ -17,7 +17,7 @@ use crate::util::phys::PhysLayer;
 
 /// TLS configuration
 pub struct TlsClientConfig {
-    dns_name: webpki::DnsName,
+    dns_name: webpki::DNSName,
     config: std::sync::Arc<rustls::ClientConfig>,
 }
 
@@ -86,7 +86,7 @@ impl TlsClientConfig {
         peer_cert_path: &Path,
         local_cert_path: &Path,
         private_key_path: &Path,
-        allow_tls_1_2: bool,
+        min_tls_version: MinTlsVersion,
     ) -> Result<Self, TlsError> {
         let peer_certs = load_certs(peer_cert_path, false)?;
         let local_certs = load_certs(local_cert_path, true)?;
@@ -115,12 +115,9 @@ impl TlsClientConfig {
             })?;
 
         // Set allowed TLS versions
-        config.versions = vec![rustls::ProtocolVersion::TLSv1_3];
-        if allow_tls_1_2 {
-            config.versions.push(rustls::ProtocolVersion::TLSv1_2);
-        }
+        config.versions = min_tls_version.to_vec();
 
-        let dns_name = webpki::DnsNameRef::try_from_ascii_str(name)
+        let dns_name = webpki::DNSNameRef::try_from_ascii_str(name)
             .map_err(|_| TlsError::InvalidDnsName)?
             .to_owned();
 
