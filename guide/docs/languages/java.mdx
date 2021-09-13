@@ -7,7 +7,7 @@ slug: /java
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-The Java bindings are distributed as a JAR targeting Java 8. Native libraries for Windows and Linux are embedded in the JAR's `resources` directory. The
+The Java bindings are distributed as a JAR targeting Java 8. Native libraries for Windows x64, Linux x64 and Linux AArch64 are embedded in the JAR's `resources` directory. The
 correct native library will automatically load during static initialization. These native libraries wrap the underlying C API with a thin layer of
 [JNI](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/).
 
@@ -25,12 +25,11 @@ Release artifacts are published to Maven central. Add this dependency to incorpo
 
 ## Dependencies
 
-In addition to the Rust dependencies, the Java bindings depend on these two open source projects:
+In addition to the Rust dependencies, the Java bindings depend on one open source project:
 
 * [joou-java-6](https://github.com/jOOQ/jOOU) - Apache 2.0 - Java Object Oriented Unsigned (JOOU) integer classes
-* [commons-lang3](https://github.com/apache/commons-lang) - Apache 2.0 - Java utility classes
 
-These libraries are not distributed by Step Function I/O directly. They are only declared as a dependency for the package manager to retrieve.
+This library is not distributed by Step Function I/O directly. It is only declared as a dependency for the package manager to retrieve.
 
 ## Unsigned Integers
 
