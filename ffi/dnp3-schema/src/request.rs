@@ -3,6 +3,7 @@ use oo_bindgen::native_function::*;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
+use oo_bindgen::types::BasicType;
 
 pub fn define(
     lib: &mut LibraryBuilder,
@@ -21,10 +22,10 @@ pub fn define(
 
     let request_new_class_fn = lib
         .declare_native_function("request_new_class")?
-        .param("class0", Type::Bool, "Ask for class 0 (static data)")?
-        .param("class1", Type::Bool, "Ask for class 1 events")?
-        .param("class2", Type::Bool, "Ask for class 2 events")?
-        .param("class3", Type::Bool, "Ask for class 3 events")?
+        .param("class0", BasicType::Bool, "Ask for class 0 (static data)")?
+        .param("class1", BasicType::Bool, "Ask for class 1 events")?
+        .param("class2", BasicType::Bool, "Ask for class 2 events")?
+        .param("class3", BasicType::Bool, "Ask for class 3 events")?
         .return_type(ReturnType::new(
             Type::ClassRef(request.clone()),
             "Handle to the created request",
@@ -58,8 +59,8 @@ pub fn define(
             Type::Enum(shared.variation_enum.clone()),
             "Variation to ask for",
         )?
-        .param("start", Type::Uint8, "Start index to ask")?
-        .param("stop", Type::Uint8, "Stop index to ask (inclusive)")?
+        .param("start", BasicType::Uint8, "Start index to ask")?
+        .param("stop", BasicType::Uint8, "Stop index to ask (inclusive)")?
         .return_type(ReturnType::void())?
         .doc("Add a one-byte start/stop variation interrogation")?
         .build()?;
@@ -76,8 +77,8 @@ pub fn define(
             Type::Enum(shared.variation_enum.clone()),
             "Variation to ask for",
         )?
-        .param("start", Type::Uint16, "Start index to ask")?
-        .param("stop", Type::Uint16, "Stop index to ask (inclusive)")?
+        .param("start", BasicType::Uint16, "Start index to ask")?
+        .param("stop", BasicType::Uint16, "Stop index to ask (inclusive)")?
         .return_type(ReturnType::void())?
         .doc("Add a two-byte start/stop variation interrogation")?
         .build()?;

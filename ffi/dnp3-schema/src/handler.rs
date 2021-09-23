@@ -5,6 +5,7 @@ use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
 use oo_bindgen::native_enum::NativeEnumHandle;
+use oo_bindgen::types::BasicType;
 
 pub fn define(
     lib: &mut LibraryBuilder,
@@ -217,7 +218,7 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, Bi
     let iin1 = lib.declare_native_struct("IIN1")?;
     let iin1 = lib
         .define_native_struct(&iin1)?
-        .add("value", Type::Uint8, "Byte value")?
+        .add("value", BasicType::Uint8, "Byte value")?
         .doc("First IIN byte")?
         .build()?;
 
@@ -254,7 +255,7 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, Bi
         .param("iin1", Type::StructRef(iin1.declaration()), "IIN1 to check")?
         .param("flag", Type::Enum(iin1_flag), "Flag to check")?
         .return_type(ReturnType::new(
-            Type::Bool,
+            BasicType::Bool,
             "true if the flag is set, false otherwise",
         ))?
         .doc("Check if a particular flag is set in the IIN1 byte")?
@@ -267,7 +268,7 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, Bi
     let iin2 = lib.declare_native_struct("IIN2")?;
     let iin2 = lib
         .define_native_struct(&iin2)?
-        .add("value", Type::Uint8, "Byte value")?
+        .add("value", BasicType::Uint8, "Byte value")?
         .doc("Second IIN byte")?
         .build()?;
 
@@ -302,7 +303,7 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, Bi
         .param("iin2", Type::StructRef(iin2.declaration()), "IIN2 to check")?
         .param("flag", Type::Enum(iin2_flag), "Flag to check")?
         .return_type(ReturnType::new(
-            Type::Bool,
+            BasicType::Bool,
             "true if the flag is set, false otherwise",
         ))?
         .doc("Check if a particular flag is set in the IIN2 byte")?

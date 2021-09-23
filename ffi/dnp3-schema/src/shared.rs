@@ -7,6 +7,7 @@ use oo_bindgen::native_enum::NativeEnumHandle;
 use oo_bindgen::native_function::{DurationMapping, ReturnType, Type};
 use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
 use oo_bindgen::{BindingError, LibraryBuilder};
+use oo_bindgen::types::BasicType;
 
 pub struct SharedDefinitions {
     pub error_type: ErrorType,
@@ -87,11 +88,11 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     let control_struct = lib.declare_native_struct("Control")?;
     let control_struct = lib
         .define_native_struct(&control_struct)?
-        .add("fir", Type::Bool, "First fragment in the message")?
-        .add("fin", Type::Bool, "Final fragment of the message")?
-        .add("con", Type::Bool, "Requires confirmation")?
-        .add("uns", Type::Bool, "Unsolicited response")?
-        .add("seq", Type::Uint8, "Sequence number")?
+        .add("fir", BasicType::Bool, "First fragment in the message")?
+        .add("fin", BasicType::Bool, "Final fragment of the message")?
+        .add("con", BasicType::Bool, "Requires confirmation")?
+        .add("uns", BasicType::Bool, "Unsolicited response")?
+        .add("seq", BasicType::Uint8, "Sequence number")?
         .doc("APDU Control field")?
         .build()?;
 
@@ -119,7 +120,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     let control_code = lib
         .define_native_struct(&control_code)?
         .add("tcc", Type::Enum(trip_close_code), "This field is used in conjunction with the `op_type` field to specify a control operation")?
-        .add("clear", Type::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
+        .add("clear", BasicType::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
         .add("queue", StructElementType::Bool(Some(false)), "This field is obsolete and should always be 0")?
         .add("op_type", Type::Enum(op_type), "This field is used in conjunction with the `tcc` field to specify a control operation")?
         .doc("CROB ({struct:G12V1}) control code")?
@@ -129,15 +130,15 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     let g12v1_struct = lib
         .define_native_struct(&g12v1_struct)?
         .add("code", Type::Struct(control_code), "Control code")?
-        .add("count", Type::Uint8, "Count")?
+        .add("count", BasicType::Uint8, "Count")?
         .add(
             "on_time",
-            Type::Uint32,
+            BasicType::Uint32,
             "Duration the output drive remains active (in milliseconds)",
         )?
         .add(
             "off_time",
-            Type::Uint32,
+            BasicType::Uint32,
             "Duration the output drive remains non-active (in milliseconds)",
         )?
         .doc("Control Relay Output Block")?
@@ -160,7 +161,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .build()?;
 
     let (binary_point, binary_it) =
-        build_iterator("Binary", Type::Bool, lib, &flags_struct, &timestamp_struct)?;
+        build_iterator("Binary", BasicType::Bool, lib, &flags_struct, &timestamp_struct)?;
     let (double_bit_binary_point, double_bit_binary_it) = build_iterator(
         "DoubleBitBinary",
         Type::Enum(double_bit_enum),
@@ -170,35 +171,35 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     )?;
     let (binary_output_status_point, binary_output_status_it) = build_iterator(
         "BinaryOutputStatus",
-        Type::Bool,
+        BasicType::Bool,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (counter_point, counter_it) = build_iterator(
         "Counter",
-        Type::Uint32,
+        BasicType::Uint32,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (frozen_counter_point, frozen_counter_it) = build_iterator(
         "FrozenCounter",
-        Type::Uint32,
+        BasicType::Uint32,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (analog_point, analog_it) = build_iterator(
         "Analog",
-        Type::Double,
+        BasicType::Double,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (analog_output_status_point, analog_output_status_it) = build_iterator(
         "AnalogOutputStatus",
-        Type::Double,
+        BasicType::Double,
         lib,
         &flags_struct,
         &timestamp_struct,
@@ -340,7 +341,7 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
         .define_native_struct(&flags_struct)?
         .add(
             "value",
-            Type::Uint8,
+            BasicType::Uint8,
             "bit-mask representing a set of individual flag bits",
         )?
         .doc("Collection of individual flag bits represented by an underlying mask value")?
@@ -395,7 +396,7 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHand
     let timestamp_struct = lib.declare_native_struct("Timestamp")?;
     let timestamp_struct = lib
         .define_native_struct(&timestamp_struct)?
-        .add("value", Type::Uint64, "Timestamp value")?
+        .add("value", BasicType::Uint64, "Timestamp value")?
         .add(
             "quality",
             Type::Enum(time_quality_enum),
@@ -417,7 +418,7 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHand
         .declare_native_function("timestamp_synchronized")?
         .param(
             "value",
-            Type::Uint64,
+            BasicType::Uint64,
             "Timestamp value in milliseconds since EPOCH",
         )?
         .return_type(ReturnType::new(
@@ -431,7 +432,7 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHand
         .declare_native_function("timestamp_not_synchronized")?
         .param(
             "value",
-            Type::Uint64,
+            BasicType::Uint64,
             "Timestamp value in milliseconds since EPOCH",
         )?
         .return_type(ReturnType::new(
@@ -450,17 +451,18 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHand
     Ok(timestamp_struct)
 }
 
-fn build_iterator(
+fn build_iterator<T: Into<Type>>(
     name: &str,
-    value_type: Type,
+    value_type: T,
     lib: &mut LibraryBuilder,
     flags_struct: &NativeStructHandle,
     timestamp_struct: &NativeStructHandle,
 ) -> Result<(NativeStructHandle, IteratorHandle), BindingError> {
+    let value_type : Type = value_type.into();
     let value_struct = lib.declare_native_struct(name)?;
     let value_struct = lib
         .define_native_struct(&value_struct)?
-        .add("index", Type::Uint16, "Point index")?
+        .add("index", BasicType::Uint16, "Point index")?
         .add("value", value_type, "Point value")?
         .add("flags", Type::Struct(flags_struct.clone()), "Point flags")?
         .add(
@@ -494,7 +496,7 @@ fn build_octet_string(
     let byte_struct = lib.declare_native_struct("Byte")?;
     let byte_struct = lib
         .define_native_struct(&byte_struct)?
-        .add("value", Type::Uint8, "Byte value")?
+        .add("value", BasicType::Uint8, "Byte value")?
         .doc("Single byte struct")?
         .build()?;
 
@@ -513,7 +515,7 @@ fn build_octet_string(
     let octet_string_struct = lib.declare_native_struct("OctetString")?;
     let octet_string_struct = lib
         .define_native_struct(&octet_string_struct)?
-        .add("index", Type::Uint16, "Point index")?
+        .add("index", BasicType::Uint16, "Point index")?
         .add("value", Type::Iterator(byte_it), "Point value")?
         .doc("Octet String point")?
         .build()?;

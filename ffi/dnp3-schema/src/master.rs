@@ -8,6 +8,7 @@ use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
 use oo_bindgen::native_enum::{NativeEnumBuilder, NativeEnumHandle};
+use oo_bindgen::types::BasicType;
 
 pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<(), BindingError> {
     let read_handler = crate::handler::define(lib, shared)?;
@@ -131,7 +132,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param(
             "address",
-            Type::Uint16,
+            BasicType::Uint16,
             "DNP3 data-link address of the remote outstation",
         )?
         .param(
@@ -467,7 +468,7 @@ fn define_association_id(
         .make_opaque()
         .add(
             "address",
-            Type::Uint16,
+            BasicType::Uint16,
             "Outstation address of the association",
         )?
         .doc("Association identifier")?
@@ -482,12 +483,12 @@ fn define_poll_id(
         .make_opaque()
         .add(
             "association_id",
-            Type::Uint16,
+            BasicType::Uint16,
             "Outstation address of the association",
         )?
         .add(
             "id",
-            Type::Uint64,
+            BasicType::Uint64,
             "Unique poll id assigned by the association",
         )?
         .doc("Poll identifier")?
@@ -629,7 +630,7 @@ fn define_master_channel_config(
 ) -> std::result::Result<NativeStructHandle, BindingError> {
     let config = lib.declare_native_struct("MasterChannelConfig")?;
     lib.define_native_struct(&config)?
-        .add("address", Type::Uint16, "Local DNP3 data-link address")?
+        .add("address", BasicType::Uint16, "Local DNP3 data-link address")?
         .add("decode_level", StructElementType::Struct(shared.decode_level.clone()), "Decoding level for this master. You can modify this later on with {class:MasterChannel.SetDecodeLevel()}.")?
         .add(
             "response_timeout",
@@ -684,8 +685,8 @@ fn define_endpoint_list(
 fn define_association_handler(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let timestamp_struct = lib.declare_native_struct("TimestampUtc")?;
     let timestamp_struct = lib.define_native_struct(&timestamp_struct)?
-        .add("value", Type::Uint64, doc("Value of the timestamp (in milliseconds from UNIX Epoch).").warning("Only 48 bits are available for timestamps."))?
-        .add("is_valid", Type::Bool, "True if the timestamp is valid, false otherwise.")?
+        .add("value", BasicType::Uint64, doc("Value of the timestamp (in milliseconds from UNIX Epoch).").warning("Only 48 bits are available for timestamps."))?
+        .add("is_valid", BasicType::Bool, "True if the timestamp is valid, false otherwise.")?
         .doc(doc("Timestamp value returned by {interface:AssociationHandler.get_current_time()}.").details("{struct:TimestampUtc.value} is only valid if {struct:TimestampUtc.is_valid} is true."))?
         .build()?;
 
@@ -693,7 +694,7 @@ fn define_association_handler(lib: &mut LibraryBuilder) -> Result<InterfaceHandl
         .declare_native_function("timestamp_utc_valid")?
         .param(
             "value",
-            Type::Uint64,
+            BasicType::Uint64,
             "Timestamp value in milliseconds from UNIX Epoch",
         )?
         .return_type(ReturnType::new(
@@ -740,9 +741,9 @@ fn define_event_classes(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
     let event_classes = lib.declare_native_struct("EventClasses")?;
     let event_classes = lib
         .define_native_struct(&event_classes)?
-        .add("class1", Type::Bool, "Class 1 events")?
-        .add("class2", Type::Bool, "Class 2 events")?
-        .add("class3", Type::Bool, "Class 3 events")?
+        .add("class1", BasicType::Bool, "Class 1 events")?
+        .add("class2", BasicType::Bool, "Class 2 events")?
+        .add("class3", BasicType::Bool, "Class 3 events")?
         .doc("Event classes")?
         .build()?;
 
@@ -776,10 +777,10 @@ fn define_classes(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, Bindin
     let classes = lib.declare_native_struct("Classes")?;
     let classes = lib
         .define_native_struct(&classes)?
-        .add("class0", Type::Bool, "Class 0 (static data)")?
-        .add("class1", Type::Bool, "Class 1 events")?
-        .add("class2", Type::Bool, "Class 2 events")?
-        .add("class3", Type::Bool, "Class 3 events")?
+        .add("class0", BasicType::Bool, "Class 0 (static data)")?
+        .add("class1", BasicType::Bool, "Class 1 events")?
+        .add("class2", BasicType::Bool, "Class 2 events")?
+        .add("class3", BasicType::Bool, "Class 3 events")?
         .doc("Class 0, 1, 2 and 3 config")?
         .build()?;
 
@@ -921,7 +922,7 @@ fn define_command_builder(
         )?
         .param(
             "idx",
-            Type::Uint8,
+            BasicType::Uint8,
             "Index of the point to send the command to",
         )?
         .param(
@@ -942,7 +943,7 @@ fn define_command_builder(
         )?
         .param(
             "idx",
-            Type::Uint16,
+            BasicType::Uint16,
             "Index of the point to send the command to",
         )?
         .param(
@@ -963,10 +964,10 @@ fn define_command_builder(
         )?
         .param(
             "idx",
-            Type::Uint8,
+            BasicType::Uint8,
             "Index of the point to send the command to",
         )?
-        .param("value", Type::Sint32, "Value to set the analog output to")?
+        .param("value", BasicType::Sint32, "Value to set the analog output to")?
         .return_type(ReturnType::void())?
         .doc("Add a Analog Output command (signed 32-bit integer) with 1-byte prefix index")?
         .build()?;
@@ -980,10 +981,10 @@ fn define_command_builder(
         )?
         .param(
             "idx",
-            Type::Uint16,
+            BasicType::Uint16,
             "Index of the point to send the command to",
         )?
-        .param("value", Type::Sint32, "Value to set the analog output to")?
+        .param("value", BasicType::Sint32, "Value to set the analog output to")?
         .return_type(ReturnType::void())?
         .doc("Add a Analog Output command (signed 32-bit integer) with 2-byte prefix index")?
         .build()?;
@@ -997,10 +998,10 @@ fn define_command_builder(
         )?
         .param(
             "idx",
-            Type::Uint8,
+            BasicType::Uint8,
             "Index of the point to send the command to",
         )?
-        .param("value", Type::Sint16, "Value to set the analog output to")?
+        .param("value", BasicType::Sint16, "Value to set the analog output to")?
         .return_type(ReturnType::void())?
         .doc("Add a Analog Output command (signed 16-bit integer) with 1-byte prefix index")?
         .build()?;
@@ -1014,10 +1015,10 @@ fn define_command_builder(
         )?
         .param(
             "idx",
-            Type::Uint16,
+            BasicType::Uint16,
             "Index of the point to send the command to",
         )?
-        .param("value", Type::Sint16, "Value to set the analog output to")?
+        .param("value", BasicType::Sint16, "Value to set the analog output to")?
         .return_type(ReturnType::void())?
         .doc("Add a Analog Output command (signed 16-bit integer) with 2-byte prefix index")?
         .build()?;
@@ -1031,10 +1032,10 @@ fn define_command_builder(
         )?
         .param(
             "idx",
-            Type::Uint8,
+            BasicType::Uint8,
             "Index of the point to send the command to",
         )?
-        .param("value", Type::Float, "Value to set the analog output to")?
+        .param("value", BasicType::Float, "Value to set the analog output to")?
         .return_type(ReturnType::void())?
         .doc("Add a Analog Output command (single-precision float) with 1-byte prefix index")?
         .build()?;
@@ -1048,10 +1049,10 @@ fn define_command_builder(
         )?
         .param(
             "idx",
-            Type::Uint16,
+            BasicType::Uint16,
             "Index of the point to send the command to",
         )?
-        .param("value", Type::Float, "Value to set the analog output to")?
+        .param("value", BasicType::Float, "Value to set the analog output to")?
         .return_type(ReturnType::void())?
         .doc("Add a Analog Output command (single-precision float) with 2-byte prefix index")?
         .build()?;
@@ -1065,10 +1066,10 @@ fn define_command_builder(
         )?
         .param(
             "idx",
-            Type::Uint8,
+            BasicType::Uint8,
             "Index of the point to send the command to",
         )?
-        .param("value", Type::Double, "Value to set the analog output to")?
+        .param("value", BasicType::Double, "Value to set the analog output to")?
         .return_type(ReturnType::void())?
         .doc("Add a Analog Output command (double-precision float) with 1-byte prefix index")?
         .build()?;
@@ -1082,10 +1083,10 @@ fn define_command_builder(
         )?
         .param(
             "idx",
-            Type::Uint16,
+            BasicType::Uint16,
             "Index of the point to send the command to",
         )?
-        .param("value", Type::Double, "Value to set the analog output to")?
+        .param("value", BasicType::Double, "Value to set the analog output to")?
         .return_type(ReturnType::void())?
         .doc("Add a Analog Output command (double-precision float) with 2-byte prefix index")?
         .build()?;

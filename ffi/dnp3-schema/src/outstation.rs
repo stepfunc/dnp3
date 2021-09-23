@@ -8,6 +8,7 @@ use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
+use oo_bindgen::types::BasicType;
 
 struct OutstationTypes {
     database: ClassHandle,
@@ -316,10 +317,10 @@ fn define_outstation_config(
         .define_native_struct(&outstation_config)?
         .add(
             "outstation_address",
-            Type::Uint16,
+            BasicType::Uint16,
             "Link-layer outstation address",
         )?
-        .add("master_address", Type::Uint16, "Link-layer master address")?
+        .add("master_address", BasicType::Uint16, "Link-layer master address")?
         .add(
             "solicited_buffer_size",
             StructElementType::Uint16(Some(2048)),
@@ -384,42 +385,42 @@ fn define_event_buffer_config(
         .define_native_struct(&event_buffer_config)?
         .add(
             "max_binary",
-            Type::Uint16,
+            BasicType::Uint16,
             "Maximum number of Binary Input events (g2)",
         )?
         .add(
             "max_double_bit_binary",
-            Type::Uint16,
+            BasicType::Uint16,
             "Maximum number of Double-Bit Binary Input events (g4)",
         )?
         .add(
             "max_binary_output_status",
-            Type::Uint16,
+            BasicType::Uint16,
             "Maximum number of Binary Output Status events (g11)",
         )?
         .add(
             "max_counter",
-            Type::Uint16,
+            BasicType::Uint16,
             "Maximum number of Counter events (g22)",
         )?
         .add(
             "max_frozen_counter",
-            Type::Uint16,
+            BasicType::Uint16,
             "Maximum number of Frozen Counter events (g23)",
         )?
         .add(
             "max_analog",
-            Type::Uint16,
+            BasicType::Uint16,
             "Maximum number of Analog Input events (g32)",
         )?
         .add(
             "max_analog_output_status",
-            Type::Uint16,
+            BasicType::Uint16,
             "Maximum number of Analog Output Status events (g42)",
         )?
         .add(
             "max_octet_string",
-            Type::Uint16,
+            BasicType::Uint16,
             doc("Maximum number of Octet String events (g111)"),
         )?
         .doc(
@@ -430,7 +431,7 @@ fn define_event_buffer_config(
 
     let event_buffer_config_all_types = lib
         .declare_native_function("event_buffer_config_all_types")?
-        .param("max", Type::Uint16, "Maximum value to set all types")?
+        .param("max", BasicType::Uint16, "Maximum value to set all types")?
         .return_type(ReturnType::new(
             Type::Struct(event_buffer_config.clone()),
             "Event buffer configuration",
@@ -499,7 +500,7 @@ fn define_outstation_application(
     let restart_delay = lib.declare_native_struct("RestartDelay")?;
     let restart_delay = lib.define_native_struct(&restart_delay)?
         .add("restart_type", Type::Enum(restart_delay_type), "Indicates what {struct:RestartDelay.value} is.")?
-        .add("value", Type::Uint16, "Expected delay before the outstation comes back online.")?
+        .add("value", BasicType::Uint16, "Expected delay before the outstation comes back online.")?
         .doc(doc("Restart delay used by {interface:OutstationApplication.cold_restart()} and {interface:OutstationApplication.warm_restart()}")
         .details("If {struct:RestartDelay.restart_type} is not {enum:RestartDelayType.NotSupported}, then the {struct:RestartDelay.value} is valid. Otherwise, the outstation will return IIN2.0 NO_FUNC_CODE_SUPPORT."))?
         .build()?;
@@ -515,7 +516,7 @@ fn define_outstation_application(
 
     let restart_delay_seconds_fn = lib
         .declare_native_function("restart_delay_seconds")?
-        .param("value", Type::Uint16, "Expected restart delay (in seconds)")?
+        .param("value", BasicType::Uint16, "Expected restart delay (in seconds)")?
         .return_type(ReturnType::new(
             Type::Struct(restart_delay.clone()),
             "Valid restart delay",
@@ -527,7 +528,7 @@ fn define_outstation_application(
         .declare_native_function("restart_delay_millis")?
         .param(
             "value",
-            Type::Uint16,
+            BasicType::Uint16,
             "Expected restart delay (in milliseconds)",
         )?
         .return_type(ReturnType::new(
@@ -572,10 +573,10 @@ fn define_outstation_application(
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
             .details("For more information, see IEEE-1815 2012, p. 64."))?
-            .return_type(ReturnType::new(Type::Uint16, "Processing delay, in milliseconds"))?
+            .return_type(ReturnType::new(BasicType::Uint16, "Processing delay, in milliseconds"))?
             .build()?
         .callback("write_absolute_time", "Handle a write of the absolute time during time synchronization procedures.")?
-            .param("time", Type::Uint64, "Received time in milliseconds since EPOCH (only 48 bits are used)")?
+            .param("time", BasicType::Uint64, "Received time in milliseconds since EPOCH (only 48 bits are used)")?
             .return_type(ReturnType::new(Type::Enum(write_time_result), "Result of the write time operation"))?
             .build()?
         .callback("get_application_iin", "Returns the application-controlled IIN bits")?
@@ -595,8 +596,8 @@ fn define_outstation_application(
             .return_type(ReturnType::new(Type::Enum(freeze_result.clone()), "Result of the freeze operation"))?
             .build()?
         .callback("freeze_counters_range", "Freeze a range of counters")?
-            .param("start", Type::Uint16, "Start index to freeze (inclusive)")?
-            .param("stop", Type::Uint16, "Stop index to freeze (inclusive)")?
+            .param("start", BasicType::Uint16, "Start index to freeze (inclusive)")?
+            .param("stop", BasicType::Uint16, "Stop index to freeze (inclusive)")?
             .param("freeze_type", Type::Enum(freeze_type), "Type of freeze operation")?
             .param("database", Type::ClassRef(database.declaration()), "Database")?
             .return_type(ReturnType::new(Type::Enum(freeze_result), "Result of the freeze operation"))?
@@ -646,41 +647,41 @@ fn define_outstation_information(
             .return_type(ReturnType::void())?
             .build()?
         .callback("enter_solicited_confirm_wait", "Outstation has begun waiting for a solicited confirm")?
-            .param("ecsn", Type::Uint8, "Expected sequence number")?
+            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("solicited_confirm_timeout", "Failed to receive a solicited confirm before the timeout occurred")?
-            .param("ecsn", Type::Uint8, "Expected sequence number")?
+            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("solicited_confirm_received", "Received the expected confirm")?
-            .param("ecsn", Type::Uint8, "Expected sequence number")?
+            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("solicited_confirm_wait_new_request", "Received a new request while waiting for a solicited confirm, aborting the response series")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("wrong_solicited_confirm_seq", "Received a solicited confirm with the wrong sequence number")?
-            .param("ecsn", Type::Uint8, "Expected sequence number")?
-            .param("seq", Type::Uint8, "Received sequence number")?
+            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
+            .param("seq", BasicType::Uint8, "Received sequence number")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("unexpected_confirm", "Received a confirm when not expecting one")?
-            .param("unsolicited", Type::Bool, "True if it's an unsolicited response confirm, false if it's a solicited response confirm")?
-            .param("seq", Type::Uint8, "Received sequence number")?
+            .param("unsolicited", BasicType::Bool, "True if it's an unsolicited response confirm, false if it's a solicited response confirm")?
+            .param("seq", BasicType::Uint8, "Received sequence number")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("enter_unsolicited_confirm_wait", "Outstation has begun waiting for an unsolicited confirm")?
-            .param("ecsn", Type::Uint8, "Expected sequence number")?
+            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("unsolicited_confirm_timeout", "Failed to receive an unsolicited confirm before the timeout occurred")?
-            .param("ecsn", Type::Uint8, "Expected sequence number")?
-            .param("retry", Type::Bool, "Is it a retry")?
+            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
+            .param("retry", BasicType::Bool, "Is it a retry")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("unsolicited_confirmed", "Master confirmed an unsolicited message")?
-            .param("ecsn", Type::Uint8, "Expected sequence number")?
+            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
             .return_type(ReturnType::void())?
             .build()?
         .callback("clear_restart_iin", "Master cleared the restart IIN bit")?
@@ -736,7 +737,7 @@ fn define_control_handler(
             Type::Struct(shared_def.g12v1_struct.clone()),
             "Received CROB",
         )?
-        .param("index", Type::Uint16, "Index of the point")?
+        .param("index", BasicType::Uint16, "Index of the point")?
         .param(
             "database",
             Type::ClassRef(database.declaration()),
@@ -753,7 +754,7 @@ fn define_control_handler(
             Type::Struct(shared_def.g12v1_struct.clone()),
             "Received CROB",
         )?
-        .param("index", Type::Uint16, "Index of the point")?
+        .param("index", BasicType::Uint16, "Index of the point")?
         .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
         .param(
             "database",
@@ -766,8 +767,8 @@ fn define_control_handler(
         ))?
         .build()?
         .callback("select_g41v1", select_g40_doc.clone())?
-        .param("control", Type::Sint32, "Received analog output value")?
-        .param("index", Type::Uint16, "Index of the point")?
+        .param("control", BasicType::Sint32, "Received analog output value")?
+        .param("index", BasicType::Uint16, "Index of the point")?
         .param(
             "database",
             Type::ClassRef(database.declaration()),
@@ -779,8 +780,8 @@ fn define_control_handler(
         ))?
         .build()?
         .callback("operate_g41v1", "Operate a control point")?
-        .param("control", Type::Sint32, "Received analog output value")?
-        .param("index", Type::Uint16, "Index of the point")?
+        .param("control", BasicType::Sint32, "Received analog output value")?
+        .param("index", BasicType::Uint16, "Index of the point")?
         .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
         .param(
             "database",
@@ -793,8 +794,8 @@ fn define_control_handler(
         ))?
         .build()?
         .callback("select_g41v2", select_g40_doc.clone())?
-        .param("value", Type::Sint16, "Received analog output value")?
-        .param("index", Type::Uint16, "Index of the point")?
+        .param("value", BasicType::Sint16, "Received analog output value")?
+        .param("index", BasicType::Uint16, "Index of the point")?
         .param(
             "database",
             Type::ClassRef(database.declaration()),
@@ -806,8 +807,8 @@ fn define_control_handler(
         ))?
         .build()?
         .callback("operate_g41v2", "Operate a control point")?
-        .param("value", Type::Sint16, "Received analog output value")?
-        .param("index", Type::Uint16, "Index of the point")?
+        .param("value", BasicType::Sint16, "Received analog output value")?
+        .param("index", BasicType::Uint16, "Index of the point")?
         .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
         .param(
             "database",
@@ -820,8 +821,8 @@ fn define_control_handler(
         ))?
         .build()?
         .callback("select_g41v3", select_g40_doc.clone())?
-        .param("value", Type::Float, "Received analog output value")?
-        .param("index", Type::Uint16, "Index of the point")?
+        .param("value", BasicType::Float, "Received analog output value")?
+        .param("index", BasicType::Uint16, "Index of the point")?
         .param(
             "database",
             Type::ClassRef(database.declaration()),
@@ -833,8 +834,8 @@ fn define_control_handler(
         ))?
         .build()?
         .callback("operate_g41v3", "Operate a control point")?
-        .param("value", Type::Float, "Received analog output value")?
-        .param("index", Type::Uint16, "Index of the point")?
+        .param("value", BasicType::Float, "Received analog output value")?
+        .param("index", BasicType::Uint16, "Index of the point")?
         .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
         .param(
             "database",
@@ -847,8 +848,8 @@ fn define_control_handler(
         ))?
         .build()?
         .callback("select_g41v4", select_g40_doc)?
-        .param("value", Type::Double, "Received analog output value")?
-        .param("index", Type::Uint16, "Index of the point")?
+        .param("value", BasicType::Double, "Received analog output value")?
+        .param("index", BasicType::Uint16, "Index of the point")?
         .param(
             "database",
             Type::ClassRef(database.declaration()),
@@ -860,8 +861,8 @@ fn define_control_handler(
         ))?
         .build()?
         .callback("operate_g41v4", "Operate a control point")?
-        .param("value", Type::Double, "Received analog output value")?
-        .param("index", Type::Uint16, "Index of the point")?
+        .param("value", BasicType::Double, "Received analog output value")?
+        .param("index", BasicType::Uint16, "Index of the point")?
         .param("op_type", Type::Enum(operate_type), "Operate type")?
         .param(
             "database",
