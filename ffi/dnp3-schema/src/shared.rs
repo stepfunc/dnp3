@@ -17,6 +17,7 @@ pub struct SharedDefinitions {
     pub serial_port_settings: NativeStructHandle,
     pub link_error_mode: NativeEnumHandle,
     pub min_tls_version: NativeEnumHandle,
+    pub certificate_mode: NativeEnumHandle,
     pub retry_strategy: NativeStructHandle,
     pub control_struct: NativeStructHandle,
     pub g12v1_struct: NativeStructHandle,
@@ -221,6 +222,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         serial_port_settings: define_serial_params(lib)?,
         link_error_mode: define_link_error_mode(lib)?,
         min_tls_version: define_min_tls_version(lib)?,
+        certificate_mode: define_certificate_mode(lib)?,
         control_struct,
         g12v1_struct,
         binary_point,
@@ -281,6 +283,17 @@ fn define_min_tls_version(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, 
         .push("Tls1_2", "TLS 1.2")?
         .push("Tls1_3", "TLS 1.3")?
         .doc("Minimum TLS version to allow")?
+        .build()
+}
+
+fn define_certificate_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
+    lib.define_native_enum("CertificateMode")?
+        .push("TrustChain", "TrustChain")?
+        .push(
+            "SelfSignedCertificate",
+            "Single pre-shared self-sign certificate compared byte-for-byte",
+        )?
+        .doc("Certificate validation mode")?
         .build()
 }
 

@@ -997,8 +997,9 @@ fn define_tls_server_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> Result<NativeStructHandle, BindingError> {
-    let tls_client_config = lib.declare_native_struct("TlsServerConfig")?;
-    lib.define_native_struct(&tls_client_config)?
+    let tls_server_config = lib.declare_native_struct("TlsServerConfig")?;
+    lib.define_native_struct(&tls_server_config)?
+        .add("dns_name", Type::String, "Expected name to validate in the presented certificate (only in {enum:CertificateMode.TrustChain} mode)")?
         .add(
             "peer_cert_path",
             Type::String,
@@ -1019,6 +1020,7 @@ fn define_tls_server_config(
             StructElementType::Enum(shared.min_tls_version.clone(), Some("Tls1_2".to_owned())),
             "Minimum TLS version allowed",
         )?
+        .add("certificate_mode", StructElementType::Enum(shared.certificate_mode.clone(), Some("TrustChain".to_owned())), "Certficate validation mode")?
         .doc("TLS server configuration")?
         .build()
 }

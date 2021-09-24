@@ -1,5 +1,6 @@
 mod master;
 mod outstation;
+mod rasn;
 
 use std::io::{self, ErrorKind};
 use std::path::Path;
@@ -7,6 +8,15 @@ use std::path::Path;
 pub use master::*;
 pub use outstation::*;
 use tokio_rustls::rustls;
+
+/// Certificate validation mode
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub enum CertificateMode {
+    /// Single or chain of certificates validated against trust anchors
+    TrustChain,
+    /// Single pre-shared self-sign certificate compared byte-for-byte
+    SelfSignedCertificate,
+}
 
 /// TLS-related errors
 #[derive(Debug)]

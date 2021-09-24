@@ -1,43 +1,73 @@
 use std::io::{self, ErrorKind};
 use std::path::Path;
+use std::sync::Arc;
 
-use tokio_rustls::rustls;
+use tokio_rustls::rustls::AllowAnyAuthenticatedClient;
+use tokio_rustls::{rustls, webpki};
 
-use crate::tcp::tls::{load_certs, load_private_key, MinTlsVersion, TlsError};
+use super::rasn;
+use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
 use crate::tokio::net::TcpStream;
 use crate::util::phys::PhysLayer;
 
 /// TLS configuration
 pub struct TlsServerConfig {
-    config: std::sync::Arc<rustls::ServerConfig>,
+    config: Arc<rustls::ServerConfig>,
 }
 
 impl TlsServerConfig {
     /// Create a TLS server config
     pub fn new(
+        name: &str,
         peer_cert_path: &Path,
         local_cert_path: &Path,
         private_key_path: &Path,
         min_tls_version: MinTlsVersion,
+        certificate_mode: CertificateMode,
     ) -> Result<Self, TlsError> {
-        let peer_certs = load_certs(peer_cert_path, false)?;
+        let mut peer_certs = load_certs(peer_cert_path, false)?;
         let local_certs = load_certs(local_cert_path, true)?;
         let private_key = load_private_key(private_key_path)?;
 
-        // Build root certificate store
-        let mut root_cert_store = rustls::RootCertStore::empty();
-        for cert in &peer_certs {
-            root_cert_store.add(cert).map_err(|err| {
-                TlsError::InvalidPeerCertificate(io::Error::new(
-                    ErrorKind::InvalidData,
-                    err.to_string(),
-                ))
-            })?;
-        }
+        let verifier = match certificate_mode {
+            CertificateMode::TrustChain => {
+                // Build root certificate store
+                let mut roots = rustls::RootCertStore::empty();
+                for cert in &peer_certs {
+                    roots.add(cert).map_err(|err| {
+                        TlsError::InvalidPeerCertificate(io::Error::new(
+                            ErrorKind::InvalidData,
+                            err.to_string(),
+                        ))
+                    })?;
+                }
 
-        // TODO: do we want to do name checking here? I'm not sure how to do it...
-        let client_cert_verifier = rustls::AllowAnyAuthenticatedClient::new(root_cert_store);
-        let mut config = rustls::ServerConfig::new(client_cert_verifier);
+                let dns_name = webpki::DNSNameRef::try_from_ascii_str(name)
+                    .map_err(|_| TlsError::InvalidDnsName)?
+                    .to_owned();
+
+                CaChainClientCertVerifier::new(roots, dns_name)
+            }
+            CertificateMode::SelfSignedCertificate => {
+                if let Some(peer_cert) = peer_certs.pop() {
+                    if !peer_certs.is_empty() {
+                        return Err(TlsError::InvalidPeerCertificate(io::Error::new(
+                            ErrorKind::InvalidData,
+                            "more than one peer certificate in self-signed mode",
+                        )));
+                    }
+
+                    SelfSignedCertificateClientCertVerifier::new(peer_cert)
+                } else {
+                    return Err(TlsError::InvalidPeerCertificate(io::Error::new(
+                        ErrorKind::InvalidData,
+                        "no peer certificate",
+                    )));
+                }
+            }
+        };
+
+        let mut config = rustls::ServerConfig::new(verifier);
 
         // Set local cert chain
         config
@@ -68,5 +98,127 @@ impl TlsServerConfig {
                 stream,
             )))),
         }
+    }
+}
+
+struct CaChainClientCertVerifier {
+    inner: Arc<dyn rustls::ClientCertVerifier>,
+    dns_name: webpki::DNSName,
+}
+
+impl CaChainClientCertVerifier {
+    #[allow(clippy::new_ret_no_self)]
+    fn new(
+        roots: rustls::RootCertStore,
+        dns_name: webpki::DNSName,
+    ) -> Arc<dyn rustls::ClientCertVerifier> {
+        let inner = AllowAnyAuthenticatedClient::new(roots);
+        Arc::new(CaChainClientCertVerifier { inner, dns_name })
+    }
+}
+
+impl rustls::ClientCertVerifier for CaChainClientCertVerifier {
+    fn offer_client_auth(&self) -> bool {
+        // Client must authenticate itself, so we better offer the authentication!
+        true
+    }
+
+    fn client_auth_mandatory(&self, _sni: Option<&webpki::DNSName>) -> Option<bool> {
+        // Client must authenticate itself
+        Some(true)
+    }
+
+    fn client_auth_root_subjects(
+        &self,
+        sni: Option<&webpki::DNSName>,
+    ) -> Option<rustls::DistinguishedNames> {
+        self.inner.client_auth_root_subjects(sni)
+    }
+
+    fn verify_client_cert(
+        &self,
+        presented_certs: &[rustls::Certificate],
+        sni: Option<&webpki::DNSName>,
+    ) -> Result<rustls::ClientCertVerified, rustls::TLSError> {
+        self.inner.verify_client_cert(presented_certs, sni)?;
+
+        // Check DNS name
+        let cert = webpki::EndEntityCert::from(&presented_certs[0].0)
+            .map_err(rustls::TLSError::WebPKIError)?;
+        cert.verify_is_valid_for_dns_name(self.dns_name.as_ref())
+            .map_err(|_| {
+                rustls::TLSError::General(
+                    "client certificate is not valid for provided name".to_string(),
+                )
+            })
+            .map(|_| rustls::ClientCertVerified::assertion())
+    }
+}
+
+struct SelfSignedCertificateClientCertVerifier {
+    cert: rustls::Certificate,
+}
+
+impl SelfSignedCertificateClientCertVerifier {
+    #[allow(clippy::new_ret_no_self)]
+    fn new(cert: rustls::Certificate) -> Arc<dyn rustls::ClientCertVerifier> {
+        Arc::new(SelfSignedCertificateClientCertVerifier { cert })
+    }
+}
+
+impl rustls::ClientCertVerifier for SelfSignedCertificateClientCertVerifier {
+    fn offer_client_auth(&self) -> bool {
+        // Client must authenticate itself, so we better offer the authentication!
+        true
+    }
+
+    fn client_auth_mandatory(&self, _sni: Option<&webpki::DNSName>) -> Option<bool> {
+        // Client must authenticate itself
+        Some(true)
+    }
+
+    fn client_auth_root_subjects(
+        &self,
+        _sni: Option<&webpki::DNSName>,
+    ) -> Option<rustls::DistinguishedNames> {
+        // Let rustls extract the subjects
+        let mut store = rustls::RootCertStore::empty();
+        let _ = store.add(&self.cert);
+        Some(store.get_subjects())
+    }
+
+    fn verify_client_cert(
+        &self,
+        presented_certs: &[rustls::Certificate],
+        _sni: Option<&webpki::DNSName>,
+    ) -> Result<rustls::ClientCertVerified, rustls::TLSError> {
+        let now = chrono::offset::Utc::now();
+
+        // Check that only 1 certificate is presented
+        if presented_certs.len() != 1 {
+            return Err(rustls::TLSError::General(format!(
+                "client sent {} certificates, expected one",
+                presented_certs.len()
+            )));
+        }
+
+        // Check that presented certificate matches byte-for-byte the expected certificate
+        if presented_certs[0] != self.cert {
+            return Err(rustls::TLSError::General(
+                "client certificate doesn't match the expected self-signed certificate".to_string(),
+            ));
+        }
+
+        // Check that the certificate is still valid
+        let parsed_cert = rasn::x509::Certificate::parse(&presented_certs[0].0).unwrap();
+        parsed_cert
+            .tbs_certificate
+            .value
+            .validity
+            .is_valid(now.into());
+
+        // We do not validate DNS name. Providing the exact same certificate is sufficient.
+
+        Ok(rustls::ClientCertVerified::assertion())
     }
 }

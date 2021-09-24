@@ -44,16 +44,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(false)
         .init();
 
-    let tls_config = TlsServerConfig::new(
+    #[allow(unused)]
+    let self_signed_tls_config = TlsServerConfig::new(
+        "test.com",
+        &Path::new("./certs/self_signed/entity1_cert.pem"),
+        &Path::new("./certs/self_signed/entity2_cert.pem"),
+        &Path::new("./certs/self_signed/entity2_key.pem"),
+        MinTlsVersion::Tls1_2,
+        CertificateMode::SelfSignedCertificate,
+    )?;
+
+    #[allow(unused)]
+    let ca_chain_tls_config = TlsServerConfig::new(
+        "test.com",
         &Path::new("./certs/ca_chain/ca_cert.pem"),
         &Path::new("./certs/ca_chain/entity2_cert.pem"),
         &Path::new("./certs/ca_chain/entity2_key.pem"),
         MinTlsVersion::Tls1_2,
+        CertificateMode::TrustChain,
     )?;
 
     // ANCHOR: create_tcp_server
-    let mut server =
-        TcpServer::new_tls_server(LinkErrorMode::Close, "127.0.0.1:20001".parse()?, tls_config);
+    let mut server = TcpServer::new_tls_server(
+        LinkErrorMode::Close,
+        "127.0.0.1:20001".parse()?,
+        ca_chain_tls_config,
+    );
     // ANCHOR_END: create_tcp_server
 
     // ANCHOR: tcp_server_spawn_outstation

@@ -56,12 +56,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
     // ANCHOR_END: logging
 
-    let tls_config = TlsClientConfig::new(
+    #[allow(unused)]
+    let self_signed_tls_config = TlsClientConfig::new(
+        "test.com",
+        &Path::new("./certs/self_signed/entity2_cert.pem"),
+        &Path::new("./certs/self_signed/entity1_cert.pem"),
+        &Path::new("./certs/self_signed/entity1_key.pem"),
+        MinTlsVersion::Tls1_2,
+        CertificateMode::SelfSignedCertificate,
+    )?;
+
+    #[allow(unused)]
+    let ca_chain_tls_config = TlsClientConfig::new(
         "test.com",
         &Path::new("./certs/ca_chain/ca_cert.pem"),
         &Path::new("./certs/ca_chain/entity1_cert.pem"),
         &Path::new("./certs/ca_chain/entity1_key.pem"),
         MinTlsVersion::Tls1_2,
+        CertificateMode::TrustChain,
     )?;
 
     // spawn the master channel onto another task
@@ -70,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         LinkErrorMode::Close,
         get_master_channel_config()?,
         EndpointList::new("127.0.0.1:20001".to_owned(), &[]),
-        tls_config,
+        ca_chain_tls_config,
         ConnectStrategy::default(),
         NullListener::create(),
     );

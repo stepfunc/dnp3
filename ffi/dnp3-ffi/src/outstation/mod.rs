@@ -62,10 +62,12 @@ pub unsafe fn tcpserver_new_tls(
     let address = address.to_string_lossy().parse()?;
 
     let tls_config = TlsServerConfig::new(
+        &tls_config.dns_name().to_string_lossy(),
         Path::new(tls_config.peer_cert_path().to_string_lossy().as_ref()),
         Path::new(tls_config.local_cert_path().to_string_lossy().as_ref()),
         Path::new(tls_config.private_key_path().to_string_lossy().as_ref()),
         tls_config.min_tls_version().into(),
+        tls_config.certificate_mode().into(),
     )?;
 
     let server = dnp3::tcp::TcpServer::new_tls_server(link_error_mode.into(), address, tls_config);
