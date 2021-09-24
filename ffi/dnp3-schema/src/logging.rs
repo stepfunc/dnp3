@@ -78,9 +78,9 @@ pub fn define(
             "on_message",
             "Called when a log message was received and should be logged",
         )?
-        .param("level", Type::Enum(log_level_enum), "Level of the message")?
+        .param("level", log_level_enum, "Level of the message")?
         .param("message", Type::String, "Actual formatted message")?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .destroy_callback("on_destroy")?
         .build()?;
@@ -89,15 +89,15 @@ pub fn define(
         .declare_native_function("configure_logging")?
         .param(
             "config",
-            Type::Struct(logging_config_struct),
+           logging_config_struct,
             "Configuration options for logging"
         )?
         .param(
             "logger",
-            Type::Interface(log_callback_interface),
+           log_callback_interface,
             "Logger that will receive each logged message",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .fails_with(error_type)?
         .doc(
             doc("Set the callback that will receive all the log messages")

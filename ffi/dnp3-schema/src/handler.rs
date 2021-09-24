@@ -1,5 +1,4 @@
 use oo_bindgen::callback::InterfaceHandle;
-use oo_bindgen::native_function::*;
 use oo_bindgen::native_struct::NativeStructHandle;
 use oo_bindgen::*;
 
@@ -25,11 +24,11 @@ pub fn define(
         .define_native_struct(&response_header)?
         .add(
             "control",
-            Type::Struct(shared_def.control_struct.clone()),
+            shared_def.control_struct.clone(),
             "Application control field",
         )?
-        .add("func", Type::Enum(response_function), "Response type")?
-        .add("iin", Type::Struct(iin), "IIN bytes")?
+        .add("func", response_function, "Response type")?
+        .add("iin", iin, "IIN bytes")?
         .doc("Response header information")?
         .build()?;
 
@@ -51,12 +50,12 @@ pub fn define(
         .define_native_struct(&header_info)?
         .add(
             "variation",
-            Type::Enum(shared_def.variation_enum.clone()),
+            shared_def.variation_enum.clone(),
             "Group/Variation used in the response",
         )?
         .add(
             "qualifier",
-            Type::Enum(qualifier_code_enum),
+            qualifier_code_enum,
             "Qualitifer used in the response",
         )?
         .doc("Object header information")?
@@ -72,41 +71,41 @@ pub fn define(
         .callback("begin_fragment", "Marks the beginning of a fragment")?
         .param(
             "read_type",
-            Type::Enum(read_type.clone()),
+            read_type.clone(),
             "Describes what triggered the read event"
         )?
         .param(
             "header",
-            Type::Struct(response_header.clone()),
+            response_header.clone(),
             "Header of the fragment",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .callback("end_fragment", "Marks the end of a fragment")?
         .param(
             "read_type",
-            Type::Enum(read_type),
+            read_type,
             "Describes what triggered the read event"
         )?
         .param(
             "header",
-            Type::Struct(response_header),
+           response_header,
             "Header of the fragment",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .callback("handle_binary", "Handle binary input data")?
         .param(
             "info",
-            Type::Struct(header_info.clone()),
+           header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
             "it",
-            Type::Iterator(shared_def.binary_it.clone()),
+           shared_def.binary_it.clone(),
                 "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .callback(
             "handle_double_bit_binary",
@@ -114,15 +113,15 @@ pub fn define(
         )?
         .param(
             "info",
-            Type::Struct(header_info.clone()),
+           header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
             "it",
-            Type::Iterator(shared_def.double_bit_binary_it.clone()),
+           shared_def.double_bit_binary_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .callback(
             "handle_binary_output_status",
@@ -130,54 +129,54 @@ pub fn define(
         )?
         .param(
             "info",
-            Type::Struct(header_info.clone()),
+           header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
             "it",
-            Type::Iterator(shared_def.binary_output_status_it.clone()),
+           shared_def.binary_output_status_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .callback("handle_counter", "Handle counter data")?
         .param(
             "info",
-            Type::Struct(header_info.clone()),
+           header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
             "it",
-            Type::Iterator(shared_def.counter_it.clone()),
+           shared_def.counter_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .callback("handle_frozen_counter", "Handle frozen counter input data")?
         .param(
             "info",
-            Type::Struct(header_info.clone()),
+           header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
             "it",
-            Type::Iterator(shared_def.frozen_counter_it.clone()),
+           shared_def.frozen_counter_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .callback("handle_analog", "Handle analog input data")?
         .param(
             "info",
-            Type::Struct(header_info.clone()),
+           header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
             "it",
-            Type::Iterator(shared_def.analog_it.clone()),
+           shared_def.analog_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .callback(
             "handle_analog_output_status",
@@ -185,28 +184,28 @@ pub fn define(
         )?
         .param(
             "info",
-            Type::Struct(header_info.clone()),
+           header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
             "it",
-            Type::Iterator(shared_def.analog_output_status_it.clone()),
+           shared_def.analog_output_status_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .callback("handle_octet_string", "Handle octet string data")?
         .param(
             "info",
-            Type::Struct(header_info),
+           header_info,
             "Group/variation and qualifier information",
         )?
         .param(
             "it",
-            Type::Iterator(shared_def.octet_string_it.clone()),
+           shared_def.octet_string_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .destroy_callback("on_destroy")?
         .build()?;
@@ -252,12 +251,9 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, Bi
 
     let iin1_is_set_fn = lib
         .declare_native_function("iin1_is_set")?
-        .param("iin1", Type::StructRef(iin1.declaration()), "IIN1 to check")?
-        .param("flag", Type::Enum(iin1_flag), "Flag to check")?
-        .return_type(ReturnType::new(
-            BasicType::Bool,
-            "true if the flag is set, false otherwise",
-        ))?
+        .param("iin1", iin1.declaration(), "IIN1 to check")?
+        .param("flag", iin1_flag, "Flag to check")?
+        .returns(BasicType::Bool, "true if the flag is set, false otherwise")?
         .doc("Check if a particular flag is set in the IIN1 byte")?
         .build()?;
 
@@ -300,12 +296,9 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, Bi
 
     let iin2_is_set_fn = lib
         .declare_native_function("iin2_is_set")?
-        .param("iin2", Type::StructRef(iin2.declaration()), "IIN2 to check")?
-        .param("flag", Type::Enum(iin2_flag), "Flag to check")?
-        .return_type(ReturnType::new(
-            BasicType::Bool,
-            "true if the flag is set, false otherwise",
-        ))?
+        .param("iin2", iin2.declaration(), "IIN2 to check")?
+        .param("flag", iin2_flag, "Flag to check")?
+        .returns(BasicType::Bool, "true if the flag is set, false otherwise")?
         .doc("Check if a particular flag is set in the IIN2 byte")?
         .build()?;
 
@@ -316,8 +309,8 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, Bi
     let iin = lib.declare_native_struct("IIN")?;
     let iin = lib
         .define_native_struct(&iin)?
-        .add("iin1", Type::Struct(iin1), "First IIN byte")?
-        .add("iin2", Type::Struct(iin2), "Second IIN byte")?
+        .add("iin1", iin1, "First IIN byte")?
+        .add("iin2", iin2, "Second IIN byte")?
         .doc("Pair of IIN bytes")?
         .build()?;
 

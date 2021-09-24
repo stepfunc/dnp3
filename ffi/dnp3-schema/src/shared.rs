@@ -4,10 +4,10 @@ use oo_bindgen::doc;
 use oo_bindgen::error_type::{ErrorType, ExceptionType};
 use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::native_enum::NativeEnumHandle;
-use oo_bindgen::native_function::{DurationMapping, ReturnType, Type};
+use oo_bindgen::native_function::Type;
 use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
+use oo_bindgen::types::{BasicType, DurationType};
 use oo_bindgen::{BindingError, LibraryBuilder};
-use oo_bindgen::types::BasicType;
 
 pub struct SharedDefinitions {
     pub error_type: ErrorType,
@@ -119,17 +119,17 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     let control_code = lib.declare_native_struct("ControlCode")?;
     let control_code = lib
         .define_native_struct(&control_code)?
-        .add("tcc", Type::Enum(trip_close_code), "This field is used in conjunction with the `op_type` field to specify a control operation")?
+        .add("tcc", trip_close_code, "This field is used in conjunction with the `op_type` field to specify a control operation")?
         .add("clear", BasicType::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
         .add("queue", StructElementType::Bool(Some(false)), "This field is obsolete and should always be 0")?
-        .add("op_type", Type::Enum(op_type), "This field is used in conjunction with the `tcc` field to specify a control operation")?
+        .add("op_type", op_type, "This field is used in conjunction with the `tcc` field to specify a control operation")?
         .doc("CROB ({struct:G12V1}) control code")?
         .build()?;
 
     let g12v1_struct = lib.declare_native_struct("G12V1")?;
     let g12v1_struct = lib
         .define_native_struct(&g12v1_struct)?
-        .add("code", Type::Struct(control_code), "Control code")?
+        .add("code", control_code, "Control code")?
         .add("count", BasicType::Uint8, "Count")?
         .add(
             "on_time",
@@ -160,11 +160,16 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .doc("Double-bit binary input value")?
         .build()?;
 
-    let (binary_point, binary_it) =
-        build_iterator("Binary", BasicType::Bool, lib, &flags_struct, &timestamp_struct)?;
+    let (binary_point, binary_it) = build_iterator(
+        "Binary",
+        BasicType::Bool,
+        lib,
+        &flags_struct,
+        &timestamp_struct,
+    )?;
     let (double_bit_binary_point, double_bit_binary_it) = build_iterator(
         "DoubleBitBinary",
-        Type::Enum(double_bit_enum),
+        double_bit_enum,
         lib,
         &flags_struct,
         &timestamp_struct,
@@ -243,7 +248,7 @@ fn define_retry_strategy(lib: &mut LibraryBuilder) -> Result<NativeStructHandle,
         .add(
             "min_delay",
             StructElementType::Duration(
-                DurationMapping::Milliseconds,
+                DurationType::Milliseconds,
                 Some(std::time::Duration::from_secs(1)),
             ),
             "Minimum delay between two retries",
@@ -251,7 +256,7 @@ fn define_retry_strategy(lib: &mut LibraryBuilder) -> Result<NativeStructHandle,
         .add(
             "max_delay",
             StructElementType::Duration(
-                DurationMapping::Milliseconds,
+                DurationType::Milliseconds,
                 Some(std::time::Duration::from_secs(10)),
             ),
             "Maximum delay between two retries",
@@ -366,8 +371,8 @@ fn define_port_state_listener(lib: &mut LibraryBuilder) -> Result<InterfaceHandl
             "Callback interface for receiving updates about the state of a serial port",
         )?
         .callback("on_change", "Invoked when the serial port changes state")?
-        .param("state", Type::Enum(port_state), "New state of the port")?
-        .return_type(ReturnType::Void)?
+        .param("state", port_state, "New state of the port")?
+        .returns_nothing()?
         .build()?
         .destroy_callback("on_destroy")?
         .build()?;
@@ -397,20 +402,13 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHand
     let timestamp_struct = lib
         .define_native_struct(&timestamp_struct)?
         .add("value", BasicType::Uint64, "Timestamp value")?
-        .add(
-            "quality",
-            Type::Enum(time_quality_enum),
-            "Timestamp quality",
-        )?
+        .add("quality", time_quality_enum, "Timestamp quality")?
         .doc("Timestamp value")?
         .build()?;
 
     let timestamp_invalid_fn = lib
         .declare_native_function("timestamp_invalid")?
-        .return_type(ReturnType::new(
-            Type::Struct(timestamp_struct.clone()),
-            "Invalid timestamp",
-        ))?
+        .returns(timestamp_struct.clone(), "Invalid timestamp")?
         .doc("Creates an invalid timestamp struct")?
         .build()?;
 
@@ -421,10 +419,7 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHand
             BasicType::Uint64,
             "Timestamp value in milliseconds since EPOCH",
         )?
-        .return_type(ReturnType::new(
-            Type::Struct(timestamp_struct.clone()),
-            "Synchronized timestamp",
-        ))?
+        .returns(timestamp_struct.clone(), "Synchronized timestamp")?
         .doc("Creates a synchronized timestamp struct")?
         .build()?;
 
@@ -435,10 +430,7 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHand
             BasicType::Uint64,
             "Timestamp value in milliseconds since EPOCH",
         )?
-        .return_type(ReturnType::new(
-            Type::Struct(timestamp_struct.clone()),
-            "Not synchronized timestamp",
-        ))?
+        .returns(timestamp_struct.clone(), "Not synchronized timestamp")?
         .doc("Creates a not synchronized timestamp struct")?
         .build()?;
 
@@ -458,29 +450,25 @@ fn build_iterator<T: Into<Type>>(
     flags_struct: &NativeStructHandle,
     timestamp_struct: &NativeStructHandle,
 ) -> Result<(NativeStructHandle, IteratorHandle), BindingError> {
-    let value_type : Type = value_type.into();
+    let value_type: Type = value_type.into();
     let value_struct = lib.declare_native_struct(name)?;
     let value_struct = lib
         .define_native_struct(&value_struct)?
         .add("index", BasicType::Uint16, "Point index")?
         .add("value", value_type, "Point value")?
-        .add("flags", Type::Struct(flags_struct.clone()), "Point flags")?
-        .add(
-            "time",
-            Type::Struct(timestamp_struct.clone()),
-            "Point timestamp",
-        )?
+        .add("flags", flags_struct.clone(), "Point flags")?
+        .add("time", timestamp_struct.clone(), "Point timestamp")?
         .doc(format!("{} point", name))?
         .build()?;
 
     let value_iterator = lib.declare_class(&format!("{}Iterator", name))?;
     let iterator_next_fn = lib
         .declare_native_function(&format!("{}_next", name.to_lowercase()))?
-        .param("it", Type::ClassRef(value_iterator), "Iterator")?
-        .return_type(ReturnType::new(
-            Type::StructRef(value_struct.declaration()),
+        .param("it", value_iterator, "Iterator")?
+        .returns(
+            value_struct.declaration(),
             "Next value of the iterator or {null} if the iterator reached the end",
-        ))?
+        )?
         .doc("Get the next value of the iterator")?
         .build()?;
 
@@ -503,11 +491,11 @@ fn build_octet_string(
     let byte_it = lib.declare_class("ByteIterator")?;
     let byte_it_next_fn = lib
         .declare_native_function("byte_next")?
-        .param("it", Type::ClassRef(byte_it), "Iterator")?
-        .return_type(ReturnType::new(
-            Type::StructRef(byte_struct.declaration()),
+        .param("it", byte_it, "Iterator")?
+        .returns(
+            byte_struct.declaration(),
             "Next value of the iterator or {null} if the iterator reached the end",
-        ))?
+        )?
         .doc("Get the next value of the iterator")?
         .build()?;
     let byte_it = lib.define_iterator_with_lifetime(&byte_it_next_fn, &byte_struct)?;
@@ -516,18 +504,18 @@ fn build_octet_string(
     let octet_string_struct = lib
         .define_native_struct(&octet_string_struct)?
         .add("index", BasicType::Uint16, "Point index")?
-        .add("value", Type::Iterator(byte_it), "Point value")?
+        .add("value", byte_it, "Point value")?
         .doc("Octet String point")?
         .build()?;
 
     let octet_string_iterator = lib.declare_class("OctetStringIterator")?;
     let iterator_next_fn = lib
         .declare_native_function("octetstring_next")?
-        .param("it", Type::ClassRef(octet_string_iterator), "Iterator")?
-        .return_type(ReturnType::new(
-            Type::StructRef(octet_string_struct.declaration()),
+        .param("it", octet_string_iterator, "Iterator")?
+        .returns(
+            octet_string_struct.declaration(),
             "Next value of the iterator or {null} if the iterator reached the end",
-        ))?
+        )?
         .doc("Get the next value of the iterator")?
         .build()?;
 

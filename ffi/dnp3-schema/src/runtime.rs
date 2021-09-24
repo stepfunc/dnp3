@@ -1,7 +1,6 @@
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::error_type::ErrorType;
-use oo_bindgen::native_function::*;
-use oo_bindgen::native_struct::*;
+use oo_bindgen::native_struct::StructElementType;
 use oo_bindgen::*;
 
 pub fn define(
@@ -29,13 +28,13 @@ pub fn define(
         .declare_native_function("runtime_new")?
         .param(
             "config",
-            Type::Struct(config_struct),
+          config_struct,
             "Runtime configuration",
         )?
-        .return_type(ReturnType::new(
-            Type::ClassRef(runtime_class.clone()),
+        .returns(
+          runtime_class.clone(),
             "Handle to the created runtime, {null} if an error occurred",
-        ))?
+        )?
         .fails_with(error_type)?
         .doc(
             doc("Creates a new runtime for running the protocol stack.")
@@ -45,8 +44,8 @@ pub fn define(
 
     let destroy_fn = lib
         .declare_native_function("runtime_destroy")?
-        .param("runtime", Type::ClassRef(runtime_class.clone()), "Runtime to destroy")?
-        .return_type(ReturnType::void())?
+        .param("runtime",runtime_class.clone(), "Runtime to destroy")?
+        .returns_nothing()?
         .doc(
             doc("Destroy a runtime.")
             .details("This method will gracefully wait for all asynchronous operation to end before returning")

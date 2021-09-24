@@ -8,7 +8,7 @@ use oo_bindgen::native_struct::*;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
-use oo_bindgen::types::BasicType;
+use oo_bindgen::types::{BasicType, DurationType};
 
 struct OutstationTypes {
     database: ClassHandle,
@@ -56,12 +56,12 @@ pub fn define(
         .declare_native_function("tcpserver_new")?
         .param(
             "runtime",
-            Type::ClassRef(shared_def.runtime_class.clone()),
+            shared_def.runtime_class.clone(),
             "Runtime to execute the server on",
         )?
         .param(
             "link_error_mode",
-            Type::Enum(shared_def.link_error_mode.clone()),
+            shared_def.link_error_mode.clone(),
             "Controls how link errors are handled with respect to the TCP session",
         )?
         .param(
@@ -69,30 +69,27 @@ pub fn define(
             Type::String,
             "Address to bind the server to e.g. 127.0.0.1:20000",
         )?
-        .return_type(ReturnType::new(
-            Type::ClassRef(tcp_server.clone()),
-            "New TCP server instance",
-        ))?
+        .returns(tcp_server.clone(), "New TCP server instance")?
         .fails_with(shared_def.error_type.clone())?
         .doc(doc("Create a new TCP server.").details("To start it, use {class:TCPServer.bind()}."))?
         .build()?;
 
     let tcp_server_destroy_fn = lib.declare_native_function("tcpserver_destroy")?
-        .param("server", Type::ClassRef(tcp_server.clone()), "Server to shutdown")?
-        .return_type(ReturnType::void())?
+        .param("server",tcp_server.clone(), "Server to shutdown")?
+        .returns_nothing()?
         .doc("Gracefully shutdown all the outstations associated to this server, stops the server and release resources.")?
         .build()?;
 
     let tcp_server_add_outstation_fn = lib.declare_native_function("tcpserver_add_outstation")?
-        .param("server", Type::ClassRef(tcp_server.clone()), "TCP server to add the outstation to")?
-        .param("config", Type::Struct(types.outstation_config), "Outstation configuration")?
-        .param("event_config", Type::Struct(types.event_buffer_config), "Event buffer configuration")?
-        .param("application", Type::Interface(types.outstation_application), "Outstation application callbacks")?
-        .param("information", Type::Interface(types.outstation_information), "Outstation information callbacks")?
-        .param("control_handler", Type::Interface(types.control_handler), "Outstation control handler")?
-        .param("listener", Type::Interface(types.connection_state_listener), "Listener for the connection state")?
-        .param("filter", Type::ClassRef(address_filter.declaration()), "Address filter")?
-        .return_type(ReturnType::new(Type::ClassRef(outstation.declaration()), "Outstation handle"))?
+        .param("server",tcp_server.clone(), "TCP server to add the outstation to")?
+        .param("config",types.outstation_config, "Outstation configuration")?
+        .param("event_config", types.event_buffer_config, "Event buffer configuration")?
+        .param("application", types.outstation_application, "Outstation application callbacks")?
+        .param("information", types.outstation_information, "Outstation information callbacks")?
+        .param("control_handler", types.control_handler, "Outstation control handler")?
+        .param("listener", types.connection_state_listener, "Listener for the connection state")?
+        .param("filter",address_filter.declaration(), "Address filter")?
+        .returns(outstation.declaration(), "Outstation handle")?
         .fails_with(shared_def.error_type.clone())?
         .doc(doc("Add an outstation to the server.")
             .details("The returned {class:Outstation} can be used to modify points of the outstation.")
@@ -100,8 +97,8 @@ pub fn define(
         .build()?;
 
     let tcp_server_bind_fn = lib.declare_native_function("tcpserver_bind")?
-        .param("server", Type::ClassRef(tcp_server.clone()), "Server to bind")?
-        .return_type(ReturnType::void())?
+        .param("server",tcp_server.clone(), "Server to bind")?
+        .returns_nothing()?
         .fails_with(shared_def.error_type.clone())?
         .doc("Bind the server to the port and starts listening. Also starts all the outstations associated to it.")?
         .build()?;
@@ -131,12 +128,8 @@ fn define_outstation(
             "execute",
             "Execute the transaction with the provided database",
         )?
-        .param(
-            "database",
-            Type::ClassRef(types.database.declaration()),
-            "Database",
-        )?
-        .return_type(ReturnType::void())?
+        .param("database", types.database.declaration(), "Database")?
+        .returns_nothing()?
         .build()?
         .destroy_callback("on_destroy")?
         .build()?;
@@ -147,67 +140,63 @@ fn define_outstation(
         .declare_native_function("outstation_create_serial_session")?
         .param(
             "runtime",
-            Type::ClassRef(shared_def.runtime_class.clone()),
+            shared_def.runtime_class.clone(),
             "runtime on which to spawn the outstation",
         )?
         .param("serial_path", Type::String, "Path of the serial device")?
         .param(
             "settings",
-            Type::Struct(shared_def.serial_port_settings.clone()),
+            shared_def.serial_port_settings.clone(),
             "settings for the serial port",
         )?
         .param(
             "config",
-            Type::Struct(types.outstation_config.clone()),
+            types.outstation_config.clone(),
             "outstation configuration",
         )?
         .param(
             "event_config",
-            Type::Struct(types.event_buffer_config.clone()),
+            types.event_buffer_config.clone(),
             "event buffer configuration",
         )?
         .param(
             "application",
-            Type::Interface(types.outstation_application.clone()),
+            types.outstation_application.clone(),
             "application interface",
         )?
         .param(
             "information",
-            Type::Interface(types.outstation_information.clone()),
+            types.outstation_information.clone(),
             "informational events interface",
         )?
         .param(
             "control_handler",
-            Type::Interface(types.control_handler.clone()),
+            types.control_handler.clone(),
             "control handler interface",
         )?
-        .return_type(ReturnType::Type(
-            Type::ClassRef(outstation.clone()),
-            "Outstation instance or {null} if the port cannot be opened".into(),
-        ))?
+        .returns(
+            outstation.clone(),
+            "Outstation instance or {null} if the port cannot be opened",
+        )?
         .fails_with(shared_def.error_type.clone())?
         .doc("Create an outstation instance running on a serial port")?
         .build()?;
 
     let outstation_destroy_fn = lib.declare_native_function("outstation_destroy")?
-        .param("outstation", Type::ClassRef(outstation.clone()), "Outstation to destroy")?
-        .return_type(ReturnType::void())?
+        .param("outstation",outstation.clone(), "Outstation to destroy")?
+        .returns_nothing()?
         .doc(doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:TCPServer.[destructor]} will properly shutdown the outstation."))?
         .build()?;
 
     let outstation_transaction_fn = lib
         .declare_native_function("outstation_transaction")?
-        .param(
-            "outstation",
-            Type::ClassRef(outstation.clone()),
-            "Outstation",
-        )?
+        .param("outstation", outstation.clone(), "Outstation")?
         .param(
             "callback",
-            Type::Interface(transaction_interface),
+            transaction_interface,
             "Method to execute as a transaction",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .doc("Execute transaction to modify the internal database of the outstation")?
         .build()?;
 
@@ -215,15 +204,11 @@ fn define_outstation(
         .declare_native_function("outstation_set_decode_level")?
         .param(
             "outstation",
-            Type::ClassRef(outstation.clone()),
+            outstation.clone(),
             "{class:Outstation} on which to set the decoding level",
         )?
-        .param(
-            "level",
-            Type::Struct(shared_def.decode_level.clone()),
-            "Decode log",
-        )?
-        .return_type(ReturnType::void())?
+        .param("level", shared_def.decode_level.clone(), "Decode log")?
+        .returns_nothing()?
         .fails_with(shared_def.error_type.clone())?
         .doc("Set decoding log level")?
         .build()?;
@@ -343,15 +328,15 @@ fn define_outstation_config(
         )?
         .add(
             "confirm_timeout",
-            StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(5))),
+            StructElementType::Duration(DurationType::Milliseconds, Some(Duration::from_secs(5))),
             "Confirmation timeout",
         )?
         .add(
             "select_timeout",
-            StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(5))),
+            StructElementType::Duration(DurationType::Milliseconds, Some(Duration::from_secs(5))),
             "Select timeout",
         )?
-        .add("features", Type::Struct(features), "Optional features")?
+        .add("features", features, "Optional features")?
         .add(
             "max_unsolicited_retries",
             StructElementType::Uint32(Some(u32::MAX)),
@@ -359,18 +344,18 @@ fn define_outstation_config(
         )?
         .add(
             "unsolicited_retry_delay",
-            StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(5))),
+            StructElementType::Duration(DurationType::Milliseconds, Some(Duration::from_secs(5))),
             "Delay to wait before retrying an unsolicited response",
         )?
         .add(
             "keep_alive_timeout",
-            StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(60))),
+            StructElementType::Duration(DurationType::Milliseconds, Some(Duration::from_secs(60))),
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the master")
                 .details("A value of zero means no automatic keep-alives."),
         )?
         .add("max_read_request_headers", StructElementType::Uint16(Some(64)), doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
         .add("max_controls_per_request", StructElementType::Uint16(Some(64)), doc("Maximum number of controls in a single request."))?
-        .add("class_zero", Type::Struct(class_zero_config), "Controls responses to Class 0 reads")?
+        .add("class_zero", class_zero_config, "Controls responses to Class 0 reads")?
         .doc("Outstation configuration")?
         .build()?;
 
@@ -432,19 +417,13 @@ fn define_event_buffer_config(
     let event_buffer_config_all_types = lib
         .declare_native_function("event_buffer_config_all_types")?
         .param("max", BasicType::Uint16, "Maximum value to set all types")?
-        .return_type(ReturnType::new(
-            Type::Struct(event_buffer_config.clone()),
-            "Event buffer configuration",
-        ))?
+        .returns(event_buffer_config.clone(), "Event buffer configuration")?
         .doc("Initialize an event buffer configuration with the same maximum values for all types")?
         .build()?;
 
     let event_buffer_config_no_events = lib
         .declare_native_function("event_buffer_config_no_events")?
-        .return_type(ReturnType::new(
-            Type::Struct(event_buffer_config.clone()),
-            "Event buffer configuration",
-        ))?
+        .returns(event_buffer_config.clone(), "Event buffer configuration")?
         .doc("Initialize an event buffer configuration to support no events")?
         .build()?;
 
@@ -499,7 +478,7 @@ fn define_outstation_application(
 
     let restart_delay = lib.declare_native_struct("RestartDelay")?;
     let restart_delay = lib.define_native_struct(&restart_delay)?
-        .add("restart_type", Type::Enum(restart_delay_type), "Indicates what {struct:RestartDelay.value} is.")?
+        .add("restart_type", restart_delay_type, "Indicates what {struct:RestartDelay.value} is.")?
         .add("value", BasicType::Uint16, "Expected delay before the outstation comes back online.")?
         .doc(doc("Restart delay used by {interface:OutstationApplication.cold_restart()} and {interface:OutstationApplication.warm_restart()}")
         .details("If {struct:RestartDelay.restart_type} is not {enum:RestartDelayType.NotSupported}, then the {struct:RestartDelay.value} is valid. Otherwise, the outstation will return IIN2.0 NO_FUNC_CODE_SUPPORT."))?
@@ -507,20 +486,18 @@ fn define_outstation_application(
 
     let restart_delay_not_supported_fn = lib
         .declare_native_function("restart_delay_not_supported")?
-        .return_type(ReturnType::new(
-            Type::Struct(restart_delay.clone()),
-            "Unsupported restart delay",
-        ))?
+        .returns(restart_delay.clone(), "Unsupported restart delay")?
         .doc("Creates a restart delay that indicates that this operation is not supported.")?
         .build()?;
 
     let restart_delay_seconds_fn = lib
         .declare_native_function("restart_delay_seconds")?
-        .param("value", BasicType::Uint16, "Expected restart delay (in seconds)")?
-        .return_type(ReturnType::new(
-            Type::Struct(restart_delay.clone()),
-            "Valid restart delay",
-        ))?
+        .param(
+            "value",
+            BasicType::Uint16,
+            "Expected restart delay (in seconds)",
+        )?
+        .returns(restart_delay.clone(), "Valid restart delay")?
         .doc("Creates a restart delay with a value specified in seconds.")?
         .build()?;
 
@@ -531,10 +508,7 @@ fn define_outstation_application(
             BasicType::Uint16,
             "Expected restart delay (in milliseconds)",
         )?
-        .return_type(ReturnType::new(
-            Type::Struct(restart_delay.clone()),
-            "Valid restart delay",
-        ))?
+        .returns(restart_delay.clone(), "Valid restart delay")?
         .doc("Creates a restart delay with a value specified in milliseconds.")?
         .build()?;
 
@@ -573,34 +547,34 @@ fn define_outstation_application(
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
             .details("For more information, see IEEE-1815 2012, p. 64."))?
-            .return_type(ReturnType::new(BasicType::Uint16, "Processing delay, in milliseconds"))?
+            .returns(BasicType::Uint16, "Processing delay, in milliseconds")?
             .build()?
         .callback("write_absolute_time", "Handle a write of the absolute time during time synchronization procedures.")?
             .param("time", BasicType::Uint64, "Received time in milliseconds since EPOCH (only 48 bits are used)")?
-            .return_type(ReturnType::new(Type::Enum(write_time_result), "Result of the write time operation"))?
+            .returns(write_time_result, "Result of the write time operation")?
             .build()?
         .callback("get_application_iin", "Returns the application-controlled IIN bits")?
-            .return_type(ReturnType::new(Type::Struct(application_iin), "Application IIN bits"))?
+            .returns(application_iin, "Application IIN bits")?
             .build()?
         .callback("cold_restart", doc("Request that the outstation perform a cold restart (IEEE-1815 2012, p. 58)")
             .details("The outstation will not automatically restart. It is the responsibility of the user application to handle this request and take the appropriate action."))?
-            .return_type(ReturnType::new(Type::Struct(restart_delay.clone()), "The restart delay"))?
+            .returns(restart_delay.clone(), "The restart delay")?
             .build()?
         .callback("warm_restart", doc("Request that the outstation perform a warm restart (IEEE-1815 2012, p. 58)")
             .details("The outstation will not automatically restart. It is the responsibility of the user application to handle this request and take the appropriate action."))?
-            .return_type(ReturnType::new(Type::Struct(restart_delay), "The restart delay"))?
+            .returns(restart_delay, "The restart delay")?
             .build()?
         .callback("freeze_counters_all", "Freeze all the counters")?
-            .param("freeze_type", Type::Enum(freeze_type.clone()), "Type of freeze operation")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(freeze_result.clone()), "Result of the freeze operation"))?
+            .param("freeze_type", freeze_type.clone(), "Type of freeze operation")?
+            .param("database",database.declaration(), "Database")?
+            .returns(freeze_result.clone(), "Result of the freeze operation")?
             .build()?
         .callback("freeze_counters_range", "Freeze a range of counters")?
             .param("start", BasicType::Uint16, "Start index to freeze (inclusive)")?
             .param("stop", BasicType::Uint16, "Stop index to freeze (inclusive)")?
-            .param("freeze_type", Type::Enum(freeze_type), "Type of freeze operation")?
-            .param("database", Type::ClassRef(database.declaration()), "Database")?
-            .return_type(ReturnType::new(Type::Enum(freeze_result), "Result of the freeze operation"))?
+            .param("freeze_type", freeze_type, "Type of freeze operation")?
+            .param("database",database.declaration(), "Database")?
+            .returns(freeze_result, "Result of the freeze operation")?
             .build()?
         .destroy_callback("on_destroy")?
         .build()
@@ -617,14 +591,10 @@ fn define_outstation_information(
         .define_native_struct(&request_header)?
         .add(
             "control",
-            Type::Struct(shared_def.control_struct.clone()),
+            shared_def.control_struct.clone(),
             "Control field",
         )?
-        .add(
-            "function",
-            Type::Enum(function_code.clone()),
-            "Function code",
-        )?
+        .add("function", function_code.clone(), "Function code")?
         .doc("Application-layer header for requests")?
         .build()?;
 
@@ -638,54 +608,54 @@ fn define_outstation_information(
 
     lib.define_interface("OutstationInformation", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))?
         .callback("process_request_from_idle", "Called when a request is processed from the IDLE state")?
-            .param("header", Type::Struct(request_header), "Request header")?
-            .return_type(ReturnType::void())?
+            .param("header", request_header, "Request header")?
+            .returns_nothing()?
             .build()?
         .callback("broadcast_received", "Called when a broadcast request is received by the outstation")?
-            .param("function_code", Type::Enum(function_code), "Function code received")?
-            .param("action", Type::Enum(broadcast_action), "Broadcast action")?
-            .return_type(ReturnType::void())?
+            .param("function_code", function_code, "Function code received")?
+            .param("action", broadcast_action, "Broadcast action")?
+            .returns_nothing()?
             .build()?
         .callback("enter_solicited_confirm_wait", "Outstation has begun waiting for a solicited confirm")?
             .param("ecsn", BasicType::Uint8, "Expected sequence number")?
-            .return_type(ReturnType::void())?
+            .returns_nothing()?
             .build()?
         .callback("solicited_confirm_timeout", "Failed to receive a solicited confirm before the timeout occurred")?
             .param("ecsn", BasicType::Uint8, "Expected sequence number")?
-            .return_type(ReturnType::void())?
+            .returns_nothing()?
             .build()?
         .callback("solicited_confirm_received", "Received the expected confirm")?
             .param("ecsn", BasicType::Uint8, "Expected sequence number")?
-            .return_type(ReturnType::void())?
+            .returns_nothing()?
             .build()?
         .callback("solicited_confirm_wait_new_request", "Received a new request while waiting for a solicited confirm, aborting the response series")?
-            .return_type(ReturnType::void())?
+            .returns_nothing()?
             .build()?
         .callback("wrong_solicited_confirm_seq", "Received a solicited confirm with the wrong sequence number")?
             .param("ecsn", BasicType::Uint8, "Expected sequence number")?
             .param("seq", BasicType::Uint8, "Received sequence number")?
-            .return_type(ReturnType::void())?
+            .returns_nothing()?
             .build()?
         .callback("unexpected_confirm", "Received a confirm when not expecting one")?
             .param("unsolicited", BasicType::Bool, "True if it's an unsolicited response confirm, false if it's a solicited response confirm")?
             .param("seq", BasicType::Uint8, "Received sequence number")?
-            .return_type(ReturnType::void())?
+            .returns_nothing()?
             .build()?
         .callback("enter_unsolicited_confirm_wait", "Outstation has begun waiting for an unsolicited confirm")?
             .param("ecsn", BasicType::Uint8, "Expected sequence number")?
-            .return_type(ReturnType::void())?
+            .returns_nothing()?
             .build()?
         .callback("unsolicited_confirm_timeout", "Failed to receive an unsolicited confirm before the timeout occurred")?
             .param("ecsn", BasicType::Uint8, "Expected sequence number")?
             .param("retry", BasicType::Bool, "Is it a retry")?
-            .return_type(ReturnType::void())?
+            .returns_nothing()?
             .build()?
         .callback("unsolicited_confirmed", "Master confirmed an unsolicited message")?
             .param("ecsn", BasicType::Uint8, "Expected sequence number")?
-            .return_type(ReturnType::void())?
+            .returns_nothing()?
             .build()?
         .callback("clear_restart_iin", "Master cleared the restart IIN bit")?
-            .return_type(ReturnType::void())?
+            .returns_nothing()?
             .build()?
         .destroy_callback("on_destroy")?
         .build()
@@ -726,153 +696,75 @@ fn define_control_handler(
 
     lib.define_interface("ControlHandler", "Callbacks for handling controls")?
         .callback("begin_fragment", "Notifies the start of a command fragment")?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .callback("end_fragment", "Notifies the end of a command fragment")?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .build()?
         .callback("select_g12v1", select_g12_doc)?
-        .param(
-            "control",
-            Type::Struct(shared_def.g12v1_struct.clone()),
-            "Received CROB",
-        )?
+        .param("control", shared_def.g12v1_struct.clone(), "Received CROB")?
         .param("index", BasicType::Uint16, "Index of the point")?
-        .param(
-            "database",
-            Type::ClassRef(database.declaration()),
-            "Database",
-        )?
-        .return_type(ReturnType::new(
-            Type::Enum(command_status.clone()),
-            "Command status",
-        ))?
+        .param("database", database.declaration(), "Database")?
+        .returns(command_status.clone(), "Command status")?
         .build()?
         .callback("operate_g12v1", "Operate a control point")?
-        .param(
-            "control",
-            Type::Struct(shared_def.g12v1_struct.clone()),
-            "Received CROB",
-        )?
+        .param("control", shared_def.g12v1_struct.clone(), "Received CROB")?
         .param("index", BasicType::Uint16, "Index of the point")?
-        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-        .param(
-            "database",
-            Type::ClassRef(database.declaration()),
-            "Database",
-        )?
-        .return_type(ReturnType::new(
-            Type::Enum(command_status.clone()),
-            "Command status",
-        ))?
+        .param("op_type", operate_type.clone(), "Operate type")?
+        .param("database", database.declaration(), "Database")?
+        .returns(command_status.clone(), "Command status")?
         .build()?
         .callback("select_g41v1", select_g40_doc.clone())?
         .param("control", BasicType::Sint32, "Received analog output value")?
         .param("index", BasicType::Uint16, "Index of the point")?
-        .param(
-            "database",
-            Type::ClassRef(database.declaration()),
-            "Database",
-        )?
-        .return_type(ReturnType::new(
-            Type::Enum(command_status.clone()),
-            "Command status",
-        ))?
+        .param("database", database.declaration(), "Database")?
+        .returns(command_status.clone(), "Command status")?
         .build()?
         .callback("operate_g41v1", "Operate a control point")?
         .param("control", BasicType::Sint32, "Received analog output value")?
         .param("index", BasicType::Uint16, "Index of the point")?
-        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-        .param(
-            "database",
-            Type::ClassRef(database.declaration()),
-            "Database",
-        )?
-        .return_type(ReturnType::new(
-            Type::Enum(command_status.clone()),
-            "Command status",
-        ))?
+        .param("op_type", operate_type.clone(), "Operate type")?
+        .param("database", database.declaration(), "Database")?
+        .returns(command_status.clone(), "Command status")?
         .build()?
         .callback("select_g41v2", select_g40_doc.clone())?
         .param("value", BasicType::Sint16, "Received analog output value")?
         .param("index", BasicType::Uint16, "Index of the point")?
-        .param(
-            "database",
-            Type::ClassRef(database.declaration()),
-            "Database",
-        )?
-        .return_type(ReturnType::new(
-            Type::Enum(command_status.clone()),
-            "Command status",
-        ))?
+        .param("database", database.declaration(), "Database")?
+        .returns(command_status.clone(), "Command status")?
         .build()?
         .callback("operate_g41v2", "Operate a control point")?
         .param("value", BasicType::Sint16, "Received analog output value")?
         .param("index", BasicType::Uint16, "Index of the point")?
-        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-        .param(
-            "database",
-            Type::ClassRef(database.declaration()),
-            "Database",
-        )?
-        .return_type(ReturnType::new(
-            Type::Enum(command_status.clone()),
-            "Command status",
-        ))?
+        .param("op_type", operate_type.clone(), "Operate type")?
+        .param("database", database.declaration(), "Database")?
+        .returns(command_status.clone(), "Command status")?
         .build()?
         .callback("select_g41v3", select_g40_doc.clone())?
         .param("value", BasicType::Float, "Received analog output value")?
         .param("index", BasicType::Uint16, "Index of the point")?
-        .param(
-            "database",
-            Type::ClassRef(database.declaration()),
-            "Database",
-        )?
-        .return_type(ReturnType::new(
-            Type::Enum(command_status.clone()),
-            "Command status",
-        ))?
+        .param("database", database.declaration(), "Database")?
+        .returns(command_status.clone(), "Command status")?
         .build()?
         .callback("operate_g41v3", "Operate a control point")?
         .param("value", BasicType::Float, "Received analog output value")?
         .param("index", BasicType::Uint16, "Index of the point")?
-        .param("op_type", Type::Enum(operate_type.clone()), "Operate type")?
-        .param(
-            "database",
-            Type::ClassRef(database.declaration()),
-            "Database",
-        )?
-        .return_type(ReturnType::new(
-            Type::Enum(command_status.clone()),
-            "Command status",
-        ))?
+        .param("op_type", operate_type.clone(), "Operate type")?
+        .param("database", database.declaration(), "Database")?
+        .returns(command_status.clone(), "Command status")?
         .build()?
         .callback("select_g41v4", select_g40_doc)?
         .param("value", BasicType::Double, "Received analog output value")?
         .param("index", BasicType::Uint16, "Index of the point")?
-        .param(
-            "database",
-            Type::ClassRef(database.declaration()),
-            "Database",
-        )?
-        .return_type(ReturnType::new(
-            Type::Enum(command_status.clone()),
-            "Command status",
-        ))?
+        .param("database", database.declaration(), "Database")?
+        .returns(command_status.clone(), "Command status")?
         .build()?
         .callback("operate_g41v4", "Operate a control point")?
         .param("value", BasicType::Double, "Received analog output value")?
         .param("index", BasicType::Uint16, "Index of the point")?
-        .param("op_type", Type::Enum(operate_type), "Operate type")?
-        .param(
-            "database",
-            Type::ClassRef(database.declaration()),
-            "Database",
-        )?
-        .return_type(ReturnType::new(
-            Type::Enum(command_status),
-            "Command status",
-        ))?
+        .param("op_type", operate_type, "Operate type")?
+        .param("database", database.declaration(), "Database")?
+        .returns(command_status, "Command status")?
         .build()?
         .destroy_callback("on_destroy")?
         .build()
@@ -893,8 +785,8 @@ fn define_connection_state_listener(
         "Callback interface for connection state events",
     )?
     .callback("on_change", "Called when the connection state changes")?
-    .param("state", Type::Enum(state), "New state of the connection")?
-    .return_type(ReturnType::Void)?
+    .param("state", state, "New state of the connection")?
+    .returns_nothing()?
     .build()?
     .destroy_callback("on_destroy")?
     .build()
@@ -908,20 +800,14 @@ fn define_address_filter(
 
     let address_filter_any_fn = lib
         .declare_native_function("address_filter_any")?
-        .return_type(ReturnType::new(
-            Type::ClassRef(address_filter.clone()),
-            "Address filter",
-        ))?
+        .returns(address_filter.clone(), "Address filter")?
         .doc("Create an address filter that accepts any IP address")?
         .build()?;
 
     let address_filter_new_fn = lib
         .declare_native_function("address_filter_new")?
         .param("address", Type::String, "IP address to accept")?
-        .return_type(ReturnType::new(
-            Type::ClassRef(address_filter.clone()),
-            "Address filter",
-        ))?
+        .returns(address_filter.clone(), "Address filter")?
         .fails_with(shared_def.error_type.clone())?
         .doc("Create an address filter that accepts any IP address")?
         .build()?;
@@ -930,11 +816,11 @@ fn define_address_filter(
         .declare_native_function("address_filter_add")?
         .param(
             "address_filter",
-            Type::ClassRef(address_filter.clone()),
+            address_filter.clone(),
             "Address filter to modify",
         )?
         .param("address", Type::String, "IP address to add")?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .fails_with(shared_def.error_type.clone())?
         .doc("Add an accepted IP address to the filter")?
         .build()?;
@@ -943,10 +829,10 @@ fn define_address_filter(
         .declare_native_function("address_filter_destroy")?
         .param(
             "address_filter",
-            Type::ClassRef(address_filter.clone()),
+            address_filter.clone(),
             "Address filter to destroy",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .doc("Destroy an address filter")?
         .build()?;
 

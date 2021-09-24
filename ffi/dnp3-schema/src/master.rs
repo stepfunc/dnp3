@@ -8,7 +8,7 @@ use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
 use oo_bindgen::native_enum::{NativeEnumBuilder, NativeEnumHandle};
-use oo_bindgen::types::BasicType;
+use oo_bindgen::types::{BasicType, DurationType};
 
 pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<(), BindingError> {
     let read_handler = crate::handler::define(lib, shared)?;
@@ -27,51 +27,51 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_create_tcp")?
         .param(
             "runtime",
-            Type::ClassRef(shared.runtime_class.clone()),
+            shared.runtime_class.clone(),
             "Runtime to use to drive asynchronous operations of the master",
         )?
         .param(
             "link_error_mode",
-            Type::Enum(shared.link_error_mode.clone()),
+            shared.link_error_mode.clone(),
             "Controls how link errors are handled with respect to the TCP session",
         )?
         .param(
             "config",
-            Type::Struct(master_channel_config.clone()),
+            master_channel_config.clone(),
             "Generic configuration for the channel",
         )?
         .param(
             "endpoints",
-            Type::ClassRef(endpoint_list.declaration()),
+            endpoint_list.declaration(),
             "List of IP endpoints.",
         )?
         .param(
             "connect_strategy",
-            Type::Struct(connect_strategy),
+            connect_strategy,
             "Controls the timing of (re)connection attempts",
         )?
         .param(
             "listener",
-            Type::Interface(tcp_client_state_listener),
+            tcp_client_state_listener,
             "TCP connection listener used to receive updates on the status of the connection",
         )?
-        .return_type(ReturnType::new(
-            Type::ClassRef(master_channel_class.clone()),
+        .returns(
+            master_channel_class.clone(),
             "Handle to the master created, {null} if an error occurred",
-        ))?
+        )?
         .fails_with(shared.error_type.clone())?
         .doc("Create a master channel that connects to the specified TCP endpoint(s)")?
         .build()?;
 
     let master_channel_create_serial_fn = lib
         .declare_native_function("master_channel_create_serial")?
-        .param("runtime", Type::ClassRef(shared.runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
-        .param("config", Type::Struct(master_channel_config), "Generic configuration for the channel")?
-        .param("path", Type::String, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
-        .param("serial_params", Type::Struct(shared.serial_port_settings.clone()), "Serial port settings")?
-        .param("open_retry_delay", Type::Duration(DurationMapping::Milliseconds), "delay between attempts to open the serial port")?
-        .param("listener", Type::Interface(shared.port_state_listener.clone()), "Listener to receive updates on the status of the serial port")?
-        .return_type(ReturnType::new(Type::ClassRef(master_channel_class.clone()), "Handle to the master created, {null} if an error occurred"))?
+        .param("runtime",shared.runtime_class.clone(), "Runtime to use to drive asynchronous operations of the master")?
+        .param("config",master_channel_config, "Generic configuration for the channel")?
+        .param("path",Type::String, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
+        .param("serial_params",shared.serial_port_settings.clone(), "Serial port settings")?
+        .param("open_retry_delay", DurationType::Milliseconds, "delay between attempts to open the serial port")?
+        .param("listener",shared.port_state_listener.clone(), "Listener to receive updates on the status of the serial port")?
+        .returns(master_channel_class.clone(), "Handle to the master created, {null} if an error occurred")?
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Create a master channel on the specified serial port")
@@ -83,10 +83,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_destroy")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} to destroy",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .doc("Shutdown a {class:MasterChannel} and release all resources")?
         .build()?;
 
@@ -94,10 +94,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_enable")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} to enable",
         )?
-        .return_type(ReturnType::Void)?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("start communications")?
         .build()?;
@@ -106,10 +106,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_disable")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} to disable",
         )?
-        .return_type(ReturnType::Void)?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("stop communications")?
         .build()?;
@@ -127,7 +127,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_add_association")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} on which the association will be created",
         )?
         .param(
@@ -135,25 +135,18 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             BasicType::Uint16,
             "DNP3 data-link address of the remote outstation",
         )?
-        .param(
-            "config",
-            Type::Struct(association_config),
-            "Association configuration",
-        )?
+        .param("config", association_config, "Association configuration")?
         .param(
             "read_handler",
-            Type::Interface(read_handler),
+            read_handler,
             "Interface uses to load measurement data",
         )?
         .param(
             "association_handler",
-            Type::Interface(association_handler_interface),
+            association_handler_interface,
             "Association specific callbacks such as time synchronization",
         )?
-        .return_type(ReturnType::new(
-            Type::Struct(association_id.clone()),
-            "Id of the association",
-        ))?
+        .returns(association_id.clone(), "Id of the association")?
         .fails_with(shared.error_type.clone())?
         .doc("Add an association to the channel")?
         .build()?;
@@ -162,15 +155,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_remove_association")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} on which to apply the operation",
         )?
-        .param(
-            "id",
-            Type::Struct(association_id.clone()),
-            "Id of the association",
-        )?
-        .return_type(ReturnType::void())?
+        .param("id", association_id.clone(), "Id of the association")?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Remove an association from the channel")?
         .build()?;
@@ -178,13 +167,13 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     let add_poll_fn = lib.declare_native_function("master_channel_add_poll")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} on which to apply the operation",
         )?
-        .param("id", Type::Struct(association_id.clone()), "Association on which to add the poll")?
-        .param("request", Type::ClassRef(request_class.declaration()), "Request to perform")?
-        .param("period", Type::Duration(DurationMapping::Milliseconds), "Period to wait between each poll (in ms)")?
-        .return_type(ReturnType::new(Type::Struct(poll_id.clone()), "Id of the created poll"))?
+        .param("id", association_id.clone(), "Association on which to add the poll")?
+        .param("request", request_class.declaration(), "Request to perform")?
+        .param("period", DurationType::Milliseconds, "Period to wait between each poll (in ms)")?
+        .returns(poll_id.clone(), "Id of the created poll")?
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Add a periodic poll to an association")
@@ -195,11 +184,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     let remove_poll_fn = lib.declare_native_function("master_channel_remove_poll")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+           master_channel_class.clone(),
             "{class:MasterChannel} on which to apply the operation",
         )?
-        .param("poll_id", Type::Struct(poll_id.clone()), "Id of the created poll")?
-        .return_type(ReturnType::Void)?
+        .param("poll_id", poll_id.clone(), "Id of the created poll")?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Add a periodic poll to an association")
@@ -210,11 +199,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     let demand_poll_fn = lib.declare_native_function("master_channel_demand_poll")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+           master_channel_class.clone(),
             "{class:MasterChannel} on which to apply the operation",
         )?
-        .param("poll_id", Type::Struct(poll_id), "Id of the poll")?
-        .return_type(ReturnType::void())?
+        .param("poll_id", poll_id, "Id of the poll")?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Demand the immediate execution of a poll previously created with {class:MasterChannel.AddPoll()}.")
@@ -227,15 +216,15 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_set_decode_level")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} on which to apply the operation",
         )?
         .param(
             "decode_level",
-            Type::Struct(shared.decode_level.clone()),
+            shared.decode_level.clone(),
             "Decoding level",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Set the decoding level for the channel")?
         .build()?;
@@ -244,13 +233,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_get_decode_level")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} on which to apply the operation",
         )?
-        .return_type(ReturnType::new(
-            Type::Struct(shared.decode_level.clone()),
-            "Decode level",
-        ))?
+        .returns(shared.decode_level.clone(), "Decode level")?
         .fails_with(shared.error_type.clone())?
         .doc("Get the decoding level for the channel")?
         .build()?;
@@ -259,11 +245,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
 
     let read_fn = lib
         .declare_native_function("master_channel_read")?
-        .param("channel", Type::ClassRef(master_channel_class.clone()), "{class:MasterChannel} on which to perform the operation")?
-        .param("association", Type::Struct(association_id.clone()), "Association on which to perform the read")?
-        .param("request", Type::ClassRef(request_class.declaration()), "Request to send")?
-        .param("callback", Type::Interface(read_callback), "Callback that will be invoked once the read is complete")?
-        .return_type(ReturnType::void())?
+        .param("channel",master_channel_class.clone(), "{class:MasterChannel} on which to perform the operation")?
+        .param("association",association_id.clone(), "Association on which to perform the read")?
+        .param("request",request_class.declaration(), "Request to send")?
+        .param("callback", read_callback, "Callback that will be invoked once the read is complete")?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Perform a read on the association.")
@@ -279,26 +265,22 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_operate")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} on which to perform the operation",
         )?
         .param(
             "association",
-            Type::Struct(association_id.clone()),
+            association_id.clone(),
             "Id of the association",
         )?
-        .param("mode", Type::Enum(command_mode), "Operation mode")?
-        .param(
-            "command",
-            Type::ClassRef(command.declaration()),
-            "Command to send",
-        )?
+        .param("mode", command_mode, "Operation mode")?
+        .param("command", command.declaration(), "Command to send")?
         .param(
             "callback",
-            Type::Interface(command_cb),
+            command_cb,
             "Callback that will receive the result of the command",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a command operation on the association")?
         .build()?;
@@ -310,21 +292,21 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_sync_time")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} on which to perform the operation",
         )?
         .param(
             "association",
-            Type::Struct(association_id.clone()),
+            association_id.clone(),
             "Id of the association",
         )?
-        .param("mode", Type::Enum(time_sync_mode), "Time sync mode")?
+        .param("mode", time_sync_mode, "Time sync mode")?
         .param(
             "callback",
-            Type::Interface(time_sync_cb),
+            time_sync_cb,
             "Callback that will receive the result of the time sync",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a time sync operation to the association")?
         .build()?;
@@ -335,20 +317,20 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_cold_restart")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} on which to perform the operation",
         )?
         .param(
             "association",
-            Type::Struct(association_id.clone()),
+            association_id.clone(),
             "Id of the association",
         )?
         .param(
             "callback",
-            Type::Interface(restart_cb.clone()),
+            restart_cb.clone(),
             "Callback that will receive the result of the restart",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a cold restart operation to the association")?
         .build()?;
@@ -357,20 +339,20 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_warm_restart")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} on which to perform the operation",
         )?
         .param(
             "association",
-            Type::Struct(association_id.clone()),
+            association_id.clone(),
             "Id of the association",
         )?
         .param(
             "callback",
-            Type::Interface(restart_cb),
+            restart_cb,
             "Callback that will receive the result of the restart",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a warm restart operation to the association")?
         .build()?;
@@ -381,20 +363,16 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .declare_native_function("master_channel_check_link_status")?
         .param(
             "channel",
-            Type::ClassRef(master_channel_class.clone()),
+            master_channel_class.clone(),
             "{class:MasterChannel} on which to perform the operation",
         )?
-        .param(
-            "association",
-            Type::Struct(association_id),
-            "Id of the association",
-        )?
+        .param("association", association_id, "Id of the association")?
         .param(
             "callback",
-            Type::Interface(link_status_cb),
+            link_status_cb,
             "Callback that will receive the result of the link status",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a link status check")?
         .build()?;
@@ -435,7 +413,7 @@ fn define_connect_strategy(lib: &mut LibraryBuilder) -> Result<NativeStructHandl
         .add(
             "min_connect_delay",
             StructElementType::Duration(
-                DurationMapping::Milliseconds,
+                DurationType::Milliseconds,
                 Some(std::time::Duration::from_secs(1)),
             ),
             "Minimum delay between two connection attempts, doubles up to the maximum delay",
@@ -443,7 +421,7 @@ fn define_connect_strategy(lib: &mut LibraryBuilder) -> Result<NativeStructHandl
         .add(
             "max_connect_delay",
             StructElementType::Duration(
-                DurationMapping::Milliseconds,
+                DurationType::Milliseconds,
                 Some(std::time::Duration::from_secs(10)),
             ),
             "Maximum delay between two connection attempts",
@@ -451,7 +429,7 @@ fn define_connect_strategy(lib: &mut LibraryBuilder) -> Result<NativeStructHandl
         .add(
             "reconnect_delay",
             StructElementType::Duration(
-                DurationMapping::Milliseconds,
+                DurationType::Milliseconds,
                 Some(std::time::Duration::from_secs(1)),
             ),
             "Delay before attempting a connection after a disconnect",
@@ -510,8 +488,8 @@ fn define_read_callback(
             "on_complete",
             "Called when the read task reached completion or failed",
         )?
-        .param("result", Type::Enum(read_result), "Result of the read task")?
-        .return_type(ReturnType::void())?
+        .param("result", read_result, "Result of the read task")?
+        .returns_nothing()?
         .build()?
         .destroy_callback("on_destroy")?
         .build()
@@ -543,17 +521,17 @@ fn define_association_config(
         .define_native_struct(&association_config)?
         .add(
             "disable_unsol_classes",
-            Type::Struct(event_classes.clone()),
+          event_classes.clone(),
             "Classes to disable unsolicited responses at startup",
         )?
         .add(
             "enable_unsol_classes",
-            Type::Struct(event_classes.clone()),
+          event_classes.clone(),
             "Classes to enable unsolicited responses at startup",
         )?
         .add(
             "startup_integrity_classes",
-            Type::Struct(classes),
+          classes,
             doc("Startup integrity classes to ask on master startup and when an outstation restart is detected.").details("For conformance, this should be Class 1230.")
         )?
         .add(
@@ -563,11 +541,11 @@ fn define_association_config(
         )?
         .add(
             "auto_tasks_retry_strategy",
-            Type::Struct(shared.retry_strategy.clone()),
+          shared.retry_strategy.clone(),
             "Automatic tasks retry strategy",
         )?
         .add("keep_alive_timeout",
-             StructElementType::Duration(DurationMapping::Seconds, Some(Duration::from_secs(60))),
+             StructElementType::Duration(DurationType::Seconds, Some(Duration::from_secs(60))),
              doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the outstation").details("A value of zero means no automatic keep-alive.")
         )?
         .add("auto_integrity_scan_on_buffer_overflow",
@@ -575,7 +553,7 @@ fn define_association_config(
              doc("Automatic integrity scan when an EVENT_BUFFER_OVERFLOW is detected")
         )?
         .add("event_scan_on_events_available",
-             Type::Struct(event_classes),
+           event_classes,
              doc("Classes to automatically send reads when the IIN bit is asserted")
         )?
         .add("max_queued_user_requests",
@@ -617,8 +595,8 @@ fn define_tcp_client_state_listener(
         "Callback for monitoring the client TCP connection state",
     )?
     .callback("on_change", "Called when the client state changed")?
-    .param("state", Type::Enum(client_state_enum), "New state")?
-    .return_type(ReturnType::void())?
+    .param("state", client_state_enum, "New state")?
+    .returns_nothing()?
     .build()?
     .destroy_callback("on_destroy")?
     .build()
@@ -634,7 +612,7 @@ fn define_master_channel_config(
         .add("decode_level", StructElementType::Struct(shared.decode_level.clone()), "Decoding level for this master. You can modify this later on with {class:MasterChannel.SetDecodeLevel()}.")?
         .add(
             "response_timeout",
-            StructElementType::Duration(DurationMapping::Milliseconds, Some(Duration::from_secs(5))),
+            StructElementType::Duration(DurationType::Milliseconds, Some(Duration::from_secs(5))),
             "Timeout for receiving a response"
         )?
         .add("tx_buffer_size", StructElementType::Uint16(Some(2048)), doc("TX buffer size").details("Must be at least 249"))?
@@ -649,8 +627,8 @@ fn define_endpoint_list(
     let endpoint_list_class = lib.declare_class("EndpointList")?;
 
     let endpoint_list_new = lib.declare_native_function("endpoint_list_new")?
-        .param("main_endpoint", Type::String, "Main endpoint")?
-        .return_type(ReturnType::new(Type::ClassRef(endpoint_list_class.clone()), "New endpoint list"))?
+        .param("main_endpoint",Type::String, "Main endpoint")?
+        .returns(endpoint_list_class.clone(), "New endpoint list")?
         .doc(doc("Create a new list of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
         .build()?;
 
@@ -658,17 +636,17 @@ fn define_endpoint_list(
         .declare_native_function("endpoint_list_destroy")?
         .param(
             "list",
-            Type::ClassRef(endpoint_list_class.clone()),
+            endpoint_list_class.clone(),
             "Endpoint list to destroy",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .doc("Delete a previously allocated endpoint list.")?
         .build()?;
 
     let endpoint_list_add = lib.declare_native_function("endpoint_list_add")?
-        .param("list", Type::ClassRef(endpoint_list_class.clone()), "Endpoint list to modify")?
-        .param("endpoint", Type::String, "Endpoint to add to the list")?
-        .return_type(ReturnType::void())?
+        .param("list", endpoint_list_class.clone(), "Endpoint list to modify")?
+        .param("endpoint",Type::String, "Endpoint to add to the list")?
+        .returns_nothing()?
         .doc(doc("Add an IP endpoint to the list.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
         .build()?;
 
@@ -697,19 +675,13 @@ fn define_association_handler(lib: &mut LibraryBuilder) -> Result<InterfaceHandl
             BasicType::Uint64,
             "Timestamp value in milliseconds from UNIX Epoch",
         )?
-        .return_type(ReturnType::new(
-            Type::Struct(timestamp_struct.clone()),
-            "Timestamp",
-        ))?
+        .returns(timestamp_struct.clone(), "Timestamp")?
         .doc("Create a valid timestamp value")?
         .build()?;
 
     let invalid_constructor = lib
         .declare_native_function("timestamp_utc_invalid")?
-        .return_type(ReturnType::new(
-            Type::Struct(timestamp_struct.clone()),
-            "Timestamp",
-        ))?
+        .returns(timestamp_struct.clone(), "Timestamp")?
         .doc("Create an invalid timestamp value")?
         .build()?;
 
@@ -728,10 +700,10 @@ fn define_association_handler(lib: &mut LibraryBuilder) -> Result<InterfaceHandl
             .details("This callback is used when the master performs time synchronization for a particular outstation.")
             .details("This could return the system clock or some other clock's time"),
     )?
-    .return_type(ReturnType::new(
-        Type::Struct(timestamp_struct),
+    .returns(
+        timestamp_struct,
         "The current time",
-    ))?
+    )?
     .build()?
     .destroy_callback("on_destroy")?
     .build()
@@ -749,19 +721,13 @@ fn define_event_classes(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, 
 
     let event_classes_all_fn = lib
         .declare_native_function("event_classes_all")?
-        .return_type(ReturnType::Type(
-            Type::Struct(event_classes.clone()),
-            "Initialized value".into(),
-        ))?
+        .returns(event_classes.clone(), "Initialized value")?
         .doc("Initialize all three event classes to true")?
         .build()?;
 
     let event_classes_none_fn = lib
         .declare_native_function("event_classes_none")?
-        .return_type(ReturnType::Type(
-            Type::Struct(event_classes.clone()),
-            "Initialized value".into(),
-        ))?
+        .returns(event_classes.clone(), "Initialized value")?
         .doc("Initialize all three event classes to false")?
         .build()?;
 
@@ -786,13 +752,13 @@ fn define_classes(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, Bindin
 
     let classes_all_fn = lib
         .declare_native_function("classes_all")?
-        .return_type(ReturnType::new(Type::Struct(classes.clone()), "Class 1230"))?
+        .returns(classes.clone(), "Class 1230")?
         .doc("Class 1230")?
         .build()?;
 
     let classes_none_fn = lib
         .declare_native_function("classes_none")?
-        .return_type(ReturnType::new(Type::Struct(classes.clone()), "No class"))?
+        .returns(classes.clone(), "No class")?
         .doc("No class")?
         .build()?;
 
@@ -865,12 +831,8 @@ fn define_command_callback(
             "on_complete",
             "Called when the command task reached completion or failed",
         )?
-        .param(
-            "result",
-            Type::Enum(command_result),
-            "Result of the command task",
-        )?
-        .return_type(ReturnType::void())?
+        .param("result", command_result, "Result of the command task")?
+        .returns_nothing()?
         .build()?
         .destroy_callback("on_destroy")?
         .build()
@@ -884,21 +846,14 @@ fn define_command_builder(
 
     let command_new_fn = lib
         .declare_native_function("commands_new")?
-        .return_type(ReturnType::new(
-            Type::ClassRef(command.clone()),
-            "Handle to the created set of commands",
-        ))?
+        .returns(command.clone(), "Handle to the created set of commands")?
         .doc("Create a new set of commands")?
         .build()?;
 
     let command_destroy_fn = lib
         .declare_native_function("commands_destroy")?
-        .param(
-            "command",
-            Type::ClassRef(command.clone()),
-            "Set of commands to destroy",
-        )?
-        .return_type(ReturnType::void())?
+        .param("command", command.clone(), "Set of commands to destroy")?
+        .returns_nothing()?
         .doc("Destroy set of commands")?
         .build()?;
 
@@ -906,188 +861,172 @@ fn define_command_builder(
         .declare_native_function("commands_finish_header")?
         .param(
             "commands",
-            Type::ClassRef(command.clone()),
+          command.clone(),
             "Commands on which to finish the header",
         )?
-        .return_type(ReturnType::void())?
+        .returns_nothing()?
         .doc("Finish any partially completed header. This allows for the construction of two headers with the same type and index")?
         .build()?;
 
     let command_add_u8_g12v1_fn = lib
         .declare_native_function("commands_add_g12v1_u8")?
-        .param(
-            "command",
-            Type::ClassRef(command.clone()),
-            "Commands to modify",
-        )?
+        .param("command", command.clone(), "Commands to modify")?
         .param(
             "idx",
             BasicType::Uint8,
             "Index of the point to send the command to",
         )?
-        .param(
-            "header",
-            Type::Struct(shared.g12v1_struct.clone()),
-            "CROB data",
-        )?
-        .return_type(ReturnType::void())?
+        .param("header", shared.g12v1_struct.clone(), "CROB data")?
+        .returns_nothing()?
         .doc("Add a CROB with 1-byte prefix index")?
         .build()?;
 
     let command_add_u16_g12v1_fn = lib
         .declare_native_function("commands_add_g12v1_u16")?
-        .param(
-            "command",
-            Type::ClassRef(command.clone()),
-            "Command to modify",
-        )?
+        .param("command", command.clone(), "Command to modify")?
         .param(
             "idx",
             BasicType::Uint16,
             "Index of the point to send the command to",
         )?
-        .param(
-            "header",
-            Type::Struct(shared.g12v1_struct.clone()),
-            "CROB data",
-        )?
-        .return_type(ReturnType::void())?
+        .param("header", shared.g12v1_struct.clone(), "CROB data")?
+        .returns_nothing()?
         .doc("Add a CROB with 2-byte prefix index")?
         .build()?;
 
     let command_add_u8_g41v1_fn = lib
         .declare_native_function("commands_add_g41v1_u8")?
-        .param(
-            "command",
-            Type::ClassRef(command.clone()),
-            "Command to modify",
-        )?
+        .param("command", command.clone(), "Command to modify")?
         .param(
             "idx",
             BasicType::Uint8,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::Sint32, "Value to set the analog output to")?
-        .return_type(ReturnType::void())?
+        .param(
+            "value",
+            BasicType::Sint32,
+            "Value to set the analog output to",
+        )?
+        .returns_nothing()?
         .doc("Add a Analog Output command (signed 32-bit integer) with 1-byte prefix index")?
         .build()?;
 
     let command_add_u16_g41v1_fn = lib
         .declare_native_function("commands_add_g41v1_u16")?
-        .param(
-            "command",
-            Type::ClassRef(command.clone()),
-            "Commands to modify",
-        )?
+        .param("command", command.clone(), "Commands to modify")?
         .param(
             "idx",
             BasicType::Uint16,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::Sint32, "Value to set the analog output to")?
-        .return_type(ReturnType::void())?
+        .param(
+            "value",
+            BasicType::Sint32,
+            "Value to set the analog output to",
+        )?
+        .returns_nothing()?
         .doc("Add a Analog Output command (signed 32-bit integer) with 2-byte prefix index")?
         .build()?;
 
     let command_add_u8_g41v2_fn = lib
         .declare_native_function("commands_add_g41v2_u8")?
-        .param(
-            "command",
-            Type::ClassRef(command.clone()),
-            "Commands to modify",
-        )?
+        .param("command", command.clone(), "Commands to modify")?
         .param(
             "idx",
             BasicType::Uint8,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::Sint16, "Value to set the analog output to")?
-        .return_type(ReturnType::void())?
+        .param(
+            "value",
+            BasicType::Sint16,
+            "Value to set the analog output to",
+        )?
+        .returns_nothing()?
         .doc("Add a Analog Output command (signed 16-bit integer) with 1-byte prefix index")?
         .build()?;
 
     let command_add_u16_g41v2_fn = lib
         .declare_native_function("commands_add_g41v2_u16")?
-        .param(
-            "command",
-            Type::ClassRef(command.clone()),
-            "Commands to modify",
-        )?
+        .param("command", command.clone(), "Commands to modify")?
         .param(
             "idx",
             BasicType::Uint16,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::Sint16, "Value to set the analog output to")?
-        .return_type(ReturnType::void())?
+        .param(
+            "value",
+            BasicType::Sint16,
+            "Value to set the analog output to",
+        )?
+        .returns_nothing()?
         .doc("Add a Analog Output command (signed 16-bit integer) with 2-byte prefix index")?
         .build()?;
 
     let command_add_u8_g41v3_fn = lib
         .declare_native_function("commands_add_g41v3_u8")?
-        .param(
-            "command",
-            Type::ClassRef(command.clone()),
-            "Commands to modify",
-        )?
+        .param("command", command.clone(), "Commands to modify")?
         .param(
             "idx",
             BasicType::Uint8,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::Float, "Value to set the analog output to")?
-        .return_type(ReturnType::void())?
+        .param(
+            "value",
+            BasicType::Float,
+            "Value to set the analog output to",
+        )?
+        .returns_nothing()?
         .doc("Add a Analog Output command (single-precision float) with 1-byte prefix index")?
         .build()?;
 
     let command_add_u16_g41v3_fn = lib
         .declare_native_function("commands_add_g41v3_u16")?
-        .param(
-            "commands",
-            Type::ClassRef(command.clone()),
-            "Commands to modify",
-        )?
+        .param("commands", command.clone(), "Commands to modify")?
         .param(
             "idx",
             BasicType::Uint16,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::Float, "Value to set the analog output to")?
-        .return_type(ReturnType::void())?
+        .param(
+            "value",
+            BasicType::Float,
+            "Value to set the analog output to",
+        )?
+        .returns_nothing()?
         .doc("Add a Analog Output command (single-precision float) with 2-byte prefix index")?
         .build()?;
 
     let command_add_u8_g41v4_fn = lib
         .declare_native_function("commands_add_g41v4_u8")?
-        .param(
-            "commands",
-            Type::ClassRef(command.clone()),
-            "Commands to modify",
-        )?
+        .param("commands", command.clone(), "Commands to modify")?
         .param(
             "idx",
             BasicType::Uint8,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::Double, "Value to set the analog output to")?
-        .return_type(ReturnType::void())?
+        .param(
+            "value",
+            BasicType::Double,
+            "Value to set the analog output to",
+        )?
+        .returns_nothing()?
         .doc("Add a Analog Output command (double-precision float) with 1-byte prefix index")?
         .build()?;
 
     let command_add_u16_g41v4_fn = lib
         .declare_native_function("commands_add_g41v4_u16")?
-        .param(
-            "commands",
-            Type::ClassRef(command.clone()),
-            "Commands to modify",
-        )?
+        .param("commands", command.clone(), "Commands to modify")?
         .param(
             "idx",
             BasicType::Uint16,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::Double, "Value to set the analog output to")?
-        .return_type(ReturnType::void())?
+        .param(
+            "value",
+            BasicType::Double,
+            "Value to set the analog output to",
+        )?
+        .returns_nothing()?
         .doc("Add a Analog Output command (double-precision float) with 2-byte prefix index")?
         .build()?;
 
@@ -1143,10 +1082,10 @@ fn define_time_sync_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle
     )?
     .param(
         "result",
-        Type::Enum(timesync_result),
+        timesync_result,
         "Result of the time synchronization task",
     )?
-    .return_type(ReturnType::void())?
+    .returns_nothing()?
     .build()?
     .destroy_callback("on_destroy")?
     .build()
@@ -1176,8 +1115,8 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, 
 
     let restart_result = lib.declare_native_struct("RestartResult")?;
     let restart_result = lib.define_native_struct(&restart_result)?
-        .add("error", Type::Enum(restart_error), "Success/failure of the restart task")?
-        .add("delay", Type::Duration(DurationMapping::Milliseconds), "Delay value returned by the outstation. Valid only if {struct:RestartResult.error} is {enum:RestartError.Ok}.")?
+        .add("error", restart_error, "Success/failure of the restart task")?
+        .add("delay", DurationType::Milliseconds, "Delay value returned by the outstation. Valid only if {struct:RestartResult.error} is {enum:RestartError.Ok}.")?
         .doc("Result of a restart task")?
         .build()?;
 
@@ -1186,12 +1125,8 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, 
             "on_complete",
             "Called when the restart task reached completion or failed",
         )?
-        .param(
-            "result",
-            Type::Struct(restart_result),
-            "Result of the restart task",
-        )?
-        .return_type(ReturnType::void())?
+        .param("result", restart_result, "Result of the restart task")?
+        .returns_nothing()?
         .build()?
         .destroy_callback("on_destroy")?
         .build()
@@ -1217,12 +1152,8 @@ fn define_link_status_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHand
 
     lib.define_interface("LinkStatusCallback", "Handler for link status check")?
         .callback("on_complete", "Called when a link status is received")?
-        .param(
-            "result",
-            Type::Enum(link_status_enum),
-            "Result of the link status",
-        )?
-        .return_type(ReturnType::void())?
+        .param("result", link_status_enum, "Result of the link status")?
+        .returns_nothing()?
         .build()?
         .destroy_callback("on_destroy")?
         .build()
