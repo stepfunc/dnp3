@@ -163,7 +163,12 @@ class MainClass
         var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
         // ANCHOR_END: runtime_init
 
-        var tlsConfig = new TlsClientConfig("test.com", "./certs/ca_chain/ca_cert.pem", "./certs/ca_chain/entity1_cert.pem", "./certs/ca_chain/entity1_key.pem");
+        var tlsConfig = new TlsClientConfig(
+            "test.com",
+            "./certs/ca_chain/ca_cert.pem",
+            "./certs/ca_chain/entity1_cert.pem",
+            "./certs/ca_chain/entity1_key.pem"
+        );
 
         // ANCHOR: create_master_channel
         var channel = MasterChannel.CreateTlsChannel(
@@ -172,7 +177,7 @@ class MainClass
             GetMasterChannelConfig(),
             new EndpointList("127.0.0.1:20001"),
             tlsConfig,
-            new ConnectStrategy(),            
+            new ConnectStrategy(),
             new TestListener()
         );
         // ANCHOR_END: create_master_channel

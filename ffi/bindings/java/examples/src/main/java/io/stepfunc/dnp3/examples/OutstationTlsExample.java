@@ -37,6 +37,7 @@ public class OutstationTlsExample {
 
     TlsServerConfig tlsConfig =
         new TlsServerConfig(
+            "test.com",
             "./certs/ca_chain/ca_cert.pem",
             "./certs/ca_chain/entity2_cert.pem",
             "./certs/ca_chain/entity2_key.pem");

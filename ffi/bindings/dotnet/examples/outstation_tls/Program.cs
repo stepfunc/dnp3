@@ -117,7 +117,12 @@ class ExampleOutstation
 
         var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
 
-        var tlsConfig = new TlsServerConfig("./certs/ca_chain/ca_cert.pem", "./certs/ca_chain/entity2_cert.pem", "./certs/ca_chain/entity2_key.pem");
+        var tlsConfig = new TlsServerConfig(
+            "test.com",
+            "./certs/ca_chain/ca_cert.pem",
+            "./certs/ca_chain/entity2_cert.pem",
+            "./certs/ca_chain/entity2_key.pem"
+        );
 
         // ANCHOR: create_tcp_server
         var server = TcpServer.CreateTlsServer(runtime, LinkErrorMode.Close, "127.0.0.1:20001", tlsConfig);

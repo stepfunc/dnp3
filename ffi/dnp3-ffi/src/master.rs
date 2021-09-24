@@ -6,7 +6,7 @@ use dnp3::app::{ConnectStrategy, Listener, RetryStrategy, Timeout, Timestamp};
 use dnp3::link::{EndpointAddress, LinkStatusResult, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::serial::*;
-use dnp3::tcp::tls::{MinTlsVersion, TlsClientConfig, TlsError};
+use dnp3::tcp::tls::*;
 use dnp3::tcp::ClientState;
 
 use crate::ffi;
@@ -69,6 +69,7 @@ pub(crate) unsafe fn master_channel_create_tls(
         Path::new(tls_config.local_cert_path().to_string_lossy().as_ref()),
         Path::new(tls_config.private_key_path().to_string_lossy().as_ref()),
         tls_config.min_tls_version().into(),
+        tls_config.certificate_mode().into(),
     )?;
 
     let connect_strategy = ConnectStrategy::new(
@@ -697,6 +698,15 @@ impl From<ffi::MinTlsVersion> for MinTlsVersion {
         match from {
             ffi::MinTlsVersion::Tls1_2 => MinTlsVersion::Tls1_2,
             ffi::MinTlsVersion::Tls1_3 => MinTlsVersion::Tls1_3,
+        }
+    }
+}
+
+impl From<ffi::CertificateMode> for CertificateMode {
+    fn from(from: ffi::CertificateMode) -> Self {
+        match from {
+            ffi::CertificateMode::TrustChain => CertificateMode::TrustChain,
+            ffi::CertificateMode::SelfSignedCertificate => CertificateMode::SelfSignedCertificate,
         }
     }
 }

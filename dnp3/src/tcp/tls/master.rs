@@ -2,14 +2,16 @@ use std::future::Future;
 use std::io::{self, ErrorKind};
 use std::net::SocketAddr;
 use std::path::Path;
+use std::sync::Arc;
 
 use tokio_rustls::{rustls, webpki};
 use tracing::Instrument;
 
+use super::rasn;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::tcp::tls::{load_certs, load_private_key, MinTlsVersion, TlsError};
+use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
 use crate::tcp::EndpointList;
 use crate::tcp::{ClientState, MasterTask, MasterTaskConnectionHandler};
 use crate::tokio::net::TcpStream;
@@ -18,7 +20,7 @@ use crate::util::phys::PhysLayer;
 /// TLS configuration
 pub struct TlsClientConfig {
     dns_name: webpki::DNSName,
-    config: std::sync::Arc<rustls::ClientConfig>,
+    config: Arc<rustls::ClientConfig>,
 }
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
@@ -87,22 +89,13 @@ impl TlsClientConfig {
         local_cert_path: &Path,
         private_key_path: &Path,
         min_tls_version: MinTlsVersion,
+        certificate_mode: CertificateMode,
     ) -> Result<Self, TlsError> {
-        let peer_certs = load_certs(peer_cert_path, false)?;
+        let mut peer_certs = load_certs(peer_cert_path, false)?;
         let local_certs = load_certs(local_cert_path, true)?;
         let private_key = load_private_key(private_key_path)?;
 
         let mut config = rustls::ClientConfig::new();
-
-        // Add peer certificates
-        for cert in &peer_certs {
-            config.root_store.add(cert).map_err(|err| {
-                TlsError::InvalidPeerCertificate(io::Error::new(
-                    ErrorKind::InvalidData,
-                    err.to_string(),
-                ))
-            })?;
-        }
 
         // Set local cert chain
         config
@@ -116,6 +109,46 @@ impl TlsClientConfig {
 
         // Set allowed TLS versions
         config.versions = min_tls_version.to_vec();
+
+        match certificate_mode {
+            CertificateMode::TrustChain => {
+                // Add peer certificates
+                // The default WebPKIVerifier will validate the presented
+                // cert chain against these.
+                if certificate_mode == CertificateMode::TrustChain {
+                    for cert in &peer_certs {
+                        config.root_store.add(cert).map_err(|err| {
+                            TlsError::InvalidPeerCertificate(io::Error::new(
+                                ErrorKind::InvalidData,
+                                err.to_string(),
+                            ))
+                        })?;
+                    }
+                }
+            }
+            CertificateMode::SelfSignedCertificate => {
+                // Set the custom certificate verifier
+                if certificate_mode == CertificateMode::SelfSignedCertificate {
+                    if let Some(peer_cert) = peer_certs.pop() {
+                        if !peer_certs.is_empty() {
+                            return Err(TlsError::InvalidPeerCertificate(io::Error::new(
+                                ErrorKind::InvalidData,
+                                "more than one peer certificate in self-signed mode",
+                            )));
+                        }
+
+                        config.dangerous().set_certificate_verifier(Arc::new(
+                            SelfSignedCertificateServerCertVerifier::new(peer_cert),
+                        ));
+                    } else {
+                        return Err(TlsError::InvalidPeerCertificate(io::Error::new(
+                            ErrorKind::InvalidData,
+                            "no peer certificate",
+                        )));
+                    }
+                }
+            }
+        }
 
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(name)
             .map_err(|_| TlsError::InvalidDnsName)?
@@ -142,5 +175,54 @@ impl TlsClientConfig {
                 stream,
             )))),
         }
+    }
+}
+
+struct SelfSignedCertificateServerCertVerifier {
+    cert: rustls::Certificate,
+}
+
+impl SelfSignedCertificateServerCertVerifier {
+    fn new(cert: rustls::Certificate) -> Self {
+        Self { cert }
+    }
+}
+
+impl rustls::ServerCertVerifier for SelfSignedCertificateServerCertVerifier {
+    fn verify_server_cert(
+        &self,
+        _roots: &rustls::RootCertStore,
+        presented_certs: &[rustls::Certificate],
+        _dns_name: webpki::DNSNameRef<'_>,
+        _ocsp_response: &[u8],
+    ) -> Result<rustls::ServerCertVerified, rustls::TLSError> {
+        let now = chrono::offset::Utc::now();
+
+        // Check that only 1 certificate is presented
+        if presented_certs.len() != 1 {
+            return Err(rustls::TLSError::General(format!(
+                "server sent {} certificates, expected one",
+                presented_certs.len()
+            )));
+        }
+
+        // Check that presented certificate matches byte-for-byte the expected certificate
+        if presented_certs[0] != self.cert {
+            return Err(rustls::TLSError::General(
+                "server certificate doesn't match the expected self-signed certificate".to_string(),
+            ));
+        }
+
+        // Check that the certificate is still valid
+        let parsed_cert = rasn::x509::Certificate::parse(&presented_certs[0].0).unwrap();
+        parsed_cert
+            .tbs_certificate
+            .value
+            .validity
+            .is_valid(now.into());
+
+        // We do not validate DNS name. Providing the exact same certificate is sufficient.
+
+        Ok(rustls::ServerCertVerified::assertion())
     }
 }

@@ -307,6 +307,7 @@ int main()
     }
 
     dnp3_tls_server_config_t tls_config = dnp3_tls_server_config_init(
+        "test.com",
         "./certs/ca_chain/ca_cert.pem",
         "./certs/ca_chain/entity2_cert.pem",
         "./certs/ca_chain/entity2_key.pem"
