@@ -214,7 +214,9 @@ impl rustls::ServerCertVerifier for SelfSignedCertificateServerCertVerifier {
         }
 
         // Check that the certificate is still valid
-        let parsed_cert = rasn::x509::Certificate::parse(&presented_certs[0].0).unwrap();
+        let parsed_cert = rasn::x509::Certificate::parse(&presented_certs[0].0).map_err(|err| {
+            rustls::TLSError::General(format!("unable to parse cert with rasn: {:?}", err))
+        })?;
         parsed_cert
             .tbs_certificate
             .value
