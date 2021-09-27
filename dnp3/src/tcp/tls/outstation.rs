@@ -192,8 +192,6 @@ impl rustls::ClientCertVerifier for SelfSignedCertificateClientCertVerifier {
         presented_certs: &[rustls::Certificate],
         _sni: Option<&webpki::DNSName>,
     ) -> Result<rustls::ClientCertVerified, rustls::TLSError> {
-        let now = chrono::offset::Utc::now();
-
         // Check that only 1 certificate is presented
         if presented_certs.len() != 1 {
             return Err(rustls::TLSError::General(format!(
@@ -213,11 +211,13 @@ impl rustls::ClientCertVerifier for SelfSignedCertificateClientCertVerifier {
         let parsed_cert = rasn::x509::Certificate::parse(&presented_certs[0].0).map_err(|err| {
             rustls::TLSError::General(format!("unable to parse cert with rasn: {:?}", err))
         })?;
-        parsed_cert
-            .tbs_certificate
-            .value
-            .validity
-            .is_valid(now.into());
+        let now = rasn::types::UtcTime::now()
+            .map_err(|_| rustls::TLSError::General("unable to get the current time".to_string()))?;
+        if !parsed_cert.tbs_certificate.value.validity.is_valid(now) {
+            return Err(rustls::TLSError::General(
+                "self-signed certificate is currently not valid".to_string(),
+            ));
+        }
 
         // We do not validate DNS name. Providing the exact same certificate is sufficient.
 

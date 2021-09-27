@@ -1,6 +1,7 @@
+#![allow(unused)]
+
 use super::oid::get_oid;
 use super::reader;
-use chrono::{DateTime, FixedOffset};
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq)]
@@ -449,17 +450,29 @@ impl<'a> ASNWrapperType<'a> for BitString<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+/// UTC time stored as an u64 count of non-leap seconds since UNIX Epoch.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub(crate) struct UtcTime {
-    pub(crate) value: DateTime<FixedOffset>,
+    value: u64,
 }
 impl UtcTime {
-    pub(crate) fn asn<'a>(value: DateTime<FixedOffset>) -> ASNType<'a> {
+    pub(crate) fn asn<'a>(value: u64) -> ASNType<'a> {
         ASNType::UTCTime(UtcTime { value })
+    }
+
+    pub(crate) fn from_seconds_since_epoch(secs: u64) -> Self {
+        Self { value: secs }
+    }
+
+    pub(crate) fn now() -> Result<Self, ASNError> {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| Self::from_seconds_since_epoch(duration.as_secs()))
+            .map_err(|_| ASNError::BadUTCTime)
     }
 }
 impl<'a> ASNWrapperType<'a> for UtcTime {
-    type Item = DateTime<FixedOffset>;
+    type Item = UtcTime;
 
     fn get_id() -> ASNTypeId {
         ASNTypeId::UTCTime
@@ -467,7 +480,7 @@ impl<'a> ASNWrapperType<'a> for UtcTime {
 
     fn get_value(asn_type: ASNType<'a>) -> Option<Self::Item> {
         match asn_type {
-            ASNType::UTCTime(wrapper) => Some(wrapper.value),
+            ASNType::UTCTime(wrapper) => Some(wrapper),
             _ => None,
         }
     }
@@ -508,6 +521,7 @@ pub(crate) enum ASNType<'a> {
     UTF8String(UTF8String<'a>),
     Null,
     UTCTime(UtcTime),
+    GeneralizedTime(UtcTime),
     BitString(BitString<'a>),
     OctetString(OctetString<'a>),
     ObjectIdentifier(ObjectIdentifier),
@@ -527,6 +541,7 @@ pub(crate) enum ASNTypeId {
     UTF8String,
     Null,
     UTCTime,
+    GeneralizedTime,
     BitString,
     OctetString,
     ObjectIdentifier,
@@ -545,6 +560,7 @@ impl<'a> ASNType<'a> {
             ASNType::UTF8String(_) => ASNTypeId::UTF8String,
             ASNType::Null => ASNTypeId::Null,
             ASNType::UTCTime(_) => ASNTypeId::UTCTime,
+            ASNType::GeneralizedTime(_) => ASNTypeId::GeneralizedTime,
             ASNType::BitString(_) => ASNTypeId::BitString,
             ASNType::OctetString(_) => ASNTypeId::OctetString,
             ASNType::ObjectIdentifier(_) => ASNTypeId::ObjectIdentifier,
@@ -568,7 +584,7 @@ pub(crate) enum ASNError {
     BadLengthEncoding(u8, usize), // count of bytes followed by the value
     BadOidLength,
     BadUTF8(std::str::Utf8Error),
-    BadUTCTime(chrono::format::ParseError),
+    BadUTCTime,
     BitStringUnusedBitsTooLarge(u8),
     // these errors relate to schemas
     UnexpectedType(ASNTypeId, ASNTypeId), // the expected type followed by the actual type

@@ -1,6 +1,6 @@
-use chrono;
 use std::str;
 
+use super::calendar;
 use super::reader::Reader;
 use super::types::*;
 
@@ -39,28 +39,95 @@ fn parse_integer(contents: &[u8]) -> ASNResult {
     }
 }
 
-const UTC_WITH_SECONDS: &str = "%y%m%d%H%M%SZ";
-const UTC_WITHOUT_SECONDS: &str = "%y%m%d%H%MZ";
-const TZ_WITH_SECONDS: &str = "%y%m%d%H%M%S%z";
-const TZ_WITHOUT_SECONDS: &str = "%y%m%d%H%M%z";
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+enum TimeType {
+    Utc,
+    Generalized,
+}
 
 fn parse_utc_time(contents: &[u8]) -> ASNResult {
-    // TODO: do something better than this, and perhaps remove the chrono dependency
-    fn try_parse_all_variants(
-        s: &str,
-    ) -> Result<chrono::DateTime<chrono::FixedOffset>, chrono::ParseError> {
-        // try the explicitly UTC variant
-        chrono::NaiveDateTime::parse_from_str(s, UTC_WITH_SECONDS)
-            .or_else(|_| chrono::NaiveDateTime::parse_from_str(s, UTC_WITHOUT_SECONDS))
-            .map(|t| chrono::DateTime::from_utc(t, chrono::FixedOffset::east(0)))
-            .or_else(|_| chrono::DateTime::parse_from_str(s, TZ_WITH_SECONDS))
-            .or_else(|_| chrono::DateTime::parse_from_str(s, TZ_WITHOUT_SECONDS))
+    parse_time(contents, TimeType::Utc)
+}
+
+fn parse_generalized_time(contents: &[u8]) -> ASNResult {
+    parse_time(contents, TimeType::Generalized)
+}
+
+fn parse_time(contents: &[u8], time_type: TimeType) -> ASNResult {
+    // This code is highly inspired from webpki available here:
+    // https://github.com/briansmith/webpki/blob/18cda8a5e32dfc2723930018853a984bd634e667/src/der.rs#L113-L166
+
+    // The original file is licensed under this:
+
+    // Except as otherwise noted, this project is licensed under the following
+    // (ISC-style) terms:
+    //
+    // Copyright 2015 Brian Smith.
+    //
+    // Permission to use, copy, modify, and/or distribute this software for any
+    // purpose with or without fee is hereby granted, provided that the above
+    // copyright notice and this permission notice appear in all copies.
+    //
+    // THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHORS DISCLAIM ALL WARRANTIES
+    // WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    // MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR
+    // ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    // WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+    // The files under third-party/chromium are licensed as described in
+    // third-party/chromium/LICENSE.
+
+    let mut reader = Reader::new(contents);
+
+    fn read_digit(inner: &mut Reader) -> Result<u64, ASNError> {
+        const DIGIT: core::ops::RangeInclusive<u8> = b'0'..=b'9';
+        let b = inner.read_byte().map_err(|_| ASNError::BadUTCTime)?;
+        if DIGIT.contains(&b) {
+            return Ok(u64::from(b - DIGIT.start()));
+        }
+        Err(ASNError::BadUTCTime)
     }
 
-    match try_parse_all_variants(str::from_utf8(contents)?) {
-        Ok(time) => Ok(UtcTime::asn(time)),
-        Err(err) => Err(ASNError::BadUTCTime(err)),
+    fn read_two_digits(inner: &mut Reader, min: u64, max: u64) -> Result<u64, ASNError> {
+        let hi = read_digit(inner)?;
+        let lo = read_digit(inner)?;
+        let value = (hi * 10) + lo;
+        if value < min || value > max {
+            return Err(ASNError::BadUTCTime);
+        }
+        Ok(value)
     }
+
+    let (year_hi, year_lo) = match time_type {
+        TimeType::Utc => {
+            let lo = read_two_digits(&mut reader, 0, 99)?;
+            let hi = if lo >= 50 { 19 } else { 20 };
+            (hi, lo)
+        }
+        TimeType::Generalized => {
+            let hi = read_two_digits(&mut reader, 0, 99)?;
+            let lo = read_two_digits(&mut reader, 0, 99)?;
+            (hi, lo)
+        }
+    };
+
+    let year = (year_hi * 100) + year_lo;
+    let month = read_two_digits(&mut reader, 1, 12)?;
+    let days_in_month = calendar::days_in_month(year, month);
+    let day_of_month = read_two_digits(&mut reader, 1, days_in_month)?;
+    let hours = read_two_digits(&mut reader, 0, 23)?;
+    let minutes = read_two_digits(&mut reader, 0, 59)?;
+    let seconds = read_two_digits(&mut reader, 0, 59)?;
+
+    let time_zone = reader.read_byte().map_err(|_| ASNError::BadUTCTime)?;
+    if time_zone != b'Z' {
+        return Err(ASNError::BadUTCTime);
+    }
+
+    calendar::time_from_ymdhms_utc(year, month, day_of_month, hours, minutes, seconds)
+        .map(ASNType::UTCTime)
 }
 
 fn parse_string<T: Fn(&str) -> ASNType>(contents: &[u8], create: T) -> ASNResult {
@@ -194,6 +261,7 @@ fn read_type(id: &Identifier) -> Option<(ASNTypeId, u8)> {
             0x13 => Some((ASNTypeId::PrintableString, *tag)),
             0x16 => Some((ASNTypeId::IA5String, *tag)),
             0x17 => Some((ASNTypeId::UTCTime, *tag)),
+            0x18 => Some((ASNTypeId::GeneralizedTime, *tag)),
 
             _ => None,
         },
@@ -235,6 +303,7 @@ fn parse_content<'a>(type_id: &ASNTypeId, tag: u8, contents: &'a [u8]) -> ASNRes
         ASNTypeId::PrintableString => parse_string(contents, |s| PrintableString::asn(s)),
         ASNTypeId::IA5String => parse_string(contents, |s| IA5String::asn(s)),
         ASNTypeId::UTCTime => parse_utc_time(contents),
+        ASNTypeId::GeneralizedTime => parse_generalized_time(contents),
 
         ASNTypeId::Sequence => parse_seq(contents),
         ASNTypeId::Set => parse_set(contents),
@@ -247,6 +316,7 @@ pub(crate) struct Parser<'a> {
     reader: Reader<'a>,
 }
 
+#[allow(unused)]
 impl<'a> Parser<'a> {
     pub(crate) fn parse_all<'b, T: 'b>(
         input: &'b [u8],
@@ -596,32 +666,36 @@ mod tests {
 
     #[test]
     fn parses_utc_time() {
-        let utc_with_seconds = "990102052345Z";
-        let utc_without_seconds = "9901020523Z";
-        let tz_positive_with_seconds = "990102052345+0000";
-        let tz_positive_without_seconds = "9901020523+0000";
-        let tz_negative_with_seconds = "990102052345-0000";
-        let tz_negative_without_seconds = "9901020523-0000";
+        // UTC time in the 20th century
+        assert_eq!(
+            parse_utc_time("990102052345Z".as_bytes()),
+            Ok(UtcTime::asn(915254625))
+        );
 
-        fn test_variant(value: &str, seconds: u32) {
-            assert_eq!(
-                parse_utc_time(value.as_bytes()),
-                Ok(UtcTime::asn(chrono::DateTime::from_utc(
-                    chrono::NaiveDate::from_ymd(1999, 01, 02).and_hms(5, 23, seconds),
-                    chrono::FixedOffset::east(0)
-                )))
-            );
-        }
+        // UTC time in the 21th century.
+        // On October 9th 2001, Leonard Cohen and Sharon Robinson released "Ten New Songs".
+        //
+        // "The ponies run, the girls are young,
+        // The odds are there to beat.
+        // You win a while, and then it's done
+        // Your little winning streak.
+        // And summoned now to deal
+        // With your invincible defeat,
+        // You live your life as if it's real,
+        // A Thousand Kisses Deep."
+        assert_eq!(
+            parse_utc_time("011009010203Z".as_bytes()),
+            Ok(UtcTime::asn(1002589323))
+        );
+    }
 
-        // parses the explicit timezone version
-        test_variant(utc_with_seconds, 45);
-        test_variant(utc_without_seconds, 00);
-
-        test_variant(tz_positive_with_seconds, 45);
-        test_variant(tz_positive_without_seconds, 00);
-
-        test_variant(tz_negative_with_seconds, 45);
-        test_variant(tz_negative_without_seconds, 00);
+    #[test]
+    fn parses_generalized_time() {
+        // UTC time in the 20th century
+        assert_eq!(
+            parse_generalized_time("19990102052345Z".as_bytes()),
+            Ok(UtcTime::asn(915254625))
+        );
     }
 
     #[test]

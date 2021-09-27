@@ -48,16 +48,14 @@ pub(crate) struct TBSCertificate<'a> {
     //pub(crate) extensions: Vec<Extension<'a>>,
 }
 
-pub(crate) type Time = chrono::DateTime<chrono::FixedOffset>;
-
 #[derive(Debug)]
 pub(crate) struct Validity {
-    pub(crate) not_before: Time,
-    pub(crate) not_after: Time,
+    pub(crate) not_before: UtcTime,
+    pub(crate) not_after: UtcTime,
 }
 
 impl Validity {
-    fn new(not_before: Time, not_after: Time) -> Validity {
+    fn new(not_before: UtcTime, not_after: UtcTime) -> Validity {
         Validity {
             not_before,
             not_after,
@@ -73,7 +71,7 @@ impl Validity {
         })
     }
 
-    pub(crate) fn is_valid(&self, now: Time) -> bool {
+    pub(crate) fn is_valid(&self, now: UtcTime) -> bool {
         now >= self.not_before && now <= self.not_after
     }
 }
@@ -234,7 +232,7 @@ impl<'a> TBSCertificate<'a> {
         subject_public_key_info: SubjectPublicKeyInfo<'a>,
         issuer_unique_id: Option<ASNBitString<'a>>,
         subject_unique_id: Option<ASNBitString<'a>>,
-        extensions: (),
+        _extensions: (),
         //extensions: Vec<Extension<'a>>,
     ) -> TBSCertificate<'a> {
         TBSCertificate {
