@@ -55,12 +55,26 @@ public class MasterTlsExample {
     Runtime runtime = new Runtime(getRuntimeConfig());
     // ANCHOR_END: runtime
 
-    TlsClientConfig tlsConfig =
+    // ANCHOR: tls_self_signed_config
+    TlsClientConfig selfSignedTlsConfig =
+        new TlsClientConfig(
+            "test.com",
+            "./certs/self_signed/entity2_cert.pem",
+            "./certs/self_signed/entity1_cert.pem",
+            "./certs/self_signed/entity1_key.pem");
+    selfSignedTlsConfig.certificateMode = CertificateMode.SELF_SIGNED_CERTIFICATE;
+    // ANCHOR_END: tls_self_signed_config
+
+    // ANCHOR: tls_ca_chain_config
+    TlsClientConfig caChainTlsConfig =
         new TlsClientConfig(
             "test.com",
             "./certs/ca_chain/ca_cert.pem",
             "./certs/ca_chain/entity1_cert.pem",
             "./certs/ca_chain/entity1_key.pem");
+    // ANCHOR_END: tls_ca_chain_config
+
+    TlsClientConfig tlsConfig = caChainTlsConfig;
 
     // ANCHOR: create_master_channel
     MasterChannel channel =

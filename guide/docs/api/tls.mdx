@@ -1,0 +1,89 @@
+---
+id: tls
+title: TLS
+sidebar_label: TLS
+slug: /api/tls
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Both TCP masters and outstations support TLS to enable authentication and privacy of the communication links. The library internally uses
+[rustls](https://github.com/rustls/rustls), a modern TLS library entirely written in Rust. Therefore, it does **not** depend on OpenSSL
+or other third-party library that needs to be present on the system, but will interoperate with peers using
+these libraries.
+
+## Supported features
+
+- TLS v1.2 and v1.3
+- Supported cipher suites (in descending order of preference):
+  - TLS v1.3:
+    - `TLS_CHACHA20_POLY1305_SHA256`
+    - `TLS_AES_256_GCM_SHA384`
+    - `TLS_AES_128_GCM_SHA256`
+  - TLS v1.2:
+    - `TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256`
+    - `TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256`
+    - `TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384`
+    - `TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256`
+    - `TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384`
+    - `TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256`
+- Supported key exchange groups (in descending order of preference):
+  - `x25519`
+  - `secp384r1`
+  - `secp256r1`
+- Supported signature hash algorithms (in descending order of preference):
+  - `ecdsa_secp384r1_sha384`
+  - `ecdsa_secp256r1_sha256`
+  - `ed25519` (v1.3 only)
+  - `rsa_pss_sha512` (v1.3 only)
+  - `rsa_pss_sha384` (v1.3 only)
+  - `rsa_pss_sha256` (v1.3 only)
+  - `rsa_pkcs1_sha512`
+  - `rsa_pkcs1_sha384`
+  - `rsa_pkcs1_sha256`
+- Client and server name validation
+- Self-signed certificates (with a special configuration)
+
+## Configuration
+
+TLS configuration is done through the `TlsClientConfig` and `TlsServerConfig` structures. They are both very similar.
+The fields are the following:
+
+- `name`: name requested. The client will advertise this name through
+  a Server Name Indication (SNI) extension in the `Client Hello`. Both
+  the client and the server will verify that the presented certificate
+  is valid for this DNS name. Since Common Name is deprecated, the
+  presented certificate must have the DNS name appear in in a Subject
+  Alternative Name (SAN) extension. DNS name validation is not performed
+  when `CertificateMode` is `SelfSignedCertificate`.
+- `peer_cert_path`: path to the unencrypted PEM file containing the trusted
+  root certificate(s) or the peer self-signed certificate.
+- `local_cert_path`: path to the unencrypted PEM file containing the certificate
+  or the chain of certificates to present to the peer.
+- `private_key_path`: path to the unencrypted PEM file containing the private
+  key of the local certificate.
+- `min_tls_version`: minimum TLS version to support. Setting this to `Tls1_3`
+  will force TLSv1.3.
+- `certificate_mode`: mode of verification of the presented certificate. See
+  the next section for more details.
+
+### Certificate mode
+
+The `certificate_mode` parameter determines how the presented peer certificate
+will be validated.
+
+The default `TrustChain` value validates that the presented chain of certificates
+and verify that the root certificate of the chain is one of those provided in
+the `peer_cert_path` file. In the power industry, we recommend having a **single**
+root certificate. It also validates that all critical extensions are handled, the
+time validity, the DNS name and other details. It will **not** accept self-signed
+certificate.
+
+The `SelfSignedCertificate` value validates that only a single certificate is
+presented and that it matches byte-for-byte the configured `peer_cert_path`. It
+also checks the time validity using the system clock. Since the number of checks
+is limited, a **thorough manual inspection of the configured self-signed certificate is
+required beforehand**. Also note that the DNS name is **not** verified with this mode,
+as this check should be performed manually before adding the self-signed certificate
+to the configuration.

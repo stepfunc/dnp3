@@ -163,12 +163,26 @@ class MainClass
         var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
         // ANCHOR_END: runtime_init
 
-        var tlsConfig = new TlsClientConfig(
+        // ANCHOR: tls_self_signed_config
+        var selfSignedTlsConfig = new TlsClientConfig(
+            "test.com",
+            "./certs/self_signed/ca_cert.pem",
+            "./certs/self_signed/entity1_cert.pem",
+            "./certs/self_signed/entity1_key.pem"
+        );
+        selfSignedTlsConfig.CertificateMode = CertificateMode.SelfSignedCertificate;
+        // ANCHOR_END: tls_self_signed_config
+
+        // ANCHOR: tls_ca_chain_config
+        var caChainTlsConfig = new TlsClientConfig(
             "test.com",
             "./certs/ca_chain/ca_cert.pem",
             "./certs/ca_chain/entity1_cert.pem",
             "./certs/ca_chain/entity1_key.pem"
         );
+        // ANCHOR_END: tls_ca_chain_config
+
+        var tlsConfig = caChainTlsConfig;
 
         // ANCHOR: create_master_channel
         var channel = MasterChannel.CreateTlsChannel(

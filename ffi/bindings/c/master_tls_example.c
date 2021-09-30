@@ -258,13 +258,26 @@ int main()
         goto cleanup;
     }
 
-    // create TLS config
-    dnp3_tls_client_config_t tls_config = dnp3_tls_client_config_init(
+    // ANCHOR: tls_self_signed_config
+    dnp3_tls_client_config_t self_signed_tls_config = dnp3_tls_client_config_init(
+        "test.com",
+        "./certs/self_signed/entity2_cert.pem",
+        "./certs/self_signed/entity1_cert.pem",
+        "./certs/self_signed/entity1_key.pem"
+    );
+    self_signed_tls_config.certificate_mode = DNP3_CERTIFICATE_MODE_SELF_SIGNED_CERTIFICATE;
+    // ANCHOR_END: tls_self_signed_config
+
+    // ANCHOR: tls_ca_chain_config
+    dnp3_tls_client_config_t ca_chain_tls_config = dnp3_tls_client_config_init(
         "test.com",
         "./certs/ca_chain/ca_cert.pem",
         "./certs/ca_chain/entity1_cert.pem",
         "./certs/ca_chain/entity1_key.pem"
     );
+    // ANCHOR_END: tls_ca_chain_config
+
+    dnp3_tls_client_config_t tls_config = ca_chain_tls_config;
 
     // ANCHOR: create_master_channel
     dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_new("127.0.0.1:20001");
