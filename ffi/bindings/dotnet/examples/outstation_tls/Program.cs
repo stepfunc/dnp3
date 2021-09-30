@@ -117,16 +117,30 @@ class ExampleOutstation
 
         var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
 
-        var tlsConfig = new TlsServerConfig(
+        // ANCHOR: tls_self_signed_config
+        var selfSignedTlsConfig = new TlsServerConfig(
+            "test.com",
+            "./certs/self_signed/entity1.pem",
+            "./certs/self_signed/entity2_cert.pem",
+            "./certs/self_signed/entity2_key.pem"
+        );
+        selfSignedTlsConfig.CertificateMode = CertificateMode.SelfSignedCertificate;
+        // ANCHOR_END: tls_self_signed_config
+
+        // ANCHOR: tls_ca_chain_config
+        var caChainTlsConfig = new TlsServerConfig(
             "test.com",
             "./certs/ca_chain/ca_cert.pem",
             "./certs/ca_chain/entity2_cert.pem",
             "./certs/ca_chain/entity2_key.pem"
         );
+        // ANCHOR_END: tls_ca_chain_config
 
-        // ANCHOR: create_tcp_server
+        var tlsConfig = caChainTlsConfig;
+
+        // ANCHOR: create_tls_server
         var server = TcpServer.CreateTlsServer(runtime, LinkErrorMode.Close, "127.0.0.1:20001", tlsConfig);
-        // ANCHOR_END: create_tcp_server
+        // ANCHOR_END: create_tls_server
 
         try
         {

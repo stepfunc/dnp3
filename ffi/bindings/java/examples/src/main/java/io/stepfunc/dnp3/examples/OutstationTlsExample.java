@@ -35,17 +35,31 @@ public class OutstationTlsExample {
     // Create the Tokio runtime
     Runtime runtime = new Runtime(new RuntimeConfig());
 
-    TlsServerConfig tlsConfig =
+    // ANCHOR: tls_self_signed_config
+    TlsServerConfig selfSignedTlsConfig =
+        new TlsServerConfig(
+            "test.com",
+            "./certs/self_signed/entity1_cert.pem",
+            "./certs/self_signed/entity2_cert.pem",
+            "./certs/self_signed/entity2_key.pem");
+    selfSignedTlsConfig.certificateMode = CertificateMode.SELF_SIGNED_CERTIFICATE;
+    // ANCHOR_END: tls_self_signed_config
+
+    // ANCHOR: tls_ca_chain_config
+    TlsServerConfig caChainTlsConfig =
         new TlsServerConfig(
             "test.com",
             "./certs/ca_chain/ca_cert.pem",
             "./certs/ca_chain/entity2_cert.pem",
             "./certs/ca_chain/entity2_key.pem");
+    // ANCHOR_END: tls_ca_chain_config
 
-    // ANCHOR: create_tcp_server
+    TlsServerConfig tlsConfig = caChainTlsConfig;
+
+    // ANCHOR: create_tls_server
     TcpServer server =
         TcpServer.createTlsServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20001", tlsConfig);
-    // ANCHOR_END: create_tcp_server
+    // ANCHOR_END: create_tls_server
 
     try {
       run(server);
