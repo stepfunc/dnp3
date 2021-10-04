@@ -5,10 +5,10 @@ use std::sync::Arc;
 use tokio_rustls::rustls::AllowAnyAuthenticatedClient;
 use tokio_rustls::{rustls, webpki};
 
-use super::rasn;
 use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
 use crate::tokio::net::TcpStream;
 use crate::util::phys::PhysLayer;
+use rasn;
 
 /// TLS configuration
 pub struct TlsServerConfig {

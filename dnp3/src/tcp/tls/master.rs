@@ -7,7 +7,6 @@ use std::sync::Arc;
 use tokio_rustls::{rustls, webpki};
 use tracing::Instrument;
 
-use super::rasn;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
@@ -16,6 +15,7 @@ use crate::tcp::EndpointList;
 use crate::tcp::{ClientState, MasterTask, MasterTaskConnectionHandler};
 use crate::tokio::net::TcpStream;
 use crate::util::phys::PhysLayer;
+use rasn;
 
 /// TLS configuration
 pub struct TlsClientConfig {
