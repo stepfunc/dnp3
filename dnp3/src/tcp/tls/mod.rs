@@ -1,6 +1,5 @@
 mod master;
 mod outstation;
-mod rasn;
 
 use std::io::{self, ErrorKind};
 use std::path::Path;

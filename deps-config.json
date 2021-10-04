@@ -1,5 +1,5 @@
 {
-    "ignore": ["dnp3", "tokio-mock"],
+    "ignore": ["dnp3", "rasn", "tokio-mock"],
     "allowed_licenses": ["Apache-2.0 OR ISC OR MIT", "Apache-2.0 OR MIT", "BSD-2-Clause", "BSL-1.0", "ISC", "ISC-OpenSSL-SSLeay", "MIT", "MIT OR Unlicense", "MPL-2.0"],
     "crates": {
         "ring": {
