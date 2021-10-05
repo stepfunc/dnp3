@@ -1,10 +1,11 @@
+use std::convert::TryFrom;
 use std::future::Future;
 use std::io::{self, ErrorKind};
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 
-use tokio_rustls::{rustls, webpki};
+use tokio_rustls::rustls;
 use tracing::Instrument;
 
 use crate::app::{ConnectStrategy, Listener};
@@ -19,7 +20,7 @@ use rasn;
 
 /// TLS configuration
 pub struct TlsClientConfig {
-    dns_name: webpki::DNSName,
+    dns_name: rustls::ServerName,
     config: Arc<rustls::ClientConfig>,
 }
 
@@ -95,64 +96,58 @@ impl TlsClientConfig {
         let local_certs = load_certs(local_cert_path, true)?;
         let private_key = load_private_key(private_key_path)?;
 
-        let mut config = rustls::ClientConfig::new();
+        let builder = rustls::ClientConfig::builder()
+            .with_safe_default_cipher_suites()
+            .with_safe_default_kx_groups()
+            .with_protocol_versions(min_tls_version.to_rustls())
+            .expect("cipher suites or kx groups mismatch with TLS version");
 
-        // Set local cert chain
-        config
-            .set_single_client_cert(local_certs, private_key)
-            .map_err(|err| {
-                TlsError::InvalidLocalCertificate(io::Error::new(
-                    ErrorKind::InvalidData,
-                    err.to_string(),
-                ))
-            })?;
-
-        // Set allowed TLS versions
-        config.versions = min_tls_version.to_vec();
-
-        match certificate_mode {
+        let config = match certificate_mode {
             CertificateMode::TrustChain => {
-                // Add peer certificates
-                // The default WebPKIVerifier will validate the presented
-                // cert chain against these.
-                if certificate_mode == CertificateMode::TrustChain {
-                    for cert in &peer_certs {
-                        config.root_store.add(cert).map_err(|err| {
-                            TlsError::InvalidPeerCertificate(io::Error::new(
-                                ErrorKind::InvalidData,
-                                err.to_string(),
-                            ))
-                        })?;
-                    }
+                let mut root_store = rustls::RootCertStore::empty();
+                for cert in &peer_certs {
+                    root_store.add(cert).map_err(|err| {
+                        TlsError::InvalidPeerCertificate(io::Error::new(
+                            ErrorKind::InvalidData,
+                            err.to_string(),
+                        ))
+                    })?;
                 }
+                builder
+                    .with_root_certificates(root_store)
+                    .with_single_cert(local_certs, private_key)
             }
             CertificateMode::SelfSignedCertificate => {
                 // Set the custom certificate verifier
-                if certificate_mode == CertificateMode::SelfSignedCertificate {
-                    if let Some(peer_cert) = peer_certs.pop() {
-                        if !peer_certs.is_empty() {
-                            return Err(TlsError::InvalidPeerCertificate(io::Error::new(
-                                ErrorKind::InvalidData,
-                                "more than one peer certificate in self-signed mode",
-                            )));
-                        }
-
-                        config.dangerous().set_certificate_verifier(Arc::new(
-                            SelfSignedCertificateServerCertVerifier::new(peer_cert),
-                        ));
-                    } else {
+                if let Some(peer_cert) = peer_certs.pop() {
+                    if !peer_certs.is_empty() {
                         return Err(TlsError::InvalidPeerCertificate(io::Error::new(
                             ErrorKind::InvalidData,
-                            "no peer certificate",
+                            "more than one peer certificate in self-signed mode",
                         )));
                     }
+
+                    builder
+                        .with_custom_certificate_verifier(Arc::new(
+                            SelfSignedCertificateServerCertVerifier::new(peer_cert),
+                        ))
+                        .with_single_cert(local_certs, private_key)
+                } else {
+                    return Err(TlsError::InvalidPeerCertificate(io::Error::new(
+                        ErrorKind::InvalidData,
+                        "no peer certificate",
+                    )));
                 }
             }
         }
+        .map_err(|err| {
+            TlsError::InvalidLocalCertificate(io::Error::new(
+                ErrorKind::InvalidData,
+                err.to_string(),
+            ))
+        })?;
 
-        let dns_name = webpki::DNSNameRef::try_from_ascii_str(name)
-            .map_err(|_| TlsError::InvalidDnsName)?
-            .to_owned();
+        let dns_name = rustls::ServerName::try_from(name).map_err(|_| TlsError::InvalidDnsName)?;
 
         Ok(Self {
             config: std::sync::Arc::new(config),
@@ -166,7 +161,7 @@ impl TlsClientConfig {
         endpoint: &SocketAddr,
     ) -> Result<PhysLayer, String> {
         let connector = tokio_rustls::TlsConnector::from(self.config.clone());
-        match connector.connect(self.dns_name.as_ref(), socket).await {
+        match connector.connect(self.dns_name.clone(), socket).await {
             Err(err) => Err(format!(
                 "failed to establish TLS session with {}: {}",
                 endpoint, err
@@ -188,43 +183,52 @@ impl SelfSignedCertificateServerCertVerifier {
     }
 }
 
-impl rustls::ServerCertVerifier for SelfSignedCertificateServerCertVerifier {
+impl rustls::client::ServerCertVerifier for SelfSignedCertificateServerCertVerifier {
     fn verify_server_cert(
         &self,
-        _roots: &rustls::RootCertStore,
-        presented_certs: &[rustls::Certificate],
-        _dns_name: webpki::DNSNameRef<'_>,
+        end_entity: &rustls::Certificate,
+        intermediates: &[rustls::Certificate],
+        _server_name: &rustls::ServerName,
+        _scts: &mut dyn Iterator<Item = &[u8]>,
         _ocsp_response: &[u8],
-    ) -> Result<rustls::ServerCertVerified, rustls::TLSError> {
-        // Check that only 1 certificate is presented
-        if presented_certs.len() != 1 {
-            return Err(rustls::TLSError::General(format!(
-                "server sent {} certificates, expected one",
-                presented_certs.len()
+        now: std::time::SystemTime,
+    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
+        // Check that no intermediate certificates are present
+        if !intermediates.is_empty() {
+            return Err(rustls::Error::General(format!(
+                "client sent {} intermediate certificates, expected none",
+                intermediates.len()
             )));
         }
 
         // Check that presented certificate matches byte-for-byte the expected certificate
-        if presented_certs[0] != self.cert {
-            return Err(rustls::TLSError::General(
-                "server certificate doesn't match the expected self-signed certificate".to_string(),
+        if end_entity != &self.cert {
+            return Err(rustls::Error::InvalidCertificateData(
+                "client certificate doesn't match the expected self-signed certificate".to_string(),
             ));
         }
 
         // Check that the certificate is still valid
-        let parsed_cert = rasn::x509::Certificate::parse(&presented_certs[0].0).map_err(|err| {
-            rustls::TLSError::General(format!("unable to parse cert with rasn: {:?}", err))
+        let parsed_cert = rasn::x509::Certificate::parse(&end_entity.0).map_err(|err| {
+            rustls::Error::InvalidCertificateData(format!(
+                "unable to parse cert with rasn: {:?}",
+                err
+            ))
         })?;
-        let now = rasn::types::UtcTime::now()
-            .map_err(|_| rustls::TLSError::General("unable to get the current time".to_string()))?;
+
+        let now = now
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|_| rustls::Error::FailedToGetCurrentTime)?;
+        let now = rasn::types::UtcTime::from_seconds_since_epoch(now.as_secs());
+
         if !parsed_cert.tbs_certificate.value.validity.is_valid(now) {
-            return Err(rustls::TLSError::General(
+            return Err(rustls::Error::InvalidCertificateData(
                 "self-signed certificate is currently not valid".to_string(),
             ));
         }
 
         // We do not validate DNS name. Providing the exact same certificate is sufficient.
 
-        Ok(rustls::ServerCertVerified::assertion())
+        Ok(rustls::client::ServerCertVerified::assertion())
     }
 }
