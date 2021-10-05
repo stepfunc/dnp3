@@ -57,13 +57,15 @@ pub enum MinTlsVersion {
 }
 
 impl MinTlsVersion {
-    fn to_vec(self) -> Vec<rustls::ProtocolVersion> {
+    fn to_rustls(self) -> &'static [&'static rustls::SupportedProtocolVersion] {
+        static MIN_TLS12_VERSIONS: &[&rustls::SupportedProtocolVersion] =
+            &[&rustls::version::TLS13, &rustls::version::TLS12];
+        static MIN_TLS13_VERSIONS: &[&rustls::SupportedProtocolVersion] =
+            &[&rustls::version::TLS13];
+
         match self {
-            Self::Tls1_2 => vec![
-                rustls::ProtocolVersion::TLSv1_3,
-                rustls::ProtocolVersion::TLSv1_2,
-            ],
-            Self::Tls1_3 => vec![rustls::ProtocolVersion::TLSv1_3],
+            Self::Tls1_2 => MIN_TLS12_VERSIONS,
+            Self::Tls1_3 => MIN_TLS13_VERSIONS,
         }
     }
 }
