@@ -70,7 +70,11 @@ pub(crate) unsafe fn master_channel_create_tls(
         Path::new(tls_config.private_key_path().to_string_lossy().as_ref()),
         tls_config.min_tls_version().into(),
         tls_config.certificate_mode().into(),
-    )?;
+    )
+    .map_err(|err| {
+        tracing::error!("TLS error: {}", err);
+        err
+    })?;
 
     let connect_strategy = ConnectStrategy::new(
         connect_strategy.min_connect_delay(),
@@ -689,6 +693,7 @@ impl From<TlsError> for ffi::ParamError {
             TlsError::InvalidPeerCertificate(_) => ffi::ParamError::InvalidPeerCertificate,
             TlsError::InvalidLocalCertificate(_) => ffi::ParamError::InvalidLocalCertificate,
             TlsError::InvalidPrivateKey(_) => ffi::ParamError::InvalidPrivateKey,
+            TlsError::Miscellaneous(_) => ffi::ParamError::MiscellaneousTlsError,
         }
     }
 }
