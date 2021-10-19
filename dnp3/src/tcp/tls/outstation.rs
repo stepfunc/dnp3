@@ -72,7 +72,9 @@ impl TlsServerConfig {
             .with_safe_default_cipher_suites()
             .with_safe_default_kx_groups()
             .with_protocol_versions(min_tls_version.to_rustls())
-            .expect("cipher suites or kx groups mismatch with TLS version")
+            .map_err(|err| {
+                TlsError::Miscellaneous(io::Error::new(ErrorKind::InvalidData, err.to_string()))
+            })?
             .with_client_cert_verifier(verifier)
             .with_single_cert(local_certs, private_key)
             .map_err(|err| {

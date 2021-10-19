@@ -68,7 +68,11 @@ pub unsafe fn tcpserver_new_tls(
         Path::new(tls_config.private_key_path().to_string_lossy().as_ref()),
         tls_config.min_tls_version().into(),
         tls_config.certificate_mode().into(),
-    )?;
+    )
+    .map_err(|err| {
+        tracing::error!("TLS error: {}", err);
+        err
+    })?;
 
     let server = dnp3::tcp::TcpServer::new_tls_server(link_error_mode.into(), address, tls_config);
 

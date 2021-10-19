@@ -54,7 +54,7 @@ The fields are the following:
   a Server Name Indication (SNI) extension in the `Client Hello`. Both
   the client and the server will verify that the presented certificate
   is valid for this DNS name. Since Common Name is deprecated, the
-  presented certificate must have the DNS name appear in in a Subject
+  presented certificate **must** have the DNS name appear in in a Subject
   Alternative Name (SAN) extension. DNS name validation is not performed
   when `CertificateMode` is `SelfSignedCertificate`.
 - `peer_cert_path`: path to the unencrypted PEM file containing the trusted
@@ -87,3 +87,26 @@ is limited, a **thorough manual inspection of the configured self-signed certifi
 required beforehand**. Also note that the DNS name is **not** verified with this mode,
 as this check should be performed manually before adding the self-signed certificate
 to the configuration.
+
+### Generating certificates
+
+The following commands are provided as a guideline to generate certificates using the
+OpenSSL command line interface.
+
+#### CA trust chain
+
+:::warning
+You should probably use an actual CA software instead of manually generating these certificates.
+These commands are provided for testing purposes.
+:::
+
+- Generate the root CA certificate: `openssl req -x509 -newkey rsa:4096 -keyout ./ca_key.pem -out ./ca_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -nodes -days 3650`
+- Generate the master CSR: `openssl req -new -newkey rsa:4096 -keyout ./master_key.pem -out ./master_csr.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365`
+- Generate the master certificate: `openssl x509 -req -days 365 -in ./master_csr.pem -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem -CAkey ./ca_key.pem -set_serial 1 -out ./master_cert.pem -sha256`
+- Generate the outstation CSR: `openssl req -new -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation_csr.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365`
+- Generate the outstation certificate: `openssl x509 -req -days 365 -in ./outstation_csr.pem -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem -CAkey ./ca_key.pem -set_serial 2 -out ./outstation_cert.pem -sha256`
+
+#### Self-signed certificate
+
+- Generate the master certificate: `openssl req -x509 -newkey rsa:4096 -keyout ./master_key.pem -out ./master_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365`
+- Generate the outstation certificate: `openssl req -x509 -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation/entity2_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365`
