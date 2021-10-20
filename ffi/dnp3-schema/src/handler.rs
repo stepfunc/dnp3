@@ -1,9 +1,9 @@
-use oo_bindgen::callback::InterfaceHandle;
-use oo_bindgen::native_struct::NativeStructHandle;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
-use oo_bindgen::native_enum::NativeEnumHandle;
+use oo_bindgen::enum_type::EnumHandle;
+use oo_bindgen::interface::InterfaceHandle;
+use oo_bindgen::structs::CallbackArgStructHandle;
 use oo_bindgen::types::BasicType;
 
 pub fn define(
@@ -11,7 +11,7 @@ pub fn define(
     shared_def: &SharedDefinitions,
 ) -> Result<InterfaceHandle, BindingError> {
     let response_function = lib
-        .define_native_enum("ResponseFunction")?
+        .define_enum("ResponseFunction")
         .push("Response", "Solicited response")?
         .push("UnsolicitedResponse", "Unsolicited response")?
         .doc("Type of response")?
@@ -19,9 +19,9 @@ pub fn define(
 
     let iin = declare_iin_struct(lib)?;
 
-    let response_header = lib.declare_native_struct("ResponseHeader")?;
+    let response_header = lib.declare_struct("ResponseHeader")?;
     let response_header = lib
-        .define_native_struct(&response_header)?
+        .define_callback_argument_struct(&response_header)?
         .add(
             "control",
             shared_def.control_struct.clone(),
@@ -30,10 +30,12 @@ pub fn define(
         .add("func", response_function, "Response type")?
         .add("iin", iin, "IIN bytes")?
         .doc("Response header information")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
     let qualifier_code_enum = lib
-        .define_native_enum("QualifierCode")?
+        .define_enum("QualifierCode")
         .push("Range8", "8-bit start stop (0x00)")?
         .push("Range16", "16-bit start stop (0x01)")?
         .push("AllObjects", "All objects (0x06)")?
@@ -45,9 +47,9 @@ pub fn define(
         .doc("Qualifier code used in the response")?
         .build()?;
 
-    let header_info = lib.declare_native_struct("HeaderInfo")?;
+    let header_info = lib.declare_struct("HeaderInfo")?;
     let header_info = lib
-        .define_native_struct(&header_info)?
+        .define_callback_argument_struct(&header_info)?
         .add(
             "variation",
             shared_def.variation_enum.clone(),
@@ -56,9 +58,11 @@ pub fn define(
         .add(
             "qualifier",
             qualifier_code_enum,
-            "Qualitifer used in the response",
+            "Qualifier used in the response",
         )?
         .doc("Object header information")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
     let read_type = define_read_type_enum(lib)?;
@@ -67,8 +71,8 @@ pub fn define(
         .define_interface(
             "ReadHandler",
             "General handler that will receive all values read from the outstation.",
-        )?
-        .callback("begin_fragment", "Marks the beginning of a fragment")?
+        )
+        .begin_callback("begin_fragment", "Marks the beginning of a fragment")?
         .param(
             "read_type",
             read_type.clone(),
@@ -80,8 +84,8 @@ pub fn define(
             "Header of the fragment",
         )?
         .returns_nothing()?
-        .build()?
-        .callback("end_fragment", "Marks the end of a fragment")?
+        .end_callback()?
+        .begin_callback("end_fragment", "Marks the end of a fragment")?
         .param(
             "read_type",
             read_type,
@@ -93,8 +97,8 @@ pub fn define(
             "Header of the fragment",
         )?
         .returns_nothing()?
-        .build()?
-        .callback("handle_binary", "Handle binary input data")?
+        .end_callback()?
+        .begin_callback("handle_binary", "Handle binary input data")?
         .param(
             "info",
            header_info.clone(),
@@ -106,8 +110,8 @@ pub fn define(
                 "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .returns_nothing()?
-        .build()?
-        .callback(
+        .end_callback()?
+        .begin_callback(
             "handle_double_bit_binary",
             "Handle double-bit binary input data",
         )?
@@ -122,8 +126,8 @@ pub fn define(
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .returns_nothing()?
-        .build()?
-        .callback(
+        .end_callback()?
+        .begin_callback(
             "handle_binary_output_status",
             "Handle binary output status data",
         )?
@@ -138,8 +142,8 @@ pub fn define(
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .returns_nothing()?
-        .build()?
-        .callback("handle_counter", "Handle counter data")?
+        .end_callback()?
+        .begin_callback("handle_counter", "Handle counter data")?
         .param(
             "info",
            header_info.clone(),
@@ -151,8 +155,8 @@ pub fn define(
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .returns_nothing()?
-        .build()?
-        .callback("handle_frozen_counter", "Handle frozen counter input data")?
+        .end_callback()?
+        .begin_callback("handle_frozen_counter", "Handle frozen counter input data")?
         .param(
             "info",
            header_info.clone(),
@@ -164,8 +168,8 @@ pub fn define(
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .returns_nothing()?
-        .build()?
-        .callback("handle_analog", "Handle analog input data")?
+        .end_callback()?
+        .begin_callback("handle_analog", "Handle analog input data")?
         .param(
             "info",
            header_info.clone(),
@@ -177,8 +181,8 @@ pub fn define(
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .returns_nothing()?
-        .build()?
-        .callback(
+        .end_callback()?
+        .begin_callback(
             "handle_analog_output_status",
             "Handle analog output status data",
         )?
@@ -193,8 +197,8 @@ pub fn define(
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .returns_nothing()?
-        .build()?
-        .callback("handle_octet_string", "Handle octet string data")?
+        .end_callback()?
+        .begin_callback("handle_octet_string", "Handle octet string data")?
         .param(
             "info",
            header_info,
@@ -206,119 +210,104 @@ pub fn define(
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
         .returns_nothing()?
-        .build()?
-        .destroy_callback("on_destroy")?
+        .end_callback()?
         .build()?;
 
     Ok(read_handler_interface)
 }
 
-fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
-    let iin1 = lib.declare_native_struct("IIN1")?;
+fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<CallbackArgStructHandle, BindingError> {
+    let iin1 = lib.declare_struct("IIN1")?;
     let iin1 = lib
-        .define_native_struct(&iin1)?
+        .define_callback_argument_struct(&iin1)?
         .add("value", BasicType::Uint8, "Byte value")?
         .doc("First IIN byte")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
-    let iin1_flag = lib
-        .define_native_enum("IIN1Flag")?
-        .push("Broadcast", "Indicate that the message was broadcasted")?
-        .push(
-            "Class1Events",
-            "Outstation has Class 1 events not reported yet",
-        )?
-        .push(
-            "Class2Events",
-            "Outstation has Class 2 events not reported yet",
-        )?
-        .push(
-            "Class3Events",
-            "Outstation has Class 3 events not reported yet",
-        )?
-        .push(
-            "NeedTime",
-            "Outstation indicates it requires time synchronization from the master",
-        )?
-        .push(
-            "LocalControl",
-            "At least one point of the outstation is in the local operation mode",
-        )?
-        .push("DeviceTrouble", "Outstation reports abnormal condition")?
-        .push("DeviceRestart", "Outstation has restarted")?
-        .doc("First IIN bit flags")?
-        .build()?;
+    /*
+        let iin1_flag = lib
+            .define_enum("IIN1Flag")
+            .push("Broadcast", "Indicate that the message was broadcasted")?
+            .push(
+                "Class1Events",
+                "Outstation has Class 1 events not reported yet",
+            )?
+            .push(
+                "Class2Events",
+                "Outstation has Class 2 events not reported yet",
+            )?
+            .push(
+                "Class3Events",
+                "Outstation has Class 3 events not reported yet",
+            )?
+            .push(
+                "NeedTime",
+                "Outstation indicates it requires time synchronization from the master",
+            )?
+            .push(
+                "LocalControl",
+                "At least one point of the outstation is in the local operation mode",
+            )?
+            .push("DeviceTrouble", "Outstation reports abnormal condition")?
+            .push("DeviceRestart", "Outstation has restarted")?
+            .doc("First IIN bit flags")?
+            .build()?;
 
-    let iin1_is_set_fn = lib
-        .declare_native_function("iin1_is_set")?
-        .param("iin1", iin1.declaration(), "IIN1 to check")?
-        .param("flag", iin1_flag, "Flag to check")?
-        .returns(BasicType::Bool, "true if the flag is set, false otherwise")?
-        .doc("Check if a particular flag is set in the IIN1 byte")?
-        .build()?;
-
-    lib.define_struct(&iin1)?
-        .method("IsSet", &iin1_is_set_fn)?
-        .build();
-
-    let iin2 = lib.declare_native_struct("IIN2")?;
+    */
+    let iin2 = lib.declare_struct("IIN2")?;
     let iin2 = lib
-        .define_native_struct(&iin2)?
+        .define_callback_argument_struct(&iin2)?
         .add("value", BasicType::Uint8, "Byte value")?
         .doc("Second IIN byte")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
-    let iin2_flag = lib
-        .define_native_enum("IIN2Flag")?
-        .push(
-            "NoFuncCodeSupport",
-            "Function code is not supported by the outstation",
-        )?
-        .push("ObjectUnknown", "Request contains an unknown point")?
-        .push(
-            "ParameterError",
-            "Unable to parse request or invalid qualifier code",
-        )?
-        .push(
-            "EventBufferOverflow",
-            "Event buffer overflow, at least one event was lost",
-        )?
-        .push(
-            "AlreadyExecuting",
-            "Cannot perform operation because an execution is already in progress",
-        )?
-        .push(
-            "ConfigCorrupt",
-            "Outstation reports a configuration corruption",
-        )?
-        .doc("Second IIN bit flags")?
-        .build()?;
+    /*
+       let iin2_flag = lib
+           .define_enum("IIN2Flag")
+           .push(
+               "NoFuncCodeSupport",
+               "Function code is not supported by the outstation",
+           )?
+           .push("ObjectUnknown", "Request contains an unknown point")?
+           .push(
+               "ParameterError",
+               "Unable to parse request or invalid qualifier code",
+           )?
+           .push(
+               "EventBufferOverflow",
+               "Event buffer overflow, at least one event was lost",
+           )?
+           .push(
+               "AlreadyExecuting",
+               "Cannot perform operation because an execution is already in progress",
+           )?
+           .push(
+               "ConfigCorrupt",
+               "Outstation reports a configuration corruption",
+           )?
+           .doc("Second IIN bit flags")?
+           .build()?;
+    */
 
-    let iin2_is_set_fn = lib
-        .declare_native_function("iin2_is_set")?
-        .param("iin2", iin2.declaration(), "IIN2 to check")?
-        .param("flag", iin2_flag, "Flag to check")?
-        .returns(BasicType::Bool, "true if the flag is set, false otherwise")?
-        .doc("Check if a particular flag is set in the IIN2 byte")?
-        .build()?;
-
-    lib.define_struct(&iin2)?
-        .method("IsSet", &iin2_is_set_fn)?
-        .build();
-
-    let iin = lib.declare_native_struct("IIN")?;
+    let iin = lib.declare_struct("IIN")?;
     let iin = lib
-        .define_native_struct(&iin)?
+        .define_callback_argument_struct(&iin)?
         .add("iin1", iin1, "First IIN byte")?
         .add("iin2", iin2, "Second IIN byte")?
         .doc("Pair of IIN bytes")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
     Ok(iin)
 }
 
-fn define_read_type_enum(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
-    lib.define_native_enum("ReadType")?
+fn define_read_type_enum(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingError> {
+    lib.define_enum("ReadType")
         .push("StartupIntegrity", "Startup integrity poll")?
         .push("Unsolicited", "Unsolicited message")?
         .push("SinglePoll", "Single poll requested by the user")?

@@ -1,6 +1,6 @@
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::error_type::ErrorType;
-use oo_bindgen::native_struct::StructElementType;
+use oo_bindgen::types::BasicType;
 use oo_bindgen::*;
 
 pub fn define(
@@ -11,21 +11,23 @@ pub fn define(
     let runtime_class = lib.declare_class("Runtime")?;
 
     // Declare the C-style structs
-    let config_struct = lib.declare_native_struct("RuntimeConfig")?;
+    let config_struct = lib.declare_struct("RuntimeConfig")?;
     let config_struct = lib
-        .define_native_struct(&config_struct)?
+        .define_function_argument_struct(&config_struct)?
         .add(
             "num_core_threads",
-            StructElementType::Uint16(Some(0)),
+            BasicType::Uint16,
             doc("Number of runtime threads to spawn. For a guess of the number of CPU cores, use 0.")
             .details("Even if tons of connections are expected, it is preferred to use a value around the number of CPU cores for better performances. The library uses an efficient thread pool polling mechanism."),
         )?
         .doc("Runtime configuration")?
+        .end_fields()?
+        // TODO - Constructor
         .build()?;
 
     // Declare the native functions
     let new_fn = lib
-        .declare_native_function("runtime_new")?
+        .define_function("runtime_new")
         .param(
             "config",
           config_struct,
@@ -43,7 +45,7 @@ pub fn define(
         .build()?;
 
     let destroy_fn = lib
-        .declare_native_function("runtime_destroy")?
+        .define_function("runtime_destroy")
         .param("runtime",runtime_class.clone(), "Runtime to destroy")?
         .returns_nothing()?
         .doc(

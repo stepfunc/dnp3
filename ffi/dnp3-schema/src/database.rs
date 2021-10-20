@@ -1,5 +1,4 @@
 use class::ClassHandle;
-use oo_bindgen::native_struct::StructElementType;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
@@ -12,7 +11,7 @@ pub fn define(
     let database = lib.declare_class("Database")?;
 
     let event_class = lib
-        .define_native_enum("EventClass")?
+        .define_enum("EventClass")
         .push("None", "Does not generate events")?
         .push("Class1", "Class 1 event")?
         .push("Class2", "Class 2 event")?
@@ -21,7 +20,7 @@ pub fn define(
         .build()?;
 
     let event_mode = lib
-        .define_native_enum("EventMode")?
+        .define_enum("EventMode")
         .push(
             "Detect",
             doc("Detect events in a type dependent fashion")
@@ -35,59 +34,63 @@ pub fn define(
         .doc("Controls how events are processed when updating values in the database.")?
         .build()?;
 
-    let update_options = lib.declare_native_struct("UpdateOptions")?;
+    let update_options = lib.declare_struct("UpdateOptions")?;
     let update_options = lib
-        .define_native_struct(&update_options)?
+        .define_function_argument_struct(&update_options)?
         .add(
             "update_static",
-            StructElementType::Bool(Some(true)),
-            "Optionnaly bypass updating the static database (the current value)",
+            BasicType::Bool,
+            "Optionally bypass updating the static database (the current value)",
         )?
         .add(
             "event_mode",
-            StructElementType::Enum(event_mode, Some("Detect".to_string())),
+            event_mode,
             "Determines how/if an event is produced",
         )?
         .doc(
             doc("Options that control how the update is performed.")
                 .details("99% of the time, the default value should be used."),
         )?
+        .end_fields()?
+        // TODO - define constructor
         .build()?;
 
     // Binary Input
     let binary_static_variation = lib
-        .define_native_enum("StaticBinaryVariation")?
+        .define_enum("StaticBinaryVariation")
         .push("Group1Var1", "Binary input - packed format")?
         .push("Group1Var2", "Binary input - with flags")?
         .doc("Static binary input variation")?
         .build()?;
 
     let binary_event_variation = lib
-        .define_native_enum("EventBinaryVariation")?
+        .define_enum("EventBinaryVariation")
         .push("Group2Var1", "Binary input event - without time")?
         .push("Group2Var2", "Binary input event - with absolute time")?
         .push("Group2Var3", "Binary input event - with relative time")?
         .doc("Event binary input variation")?
         .build()?;
 
-    let binary_config = lib.declare_native_struct("BinaryConfig")?;
+    let binary_config = lib.declare_struct("BinaryConfig")?;
     let binary_config = lib
-        .define_native_struct(&binary_config)?
+        .define_function_argument_struct(&binary_config)?
         .add(
             "static_variation",
-            StructElementType::Enum(binary_static_variation, Some("Group1Var1".to_string())),
+            binary_static_variation,
             "Default static variation",
         )?
         .add(
             "event_variation",
-            StructElementType::Enum(binary_event_variation, Some("Group2Var1".to_string())),
+            binary_event_variation,
             "Default event variation",
         )?
         .doc("Binary Input configuration")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
     let binary_add_fn = lib
-        .declare_native_function("database_add_binary")?
+        .define_function("database_add_binary")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -100,7 +103,7 @@ pub fn define(
         .build()?;
 
     let binary_remove_fn = lib
-        .declare_native_function("database_remove_binary")?
+        .define_function("database_remove_binary")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .returns(
@@ -111,7 +114,7 @@ pub fn define(
         .build()?;
 
     let binary_update_fn = lib
-        .declare_native_function("database_update_binary")?
+        .define_function("database_update_binary")
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -127,7 +130,7 @@ pub fn define(
         .build()?;
 
     let binary_get_fn = lib
-        .declare_native_function("database_get_binary")?
+        .define_function("database_get_binary")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point to get")?
         .returns(shared_def.binary_point.clone(), "Binary Input point")?
@@ -137,14 +140,14 @@ pub fn define(
 
     // Double-bit Binary Input
     let double_bit_binary_static_variation = lib
-        .define_native_enum("StaticDoubleBitBinaryVariation")?
+        .define_enum("StaticDoubleBitBinaryVariation")
         .push("Group3Var1", "Double-bit binary input - packed format")?
         .push("Group3Var2", "Double-bit binary input - with flags")?
         .doc("Static double-bit binary input variation")?
         .build()?;
 
     let double_bit_binary_event_variation = lib
-        .define_native_enum("EventDoubleBitBinaryVariation")?
+        .define_enum("EventDoubleBitBinaryVariation")
         .push("Group4Var1", "Double-bit binary input event - without time")?
         .push(
             "Group4Var2",
@@ -157,30 +160,26 @@ pub fn define(
         .doc("Event double-bit binary input variation")?
         .build()?;
 
-    let double_bit_binary_config = lib.declare_native_struct("DoubleBitBinaryConfig")?;
+    let double_bit_binary_config = lib.declare_struct("DoubleBitBinaryConfig")?;
     let double_bit_binary_config = lib
-        .define_native_struct(&double_bit_binary_config)?
+        .define_function_argument_struct(&double_bit_binary_config)?
         .add(
             "static_variation",
-            StructElementType::Enum(
-                double_bit_binary_static_variation,
-                Some("Group3Var1".to_string()),
-            ),
+            double_bit_binary_static_variation,
             "Default static variation",
         )?
         .add(
             "event_variation",
-            StructElementType::Enum(
-                double_bit_binary_event_variation,
-                Some("Group4Var1".to_string()),
-            ),
+            double_bit_binary_event_variation,
             "Default event variation",
         )?
         .doc("Double-Bit Binary Input configuration")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
     let double_bit_binary_add_fn = lib
-        .declare_native_function("database_add_double_bit_binary")?
+        .define_function("database_add_double_bit_binary")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -193,7 +192,7 @@ pub fn define(
         .build()?;
 
     let double_bit_binary_remove_fn = lib
-        .declare_native_function("database_remove_double_bit_binary")?
+        .define_function("database_remove_double_bit_binary")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .returns(
@@ -204,7 +203,7 @@ pub fn define(
         .build()?;
 
     let double_bit_binary_update_fn = lib
-        .declare_native_function("database_update_double_bit_binary")?
+        .define_function("database_update_double_bit_binary")
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -220,7 +219,7 @@ pub fn define(
         .build()?;
 
     let double_bit_binary_get_fn = lib
-        .declare_native_function("database_get_double_bit_binary")?
+        .define_function("database_get_double_bit_binary")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point to get")?
         .returns(
@@ -233,43 +232,39 @@ pub fn define(
 
     // Binary Output Status
     let binary_output_status_static_variation = lib
-        .define_native_enum("StaticBinaryOutputStatusVariation")?
+        .define_enum("StaticBinaryOutputStatusVariation")
         .push("Group10Var1", "Binary output - packed format")?
         .push("Group10Var2", "Binary output - output status with flags")?
         .doc("Static binary output status variation")?
         .build()?;
 
     let binary_output_status_event_variation = lib
-        .define_native_enum("EventBinaryOutputStatusVariation")?
+        .define_enum("EventBinaryOutputStatusVariation")
         .push("Group11Var1", "Binary output event - status without time")?
         .push("Group11Var2", "Binary output event - status with time")?
         .doc("Event binary output status variation")?
         .build()?;
 
-    let binary_output_status_config = lib.declare_native_struct("BinaryOutputStatusConfig")?;
+    let binary_output_status_config = lib.declare_struct("BinaryOutputStatusConfig")?;
     let binary_output_status_config = lib
-        .define_native_struct(&binary_output_status_config)?
+        .define_function_argument_struct(&binary_output_status_config)?
         .add(
             "static_variation",
-            StructElementType::Enum(
-                binary_output_status_static_variation,
-                Some("Group10Var1".to_string()),
-            ),
+            binary_output_status_static_variation,
             "Default static variation",
         )?
         .add(
             "event_variation",
-            StructElementType::Enum(
-                binary_output_status_event_variation,
-                Some("Group11Var2".to_string()),
-            ),
+            binary_output_status_event_variation,
             "Default event variation",
         )?
         .doc("Binary Output Status configuration")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
     let binary_output_status_add_fn = lib
-        .declare_native_function("database_add_binary_output_status")?
+        .define_function("database_add_binary_output_status")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -282,7 +277,7 @@ pub fn define(
         .build()?;
 
     let binary_output_status_remove_fn = lib
-        .declare_native_function("database_remove_binary_output_status")?
+        .define_function("database_remove_binary_output_status")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .returns(
@@ -293,7 +288,7 @@ pub fn define(
         .build()?;
 
     let binary_output_status_update_fn = lib
-        .declare_native_function("database_update_binary_output_status")?
+        .define_function("database_update_binary_output_status")
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -309,7 +304,7 @@ pub fn define(
         .build()?;
 
     let binary_output_status_get_fn = lib
-        .declare_native_function("database_get_binary_output_status")?
+        .define_function("database_get_binary_output_status")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point to get")?
         .returns(
@@ -322,7 +317,7 @@ pub fn define(
 
     // Counter
     let counter_static_variation = lib
-        .define_native_enum("StaticCounterVariation")?
+        .define_enum("StaticCounterVariation")
         .push("Group20Var1", "Counter - 32-bit with flag")?
         .push("Group20Var2", "Counter - 16-bit with flag")?
         .push("Group20Var5", "Counter - 32-bit without flag")?
@@ -331,7 +326,7 @@ pub fn define(
         .build()?;
 
     let counter_event_variation = lib
-        .define_native_enum("EventCounterVariation")?
+        .define_enum("EventCounterVariation")
         .push("Group22Var1", "Counter event - 32-bit with flag")?
         .push("Group22Var2", "Counter event - 16-bit with flag")?
         .push("Group22Var5", "Counter event - 32-bit with flag and time")?
@@ -339,29 +334,27 @@ pub fn define(
         .doc("Event counter variation")?
         .build()?;
 
-    let counter_config = lib.declare_native_struct("CounterConfig")?;
+    let counter_config = lib.declare_struct("CounterConfig")?;
     let counter_config = lib
-        .define_native_struct(&counter_config)?
+        .define_function_argument_struct(&counter_config)?
         .add(
             "static_variation",
-            StructElementType::Enum(counter_static_variation, Some("Group20Var1".to_string())),
+            counter_static_variation,
             "Default static variation",
         )?
         .add(
             "event_variation",
-            StructElementType::Enum(counter_event_variation, Some("Group22Var1".to_string())),
+            counter_event_variation,
             "Default event variation",
         )?
-        .add(
-            "deadband",
-            StructElementType::Uint32(Some(0)),
-            "Deadband value",
-        )?
+        .add("deadband", BasicType::Uint32, "Deadband value")?
         .doc("Counter configuration")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
     let counter_add_fn = lib
-        .declare_native_function("database_add_counter")?
+        .define_function("database_add_counter")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -374,7 +367,7 @@ pub fn define(
         .build()?;
 
     let counter_remove_fn = lib
-        .declare_native_function("database_remove_counter")?
+        .define_function("database_remove_counter")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .returns(
@@ -385,7 +378,7 @@ pub fn define(
         .build()?;
 
     let counter_update_fn = lib
-        .declare_native_function("database_update_counter")?
+        .define_function("database_update_counter")
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -401,7 +394,7 @@ pub fn define(
         .build()?;
 
     let counter_get_fn = lib
-        .declare_native_function("database_get_counter")?
+        .define_function("database_get_counter")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point to get")?
         .returns(shared_def.counter_point.clone(), "Counter point")?
@@ -411,7 +404,7 @@ pub fn define(
 
     // Frozen Counter
     let frozen_counter_static_variation = lib
-        .define_native_enum("StaticFrozenCounterVariation")?
+        .define_enum("StaticFrozenCounterVariation")
         .push("Group21Var1", "Frozen Counter - 32-bit with flag")?
         .push("Group21Var2", "Frozen Counter - 16-bit with flag")?
         .push("Group21Var5", "Frozen Counter - 32-bit with flag and time")?
@@ -422,7 +415,7 @@ pub fn define(
         .build()?;
 
     let frozen_counter_event_variation = lib
-        .define_native_enum("EventFrozenCounterVariation")?
+        .define_enum("EventFrozenCounterVariation")
         .push("Group23Var1", "Frozen Counter event - 32-bit with flag")?
         .push("Group23Var2", "Frozen Counter event - 16-bit with flag")?
         .push(
@@ -436,35 +429,27 @@ pub fn define(
         .doc("Event frozen counter variation")?
         .build()?;
 
-    let frozen_counter_config = lib.declare_native_struct("FrozenCounterConfig")?;
+    let frozen_counter_config = lib.declare_struct("FrozenCounterConfig")?;
     let frozen_counter_config = lib
-        .define_native_struct(&frozen_counter_config)?
+        .define_function_argument_struct(&frozen_counter_config)?
         .add(
             "static_variation",
-            StructElementType::Enum(
-                frozen_counter_static_variation,
-                Some("Group21Var1".to_string()),
-            ),
+            frozen_counter_static_variation,
             "Default static variation",
         )?
         .add(
             "event_variation",
-            StructElementType::Enum(
-                frozen_counter_event_variation,
-                Some("Group23Var1".to_string()),
-            ),
+            frozen_counter_event_variation,
             "Default event variation",
         )?
-        .add(
-            "deadband",
-            StructElementType::Uint32(Some(0)),
-            "Deadband value",
-        )?
+        .add("deadband", BasicType::Uint32, "Deadband value")?
         .doc("Frozen Counter configuration")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
     let frozen_counter_add_fn = lib
-        .declare_native_function("database_add_frozen_counter")?
+        .define_function("database_add_frozen_counter")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -477,7 +462,7 @@ pub fn define(
         .build()?;
 
     let frozen_counter_remove_fn = lib
-        .declare_native_function("database_remove_frozen_counter")?
+        .define_function("database_remove_frozen_counter")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .returns(
@@ -488,7 +473,7 @@ pub fn define(
         .build()?;
 
     let frozen_counter_update_fn = lib
-        .declare_native_function("database_update_frozen_counter")?
+        .define_function("database_update_frozen_counter")
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -504,7 +489,7 @@ pub fn define(
         .build()?;
 
     let frozen_counter_get_fn = lib
-        .declare_native_function("database_get_frozen_counter")?
+        .define_function("database_get_frozen_counter")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point to get")?
         .returns(
@@ -517,7 +502,7 @@ pub fn define(
 
     // Analog
     let analog_static_variation = lib
-        .define_native_enum("StaticAnalogVariation")?
+        .define_enum("StaticAnalogVariation")
         .push("Group30Var1", "Analog input - 32-bit with flag")?
         .push("Group30Var2", "Analog input - 16-bit with flag")?
         .push("Group30Var3", "Analog input - 32-bit without flag")?
@@ -534,7 +519,7 @@ pub fn define(
         .build()?;
 
     let analog_event_variation = lib
-        .define_native_enum("EventAnalogVariation")?
+        .define_enum("EventAnalogVariation")
         .push("Group32Var1", "Analog input event - 32-bit without time")?
         .push("Group32Var2", "Analog input event - 16-bit without time")?
         .push("Group32Var3", "Analog input event - 32-bit with time")?
@@ -558,29 +543,27 @@ pub fn define(
         .doc("Event analog variation")?
         .build()?;
 
-    let analog_config = lib.declare_native_struct("AnalogConfig")?;
+    let analog_config = lib.declare_struct("AnalogConfig")?;
     let analog_config = lib
-        .define_native_struct(&analog_config)?
+        .define_function_argument_struct(&analog_config)?
         .add(
             "static_variation",
-            StructElementType::Enum(analog_static_variation, Some("Group30Var1".to_string())),
+            analog_static_variation,
             "Default static variation",
         )?
         .add(
             "event_variation",
-            StructElementType::Enum(analog_event_variation, Some("Group32Var1".to_string())),
+            analog_event_variation,
             "Default event variation",
         )?
-        .add(
-            "deadband",
-            StructElementType::Double(Some(0.0)),
-            "Deadband value",
-        )?
+        .add("deadband", BasicType::Double64, "Deadband value")?
         .doc("Analog configuration")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
     let analog_add_fn = lib
-        .declare_native_function("database_add_analog")?
+        .define_function("database_add_analog")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -593,7 +576,7 @@ pub fn define(
         .build()?;
 
     let analog_remove_fn = lib
-        .declare_native_function("database_remove_analog")?
+        .define_function("database_remove_analog")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .returns(
@@ -604,7 +587,7 @@ pub fn define(
         .build()?;
 
     let analog_update_fn = lib
-        .declare_native_function("database_update_analog")?
+        .define_function("database_update_analog")
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -620,7 +603,7 @@ pub fn define(
         .build()?;
 
     let analog_get_fn = lib
-        .declare_native_function("database_get_analog")?
+        .define_function("database_get_analog")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point to get")?
         .returns(shared_def.analog_point.clone(), "Analog point")?
@@ -630,7 +613,7 @@ pub fn define(
 
     // Analog Output Status
     let analog_output_status_static_variation = lib
-        .define_native_enum("StaticAnalogOutputStatusVariation")?
+        .define_enum("StaticAnalogOutputStatusVariation")
         .push("Group40Var1", "Analog output status - 32-bit with flag")?
         .push("Group40Var2", "Analog output status - 16-bit with flag")?
         .push(
@@ -645,7 +628,7 @@ pub fn define(
         .build()?;
 
     let analog_output_status_event_variation = lib
-        .define_native_enum("EventAnalogOutputStatusVariation")?
+        .define_enum("EventAnalogOutputStatusVariation")
         .push("Group42Var1", "Analog output event - 32-bit without time")?
         .push("Group42Var2", "Analog output event - 16-bit without time")?
         .push("Group42Var3", "Analog output event - 32-bit with time")?
@@ -669,35 +652,27 @@ pub fn define(
         .doc("Event analog output status variation")?
         .build()?;
 
-    let analog_output_status_config = lib.declare_native_struct("AnalogOutputStatusConfig")?;
+    let analog_output_status_config = lib.declare_struct("AnalogOutputStatusConfig")?;
     let analog_output_status_config = lib
-        .define_native_struct(&analog_output_status_config)?
+        .define_function_argument_struct(&analog_output_status_config)?
         .add(
             "static_variation",
-            StructElementType::Enum(
-                analog_output_status_static_variation,
-                Some("Group40Var1".to_string()),
-            ),
+            analog_output_status_static_variation,
             "Default static variation",
         )?
         .add(
             "event_variation",
-            StructElementType::Enum(
-                analog_output_status_event_variation,
-                Some("Group42Var1".to_string()),
-            ),
+            analog_output_status_event_variation,
             "Default event variation",
         )?
-        .add(
-            "deadband",
-            StructElementType::Double(Some(0.0)),
-            "Deadband value",
-        )?
+        .add("deadband", BasicType::Double64, "Deadband value")?
         .doc("Analog Output Status configuration")?
+        .end_fields()?
+        // TODO - constructor
         .build()?;
 
     let analog_output_status_add_fn = lib
-        .declare_native_function("database_add_analog_output_status")?
+        .define_function("database_add_analog_output_status")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -710,7 +685,7 @@ pub fn define(
         .build()?;
 
     let analog_output_status_remove_fn = lib
-        .declare_native_function("database_remove_analog_output_status")?
+        .define_function("database_remove_analog_output_status")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .returns(
@@ -721,7 +696,7 @@ pub fn define(
         .build()?;
 
     let analog_output_status_update_fn = lib
-        .declare_native_function("database_update_analog_output_status")?
+        .define_function("database_update_analog_output_status")
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -737,7 +712,7 @@ pub fn define(
         .build()?;
 
     let analog_output_status_get_fn = lib
-        .declare_native_function("database_get_analog_output_status")?
+        .define_function("database_get_analog_output_status")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point to get")?
         .returns(
@@ -752,13 +727,13 @@ pub fn define(
     let octet_string_class = lib.declare_class("OctetStringValue")?;
 
     let octet_string_new_fn = lib
-        .declare_native_function("octet_string_new")?
+        .define_function("octet_string_new")
         .returns(octet_string_class.clone(), "Empty octet string")?
         .doc("Create a new octet string")?
         .build()?;
 
     let octet_string_destroy_fn = lib
-        .declare_native_function("octet_string_destroy")?
+        .define_function("octet_string_destroy")
         .param(
             "octet_string",
             octet_string_class.clone(),
@@ -769,7 +744,7 @@ pub fn define(
         .build()?;
 
     let octet_string_add_fn = lib
-        .declare_native_function("octet_string_add")?
+        .define_function("octet_string_add")
         .param("octet_string", octet_string_class, "Octet String to modify")?
         .param("value", BasicType::Uint8, "Byte to add")?
         .returns_nothing()?
@@ -783,7 +758,7 @@ pub fn define(
     )?;
 
     let octet_string_add_fn = lib
-        .declare_native_function("database_add_octet_string")?
+        .define_function("database_add_octet_string")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .param("point_class", event_class, "Event class")?
@@ -795,7 +770,7 @@ pub fn define(
         .build()?;
 
     let octet_string_remove_fn = lib
-        .declare_native_function("database_remove_octet_string")?
+        .define_function("database_remove_octet_string")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the point")?
         .returns(
@@ -806,7 +781,7 @@ pub fn define(
         .build()?;
 
     let octet_string_update_fn = lib
-        .declare_native_function("database_update_octet_string")?
+        .define_function("database_update_octet_string")
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::Uint16, "Index of the octet string")?
         .param("value", octet_string_collection, "New value of the point")?

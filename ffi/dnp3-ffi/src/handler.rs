@@ -1,6 +1,6 @@
 use dnp3::app::measurement::*;
 use dnp3::app::*;
-use dnp3::app::{Iin1, Iin2, ResponseFunction, ResponseHeader};
+use dnp3::app::{ResponseFunction, ResponseHeader};
 use dnp3::master::{AssociationHandler, HeaderInfo, ReadHandler, ReadType};
 
 use crate::ffi;
@@ -373,40 +373,6 @@ impl ffi::Byte {
 impl From<Flags> for ffi::Flags {
     fn from(flags: Flags) -> ffi::Flags {
         ffi::Flags { value: flags.value }
-    }
-}
-
-pub unsafe fn iin1_is_set(iin1: Option<&ffi::Iin1>, flag: ffi::Iin1Flag) -> bool {
-    if let Some(iin1) = iin1 {
-        let iin1 = Iin1::new(iin1.value);
-        match flag {
-            ffi::Iin1Flag::Broadcast => iin1.get_broadcast(),
-            ffi::Iin1Flag::Class1Events => iin1.get_class_1_events(),
-            ffi::Iin1Flag::Class2Events => iin1.get_class_2_events(),
-            ffi::Iin1Flag::Class3Events => iin1.get_class_3_events(),
-            ffi::Iin1Flag::NeedTime => iin1.get_need_time(),
-            ffi::Iin1Flag::LocalControl => iin1.get_local_control(),
-            ffi::Iin1Flag::DeviceTrouble => iin1.get_device_trouble(),
-            ffi::Iin1Flag::DeviceRestart => iin1.get_device_restart(),
-        }
-    } else {
-        false
-    }
-}
-
-pub unsafe fn iin2_is_set(iin2: Option<&ffi::Iin2>, flag: ffi::Iin2Flag) -> bool {
-    if let Some(iin1) = iin2 {
-        let iin1 = Iin2::new(iin1.value);
-        match flag {
-            ffi::Iin2Flag::NoFuncCodeSupport => iin1.get_no_func_code_support(),
-            ffi::Iin2Flag::ObjectUnknown => iin1.get_object_unknown(),
-            ffi::Iin2Flag::ParameterError => iin1.get_parameter_error(),
-            ffi::Iin2Flag::EventBufferOverflow => iin1.get_event_buffer_overflow(),
-            ffi::Iin2Flag::AlreadyExecuting => iin1.get_already_executing(),
-            ffi::Iin2Flag::ConfigCorrupt => iin1.get_config_corrupt(),
-        }
-    } else {
-        false
     }
 }
 

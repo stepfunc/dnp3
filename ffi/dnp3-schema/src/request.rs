@@ -11,13 +11,13 @@ pub fn define(
     let request = lib.declare_class("Request")?;
 
     let request_new_fn = lib
-        .declare_native_function("request_new")?
+        .define_function("request_new")
         .returns(request.clone(), "Handle to the created request")?
         .doc("Create a new request")?
         .build()?;
 
     let request_new_class_fn = lib
-        .declare_native_function("request_new_class")?
+        .define_function("request_new_class")
         .param("class0", BasicType::Bool, "Ask for class 0 (static data)")?
         .param("class1", BasicType::Bool, "Ask for class 1 events")?
         .param("class2", BasicType::Bool, "Ask for class 2 events")?
@@ -33,7 +33,7 @@ pub fn define(
         .build()?;
 
     let request_destroy_fn = lib
-        .declare_native_function("request_destroy")?
+        .define_function("request_destroy")
         .param(
             "request",
           request.clone(),
@@ -44,7 +44,7 @@ pub fn define(
         .build()?;
 
     let request_add_one_byte_header_fn = lib
-        .declare_native_function("request_add_one_byte_header")?
+        .define_function("request_add_one_byte_header")
         .param("request", request.clone(), "Request to modify")?
         .param(
             "variation",
@@ -58,7 +58,7 @@ pub fn define(
         .build()?;
 
     let request_add_two_byte_header_fn = lib
-        .declare_native_function("request_add_two_byte_header")?
+        .define_function("request_add_two_byte_header")
         .param("request", request.clone(), "Request to modify")?
         .param(
             "variation",
@@ -72,7 +72,7 @@ pub fn define(
         .build()?;
 
     let request_add_all_objects_header_fn = lib
-        .declare_native_function("request_add_all_objects_header")?
+        .define_function("request_add_all_objects_header")
         .param("request", request.clone(), "Request to modify")?
         .param(
             "variation",

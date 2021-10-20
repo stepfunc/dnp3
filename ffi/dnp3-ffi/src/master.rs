@@ -423,40 +423,6 @@ impl ffi::RestartResult {
     }
 }
 
-pub(crate) fn classes_all() -> ffi::Classes {
-    ffi::Classes {
-        class0: true,
-        class1: true,
-        class2: true,
-        class3: true,
-    }
-}
-
-pub(crate) fn classes_none() -> ffi::Classes {
-    ffi::Classes {
-        class0: false,
-        class1: false,
-        class2: false,
-        class3: false,
-    }
-}
-
-pub(crate) fn event_classes_all() -> ffi::EventClasses {
-    ffi::EventClasses {
-        class1: true,
-        class2: true,
-        class3: true,
-    }
-}
-
-pub(crate) fn event_classes_none() -> ffi::EventClasses {
-    ffi::EventClasses {
-        class1: false,
-        class2: false,
-        class3: false,
-    }
-}
-
 fn convert_event_classes(config: &ffi::EventClasses) -> EventClasses {
     EventClasses::new(config.class1, config.class2, config.class3)
 }

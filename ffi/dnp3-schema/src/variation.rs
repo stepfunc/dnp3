@@ -1,10 +1,8 @@
-use oo_bindgen::native_enum::NativeEnumHandle;
+use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::{BindingError, LibraryBuilder};
 
-pub(crate) fn define(
-    lib: &mut LibraryBuilder,
-) -> std::result::Result<NativeEnumHandle, BindingError> {
-    lib.define_native_enum("Variation")?
+pub(crate) fn define(lib: &mut LibraryBuilder) -> std::result::Result<EnumHandle, BindingError> {
+    lib.define_enum("Variation")
         .push("Group1Var0", "Binary Input - Default variation")?
         .push("Group1Var1", "Binary Input - Packed format")?
         .push("Group1Var2", "Binary Input - With flags")?

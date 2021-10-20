@@ -14,7 +14,7 @@ mod bits {
 pub(crate) fn define(lib: &mut LibraryBuilder) -> Result<(), BindingError> {
     use bits::*;
 
-    lib.define_constants("Flag")?
+    lib.define_constants("Flag")
         .add("Online", ConstantValue::U8(BIT_0,Representation::Hex), "Object value is 'good' / 'valid' / 'nominal'")?
         .add("Restart", ConstantValue::U8(BIT_1,Representation::Hex), "Object value has not been updated since device restart")?
         .add("CommLost", ConstantValue::U8(BIT_2,Representation::Hex), "Object value represents the last value available before a communication failure occurred. Should never be set by originating devices")?
