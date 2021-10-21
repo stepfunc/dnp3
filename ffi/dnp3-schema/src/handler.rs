@@ -220,78 +220,62 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<CallbackArgStructHandl
     let iin1 = lib.declare_struct("IIN1")?;
     let iin1 = lib
         .define_callback_argument_struct(&iin1)?
-        .add("value", BasicType::Uint8, "Byte value")?
         .doc("First IIN byte")?
+        .add(
+            "broadcast",
+            BasicType::Bool,
+            "Broadcast message was received",
+        )?
+        .add(
+            "class_1_events",
+            BasicType::Bool,
+            "Outstation has unreported Class 1 events",
+        )?
+        .add(
+            "class_2_events",
+            BasicType::Bool,
+            "Outstation has unreported Class 2 events",
+        )?
+        .add(
+            "class_3_events",
+            BasicType::Bool,
+            "Outstation has unreported Class 3 events",
+        )?
+        .add(
+            "need_time",
+            BasicType::Bool,
+            "Outstation requires time synchronization",
+        )?
+        .add(
+            "local_control",
+            BasicType::Bool,
+            "One or more of the outstation’s points are in local control mode",
+        )?
+        .add(
+            "device_trouble",
+            BasicType::Bool,
+            "An abnormal, device-specific condition exists in the outstation",
+        )?
+        .add("device_restart", BasicType::Bool, "Outstation restarted")?
         .end_fields()?
         // TODO - constructor
         .build()?;
 
-    /*
-        let iin1_flag = lib
-            .define_enum("IIN1Flag")
-            .push("Broadcast", "Indicate that the message was broadcasted")?
-            .push(
-                "Class1Events",
-                "Outstation has Class 1 events not reported yet",
-            )?
-            .push(
-                "Class2Events",
-                "Outstation has Class 2 events not reported yet",
-            )?
-            .push(
-                "Class3Events",
-                "Outstation has Class 3 events not reported yet",
-            )?
-            .push(
-                "NeedTime",
-                "Outstation indicates it requires time synchronization from the master",
-            )?
-            .push(
-                "LocalControl",
-                "At least one point of the outstation is in the local operation mode",
-            )?
-            .push("DeviceTrouble", "Outstation reports abnormal condition")?
-            .push("DeviceRestart", "Outstation has restarted")?
-            .doc("First IIN bit flags")?
-            .build()?;
-
-    */
     let iin2 = lib.declare_struct("IIN2")?;
     let iin2 = lib
         .define_callback_argument_struct(&iin2)?
-        .add("value", BasicType::Uint8, "Byte value")?
         .doc("Second IIN byte")?
+        .add("no_func_code_support", BasicType::Bool, "Outstation does not support this function code")?
+        .add("object_unknown", BasicType::Bool, "Outstation does not support requested operation for objects in the request")?
+        .add("parameter_error", BasicType::Bool, "Outstation does not support requested operation for objects in the request")?
+        .add("event_buffer_overflow", BasicType::Bool, "An event buffer overflow condition exists in the outstation, and at least one unconfirmed event was lost")?
+        .add("already_executing", BasicType::Bool, "The operation requested is already executing (optional support)")?
+        .add("config_corrupt", BasicType::Bool, "The outstation detected corrupt configuration (optional support)")?
+        .add("reserved_2", BasicType::Bool, "Reserved for future use - should always be set to 0")?
+        .add("reserved_1", BasicType::Bool, "Reserved for future use - should always be set to 0")?
         .end_fields()?
         // TODO - constructor
         .build()?;
-
-    /*
-       let iin2_flag = lib
-           .define_enum("IIN2Flag")
-           .push(
-               "NoFuncCodeSupport",
-               "Function code is not supported by the outstation",
-           )?
-           .push("ObjectUnknown", "Request contains an unknown point")?
-           .push(
-               "ParameterError",
-               "Unable to parse request or invalid qualifier code",
-           )?
-           .push(
-               "EventBufferOverflow",
-               "Event buffer overflow, at least one event was lost",
-           )?
-           .push(
-               "AlreadyExecuting",
-               "Cannot perform operation because an execution is already in progress",
-           )?
-           .push(
-               "ConfigCorrupt",
-               "Outstation reports a configuration corruption",
-           )?
-           .doc("Second IIN bit flags")?
-           .build()?;
-    */
 
     let iin = lib.declare_struct("IIN")?;
     let iin = lib

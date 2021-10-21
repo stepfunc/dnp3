@@ -4,8 +4,12 @@ use oo_bindgen::*;
 use crate::shared::SharedDefinitions;
 use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::interface::InterfaceHandle;
-use oo_bindgen::structs::FunctionArgStructHandle;
+use oo_bindgen::structs::{
+    ConstructorDefault, ConstructorType, FieldName, FunctionArgStructHandle, Number,
+    UniversalStructHandle,
+};
 use oo_bindgen::types::{BasicType, DurationType, StringType};
+use std::time::Duration;
 
 struct OutstationTypes {
     database: ClassHandle,
@@ -221,144 +225,211 @@ fn define_outstation(
         .build()
 }
 
-fn define_outstation_config(
-    lib: &mut LibraryBuilder,
-    shared: &SharedDefinitions,
-) -> Result<FunctionArgStructHandle, BindingError> {
+fn define_class_zero_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
+    let binary = FieldName::new("binary");
+    let double_bit_binary = FieldName::new("double_bit_binary");
+    let binary_output_status = FieldName::new("binary_output_status");
+    let counter = FieldName::new("counter");
+    let frozen_counter = FieldName::new("frozen_counter");
+    let analog = FieldName::new("analog");
+    let analog_output_status = FieldName::new("analog_output_status");
+    let octet_strings = FieldName::new("octet_strings");
+
     let class_zero_config = lib.declare_struct("ClassZeroConfig")?;
-    let class_zero_config = lib
-        .define_function_argument_struct(&class_zero_config)?
+    lib.define_function_argument_struct(&class_zero_config)?
         .add(
-            "binary",
+            &binary,
             BasicType::Bool,
             "Include Binary Inputs in Class 0 reads",
         )?
         .add(
-            "double_bit_binary",
+            &double_bit_binary,
             BasicType::Bool,
             "Include Double-Bit Binary Inputs in Class 0 reads",
         )?
         .add(
-            "binary_output_status",
+            &binary_output_status,
             BasicType::Bool,
             "Include Binary Output Status in Class 0 reads",
         )?
         .add(
-            "counter",
+            &counter,
             BasicType::Bool,
             "Include Counters in Class 0 reads",
         )?
         .add(
-            "frozen_counter",
+            &frozen_counter,
             BasicType::Bool,
             "Include Frozen Counters in Class 0 reads",
         )?
         .add(
-            "analog",
+            &analog,
             BasicType::Bool,
             "Include Analog Inputs in Class 0 reads",
         )?
         .add(
-            "analog_output_status",
+            &analog_output_status,
             BasicType::Bool,
             "Include Analog Output Status in Class 0 reads",
         )?
         .add(
-            "octet_strings",
+            &octet_strings,
             BasicType::Bool,
             doc("Include Binary Inputs in Class 0 reads")
                 .warning("For conformance, this should be false."),
         )?
         .doc("Controls which types are reported during a Class 0 read.")?
         .end_fields()?
-        // TODO - constructor
-        .build()?;
+        .begin_constructor(
+            "init",
+            ConstructorType::Normal,
+            "Initialize to default values",
+        )?
+        .default(&binary, true)?
+        .default(&double_bit_binary, true)?
+        .default(&binary_output_status, true)?
+        .default(&counter, true)?
+        .default(&frozen_counter, true)?
+        .default(&analog, true)?
+        .default(&analog_output_status, true)?
+        .default(&octet_strings, false)?
+        .end_constructor()?
+        .build()
+}
+
+fn define_outstation_features(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
+    let self_address = FieldName::new("self_address");
+    let broadcast = FieldName::new("broadcast");
+    let unsolicited = FieldName::new("unsolicited");
 
     let features = lib.declare_struct("OutstationFeatures")?;
-    let features = lib
-        .define_function_argument_struct(&features)?
+    lib.define_function_argument_struct(&features)?
         .add(
-            "self_address",
+            &self_address,
             BasicType::Bool,
             "Respond to the self address",
         )?
         .add(
-            "broadcast",
+            &broadcast,
             BasicType::Bool,
             "Process valid broadcast messages",
         )?
         .add(
-            "unsolicited",
+            &unsolicited,
             BasicType::Bool,
             "Respond to enable/disable unsolicited response and produce unsolicited responses",
         )?
         .doc("Optional outstation features that can be enabled or disabled")?
         .end_fields()?
-        // TODO - constructor
-        .build()?;
+        .begin_constructor(
+            "init",
+            ConstructorType::Normal,
+            "Initialize to default values",
+        )?
+        .default(&self_address, false)?
+        .default(&broadcast, true)?
+        .default(&unsolicited, true)?
+        .end_constructor()?
+        .build()
+}
+
+fn define_outstation_config(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> Result<FunctionArgStructHandle, BindingError> {
+    let class_zero_config = define_class_zero_config(lib)?;
+    let outstation_features = define_outstation_features(lib)?;
+
+    let solicited_buffer_size = FieldName::new("solicited_buffer_size");
+    let unsolicited_buffer_size = FieldName::new("unsolicited_buffer_size");
+    let rx_buffer_size = FieldName::new("rx_buffer_size");
+    let decode_level = FieldName::new("decode_level");
+    let confirm_timeout = FieldName::new("confirm_timeout");
+    let select_timeout = FieldName::new("select_timeout");
+    let features = FieldName::new("features");
+    let max_unsolicited_retries = FieldName::new("max_unsolicited_retries");
+    let unsolicited_retry_delay = FieldName::new("unsolicited_retry_delay");
+    let keep_alive_timeout = FieldName::new("keep_alive_timeout");
+    let max_read_request_headers = FieldName::new("max_read_request_headers");
+    let max_controls_per_request = FieldName::new("max_controls_per_request");
+    let class_zero = FieldName::new("class_zero");
 
     let outstation_config = lib.declare_struct("OutstationConfig")?;
     let outstation_config = lib
         .define_function_argument_struct(&outstation_config)?
+        .doc("Outstation configuration")?
         .add(
             "outstation_address",
-            BasicType::Uint16,
+            BasicType::U16,
             "Link-layer outstation address",
         )?
-        .add("master_address", BasicType::Uint16, "Link-layer master address")?
+        .add("master_address", BasicType::U16, "Link-layer master address")?
         .add(
-            "solicited_buffer_size",
-            BasicType::Uint16,
+            &solicited_buffer_size,
+            BasicType::U16,
             doc("Solicited response buffer size").details("Must be at least 249 bytes"),
         )?
         .add(
-            "unsolicited_buffer_size",
-            BasicType::Uint16,
+            &unsolicited_buffer_size,
+            BasicType::U16,
             doc("Unsolicited response buffer size").details("Must be at least 249 bytes"),
         )?
         .add(
-            "rx_buffer_size",
-            BasicType::Uint16,
+            &rx_buffer_size,
+            BasicType::U16,
             doc("Receive buffer size").details("Must be at least 249 bytes"),
         )?
         .add(
-            "decode_level",
+            &decode_level,
             shared.decode_level.clone(),
             "Decoding level",
         )?
         .add(
-            "confirm_timeout",
+            &confirm_timeout,
             DurationType::Milliseconds,
             "Confirmation timeout",
         )?
         .add(
-            "select_timeout",
+            &select_timeout,
             DurationType::Milliseconds,
             "Select timeout",
         )?
-        .add("features", features, "Optional features")?
+        .add(&features, outstation_features, "Optional features")?
         .add(
-            "max_unsolicited_retries",
-            BasicType::Uint32,
+            &max_unsolicited_retries,
+            BasicType::U32,
             "Maximum number of unsolicited retries",
         )?
         .add(
-            "unsolicited_retry_delay",
+            &unsolicited_retry_delay,
             DurationType::Milliseconds,
             "Delay to wait before retrying an unsolicited response",
         )?
         .add(
-            "keep_alive_timeout",
+            &keep_alive_timeout,
             DurationType::Milliseconds,
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the master")
                 .details("A value of zero means no automatic keep-alives."),
         )?
-        .add("max_read_request_headers", BasicType::Uint16, doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
-        .add("max_controls_per_request", BasicType::Uint16, doc("Maximum number of controls in a single request."))?
-        .add("class_zero", class_zero_config, "Controls responses to Class 0 reads")?
-        .doc("Outstation configuration")?
+        .add(&max_read_request_headers, BasicType::U16, doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
+        .add(&max_controls_per_request, BasicType::U16, doc("Maximum number of controls in a single request."))?
+        .add(&class_zero, class_zero_config, "Controls responses to Class 0 reads")?
         .end_fields()?
-        // TODO  - constructor
+        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .default(&solicited_buffer_size, Number::U16(2048))?
+        .default(&unsolicited_buffer_size, Number::U16(2048))?
+        .default(&rx_buffer_size, Number::U16(2048))?
+        .default_struct(&decode_level)?
+        .default(&confirm_timeout, Duration::from_secs(5))?
+        .default(&select_timeout, Duration::from_secs(5))?
+        .default(&features, ConstructorDefault::DefaultStruct)?
+        .default(&max_unsolicited_retries, Number::U32(u32::MAX))?
+        .default(&unsolicited_retry_delay, Duration::from_secs(5))?
+        .default(&keep_alive_timeout, Duration::from_secs(60))?
+        .default(&max_read_request_headers, Number::U16(64))?
+        .default(&max_controls_per_request, Number::U16(u16::MAX))?
+        .default_struct(&class_zero)?
+        .end_constructor()?
         .build()?;
 
     Ok(outstation_config)
@@ -372,42 +443,42 @@ fn define_event_buffer_config(
         .define_function_argument_struct(&event_buffer_config)?
         .add(
             "max_binary",
-            BasicType::Uint16,
+            BasicType::U16,
             "Maximum number of Binary Input events (g2)",
         )?
         .add(
             "max_double_bit_binary",
-            BasicType::Uint16,
+            BasicType::U16,
             "Maximum number of Double-Bit Binary Input events (g4)",
         )?
         .add(
             "max_binary_output_status",
-            BasicType::Uint16,
+            BasicType::U16,
             "Maximum number of Binary Output Status events (g11)",
         )?
         .add(
             "max_counter",
-            BasicType::Uint16,
+            BasicType::U16,
             "Maximum number of Counter events (g22)",
         )?
         .add(
             "max_frozen_counter",
-            BasicType::Uint16,
+            BasicType::U16,
             "Maximum number of Frozen Counter events (g23)",
         )?
         .add(
             "max_analog",
-            BasicType::Uint16,
+            BasicType::U16,
             "Maximum number of Analog Input events (g32)",
         )?
         .add(
             "max_analog_output_status",
-            BasicType::Uint16,
+            BasicType::U16,
             "Maximum number of Analog Output Status events (g42)",
         )?
         .add(
             "max_octet_string",
-            BasicType::Uint16,
+            BasicType::U16,
             doc("Maximum number of Octet String events (g111)"),
         )?
         .doc(
@@ -415,23 +486,59 @@ fn define_event_buffer_config(
                 .details("A value of zero means that events will not be buffered for that type."),
         )?
         .end_fields()?
-        // TODO - constructor
+        .add_full_constructor("init")?
         .build()?;
-
-    /* TODO - make these static constructors
-    lib.define_struct(&event_buffer_config)?
-        .static_method("all_types", &event_buffer_config_all_types)?
-        .static_method("no_events", &event_buffer_config_no_events)?
-        .build();
-     */
 
     Ok(event_buffer_config)
 }
 
-fn define_outstation_application(
-    lib: &mut LibraryBuilder,
-    database: &ClassHandle,
-) -> Result<InterfaceHandle, BindingError> {
+fn define_application_iin(lib: &mut LibraryBuilder) -> BindResult<UniversalStructHandle> {
+    let need_time = FieldName::new("need_time");
+    let local_control = FieldName::new("local_control");
+    let device_trouble = FieldName::new("device_trouble");
+    let config_corrupt = FieldName::new("config_corrupt");
+
+    let application_iin = lib.declare_struct("ApplicationIIN")?;
+    let application_iin = lib
+        .define_universal_struct(&application_iin)?
+        .add(
+            need_time.clone(),
+            BasicType::Bool,
+            "IIN1.4 - Time synchronization is required",
+        )?
+        .add(
+            local_control.clone(),
+            BasicType::Bool,
+            "IIN1.5 - Some output points are in local mode",
+        )?
+        .add(
+            device_trouble.clone(),
+            BasicType::Bool,
+            "IIN1.6 - Device trouble",
+        )?
+        .add(
+            config_corrupt.clone(),
+            BasicType::Bool,
+            "IIN2.5 - Configuration corrupt",
+        )?
+        .doc("Application-controlled IIN bits")?
+        .end_fields()?
+        .begin_constructor(
+            "init",
+            ConstructorType::Normal,
+            "Initialize all fields in {struct:ApplicationIIN} to false",
+        )?
+        .default(&need_time, false)?
+        .default(&local_control, false)?
+        .default(&device_trouble, false)?
+        .default(&config_corrupt, false)?
+        .end_constructor()?
+        .build()?;
+
+    Ok(application_iin)
+}
+
+fn define_restart_delay(lib: &mut LibraryBuilder) -> BindResult<UniversalStructHandle> {
     let restart_delay_type = lib
         .define_enum("RestartDelayType")
         .push("NotSupported", "Restart mode not supported")?
@@ -443,76 +550,42 @@ fn define_outstation_application(
         .doc("Type of restart delay value. Used by {struct:RestartDelay}.")?
         .build()?;
 
-    let application_iin = lib.declare_struct("ApplicationIIN")?;
-    let application_iin = lib
-        .define_universal_struct(&application_iin)?
-        .add(
-            "need_time",
-            BasicType::Bool,
-            "IIN1.4 - Time synchronization is required",
-        )?
-        .add(
-            "local_control",
-            BasicType::Bool,
-            "IIN1.5 - Some output points are in local mode",
-        )?
-        .add("device_trouble", BasicType::Bool, "IIN1.6 - Device trouble")?
-        .add(
-            "config_corrupt",
-            BasicType::Bool,
-            "IIN2.5 - Configuration corrupt",
-        )?
-        .doc("Application-controlled IIN bits")?
-        .end_fields()?
-        // TODO - constructor
-        .build()?;
+    let restart_type = FieldName::new("restart_type");
+    let value = FieldName::new("value");
 
     let restart_delay = lib.declare_struct("RestartDelay")?;
     let restart_delay = lib.define_universal_struct(&restart_delay)?
-        .add("restart_type", restart_delay_type, "Indicates what {struct:RestartDelay.value} is.")?
-        .add("value", BasicType::Uint16, "Expected delay before the outstation comes back online.")?
+        .add(restart_type.clone(), restart_delay_type, "Indicates what {struct:RestartDelay.value} is.")?
+        .add(value.clone(), BasicType::U16, "Expected delay before the outstation comes back online.")?
         .doc(doc("Restart delay used by {interface:OutstationApplication.cold_restart()} and {interface:OutstationApplication.warm_restart()}")
-        .details("If {struct:RestartDelay.restart_type} is not {enum:RestartDelayType.NotSupported}, then the {struct:RestartDelay.value} is valid. Otherwise, the outstation will return IIN2.0 NO_FUNC_CODE_SUPPORT."))?
+            .details("If {struct:RestartDelay.restart_type} is not {enum:RestartDelayType.NotSupported}, then the {struct:RestartDelay.value} is valid. Otherwise, the outstation will return IIN2.0 NO_FUNC_CODE_SUPPORT."))?
         .end_fields()?
-        // TODO - constructor
+        // -----
+        .begin_constructor("not_supported", ConstructorType::Static, "RestartDelay indicating that the request is not supported")?
+        .default_variant(&restart_type, "NotSupported")?
+        .default(&value, Number::U16(0))?
+        .end_constructor()?
+        // -----
+        .begin_constructor("seconds", ConstructorType::Static, "RestartDelay with a count of seconds")?
+        .default_variant(&restart_type, "Seconds")?
+        .default(&value, Number::U16(0))?
+        .end_constructor()?
+        // -----
+        .begin_constructor("milliseconds", ConstructorType::Static, "RestartDelay with a count of milliseconds")?
+        .default_variant(&restart_type, "Milliseconds")?
+        .default(&value, Number::U16(0))?
+        .end_constructor()?
+        // -----
         .build()?;
 
-    /* TODO - make these static constructors
+    Ok(restart_delay)
+}
 
-    let restart_delay_not_supported_fn = lib
-        .define_function("restart_delay_not_supported")?
-        .returns(restart_delay.clone(), "Unsupported restart delay")?
-        .doc("Creates a restart delay that indicates that this operation is not supported.")?
-        .build()?;
-
-    let restart_delay_seconds_fn = lib
-        .define_function("restart_delay_seconds")?
-        .param(
-            "value",
-            BasicType::Uint16,
-            "Expected restart delay (in seconds)",
-        )?
-        .returns(restart_delay.clone(), "Valid restart delay")?
-        .doc("Creates a restart delay with a value specified in seconds.")?
-        .build()?;
-
-    let restart_delay_millis_fn = lib
-        .define_function("restart_delay_millis")?
-        .param(
-            "value",
-            BasicType::Uint16,
-            "Expected restart delay (in milliseconds)",
-        )?
-        .returns(restart_delay.clone(), "Valid restart delay")?
-        .doc("Creates a restart delay with a value specified in milliseconds.")?
-        .build()?;
-
-    lib.define_struct(&restart_delay)?
-        .static_method("NotSupported", &restart_delay_not_supported_fn)?
-        .static_method("ValidSeconds", &restart_delay_seconds_fn)?
-        .static_method("ValidMillis", &restart_delay_millis_fn)?
-        .build();
-     */
+fn define_outstation_application(
+    lib: &mut LibraryBuilder,
+    database: &ClassHandle,
+) -> Result<InterfaceHandle, BindingError> {
+    let restart_delay = define_restart_delay(lib)?;
 
     let write_time_result = lib.define_enum("WriteTimeResult")
         .push("NotSupported", "Writing time is not supported by this outstation (translated to NO_FUNC_CODE_SUPPORT).")?
@@ -538,15 +611,17 @@ fn define_outstation_application(
         .doc("Result of a freeze operation")?
         .build()?;
 
+    let application_iin = define_application_iin(lib)?;
+
     lib.define_interface("OutstationApplication", "Dynamic information required by the outstation from the user application")
         .begin_callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
             .details("For more information, see IEEE-1815 2012, p. 64."))?
-            .returns(BasicType::Uint16, "Processing delay, in milliseconds")?
+            .returns(BasicType::U16, "Processing delay, in milliseconds")?
             .end_callback()?
         .begin_callback("write_absolute_time", "Handle a write of the absolute time during time synchronization procedures.")?
-            .param("time", BasicType::Uint64, "Received time in milliseconds since EPOCH (only 48 bits are used)")?
+            .param("time", BasicType::U64, "Received time in milliseconds since EPOCH (only 48 bits are used)")?
             .returns(write_time_result, "Result of the write time operation")?
             .end_callback()?
         .begin_callback("get_application_iin", "Returns the application-controlled IIN bits")?
@@ -566,8 +641,8 @@ fn define_outstation_application(
             .returns(freeze_result.clone(), "Result of the freeze operation")?
             .end_callback()?
         .begin_callback("freeze_counters_range", "Freeze a range of counters")?
-            .param("start", BasicType::Uint16, "Start index to freeze (inclusive)")?
-            .param("stop", BasicType::Uint16, "Stop index to freeze (inclusive)")?
+            .param("start", BasicType::U16, "Start index to freeze (inclusive)")?
+            .param("stop", BasicType::U16, "Stop index to freeze (inclusive)")?
             .param("freeze_type", freeze_type, "Type of freeze operation")?
             .param("database",database.declaration(), "Database")?
             .returns(freeze_result, "Result of the freeze operation")?
@@ -592,7 +667,6 @@ fn define_outstation_information(
         .add("function", function_code.clone(), "Function code")?
         .doc("Application-layer header for requests")?
         .end_fields()?
-        // TODO - constructor
         .build()?;
 
     let broadcast_action = lib.define_enum("BroadcastAction")
@@ -614,41 +688,41 @@ fn define_outstation_information(
             .returns_nothing()?
             .end_callback()?
         .begin_callback("enter_solicited_confirm_wait", "Outstation has begun waiting for a solicited confirm")?
-            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
+            .param("ecsn", BasicType::U8, "Expected sequence number")?
             .returns_nothing()?
             .end_callback()?
         .begin_callback("solicited_confirm_timeout", "Failed to receive a solicited confirm before the timeout occurred")?
-            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
+            .param("ecsn", BasicType::U8, "Expected sequence number")?
             .returns_nothing()?
             .end_callback()?
         .begin_callback("solicited_confirm_received", "Received the expected confirm")?
-            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
+            .param("ecsn", BasicType::U8, "Expected sequence number")?
             .returns_nothing()?
             .end_callback()?
         .begin_callback("solicited_confirm_wait_new_request", "Received a new request while waiting for a solicited confirm, aborting the response series")?
             .returns_nothing()?
             .end_callback()?
         .begin_callback("wrong_solicited_confirm_seq", "Received a solicited confirm with the wrong sequence number")?
-            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
-            .param("seq", BasicType::Uint8, "Received sequence number")?
+            .param("ecsn", BasicType::U8, "Expected sequence number")?
+            .param("seq", BasicType::U8, "Received sequence number")?
             .returns_nothing()?
             .end_callback()?
         .begin_callback("unexpected_confirm", "Received a confirm when not expecting one")?
             .param("unsolicited", BasicType::Bool, "True if it's an unsolicited response confirm, false if it's a solicited response confirm")?
-            .param("seq", BasicType::Uint8, "Received sequence number")?
+            .param("seq", BasicType::U8, "Received sequence number")?
             .returns_nothing()?
             .end_callback()?
         .begin_callback("enter_unsolicited_confirm_wait", "Outstation has begun waiting for an unsolicited confirm")?
-            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
+            .param("ecsn", BasicType::U8, "Expected sequence number")?
             .returns_nothing()?
             .end_callback()?
         .begin_callback("unsolicited_confirm_timeout", "Failed to receive an unsolicited confirm before the timeout occurred")?
-            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
+            .param("ecsn", BasicType::U8, "Expected sequence number")?
             .param("retry", BasicType::Bool, "Is it a retry")?
             .returns_nothing()?
             .end_callback()?
         .begin_callback("unsolicited_confirmed", "Master confirmed an unsolicited message")?
-            .param("ecsn", BasicType::Uint8, "Expected sequence number")?
+            .param("ecsn", BasicType::U8, "Expected sequence number")?
             .returns_nothing()?
             .end_callback()?
         .begin_callback("clear_restart_iin", "Master cleared the restart IIN bit")?
@@ -701,44 +775,44 @@ fn define_control_handler(
         //------
         .begin_callback("select_g12v1", select_g12_doc)?
         .param("control", shared_def.g12v1_struct.clone(), "Received CROB")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g12v1", "Operate a control point")?
         .param("control", shared_def.g12v1_struct.clone(), "Received CROB")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v1", select_g40_doc.clone())?
-        .param("control", BasicType::Sint32, "Received analog output value")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("control", BasicType::S32, "Received analog output value")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v1", "Operate a control point")?
-        .param("control", BasicType::Sint32, "Received analog output value")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("control", BasicType::S32, "Received analog output value")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v2", select_g40_doc.clone())?
-        .param("value", BasicType::Sint16, "Received analog output value")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("value", BasicType::S16, "Received analog output value")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v2", "Operate a control point")?
-        .param("value", BasicType::Sint16, "Received analog output value")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("value", BasicType::S16, "Received analog output value")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
@@ -746,14 +820,14 @@ fn define_control_handler(
         //------
         .begin_callback("select_g41v3", select_g40_doc.clone())?
         .param("value", BasicType::Float32, "Received analog output value")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v3", "Operate a control point")?
         .param("value", BasicType::Float32, "Received analog output value")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
@@ -761,14 +835,14 @@ fn define_control_handler(
         //------
         .begin_callback("select_g41v4", select_g40_doc)?
         .param("value", BasicType::Double64, "Received analog output value")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v4", "Operate a control point")?
         .param("value", BasicType::Double64, "Received analog output value")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("op_type", operate_type, "Operate type")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status, "Command status")?

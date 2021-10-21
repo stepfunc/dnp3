@@ -2,24 +2,11 @@ use class::ClassHandle;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
+use oo_bindgen::structs::{ConstructorType, FieldName, FunctionArgStructHandle, Number};
 use oo_bindgen::types::BasicType;
 
-pub fn define(
-    lib: &mut LibraryBuilder,
-    shared_def: &SharedDefinitions,
-) -> Result<ClassHandle, BindingError> {
-    let database = lib.declare_class("Database")?;
-
-    let event_class = lib
-        .define_enum("EventClass")
-        .push("None", "Does not generate events")?
-        .push("Class1", "Class 1 event")?
-        .push("Class2", "Class 2 event")?
-        .push("Class3", "Class 3 event")?
-        .doc("Event class")?
-        .build()?;
-
-    let event_mode = lib
+fn define_update_options(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
+    let event_mode_enum = lib
         .define_enum("EventMode")
         .push(
             "Detect",
@@ -34,17 +21,19 @@ pub fn define(
         .doc("Controls how events are processed when updating values in the database.")?
         .build()?;
 
+    let update_static = FieldName::new("update_static");
+    let event_mode = FieldName::new("event_mode");
+
     let update_options = lib.declare_struct("UpdateOptions")?;
-    let update_options = lib
-        .define_function_argument_struct(&update_options)?
+    lib.define_function_argument_struct(&update_options)?
         .add(
-            "update_static",
+            &update_static,
             BasicType::Bool,
             "Optionally bypass updating the static database (the current value)",
         )?
         .add(
-            "event_mode",
-            event_mode,
+            &event_mode,
+            event_mode_enum,
             "Determines how/if an event is produced",
         )?
         .doc(
@@ -52,10 +41,18 @@ pub fn define(
                 .details("99% of the time, the default value should be used."),
         )?
         .end_fields()?
-        // TODO - define constructor
-        .build()?;
+        .begin_constructor(
+            "init",
+            ConstructorType::Normal,
+            "Initialize to default values",
+        )?
+        .default(&update_static, true)?
+        .default_variant(&event_mode, "Detect")?
+        .end_constructor()?
+        .build()
+}
 
-    // Binary Input
+fn define_binary_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
     let binary_static_variation = lib
         .define_enum("StaticBinaryVariation")
         .push("Group1Var1", "Binary input - packed format")?
@@ -71,74 +68,33 @@ pub fn define(
         .doc("Event binary input variation")?
         .build()?;
 
+    let static_variation = FieldName::new("static_variation");
+    let event_variation = FieldName::new("event_variation");
+
     let binary_config = lib.declare_struct("BinaryConfig")?;
-    let binary_config = lib
-        .define_function_argument_struct(&binary_config)?
+    lib.define_function_argument_struct(&binary_config)?
         .add(
-            "static_variation",
+            &static_variation,
             binary_static_variation,
             "Default static variation",
         )?
         .add(
-            "event_variation",
+            &event_variation,
             binary_event_variation,
             "Default event variation",
         )?
         .doc("Binary Input configuration")?
         .end_fields()?
-        // TODO - constructor
-        .build()?;
+        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .default_variant(&static_variation, "Group1Var1")?
+        .default_variant(&event_variation, "Group2Var2")?
+        .end_constructor()?
+        .build()
+}
 
-    let binary_add_fn = lib
-        .define_function("database_add_binary")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .param("point_class", event_class.clone(), "Event class")?
-        .param("config", binary_config, "Configuration")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully added, false otherwise",
-        )?
-        .doc("Add a new Binary Input point")?
-        .build()?;
-
-    let binary_remove_fn = lib
-        .define_function("database_remove_binary")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully removed, false otherwise",
-        )?
-        .doc("Remove a Binary Input point")?
-        .build()?;
-
-    let binary_update_fn = lib
-        .define_function("database_update_binary")
-        .param("db", database.clone(), "Database")?
-        .param(
-            "value",
-            shared_def.binary_point.clone(),
-            "New value of the point",
-        )?
-        .param("options", update_options.clone(), "Update options")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully updated, false otherwise",
-        )?
-        .doc("Update a Binary Input point")?
-        .build()?;
-
-    let binary_get_fn = lib
-        .define_function("database_get_binary")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point to get")?
-        .returns(shared_def.binary_point.clone(), "Binary Input point")?
-        .fails_with(shared_def.error_type.clone())?
-        .doc("Get a Binary Input point")?
-        .build()?;
-
-    // Double-bit Binary Input
+fn define_double_bit_binary_config(
+    lib: &mut LibraryBuilder,
+) -> BindResult<FunctionArgStructHandle> {
     let double_bit_binary_static_variation = lib
         .define_enum("StaticDoubleBitBinaryVariation")
         .push("Group3Var1", "Double-bit binary input - packed format")?
@@ -160,77 +116,33 @@ pub fn define(
         .doc("Event double-bit binary input variation")?
         .build()?;
 
+    let static_variation = FieldName::new("static_variation");
+    let event_variation = FieldName::new("event_variation");
+
     let double_bit_binary_config = lib.declare_struct("DoubleBitBinaryConfig")?;
-    let double_bit_binary_config = lib
-        .define_function_argument_struct(&double_bit_binary_config)?
+    lib.define_function_argument_struct(&double_bit_binary_config)?
         .add(
-            "static_variation",
+            &static_variation,
             double_bit_binary_static_variation,
             "Default static variation",
         )?
         .add(
-            "event_variation",
+            &event_variation,
             double_bit_binary_event_variation,
             "Default event variation",
         )?
         .doc("Double-Bit Binary Input configuration")?
         .end_fields()?
-        // TODO - constructor
-        .build()?;
+        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .default_variant(&static_variation, "Group3Var1")?
+        .default_variant(&event_variation, "Group4Var2")?
+        .end_constructor()?
+        .build()
+}
 
-    let double_bit_binary_add_fn = lib
-        .define_function("database_add_double_bit_binary")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .param("point_class", event_class.clone(), "Event class")?
-        .param("config", double_bit_binary_config, "Configuration")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully added, false otherwise",
-        )?
-        .doc("Add a new Double-Bit Binary Input point")?
-        .build()?;
-
-    let double_bit_binary_remove_fn = lib
-        .define_function("database_remove_double_bit_binary")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully removed, false otherwise",
-        )?
-        .doc("Remove a Double-Bit Binary Input point")?
-        .build()?;
-
-    let double_bit_binary_update_fn = lib
-        .define_function("database_update_double_bit_binary")
-        .param("db", database.clone(), "Database")?
-        .param(
-            "value",
-            shared_def.double_bit_binary_point.clone(),
-            "New value of the point",
-        )?
-        .param("options", update_options.clone(), "Update options")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully updated, false otherwise",
-        )?
-        .doc("Update a Double-Bit Binary Input point")?
-        .build()?;
-
-    let double_bit_binary_get_fn = lib
-        .define_function("database_get_double_bit_binary")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point to get")?
-        .returns(
-            shared_def.double_bit_binary_point.clone(),
-            "Double-Bit Binary Input point",
-        )?
-        .fails_with(shared_def.error_type.clone())?
-        .doc("Get a Double-Bit Binary Input point")?
-        .build()?;
-
-    // Binary Output Status
+fn define_binary_output_status_config(
+    lib: &mut LibraryBuilder,
+) -> BindResult<FunctionArgStructHandle> {
     let binary_output_status_static_variation = lib
         .define_enum("StaticBinaryOutputStatusVariation")
         .push("Group10Var1", "Binary output - packed format")?
@@ -245,77 +157,31 @@ pub fn define(
         .doc("Event binary output status variation")?
         .build()?;
 
+    let static_variation = FieldName::new("static_variation");
+    let event_variation = FieldName::new("event_variation");
+
     let binary_output_status_config = lib.declare_struct("BinaryOutputStatusConfig")?;
-    let binary_output_status_config = lib
-        .define_function_argument_struct(&binary_output_status_config)?
+    lib.define_function_argument_struct(&binary_output_status_config)?
         .add(
-            "static_variation",
+            &static_variation,
             binary_output_status_static_variation,
             "Default static variation",
         )?
         .add(
-            "event_variation",
+            &event_variation,
             binary_output_status_event_variation,
             "Default event variation",
         )?
         .doc("Binary Output Status configuration")?
         .end_fields()?
-        // TODO - constructor
-        .build()?;
+        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .default_variant(&static_variation, "Group10Var1")?
+        .default_variant(&event_variation, "Group11Var2")?
+        .end_constructor()?
+        .build()
+}
 
-    let binary_output_status_add_fn = lib
-        .define_function("database_add_binary_output_status")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .param("point_class", event_class.clone(), "Event class")?
-        .param("config", binary_output_status_config, "Configuration")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully added, false otherwise",
-        )?
-        .doc("Add a new Binary Output Status point")?
-        .build()?;
-
-    let binary_output_status_remove_fn = lib
-        .define_function("database_remove_binary_output_status")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully removed, false otherwise",
-        )?
-        .doc("Remove a Binary Output Status point")?
-        .build()?;
-
-    let binary_output_status_update_fn = lib
-        .define_function("database_update_binary_output_status")
-        .param("db", database.clone(), "Database")?
-        .param(
-            "value",
-            shared_def.binary_output_status_point.clone(),
-            "New value of the point",
-        )?
-        .param("options", update_options.clone(), "Update options")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully updated, false otherwise",
-        )?
-        .doc("Update a Binary Output Status point")?
-        .build()?;
-
-    let binary_output_status_get_fn = lib
-        .define_function("database_get_binary_output_status")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point to get")?
-        .returns(
-            shared_def.binary_output_status_point.clone(),
-            "Binary Output Status point",
-        )?
-        .fails_with(shared_def.error_type.clone())?
-        .doc("Get a Binary Output Status point")?
-        .build()?;
-
-    // Counter
+fn define_counter_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
     let counter_static_variation = lib
         .define_enum("StaticCounterVariation")
         .push("Group20Var1", "Counter - 32-bit with flag")?
@@ -334,75 +200,34 @@ pub fn define(
         .doc("Event counter variation")?
         .build()?;
 
+    let static_variation = FieldName::new("static_variation");
+    let event_variation = FieldName::new("event_variation");
+    let deadband = FieldName::new("deadband");
+
     let counter_config = lib.declare_struct("CounterConfig")?;
-    let counter_config = lib
-        .define_function_argument_struct(&counter_config)?
+    lib.define_function_argument_struct(&counter_config)?
         .add(
-            "static_variation",
+            &static_variation,
             counter_static_variation,
             "Default static variation",
         )?
         .add(
-            "event_variation",
+            &event_variation,
             counter_event_variation,
             "Default event variation",
         )?
-        .add("deadband", BasicType::Uint32, "Deadband value")?
+        .add(&deadband, BasicType::U32, "Deadband value")?
         .doc("Counter configuration")?
         .end_fields()?
-        // TODO - constructor
-        .build()?;
+        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .default_variant(&static_variation, "Group20Var1")?
+        .default_variant(&event_variation, "Group22Var5")?
+        .default(&deadband, Number::U32(0))?
+        .end_constructor()?
+        .build()
+}
 
-    let counter_add_fn = lib
-        .define_function("database_add_counter")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .param("point_class", event_class.clone(), "Event class")?
-        .param("config", counter_config, "Configuration")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully added, false otherwise",
-        )?
-        .doc("Add a new Counter point")?
-        .build()?;
-
-    let counter_remove_fn = lib
-        .define_function("database_remove_counter")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully removed, false otherwise",
-        )?
-        .doc("Remove a Counter point")?
-        .build()?;
-
-    let counter_update_fn = lib
-        .define_function("database_update_counter")
-        .param("db", database.clone(), "Database")?
-        .param(
-            "value",
-            shared_def.counter_point.clone(),
-            "New value of the point",
-        )?
-        .param("options", update_options.clone(), "Update options")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully updated, false otherwise",
-        )?
-        .doc("Update a Counter point")?
-        .build()?;
-
-    let counter_get_fn = lib
-        .define_function("database_get_counter")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point to get")?
-        .returns(shared_def.counter_point.clone(), "Counter point")?
-        .fails_with(shared_def.error_type.clone())?
-        .doc("Get a Counter point")?
-        .build()?;
-
-    // Frozen Counter
+fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
     let frozen_counter_static_variation = lib
         .define_enum("StaticFrozenCounterVariation")
         .push("Group21Var1", "Frozen Counter - 32-bit with flag")?
@@ -429,78 +254,34 @@ pub fn define(
         .doc("Event frozen counter variation")?
         .build()?;
 
+    let static_variation = FieldName::new("static_variation");
+    let event_variation = FieldName::new("event_variation");
+    let deadband = FieldName::new("deadband");
+
     let frozen_counter_config = lib.declare_struct("FrozenCounterConfig")?;
-    let frozen_counter_config = lib
-        .define_function_argument_struct(&frozen_counter_config)?
+    lib.define_function_argument_struct(&frozen_counter_config)?
         .add(
-            "static_variation",
+            &static_variation,
             frozen_counter_static_variation,
             "Default static variation",
         )?
         .add(
-            "event_variation",
+            &event_variation,
             frozen_counter_event_variation,
             "Default event variation",
         )?
-        .add("deadband", BasicType::Uint32, "Deadband value")?
+        .add(&deadband, BasicType::U32, "Deadband value")?
         .doc("Frozen Counter configuration")?
         .end_fields()?
-        // TODO - constructor
-        .build()?;
+        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .default_variant(&static_variation, "Group21Var1")?
+        .default_variant(&event_variation, "Group23Var5")?
+        .default(&deadband, Number::U32(0))?
+        .end_constructor()?
+        .build()
+}
 
-    let frozen_counter_add_fn = lib
-        .define_function("database_add_frozen_counter")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .param("point_class", event_class.clone(), "Event class")?
-        .param("config", frozen_counter_config, "Configuration")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully added, false otherwise",
-        )?
-        .doc("Add a new Frozen Counter point")?
-        .build()?;
-
-    let frozen_counter_remove_fn = lib
-        .define_function("database_remove_frozen_counter")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully removed, false otherwise",
-        )?
-        .doc("Remove a Frozen Counter point")?
-        .build()?;
-
-    let frozen_counter_update_fn = lib
-        .define_function("database_update_frozen_counter")
-        .param("db", database.clone(), "Database")?
-        .param(
-            "value",
-            shared_def.frozen_counter_point.clone(),
-            "New value of the point",
-        )?
-        .param("options", update_options.clone(), "Update options")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully updated, false otherwise",
-        )?
-        .doc("Update an Frozen Counter point")?
-        .build()?;
-
-    let frozen_counter_get_fn = lib
-        .define_function("database_get_frozen_counter")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point to get")?
-        .returns(
-            shared_def.frozen_counter_point.clone(),
-            "Frozen Counter point",
-        )?
-        .fails_with(shared_def.error_type.clone())?
-        .doc("Get a Frozen Counter point")?
-        .build()?;
-
-    // Analog
+pub fn define_analog_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
     let analog_static_variation = lib
         .define_enum("StaticAnalogVariation")
         .push("Group30Var1", "Analog input - 32-bit with flag")?
@@ -543,75 +324,36 @@ pub fn define(
         .doc("Event analog variation")?
         .build()?;
 
+    let static_variation = FieldName::new("static_variation");
+    let event_variation = FieldName::new("event_variation");
+    let deadband = FieldName::new("deadband");
+
     let analog_config = lib.declare_struct("AnalogConfig")?;
-    let analog_config = lib
-        .define_function_argument_struct(&analog_config)?
+    lib.define_function_argument_struct(&analog_config)?
         .add(
-            "static_variation",
+            &static_variation,
             analog_static_variation,
             "Default static variation",
         )?
         .add(
-            "event_variation",
+            &event_variation,
             analog_event_variation,
             "Default event variation",
         )?
-        .add("deadband", BasicType::Double64, "Deadband value")?
+        .add(&deadband, BasicType::Double64, "Deadband value")?
         .doc("Analog configuration")?
         .end_fields()?
-        // TODO - constructor
-        .build()?;
+        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .default_variant(&static_variation, "Group30Var1")?
+        .default_variant(&event_variation, "Group32Var3")?
+        .default(&deadband, Number::Double(0.0))?
+        .end_constructor()?
+        .build()
+}
 
-    let analog_add_fn = lib
-        .define_function("database_add_analog")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .param("point_class", event_class.clone(), "Event class")?
-        .param("config", analog_config, "Configuration")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully added, false otherwise",
-        )?
-        .doc("Add a new Analog point")?
-        .build()?;
-
-    let analog_remove_fn = lib
-        .define_function("database_remove_analog")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully removed, false otherwise",
-        )?
-        .doc("Remove an Analog point")?
-        .build()?;
-
-    let analog_update_fn = lib
-        .define_function("database_update_analog")
-        .param("db", database.clone(), "Database")?
-        .param(
-            "value",
-            shared_def.analog_point.clone(),
-            "New value of the point",
-        )?
-        .param("options", update_options.clone(), "Update options")?
-        .returns(
-            BasicType::Bool,
-            "True if the point was successfully updated, false otherwise",
-        )?
-        .doc("Update a Analog point")?
-        .build()?;
-
-    let analog_get_fn = lib
-        .define_function("database_get_analog")
-        .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point to get")?
-        .returns(shared_def.analog_point.clone(), "Analog point")?
-        .fails_with(shared_def.error_type.clone())?
-        .doc("Get a Analog point")?
-        .build()?;
-
-    // Analog Output Status
+fn define_analog_output_status_config(
+    lib: &mut LibraryBuilder,
+) -> BindResult<FunctionArgStructHandle> {
     let analog_output_status_static_variation = lib
         .define_enum("StaticAnalogOutputStatusVariation")
         .push("Group40Var1", "Analog output status - 32-bit with flag")?
@@ -652,29 +394,377 @@ pub fn define(
         .doc("Event analog output status variation")?
         .build()?;
 
+    let static_variation = FieldName::new("static_variation");
+    let event_variation = FieldName::new("event_variation");
+    let deadband = FieldName::new("deadband");
+
     let analog_output_status_config = lib.declare_struct("AnalogOutputStatusConfig")?;
-    let analog_output_status_config = lib
-        .define_function_argument_struct(&analog_output_status_config)?
+    lib.define_function_argument_struct(&analog_output_status_config)?
         .add(
-            "static_variation",
+            &static_variation,
             analog_output_status_static_variation,
             "Default static variation",
         )?
         .add(
-            "event_variation",
+            &event_variation,
             analog_output_status_event_variation,
             "Default event variation",
         )?
-        .add("deadband", BasicType::Double64, "Deadband value")?
+        .add(&deadband, BasicType::Double64, "Deadband value")?
         .doc("Analog Output Status configuration")?
         .end_fields()?
-        // TODO - constructor
+        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .default_variant(&static_variation, "Group40Var1")?
+        .default_variant(&event_variation, "Group42Var3")?
+        .default(&deadband, Number::Double(0.0))?
+        .end_constructor()?
+        .build()
+}
+
+pub fn define(
+    lib: &mut LibraryBuilder,
+    shared_def: &SharedDefinitions,
+) -> Result<ClassHandle, BindingError> {
+    let database = lib.declare_class("Database")?;
+
+    let event_class = lib
+        .define_enum("EventClass")
+        .push("None", "Does not generate events")?
+        .push("Class1", "Class 1 event")?
+        .push("Class2", "Class 2 event")?
+        .push("Class3", "Class 3 event")?
+        .doc("Event class")?
         .build()?;
 
+    let update_options = define_update_options(lib)?;
+
+    // Binary Input
+    let binary_config = define_binary_config(lib)?;
+
+    let binary_add_fn = lib
+        .define_function("database_add_binary")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .param("point_class", event_class.clone(), "Event class")?
+        .param("config", binary_config, "Configuration")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully added, false otherwise",
+        )?
+        .doc("Add a new Binary Input point")?
+        .build()?;
+
+    let binary_remove_fn = lib
+        .define_function("database_remove_binary")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully removed, false otherwise",
+        )?
+        .doc("Remove a Binary Input point")?
+        .build()?;
+
+    let binary_update_fn = lib
+        .define_function("database_update_binary")
+        .param("db", database.clone(), "Database")?
+        .param(
+            "value",
+            shared_def.binary_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully updated, false otherwise",
+        )?
+        .doc("Update a Binary Input point")?
+        .build()?;
+
+    let binary_get_fn = lib
+        .define_function("database_get_binary")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point to get")?
+        .returns(shared_def.binary_point.clone(), "Binary Input point")?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Binary Input point")?
+        .build()?;
+
+    // Double-bit Binary Input
+    let double_bit_binary_config = define_double_bit_binary_config(lib)?;
+
+    let double_bit_binary_add_fn = lib
+        .define_function("database_add_double_bit_binary")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .param("point_class", event_class.clone(), "Event class")?
+        .param("config", double_bit_binary_config, "Configuration")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully added, false otherwise",
+        )?
+        .doc("Add a new Double-Bit Binary Input point")?
+        .build()?;
+
+    let double_bit_binary_remove_fn = lib
+        .define_function("database_remove_double_bit_binary")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully removed, false otherwise",
+        )?
+        .doc("Remove a Double-Bit Binary Input point")?
+        .build()?;
+
+    let double_bit_binary_update_fn = lib
+        .define_function("database_update_double_bit_binary")
+        .param("db", database.clone(), "Database")?
+        .param(
+            "value",
+            shared_def.double_bit_binary_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully updated, false otherwise",
+        )?
+        .doc("Update a Double-Bit Binary Input point")?
+        .build()?;
+
+    let double_bit_binary_get_fn = lib
+        .define_function("database_get_double_bit_binary")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point to get")?
+        .returns(
+            shared_def.double_bit_binary_point.clone(),
+            "Double-Bit Binary Input point",
+        )?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Double-Bit Binary Input point")?
+        .build()?;
+
+    // Binary Output Status
+    let binary_output_status_config = define_binary_output_status_config(lib)?;
+
+    let binary_output_status_add_fn = lib
+        .define_function("database_add_binary_output_status")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .param("point_class", event_class.clone(), "Event class")?
+        .param("config", binary_output_status_config, "Configuration")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully added, false otherwise",
+        )?
+        .doc("Add a new Binary Output Status point")?
+        .build()?;
+
+    let binary_output_status_remove_fn = lib
+        .define_function("database_remove_binary_output_status")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully removed, false otherwise",
+        )?
+        .doc("Remove a Binary Output Status point")?
+        .build()?;
+
+    let binary_output_status_update_fn = lib
+        .define_function("database_update_binary_output_status")
+        .param("db", database.clone(), "Database")?
+        .param(
+            "value",
+            shared_def.binary_output_status_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully updated, false otherwise",
+        )?
+        .doc("Update a Binary Output Status point")?
+        .build()?;
+
+    let binary_output_status_get_fn = lib
+        .define_function("database_get_binary_output_status")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point to get")?
+        .returns(
+            shared_def.binary_output_status_point.clone(),
+            "Binary Output Status point",
+        )?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Binary Output Status point")?
+        .build()?;
+
+    // Counter
+    let counter_config = define_counter_config(lib)?;
+
+    let counter_add_fn = lib
+        .define_function("database_add_counter")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .param("point_class", event_class.clone(), "Event class")?
+        .param("config", counter_config, "Configuration")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully added, false otherwise",
+        )?
+        .doc("Add a new Counter point")?
+        .build()?;
+
+    let counter_remove_fn = lib
+        .define_function("database_remove_counter")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully removed, false otherwise",
+        )?
+        .doc("Remove a Counter point")?
+        .build()?;
+
+    let counter_update_fn = lib
+        .define_function("database_update_counter")
+        .param("db", database.clone(), "Database")?
+        .param(
+            "value",
+            shared_def.counter_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully updated, false otherwise",
+        )?
+        .doc("Update a Counter point")?
+        .build()?;
+
+    let counter_get_fn = lib
+        .define_function("database_get_counter")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point to get")?
+        .returns(shared_def.counter_point.clone(), "Counter point")?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Counter point")?
+        .build()?;
+
+    // Frozen Counter
+    let frozen_counter_config = define_frozen_counter_config(lib)?;
+
+    let frozen_counter_add_fn = lib
+        .define_function("database_add_frozen_counter")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .param("point_class", event_class.clone(), "Event class")?
+        .param("config", frozen_counter_config, "Configuration")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully added, false otherwise",
+        )?
+        .doc("Add a new Frozen Counter point")?
+        .build()?;
+
+    let frozen_counter_remove_fn = lib
+        .define_function("database_remove_frozen_counter")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully removed, false otherwise",
+        )?
+        .doc("Remove a Frozen Counter point")?
+        .build()?;
+
+    let frozen_counter_update_fn = lib
+        .define_function("database_update_frozen_counter")
+        .param("db", database.clone(), "Database")?
+        .param(
+            "value",
+            shared_def.frozen_counter_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully updated, false otherwise",
+        )?
+        .doc("Update an Frozen Counter point")?
+        .build()?;
+
+    let frozen_counter_get_fn = lib
+        .define_function("database_get_frozen_counter")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point to get")?
+        .returns(
+            shared_def.frozen_counter_point.clone(),
+            "Frozen Counter point",
+        )?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Frozen Counter point")?
+        .build()?;
+
+    // Analog
+    let analog_config = define_analog_config(lib)?;
+
+    let analog_add_fn = lib
+        .define_function("database_add_analog")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .param("point_class", event_class.clone(), "Event class")?
+        .param("config", analog_config, "Configuration")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully added, false otherwise",
+        )?
+        .doc("Add a new Analog point")?
+        .build()?;
+
+    let analog_remove_fn = lib
+        .define_function("database_remove_analog")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully removed, false otherwise",
+        )?
+        .doc("Remove an Analog point")?
+        .build()?;
+
+    let analog_update_fn = lib
+        .define_function("database_update_analog")
+        .param("db", database.clone(), "Database")?
+        .param(
+            "value",
+            shared_def.analog_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            BasicType::Bool,
+            "True if the point was successfully updated, false otherwise",
+        )?
+        .doc("Update a Analog point")?
+        .build()?;
+
+    let analog_get_fn = lib
+        .define_function("database_get_analog")
+        .param("db", database.clone(), "Database")?
+        .param("index", BasicType::U16, "Index of the point to get")?
+        .returns(shared_def.analog_point.clone(), "Analog point")?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("Get a Analog point")?
+        .build()?;
+
+    // Analog Output Status
+    let analog_output_status_config = define_analog_output_status_config(lib)?;
     let analog_output_status_add_fn = lib
         .define_function("database_add_analog_output_status")
         .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", analog_output_status_config, "Configuration")?
         .returns(
@@ -687,7 +777,7 @@ pub fn define(
     let analog_output_status_remove_fn = lib
         .define_function("database_remove_analog_output_status")
         .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("index", BasicType::U16, "Index of the point")?
         .returns(
             BasicType::Bool,
             "True if the point was successfully removed, false otherwise",
@@ -714,7 +804,7 @@ pub fn define(
     let analog_output_status_get_fn = lib
         .define_function("database_get_analog_output_status")
         .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point to get")?
+        .param("index", BasicType::U16, "Index of the point to get")?
         .returns(
             shared_def.analog_output_status_point.clone(),
             "Analog Output Status point",
@@ -746,7 +836,7 @@ pub fn define(
     let octet_string_add_fn = lib
         .define_function("octet_string_add")
         .param("octet_string", octet_string_class, "Octet String to modify")?
-        .param("value", BasicType::Uint8, "Byte to add")?
+        .param("value", BasicType::U8, "Byte to add")?
         .returns_nothing()?
         .doc("Create a new octet string")?
         .build()?;
@@ -760,7 +850,7 @@ pub fn define(
     let octet_string_add_fn = lib
         .define_function("database_add_octet_string")
         .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class, "Event class")?
         .returns(
             BasicType::Bool,
@@ -772,7 +862,7 @@ pub fn define(
     let octet_string_remove_fn = lib
         .define_function("database_remove_octet_string")
         .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the point")?
+        .param("index", BasicType::U16, "Index of the point")?
         .returns(
             BasicType::Bool,
             "True if the point was successfully removed, false otherwise",
@@ -783,7 +873,7 @@ pub fn define(
     let octet_string_update_fn = lib
         .define_function("database_update_octet_string")
         .param("db", database.clone(), "Database")?
-        .param("index", BasicType::Uint16, "Index of the octet string")?
+        .param("index", BasicType::U16, "Index of the octet string")?
         .param("value", octet_string_collection, "New value of the point")?
         .param("options", update_options, "Update options")?
         .returns(

@@ -269,8 +269,8 @@ object ConversionsModule extends Module {
       def measToVariationWithCast : Iterator[String] = {
         def getFlagsAndValue: String = {
            fs.fields.find(_.isValue).get.typ match {
-             case SInt16Field => "self.to_i16()"
-             case SInt32Field => "self.to_i32()"
+             case S16Field => "self.to_i16()"
+             case S32Field => "self.to_i32()"
              case Float32Field => "self.to_f32()"
            }
         }

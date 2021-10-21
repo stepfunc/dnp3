@@ -7,8 +7,8 @@ sealed abstract class FixedSizeFieldType(val numBytes: Int)
 case object UInt8Field extends FixedSizeFieldType(1)
 case object UInt16Field extends FixedSizeFieldType(2)
 case object UInt32Field extends FixedSizeFieldType(4)
-case object SInt16Field extends FixedSizeFieldType(2)
-case object SInt32Field extends FixedSizeFieldType(4)
+case object S16Field extends FixedSizeFieldType(2)
+case object S32Field extends FixedSizeFieldType(4)
 case object Float32Field extends FixedSizeFieldType(4)
 case object Float64Field extends FixedSizeFieldType(8)
 case class EnumFieldType(model: EnumModel) extends FixedSizeFieldType(1)
@@ -37,8 +37,8 @@ object FixedSizeField {
   val count32 = FixedSizeField("value", UInt32Field, Some(FieldAttribute.Value))
 
   // analog values
-  val value16 = FixedSizeField("value", SInt16Field, Some(FieldAttribute.Value))
-  val value32 = FixedSizeField("value", SInt32Field, Some(FieldAttribute.Value))
+  val value16 = FixedSizeField("value", S16Field, Some(FieldAttribute.Value))
+  val value32 = FixedSizeField("value", S32Field, Some(FieldAttribute.Value))
   val float32 = FixedSizeField("value", Float32Field, Some(FieldAttribute.Value))
   val float64 = FixedSizeField("value", Float64Field, Some(FieldAttribute.Value))
 

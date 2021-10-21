@@ -38,7 +38,7 @@ dnp3_client_state_listener_t get_client_state_listener()
 // ReadHandler
 void begin_fragment(dnp3_read_type_t read_type, dnp3_response_header_t header, void *arg)
 {
-    printf("Beginning fragment (broadcast: %u)\n", dnp3_iin1_is_set(&header.iin.iin1, DNP3_IIN1_FLAG_BROADCAST));
+    printf("Beginning fragment (broadcast: %u)\n", header.iin.iin1.broadcast);
 }
 
 void end_fragment(dnp3_read_type_t read_type, dnp3_response_header_t header, void *arg) { printf("End fragment\n"); }

@@ -51,8 +51,8 @@ pub fn define(
             shared.variation_enum.clone(),
             "Variation to ask for",
         )?
-        .param("start", BasicType::Uint8, "Start index to ask")?
-        .param("stop", BasicType::Uint8, "Stop index to ask (inclusive)")?
+        .param("start", BasicType::U8, "Start index to ask")?
+        .param("stop", BasicType::U8, "Stop index to ask (inclusive)")?
         .returns_nothing()?
         .doc("Add a one-byte start/stop variation interrogation")?
         .build()?;
@@ -65,8 +65,8 @@ pub fn define(
             shared.variation_enum.clone(),
             "Variation to ask for",
         )?
-        .param("start", BasicType::Uint16, "Start index to ask")?
-        .param("stop", BasicType::Uint16, "Stop index to ask (inclusive)")?
+        .param("start", BasicType::U16, "Start index to ask")?
+        .param("stop", BasicType::U16, "Stop index to ask (inclusive)")?
         .returns_nothing()?
         .doc("Add a two-byte start/stop variation interrogation")?
         .build()?;

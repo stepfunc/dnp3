@@ -7,6 +7,7 @@ use oo_bindgen::structs::*;
 use oo_bindgen::types::{BasicType, DurationType};
 use oo_bindgen::{doc, UniversalOr};
 use oo_bindgen::{BindingError, LibraryBuilder};
+use std::time::Duration;
 
 pub struct SharedDefinitions {
     pub error_type: ErrorType,
@@ -91,7 +92,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .add("fin", BasicType::Bool, "Final fragment of the message")?
         .add("con", BasicType::Bool, "Requires confirmation")?
         .add("uns", BasicType::Bool, "Unsolicited response")?
-        .add("seq", BasicType::Uint8, "Sequence number")?
+        .add("seq", BasicType::U8, "Sequence number")?
         .doc("APDU Control field")?
         .end_fields()?
         // TODO - constructor
@@ -117,36 +118,40 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .doc("Operation Type field, used in conjunction with {enum:TripCloseCode} to specify a control operation")?
         .build()?;
 
+    let queue_field = FieldName::new("queue");
+
     let control_code = lib.declare_struct("ControlCode")?;
     let control_code = lib
         .define_universal_struct(&control_code)?
         .add("tcc", trip_close_code, "This field is used in conjunction with the `op_type` field to specify a control operation")?
         .add("clear", BasicType::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
-        .add("queue", BasicType::Bool, "This field is obsolete and should always be 0")?
+        .add(&queue_field, BasicType::Bool, "This field is obsolete and should always be 0")?
         .add("op_type", op_type, "This field is used in conjunction with the `tcc` field to specify a control operation")?
         .doc("CROB ({struct:G12V1}) control code")?
         .end_fields()?
-        // TODO - constructor
+        .begin_constructor("init", ConstructorType::Normal, "Initialize a {struct:ControlCode} instance")?
+        .default(&queue_field, false)?
+        .end_constructor()?
         .build()?;
 
     let g12v1_struct = lib.declare_struct("G12V1")?;
     let g12v1_struct = lib
         .define_universal_struct(&g12v1_struct)?
         .add("code", control_code, "Control code")?
-        .add("count", BasicType::Uint8, "Count")?
+        .add("count", BasicType::U8, "Count")?
         .add(
             "on_time",
-            BasicType::Uint32,
+            BasicType::U32,
             "Duration the output drive remains active (in milliseconds)",
         )?
         .add(
             "off_time",
-            BasicType::Uint32,
+            BasicType::U32,
             "Duration the output drive remains non-active (in milliseconds)",
         )?
         .doc("Control Relay Output Block")?
         .end_fields()?
-        // TODO - constructor
+        .add_full_constructor("init")?
         .build()?;
 
     // ======
@@ -188,14 +193,14 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     )?;
     let (counter_point, counter_it) = build_iterator(
         "Counter",
-        BasicType::Uint32,
+        BasicType::U32,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (frozen_counter_point, frozen_counter_it) = build_iterator(
         "FrozenCounter",
-        BasicType::Uint32,
+        BasicType::U32,
         lib,
         &flags_struct,
         &timestamp_struct,
@@ -224,7 +229,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         runtime_class,
         decode_level,
         retry_strategy: define_retry_strategy(lib)?,
-        serial_port_settings: define_serial_params(lib)?,
+        serial_port_settings: define_serial_port_settings(lib)?,
         link_error_mode: define_link_error_mode(lib)?,
         control_struct,
         g12v1_struct,
@@ -250,15 +255,18 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
 fn define_retry_strategy(
     lib: &mut LibraryBuilder,
 ) -> Result<FunctionArgStructHandle, BindingError> {
+    let min_delay = FieldName::new("min_delay");
+    let max_delay = FieldName::new("max_delay");
+
     let retry_strategy = lib.declare_struct("RetryStrategy")?;
     lib.define_function_argument_struct(&retry_strategy)?
         .add(
-            "min_delay",
+            &min_delay,
             DurationType::Milliseconds,
             "Minimum delay between two retries",
         )?
         .add(
-            "max_delay",
+            &max_delay,
             DurationType::Milliseconds,
             "Maximum delay between two retries",
         )?
@@ -266,7 +274,10 @@ fn define_retry_strategy(
             "The strategy uses an exponential back-off with a minimum and maximum value.",
         ))?
         .end_fields()?
-        // TODO - constructor
+        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .default(&min_delay, Duration::from_secs(1))?
+        .default(&max_delay, Duration::from_secs(10))?
+        .end_constructor()?
         .build()
 }
 
@@ -279,8 +290,10 @@ fn define_link_error_mode(lib: &mut LibraryBuilder) -> Result<EnumHandle, Bindin
         .build()
 }
 
-fn define_serial_params(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHandle, BindingError> {
-    let data_bits = lib
+fn define_serial_port_settings(
+    lib: &mut LibraryBuilder,
+) -> Result<FunctionArgStructHandle, BindingError> {
+    let data_bits_enum = lib
         .define_enum("DataBits")
         .push("Five", "5 bits per character")?
         .push("Six", "6 bits per character")?
@@ -289,7 +302,7 @@ fn define_serial_params(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHan
         .doc("Number of bits per character")?
         .build()?;
 
-    let flow_control = lib
+    let flow_control_enum = lib
         .define_enum("FlowControl")
         .push("None", "No flow control")?
         .push("Software", "Flow control using XON/XOFF bytes")?
@@ -297,7 +310,7 @@ fn define_serial_params(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHan
         .doc("Flow control modes")?
         .build()?;
 
-    let parity = lib
+    let parity_enum = lib
         .define_enum("Parity")
         .push("None", "No parity bit")?
         .push("Odd", "Parity bit sets odd number of 1 bits")?
@@ -305,39 +318,59 @@ fn define_serial_params(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHan
         .doc("Parity checking modes")?
         .build()?;
 
-    let stop_bits = lib
+    let stop_bits_enum = lib
         .define_enum("StopBits")
         .push("One", "One stop bit")?
         .push("Two", "Two stop bits")?
         .doc("Number of stop bits")?
         .build()?;
 
-    let serial_params = lib.declare_struct("SerialPortSettings")?;
-    lib.define_function_argument_struct(&serial_params)?
+    let baud_rate = FieldName::new("baud_rate");
+    let data_bits = FieldName::new("data_bits");
+    let flow_control = FieldName::new("flow_control");
+    let parity = FieldName::new("parity");
+    let stop_bits = FieldName::new("stop_bits");
+
+    let serial_settings = lib.declare_struct("SerialPortSettings")?;
+    lib.define_function_argument_struct(&serial_settings)?
         .add(
-            "baud_rate",
-            BasicType::Uint32,
+            &baud_rate,
+            BasicType::U32,
             "Baud rate (in symbols-per-second)",
         )?
         .add(
-            "data_bits",
-            data_bits,
+            &data_bits,
+            data_bits_enum,
             "Number of bits used to represent a character sent on the line",
         )?
         .add(
-            "flow_control",
-            flow_control,
+            &flow_control,
+            flow_control_enum,
             "Type of signalling to use for controlling data transfer",
         )?
-        .add("parity", parity, "Type of parity to use for error checking")?
         .add(
-            "stop_bits",
-            stop_bits,
+            &parity,
+            parity_enum,
+            "Type of parity to use for error checking",
+        )?
+        .add(
+            &stop_bits,
+            stop_bits_enum,
             "Number of bits to use to signal the end of a character",
         )?
         .doc("Serial port settings")?
         .end_fields()?
-        // TODO - constructor
+        .begin_constructor(
+            "init",
+            ConstructorType::Normal,
+            "Initialize to default values",
+        )?
+        .default(&baud_rate, Number::U32(9600))?
+        .default_variant(&data_bits, "Eight")?
+        .default_variant(&flow_control, "None")?
+        .default_variant(&parity, "None")?
+        .default_variant(&stop_bits, "One")?
+        .end_constructor()?
         .build()
 }
 
@@ -347,12 +380,12 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<UniversalStructHandl
         .define_universal_struct(&flags_struct)?
         .add(
             "value",
-            BasicType::Uint8,
+            BasicType::U8,
             "bit-mask representing a set of individual flag bits",
         )?
         .doc("Collection of individual flag bits represented by an underlying mask value")?
         .end_fields()?
-        // TODO - constructor
+        .add_full_constructor("init")?
         .build()?;
 
     Ok(flags_struct)
@@ -402,51 +435,39 @@ fn declare_timestamp_struct(
         .doc("Timestamp quality")?
         .build()?;
 
+    let value = FieldName::new("value");
+    let quality = FieldName::new("quality");
+
     let timestamp_struct = lib.declare_struct("Timestamp")?;
     let timestamp_struct = lib
         .define_universal_struct(&timestamp_struct)?
-        .add("value", BasicType::Uint64, "Timestamp value")?
-        .add("quality", time_quality_enum, "Timestamp quality")?
+        .add(&value, BasicType::U64, "Timestamp value")?
+        .add(&quality, time_quality_enum, "Timestamp quality")?
         .doc("Timestamp value")?
         .end_fields()?
-        // TODO - constructor
-        .build()?;
-
-    /* TODO - make these static constructors
-    let timestamp_invalid_fn = lib
-        .define_function("timestamp_invalid")
-        .returns(timestamp_struct.clone(), "Invalid timestamp")?
-        .doc("Creates an invalid timestamp struct")?
-        .build()?;
-
-    let timestamp_synchronized_fn = lib
-        .define_function("timestamp_synchronized")
-        .param(
-            "value",
-            BasicType::Uint64,
-            "Timestamp value in milliseconds since EPOCH",
+        .begin_constructor(
+            "invalid",
+            ConstructorType::Static,
+            "Creates an invalid timestamp struct",
         )?
-        .returns(timestamp_struct.clone(), "Synchronized timestamp")?
-        .doc("Creates a synchronized timestamp struct")?
-        .build()?;
-
-    let timestamp_not_synchronized_fn = lib
-        .define_function("timestamp_not_synchronized")?
-        .param(
-            "value",
-            BasicType::Uint64,
-            "Timestamp value in milliseconds since EPOCH",
+        .default(&value, Number::U64(0))?
+        .default_variant(&quality, "Invalid")?
+        .end_constructor()?
+        .begin_constructor(
+            "synchronized",
+            ConstructorType::Static,
+            "Creates a synchronized timestamp struct",
         )?
-        .returns(timestamp_struct.clone(), "Not synchronized timestamp")?
-        .doc("Creates a not synchronized timestamp struct")?
+        .default_variant(&quality, "Synchronized")?
+        .end_constructor()?
+        .begin_constructor(
+            "not_synchronized",
+            ConstructorType::Static,
+            "Creates an unsynchronized timestamp struct",
+        )?
+        .default_variant(&quality, "NotSynchronized")?
+        .end_constructor()?
         .build()?;
-
-    lib.define_struct(&timestamp_struct)?
-        .static_method("invalid_timestamp", &timestamp_invalid_fn)?
-        .static_method("synchronized_timestamp", &timestamp_synchronized_fn)?
-        .static_method("not_synchronized_timestamp", &timestamp_not_synchronized_fn)?
-        .build();
-     */
 
     Ok(timestamp_struct)
 }
@@ -461,13 +482,13 @@ fn build_iterator<T: Into<UniversalStructField>>(
     let value_struct = lib.declare_struct(name)?;
     let value_struct = lib
         .define_universal_struct(&value_struct)?
-        .add("index", BasicType::Uint16, "Point index")?
+        .add("index", BasicType::U16, "Point index")?
         .add("value", value_type, "Point value")?
         .add("flags", flags_struct.clone(), "Point flags")?
         .add("time", timestamp_struct.clone(), "Point timestamp")?
         .doc(format!("{} point", name))?
         .end_fields()?
-        // TODO - constructor
+        .add_full_constructor("init")?
         .build()?;
 
     let value_iterator = lib.declare_class(&format!("{}Iterator", name))?;
@@ -496,7 +517,7 @@ fn build_octet_string(
     let byte_struct = lib.declare_struct("Byte")?;
     let byte_struct = lib
         .define_function_return_struct(&byte_struct)?
-        .add("value", BasicType::Uint8, "Byte value")?
+        .add("value", BasicType::U8, "Byte value")?
         .doc("Single byte struct")?
         .end_fields()?
         // TODO - constructor
@@ -518,7 +539,7 @@ fn build_octet_string(
     let octet_string_struct = lib.declare_struct("OctetString")?;
     let octet_string_struct = lib
         .define_function_return_struct(&octet_string_struct)?
-        .add("index", BasicType::Uint16, "Point index")?
+        .add("index", BasicType::U16, "Point index")?
         .add("value", byte_it, "Point value")?
         .doc("Octet String point")?
         .end_fields()?

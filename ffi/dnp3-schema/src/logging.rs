@@ -1,13 +1,13 @@
+use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::error_type::ErrorType;
-use oo_bindgen::structs::UniversalStructHandle;
+use oo_bindgen::structs::{
+    ConstructorType, FieldName, FunctionArgStructHandle, ToDefaultVariant, UniversalStructHandle,
+};
 use oo_bindgen::types::{BasicType, StringType};
 use oo_bindgen::*;
 
-pub fn define(
-    lib: &mut LibraryBuilder,
-    error_type: ErrorType,
-) -> Result<UniversalStructHandle, BindingError> {
-    let log_level_enum = lib
+fn define_log_level_enum(lib: &mut LibraryBuilder) -> BindResult<EnumHandle> {
+    lib
         .define_enum("LogLevel")
         .push("Error", "Error log level")?
         .push("Warn", "Warning log level")?
@@ -16,12 +16,13 @@ pub fn define(
         .push("Trace", "Trace log level")?
         .doc(
             doc("Log level")
-            .details("Used in {interface:Logger.on_message()} callback to identify the log level of a message.")
+                .details("Used in {interface:Logger.on_message()} callback to identify the log level of a message.")
         )?
-        .build()?;
+        .build()
+}
 
-    let time_format_enum = lib
-        .define_enum("TimeFormat")
+fn define_time_format_enum(lib: &mut LibraryBuilder) -> BindResult<EnumHandle> {
+    lib.define_enum("TimeFormat")
         .push("None", "Don't format the timestamp as part of the message")?
         .push("Rfc3339", "Format the time using RFC 3339")?
         .push(
@@ -29,39 +30,75 @@ pub fn define(
             "Format the time in a human readable format e.g. 'Jun 25 14:27:12.955'",
         )?
         .doc("Describes if and how the time will be formatted in log messages")?
-        .build()?;
+        .build()
+}
 
-    let log_output_format_enum = lib
-        .define_enum("LogOutputFormat")
+fn define_log_output_format_enum(lib: &mut LibraryBuilder) -> BindResult<EnumHandle> {
+    lib.define_enum("LogOutputFormat")
         .push("Text", "A simple text-based format")?
         .push("Json", "Output formatted as JSON")?
         .doc("Describes how each log event is formatted")?
-        .build()?;
+        .build()
+}
 
+fn define_logging_config_struct(
+    lib: &mut LibraryBuilder,
+    log_level_enum: EnumHandle,
+) -> BindResult<FunctionArgStructHandle> {
     let logging_config_struct = lib.declare_struct("LoggingConfig")?;
-    let logging_config_struct = lib
-        .define_function_argument_struct(&logging_config_struct)?
-        .add("level", log_level_enum.clone(), "logging level")?
+
+    let log_output_format_enum = define_log_output_format_enum(lib)?;
+    let time_format_enum = define_time_format_enum(lib)?;
+
+    let level = FieldName::new("level");
+    let output_format = FieldName::new("output_format");
+    let time_format = FieldName::new("time_format");
+    let print_level = FieldName::new("print_level");
+    let print_module_info = FieldName::new("print_module_info");
+
+    lib.define_function_argument_struct(&logging_config_struct)?
+        .add(&level, log_level_enum, "logging level")?
         .add(
-            "output_format",
+            &output_format,
             log_output_format_enum,
             "output formatting options",
         )?
-        .add("time_format", time_format_enum, "optional time format")?
+        .add(&time_format, time_format_enum, "optional time format")?
         .add(
-            "print_level",
+            &print_level,
             BasicType::Bool,
             "optionally print the log level as part to the message string",
         )?
         .add(
-            "print_module_info",
+            &print_module_info,
             BasicType::Bool,
             "optionally print the underlying Rust module information to the message string",
         )?
         .doc("Logging configuration options")?
         .end_fields()?
-        // TODO - constructor
-        .build()?;
+        .begin_constructor(
+            "init",
+            ConstructorType::Normal,
+            "Initialize the configuration to default values",
+        )?
+        .default(&level, "Info".default_variant())?
+        .default(&output_format, "Text".default_variant())?
+        .default(&time_format, "System".default_variant())?
+        .default(&print_level, true)?
+        .default(&print_module_info, false)?
+        .end_constructor()?
+        .build()
+}
+
+const NOTHING: &str = "Nothing";
+
+pub fn define(
+    lib: &mut LibraryBuilder,
+    error_type: ErrorType,
+) -> Result<UniversalStructHandle, BindingError> {
+    let log_level_enum = define_log_level_enum(lib)?;
+
+    let logging_config_struct = define_logging_config_struct(lib, log_level_enum.clone())?;
 
     let log_callback_interface = lib
         .define_interface(
@@ -107,7 +144,7 @@ pub fn define(
 
     let app_decode_level_enum = lib
         .define_enum("AppDecodeLevel")
-        .push("Nothing", "Decode nothing")?
+        .push(NOTHING, "Decode nothing")?
         .push("Header", " Decode the header-only")?
         .push("ObjectHeaders", "Decode the header and the object headers")?
         .push(
@@ -119,7 +156,7 @@ pub fn define(
 
     let transport_decode_level_enum = lib
         .define_enum("TransportDecodeLevel")
-        .push("Nothing", "Decode nothing")?
+        .push(NOTHING, "Decode nothing")?
         .push("Header", " Decode the header")?
         .push("Payload", "Decode the header and the raw payload as hexadecimal")?
         .doc("Controls how transmitted and received transport segments are decoded at the INFO log level")?
@@ -127,7 +164,7 @@ pub fn define(
 
     let link_decode_level_enum = lib
         .define_enum("LinkDecodeLevel")
-        .push("Nothing", "Decode nothing")?
+        .push(NOTHING, "Decode nothing")?
         .push("Header", " Decode the header")?
         .push(
             "Payload",
@@ -138,7 +175,7 @@ pub fn define(
 
     let phys_decode_level_enum = lib
         .define_enum("PhysDecodeLevel")
-        .push("Nothing", "Log nothing")?
+        .push(NOTHING, "Log nothing")?
         .push(
             "Length",
             "Log only the length of data that is sent and received",
@@ -150,15 +187,25 @@ pub fn define(
         .doc("Controls how data transmitted at the physical layer (TCP, serial, etc) is logged")?
         .build()?;
 
+    let application_field = FieldName::new("application");
+    let transport_field = FieldName::new("transport");
+    let link_field = FieldName::new("link");
+    let physical_field = FieldName::new("physical");
+
     let decode_level_struct = lib.declare_struct("DecodeLevel")?;
     let decode_level_struct = lib.define_universal_struct(&decode_level_struct)?
-        .add("application", app_decode_level_enum, "Controls application fragment decoding")?
-        .add("transport", transport_decode_level_enum, "Controls transport segment layer decoding")?
-        .add("link", link_decode_level_enum, "Controls link frame decoding")?
-        .add("physical", phys_decode_level_enum, "Controls the logging of physical layer read/write")?
+        .add(&application_field, app_decode_level_enum, "Controls application fragment decoding")?
+        .add(&transport_field, transport_decode_level_enum, "Controls transport segment layer decoding")?
+        .add(&link_field, link_decode_level_enum, "Controls link frame decoding")?
+        .add(&physical_field, phys_decode_level_enum, "Controls the logging of physical layer read/write")?
         .doc("Controls the decoding of transmitted and received data at the application, transport, link, and physical layers")?
         .end_fields()?
-        // TODO - constructor
+        .begin_constructor("init", ConstructorType::Normal, "Initialize log levels to defaults")?
+        .default_variant(&application_field, NOTHING)?
+        .default_variant(&transport_field, NOTHING)?
+        .default_variant(&link_field, NOTHING)?
+        .default_variant(&physical_field, NOTHING)?
+        .end_constructor()?
         .build()?;
 
     Ok(decode_level_struct)

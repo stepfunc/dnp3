@@ -104,6 +104,36 @@ impl From<ReadType> for ffi::ReadType {
     }
 }
 
+impl From<Iin1> for ffi::Iin1 {
+    fn from(x: Iin1) -> Self {
+        Self {
+            broadcast: x.get_broadcast(),
+            class_1_events: x.get_class_1_events(),
+            class_2_events: x.get_class_2_events(),
+            class_3_events: x.get_class_3_events(),
+            device_restart: x.get_device_restart(),
+            device_trouble: x.get_device_trouble(),
+            local_control: x.get_local_control(),
+            need_time: x.get_need_time(),
+        }
+    }
+}
+
+impl From<Iin2> for ffi::Iin2 {
+    fn from(x: Iin2) -> Self {
+        Self {
+            no_func_code_support: x.get_no_func_code_support(),
+            object_unknown: x.get_object_unknown(),
+            parameter_error: x.get_parameter_error(),
+            event_buffer_overflow: x.get_event_buffer_overflow(),
+            already_executing: x.get_already_executing(),
+            config_corrupt: x.get_config_corrupt(),
+            reserved_2: x.get_reserved_2(),
+            reserved_1: x.get_reserved_1(),
+        }
+    }
+}
+
 impl From<ResponseHeader> for ffi::ResponseHeader {
     fn from(header: ResponseHeader) -> ffi::ResponseHeader {
         ffi::ResponseHeaderFields {
@@ -119,12 +149,8 @@ impl From<ResponseHeader> for ffi::ResponseHeader {
                 ResponseFunction::UnsolicitedResponse => ffi::ResponseFunction::UnsolicitedResponse,
             },
             iin: ffi::Iin {
-                iin1: ffi::Iin1 {
-                    value: header.iin.iin1.value,
-                },
-                iin2: ffi::Iin2 {
-                    value: header.iin.iin2.value,
-                },
+                iin1: header.iin.iin1.into(),
+                iin2: header.iin.iin2.into(),
             },
         }
         .into()
