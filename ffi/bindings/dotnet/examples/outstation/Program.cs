@@ -148,7 +148,7 @@ class ExampleOutstation
 
     private static Timestamp Now()
     {        
-        return Timestamp.Synchronized((ulong) DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        return Timestamp.SynchronizedTimestamp((ulong) DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
     }
 
     private static void RunServer(TcpServer server)

@@ -184,7 +184,7 @@ void binary_transaction(dnp3_database_t *db, void *context)
 {
     ((database_points_t *)context)->binaryValue = !((database_points_t *)context)->binaryValue;
 
-    dnp3_binary_t value = dnp3_binary_init(7, ((database_points_t *)context)->binaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+    dnp3_binary_t value = dnp3_binary_init(7, ((database_points_t *)context)->binaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
     dnp3_database_update_binary(db, value, dnp3_update_options_init());
 }
 
@@ -194,7 +194,7 @@ void double_bit_binary_transaction(dnp3_database_t *db, void *context)
         ((database_points_t *)context)->doubleBitBinaryValue == DNP3_DOUBLE_BIT_DETERMINED_OFF ? DNP3_DOUBLE_BIT_DETERMINED_ON : DNP3_DOUBLE_BIT_DETERMINED_OFF;
 
     dnp3_double_bit_binary_t value =
-        dnp3_double_bit_binary_init(7, ((database_points_t *)context)->doubleBitBinaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+        dnp3_double_bit_binary_init(7, ((database_points_t *)context)->doubleBitBinaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
     dnp3_database_update_double_bit_binary(db, value, dnp3_update_options_init());
 }
 
@@ -203,34 +203,34 @@ void binary_output_status_transaction(dnp3_database_t *db, void *context)
     ((database_points_t *)context)->binaryOutputStatusValue = !((database_points_t *)context)->binaryOutputStatusValue;
 
     dnp3_binary_output_status_t value = dnp3_binary_output_status_init(7, ((database_points_t *)context)->binaryOutputStatusValue,
-                                                                       dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+                                                                       dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
     dnp3_database_update_binary_output_status(db, value, dnp3_update_options_init());
 }
 
 void counter_transaction(dnp3_database_t *db, void *context)
 {
     dnp3_counter_t value =
-        dnp3_counter_init(7, ++((database_points_t *)context)->counterValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+        dnp3_counter_init(7, ++((database_points_t *)context)->counterValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
     dnp3_database_update_counter(db, value, dnp3_update_options_init());
 }
 
 void frozen_counter_transaction(dnp3_database_t *db, void *context)
 {
     dnp3_frozen_counter_t value =
-        dnp3_frozen_counter_init(7, ++((database_points_t *)context)->frozenCounterValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+        dnp3_frozen_counter_init(7, ++((database_points_t *)context)->frozenCounterValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
     dnp3_database_update_frozen_counter(db, value, dnp3_update_options_init());
 }
 
 void analog_transaction(dnp3_database_t *db, void *context)
 {
-    dnp3_analog_t value = dnp3_analog_init(7, ++((database_points_t *)context)->analogValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+    dnp3_analog_t value = dnp3_analog_init(7, ++((database_points_t *)context)->analogValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
     dnp3_database_update_analog(db, value, dnp3_update_options_init());
 }
 
 void analog_output_status_transaction(dnp3_database_t *db, void *context)
 {
     dnp3_analog_output_status_t value = dnp3_analog_output_status_init(7, ++((database_points_t *)context)->analogOutputStatusValue,
-                                                                       dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized(0));
+                                                                       dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
     dnp3_database_update_analog_output_status(db, value, dnp3_update_options_init());
 }
 
