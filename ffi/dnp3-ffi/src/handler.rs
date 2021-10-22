@@ -411,7 +411,7 @@ impl From<Option<Time>> for ffi::Timestamp {
             },
             quality: match time {
                 Some(Time::Synchronized(_)) => ffi::TimeQuality::Synchronized,
-                Some(Time::NotSynchronized(_)) => ffi::TimeQuality::NotSynchronized,
+                Some(Time::Unsynchronized(_)) => ffi::TimeQuality::Unsynchronized,
                 None => ffi::TimeQuality::Invalid,
             },
         }

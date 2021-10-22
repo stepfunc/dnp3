@@ -86,7 +86,7 @@ pub fn timestamp_synchronized(value: u64) -> ffi::Timestamp {
 pub fn timestamp_not_synchronized(value: u64) -> ffi::Timestamp {
     ffi::TimestampFields {
         value,
-        quality: ffi::TimeQuality::NotSynchronized,
+        quality: ffi::TimeQuality::Unsynchronized,
     }
     .into()
 }

@@ -425,7 +425,7 @@ fn declare_timestamp_struct(
             "The timestamp is UTC synchronized at the remote device",
         )?
         .push(
-            "NotSynchronized",
+            "Unsynchronized",
             "The device indicates the timestamp may be not be synchronized",
         )?
         .push(
@@ -446,7 +446,7 @@ fn declare_timestamp_struct(
         .doc("Timestamp value")?
         .end_fields()?
         .begin_constructor(
-            "invalid",
+            "invalid_timestamp",
             ConstructorType::Static,
             "Creates an invalid timestamp struct",
         )?
@@ -454,18 +454,18 @@ fn declare_timestamp_struct(
         .default_variant(&quality, "Invalid")?
         .end_constructor()?
         .begin_constructor(
-            "synchronized",
+            "synchronized_timestamp",
             ConstructorType::Static,
             "Creates a synchronized timestamp struct",
         )?
         .default_variant(&quality, "Synchronized")?
         .end_constructor()?
         .begin_constructor(
-            "not_synchronized",
+            "unsynchronized_timestamp",
             ConstructorType::Static,
             "Creates an unsynchronized timestamp struct",
         )?
-        .default_variant(&quality, "NotSynchronized")?
+        .default_variant(&quality, "Unsynchronized")?
         .end_constructor()?
         .build()?;
 

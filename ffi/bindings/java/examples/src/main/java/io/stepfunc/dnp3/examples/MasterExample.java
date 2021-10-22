@@ -32,8 +32,7 @@ class TestReadHandler implements ReadHandler {
 
   @Override
   public void beginFragment(ReadType readType, ResponseHeader header) {
-    System.out.println(
-        "Beginning fragment (broadcast: " + header.iin.iin1.isSet(Iin1Flag.BROADCAST) + ")");
+    System.out.println("Beginning fragment (broadcast: " + header.iin.iin1.broadcast + ")");
   }
 
   @Override

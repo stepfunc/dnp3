@@ -796,13 +796,13 @@ impl Updatable for OctetString {
 
 impl Default for Binary {
     fn default() -> Self {
-        Self::new(false, Flags::RESTART, Time::not_synchronized(0))
+        Self::new(false, Flags::RESTART, Time::unsynchronized(0))
     }
 }
 
 impl Default for BinaryOutputStatus {
     fn default() -> Self {
-        Self::new(false, Flags::RESTART, Time::not_synchronized(0))
+        Self::new(false, Flags::RESTART, Time::unsynchronized(0))
     }
 }
 
@@ -811,32 +811,32 @@ impl Default for DoubleBitBinary {
         Self::new(
             DoubleBit::Indeterminate,
             Flags::RESTART,
-            Time::not_synchronized(0),
+            Time::unsynchronized(0),
         )
     }
 }
 
 impl Default for Counter {
     fn default() -> Self {
-        Self::new(0, Flags::RESTART, Time::not_synchronized(0))
+        Self::new(0, Flags::RESTART, Time::unsynchronized(0))
     }
 }
 
 impl Default for FrozenCounter {
     fn default() -> Self {
-        Self::new(0, Flags::RESTART, Time::not_synchronized(0))
+        Self::new(0, Flags::RESTART, Time::unsynchronized(0))
     }
 }
 
 impl Default for Analog {
     fn default() -> Self {
-        Self::new(0.0, Flags::RESTART, Time::not_synchronized(0))
+        Self::new(0.0, Flags::RESTART, Time::unsynchronized(0))
     }
 }
 
 impl Default for AnalogOutputStatus {
     fn default() -> Self {
-        Self::new(0.0, Flags::RESTART, Time::not_synchronized(0))
+        Self::new(0.0, Flags::RESTART, Time::unsynchronized(0))
     }
 }
 

@@ -182,7 +182,7 @@ impl EventWriter {
     {
         let time = event
             .get_time()
-            .unwrap_or_else(|| Time::NotSynchronized(Timestamp::new(0)));
+            .unwrap_or_else(|| Time::Unsynchronized(Timestamp::new(0)));
 
         let write_op = |cursor: &mut WriteCursor| -> Result<usize, WriteError> {
             if variation.uses_cto() {

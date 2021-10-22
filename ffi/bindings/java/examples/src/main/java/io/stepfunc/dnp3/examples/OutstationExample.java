@@ -40,7 +40,7 @@ class TestApplication implements OutstationApplication {
 
   @Override
   public RestartDelay coldRestart() {
-    return RestartDelay.validSeconds(ushort(60));
+    return RestartDelay.seconds(ushort(60));
   }
 
   @Override

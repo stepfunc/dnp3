@@ -19,7 +19,7 @@ pub(crate) fn extract_measurements(
     }
 
     fn extract_cto_g51v2(prev: Option<Time>, item: Option<Group51Var2>) -> Option<Time> {
-        item.map_or(prev, |x| Some(Time::NotSynchronized(x.time)))
+        item.map_or(prev, |x| Some(Time::Unsynchronized(x.time)))
     }
 
     fn handle(

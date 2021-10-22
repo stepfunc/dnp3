@@ -248,8 +248,8 @@ impl From<&ffi::Timestamp> for Option<Time> {
             ffi::TimeQuality::Synchronized => {
                 Some(Time::Synchronized(Timestamp::new(from.value())))
             }
-            ffi::TimeQuality::NotSynchronized => {
-                Some(Time::NotSynchronized(Timestamp::new(from.value())))
+            ffi::TimeQuality::Unsynchronized => {
+                Some(Time::Unsynchronized(Timestamp::new(from.value())))
             }
         }
     }
