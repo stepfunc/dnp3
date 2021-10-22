@@ -568,12 +568,10 @@ fn define_restart_delay(lib: &mut LibraryBuilder) -> BindResult<UniversalStructH
         // -----
         .begin_constructor("seconds", ConstructorType::Static, "RestartDelay with a count of seconds")?
         .default_variant(&restart_type, "Seconds")?
-        .default(&value, Number::U16(0))?
         .end_constructor()?
         // -----
         .begin_constructor("milliseconds", ConstructorType::Static, "RestartDelay with a count of milliseconds")?
         .default_variant(&restart_type, "Milliseconds")?
-        .default(&value, Number::U16(0))?
         .end_constructor()?
         // -----
         .build()?;

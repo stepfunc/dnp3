@@ -28,7 +28,7 @@ class MainClass
     {
         public void BeginFragment(ReadType readType, ResponseHeader header)
         {
-            Console.WriteLine($"Beginning fragment (broadcast: {header.Iin.Iin1.IsSet(Iin1Flag.Broadcast)})");
+            Console.WriteLine($"Beginning fragment (broadcast: {header.Iin.Iin1.Broadcast})");
         }
 
         public void EndFragment(ReadType readType, ResponseHeader header)

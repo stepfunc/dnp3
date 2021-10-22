@@ -32,7 +32,7 @@ class ExampleOutstation
 
         public RestartDelay ColdRestart()
         {
-            return RestartDelay.ValidSeconds(60);
+            return RestartDelay.Seconds(60);
         }
 
         public RestartDelay WarmRestart()
@@ -146,6 +146,11 @@ class ExampleOutstation
     }
     // ANCHOR_END: event_buffer_config
 
+    private static Timestamp Now()
+    {        
+        return Timestamp.Synchronized((ulong) DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+    }
+
     private static void RunServer(TcpServer server)
     {
         // ANCHOR: outstation_config
@@ -215,7 +220,7 @@ class ExampleOutstation
                         outstation.Transaction(new OutstationTransaction((db) =>
                         {
                             binaryValue = !binaryValue;
-                            db.UpdateBinary(new Binary(7, binaryValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                            db.UpdateBinary(new Binary(7, binaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         }));
                         break;
                     }
@@ -224,7 +229,7 @@ class ExampleOutstation
                         outstation.Transaction(new OutstationTransaction((db) =>
                         {
                             doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DeterminedOff ? DoubleBit.DeterminedOn : DoubleBit.DeterminedOff;
-                            db.UpdateDoubleBitBinary(new DoubleBitBinary(7, doubleBitBinaryValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                            db.UpdateDoubleBitBinary(new DoubleBitBinary(7, doubleBitBinaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         }));
                         break;
                     }
@@ -233,7 +238,7 @@ class ExampleOutstation
                         outstation.Transaction(new OutstationTransaction((db) =>
                         {
                             binaryOutputStatusValue = !binaryOutputStatusValue;
-                            db.UpdateBinaryOutputStatus(new BinaryOutputStatus(7, binaryOutputStatusValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                            db.UpdateBinaryOutputStatus(new BinaryOutputStatus(7, binaryOutputStatusValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         }));
                         break;
                     }
@@ -241,7 +246,7 @@ class ExampleOutstation
                     {
                         outstation.Transaction(new OutstationTransaction((db) =>
                         {
-                            db.UpdateCounter(new Counter(7, ++counterValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                            db.UpdateCounter(new Counter(7, ++counterValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         }));
                         break;
                     }
@@ -249,7 +254,7 @@ class ExampleOutstation
                     {
                         outstation.Transaction(new OutstationTransaction((db) =>
                         {
-                            db.UpdateFrozenCounter(new FrozenCounter(7, ++frozenCounterValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                            db.UpdateFrozenCounter(new FrozenCounter(7, ++frozenCounterValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         }));
                         break;
                     }
@@ -257,7 +262,7 @@ class ExampleOutstation
                     {
                         outstation.Transaction(new OutstationTransaction((db) =>
                         {
-                            db.UpdateAnalog(new Analog(7, ++analogValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                            db.UpdateAnalog(new Analog(7, ++analogValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         }));
                         break;
                     }
@@ -265,7 +270,7 @@ class ExampleOutstation
                     {
                         outstation.Transaction(new OutstationTransaction((db) =>
                         {
-                            db.UpdateAnalogOutputStatus(new AnalogOutputStatus(7, ++analogOutputStatusValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
+                            db.UpdateAnalogOutputStatus(new AnalogOutputStatus(7, ++analogOutputStatusValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         }));
                         break;
                     }
