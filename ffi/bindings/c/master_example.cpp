@@ -101,15 +101,16 @@ class AssociationHandler : public dnp3::AssociationHandler {
 
 int main()
 {
-    dnp3::Logging::configure(dnp3::LoggingConfig::LoggingConfig(), std::make_unique<Logger>());
+    dnp3::Logging::configure(dnp3::LoggingConfig(), std::make_unique<Logger>());
 
     auto runtime = dnp3::Runtime(dnp3::RuntimeConfig());
     
+    dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
     auto channel = dnp3::MasterChannel::create_tcp_channel(
         runtime,
         dnp3::LinkErrorMode::close,
         dnp3::MasterChannelConfig(1),
-        dnp3::EndpointList(std::string("127.0.0.1:20000")),
+        endpoints,
         dnp3::ConnectStrategy(),
         std::make_unique<ClientStateListener>()
     );
