@@ -131,9 +131,11 @@ int main()
 
     while (true)
     {
-        std::string str;
-        std::getline(std::cin, str);        
+        std::string cmd;
+        std::getline(std::cin, cmd);
+
+        if(cmd == "x") {
+            return 0;
+        }
     }
-    
-    return 0;
 }
