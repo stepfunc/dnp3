@@ -415,8 +415,8 @@ fn define_connect_strategy(
     let max_connect_delay = FieldName::new("max_connect_delay");
     let reconnect_delay = FieldName::new("reconnect_delay");
 
-    let strategy = lib.declare_struct("ConnectStrategy")?;
-    lib.define_function_argument_struct(&strategy)?
+    let strategy = lib.declare_function_arg_struct("ConnectStrategy")?;
+    lib.define_function_argument_struct(strategy)?
         .add(
             &min_connect_delay,
             DurationType::Milliseconds,
@@ -449,9 +449,8 @@ fn define_connect_strategy(
 fn define_association_id(
     lib: &mut LibraryBuilder,
 ) -> std::result::Result<UniversalStructHandle, BindingError> {
-    let id = lib.declare_struct("AssociationId")?;
-    lib.define_universal_struct(&id)?
-        .make_opaque()
+    let id = lib.declare_universal_struct("AssociationId")?;
+    lib.define_opaque_struct(id)?
         .add(
             "address",
             BasicType::U16,
@@ -465,9 +464,8 @@ fn define_association_id(
 fn define_poll_id(
     lib: &mut LibraryBuilder,
 ) -> std::result::Result<UniversalStructHandle, BindingError> {
-    let id = lib.declare_struct("PollId")?;
-    lib.define_universal_struct(&id)?
-        .make_opaque()
+    let id = lib.declare_universal_struct("PollId")?;
+    lib.define_opaque_struct(id)?
         .add(
             "association_id",
             BasicType::U16,
@@ -493,7 +491,7 @@ fn define_read_callback(
         .doc("Result of a read operation")?
         .build()?;
 
-    lib.define_interface("ReadTaskCallback", "Handler for read tasks")
+    lib.define_asynchronous_interface("ReadTaskCallback", "Handler for read tasks")
         .begin_callback(
             "on_complete",
             "Called when the read task reached completion or failed",
@@ -531,10 +529,10 @@ fn define_association_config(
     let auto_integrity_scan_on_buffer_overflow =
         FieldName::new("auto_integrity_scan_on_buffer_overflow");
     let max_queued_user_requests = FieldName::new("max_queued_user_requests");
-    let association_config = lib.declare_struct("AssociationConfig")?;
+    let association_config = lib.declare_function_arg_struct("AssociationConfig")?;
 
     lib
-        .define_function_argument_struct(&association_config)?
+        .define_function_argument_struct(association_config)?
         .doc("Association configuration")?
         .add(
             "disable_unsol_classes",
@@ -614,7 +612,7 @@ fn define_tcp_client_state_listener(
         )?
         .build()?;
 
-    lib.define_interface(
+    lib.define_asynchronous_interface(
         "ClientStateListener",
         "Callback for monitoring the client TCP connection state",
     )
@@ -629,14 +627,14 @@ fn define_master_channel_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> std::result::Result<FunctionArgStructHandle, BindingError> {
-    let config = lib.declare_struct("MasterChannelConfig")?;
+    let config = lib.declare_function_arg_struct("MasterChannelConfig")?;
 
     let decode_level = FieldName::new("decode_level");
     let response_timeout = FieldName::new("response_timeout");
     let tx_buffer_size = FieldName::new("tx_buffer_size");
     let rx_buffer_size = FieldName::new("rx_buffer_size");
 
-    lib.define_function_argument_struct(&config)?
+    lib.define_function_argument_struct(config)?
         .doc("Generic configuration for a MasterChannel")?
         .add("address", BasicType::U16, "Local DNP3 data-link address")?
         .add(decode_level.clone(), shared.decode_level.clone(), "Decoding level for this master. You can modify this later on with {class:MasterChannel.SetDecodeLevel()}.")?
@@ -700,8 +698,8 @@ fn define_utc_timestamp(lib: &mut LibraryBuilder) -> Result<UniversalStructHandl
     let value = FieldName::new("value");
     let is_valid = FieldName::new("is_valid");
 
-    let timestamp_utc = lib.declare_struct("TimestampUtc")?;
-    let timestamp_utc = lib.define_universal_struct(&timestamp_utc)?
+    let timestamp_utc = lib.declare_universal_struct("TimestampUtc")?;
+    let timestamp_utc = lib.define_universal_struct(timestamp_utc)?
         .add(&value, BasicType::U64, doc("Value of the timestamp (in milliseconds from UNIX Epoch).").warning("Only 48 bits are available for timestamps."))?
         .add(&is_valid, BasicType::Bool, "True if the timestamp is valid, false otherwise.")?
         .doc(doc("Timestamp value returned by {interface:AssociationHandler.get_current_time()}.").details("{struct:TimestampUtc.value} is only valid if {struct:TimestampUtc.is_valid} is true."))?
@@ -721,7 +719,7 @@ fn define_utc_timestamp(lib: &mut LibraryBuilder) -> Result<UniversalStructHandl
 fn define_association_handler(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let timestamp_utc = define_utc_timestamp(lib)?;
 
-    lib.define_interface(
+    lib.define_asynchronous_interface(
         "AssociationHandler",
         "Callbacks for a particular outstation association",
     )
@@ -744,9 +742,9 @@ fn define_event_classes(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHan
     let class2 = FieldName::new("class2");
     let class3 = FieldName::new("class3");
 
-    let event_classes = lib.declare_struct("EventClasses")?;
+    let event_classes = lib.declare_function_arg_struct("EventClasses")?;
     let event_classes = lib
-        .define_function_argument_struct(&event_classes)?
+        .define_function_argument_struct(event_classes)?
         .add(&class1, BasicType::Bool, "Class 1 events")?
         .add(&class2, BasicType::Bool, "Class 2 events")?
         .add(&class3, BasicType::Bool, "Class 3 events")?
@@ -782,9 +780,9 @@ fn define_classes(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHandle, B
     let class2 = FieldName::new("class2");
     let class3 = FieldName::new("class3");
 
-    let classes = lib.declare_struct("Classes")?;
+    let classes = lib.declare_function_arg_struct("Classes")?;
     let classes = lib
-        .define_function_argument_struct(&classes)?
+        .define_function_argument_struct(classes)?
         .add(&class0, BasicType::Bool, "Class 0 (static data)")?
         .add(&class1, BasicType::Bool, "Class 1 events")?
         .add(&class2, BasicType::Bool, "Class 2 events")?
@@ -871,7 +869,7 @@ fn define_command_callback(
         .doc("Result of a command")?
         .build()?;
 
-    lib.define_interface("CommandTaskCallback", "Handler for command tasks")
+    lib.define_asynchronous_interface("CommandTaskCallback", "Handler for command tasks")
         .begin_callback(
             "on_complete",
             "Called when the command task reached completion or failed",
@@ -1100,7 +1098,7 @@ fn define_time_sync_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle
         .doc("Result of a time sync operation")?
         .build()?;
 
-    lib.define_interface(
+    lib.define_asynchronous_interface(
         "TimeSyncTaskCallback",
         "Handler for time synchronization tasks",
     )
@@ -1140,8 +1138,8 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, 
         .doc("Result of a restart operation")?
         .build()?;
 
-    let restart_result = lib.declare_struct("RestartResult")?;
-    let restart_result = lib.define_callback_argument_struct(&restart_result)?
+    let restart_result = lib.declare_callback_arg_struct("RestartResult")?;
+    let restart_result = lib.define_callback_argument_struct(restart_result)?
         .add("error", restart_error, "Success/failure of the restart task")?
         .add("delay", DurationType::Milliseconds, "Delay value returned by the outstation. Valid only if {struct:RestartResult.error} is {enum:RestartError.Ok}.")?
         .doc("Result of a restart task")?
@@ -1149,7 +1147,7 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, 
         .add_full_constructor("init")?
         .build()?;
 
-    lib.define_interface("RestartTaskCallback", "Handler for restart tasks")
+    lib.define_asynchronous_interface("RestartTaskCallback", "Handler for restart tasks")
         .begin_callback(
             "on_complete",
             "Called when the restart task reached completion or failed",
@@ -1178,7 +1176,7 @@ fn define_link_status_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHand
         .doc("Result of a link status check. See {class:MasterChannel.CheckLinkStatus()}")?
         .build()?;
 
-    lib.define_interface("LinkStatusCallback", "Handler for link status check")
+    lib.define_asynchronous_interface("LinkStatusCallback", "Handler for link status check")
         .begin_callback("on_complete", "Called when a link status is received")?
         .param("result", link_status_enum, "Result of the link status")?
         .returns_nothing()?

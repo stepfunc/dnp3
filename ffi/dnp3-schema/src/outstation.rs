@@ -124,7 +124,7 @@ fn define_outstation(
     types: &OutstationTypes,
 ) -> Result<ClassHandle, BindingError> {
     let transaction_interface = lib
-        .define_interface("OutstationTransaction", "Outstation transaction interface")
+        .define_synchronous_interface("OutstationTransaction", "Outstation transaction interface")
         .begin_callback(
             "execute",
             "Execute the transaction with the provided database",
@@ -235,8 +235,8 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgS
     let analog_output_status = FieldName::new("analog_output_status");
     let octet_strings = FieldName::new("octet_strings");
 
-    let class_zero_config = lib.declare_struct("ClassZeroConfig")?;
-    lib.define_function_argument_struct(&class_zero_config)?
+    let class_zero_config = lib.declare_function_arg_struct("ClassZeroConfig")?;
+    lib.define_function_argument_struct(class_zero_config)?
         .add(
             &binary,
             BasicType::Bool,
@@ -302,8 +302,8 @@ fn define_outstation_features(lib: &mut LibraryBuilder) -> BindResult<FunctionAr
     let broadcast = FieldName::new("broadcast");
     let unsolicited = FieldName::new("unsolicited");
 
-    let features = lib.declare_struct("OutstationFeatures")?;
-    lib.define_function_argument_struct(&features)?
+    let features = lib.declare_function_arg_struct("OutstationFeatures")?;
+    lib.define_function_argument_struct(features)?
         .add(
             &self_address,
             BasicType::Bool,
@@ -354,9 +354,9 @@ fn define_outstation_config(
     let max_controls_per_request = FieldName::new("max_controls_per_request");
     let class_zero = FieldName::new("class_zero");
 
-    let outstation_config = lib.declare_struct("OutstationConfig")?;
+    let outstation_config = lib.declare_function_arg_struct("OutstationConfig")?;
     let outstation_config = lib
-        .define_function_argument_struct(&outstation_config)?
+        .define_function_argument_struct(outstation_config)?
         .doc("Outstation configuration")?
         .add(
             "outstation_address",
@@ -438,9 +438,9 @@ fn define_outstation_config(
 fn define_event_buffer_config(
     lib: &mut LibraryBuilder,
 ) -> Result<FunctionArgStructHandle, BindingError> {
-    let event_buffer_config = lib.declare_struct("EventBufferConfig")?;
+    let event_buffer_config = lib.declare_function_arg_struct("EventBufferConfig")?;
     let event_buffer_config = lib
-        .define_function_argument_struct(&event_buffer_config)?
+        .define_function_argument_struct(event_buffer_config)?
         .add(
             "max_binary",
             BasicType::U16,
@@ -498,9 +498,9 @@ fn define_application_iin(lib: &mut LibraryBuilder) -> BindResult<UniversalStruc
     let device_trouble = FieldName::new("device_trouble");
     let config_corrupt = FieldName::new("config_corrupt");
 
-    let application_iin = lib.declare_struct("ApplicationIIN")?;
+    let application_iin = lib.declare_universal_struct("ApplicationIIN")?;
     let application_iin = lib
-        .define_universal_struct(&application_iin)?
+        .define_universal_struct(application_iin)?
         .add(
             need_time.clone(),
             BasicType::Bool,
@@ -553,8 +553,8 @@ fn define_restart_delay(lib: &mut LibraryBuilder) -> BindResult<UniversalStructH
     let restart_type = FieldName::new("restart_type");
     let value = FieldName::new("value");
 
-    let restart_delay = lib.declare_struct("RestartDelay")?;
-    let restart_delay = lib.define_universal_struct(&restart_delay)?
+    let restart_delay = lib.declare_universal_struct("RestartDelay")?;
+    let restart_delay = lib.define_universal_struct(restart_delay)?
         .add(restart_type.clone(), restart_delay_type, "Indicates what {struct:RestartDelay.value} is.")?
         .add(value.clone(), BasicType::U16, "Expected delay before the outstation comes back online.")?
         .doc(doc("Restart delay used by {interface:OutstationApplication.cold_restart()} and {interface:OutstationApplication.warm_restart()}")
@@ -611,7 +611,7 @@ fn define_outstation_application(
 
     let application_iin = define_application_iin(lib)?;
 
-    lib.define_interface("OutstationApplication", "Dynamic information required by the outstation from the user application")
+    lib.define_asynchronous_interface("OutstationApplication", "Dynamic information required by the outstation from the user application")
         .begin_callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
@@ -654,9 +654,9 @@ fn define_outstation_information(
 ) -> Result<InterfaceHandle, BindingError> {
     let function_code = define_function_code(lib)?;
 
-    let request_header = lib.declare_struct("RequestHeader")?;
+    let request_header = lib.declare_callback_arg_struct("RequestHeader")?;
     let request_header = lib
-        .define_callback_argument_struct(&request_header)?
+        .define_callback_argument_struct(request_header)?
         .add(
             "control",
             shared_def.control_struct.clone(),
@@ -675,7 +675,7 @@ fn define_outstation_information(
         .doc("Enumeration describing how the outstation processed a broadcast request")?
         .build()?;
 
-    lib.define_interface("OutstationInformation", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))
+    lib.define_asynchronous_interface("OutstationInformation", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))
         .begin_callback("process_request_from_idle", "Called when a request is processed from the IDLE state")?
             .param("header", request_header, "Request header")?
             .returns_nothing()?
@@ -762,7 +762,7 @@ fn define_control_handler(
         .details(select_details_1)
         .details(select_details_2);
 
-    lib.define_interface("ControlHandler", "Callbacks for handling controls")
+    lib.define_asynchronous_interface("ControlHandler", "Callbacks for handling controls")
         //------
         .begin_callback("begin_fragment", "Notifies the start of a command fragment")?
         .returns_nothing()?
@@ -859,7 +859,7 @@ fn define_connection_state_listener(
         .doc("Outstation connection state for connection-oriented transports, e.g. TCP")?
         .build()?;
 
-    lib.define_interface(
+    lib.define_asynchronous_interface(
         "ConnectionStateListener",
         "Callback interface for connection state events",
     )

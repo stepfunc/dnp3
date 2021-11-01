@@ -45,7 +45,7 @@ fn define_logging_config_struct(
     lib: &mut LibraryBuilder,
     log_level_enum: EnumHandle,
 ) -> BindResult<FunctionArgStructHandle> {
-    let logging_config_struct = lib.declare_struct("LoggingConfig")?;
+    let logging_config_struct = lib.declare_function_arg_struct("LoggingConfig")?;
 
     let log_output_format_enum = define_log_output_format_enum(lib)?;
     let time_format_enum = define_time_format_enum(lib)?;
@@ -56,7 +56,7 @@ fn define_logging_config_struct(
     let print_level = FieldName::new("print_level");
     let print_module_info = FieldName::new("print_module_info");
 
-    lib.define_function_argument_struct(&logging_config_struct)?
+    lib.define_function_argument_struct(logging_config_struct)?
         .add(&level, log_level_enum, "logging level")?
         .add(
             &output_format,
@@ -101,7 +101,7 @@ pub fn define(
     let logging_config_struct = define_logging_config_struct(lib, log_level_enum.clone())?;
 
     let log_callback_interface = lib
-        .define_interface(
+        .define_asynchronous_interface(
             "Logger",
             "Logging interface that receives the log messages and writes them somewhere.",
         )
@@ -192,8 +192,8 @@ pub fn define(
     let link_field = FieldName::new("link");
     let physical_field = FieldName::new("physical");
 
-    let decode_level_struct = lib.declare_struct("DecodeLevel")?;
-    let decode_level_struct = lib.define_universal_struct(&decode_level_struct)?
+    let decode_level_struct = lib.declare_universal_struct("DecodeLevel")?;
+    let decode_level_struct = lib.define_universal_struct(decode_level_struct)?
         .add(&application_field, app_decode_level_enum, "Controls application fragment decoding")?
         .add(&transport_field, transport_decode_level_enum, "Controls transport segment layer decoding")?
         .add(&link_field, link_decode_level_enum, "Controls link frame decoding")?

@@ -24,8 +24,8 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStru
     let update_static = FieldName::new("update_static");
     let event_mode = FieldName::new("event_mode");
 
-    let update_options = lib.declare_struct("UpdateOptions")?;
-    lib.define_function_argument_struct(&update_options)?
+    let update_options = lib.declare_function_arg_struct("UpdateOptions")?;
+    lib.define_function_argument_struct(update_options.clone())?
         .add(
             &update_static,
             BasicType::Bool,
@@ -71,8 +71,8 @@ fn define_binary_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStruc
     let static_variation = FieldName::new("static_variation");
     let event_variation = FieldName::new("event_variation");
 
-    let binary_config = lib.declare_struct("BinaryConfig")?;
-    lib.define_function_argument_struct(&binary_config)?
+    let binary_config = lib.declare_function_arg_struct("BinaryConfig")?;
+    lib.define_function_argument_struct(binary_config)?
         .add(
             &static_variation,
             binary_static_variation,
@@ -119,8 +119,8 @@ fn define_double_bit_binary_config(
     let static_variation = FieldName::new("static_variation");
     let event_variation = FieldName::new("event_variation");
 
-    let double_bit_binary_config = lib.declare_struct("DoubleBitBinaryConfig")?;
-    lib.define_function_argument_struct(&double_bit_binary_config)?
+    let double_bit_binary_config = lib.declare_function_arg_struct("DoubleBitBinaryConfig")?;
+    lib.define_function_argument_struct(double_bit_binary_config)?
         .add(
             &static_variation,
             double_bit_binary_static_variation,
@@ -160,8 +160,8 @@ fn define_binary_output_status_config(
     let static_variation = FieldName::new("static_variation");
     let event_variation = FieldName::new("event_variation");
 
-    let binary_output_status_config = lib.declare_struct("BinaryOutputStatusConfig")?;
-    lib.define_function_argument_struct(&binary_output_status_config)?
+    let binary_output_status_config = lib.declare_function_arg_struct("BinaryOutputStatusConfig")?;
+    lib.define_function_argument_struct(binary_output_status_config)?
         .add(
             &static_variation,
             binary_output_status_static_variation,
@@ -204,8 +204,8 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStru
     let event_variation = FieldName::new("event_variation");
     let deadband = FieldName::new("deadband");
 
-    let counter_config = lib.declare_struct("CounterConfig")?;
-    lib.define_function_argument_struct(&counter_config)?
+    let counter_config = lib.declare_function_arg_struct("CounterConfig")?;
+    lib.define_function_argument_struct(counter_config)?
         .add(
             &static_variation,
             counter_static_variation,
@@ -258,8 +258,8 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BindResult<Function
     let event_variation = FieldName::new("event_variation");
     let deadband = FieldName::new("deadband");
 
-    let frozen_counter_config = lib.declare_struct("FrozenCounterConfig")?;
-    lib.define_function_argument_struct(&frozen_counter_config)?
+    let frozen_counter_config = lib.declare_function_arg_struct("FrozenCounterConfig")?;
+    lib.define_function_argument_struct(frozen_counter_config)?
         .add(
             &static_variation,
             frozen_counter_static_variation,
@@ -328,8 +328,8 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgS
     let event_variation = FieldName::new("event_variation");
     let deadband = FieldName::new("deadband");
 
-    let analog_config = lib.declare_struct("AnalogConfig")?;
-    lib.define_function_argument_struct(&analog_config)?
+    let analog_config = lib.declare_function_arg_struct("AnalogConfig")?;
+    lib.define_function_argument_struct(analog_config)?
         .add(
             &static_variation,
             analog_static_variation,
@@ -398,8 +398,8 @@ fn define_analog_output_status_config(
     let event_variation = FieldName::new("event_variation");
     let deadband = FieldName::new("deadband");
 
-    let analog_output_status_config = lib.declare_struct("AnalogOutputStatusConfig")?;
-    lib.define_function_argument_struct(&analog_output_status_config)?
+    let analog_output_status_config = lib.declare_function_arg_struct("AnalogOutputStatusConfig")?;
+    lib.define_function_argument_struct(analog_output_status_config)?
         .add(
             &static_variation,
             analog_output_status_static_variation,

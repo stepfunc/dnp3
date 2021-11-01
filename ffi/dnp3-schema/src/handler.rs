@@ -19,9 +19,9 @@ pub fn define(
 
     let iin = declare_iin_struct(lib)?;
 
-    let response_header = lib.declare_struct("ResponseHeader")?;
+    let response_header = lib.declare_callback_arg_struct("ResponseHeader")?;
     let response_header = lib
-        .define_callback_argument_struct(&response_header)?
+        .define_callback_argument_struct(response_header)?
         .add(
             "control",
             shared_def.control_struct.clone(),
@@ -47,9 +47,9 @@ pub fn define(
         .doc("Qualifier code used in the response")?
         .build()?;
 
-    let header_info = lib.declare_struct("HeaderInfo")?;
+    let header_info = lib.declare_callback_arg_struct("HeaderInfo")?;
     let header_info = lib
-        .define_callback_argument_struct(&header_info)?
+        .define_callback_argument_struct(header_info)?
         .add(
             "variation",
             shared_def.variation_enum.clone(),
@@ -68,7 +68,7 @@ pub fn define(
     let read_type = define_read_type_enum(lib)?;
 
     let read_handler_interface = lib
-        .define_interface(
+        .define_asynchronous_interface(
             "ReadHandler",
             "General handler that will receive all values read from the outstation.",
         )
@@ -217,9 +217,9 @@ pub fn define(
 }
 
 fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<CallbackArgStructHandle, BindingError> {
-    let iin1 = lib.declare_struct("IIN1")?;
+    let iin1 = lib.declare_callback_arg_struct("IIN1")?;
     let iin1 = lib
-        .define_callback_argument_struct(&iin1)?
+        .define_callback_argument_struct(iin1)?
         .doc("First IIN byte")?
         .add(
             "broadcast",
@@ -261,9 +261,9 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<CallbackArgStructHandl
         // TODO - constructor
         .build()?;
 
-    let iin2 = lib.declare_struct("IIN2")?;
+    let iin2 = lib.declare_callback_arg_struct("IIN2")?;
     let iin2 = lib
-        .define_callback_argument_struct(&iin2)?
+        .define_callback_argument_struct(iin2)?
         .doc("Second IIN byte")?
         .add("no_func_code_support", BasicType::Bool, "Outstation does not support this function code")?
         .add("object_unknown", BasicType::Bool, "Outstation does not support requested operation for objects in the request")?
@@ -277,9 +277,9 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<CallbackArgStructHandl
         // TODO - constructor
         .build()?;
 
-    let iin = lib.declare_struct("IIN")?;
+    let iin = lib.declare_callback_arg_struct("IIN")?;
     let iin = lib
-        .define_callback_argument_struct(&iin)?
+        .define_callback_argument_struct(iin)?
         .add("iin1", iin1, "First IIN byte")?
         .add("iin2", iin2, "Second IIN byte")?
         .doc("Pair of IIN bytes")?

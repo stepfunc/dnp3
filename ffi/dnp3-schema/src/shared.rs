@@ -85,9 +85,9 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     let decode_level = crate::logging::define(lib, error_type.clone())?;
     let runtime_class = crate::runtime::define(lib, error_type.clone())?;
 
-    let control_struct = lib.declare_struct("Control")?;
+    let control_struct = lib.declare_callback_arg_struct("Control")?;
     let control_struct = lib
-        .define_callback_argument_struct(&control_struct)?
+        .define_callback_argument_struct(control_struct)?
         .add("fir", BasicType::Bool, "First fragment in the message")?
         .add("fin", BasicType::Bool, "Final fragment of the message")?
         .add("con", BasicType::Bool, "Requires confirmation")?
@@ -95,7 +95,6 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .add("seq", BasicType::U8, "Sequence number")?
         .doc("APDU Control field")?
         .end_fields()?
-        // TODO - constructor
         .build()?;
 
     let trip_close_code = lib
@@ -120,9 +119,9 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
 
     let queue_field = FieldName::new("queue");
 
-    let control_code = lib.declare_struct("ControlCode")?;
+    let control_code = lib.declare_universal_struct("ControlCode")?;
     let control_code = lib
-        .define_universal_struct(&control_code)?
+        .define_universal_struct(control_code)?
         .add("tcc", trip_close_code, "This field is used in conjunction with the `op_type` field to specify a control operation")?
         .add("clear", BasicType::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
         .add(&queue_field, BasicType::Bool, "This field is obsolete and should always be 0")?
@@ -134,9 +133,9 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .end_constructor()?
         .build()?;
 
-    let g12v1_struct = lib.declare_struct("G12V1")?;
+    let g12v1_struct = lib.declare_universal_struct("G12V1")?;
     let g12v1_struct = lib
-        .define_universal_struct(&g12v1_struct)?
+        .define_universal_struct(g12v1_struct)?
         .add("code", control_code, "Control code")?
         .add("count", BasicType::U8, "Count")?
         .add(
@@ -258,8 +257,8 @@ fn define_retry_strategy(
     let min_delay = FieldName::new("min_delay");
     let max_delay = FieldName::new("max_delay");
 
-    let retry_strategy = lib.declare_struct("RetryStrategy")?;
-    lib.define_function_argument_struct(&retry_strategy)?
+    let retry_strategy = lib.declare_function_arg_struct("RetryStrategy")?;
+    lib.define_function_argument_struct(retry_strategy)?
         .add(
             &min_delay,
             DurationType::Milliseconds,
@@ -331,8 +330,8 @@ fn define_serial_port_settings(
     let parity = FieldName::new("parity");
     let stop_bits = FieldName::new("stop_bits");
 
-    let serial_settings = lib.declare_struct("SerialPortSettings")?;
-    lib.define_function_argument_struct(&serial_settings)?
+    let serial_settings = lib.declare_function_arg_struct("SerialPortSettings")?;
+    lib.define_function_argument_struct(serial_settings)?
         .add(
             &baud_rate,
             BasicType::U32,
@@ -375,9 +374,9 @@ fn define_serial_port_settings(
 }
 
 fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<UniversalStructHandle, BindingError> {
-    let flags_struct = lib.declare_struct("Flags")?;
+    let flags_struct = lib.declare_universal_struct("Flags")?;
     let flags_struct = lib
-        .define_universal_struct(&flags_struct)?
+        .define_universal_struct(flags_struct)?
         .add(
             "value",
             BasicType::U8,
@@ -402,7 +401,7 @@ fn define_port_state_listener(lib: &mut LibraryBuilder) -> Result<InterfaceHandl
         .build()?;
 
     let port_state_listener = lib
-        .define_interface(
+        .define_asynchronous_interface(
             "PortStateListener",
             "Callback interface for receiving updates about the state of a serial port",
         )
@@ -438,9 +437,9 @@ fn declare_timestamp_struct(
     let value = FieldName::new("value");
     let quality = FieldName::new("quality");
 
-    let timestamp_struct = lib.declare_struct("Timestamp")?;
+    let timestamp_struct = lib.declare_universal_struct("Timestamp")?;
     let timestamp_struct = lib
-        .define_universal_struct(&timestamp_struct)?
+        .define_universal_struct(timestamp_struct)?
         .add(&value, BasicType::U64, "Timestamp value")?
         .add(&quality, time_quality_enum, "Timestamp quality")?
         .doc("Timestamp value")?
@@ -479,9 +478,9 @@ fn build_iterator<T: Into<UniversalStructField>>(
     flags_struct: &UniversalStructHandle,
     timestamp_struct: &UniversalStructHandle,
 ) -> Result<(UniversalStructHandle, IteratorHandle), BindingError> {
-    let value_struct = lib.declare_struct(name)?;
+    let value_struct_decl = lib.declare_universal_struct(name)?;
     let value_struct = lib
-        .define_universal_struct(&value_struct)?
+        .define_universal_struct(value_struct_decl.clone())?
         .add("index", BasicType::U16, "Point index")?
         .add("value", value_type, "Point value")?
         .add("flags", flags_struct.clone(), "Point flags")?
@@ -496,7 +495,7 @@ fn build_iterator<T: Into<UniversalStructField>>(
         .define_function(&format!("{}_next", name.to_lowercase()))
         .param("it", value_iterator, "Iterator")?
         .returns(
-            value_struct.declaration(),
+            value_struct_decl,
             "Next value of the iterator or {null} if the iterator reached the end",
         )?
         .doc("Get the next value of the iterator")?
@@ -514,9 +513,9 @@ fn build_octet_string(
     lib: &mut LibraryBuilder,
 ) -> Result<(FunctionReturnStructHandle, IteratorHandle), BindingError> {
     // Octet string stuff
-    let byte_struct = lib.declare_struct("Byte")?;
+    let byte_struct_decl = lib.declare_function_return_struct("Byte")?;
     let byte_struct = lib
-        .define_function_return_struct(&byte_struct)?
+        .define_function_return_struct(byte_struct_decl.clone())?
         .add("value", BasicType::U8, "Byte value")?
         .doc("Single byte struct")?
         .end_fields()?
@@ -528,7 +527,7 @@ fn build_octet_string(
         .define_function("byte_next")
         .param("it", byte_it, "Iterator")?
         .returns(
-            byte_struct.declaration(),
+            byte_struct_decl,
             "Next value of the iterator or {null} if the iterator reached the end",
         )?
         .doc("Get the next value of the iterator")?
@@ -536,9 +535,9 @@ fn build_octet_string(
 
     let byte_it = lib.define_iterator_with_lifetime(&byte_it_next_fn, byte_struct.into())?;
 
-    let octet_string_struct = lib.declare_struct("OctetString")?;
+    let octet_string_struct_decl = lib.declare_function_return_struct("OctetString")?;
     let octet_string_struct = lib
-        .define_function_return_struct(&octet_string_struct)?
+        .define_function_return_struct(octet_string_struct_decl.clone())?
         .add("index", BasicType::U16, "Point index")?
         .add("value", byte_it, "Point value")?
         .doc("Octet String point")?
@@ -551,7 +550,7 @@ fn build_octet_string(
         .define_function("octetstring_next")
         .param("it", octet_string_iterator, "Iterator")?
         .returns(
-            octet_string_struct.declaration(),
+            octet_string_struct_decl,
             "Next value of the iterator or {null} if the iterator reached the end",
         )?
         .doc("Get the next value of the iterator")?

@@ -7,9 +7,9 @@ use oo_bindgen::*;
 fn define_runtime_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
     let num_core_threads = FieldName::new("num_core_threads");
 
-    let config_struct = lib.declare_struct("RuntimeConfig")?;
+    let config_struct = lib.declare_function_arg_struct("RuntimeConfig")?;
     lib
-        .define_function_argument_struct(&config_struct)?
+        .define_function_argument_struct(config_struct)?
         .add(
             &num_core_threads,
             BasicType::U16,
