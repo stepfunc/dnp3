@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
 
-project(dnp3_c LANGUAGES C)
+project(dnp3_c LANGUAGES C CXX)
 
 # Find dnp3
 if(WIN32)
@@ -10,13 +10,17 @@ elseif(UNIX)
 endif()
 find_package(dnp3 REQUIRED)
 
-# Master example
+# C Master example
 add_executable(master_example master_example.c)
 target_link_libraries(master_example PRIVATE dnp3)
 
-# Outstation example
+# C Outstation example
 add_executable(outstation_example outstation_example.c)
 target_link_libraries(outstation_example PRIVATE dnp3)
+
+# C++ Outstation example
+add_executable(cpp_master_example master_example.cpp ${DNP3_CPP_FILE})
+target_link_libraries(cpp_master_example PRIVATE dnp3)
 
 # Copy the DLL after build
 add_custom_command(TARGET master_example POST_BUILD 

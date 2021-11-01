@@ -814,7 +814,7 @@ pub fn define(
         .build()?;
 
     // Octet String
-    let octet_string_class = lib.declare_class("OctetStringValue")?;
+    let octet_string_class = lib.declare_collection("OctetStringValue")?;
 
     let octet_string_new_fn = lib
         .define_function("octet_string_new")

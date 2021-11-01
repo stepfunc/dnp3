@@ -490,7 +490,7 @@ fn build_iterator<T: Into<UniversalStructField>>(
         .add_full_constructor("init")?
         .build()?;
 
-    let value_iterator = lib.declare_class(&format!("{}Iterator", name))?;
+    let value_iterator = lib.declare_iterator(&format!("{}Iterator", name))?;
     let iterator_next_fn = lib
         .define_function(&format!("{}_next", name.to_lowercase()))
         .param("it", value_iterator, "Iterator")?
@@ -522,7 +522,7 @@ fn build_octet_string(
         // TODO - constructor
         .build()?;
 
-    let byte_it = lib.declare_class("ByteIterator")?;
+    let byte_it = lib.declare_iterator("ByteIterator")?;
     let byte_it_next_fn = lib
         .define_function("byte_next")
         .param("it", byte_it, "Iterator")?
@@ -545,7 +545,7 @@ fn build_octet_string(
         // TODO - constructor
         .build()?;
 
-    let octet_string_iterator = lib.declare_class("OctetStringIterator")?;
+    let octet_string_iterator = lib.declare_iterator("OctetStringIterator")?;
     let iterator_next_fn = lib
         .define_function("octetstring_next")
         .param("it", octet_string_iterator, "Iterator")?
