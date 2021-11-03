@@ -4,9 +4,9 @@ use oo_bindgen::*;
 use crate::shared::SharedDefinitions;
 use oo_bindgen::enum_type::{EnumBuilder, EnumHandle};
 use oo_bindgen::interface::InterfaceHandle;
+use oo_bindgen::name::Name;
 use oo_bindgen::structs::{
-    ConstructorDefault, ConstructorType, FieldName, FunctionArgStructHandle, Number,
-    UniversalStructHandle,
+    ConstructorDefault, ConstructorType, FunctionArgStructHandle, Number, UniversalStructHandle,
 };
 use oo_bindgen::types::{BasicType, DurationType, StringType};
 use std::time::Duration;
@@ -20,12 +20,12 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
 
     let tcp_client_state_listener = define_tcp_client_state_listener(lib)?;
 
-    let master_channel_class = lib.declare_class("MasterChannel")?;
+    let master_channel_class = lib.declare_class("master_channel")?;
 
     let connect_strategy = define_connect_strategy(lib)?;
 
     let master_channel_create_tcp_fn = lib
-        .define_function("master_channel_create_tcp")
+        .define_function("master_channel_create_tcp")?
         .param(
             "runtime",
             shared.runtime_class.clone(),
@@ -65,7 +65,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .build()?;
 
     let master_channel_create_serial_fn = lib
-        .define_function("master_channel_create_serial")
+        .define_function("master_channel_create_serial")?
         .param("runtime",shared.runtime_class.clone(), "Runtime to use to drive asynchronous operations of the master")?
         .param("config",master_channel_config, "Generic configuration for the channel")?
         .param("path", StringType, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
@@ -81,7 +81,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .build()?;
 
     let destroy_fn = lib
-        .define_function("master_channel_destroy")
+        .define_function("master_channel_destroy")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -92,7 +92,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .build()?;
 
     let enable_fn = lib
-        .define_function("master_channel_enable")
+        .define_function("master_channel_enable")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -104,7 +104,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .build()?;
 
     let disable_fn = lib
-        .define_function("master_channel_disable")
+        .define_function("master_channel_disable")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -125,7 +125,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     let request_class = crate::request::define(lib, shared)?;
 
     let add_association_fn = lib
-        .define_function("master_channel_add_association")
+        .define_function("master_channel_add_association")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -153,7 +153,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .build()?;
 
     let remove_association_fn = lib
-        .define_function("master_channel_remove_association")
+        .define_function("master_channel_remove_association")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -165,7 +165,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .doc("Remove an association from the channel")?
         .build()?;
 
-    let add_poll_fn = lib.define_function("master_channel_add_poll")
+    let add_poll_fn = lib.define_function("master_channel_add_poll")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -178,26 +178,26 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Add a periodic poll to an association")
-                .details("Each result of the poll will be sent to the {interface:ReadHandler} of the association.")
+                .details("Each result of the poll will be sent to the {interface:read_handler} of the association.")
         )?
         .build()?;
 
-    let remove_poll_fn = lib.define_function("master_channel_remove_poll")
+    let remove_poll_fn = lib.define_function("master_channel_remove_poll")?
         .param(
             "channel",
            master_channel_class.clone(),
-            "{class:MasterChannel} on which to apply the operation",
+            "{class:master_channel} on which to apply the operation",
         )?
         .param("poll_id", poll_id.clone(), "Id of the created poll")?
         .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Add a periodic poll to an association")
-                .details("Each result of the poll will be sent to the {interface:ReadHandler} of the association.")
+                .details("Each result of the poll will be sent to the {interface:read_handler} of the association.")
         )?
         .build()?;
 
-    let demand_poll_fn = lib.define_function("master_channel_demand_poll")
+    let demand_poll_fn = lib.define_function("master_channel_demand_poll")?
         .param(
             "channel",
            master_channel_class.clone(),
@@ -207,18 +207,18 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc(
-            doc("Demand the immediate execution of a poll previously created with {class:MasterChannel.AddPoll()}.")
-                .details("This method returns immediately. The result will be sent to the registered {interface:ReadHandler}.")
+            doc("Demand the immediate execution of a poll previously created with {class:master_channel.add_poll()}.")
+                .details("This method returns immediately. The result will be sent to the registered {interface:read_handler}.")
                 .details("This method resets the internal timer of the poll.")
         )?
         .build()?;
 
     let set_decode_level_fn = lib
-        .define_function("master_channel_set_decode_level")
+        .define_function("master_channel_set_decode_level")?
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} on which to apply the operation",
+            "{class:master_channel} on which to apply the operation",
         )?
         .param(
             "decode_level",
@@ -231,7 +231,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .build()?;
 
     let get_decode_level_fn = lib
-        .define_function("master_channel_get_decode_level")
+        .define_function("master_channel_get_decode_level")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -245,8 +245,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     let read_callback = define_read_callback(lib)?;
 
     let read_fn = lib
-        .define_function("master_channel_read")
-        .param("channel",master_channel_class.clone(), "{class:MasterChannel} on which to perform the operation")?
+        .define_function("master_channel_read")?
+        .param("channel",master_channel_class.clone(), "{class:master_channel} on which to perform the operation")?
         .param("association",association_id.clone(), "Association on which to perform the read")?
         .param("request",request_class.declaration(), "Request to send")?
         .param("callback", read_callback, "Callback that will be invoked once the read is complete")?
@@ -263,7 +263,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     let command_cb = define_command_callback(lib)?;
 
     let operate_fn = lib
-        .define_function("master_channel_operate")
+        .define_function("master_channel_operate")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -290,7 +290,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     let time_sync_cb = define_time_sync_callback(lib)?;
 
     let perform_time_sync_fn = lib
-        .define_function("master_channel_sync_time")
+        .define_function("master_channel_sync_time")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -315,7 +315,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     let restart_cb = define_restart_callback(lib)?;
 
     let cold_restart_fn = lib
-        .define_function("master_channel_cold_restart")
+        .define_function("master_channel_cold_restart")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -337,7 +337,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .build()?;
 
     let warm_restart_fn = lib
-        .define_function("master_channel_warm_restart")
+        .define_function("master_channel_warm_restart")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -361,7 +361,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     let link_status_cb = define_link_status_callback(lib)?;
 
     let check_link_status_fn = lib
-        .define_function("master_channel_check_link_status")
+        .define_function("master_channel_check_link_status")?
         .param(
             "channel",
             master_channel_class.clone(),
@@ -411,9 +411,9 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
 fn define_connect_strategy(
     lib: &mut LibraryBuilder,
 ) -> Result<FunctionArgStructHandle, BindingError> {
-    let min_connect_delay = FieldName::new("min_connect_delay");
-    let max_connect_delay = FieldName::new("max_connect_delay");
-    let reconnect_delay = FieldName::new("reconnect_delay");
+    let min_connect_delay = Name::create("min_connect_delay")?;
+    let max_connect_delay = Name::create("max_connect_delay")?;
+    let reconnect_delay = Name::create("reconnect_delay")?;
 
     let strategy = lib.declare_function_arg_struct("ConnectStrategy")?;
     lib.define_function_argument_struct(strategy)?
@@ -485,13 +485,13 @@ fn define_read_callback(
     lib: &mut LibraryBuilder,
 ) -> std::result::Result<InterfaceHandle, BindingError> {
     let read_result = lib
-        .define_enum("ReadResult")
+        .define_enum("ReadResult")?
         .push("Success", "Read was perform successfully")?
         .add_task_errors()?
         .doc("Result of a read operation")?
         .build()?;
 
-    lib.define_asynchronous_interface("ReadTaskCallback", "Handler for read tasks")
+    lib.define_asynchronous_interface("ReadTaskCallback", "Handler for read tasks")?
         .begin_callback(
             "on_complete",
             "Called when the read task reached completion or failed",
@@ -510,7 +510,7 @@ fn define_association_config(
     let classes = define_classes(lib)?;
 
     let auto_time_sync_enum = lib
-        .define_enum("AutoTimeSync")
+        .define_enum("AutoTimeSync")?
         .push("None", "Do not perform automatic time sync")?
         .push(
             "Lan",
@@ -523,12 +523,12 @@ fn define_association_config(
         .doc("Automatic time synchronization configuration")?
         .build()?;
 
-    let auto_time_sync = FieldName::new("auto_time_sync");
-    let auto_tasks_retry_strategy = FieldName::new("auto_tasks_retry_strategy");
-    let keep_alive_timeout = FieldName::new("keep_alive_timeout");
+    let auto_time_sync = Name::create("auto_time_sync")?;
+    let auto_tasks_retry_strategy = Name::create("auto_tasks_retry_strategy")?;
+    let keep_alive_timeout = Name::create("keep_alive_timeout")?;
     let auto_integrity_scan_on_buffer_overflow =
-        FieldName::new("auto_integrity_scan_on_buffer_overflow");
-    let max_queued_user_requests = FieldName::new("max_queued_user_requests");
+        Name::create("auto_integrity_scan_on_buffer_overflow")?;
+    let max_queued_user_requests = Name::create("max_queued_user_requests")?;
     let association_config = lib.declare_function_arg_struct("AssociationConfig")?;
 
     lib
@@ -590,7 +590,7 @@ fn define_tcp_client_state_listener(
     lib: &mut LibraryBuilder,
 ) -> std::result::Result<InterfaceHandle, BindingError> {
     let client_state_enum = lib
-        .define_enum("ClientState")
+        .define_enum("ClientState")?
         .push("Disabled", "Client is disabled and idle until disabled")?
         .push(
             "Connecting",
@@ -615,7 +615,7 @@ fn define_tcp_client_state_listener(
     lib.define_asynchronous_interface(
         "ClientStateListener",
         "Callback for monitoring the client TCP connection state",
-    )
+    )?
     .begin_callback("on_change", "Called when the client state changed")?
     .param("state", client_state_enum, "New state")?
     .returns_nothing()?
@@ -629,10 +629,10 @@ fn define_master_channel_config(
 ) -> std::result::Result<FunctionArgStructHandle, BindingError> {
     let config = lib.declare_function_arg_struct("MasterChannelConfig")?;
 
-    let decode_level = FieldName::new("decode_level");
-    let response_timeout = FieldName::new("response_timeout");
-    let tx_buffer_size = FieldName::new("tx_buffer_size");
-    let rx_buffer_size = FieldName::new("rx_buffer_size");
+    let decode_level = Name::create("decode_level")?;
+    let response_timeout = Name::create("response_timeout")?;
+    let tx_buffer_size = Name::create("tx_buffer_size")?;
+    let rx_buffer_size = Name::create("rx_buffer_size")?;
 
     lib.define_function_argument_struct(config)?
         .doc("Generic configuration for a MasterChannel")?
@@ -660,14 +660,14 @@ fn define_endpoint_list(
 ) -> std::result::Result<ClassHandle, BindingError> {
     let endpoint_list_class = lib.declare_class("EndpointList")?;
 
-    let endpoint_list_new = lib.define_function("endpoint_list_new")
+    let endpoint_list_new = lib.define_function("endpoint_list_new")?
         .param("main_endpoint", StringType, "Main endpoint")?
         .returns(endpoint_list_class.clone(), "New endpoint list")?
         .doc(doc("Create a new list of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
         .build()?;
 
     let endpoint_list_destroy = lib
-        .define_function("endpoint_list_destroy")
+        .define_function("endpoint_list_destroy")?
         .param(
             "list",
             endpoint_list_class.clone(),
@@ -677,7 +677,7 @@ fn define_endpoint_list(
         .doc("Delete a previously allocated endpoint list.")?
         .build()?;
 
-    let endpoint_list_add = lib.define_function("endpoint_list_add")
+    let endpoint_list_add = lib.define_function("endpoint_list_add")?
         .param("list", endpoint_list_class.clone(), "Endpoint list to modify")?
         .param("endpoint", StringType, "Endpoint to add to the list")?
         .returns_nothing()?
@@ -695,8 +695,8 @@ fn define_endpoint_list(
 }
 
 fn define_utc_timestamp(lib: &mut LibraryBuilder) -> Result<UniversalStructHandle, BindingError> {
-    let value = FieldName::new("value");
-    let is_valid = FieldName::new("is_valid");
+    let value = Name::create("value")?;
+    let is_valid = Name::create("is_valid")?;
 
     let timestamp_utc = lib.declare_universal_struct("TimestampUtc")?;
     let timestamp_utc = lib.define_universal_struct(timestamp_utc)?
@@ -722,7 +722,7 @@ fn define_association_handler(lib: &mut LibraryBuilder) -> Result<InterfaceHandl
     lib.define_asynchronous_interface(
         "AssociationHandler",
         "Callbacks for a particular outstation association",
-    )
+    )?
     .begin_callback(
         "get_current_time",
         doc("Returns the current time or an invalid time if none is available")
@@ -738,9 +738,9 @@ fn define_association_handler(lib: &mut LibraryBuilder) -> Result<InterfaceHandl
 }
 
 fn define_event_classes(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHandle, BindingError> {
-    let class1 = FieldName::new("class1");
-    let class2 = FieldName::new("class2");
-    let class3 = FieldName::new("class3");
+    let class1 = Name::create("class1")?;
+    let class2 = Name::create("class2")?;
+    let class3 = Name::create("class3")?;
 
     let event_classes = lib.declare_function_arg_struct("EventClasses")?;
     let event_classes = lib
@@ -775,10 +775,10 @@ fn define_event_classes(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHan
 }
 
 fn define_classes(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHandle, BindingError> {
-    let class0 = FieldName::new("class0");
-    let class1 = FieldName::new("class1");
-    let class2 = FieldName::new("class2");
-    let class3 = FieldName::new("class3");
+    let class0 = Name::create("class0")?;
+    let class1 = Name::create("class1")?;
+    let class2 = Name::create("class2")?;
+    let class3 = Name::create("class3")?;
 
     let classes = lib.declare_function_arg_struct("Classes")?;
     let classes = lib
@@ -816,7 +816,7 @@ fn define_classes(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHandle, B
 }
 
 fn define_command_mode(lib: &mut LibraryBuilder) -> std::result::Result<EnumHandle, BindingError> {
-    lib.define_enum("CommandMode")
+    lib.define_enum("CommandMode")?
         .push("DirectOperate", "Perform a Direct Operate (0x05)")?
         .push(
             "SelectBeforeOperate",
@@ -855,7 +855,7 @@ fn define_command_callback(
     lib: &mut LibraryBuilder,
 ) -> std::result::Result<InterfaceHandle, BindingError> {
     let command_result = lib
-        .define_enum("CommandResult")
+        .define_enum("CommandResult")?
         .push("Success", "Command was a success")?
         .push(
             "BadStatus",
@@ -869,7 +869,7 @@ fn define_command_callback(
         .doc("Result of a command")?
         .build()?;
 
-    lib.define_asynchronous_interface("CommandTaskCallback", "Handler for command tasks")
+    lib.define_asynchronous_interface("CommandTaskCallback", "Handler for command tasks")?
         .begin_callback(
             "on_complete",
             "Called when the command task reached completion or failed",
@@ -887,20 +887,20 @@ fn define_command_builder(
     let command = lib.declare_class("Commands")?;
 
     let command_new_fn = lib
-        .define_function("commands_new")
+        .define_function("commands_new")?
         .returns(command.clone(), "Handle to the created set of commands")?
         .doc("Create a new set of commands")?
         .build()?;
 
     let command_destroy_fn = lib
-        .define_function("commands_destroy")
+        .define_function("commands_destroy")?
         .param("command", command.clone(), "Set of commands to destroy")?
         .returns_nothing()?
         .doc("Destroy set of commands")?
         .build()?;
 
     let command_finish_header_fn = lib
-        .define_function("commands_finish_header")
+        .define_function("commands_finish_header")?
         .param(
             "commands",
           command.clone(),
@@ -911,7 +911,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u8_g12v1_fn = lib
-        .define_function("commands_add_g12v1_u8")
+        .define_function("commands_add_g12v1_u8")?
         .param("command", command.clone(), "Commands to modify")?
         .param(
             "idx",
@@ -924,7 +924,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u16_g12v1_fn = lib
-        .define_function("commands_add_g12v1_u16")
+        .define_function("commands_add_g12v1_u16")?
         .param("command", command.clone(), "Command to modify")?
         .param(
             "idx",
@@ -937,7 +937,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u8_g41v1_fn = lib
-        .define_function("commands_add_g41v1_u8")
+        .define_function("commands_add_g41v1_u8")?
         .param("command", command.clone(), "Command to modify")?
         .param(
             "idx",
@@ -950,7 +950,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u16_g41v1_fn = lib
-        .define_function("commands_add_g41v1_u16")
+        .define_function("commands_add_g41v1_u16")?
         .param("command", command.clone(), "Commands to modify")?
         .param(
             "idx",
@@ -963,7 +963,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u8_g41v2_fn = lib
-        .define_function("commands_add_g41v2_u8")
+        .define_function("commands_add_g41v2_u8")?
         .param("command", command.clone(), "Commands to modify")?
         .param(
             "idx",
@@ -976,7 +976,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u16_g41v2_fn = lib
-        .define_function("commands_add_g41v2_u16")
+        .define_function("commands_add_g41v2_u16")?
         .param("command", command.clone(), "Commands to modify")?
         .param(
             "idx",
@@ -989,7 +989,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u8_g41v3_fn = lib
-        .define_function("commands_add_g41v3_u8")
+        .define_function("commands_add_g41v3_u8")?
         .param("command", command.clone(), "Commands to modify")?
         .param(
             "idx",
@@ -1006,7 +1006,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u16_g41v3_fn = lib
-        .define_function("commands_add_g41v3_u16")
+        .define_function("commands_add_g41v3_u16")?
         .param("commands", command.clone(), "Commands to modify")?
         .param(
             "idx",
@@ -1023,7 +1023,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u8_g41v4_fn = lib
-        .define_function("commands_add_g41v4_u8")
+        .define_function("commands_add_g41v4_u8")?
         .param("commands", command.clone(), "Commands to modify")?
         .param(
             "idx",
@@ -1040,7 +1040,7 @@ fn define_command_builder(
         .build()?;
 
     let command_add_u16_g41v4_fn = lib
-        .define_function("commands_add_g41v4_u16")
+        .define_function("commands_add_g41v4_u16")?
         .param("commands", command.clone(), "Commands to modify")?
         .param(
             "idx",
@@ -1076,7 +1076,7 @@ fn define_command_builder(
 
 fn define_time_sync_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let timesync_result = lib
-        .define_enum("TimeSyncResult")
+        .define_enum("TimeSyncResult")?
         .push("Success", "Time synchronization operation was a success")?
         .push("ClockRollback", "Detected a clock rollback")?
         .push(
@@ -1101,7 +1101,7 @@ fn define_time_sync_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle
     lib.define_asynchronous_interface(
         "TimeSyncTaskCallback",
         "Handler for time synchronization tasks",
-    )
+    )?
     .begin_callback(
         "on_complete",
         "Called when the timesync task reached completion or failed",
@@ -1117,7 +1117,7 @@ fn define_time_sync_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle
 }
 
 fn define_time_sync_mode(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingError> {
-    lib.define_enum("TimeSyncMode")
+    lib.define_enum("TimeSyncMode")?
         .push(
             "Lan",
             "Perform a LAN time sync with Record Current Time (0x18) function code",
@@ -1132,7 +1132,7 @@ fn define_time_sync_mode(lib: &mut LibraryBuilder) -> Result<EnumHandle, Binding
 
 fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let restart_error = lib
-        .define_enum("RestartError")
+        .define_enum("RestartError")?
         .push("Ok", "Restart was perform successfully")?
         .add_task_errors()?
         .doc("Result of a restart operation")?
@@ -1147,7 +1147,7 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, 
         .add_full_constructor("init")?
         .build()?;
 
-    lib.define_asynchronous_interface("RestartTaskCallback", "Handler for restart tasks")
+    lib.define_asynchronous_interface("RestartTaskCallback", "Handler for restart tasks")?
         .begin_callback(
             "on_complete",
             "Called when the restart task reached completion or failed",
@@ -1160,7 +1160,7 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, 
 
 fn define_link_status_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let link_status_enum = lib
-        .define_enum("LinkStatusResult")
+        .define_enum("LinkStatusResult")?
         .push(
             "Success",
             "The outstation responded with a valid LINK_STATUS",
@@ -1176,7 +1176,7 @@ fn define_link_status_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHand
         .doc("Result of a link status check. See {class:MasterChannel.CheckLinkStatus()}")?
         .build()?;
 
-    lib.define_asynchronous_interface("LinkStatusCallback", "Handler for link status check")
+    lib.define_asynchronous_interface("LinkStatusCallback", "Handler for link status check")?
         .begin_callback("on_complete", "Called when a link status is received")?
         .param("result", link_status_enum, "Result of the link status")?
         .returns_nothing()?

@@ -49,7 +49,15 @@ pub fn build_lib() -> Result<Library, BindingError> {
             },
         ],
     };
-    let mut builder = LibraryBuilder::new(Version::parse(dnp3::VERSION).unwrap(), info, LibrarySettings::create("dnp3", "dnp3"));
+
+    let settings = LibrarySettings::create(
+        "dnp3",
+        "dnp3",
+        IteratorSettings::default()?,
+        CollectionSettings::default()?,
+    )?;
+
+    let mut builder = LibraryBuilder::new(Version::parse(dnp3::VERSION).unwrap(), info, settings);
 
     // Shared stuff
     let shared_def = shared::define(&mut builder)?;

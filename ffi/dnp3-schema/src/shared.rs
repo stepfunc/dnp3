@@ -1,11 +1,12 @@
 use oo_bindgen::class::ClassDeclarationHandle;
+use oo_bindgen::doc;
 use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::error_type::{ErrorType, ExceptionType};
 use oo_bindgen::interface::InterfaceHandle;
 use oo_bindgen::iterator::IteratorHandle;
+use oo_bindgen::name::Name;
 use oo_bindgen::structs::*;
 use oo_bindgen::types::{BasicType, DurationType};
-use oo_bindgen::{doc, UniversalOr};
 use oo_bindgen::{BindingError, LibraryBuilder};
 use std::time::Duration;
 
@@ -98,7 +99,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .build()?;
 
     let trip_close_code = lib
-        .define_enum("TripCloseCode")
+        .define_enum("TripCloseCode")?
         .variant("Nul", 0, "NUL (0)")?
         .variant("Close", 1, "CLOSE (1)")?
         .variant("Trip", 2, "TRIP (2)")?
@@ -108,16 +109,16 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         .build()?;
 
     let op_type = lib
-        .define_enum("OpType")
-        .variant("Nul", 0, "NUL (0)")?
-        .variant("PulseOn", 1, "PULSE_ON (1)")?
-        .variant("PulseOff", 2, "PULSE_OFF (2)")?
-        .variant("LatchOn", 3, "LATCH_ON (3)")?
-        .variant("LatchOff", 4, "LATCH_OFF(4)")?
-        .doc("Operation Type field, used in conjunction with {enum:TripCloseCode} to specify a control operation")?
+        .define_enum("op_type")?
+        .variant("nul", 0, "NUL (0)")?
+        .variant("pulse_on", 1, "PULSE_ON (1)")?
+        .variant("pulse_off", 2, "PULSE_OFF (2)")?
+        .variant("latch_on", 3, "LATCH_ON (3)")?
+        .variant("latch_off", 4, "LATCH_OFF(4)")?
+        .doc("Operation Type field, used in conjunction with {enum:trip_close_code} to specify a control operation")?
         .build()?;
 
-    let queue_field = FieldName::new("queue");
+    let queue_field = Name::create("queue")?;
 
     let control_code = lib.declare_universal_struct("ControlCode")?;
     let control_code = lib
@@ -161,7 +162,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     let timestamp_struct = declare_timestamp_struct(lib)?;
 
     let double_bit_enum = lib
-        .define_enum("DoubleBit")
+        .define_enum("DoubleBit")?
         .push("Intermediate", "Transition between conditions")?
         .push("DeterminedOff", "Determined to be OFF")?
         .push("DeterminedOn", "Determined to be ON")?
@@ -254,8 +255,8 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
 fn define_retry_strategy(
     lib: &mut LibraryBuilder,
 ) -> Result<FunctionArgStructHandle, BindingError> {
-    let min_delay = FieldName::new("min_delay");
-    let max_delay = FieldName::new("max_delay");
+    let min_delay = Name::create("min_delay")?;
+    let max_delay = Name::create("max_delay")?;
 
     let retry_strategy = lib.declare_function_arg_struct("RetryStrategy")?;
     lib.define_function_argument_struct(retry_strategy)?
@@ -282,7 +283,7 @@ fn define_retry_strategy(
 
 fn define_link_error_mode(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingError> {
     lib
-        .define_enum("LinkErrorMode")
+        .define_enum("LinkErrorMode")?
         .push("Discard", "Framing errors are discarded. The link-layer parser is reset on any error, and the parser begins scanning for 0x0564. This is always the behavior for serial ports.")?
         .push("Close", "Framing errors are bubbled up to calling code, closing the session. Suitable for physical layers that provide error correction like TCP.")?
         .doc("Controls how errors in parsed link-layer frames are handled. This behavior is configurable for physical layers with built-in error correction like TCP as the connection might be through a terminal server.")?
@@ -293,7 +294,7 @@ fn define_serial_port_settings(
     lib: &mut LibraryBuilder,
 ) -> Result<FunctionArgStructHandle, BindingError> {
     let data_bits_enum = lib
-        .define_enum("DataBits")
+        .define_enum("DataBits")?
         .push("Five", "5 bits per character")?
         .push("Six", "6 bits per character")?
         .push("Seven", "7 bits per character")?
@@ -302,7 +303,7 @@ fn define_serial_port_settings(
         .build()?;
 
     let flow_control_enum = lib
-        .define_enum("FlowControl")
+        .define_enum("FlowControl")?
         .push("None", "No flow control")?
         .push("Software", "Flow control using XON/XOFF bytes")?
         .push("Hardware", "Flow control using RTS/CTS signals")?
@@ -310,7 +311,7 @@ fn define_serial_port_settings(
         .build()?;
 
     let parity_enum = lib
-        .define_enum("Parity")
+        .define_enum("Parity")?
         .push("None", "No parity bit")?
         .push("Odd", "Parity bit sets odd number of 1 bits")?
         .push("Even", "Parity bit sets even number of 1 bits")?
@@ -318,17 +319,17 @@ fn define_serial_port_settings(
         .build()?;
 
     let stop_bits_enum = lib
-        .define_enum("StopBits")
+        .define_enum("StopBits")?
         .push("One", "One stop bit")?
         .push("Two", "Two stop bits")?
         .doc("Number of stop bits")?
         .build()?;
 
-    let baud_rate = FieldName::new("baud_rate");
-    let data_bits = FieldName::new("data_bits");
-    let flow_control = FieldName::new("flow_control");
-    let parity = FieldName::new("parity");
-    let stop_bits = FieldName::new("stop_bits");
+    let baud_rate = Name::create("baud_rate")?;
+    let data_bits = Name::create("data_bits")?;
+    let flow_control = Name::create("flow_control")?;
+    let parity = Name::create("parity")?;
+    let stop_bits = Name::create("stop_bits")?;
 
     let serial_settings = lib.declare_function_arg_struct("SerialPortSettings")?;
     lib.define_function_argument_struct(serial_settings)?
@@ -392,7 +393,7 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<UniversalStructHandl
 
 fn define_port_state_listener(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
     let port_state = lib
-        .define_enum("PortState")
+        .define_enum("PortState")?
         .push("Disabled", "Disabled until enabled")?
         .push("Wait", "Waiting to perform an open retry")?
         .push("Open", "Port is open")?
@@ -404,7 +405,7 @@ fn define_port_state_listener(lib: &mut LibraryBuilder) -> Result<InterfaceHandl
         .define_asynchronous_interface(
             "PortStateListener",
             "Callback interface for receiving updates about the state of a serial port",
-        )
+        )?
         .begin_callback("on_change", "Invoked when the serial port changes state")?
         .param("state", port_state, "New state of the port")?
         .returns_nothing()?
@@ -418,7 +419,7 @@ fn declare_timestamp_struct(
     lib: &mut LibraryBuilder,
 ) -> Result<UniversalStructHandle, BindingError> {
     let time_quality_enum = lib
-        .define_enum("TimeQuality")
+        .define_enum("TimeQuality")?
         .push(
             "Synchronized",
             "The timestamp is UTC synchronized at the remote device",
@@ -434,8 +435,8 @@ fn declare_timestamp_struct(
         .doc("Timestamp quality")?
         .build()?;
 
-    let value = FieldName::new("value");
-    let quality = FieldName::new("quality");
+    let value = Name::create("value")?;
+    let quality = Name::create("quality")?;
 
     let timestamp_struct = lib.declare_universal_struct("Timestamp")?;
     let timestamp_struct = lib
@@ -490,21 +491,7 @@ fn build_iterator<T: Into<UniversalStructField>>(
         .add_full_constructor("init")?
         .build()?;
 
-    let value_iterator = lib.declare_iterator(&format!("{}Iterator", name))?;
-    let iterator_next_fn = lib
-        .define_function(&format!("{}_next", name.to_lowercase()))
-        .param("it", value_iterator, "Iterator")?
-        .returns(
-            value_struct_decl,
-            "Next value of the iterator or {null} if the iterator reached the end",
-        )?
-        .doc("Get the next value of the iterator")?
-        .build()?;
-
-    let value_iterator = lib.define_iterator(
-        &iterator_next_fn,
-        UniversalOr::Universal(value_struct.clone()),
-    )?;
+    let value_iterator = lib.define_iterator(format!("{}_iterator", name), value_struct.clone())?;
 
     Ok((value_struct, value_iterator))
 }
@@ -513,51 +500,27 @@ fn build_octet_string(
     lib: &mut LibraryBuilder,
 ) -> Result<(FunctionReturnStructHandle, IteratorHandle), BindingError> {
     // Octet string stuff
-    let byte_struct_decl = lib.declare_function_return_struct("Byte")?;
+    let byte_struct_decl = lib.declare_function_return_struct("byte")?;
     let byte_struct = lib
         .define_function_return_struct(byte_struct_decl.clone())?
         .add("value", BasicType::U8, "Byte value")?
         .doc("Single byte struct")?
         .end_fields()?
-        // TODO - constructor
         .build()?;
 
-    let byte_it = lib.declare_iterator("ByteIterator")?;
-    let byte_it_next_fn = lib
-        .define_function("byte_next")
-        .param("it", byte_it, "Iterator")?
-        .returns(
-            byte_struct_decl,
-            "Next value of the iterator or {null} if the iterator reached the end",
-        )?
-        .doc("Get the next value of the iterator")?
-        .build()?;
+    let byte_it = lib.define_iterator_with_lifetime("byte_iterator", byte_struct)?;
 
-    let byte_it = lib.define_iterator_with_lifetime(&byte_it_next_fn, byte_struct.into())?;
-
-    let octet_string_struct_decl = lib.declare_function_return_struct("OctetString")?;
+    let octet_string_struct_decl = lib.declare_function_return_struct("octet_string")?;
     let octet_string_struct = lib
         .define_function_return_struct(octet_string_struct_decl.clone())?
         .add("index", BasicType::U16, "Point index")?
         .add("value", byte_it, "Point value")?
         .doc("Octet String point")?
         .end_fields()?
-        // TODO - constructor
-        .build()?;
-
-    let octet_string_iterator = lib.declare_iterator("OctetStringIterator")?;
-    let iterator_next_fn = lib
-        .define_function("octetstring_next")
-        .param("it", octet_string_iterator, "Iterator")?
-        .returns(
-            octet_string_struct_decl,
-            "Next value of the iterator or {null} if the iterator reached the end",
-        )?
-        .doc("Get the next value of the iterator")?
         .build()?;
 
     let octet_string_iterator =
-        lib.define_iterator_with_lifetime(&iterator_next_fn, octet_string_struct.clone().into())?;
+        lib.define_iterator_with_lifetime("octet_string_iterator", octet_string_struct.clone())?;
 
     Ok((octet_string_struct, octet_string_iterator))
 }

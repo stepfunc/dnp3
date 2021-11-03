@@ -1,11 +1,12 @@
 use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::error_type::ErrorType;
-use oo_bindgen::structs::{ConstructorType, FieldName, FunctionArgStructHandle, Number};
+use oo_bindgen::name::Name;
+use oo_bindgen::structs::{ConstructorType, FunctionArgStructHandle, Number};
 use oo_bindgen::types::BasicType;
 use oo_bindgen::*;
 
 fn define_runtime_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
-    let num_core_threads = FieldName::new("num_core_threads");
+    let num_core_threads = Name::create("num_core_threads")?;
 
     let config_struct = lib.declare_function_arg_struct("RuntimeConfig")?;
     lib
@@ -35,7 +36,7 @@ pub fn define(
 
     // Declare the native functions
     let new_fn = lib
-        .define_function("runtime_new")
+        .define_function("runtime_new")?
         .param(
             "config",
           config_struct,
@@ -53,7 +54,7 @@ pub fn define(
         .build()?;
 
     let destroy_fn = lib
-        .define_function("runtime_destroy")
+        .define_function("runtime_destroy")?
         .param("runtime",runtime_class.clone(), "Runtime to destroy")?
         .returns_nothing()?
         .doc(

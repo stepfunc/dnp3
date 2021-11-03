@@ -4,9 +4,9 @@ use oo_bindgen::*;
 use crate::shared::SharedDefinitions;
 use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::interface::InterfaceHandle;
+use oo_bindgen::name::Name;
 use oo_bindgen::structs::{
-    ConstructorDefault, ConstructorType, FieldName, FunctionArgStructHandle, Number,
-    UniversalStructHandle,
+    ConstructorDefault, ConstructorType, FunctionArgStructHandle, Number, UniversalStructHandle,
 };
 use oo_bindgen::types::{BasicType, DurationType, StringType};
 use std::time::Duration;
@@ -54,7 +54,7 @@ pub fn define(
     let tcp_server = lib.declare_class("TCPServer")?;
 
     let tcp_server_new_fn = lib
-        .define_function("tcpserver_new")
+        .define_function("tcpserver_new")?
         .param(
             "runtime",
             shared_def.runtime_class.clone(),
@@ -75,13 +75,13 @@ pub fn define(
         .doc(doc("Create a new TCP server.").details("To start it, use {class:TCPServer.bind()}."))?
         .build()?;
 
-    let tcp_server_destroy_fn = lib.define_function("tcpserver_destroy")
+    let tcp_server_destroy_fn = lib.define_function("tcpserver_destroy")?
         .param("server",tcp_server.clone(), "Server to shutdown")?
         .returns_nothing()?
         .doc("Gracefully shutdown all the outstations associated to this server, stops the server and release resources.")?
         .build()?;
 
-    let tcp_server_add_outstation_fn = lib.define_function("tcpserver_add_outstation")
+    let tcp_server_add_outstation_fn = lib.define_function("tcpserver_add_outstation")?
         .param("server",tcp_server.clone(), "TCP server to add the outstation to")?
         .param("config",types.outstation_config, "Outstation configuration")?
         .param("event_config", types.event_buffer_config, "Event buffer configuration")?
@@ -97,7 +97,7 @@ pub fn define(
             .details("In order for the outstation to run, the TCP server must be running. Use {class:TCPServer.bind()} to run it."))?
         .build()?;
 
-    let tcp_server_bind_fn = lib.define_function("tcpserver_bind")
+    let tcp_server_bind_fn = lib.define_function("tcpserver_bind")?
         .param("server",tcp_server.clone(), "Server to bind")?
         .returns_nothing()?
         .fails_with(shared_def.error_type.clone())?
@@ -124,7 +124,7 @@ fn define_outstation(
     types: &OutstationTypes,
 ) -> Result<ClassHandle, BindingError> {
     let transaction_interface = lib
-        .define_synchronous_interface("OutstationTransaction", "Outstation transaction interface")
+        .define_synchronous_interface("OutstationTransaction", "Outstation transaction interface")?
         .begin_callback(
             "execute",
             "Execute the transaction with the provided database",
@@ -137,7 +137,7 @@ fn define_outstation(
     let outstation = lib.declare_class("Outstation")?;
 
     let outstation_create_serial_session_fn = lib
-        .define_function("outstation_create_serial_session")
+        .define_function("outstation_create_serial_session")?
         .param(
             "runtime",
             shared_def.runtime_class.clone(),
@@ -182,14 +182,14 @@ fn define_outstation(
         .doc("Create an outstation instance running on a serial port")?
         .build()?;
 
-    let outstation_destroy_fn = lib.define_function("outstation_destroy")
+    let outstation_destroy_fn = lib.define_function("outstation_destroy")?
         .param("outstation",outstation.clone(), "Outstation to destroy")?
         .returns_nothing()?
         .doc(doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:TCPServer.[destructor]} will properly shutdown the outstation."))?
         .build()?;
 
     let outstation_transaction_fn = lib
-        .define_function("outstation_transaction")
+        .define_function("outstation_transaction")?
         .param("outstation", outstation.clone(), "Outstation")?
         .param(
             "callback",
@@ -201,7 +201,7 @@ fn define_outstation(
         .build()?;
 
     let outstation_set_decode_level_fn = lib
-        .define_function("outstation_set_decode_level")
+        .define_function("outstation_set_decode_level")?
         .param(
             "outstation",
             outstation.clone(),
@@ -226,14 +226,14 @@ fn define_outstation(
 }
 
 fn define_class_zero_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
-    let binary = FieldName::new("binary");
-    let double_bit_binary = FieldName::new("double_bit_binary");
-    let binary_output_status = FieldName::new("binary_output_status");
-    let counter = FieldName::new("counter");
-    let frozen_counter = FieldName::new("frozen_counter");
-    let analog = FieldName::new("analog");
-    let analog_output_status = FieldName::new("analog_output_status");
-    let octet_strings = FieldName::new("octet_strings");
+    let binary = Name::create("binary")?;
+    let double_bit_binary = Name::create("double_bit_binary")?;
+    let binary_output_status = Name::create("binary_output_status")?;
+    let counter = Name::create("counter")?;
+    let frozen_counter = Name::create("frozen_counter")?;
+    let analog = Name::create("analog")?;
+    let analog_output_status = Name::create("analog_output_status")?;
+    let octet_strings = Name::create("octet_strings")?;
 
     let class_zero_config = lib.declare_function_arg_struct("ClassZeroConfig")?;
     lib.define_function_argument_struct(class_zero_config)?
@@ -298,9 +298,9 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgS
 }
 
 fn define_outstation_features(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
-    let self_address = FieldName::new("self_address");
-    let broadcast = FieldName::new("broadcast");
-    let unsolicited = FieldName::new("unsolicited");
+    let self_address = Name::create("self_address")?;
+    let broadcast = Name::create("broadcast")?;
+    let unsolicited = Name::create("unsolicited")?;
 
     let features = lib.declare_function_arg_struct("OutstationFeatures")?;
     lib.define_function_argument_struct(features)?
@@ -340,19 +340,19 @@ fn define_outstation_config(
     let class_zero_config = define_class_zero_config(lib)?;
     let outstation_features = define_outstation_features(lib)?;
 
-    let solicited_buffer_size = FieldName::new("solicited_buffer_size");
-    let unsolicited_buffer_size = FieldName::new("unsolicited_buffer_size");
-    let rx_buffer_size = FieldName::new("rx_buffer_size");
-    let decode_level = FieldName::new("decode_level");
-    let confirm_timeout = FieldName::new("confirm_timeout");
-    let select_timeout = FieldName::new("select_timeout");
-    let features = FieldName::new("features");
-    let max_unsolicited_retries = FieldName::new("max_unsolicited_retries");
-    let unsolicited_retry_delay = FieldName::new("unsolicited_retry_delay");
-    let keep_alive_timeout = FieldName::new("keep_alive_timeout");
-    let max_read_request_headers = FieldName::new("max_read_request_headers");
-    let max_controls_per_request = FieldName::new("max_controls_per_request");
-    let class_zero = FieldName::new("class_zero");
+    let solicited_buffer_size = Name::create("solicited_buffer_size")?;
+    let unsolicited_buffer_size = Name::create("unsolicited_buffer_size")?;
+    let rx_buffer_size = Name::create("rx_buffer_size")?;
+    let decode_level = Name::create("decode_level")?;
+    let confirm_timeout = Name::create("confirm_timeout")?;
+    let select_timeout = Name::create("select_timeout")?;
+    let features = Name::create("features")?;
+    let max_unsolicited_retries = Name::create("max_unsolicited_retries")?;
+    let unsolicited_retry_delay = Name::create("unsolicited_retry_delay")?;
+    let keep_alive_timeout = Name::create("keep_alive_timeout")?;
+    let max_read_request_headers = Name::create("max_read_request_headers")?;
+    let max_controls_per_request = Name::create("max_controls_per_request")?;
+    let class_zero = Name::create("class_zero")?;
 
     let outstation_config = lib.declare_function_arg_struct("OutstationConfig")?;
     let outstation_config = lib
@@ -493,10 +493,10 @@ fn define_event_buffer_config(
 }
 
 fn define_application_iin(lib: &mut LibraryBuilder) -> BindResult<UniversalStructHandle> {
-    let need_time = FieldName::new("need_time");
-    let local_control = FieldName::new("local_control");
-    let device_trouble = FieldName::new("device_trouble");
-    let config_corrupt = FieldName::new("config_corrupt");
+    let need_time = Name::create("need_time")?;
+    let local_control = Name::create("local_control")?;
+    let device_trouble = Name::create("device_trouble")?;
+    let config_corrupt = Name::create("config_corrupt")?;
 
     let application_iin = lib.declare_universal_struct("ApplicationIIN")?;
     let application_iin = lib
@@ -540,7 +540,7 @@ fn define_application_iin(lib: &mut LibraryBuilder) -> BindResult<UniversalStruc
 
 fn define_restart_delay(lib: &mut LibraryBuilder) -> BindResult<UniversalStructHandle> {
     let restart_delay_type = lib
-        .define_enum("RestartDelayType")
+        .define_enum("RestartDelayType")?
         .push("NotSupported", "Restart mode not supported")?
         .push("Seconds", "Value is in seconds (corresponds to g51v1)")?
         .push(
@@ -550,8 +550,8 @@ fn define_restart_delay(lib: &mut LibraryBuilder) -> BindResult<UniversalStructH
         .doc("Type of restart delay value. Used by {struct:RestartDelay}.")?
         .build()?;
 
-    let restart_type = FieldName::new("restart_type");
-    let value = FieldName::new("value");
+    let restart_type = Name::create("restart_type")?;
+    let value = Name::create("value")?;
 
     let restart_delay = lib.declare_universal_struct("RestartDelay")?;
     let restart_delay = lib.define_universal_struct(restart_delay)?
@@ -585,21 +585,21 @@ fn define_outstation_application(
 ) -> Result<InterfaceHandle, BindingError> {
     let restart_delay = define_restart_delay(lib)?;
 
-    let write_time_result = lib.define_enum("WriteTimeResult")
+    let write_time_result = lib.define_enum("WriteTimeResult")?
         .push("NotSupported", "Writing time is not supported by this outstation (translated to NO_FUNC_CODE_SUPPORT).")?
         .push("InvalidValue", "The provided value was invalid (translated to PARAM_ERROR)")?
         .push("Ok", "The write time operation succeeded.")?
         .doc("Write time result used by {interface:OutstationApplication.write_absolute_time()}")?
         .build()?;
 
-    let freeze_type = lib.define_enum("FreezeType")
+    let freeze_type = lib.define_enum("FreezeType")?
         .push("ImmediateFreeze", "Copy the current value of a counter to the associated point")?
         .push("FreezeAndClear", "Copy the current value of a counter to the associated point and clear the current value to 0.")?
         .doc("Freeze operation type")?
         .build()?;
 
     let freeze_result = lib
-        .define_enum("FreezeResult")
+        .define_enum("FreezeResult")?
         .push("Success", "Freeze operation was successful")?
         .push("ParameterError", "One of the point is invalid")?
         .push(
@@ -611,7 +611,7 @@ fn define_outstation_application(
 
     let application_iin = define_application_iin(lib)?;
 
-    lib.define_asynchronous_interface("OutstationApplication", "Dynamic information required by the outstation from the user application")
+    lib.define_asynchronous_interface("OutstationApplication", "Dynamic information required by the outstation from the user application")?
         .begin_callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
@@ -667,7 +667,7 @@ fn define_outstation_information(
         .end_fields()?
         .build()?;
 
-    let broadcast_action = lib.define_enum("BroadcastAction")
+    let broadcast_action = lib.define_enum("BroadcastAction")?
         .push("Processed", "Outstation processed the broadcast")?
         .push("IgnoredByConfiguration", "Outstation ignored the broadcast message b/c it is disabled by configuration")?
         .push("BadObjectHeaders", "Outstation was unable to parse the object headers and ignored the request")?
@@ -675,7 +675,7 @@ fn define_outstation_information(
         .doc("Enumeration describing how the outstation processed a broadcast request")?
         .build()?;
 
-    lib.define_asynchronous_interface("OutstationInformation", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))
+    lib.define_asynchronous_interface("OutstationInformation", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))?
         .begin_callback("process_request_from_idle", "Called when a request is processed from the IDLE state")?
             .param("header", request_header, "Request header")?
             .returns_nothing()?
@@ -737,7 +737,7 @@ fn define_control_handler(
     let command_status = define_command_status(lib)?;
 
     let operate_type = lib
-        .define_enum("OperateType")
+        .define_enum("OperateType")?
         .push(
             "SelectBeforeOperate",
             "control point was properly selected before the operate request",
@@ -762,7 +762,7 @@ fn define_control_handler(
         .details(select_details_1)
         .details(select_details_2);
 
-    lib.define_asynchronous_interface("ControlHandler", "Callbacks for handling controls")
+    lib.define_asynchronous_interface("ControlHandler", "Callbacks for handling controls")?
         //------
         .begin_callback("begin_fragment", "Notifies the start of a command fragment")?
         .returns_nothing()?
@@ -853,7 +853,7 @@ fn define_connection_state_listener(
     lib: &mut LibraryBuilder,
 ) -> Result<InterfaceHandle, BindingError> {
     let state = lib
-        .define_enum("ConnectionState")
+        .define_enum("ConnectionState")?
         .push("Connected", "Connected to the master")?
         .push("Disconnected", "Disconnected from the master")?
         .doc("Outstation connection state for connection-oriented transports, e.g. TCP")?
@@ -862,7 +862,7 @@ fn define_connection_state_listener(
     lib.define_asynchronous_interface(
         "ConnectionStateListener",
         "Callback interface for connection state events",
-    )
+    )?
     .begin_callback("on_change", "Called when the connection state changes")?
     .param("state", state, "New state of the connection")?
     .returns_nothing()?
@@ -877,13 +877,13 @@ fn define_address_filter(
     let address_filter = lib.declare_class("AddressFilter")?;
 
     let address_filter_any_fn = lib
-        .define_function("address_filter_any")
+        .define_function("address_filter_any")?
         .returns(address_filter.clone(), "Address filter")?
         .doc("Create an address filter that accepts any IP address")?
         .build()?;
 
     let address_filter_new_fn = lib
-        .define_function("address_filter_new")
+        .define_function("address_filter_new")?
         .param("address", StringType, "IP address to accept")?
         .returns(address_filter.clone(), "Address filter")?
         .fails_with(shared_def.error_type.clone())?
@@ -891,7 +891,7 @@ fn define_address_filter(
         .build()?;
 
     let address_filter_add_fn = lib
-        .define_function("address_filter_add")
+        .define_function("address_filter_add")?
         .param(
             "address_filter",
             address_filter.clone(),
@@ -904,7 +904,7 @@ fn define_address_filter(
         .build()?;
 
     let address_filter_destroy_fn = lib
-        .define_function("address_filter_destroy")
+        .define_function("address_filter_destroy")?
         .param(
             "address_filter",
             address_filter.clone(),
@@ -924,7 +924,7 @@ fn define_address_filter(
 }
 
 fn define_function_code(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingError> {
-    lib.define_enum("FunctionCode")
+    lib.define_enum("FunctionCode")?
         .push("Confirm", "Master sends this to an outstation to confirm the receipt of an Application Layer fragment (value == 0)")?
         .push("Read", "Outstation shall return the data specified by the objects in the request (value == 1)")?
         .push("Write", "Outstation shall store the data specified by the objects in the request (value == 2)")?
@@ -963,7 +963,7 @@ fn define_function_code(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingE
 }
 
 fn define_command_status(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingError> {
-    lib.define_enum("CommandStatus")
+    lib.define_enum("CommandStatus")?
     .push("Success", "command was accepted, initiated, or queued (value == 0)")?
     .push("Timeout", "command timed out before completing (value == 1)")?
     .push("NoSelect", "command requires being selected before operate, configuration issue (value == 2)")?

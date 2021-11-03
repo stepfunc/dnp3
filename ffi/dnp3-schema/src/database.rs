@@ -2,27 +2,28 @@ use class::ClassHandle;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
-use oo_bindgen::structs::{ConstructorType, FieldName, FunctionArgStructHandle, Number};
+use oo_bindgen::name::Name;
+use oo_bindgen::structs::{ConstructorType, FunctionArgStructHandle, Number};
 use oo_bindgen::types::BasicType;
 
 fn define_update_options(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
     let event_mode_enum = lib
-        .define_enum("EventMode")
+        .define_enum("event_mode")?
         .push(
-            "Detect",
+            "detect",
             doc("Detect events in a type dependent fashion")
                 .details("This is the default mode that should be used."),
         )?
         .push(
-            "Force",
+            "force",
             "Produce an event whether the value has changed or not",
         )?
-        .push("Suppress", "Never produce an event regardless of change")?
+        .push("suppress", "Never produce an event regardless of change")?
         .doc("Controls how events are processed when updating values in the database.")?
         .build()?;
 
-    let update_static = FieldName::new("update_static");
-    let event_mode = FieldName::new("event_mode");
+    let update_static = Name::create("update_static")?;
+    let event_mode = Name::create("event_mode")?;
 
     let update_options = lib.declare_function_arg_struct("UpdateOptions")?;
     lib.define_function_argument_struct(update_options.clone())?
@@ -54,24 +55,24 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStru
 
 fn define_binary_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
     let binary_static_variation = lib
-        .define_enum("StaticBinaryVariation")
-        .push("Group1Var1", "Binary input - packed format")?
-        .push("Group1Var2", "Binary input - with flags")?
+        .define_enum("static_binary_variation")?
+        .push("group1_var1", "Binary input - packed format")?
+        .push("group1_var2", "Binary input - with flags")?
         .doc("Static binary input variation")?
         .build()?;
 
     let binary_event_variation = lib
-        .define_enum("EventBinaryVariation")
-        .push("Group2Var1", "Binary input event - without time")?
-        .push("Group2Var2", "Binary input event - with absolute time")?
-        .push("Group2Var3", "Binary input event - with relative time")?
+        .define_enum("event_binary_variation")?
+        .push("group2_var1", "Binary input event - without time")?
+        .push("group2_var2", "Binary input event - with absolute time")?
+        .push("group2_var3", "Binary input event - with relative time")?
         .doc("Event binary input variation")?
         .build()?;
 
-    let static_variation = FieldName::new("static_variation");
-    let event_variation = FieldName::new("event_variation");
+    let static_variation = Name::create("static_variation")?;
+    let event_variation = Name::create("event_variation")?;
 
-    let binary_config = lib.declare_function_arg_struct("BinaryConfig")?;
+    let binary_config = lib.declare_function_arg_struct("binary_config")?;
     lib.define_function_argument_struct(binary_config)?
         .add(
             &static_variation,
@@ -86,8 +87,8 @@ fn define_binary_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStruc
         .doc("Binary Input configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "Group1Var1")?
-        .default_variant(&event_variation, "Group2Var2")?
+        .default_variant(&static_variation, "group1_var1")?
+        .default_variant(&event_variation, "group2_var2")?
         .end_constructor()?
         .build()
 }
@@ -96,30 +97,33 @@ fn define_double_bit_binary_config(
     lib: &mut LibraryBuilder,
 ) -> BindResult<FunctionArgStructHandle> {
     let double_bit_binary_static_variation = lib
-        .define_enum("StaticDoubleBitBinaryVariation")
-        .push("Group3Var1", "Double-bit binary input - packed format")?
-        .push("Group3Var2", "Double-bit binary input - with flags")?
+        .define_enum("static_double_bit_binary_variation")?
+        .push("group3_var1", "Double-bit binary input - packed format")?
+        .push("group3_var2", "Double-bit binary input - with flags")?
         .doc("Static double-bit binary input variation")?
         .build()?;
 
     let double_bit_binary_event_variation = lib
-        .define_enum("EventDoubleBitBinaryVariation")
-        .push("Group4Var1", "Double-bit binary input event - without time")?
+        .define_enum("event_double_bit_binary_variation")?
         .push(
-            "Group4Var2",
+            "group4_var1",
+            "Double-bit binary input event - without time",
+        )?
+        .push(
+            "group4_var2",
             "Double-bit binary input event - with absolute time",
         )?
         .push(
-            "Group4Var3",
+            "group4_var3",
             "Double-bit binary input event - with relative time",
         )?
         .doc("Event double-bit binary input variation")?
         .build()?;
 
-    let static_variation = FieldName::new("static_variation");
-    let event_variation = FieldName::new("event_variation");
+    let static_variation = Name::create("static_variation")?;
+    let event_variation = Name::create("event_variation")?;
 
-    let double_bit_binary_config = lib.declare_function_arg_struct("DoubleBitBinaryConfig")?;
+    let double_bit_binary_config = lib.declare_function_arg_struct("double_bit_binary_config")?;
     lib.define_function_argument_struct(double_bit_binary_config)?
         .add(
             &static_variation,
@@ -134,8 +138,8 @@ fn define_double_bit_binary_config(
         .doc("Double-Bit Binary Input configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "Group3Var1")?
-        .default_variant(&event_variation, "Group4Var2")?
+        .default_variant(&static_variation, "group3_var1")?
+        .default_variant(&event_variation, "group4_var2")?
         .end_constructor()?
         .build()
 }
@@ -144,23 +148,24 @@ fn define_binary_output_status_config(
     lib: &mut LibraryBuilder,
 ) -> BindResult<FunctionArgStructHandle> {
     let binary_output_status_static_variation = lib
-        .define_enum("StaticBinaryOutputStatusVariation")
-        .push("Group10Var1", "Binary output - packed format")?
-        .push("Group10Var2", "Binary output - output status with flags")?
+        .define_enum("static_binary_output_status_variation")?
+        .push("group10_var1", "Binary output - packed format")?
+        .push("group10_var2", "Binary output - output status with flags")?
         .doc("Static binary output status variation")?
         .build()?;
 
     let binary_output_status_event_variation = lib
-        .define_enum("EventBinaryOutputStatusVariation")
-        .push("Group11Var1", "Binary output event - status without time")?
-        .push("Group11Var2", "Binary output event - status with time")?
+        .define_enum("event_binary_output_status_variation")?
+        .push("group11_var1", "Binary output event - status without time")?
+        .push("group11_var2", "Binary output event - status with time")?
         .doc("Event binary output status variation")?
         .build()?;
 
-    let static_variation = FieldName::new("static_variation");
-    let event_variation = FieldName::new("event_variation");
+    let static_variation = Name::create("static_variation")?;
+    let event_variation = Name::create("event_variation")?;
 
-    let binary_output_status_config = lib.declare_function_arg_struct("BinaryOutputStatusConfig")?;
+    let binary_output_status_config =
+        lib.declare_function_arg_struct("binary_output_status_config")?;
     lib.define_function_argument_struct(binary_output_status_config)?
         .add(
             &static_variation,
@@ -175,36 +180,36 @@ fn define_binary_output_status_config(
         .doc("Binary Output Status configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "Group10Var1")?
-        .default_variant(&event_variation, "Group11Var2")?
+        .default_variant(&static_variation, "group10_var1")?
+        .default_variant(&event_variation, "group11_var2")?
         .end_constructor()?
         .build()
 }
 
 fn define_counter_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
     let counter_static_variation = lib
-        .define_enum("StaticCounterVariation")
-        .push("Group20Var1", "Counter - 32-bit with flag")?
-        .push("Group20Var2", "Counter - 16-bit with flag")?
-        .push("Group20Var5", "Counter - 32-bit without flag")?
-        .push("Group20Var6", "Counter - 16-bit without flag")?
+        .define_enum("static_counter_variation")?
+        .push("group20_var1", "Counter - 32-bit with flag")?
+        .push("group20_var2", "Counter - 16-bit with flag")?
+        .push("group20_var5", "Counter - 32-bit without flag")?
+        .push("group20_var6", "Counter - 16-bit without flag")?
         .doc("Static counter variation")?
         .build()?;
 
     let counter_event_variation = lib
-        .define_enum("EventCounterVariation")
-        .push("Group22Var1", "Counter event - 32-bit with flag")?
-        .push("Group22Var2", "Counter event - 16-bit with flag")?
-        .push("Group22Var5", "Counter event - 32-bit with flag and time")?
-        .push("Group22Var6", "Counter event - 16-bit with flag and time")?
+        .define_enum("event_counter_variation")?
+        .push("group22_var1", "Counter event - 32-bit with flag")?
+        .push("group22_var2", "Counter event - 16-bit with flag")?
+        .push("group22_var5", "Counter event - 32-bit with flag and time")?
+        .push("group22_var6", "Counter event - 16-bit with flag and time")?
         .doc("Event counter variation")?
         .build()?;
 
-    let static_variation = FieldName::new("static_variation");
-    let event_variation = FieldName::new("event_variation");
-    let deadband = FieldName::new("deadband");
+    let static_variation = Name::create("static_variation")?;
+    let event_variation = Name::create("event_variation")?;
+    let deadband = Name::create("deadband")?;
 
-    let counter_config = lib.declare_function_arg_struct("CounterConfig")?;
+    let counter_config = lib.declare_function_arg_struct("counter_config")?;
     lib.define_function_argument_struct(counter_config)?
         .add(
             &static_variation,
@@ -220,8 +225,8 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStru
         .doc("Counter configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "Group20Var1")?
-        .default_variant(&event_variation, "Group22Var5")?
+        .default_variant(&static_variation, "group20_var1")?
+        .default_variant(&event_variation, "group22_var5")?
         .default(&deadband, Number::U32(0))?
         .end_constructor()?
         .build()
@@ -229,36 +234,36 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStru
 
 fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
     let frozen_counter_static_variation = lib
-        .define_enum("StaticFrozenCounterVariation")
-        .push("Group21Var1", "Frozen Counter - 32-bit with flag")?
-        .push("Group21Var2", "Frozen Counter - 16-bit with flag")?
-        .push("Group21Var5", "Frozen Counter - 32-bit with flag and time")?
-        .push("Group21Var6", "Frozen Counter - 16-bit with flag and time")?
-        .push("Group21Var9", "Frozen Counter - 32-bit without flag")?
-        .push("Group21Var10", "Frozen Counter - 16-bit without flag")?
+        .define_enum("static_frozen_counter_variation")?
+        .push("group21_var1", "Frozen Counter - 32-bit with flag")?
+        .push("group21_var2", "Frozen Counter - 16-bit with flag")?
+        .push("group21_var5", "Frozen Counter - 32-bit with flag and time")?
+        .push("group21_var6", "Frozen Counter - 16-bit with flag and time")?
+        .push("group21_var9", "Frozen Counter - 32-bit without flag")?
+        .push("group21_var10", "Frozen Counter - 16-bit without flag")?
         .doc("Static frozen counter variation")?
         .build()?;
 
     let frozen_counter_event_variation = lib
-        .define_enum("EventFrozenCounterVariation")
-        .push("Group23Var1", "Frozen Counter event - 32-bit with flag")?
-        .push("Group23Var2", "Frozen Counter event - 16-bit with flag")?
+        .define_enum("event_frozen_counter_variation")?
+        .push("group23_var1", "Frozen Counter event - 32-bit with flag")?
+        .push("group23_var2", "Frozen Counter event - 16-bit with flag")?
         .push(
-            "Group23Var5",
+            "group23_var5",
             "Frozen Counter event - 32-bit with flag and time",
         )?
         .push(
-            "Group23Var6",
+            "group23_var6",
             "Frozen Counter event - 16-bit with flag and time",
         )?
         .doc("Event frozen counter variation")?
         .build()?;
 
-    let static_variation = FieldName::new("static_variation");
-    let event_variation = FieldName::new("event_variation");
-    let deadband = FieldName::new("deadband");
+    let static_variation = Name::create("static_variation")?;
+    let event_variation = Name::create("event_variation")?;
+    let deadband = Name::create("deadband")?;
 
-    let frozen_counter_config = lib.declare_function_arg_struct("FrozenCounterConfig")?;
+    let frozen_counter_config = lib.declare_function_arg_struct("frozen_counter_config")?;
     lib.define_function_argument_struct(frozen_counter_config)?
         .add(
             &static_variation,
@@ -274,8 +279,8 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BindResult<Function
         .doc("Frozen Counter configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "Group21Var1")?
-        .default_variant(&event_variation, "Group23Var5")?
+        .default_variant(&static_variation, "group21_var1")?
+        .default_variant(&event_variation, "group23_var5")?
         .default(&deadband, Number::U32(0))?
         .end_constructor()?
         .build()
@@ -283,11 +288,11 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BindResult<Function
 
 pub fn define_analog_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
     let analog_static_variation = lib
-        .define_enum("StaticAnalogVariation")
-        .push("Group30Var1", "Analog input - 32-bit with flag")?
-        .push("Group30Var2", "Analog input - 16-bit with flag")?
-        .push("Group30Var3", "Analog input - 32-bit without flag")?
-        .push("Group30Var4", "Analog input - 16-bit without flag")?
+        .define_enum("static_analog_variation")?
+        .push("group30_var1", "Analog input - 32-bit with flag")?
+        .push("group30_var2", "Analog input - 16-bit with flag")?
+        .push("group30_var3", "Analog input - 32-bit without flag")?
+        .push("group30_var4", "Analog input - 16-bit without flag")?
         .push(
             "Group30Var5",
             "Analog input - single-precision, floating-point with flag",
@@ -300,35 +305,35 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgS
         .build()?;
 
     let analog_event_variation = lib
-        .define_enum("EventAnalogVariation")
-        .push("Group32Var1", "Analog input event - 32-bit without time")?
-        .push("Group32Var2", "Analog input event - 16-bit without time")?
-        .push("Group32Var3", "Analog input event - 32-bit with time")?
-        .push("Group32Var4", "Analog input event - 16-bit with time")?
+        .define_enum("event_analog_variation")?
+        .push("group32_var1", "Analog input event - 32-bit without time")?
+        .push("group32_var2", "Analog input event - 16-bit without time")?
+        .push("group32_var3", "Analog input event - 32-bit with time")?
+        .push("group32_var4", "Analog input event - 16-bit with time")?
         .push(
-            "Group32Var5",
+            "group32_var5",
             "Analog input event - single-precision, floating-point without time",
         )?
         .push(
-            "Group32Var6",
+            "group32_var6",
             "Analog input event - double-precision, floating-point without time",
         )?
         .push(
-            "Group32Var7",
+            "group32_var7",
             "Analog input event - single-precision, floating-point with time",
         )?
         .push(
-            "Group32Var8",
+            "group32_var8",
             "Analog input event - double-precision, floating-point with time",
         )?
         .doc("Event analog variation")?
         .build()?;
 
-    let static_variation = FieldName::new("static_variation");
-    let event_variation = FieldName::new("event_variation");
-    let deadband = FieldName::new("deadband");
+    let static_variation = Name::create("static_variation")?;
+    let event_variation = Name::create("event_variation")?;
+    let deadband = Name::create("deadband")?;
 
-    let analog_config = lib.declare_function_arg_struct("AnalogConfig")?;
+    let analog_config = lib.declare_function_arg_struct("analog_config")?;
     lib.define_function_argument_struct(analog_config)?
         .add(
             &static_variation,
@@ -344,8 +349,8 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgS
         .doc("Analog configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "Group30Var1")?
-        .default_variant(&event_variation, "Group32Var3")?
+        .default_variant(&static_variation, "group30_var1")?
+        .default_variant(&event_variation, "group32_var3")?
         .default(&deadband, Number::Double(0.0))?
         .end_constructor()?
         .build()
@@ -355,50 +360,51 @@ fn define_analog_output_status_config(
     lib: &mut LibraryBuilder,
 ) -> BindResult<FunctionArgStructHandle> {
     let analog_output_status_static_variation = lib
-        .define_enum("StaticAnalogOutputStatusVariation")
-        .push("Group40Var1", "Analog output status - 32-bit with flag")?
-        .push("Group40Var2", "Analog output status - 16-bit with flag")?
+        .define_enum("static_analog_output_status_variation")?
+        .push("group40_var1", "Analog output status - 32-bit with flag")?
+        .push("group40_var2", "Analog output status - 16-bit with flag")?
         .push(
-            "Group40Var3",
+            "group40_var3",
             "Analog output status - single-precision, floating-point with flag",
         )?
         .push(
-            "Group40Var4",
+            "group40_var4",
             "Analog output status - double-precision, floating-point with flag",
         )?
         .doc("Static analog output status variation")?
         .build()?;
 
     let analog_output_status_event_variation = lib
-        .define_enum("EventAnalogOutputStatusVariation")
-        .push("Group42Var1", "Analog output event - 32-bit without time")?
-        .push("Group42Var2", "Analog output event - 16-bit without time")?
-        .push("Group42Var3", "Analog output event - 32-bit with time")?
-        .push("Group42Var4", "Analog output event - 16-bit with time")?
+        .define_enum("event_analog_output_status_variation")?
+        .push("group42_var1", "Analog output event - 32-bit without time")?
+        .push("group42_var2", "Analog output event - 16-bit without time")?
+        .push("group42_var3", "Analog output event - 32-bit with time")?
+        .push("group42_var4", "Analog output event - 16-bit with time")?
         .push(
-            "Group42Var5",
+            "group42_var5",
             "Analog output event - single-precision, floating-point without time",
         )?
         .push(
-            "Group42Var6",
+            "group42_var6",
             "Analog output event - double-precision, floating-point without time",
         )?
         .push(
-            "Group42Var7",
+            "group42_var7",
             "Analog output event - single-precision, floating-point with time",
         )?
         .push(
-            "Group42Var8",
+            "group42_var8",
             "Analog output event - double-precision, floating-point with time",
         )?
         .doc("Event analog output status variation")?
         .build()?;
 
-    let static_variation = FieldName::new("static_variation");
-    let event_variation = FieldName::new("event_variation");
-    let deadband = FieldName::new("deadband");
+    let static_variation = Name::create("static_variation")?;
+    let event_variation = Name::create("event_variation")?;
+    let deadband = Name::create("deadband")?;
 
-    let analog_output_status_config = lib.declare_function_arg_struct("AnalogOutputStatusConfig")?;
+    let analog_output_status_config =
+        lib.declare_function_arg_struct("analog_output_status_config")?;
     lib.define_function_argument_struct(analog_output_status_config)?
         .add(
             &static_variation,
@@ -414,8 +420,8 @@ fn define_analog_output_status_config(
         .doc("Analog Output Status configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "Group40Var1")?
-        .default_variant(&event_variation, "Group42Var3")?
+        .default_variant(&static_variation, "group40_var1")?
+        .default_variant(&event_variation, "group42_var3")?
         .default(&deadband, Number::Double(0.0))?
         .end_constructor()?
         .build()
@@ -425,14 +431,14 @@ pub fn define(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
 ) -> Result<ClassHandle, BindingError> {
-    let database = lib.declare_class("Database")?;
+    let database = lib.declare_class("database")?;
 
     let event_class = lib
-        .define_enum("EventClass")
-        .push("None", "Does not generate events")?
-        .push("Class1", "Class 1 event")?
-        .push("Class2", "Class 2 event")?
-        .push("Class3", "Class 3 event")?
+        .define_enum("event_class")?
+        .push("none", "Does not generate events")?
+        .push("class1", "Class 1 event")?
+        .push("class2", "Class 2 event")?
+        .push("class3", "Class 3 event")?
         .doc("Event class")?
         .build()?;
 
@@ -442,7 +448,7 @@ pub fn define(
     let binary_config = define_binary_config(lib)?;
 
     let binary_add_fn = lib
-        .define_function("database_add_binary")
+        .define_function("database_add_binary")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -455,7 +461,7 @@ pub fn define(
         .build()?;
 
     let binary_remove_fn = lib
-        .define_function("database_remove_binary")
+        .define_function("database_remove_binary")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
@@ -466,7 +472,7 @@ pub fn define(
         .build()?;
 
     let binary_update_fn = lib
-        .define_function("database_update_binary")
+        .define_function("database_update_binary")?
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -482,7 +488,7 @@ pub fn define(
         .build()?;
 
     let binary_get_fn = lib
-        .define_function("database_get_binary")
+        .define_function("database_get_binary")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(shared_def.binary_point.clone(), "Binary Input point")?
@@ -494,7 +500,7 @@ pub fn define(
     let double_bit_binary_config = define_double_bit_binary_config(lib)?;
 
     let double_bit_binary_add_fn = lib
-        .define_function("database_add_double_bit_binary")
+        .define_function("database_add_double_bit_binary")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -507,7 +513,7 @@ pub fn define(
         .build()?;
 
     let double_bit_binary_remove_fn = lib
-        .define_function("database_remove_double_bit_binary")
+        .define_function("database_remove_double_bit_binary")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
@@ -518,7 +524,7 @@ pub fn define(
         .build()?;
 
     let double_bit_binary_update_fn = lib
-        .define_function("database_update_double_bit_binary")
+        .define_function("database_update_double_bit_binary")?
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -534,7 +540,7 @@ pub fn define(
         .build()?;
 
     let double_bit_binary_get_fn = lib
-        .define_function("database_get_double_bit_binary")
+        .define_function("database_get_double_bit_binary")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(
@@ -549,7 +555,7 @@ pub fn define(
     let binary_output_status_config = define_binary_output_status_config(lib)?;
 
     let binary_output_status_add_fn = lib
-        .define_function("database_add_binary_output_status")
+        .define_function("database_add_binary_output_status")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -562,7 +568,7 @@ pub fn define(
         .build()?;
 
     let binary_output_status_remove_fn = lib
-        .define_function("database_remove_binary_output_status")
+        .define_function("database_remove_binary_output_status")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
@@ -573,7 +579,7 @@ pub fn define(
         .build()?;
 
     let binary_output_status_update_fn = lib
-        .define_function("database_update_binary_output_status")
+        .define_function("database_update_binary_output_status")?
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -589,7 +595,7 @@ pub fn define(
         .build()?;
 
     let binary_output_status_get_fn = lib
-        .define_function("database_get_binary_output_status")
+        .define_function("database_get_binary_output_status")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(
@@ -604,7 +610,7 @@ pub fn define(
     let counter_config = define_counter_config(lib)?;
 
     let counter_add_fn = lib
-        .define_function("database_add_counter")
+        .define_function("database_add_counter")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -617,7 +623,7 @@ pub fn define(
         .build()?;
 
     let counter_remove_fn = lib
-        .define_function("database_remove_counter")
+        .define_function("database_remove_counter")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
@@ -628,7 +634,7 @@ pub fn define(
         .build()?;
 
     let counter_update_fn = lib
-        .define_function("database_update_counter")
+        .define_function("database_update_counter")?
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -644,7 +650,7 @@ pub fn define(
         .build()?;
 
     let counter_get_fn = lib
-        .define_function("database_get_counter")
+        .define_function("database_get_counter")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(shared_def.counter_point.clone(), "Counter point")?
@@ -656,7 +662,7 @@ pub fn define(
     let frozen_counter_config = define_frozen_counter_config(lib)?;
 
     let frozen_counter_add_fn = lib
-        .define_function("database_add_frozen_counter")
+        .define_function("database_add_frozen_counter")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -669,7 +675,7 @@ pub fn define(
         .build()?;
 
     let frozen_counter_remove_fn = lib
-        .define_function("database_remove_frozen_counter")
+        .define_function("database_remove_frozen_counter")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
@@ -680,7 +686,7 @@ pub fn define(
         .build()?;
 
     let frozen_counter_update_fn = lib
-        .define_function("database_update_frozen_counter")
+        .define_function("database_update_frozen_counter")?
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -696,7 +702,7 @@ pub fn define(
         .build()?;
 
     let frozen_counter_get_fn = lib
-        .define_function("database_get_frozen_counter")
+        .define_function("database_get_frozen_counter")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(
@@ -711,7 +717,7 @@ pub fn define(
     let analog_config = define_analog_config(lib)?;
 
     let analog_add_fn = lib
-        .define_function("database_add_analog")
+        .define_function("database_add_analog")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -724,7 +730,7 @@ pub fn define(
         .build()?;
 
     let analog_remove_fn = lib
-        .define_function("database_remove_analog")
+        .define_function("database_remove_analog")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
@@ -735,7 +741,7 @@ pub fn define(
         .build()?;
 
     let analog_update_fn = lib
-        .define_function("database_update_analog")
+        .define_function("database_update_analog")?
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -751,7 +757,7 @@ pub fn define(
         .build()?;
 
     let analog_get_fn = lib
-        .define_function("database_get_analog")
+        .define_function("database_get_analog")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(shared_def.analog_point.clone(), "Analog point")?
@@ -762,7 +768,7 @@ pub fn define(
     // Analog Output Status
     let analog_output_status_config = define_analog_output_status_config(lib)?;
     let analog_output_status_add_fn = lib
-        .define_function("database_add_analog_output_status")
+        .define_function("database_add_analog_output_status")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
@@ -775,7 +781,7 @@ pub fn define(
         .build()?;
 
     let analog_output_status_remove_fn = lib
-        .define_function("database_remove_analog_output_status")
+        .define_function("database_remove_analog_output_status")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
@@ -786,7 +792,7 @@ pub fn define(
         .build()?;
 
     let analog_output_status_update_fn = lib
-        .define_function("database_update_analog_output_status")
+        .define_function("database_update_analog_output_status")?
         .param("db", database.clone(), "Database")?
         .param(
             "value",
@@ -802,7 +808,7 @@ pub fn define(
         .build()?;
 
     let analog_output_status_get_fn = lib
-        .define_function("database_get_analog_output_status")
+        .define_function("database_get_analog_output_status")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(
@@ -814,41 +820,10 @@ pub fn define(
         .build()?;
 
     // Octet String
-    let octet_string_class = lib.declare_collection("OctetStringValue")?;
-
-    let octet_string_new_fn = lib
-        .define_function("octet_string_new")
-        .returns(octet_string_class.clone(), "Empty octet string")?
-        .doc("Create a new octet string")?
-        .build()?;
-
-    let octet_string_destroy_fn = lib
-        .define_function("octet_string_destroy")
-        .param(
-            "octet_string",
-            octet_string_class.clone(),
-            "Octet String to destroy",
-        )?
-        .returns_nothing()?
-        .doc("Deallocate an octet string")?
-        .build()?;
+    let octet_string = lib.define_collection("octet_string", BasicType::U8, false)?;
 
     let octet_string_add_fn = lib
-        .define_function("octet_string_add")
-        .param("octet_string", octet_string_class, "Octet String to modify")?
-        .param("value", BasicType::U8, "Byte to add")?
-        .returns_nothing()?
-        .doc("Create a new octet string")?
-        .build()?;
-
-    let octet_string_collection = lib.define_collection(
-        &octet_string_new_fn,
-        &octet_string_destroy_fn,
-        &octet_string_add_fn,
-    )?;
-
-    let octet_string_add_fn = lib
-        .define_function("database_add_octet_string")
+        .define_function("database_add_octet_string")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class, "Event class")?
@@ -860,7 +835,7 @@ pub fn define(
         .build()?;
 
     let octet_string_remove_fn = lib
-        .define_function("database_remove_octet_string")
+        .define_function("database_remove_octet_string")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
@@ -871,10 +846,10 @@ pub fn define(
         .build()?;
 
     let octet_string_update_fn = lib
-        .define_function("database_update_octet_string")
+        .define_function("database_update_octet_string")?
         .param("db", database.clone(), "Database")?
         .param("index", BasicType::U16, "Index of the octet string")?
-        .param("value", octet_string_collection, "New value of the point")?
+        .param("value", octet_string, "New value of the point")?
         .param("options", update_options, "Update options")?
         .returns(
             BasicType::Bool,

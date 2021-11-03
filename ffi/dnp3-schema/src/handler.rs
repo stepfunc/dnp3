@@ -11,7 +11,7 @@ pub fn define(
     shared_def: &SharedDefinitions,
 ) -> Result<InterfaceHandle, BindingError> {
     let response_function = lib
-        .define_enum("ResponseFunction")
+        .define_enum("ResponseFunction")?
         .push("Response", "Solicited response")?
         .push("UnsolicitedResponse", "Unsolicited response")?
         .doc("Type of response")?
@@ -35,7 +35,7 @@ pub fn define(
         .build()?;
 
     let qualifier_code_enum = lib
-        .define_enum("QualifierCode")
+        .define_enum("QualifierCode")?
         .push("Range8", "8-bit start stop (0x00)")?
         .push("Range16", "16-bit start stop (0x01)")?
         .push("AllObjects", "All objects (0x06)")?
@@ -71,7 +71,7 @@ pub fn define(
         .define_asynchronous_interface(
             "ReadHandler",
             "General handler that will receive all values read from the outstation.",
-        )
+        )?
         .begin_callback("begin_fragment", "Marks the beginning of a fragment")?
         .param(
             "read_type",
@@ -291,7 +291,7 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<CallbackArgStructHandl
 }
 
 fn define_read_type_enum(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingError> {
-    lib.define_enum("ReadType")
+    lib.define_enum("ReadType")?
         .push("StartupIntegrity", "Startup integrity poll")?
         .push("Unsolicited", "Unsolicited message")?
         .push("SinglePoll", "Single poll requested by the user")?
