@@ -1,5 +1,5 @@
 use oo_bindgen::constants::{ConstantValue, Representation};
-use oo_bindgen::{BindingError, LibraryBuilder};
+use oo_bindgen::{BackTraced, LibraryBuilder};
 
 mod bits {
     pub(crate) const BIT_0: u8 = 0b0000_0001;
@@ -11,10 +11,10 @@ mod bits {
     pub(crate) const BIT_6: u8 = 0b0100_0000;
 }
 
-pub(crate) fn define(lib: &mut LibraryBuilder) -> Result<(), BindingError> {
+pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<()> {
     use bits::*;
 
-    lib.define_constants("flag")?
+    let flag = lib.define_constants("flag")?
         .add("online", ConstantValue::U8(BIT_0,Representation::Hex), "Object value is 'good' / 'valid' / 'nominal'")?
         .add("restart", ConstantValue::U8(BIT_1,Representation::Hex), "Object value has not been updated since device restart")?
         .add("comm_lost", ConstantValue::U8(BIT_2,Representation::Hex), "Object value represents the last value available before a communication failure occurred. Should never be set by originating devices")?
@@ -25,5 +25,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> Result<(), BindingError> {
         .add("discontinuity", ConstantValue::U8(BIT_6,Representation::Hex), "Reported counter value cannot be compared against a prior value to obtain the correct count difference")?
         .add("reference_err", ConstantValue::U8(BIT_6,Representation::Hex), "Object's value might not have the expected level of accuracy")?
         .doc("Individual flag constants that may be combined using bitwise-OR operator")?
-        .build()
+        .build()?;
+
+    Ok(flag)
 }

@@ -22,10 +22,7 @@ struct OutstationTypes {
 }
 
 impl OutstationTypes {
-    fn define(
-        lib: &mut LibraryBuilder,
-        shared_def: &SharedDefinitions,
-    ) -> Result<Self, BindingError> {
+    fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackTraced<Self> {
         let database = crate::database::define(lib, shared_def)?;
 
         Ok(Self {
@@ -40,10 +37,7 @@ impl OutstationTypes {
     }
 }
 
-pub fn define(
-    lib: &mut LibraryBuilder,
-    shared_def: &SharedDefinitions,
-) -> Result<(), BindingError> {
+pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackTraced<()> {
     // Everything required to create an outstation
 
     let types = OutstationTypes::define(lib, shared_def)?;
@@ -122,7 +116,7 @@ fn define_outstation(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
     types: &OutstationTypes,
-) -> Result<ClassHandle, BindingError> {
+) -> BackTraced<ClassHandle> {
     let transaction_interface = lib
         .define_synchronous_interface("OutstationTransaction", "Outstation transaction interface")?
         .begin_callback(
@@ -213,7 +207,8 @@ fn define_outstation(
         .doc("Set decoding log level")?
         .build()?;
 
-    lib.define_class(&outstation)?
+    let outstation = lib
+        .define_class(&outstation)?
         .destructor(&outstation_destroy_fn)?
         .static_method(
             "create_serial_session",
@@ -222,10 +217,12 @@ fn define_outstation(
         .method("transaction", &outstation_transaction_fn)?
         .method("set_decode_level", &outstation_set_decode_level_fn)?
         .doc(doc("Outstation handle").details("Use this handle to modify the internal database."))?
-        .build()
+        .build()?;
+
+    Ok(outstation)
 }
 
-fn define_class_zero_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
+fn define_class_zero_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let binary = Name::create("binary")?;
     let double_bit_binary = Name::create("double_bit_binary")?;
     let binary_output_status = Name::create("binary_output_status")?;
@@ -236,7 +233,8 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgS
     let octet_strings = Name::create("octet_strings")?;
 
     let class_zero_config = lib.declare_function_arg_struct("ClassZeroConfig")?;
-    lib.define_function_argument_struct(class_zero_config)?
+    let class_zero_config = lib
+        .define_function_argument_struct(class_zero_config)?
         .add(
             &binary,
             BasicType::Bool,
@@ -294,16 +292,19 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgS
         .default(&analog_output_status, true)?
         .default(&octet_strings, false)?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(class_zero_config)
 }
 
-fn define_outstation_features(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
+fn define_outstation_features(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let self_address = Name::create("self_address")?;
     let broadcast = Name::create("broadcast")?;
     let unsolicited = Name::create("unsolicited")?;
 
     let features = lib.declare_function_arg_struct("OutstationFeatures")?;
-    lib.define_function_argument_struct(features)?
+    let features = lib
+        .define_function_argument_struct(features)?
         .add(
             &self_address,
             BasicType::Bool,
@@ -330,13 +331,15 @@ fn define_outstation_features(lib: &mut LibraryBuilder) -> BindResult<FunctionAr
         .default(&broadcast, true)?
         .default(&unsolicited, true)?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(features)
 }
 
 fn define_outstation_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
-) -> Result<FunctionArgStructHandle, BindingError> {
+) -> BackTraced<FunctionArgStructHandle> {
     let class_zero_config = define_class_zero_config(lib)?;
     let outstation_features = define_outstation_features(lib)?;
 
@@ -435,9 +438,7 @@ fn define_outstation_config(
     Ok(outstation_config)
 }
 
-fn define_event_buffer_config(
-    lib: &mut LibraryBuilder,
-) -> Result<FunctionArgStructHandle, BindingError> {
+fn define_event_buffer_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let event_buffer_config = lib.declare_function_arg_struct("EventBufferConfig")?;
     let event_buffer_config = lib
         .define_function_argument_struct(event_buffer_config)?
@@ -492,7 +493,7 @@ fn define_event_buffer_config(
     Ok(event_buffer_config)
 }
 
-fn define_application_iin(lib: &mut LibraryBuilder) -> BindResult<UniversalStructHandle> {
+fn define_application_iin(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
     let need_time = Name::create("need_time")?;
     let local_control = Name::create("local_control")?;
     let device_trouble = Name::create("device_trouble")?;
@@ -538,7 +539,7 @@ fn define_application_iin(lib: &mut LibraryBuilder) -> BindResult<UniversalStruc
     Ok(application_iin)
 }
 
-fn define_restart_delay(lib: &mut LibraryBuilder) -> BindResult<UniversalStructHandle> {
+fn define_restart_delay(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
     let restart_delay_type = lib
         .define_enum("RestartDelayType")?
         .push("NotSupported", "Restart mode not supported")?
@@ -582,7 +583,7 @@ fn define_restart_delay(lib: &mut LibraryBuilder) -> BindResult<UniversalStructH
 fn define_outstation_application(
     lib: &mut LibraryBuilder,
     database: &ClassHandle,
-) -> Result<InterfaceHandle, BindingError> {
+) -> BackTraced<InterfaceHandle> {
     let restart_delay = define_restart_delay(lib)?;
 
     let write_time_result = lib.define_enum("WriteTimeResult")?
@@ -611,7 +612,7 @@ fn define_outstation_application(
 
     let application_iin = define_application_iin(lib)?;
 
-    lib.define_asynchronous_interface("OutstationApplication", "Dynamic information required by the outstation from the user application")?
+    let application = lib.define_asynchronous_interface("OutstationApplication", "Dynamic information required by the outstation from the user application")?
         .begin_callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
@@ -645,13 +646,15 @@ fn define_outstation_application(
             .param("database",database.declaration(), "Database")?
             .returns(freeze_result, "Result of the freeze operation")?
             .end_callback()?
-        .build()
+        .build()?;
+
+    Ok(application)
 }
 
 fn define_outstation_information(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
-) -> Result<InterfaceHandle, BindingError> {
+) -> BackTraced<InterfaceHandle> {
     let function_code = define_function_code(lib)?;
 
     let request_header = lib.declare_callback_arg_struct("RequestHeader")?;
@@ -675,7 +678,7 @@ fn define_outstation_information(
         .doc("Enumeration describing how the outstation processed a broadcast request")?
         .build()?;
 
-    lib.define_asynchronous_interface("OutstationInformation", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))?
+    let information = lib.define_asynchronous_interface("OutstationInformation", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))?
         .begin_callback("process_request_from_idle", "Called when a request is processed from the IDLE state")?
             .param("header", request_header, "Request header")?
             .returns_nothing()?
@@ -726,14 +729,16 @@ fn define_outstation_information(
         .begin_callback("clear_restart_iin", "Master cleared the restart IIN bit")?
             .returns_nothing()?
             .end_callback()?
-        .build()
+        .build()?;
+
+    Ok(information)
 }
 
 fn define_control_handler(
     lib: &mut LibraryBuilder,
     database: &ClassHandle,
     shared_def: &SharedDefinitions,
-) -> Result<InterfaceHandle, BindingError> {
+) -> BackTraced<InterfaceHandle> {
     let command_status = define_command_status(lib)?;
 
     let operate_type = lib
@@ -762,7 +767,8 @@ fn define_control_handler(
         .details(select_details_1)
         .details(select_details_2);
 
-    lib.define_asynchronous_interface("ControlHandler", "Callbacks for handling controls")?
+    let control_handler = lib
+        .define_asynchronous_interface("ControlHandler", "Callbacks for handling controls")?
         //------
         .begin_callback("begin_fragment", "Notifies the start of a command fragment")?
         .returns_nothing()?
@@ -846,12 +852,12 @@ fn define_control_handler(
         .returns(command_status, "Command status")?
         .end_callback()?
         //------
-        .build()
+        .build()?;
+
+    Ok(control_handler)
 }
 
-fn define_connection_state_listener(
-    lib: &mut LibraryBuilder,
-) -> Result<InterfaceHandle, BindingError> {
+fn define_connection_state_listener(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let state = lib
         .define_enum("ConnectionState")?
         .push("Connected", "Connected to the master")?
@@ -859,21 +865,24 @@ fn define_connection_state_listener(
         .doc("Outstation connection state for connection-oriented transports, e.g. TCP")?
         .build()?;
 
-    lib.define_asynchronous_interface(
-        "ConnectionStateListener",
-        "Callback interface for connection state events",
-    )?
-    .begin_callback("on_change", "Called when the connection state changes")?
-    .param("state", state, "New state of the connection")?
-    .returns_nothing()?
-    .end_callback()?
-    .build()
+    let listener = lib
+        .define_asynchronous_interface(
+            "ConnectionStateListener",
+            "Callback interface for connection state events",
+        )?
+        .begin_callback("on_change", "Called when the connection state changes")?
+        .param("state", state, "New state of the connection")?
+        .returns_nothing()?
+        .end_callback()?
+        .build()?;
+
+    Ok(listener)
 }
 
 fn define_address_filter(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
-) -> Result<ClassHandle, BindingError> {
+) -> BackTraced<ClassHandle> {
     let address_filter = lib.declare_class("AddressFilter")?;
 
     let address_filter_any_fn = lib
@@ -914,17 +923,20 @@ fn define_address_filter(
         .doc("Destroy an address filter")?
         .build()?;
 
-    lib.define_class(&address_filter)?
+    let address_filter = lib
+        .define_class(&address_filter)?
         .constructor(&address_filter_new_fn)?
         .destructor(&address_filter_destroy_fn)?
         .static_method("Any", &address_filter_any_fn)?
         .method("Add", &address_filter_add_fn)?
         .doc("Outstation address filter")?
-        .build()
+        .build()?;
+
+    Ok(address_filter)
 }
 
-fn define_function_code(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingError> {
-    lib.define_enum("FunctionCode")?
+fn define_function_code(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let function = lib.define_enum("FunctionCode")?
         .push("Confirm", "Master sends this to an outstation to confirm the receipt of an Application Layer fragment (value == 0)")?
         .push("Read", "Outstation shall return the data specified by the objects in the request (value == 1)")?
         .push("Write", "Outstation shall store the data specified by the objects in the request (value == 2)")?
@@ -959,11 +971,13 @@ fn define_function_code(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingE
         .push("Response", "Master shall interpret this fragment as an Application Layer response to an ApplicationLayer request (value == 129)")?
         .push("UnsolicitedResponse", "Master shall interpret this fragment as an unsolicited response that was not prompted by an explicit request (value == 130)")?
         .doc("Application layer function code")?
-        .build()
+        .build()?;
+
+    Ok(function)
 }
 
-fn define_command_status(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingError> {
-    lib.define_enum("CommandStatus")?
+fn define_command_status(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let command_status = lib.define_enum("CommandStatus")?
     .push("Success", "command was accepted, initiated, or queued (value == 0)")?
     .push("Timeout", "command timed out before completing (value == 1)")?
     .push("NoSelect", "command requires being selected before operate, configuration issue (value == 2)")?
@@ -986,5 +1000,7 @@ fn define_command_status(lib: &mut LibraryBuilder) -> Result<EnumHandle, Binding
     .push("NonParticipating", "(deprecated) indicates the outstation shall not issue or perform the control operation (value == 126)")?
     .push("Unknown", "aptures any value not defined in the enumeration")?
     .doc("Enumeration received from an outstation in response to command request")?
-    .build()
+    .build()?;
+
+    Ok(command_status)
 }

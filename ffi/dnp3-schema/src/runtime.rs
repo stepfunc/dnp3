@@ -5,11 +5,11 @@ use oo_bindgen::structs::{ConstructorType, FunctionArgStructHandle, Number};
 use oo_bindgen::types::BasicType;
 use oo_bindgen::*;
 
-fn define_runtime_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
+fn define_runtime_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let num_core_threads = Name::create("num_core_threads")?;
 
     let config_struct = lib.declare_function_arg_struct("RuntimeConfig")?;
-    lib
+    let config_struct= lib
         .define_function_argument_struct(config_struct)?
         .add(
             &num_core_threads,
@@ -22,13 +22,15 @@ fn define_runtime_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStru
         .begin_constructor("init", ConstructorType::Normal, "Initialize the configuration to default values")?
         .default(&num_core_threads, Number::U16(0))?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(config_struct)
 }
 
 pub fn define(
     lib: &mut LibraryBuilder,
     error_type: ErrorType,
-) -> std::result::Result<ClassDeclarationHandle, BindingError> {
+) -> BackTraced<ClassDeclarationHandle> {
     // Forward declare the class
     let runtime_class = lib.declare_class("Runtime")?;
 

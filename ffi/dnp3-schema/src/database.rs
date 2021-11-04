@@ -6,7 +6,7 @@ use oo_bindgen::name::Name;
 use oo_bindgen::structs::{ConstructorType, FunctionArgStructHandle, Number};
 use oo_bindgen::types::BasicType;
 
-fn define_update_options(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
+fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let event_mode_enum = lib
         .define_enum("event_mode")?
         .push(
@@ -26,7 +26,8 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStru
     let event_mode = Name::create("event_mode")?;
 
     let update_options = lib.declare_function_arg_struct("UpdateOptions")?;
-    lib.define_function_argument_struct(update_options.clone())?
+    let update_options = lib
+        .define_function_argument_struct(update_options)?
         .add(
             &update_static,
             BasicType::Bool,
@@ -50,10 +51,12 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStru
         .default(&update_static, true)?
         .default_variant(&event_mode, "Detect")?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(update_options)
 }
 
-fn define_binary_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
+fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let binary_static_variation = lib
         .define_enum("static_binary_variation")?
         .push("group1_var1", "Binary input - packed format")?
@@ -72,8 +75,9 @@ fn define_binary_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStruc
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
 
-    let binary_config = lib.declare_function_arg_struct("binary_config")?;
-    lib.define_function_argument_struct(binary_config)?
+    let config = lib.declare_function_arg_struct("binary_config")?;
+    let config = lib
+        .define_function_argument_struct(config)?
         .add(
             &static_variation,
             binary_static_variation,
@@ -90,12 +94,14 @@ fn define_binary_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStruc
         .default_variant(&static_variation, "group1_var1")?
         .default_variant(&event_variation, "group2_var2")?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(config)
 }
 
 fn define_double_bit_binary_config(
     lib: &mut LibraryBuilder,
-) -> BindResult<FunctionArgStructHandle> {
+) -> BackTraced<FunctionArgStructHandle> {
     let double_bit_binary_static_variation = lib
         .define_enum("static_double_bit_binary_variation")?
         .push("group3_var1", "Double-bit binary input - packed format")?
@@ -123,8 +129,9 @@ fn define_double_bit_binary_config(
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
 
-    let double_bit_binary_config = lib.declare_function_arg_struct("double_bit_binary_config")?;
-    lib.define_function_argument_struct(double_bit_binary_config)?
+    let config = lib.declare_function_arg_struct("double_bit_binary_config")?;
+    let config = lib
+        .define_function_argument_struct(config)?
         .add(
             &static_variation,
             double_bit_binary_static_variation,
@@ -141,12 +148,14 @@ fn define_double_bit_binary_config(
         .default_variant(&static_variation, "group3_var1")?
         .default_variant(&event_variation, "group4_var2")?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(config)
 }
 
 fn define_binary_output_status_config(
     lib: &mut LibraryBuilder,
-) -> BindResult<FunctionArgStructHandle> {
+) -> BackTraced<FunctionArgStructHandle> {
     let binary_output_status_static_variation = lib
         .define_enum("static_binary_output_status_variation")?
         .push("group10_var1", "Binary output - packed format")?
@@ -164,9 +173,9 @@ fn define_binary_output_status_config(
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
 
-    let binary_output_status_config =
-        lib.declare_function_arg_struct("binary_output_status_config")?;
-    lib.define_function_argument_struct(binary_output_status_config)?
+    let config = lib.declare_function_arg_struct("binary_output_status_config")?;
+    let config = lib
+        .define_function_argument_struct(config)?
         .add(
             &static_variation,
             binary_output_status_static_variation,
@@ -183,10 +192,12 @@ fn define_binary_output_status_config(
         .default_variant(&static_variation, "group10_var1")?
         .default_variant(&event_variation, "group11_var2")?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(config)
 }
 
-fn define_counter_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
+fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let counter_static_variation = lib
         .define_enum("static_counter_variation")?
         .push("group20_var1", "Counter - 32-bit with flag")?
@@ -209,8 +220,9 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStru
     let event_variation = Name::create("event_variation")?;
     let deadband = Name::create("deadband")?;
 
-    let counter_config = lib.declare_function_arg_struct("counter_config")?;
-    lib.define_function_argument_struct(counter_config)?
+    let config = lib.declare_function_arg_struct("counter_config")?;
+    let config = lib
+        .define_function_argument_struct(config)?
         .add(
             &static_variation,
             counter_static_variation,
@@ -229,10 +241,12 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStru
         .default_variant(&event_variation, "group22_var5")?
         .default(&deadband, Number::U32(0))?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(config)
 }
 
-fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
+fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let frozen_counter_static_variation = lib
         .define_enum("static_frozen_counter_variation")?
         .push("group21_var1", "Frozen Counter - 32-bit with flag")?
@@ -263,8 +277,9 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BindResult<Function
     let event_variation = Name::create("event_variation")?;
     let deadband = Name::create("deadband")?;
 
-    let frozen_counter_config = lib.declare_function_arg_struct("frozen_counter_config")?;
-    lib.define_function_argument_struct(frozen_counter_config)?
+    let config = lib.declare_function_arg_struct("frozen_counter_config")?;
+    let config = lib
+        .define_function_argument_struct(config)?
         .add(
             &static_variation,
             frozen_counter_static_variation,
@@ -283,10 +298,12 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BindResult<Function
         .default_variant(&event_variation, "group23_var5")?
         .default(&deadband, Number::U32(0))?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(config)
 }
 
-pub fn define_analog_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgStructHandle> {
+pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let analog_static_variation = lib
         .define_enum("static_analog_variation")?
         .push("group30_var1", "Analog input - 32-bit with flag")?
@@ -334,7 +351,8 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgS
     let deadband = Name::create("deadband")?;
 
     let analog_config = lib.declare_function_arg_struct("analog_config")?;
-    lib.define_function_argument_struct(analog_config)?
+    let config = lib
+        .define_function_argument_struct(analog_config)?
         .add(
             &static_variation,
             analog_static_variation,
@@ -353,12 +371,14 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BindResult<FunctionArgS
         .default_variant(&event_variation, "group32_var3")?
         .default(&deadband, Number::Double(0.0))?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(config)
 }
 
 fn define_analog_output_status_config(
     lib: &mut LibraryBuilder,
-) -> BindResult<FunctionArgStructHandle> {
+) -> BackTraced<FunctionArgStructHandle> {
     let analog_output_status_static_variation = lib
         .define_enum("static_analog_output_status_variation")?
         .push("group40_var1", "Analog output status - 32-bit with flag")?
@@ -403,9 +423,9 @@ fn define_analog_output_status_config(
     let event_variation = Name::create("event_variation")?;
     let deadband = Name::create("deadband")?;
 
-    let analog_output_status_config =
-        lib.declare_function_arg_struct("analog_output_status_config")?;
-    lib.define_function_argument_struct(analog_output_status_config)?
+    let config = lib.declare_function_arg_struct("analog_output_status_config")?;
+    let config = lib
+        .define_function_argument_struct(config)?
         .add(
             &static_variation,
             analog_output_status_static_variation,
@@ -424,13 +444,12 @@ fn define_analog_output_status_config(
         .default_variant(&event_variation, "group42_var3")?
         .default(&deadband, Number::Double(0.0))?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(config)
 }
 
-pub fn define(
-    lib: &mut LibraryBuilder,
-    shared_def: &SharedDefinitions,
-) -> Result<ClassHandle, BindingError> {
+pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackTraced<ClassHandle> {
     let database = lib.declare_class("database")?;
 
     let event_class = lib

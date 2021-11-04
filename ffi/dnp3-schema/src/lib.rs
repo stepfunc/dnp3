@@ -13,7 +13,7 @@ mod runtime;
 mod shared;
 mod variation;
 
-pub fn build_lib() -> Result<Library, BindingError> {
+pub fn build_lib() -> BackTraced<Library> {
     let info = LibraryInfo {
         description: "Safe and fast DNP3 library".to_string(),
         project_url: "https://stepfunc.io/products/libraries/dnp3/".to_string(),
@@ -65,5 +65,7 @@ pub fn build_lib() -> Result<Library, BindingError> {
     master::define(&mut builder, &shared_def)?;
     outstation::define(&mut builder, &shared_def)?;
 
-    builder.build()
+    let library = builder.build()?;
+
+    Ok(library)
 }

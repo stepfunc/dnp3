@@ -11,7 +11,7 @@ use oo_bindgen::structs::{
 use oo_bindgen::types::{BasicType, DurationType, StringType};
 use std::time::Duration;
 
-pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<(), BindingError> {
+pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<()> {
     let read_handler = crate::handler::define(lib, shared)?;
 
     let endpoint_list = define_endpoint_list(lib)?;
@@ -408,15 +408,14 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     Ok(())
 }
 
-fn define_connect_strategy(
-    lib: &mut LibraryBuilder,
-) -> Result<FunctionArgStructHandle, BindingError> {
+fn define_connect_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let min_connect_delay = Name::create("min_connect_delay")?;
     let max_connect_delay = Name::create("max_connect_delay")?;
     let reconnect_delay = Name::create("reconnect_delay")?;
 
     let strategy = lib.declare_function_arg_struct("ConnectStrategy")?;
-    lib.define_function_argument_struct(strategy)?
+    let strategy = lib
+        .define_function_argument_struct(strategy)?
         .add(
             &min_connect_delay,
             DurationType::Milliseconds,
@@ -443,14 +442,15 @@ fn define_connect_strategy(
         .default(&max_connect_delay, Duration::from_secs(10))?
         .default(&reconnect_delay, Duration::from_secs(1))?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(strategy)
 }
 
-fn define_association_id(
-    lib: &mut LibraryBuilder,
-) -> std::result::Result<UniversalStructHandle, BindingError> {
+fn define_association_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
     let id = lib.declare_universal_struct("AssociationId")?;
-    lib.define_opaque_struct(id)?
+    let id = lib
+        .define_opaque_struct(id)?
         .add(
             "address",
             BasicType::U16,
@@ -458,14 +458,15 @@ fn define_association_id(
         )?
         .doc("Association identifier")?
         .end_fields()?
-        .build()
+        .build()?;
+
+    Ok(id)
 }
 
-fn define_poll_id(
-    lib: &mut LibraryBuilder,
-) -> std::result::Result<UniversalStructHandle, BindingError> {
+fn define_poll_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
     let id = lib.declare_universal_struct("PollId")?;
-    lib.define_opaque_struct(id)?
+    let id = lib
+        .define_opaque_struct(id)?
         .add(
             "association_id",
             BasicType::U16,
@@ -478,12 +479,12 @@ fn define_poll_id(
         )?
         .doc("Poll identifier")?
         .end_fields()?
-        .build()
+        .build()?;
+
+    Ok(id)
 }
 
-fn define_read_callback(
-    lib: &mut LibraryBuilder,
-) -> std::result::Result<InterfaceHandle, BindingError> {
+fn define_read_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let read_result = lib
         .define_enum("ReadResult")?
         .push("Success", "Read was perform successfully")?
@@ -491,7 +492,8 @@ fn define_read_callback(
         .doc("Result of a read operation")?
         .build()?;
 
-    lib.define_asynchronous_interface("ReadTaskCallback", "Handler for read tasks")?
+    let callback = lib
+        .define_asynchronous_interface("ReadTaskCallback", "Handler for read tasks")?
         .begin_callback(
             "on_complete",
             "Called when the read task reached completion or failed",
@@ -499,13 +501,15 @@ fn define_read_callback(
         .param("result", read_result, "Result of the read task")?
         .returns_nothing()?
         .end_callback()?
-        .build()
+        .build()?;
+
+    Ok(callback)
 }
 
 fn define_association_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
-) -> std::result::Result<FunctionArgStructHandle, BindingError> {
+) -> BackTraced<FunctionArgStructHandle> {
     let event_classes = define_event_classes(lib)?;
     let classes = define_classes(lib)?;
 
@@ -531,7 +535,7 @@ fn define_association_config(
     let max_queued_user_requests = Name::create("max_queued_user_requests")?;
     let association_config = lib.declare_function_arg_struct("AssociationConfig")?;
 
-    lib
+    let association_config = lib
         .define_function_argument_struct(association_config)?
         .doc("Association configuration")?
         .add(
@@ -583,12 +587,12 @@ fn define_association_config(
         .default(&auto_integrity_scan_on_buffer_overflow, true)?
         .default(&max_queued_user_requests, Number::U16(16))?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(association_config)
 }
 
-fn define_tcp_client_state_listener(
-    lib: &mut LibraryBuilder,
-) -> std::result::Result<InterfaceHandle, BindingError> {
+fn define_tcp_client_state_listener(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let client_state_enum = lib
         .define_enum("ClientState")?
         .push("Disabled", "Client is disabled and idle until disabled")?
@@ -612,21 +616,24 @@ fn define_tcp_client_state_listener(
         )?
         .build()?;
 
-    lib.define_asynchronous_interface(
-        "ClientStateListener",
-        "Callback for monitoring the client TCP connection state",
-    )?
-    .begin_callback("on_change", "Called when the client state changed")?
-    .param("state", client_state_enum, "New state")?
-    .returns_nothing()?
-    .end_callback()?
-    .build()
+    let listener = lib
+        .define_asynchronous_interface(
+            "ClientStateListener",
+            "Callback for monitoring the client TCP connection state",
+        )?
+        .begin_callback("on_change", "Called when the client state changed")?
+        .param("state", client_state_enum, "New state")?
+        .returns_nothing()?
+        .end_callback()?
+        .build()?;
+
+    Ok(listener)
 }
 
 fn define_master_channel_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
-) -> std::result::Result<FunctionArgStructHandle, BindingError> {
+) -> BackTraced<FunctionArgStructHandle> {
     let config = lib.declare_function_arg_struct("MasterChannelConfig")?;
 
     let decode_level = Name::create("decode_level")?;
@@ -634,7 +641,7 @@ fn define_master_channel_config(
     let tx_buffer_size = Name::create("tx_buffer_size")?;
     let rx_buffer_size = Name::create("rx_buffer_size")?;
 
-    lib.define_function_argument_struct(config)?
+    let config = lib.define_function_argument_struct(config)?
         .doc("Generic configuration for a MasterChannel")?
         .add("address", BasicType::U16, "Local DNP3 data-link address")?
         .add(decode_level.clone(), shared.decode_level.clone(), "Decoding level for this master. You can modify this later on with {class:MasterChannel.SetDecodeLevel()}.")?
@@ -652,12 +659,12 @@ fn define_master_channel_config(
         .default(&tx_buffer_size, Number::U16(2048))?
         .default(&rx_buffer_size, Number::U16(2048))?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(config)
 }
 
-fn define_endpoint_list(
-    lib: &mut LibraryBuilder,
-) -> std::result::Result<ClassHandle, BindingError> {
+fn define_endpoint_list(lib: &mut LibraryBuilder) -> BackTraced<ClassHandle> {
     let endpoint_list_class = lib.declare_class("EndpointList")?;
 
     let endpoint_list_new = lib.define_function("endpoint_list_new")?
@@ -694,7 +701,7 @@ fn define_endpoint_list(
     Ok(endpoint_list_class)
 }
 
-fn define_utc_timestamp(lib: &mut LibraryBuilder) -> Result<UniversalStructHandle, BindingError> {
+fn define_utc_timestamp(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
     let value = Name::create("value")?;
     let is_valid = Name::create("is_valid")?;
 
@@ -716,10 +723,10 @@ fn define_utc_timestamp(lib: &mut LibraryBuilder) -> Result<UniversalStructHandl
     Ok(timestamp_utc)
 }
 
-fn define_association_handler(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
+fn define_association_handler(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let timestamp_utc = define_utc_timestamp(lib)?;
 
-    lib.define_asynchronous_interface(
+    let timestamp_utc = lib.define_asynchronous_interface(
         "AssociationHandler",
         "Callbacks for a particular outstation association",
     )?
@@ -734,10 +741,12 @@ fn define_association_handler(lib: &mut LibraryBuilder) -> Result<InterfaceHandl
         "The current time",
     )?
     .end_callback()?
-    .build()
+    .build()?;
+
+    Ok(timestamp_utc)
 }
 
-fn define_event_classes(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHandle, BindingError> {
+fn define_event_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let class1 = Name::create("class1")?;
     let class2 = Name::create("class2")?;
     let class3 = Name::create("class3")?;
@@ -774,7 +783,7 @@ fn define_event_classes(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHan
     Ok(event_classes)
 }
 
-fn define_classes(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHandle, BindingError> {
+fn define_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let class0 = Name::create("class0")?;
     let class1 = Name::create("class1")?;
     let class2 = Name::create("class2")?;
@@ -815,24 +824,28 @@ fn define_classes(lib: &mut LibraryBuilder) -> Result<FunctionArgStructHandle, B
     Ok(classes)
 }
 
-fn define_command_mode(lib: &mut LibraryBuilder) -> std::result::Result<EnumHandle, BindingError> {
-    lib.define_enum("CommandMode")?
+fn define_command_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let mode = lib
+        .define_enum("CommandMode")?
         .push("DirectOperate", "Perform a Direct Operate (0x05)")?
         .push(
             "SelectBeforeOperate",
             "Perform a Select and Operate (0x03 then 0x04)",
         )?
         .doc("Command operation mode")?
-        .build()
+        .build()?;
+
+    Ok(mode)
 }
 
 trait TaskErrors: Sized {
-    fn add_task_errors(self) -> std::result::Result<Self, BindingError>;
+    fn add_task_errors(self) -> BackTraced<Self>;
 }
 
 impl TaskErrors for EnumBuilder<'_> {
-    fn add_task_errors(self) -> std::result::Result<Self, BindingError> {
-        self.push("TooManyRequests", "too many user requests queued")?
+    fn add_task_errors(self) -> BackTraced<Self> {
+        let builder = self
+            .push("TooManyRequests", "too many user requests queued")?
             .push(
                 "BadResponse",
                 "response was malformed or contained object headers",
@@ -847,13 +860,13 @@ impl TaskErrors for EnumBuilder<'_> {
             )?
             .push("NoConnection", "no connection")?
             .push("Shutdown", "master was shutdown")?
-            .push("AssociationRemoved", "association was removed mid-task")
+            .push("AssociationRemoved", "association was removed mid-task")?;
+
+        Ok(builder)
     }
 }
 
-fn define_command_callback(
-    lib: &mut LibraryBuilder,
-) -> std::result::Result<InterfaceHandle, BindingError> {
+fn define_command_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let command_result = lib
         .define_enum("CommandResult")?
         .push("Success", "Command was a success")?
@@ -869,7 +882,8 @@ fn define_command_callback(
         .doc("Result of a command")?
         .build()?;
 
-    lib.define_asynchronous_interface("CommandTaskCallback", "Handler for command tasks")?
+    let callback = lib
+        .define_asynchronous_interface("CommandTaskCallback", "Handler for command tasks")?
         .begin_callback(
             "on_complete",
             "Called when the command task reached completion or failed",
@@ -877,13 +891,15 @@ fn define_command_callback(
         .param("result", command_result, "Result of the command task")?
         .returns_nothing()?
         .end_callback()?
-        .build()
+        .build()?;
+
+    Ok(callback)
 }
 
 fn define_command_builder(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
-) -> std::result::Result<ClassHandle, BindingError> {
+) -> BackTraced<ClassHandle> {
     let command = lib.declare_class("Commands")?;
 
     let command_new_fn = lib
@@ -1056,7 +1072,8 @@ fn define_command_builder(
         .doc("Add a Analog Output command (double-precision float) with 2-byte prefix index")?
         .build()?;
 
-    lib.define_class(&command)?
+    let command = lib
+        .define_class(&command)?
         .constructor(&command_new_fn)?
         .destructor(&command_destroy_fn)?
         .method("AddG12V1U8", &command_add_u8_g12v1_fn)?
@@ -1071,10 +1088,12 @@ fn define_command_builder(
         .method("AddG41V4U16", &command_add_u16_g41v4_fn)?
         .method("FinishHeader", &command_finish_header_fn)?
         .doc("Builder type used to construct command requests")?
-        .build()
+        .build()?;
+
+    Ok(command)
 }
 
-fn define_time_sync_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
+fn define_time_sync_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let timesync_result = lib
         .define_enum("TimeSyncResult")?
         .push("Success", "Time synchronization operation was a success")?
@@ -1098,26 +1117,30 @@ fn define_time_sync_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle
         .doc("Result of a time sync operation")?
         .build()?;
 
-    lib.define_asynchronous_interface(
-        "TimeSyncTaskCallback",
-        "Handler for time synchronization tasks",
-    )?
-    .begin_callback(
-        "on_complete",
-        "Called when the timesync task reached completion or failed",
-    )?
-    .param(
-        "result",
-        timesync_result,
-        "Result of the time synchronization task",
-    )?
-    .returns_nothing()?
-    .end_callback()?
-    .build()
+    let callback = lib
+        .define_asynchronous_interface(
+            "TimeSyncTaskCallback",
+            "Handler for time synchronization tasks",
+        )?
+        .begin_callback(
+            "on_complete",
+            "Called when the timesync task reached completion or failed",
+        )?
+        .param(
+            "result",
+            timesync_result,
+            "Result of the time synchronization task",
+        )?
+        .returns_nothing()?
+        .end_callback()?
+        .build()?;
+
+    Ok(callback)
 }
 
-fn define_time_sync_mode(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingError> {
-    lib.define_enum("TimeSyncMode")?
+fn define_time_sync_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let mode = lib
+        .define_enum("TimeSyncMode")?
         .push(
             "Lan",
             "Perform a LAN time sync with Record Current Time (0x18) function code",
@@ -1127,10 +1150,12 @@ fn define_time_sync_mode(lib: &mut LibraryBuilder) -> Result<EnumHandle, Binding
             "Perform a non-LAN time sync with Delay Measurement (0x17) function code",
         )?
         .doc("Time synchronization mode")?
-        .build()
+        .build()?;
+
+    Ok(mode)
 }
 
-fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
+fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let restart_error = lib
         .define_enum("RestartError")?
         .push("Ok", "Restart was perform successfully")?
@@ -1147,7 +1172,8 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, 
         .add_full_constructor("init")?
         .build()?;
 
-    lib.define_asynchronous_interface("RestartTaskCallback", "Handler for restart tasks")?
+    let callback = lib
+        .define_asynchronous_interface("RestartTaskCallback", "Handler for restart tasks")?
         .begin_callback(
             "on_complete",
             "Called when the restart task reached completion or failed",
@@ -1155,10 +1181,12 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, 
         .param("result", restart_result, "Result of the restart task")?
         .returns_nothing()?
         .end_callback()?
-        .build()
+        .build()?;
+
+    Ok(callback)
 }
 
-fn define_link_status_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
+fn define_link_status_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let link_status_enum = lib
         .define_enum("LinkStatusResult")?
         .push(
@@ -1176,10 +1204,13 @@ fn define_link_status_callback(lib: &mut LibraryBuilder) -> Result<InterfaceHand
         .doc("Result of a link status check. See {class:MasterChannel.CheckLinkStatus()}")?
         .build()?;
 
-    lib.define_asynchronous_interface("LinkStatusCallback", "Handler for link status check")?
+    let callback = lib
+        .define_asynchronous_interface("LinkStatusCallback", "Handler for link status check")?
         .begin_callback("on_complete", "Called when a link status is received")?
         .param("result", link_status_enum, "Result of the link status")?
         .returns_nothing()?
         .end_callback()?
-        .build()
+        .build()?;
+
+    Ok(callback)
 }

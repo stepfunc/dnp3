@@ -1,5 +1,4 @@
 use oo_bindgen::class::ClassDeclarationHandle;
-use oo_bindgen::doc;
 use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::error_type::{ErrorType, ExceptionType};
 use oo_bindgen::interface::InterfaceHandle;
@@ -7,6 +6,7 @@ use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::name::Name;
 use oo_bindgen::structs::*;
 use oo_bindgen::types::{BasicType, DurationType};
+use oo_bindgen::{doc, BackTraced};
 use oo_bindgen::{BindingError, LibraryBuilder};
 use std::time::Duration;
 
@@ -39,11 +39,11 @@ pub struct SharedDefinitions {
     pub octet_string_it: IteratorHandle,
 }
 
-pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingError> {
+pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
     let error_type = lib
         .define_error_type(
-            "ParamError",
-            "ParamException",
+            "param_error",
+            "param_exception",
             ExceptionType::UncheckedException,
         )?
         .add_error("NullParameter", "Null parameter")?
@@ -252,14 +252,13 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     })
 }
 
-fn define_retry_strategy(
-    lib: &mut LibraryBuilder,
-) -> Result<FunctionArgStructHandle, BindingError> {
+fn define_retry_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let min_delay = Name::create("min_delay")?;
     let max_delay = Name::create("max_delay")?;
 
     let retry_strategy = lib.declare_function_arg_struct("RetryStrategy")?;
-    lib.define_function_argument_struct(retry_strategy)?
+    let retry_strategy = lib
+        .define_function_argument_struct(retry_strategy)?
         .add(
             &min_delay,
             DurationType::Milliseconds,
@@ -278,21 +277,23 @@ fn define_retry_strategy(
         .default(&min_delay, Duration::from_secs(1))?
         .default(&max_delay, Duration::from_secs(10))?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(retry_strategy)
 }
 
-fn define_link_error_mode(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingError> {
-    lib
+fn define_link_error_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let mode = lib
         .define_enum("LinkErrorMode")?
         .push("Discard", "Framing errors are discarded. The link-layer parser is reset on any error, and the parser begins scanning for 0x0564. This is always the behavior for serial ports.")?
         .push("Close", "Framing errors are bubbled up to calling code, closing the session. Suitable for physical layers that provide error correction like TCP.")?
         .doc("Controls how errors in parsed link-layer frames are handled. This behavior is configurable for physical layers with built-in error correction like TCP as the connection might be through a terminal server.")?
-        .build()
+        .build()?;
+
+    Ok(mode)
 }
 
-fn define_serial_port_settings(
-    lib: &mut LibraryBuilder,
-) -> Result<FunctionArgStructHandle, BindingError> {
+fn define_serial_port_settings(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let data_bits_enum = lib
         .define_enum("DataBits")?
         .push("Five", "5 bits per character")?
@@ -332,7 +333,8 @@ fn define_serial_port_settings(
     let stop_bits = Name::create("stop_bits")?;
 
     let serial_settings = lib.declare_function_arg_struct("SerialPortSettings")?;
-    lib.define_function_argument_struct(serial_settings)?
+    let serial_settings = lib
+        .define_function_argument_struct(serial_settings)?
         .add(
             &baud_rate,
             BasicType::U32,
@@ -371,10 +373,12 @@ fn define_serial_port_settings(
         .default_variant(&parity, "None")?
         .default_variant(&stop_bits, "One")?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(serial_settings)
 }
 
-fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<UniversalStructHandle, BindingError> {
+fn declare_flags_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
     let flags_struct = lib.declare_universal_struct("Flags")?;
     let flags_struct = lib
         .define_universal_struct(flags_struct)?
@@ -391,7 +395,7 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<UniversalStructHandl
     Ok(flags_struct)
 }
 
-fn define_port_state_listener(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
+fn define_port_state_listener(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let port_state = lib
         .define_enum("PortState")?
         .push("Disabled", "Disabled until enabled")?
@@ -415,9 +419,7 @@ fn define_port_state_listener(lib: &mut LibraryBuilder) -> Result<InterfaceHandl
     Ok(port_state_listener)
 }
 
-fn declare_timestamp_struct(
-    lib: &mut LibraryBuilder,
-) -> Result<UniversalStructHandle, BindingError> {
+fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
     let time_quality_enum = lib
         .define_enum("TimeQuality")?
         .push(
@@ -481,7 +483,7 @@ fn build_iterator<T: Into<UniversalStructField>>(
 ) -> Result<(UniversalStructHandle, IteratorHandle), BindingError> {
     let value_struct_decl = lib.declare_universal_struct(name)?;
     let value_struct = lib
-        .define_universal_struct(value_struct_decl.clone())?
+        .define_universal_struct(value_struct_decl)?
         .add("index", BasicType::U16, "Point index")?
         .add("value", value_type, "Point value")?
         .add("flags", flags_struct.clone(), "Point flags")?
@@ -502,7 +504,7 @@ fn build_octet_string(
     // Octet string stuff
     let byte_struct_decl = lib.declare_function_return_struct("byte")?;
     let byte_struct = lib
-        .define_function_return_struct(byte_struct_decl.clone())?
+        .define_function_return_struct(byte_struct_decl)?
         .add("value", BasicType::U8, "Byte value")?
         .doc("Single byte struct")?
         .end_fields()?
@@ -512,7 +514,7 @@ fn build_octet_string(
 
     let octet_string_struct_decl = lib.declare_function_return_struct("octet_string")?;
     let octet_string_struct = lib
-        .define_function_return_struct(octet_string_struct_decl.clone())?
+        .define_function_return_struct(octet_string_struct_decl)?
         .add("index", BasicType::U16, "Point index")?
         .add("value", byte_it, "Point value")?
         .doc("Octet String point")?

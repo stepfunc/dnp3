@@ -4,10 +4,7 @@ use oo_bindgen::*;
 use crate::shared::SharedDefinitions;
 use oo_bindgen::types::BasicType;
 
-pub fn define(
-    lib: &mut LibraryBuilder,
-    shared: &SharedDefinitions,
-) -> Result<ClassHandle, BindingError> {
+pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<ClassHandle> {
     let request = lib.declare_class("Request")?;
 
     let request_new_fn = lib

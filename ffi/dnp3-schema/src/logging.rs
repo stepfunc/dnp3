@@ -7,8 +7,8 @@ use oo_bindgen::structs::{
 use oo_bindgen::types::{BasicType, StringType};
 use oo_bindgen::*;
 
-fn define_log_level_enum(lib: &mut LibraryBuilder) -> BindResult<EnumHandle> {
-    lib
+fn define_log_level_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let definition = lib
         .define_enum("log_level")?
         .push("error", "Error log level")?
         .push("warn", "Warning log level")?
@@ -19,11 +19,14 @@ fn define_log_level_enum(lib: &mut LibraryBuilder) -> BindResult<EnumHandle> {
             doc("Log level")
                 .details("Used in {interface:logger.on_message()} callback to identify the log level of a message.")
         )?
-        .build()
+        .build()?;
+
+    Ok(definition)
 }
 
-fn define_time_format_enum(lib: &mut LibraryBuilder) -> BindResult<EnumHandle> {
-    lib.define_enum("time_format")?
+fn define_time_format_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let definition = lib
+        .define_enum("time_format")?
         .push("none", "Don't format the timestamp as part of the message")?
         .push("rfc_3339", "Format the time using RFC 3339")?
         .push(
@@ -31,21 +34,26 @@ fn define_time_format_enum(lib: &mut LibraryBuilder) -> BindResult<EnumHandle> {
             "Format the time in a human readable format e.g. 'Jun 25 14:27:12.955'",
         )?
         .doc("Describes if and how the time will be formatted in log messages")?
-        .build()
+        .build()?;
+
+    Ok(definition)
 }
 
-fn define_log_output_format_enum(lib: &mut LibraryBuilder) -> BindResult<EnumHandle> {
-    lib.define_enum("log_output_format")?
+fn define_log_output_format_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let definition = lib
+        .define_enum("log_output_format")?
         .push("text", "A simple text-based format")?
         .push("json", "Output formatted as JSON")?
         .doc("Describes how each log event is formatted")?
-        .build()
+        .build()?;
+
+    Ok(definition)
 }
 
 fn define_logging_config_struct(
     lib: &mut LibraryBuilder,
     log_level_enum: EnumHandle,
-) -> BindResult<FunctionArgStructHandle> {
+) -> BackTraced<FunctionArgStructHandle> {
     let logging_config_struct = lib.declare_function_arg_struct("LoggingConfig")?;
 
     let log_output_format_enum = define_log_output_format_enum(lib)?;
@@ -57,7 +65,8 @@ fn define_logging_config_struct(
     let print_level = Name::create("print_level")?;
     let print_module_info = Name::create("print_module_info")?;
 
-    lib.define_function_argument_struct(logging_config_struct)?
+    let logging_config_struct = lib
+        .define_function_argument_struct(logging_config_struct)?
         .add(&level, log_level_enum, "logging level")?
         .add(
             &output_format,
@@ -88,7 +97,9 @@ fn define_logging_config_struct(
         .default(&print_level, true)?
         .default(&print_module_info, false)?
         .end_constructor()?
-        .build()
+        .build()?;
+
+    Ok(logging_config_struct)
 }
 
 const NOTHING: &str = "nothing";
@@ -96,7 +107,7 @@ const NOTHING: &str = "nothing";
 pub fn define(
     lib: &mut LibraryBuilder,
     error_type: ErrorType,
-) -> Result<UniversalStructHandle, BindingError> {
+) -> BackTraced<UniversalStructHandle> {
     let log_level_enum = define_log_level_enum(lib)?;
 
     let logging_config_struct = define_logging_config_struct(lib, log_level_enum.clone())?;

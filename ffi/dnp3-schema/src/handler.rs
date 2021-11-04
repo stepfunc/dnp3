@@ -9,7 +9,7 @@ use oo_bindgen::types::BasicType;
 pub fn define(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
-) -> Result<InterfaceHandle, BindingError> {
+) -> BackTraced<InterfaceHandle> {
     let response_function = lib
         .define_enum("ResponseFunction")?
         .push("Response", "Solicited response")?
@@ -216,7 +216,7 @@ pub fn define(
     Ok(read_handler_interface)
 }
 
-fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<CallbackArgStructHandle, BindingError> {
+fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructHandle> {
     let iin1 = lib.declare_callback_arg_struct("IIN1")?;
     let iin1 = lib
         .define_callback_argument_struct(iin1)?
@@ -290,12 +290,15 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> Result<CallbackArgStructHandl
     Ok(iin)
 }
 
-fn define_read_type_enum(lib: &mut LibraryBuilder) -> Result<EnumHandle, BindingError> {
-    lib.define_enum("ReadType")?
+fn define_read_type_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let read_type = lib
+        .define_enum("ReadType")?
         .push("StartupIntegrity", "Startup integrity poll")?
         .push("Unsolicited", "Unsolicited message")?
         .push("SinglePoll", "Single poll requested by the user")?
         .push("PeriodicPoll", "Periodic poll configured by the user")?
         .doc("Describes the source of a read event")?
-        .build()
+        .build()?;
+
+    Ok(read_type)
 }
