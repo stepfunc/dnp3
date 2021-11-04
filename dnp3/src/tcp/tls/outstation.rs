@@ -3,8 +3,8 @@ use std::io::{self, ErrorKind};
 use std::path::Path;
 use std::sync::Arc;
 
+use tokio_rustls::rustls;
 use tokio_rustls::rustls::server::AllowAnyAuthenticatedClient;
-use tokio_rustls::{rustls, webpki};
 
 use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
 use crate::tokio::net::TcpStream;
@@ -43,11 +43,10 @@ impl TlsServerConfig {
                     })?;
                 }
 
-                let dns_name = webpki::DnsNameRef::try_from_ascii_str(name)
-                    .map_err(|_| TlsError::InvalidDnsName)?
-                    .to_owned();
+                // Check that the DNS name is at least valid
+                rustls::ServerName::try_from(name).map_err(|_| TlsError::InvalidDnsName)?;
 
-                CaChainClientCertVerifier::new(roots, dns_name)
+                CaChainClientCertVerifier::new(roots, name.to_string())
             }
             CertificateMode::SelfSignedCertificate => {
                 if let Some(peer_cert) = peer_certs.pop() {
@@ -105,17 +104,17 @@ impl TlsServerConfig {
 
 struct CaChainClientCertVerifier {
     inner: Arc<dyn rustls::server::ClientCertVerifier>,
-    dns_name: webpki::DnsName,
+    server_name: String,
 }
 
 impl CaChainClientCertVerifier {
     #[allow(clippy::new_ret_no_self)]
     fn new(
         roots: rustls::RootCertStore,
-        dns_name: webpki::DnsName,
+        server_name: String,
     ) -> Arc<dyn rustls::server::ClientCertVerifier> {
         let inner = AllowAnyAuthenticatedClient::new(roots);
-        Arc::new(CaChainClientCertVerifier { inner, dns_name })
+        Arc::new(CaChainClientCertVerifier { inner, server_name })
     }
 }
 
@@ -143,16 +142,10 @@ impl rustls::server::ClientCertVerifier for CaChainClientCertVerifier {
         self.inner
             .verify_client_cert(end_entity, intermediates, now)?;
 
-        // Check DNS name
-        let cert = webpki::EndEntityCert::try_from(end_entity.0.as_ref())
-            .map_err(|_| rustls::Error::InvalidCertificateEncoding)?;
-        cert.verify_is_valid_for_dns_name(self.dns_name.as_ref())
-            .map_err(|_| {
-                rustls::Error::InvalidCertificateData(
-                    "client certificate is not valid for provided name".to_string(),
-                )
-            })
-            .map(|_| rustls::server::ClientCertVerified::assertion())
+        // Check DNS name (including in the Common Name)
+        super::verify_dns_name(end_entity, &self.server_name)?;
+
+        Ok(rustls::server::ClientCertVerified::assertion())
     }
 }
 
