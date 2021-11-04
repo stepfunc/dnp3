@@ -1,6 +1,7 @@
 use class::ClassHandle;
 use oo_bindgen::*;
 
+use crate::gv;
 use crate::shared::SharedDefinitions;
 use oo_bindgen::name::Name;
 use oo_bindgen::structs::{ConstructorType, FunctionArgStructHandle, Number};
@@ -25,7 +26,7 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
     let update_static = Name::create("update_static")?;
     let event_mode = Name::create("event_mode")?;
 
-    let update_options = lib.declare_function_arg_struct("UpdateOptions")?;
+    let update_options = lib.declare_function_arg_struct("update_options")?;
     let update_options = lib
         .define_function_argument_struct(update_options)?
         .add(
@@ -49,7 +50,7 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
             "Initialize to default values",
         )?
         .default(&update_static, true)?
-        .default_variant(&event_mode, "Detect")?
+        .default_variant(&event_mode, "detect")?
         .end_constructor()?
         .build()?;
 
@@ -59,16 +60,16 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
 fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let binary_static_variation = lib
         .define_enum("static_binary_variation")?
-        .push("group1_var1", "Binary input - packed format")?
-        .push("group1_var2", "Binary input - with flags")?
+        .push(gv(1, 1), "Binary input - packed format")?
+        .push(gv(1, 2), "Binary input - with flags")?
         .doc("Static binary input variation")?
         .build()?;
 
     let binary_event_variation = lib
         .define_enum("event_binary_variation")?
-        .push("group2_var1", "Binary input event - without time")?
-        .push("group2_var2", "Binary input event - with absolute time")?
-        .push("group2_var3", "Binary input event - with relative time")?
+        .push(gv(2, 1), "Binary input event - without time")?
+        .push(gv(2, 2), "Binary input event - with absolute time")?
+        .push(gv(2, 3), "Binary input event - with relative time")?
         .doc("Event binary input variation")?
         .build()?;
 
@@ -91,8 +92,8 @@ fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
         .doc("Binary Input configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "group1_var1")?
-        .default_variant(&event_variation, "group2_var2")?
+        .default_variant(&static_variation, gv(1, 1))?
+        .default_variant(&event_variation, gv(2, 2))?
         .end_constructor()?
         .build()?;
 
@@ -104,23 +105,20 @@ fn define_double_bit_binary_config(
 ) -> BackTraced<FunctionArgStructHandle> {
     let double_bit_binary_static_variation = lib
         .define_enum("static_double_bit_binary_variation")?
-        .push("group3_var1", "Double-bit binary input - packed format")?
-        .push("group3_var2", "Double-bit binary input - with flags")?
+        .push(gv(3, 1), "Double-bit binary input - packed format")?
+        .push(gv(3, 2), "Double-bit binary input - with flags")?
         .doc("Static double-bit binary input variation")?
         .build()?;
 
     let double_bit_binary_event_variation = lib
         .define_enum("event_double_bit_binary_variation")?
+        .push(gv(4, 1), "Double-bit binary input event - without time")?
         .push(
-            "group4_var1",
-            "Double-bit binary input event - without time",
-        )?
-        .push(
-            "group4_var2",
+            gv(4, 2),
             "Double-bit binary input event - with absolute time",
         )?
         .push(
-            "group4_var3",
+            gv(4, 3),
             "Double-bit binary input event - with relative time",
         )?
         .doc("Event double-bit binary input variation")?
@@ -145,8 +143,8 @@ fn define_double_bit_binary_config(
         .doc("Double-Bit Binary Input configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "group3_var1")?
-        .default_variant(&event_variation, "group4_var2")?
+        .default_variant(&static_variation, gv(3, 1))?
+        .default_variant(&event_variation, gv(4, 2))?
         .end_constructor()?
         .build()?;
 
@@ -158,15 +156,15 @@ fn define_binary_output_status_config(
 ) -> BackTraced<FunctionArgStructHandle> {
     let binary_output_status_static_variation = lib
         .define_enum("static_binary_output_status_variation")?
-        .push("group10_var1", "Binary output - packed format")?
-        .push("group10_var2", "Binary output - output status with flags")?
+        .push(gv(10, 1), "Binary output - packed format")?
+        .push(gv(10, 2), "Binary output - output status with flags")?
         .doc("Static binary output status variation")?
         .build()?;
 
     let binary_output_status_event_variation = lib
         .define_enum("event_binary_output_status_variation")?
-        .push("group11_var1", "Binary output event - status without time")?
-        .push("group11_var2", "Binary output event - status with time")?
+        .push(gv(11, 1), "Binary output event - status without time")?
+        .push(gv(11, 2), "Binary output event - status with time")?
         .doc("Event binary output status variation")?
         .build()?;
 
@@ -189,8 +187,8 @@ fn define_binary_output_status_config(
         .doc("Binary Output Status configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "group10_var1")?
-        .default_variant(&event_variation, "group11_var2")?
+        .default_variant(&static_variation, gv(10, 1))?
+        .default_variant(&event_variation, gv(11, 2))?
         .end_constructor()?
         .build()?;
 
@@ -200,19 +198,19 @@ fn define_binary_output_status_config(
 fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let counter_static_variation = lib
         .define_enum("static_counter_variation")?
-        .push("group20_var1", "Counter - 32-bit with flag")?
-        .push("group20_var2", "Counter - 16-bit with flag")?
-        .push("group20_var5", "Counter - 32-bit without flag")?
-        .push("group20_var6", "Counter - 16-bit without flag")?
+        .push(gv(20, 1), "Counter - 32-bit with flag")?
+        .push(gv(20, 2), "Counter - 16-bit with flag")?
+        .push(gv(20, 5), "Counter - 32-bit without flag")?
+        .push(gv(20, 6), "Counter - 16-bit without flag")?
         .doc("Static counter variation")?
         .build()?;
 
     let counter_event_variation = lib
         .define_enum("event_counter_variation")?
-        .push("group22_var1", "Counter event - 32-bit with flag")?
-        .push("group22_var2", "Counter event - 16-bit with flag")?
-        .push("group22_var5", "Counter event - 32-bit with flag and time")?
-        .push("group22_var6", "Counter event - 16-bit with flag and time")?
+        .push(gv(22, 1), "Counter event - 32-bit with flag")?
+        .push(gv(22, 2), "Counter event - 16-bit with flag")?
+        .push(gv(22, 5), "Counter event - 32-bit with flag and time")?
+        .push(gv(22, 6), "Counter event - 16-bit with flag and time")?
         .doc("Event counter variation")?
         .build()?;
 
@@ -237,8 +235,8 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
         .doc("Counter configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "group20_var1")?
-        .default_variant(&event_variation, "group22_var5")?
+        .default_variant(&static_variation, gv(20, 1))?
+        .default_variant(&event_variation, gv(22, 5))?
         .default(&deadband, Number::U32(0))?
         .end_constructor()?
         .build()?;
@@ -249,25 +247,25 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
 fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let frozen_counter_static_variation = lib
         .define_enum("static_frozen_counter_variation")?
-        .push("group21_var1", "Frozen Counter - 32-bit with flag")?
-        .push("group21_var2", "Frozen Counter - 16-bit with flag")?
-        .push("group21_var5", "Frozen Counter - 32-bit with flag and time")?
-        .push("group21_var6", "Frozen Counter - 16-bit with flag and time")?
-        .push("group21_var9", "Frozen Counter - 32-bit without flag")?
-        .push("group21_var10", "Frozen Counter - 16-bit without flag")?
+        .push(gv(21, 1), "Frozen Counter - 32-bit with flag")?
+        .push(gv(21, 2), "Frozen Counter - 16-bit with flag")?
+        .push(gv(21, 5), "Frozen Counter - 32-bit with flag and time")?
+        .push(gv(21, 6), "Frozen Counter - 16-bit with flag and time")?
+        .push(gv(21, 9), "Frozen Counter - 32-bit without flag")?
+        .push(gv(21, 10), "Frozen Counter - 16-bit without flag")?
         .doc("Static frozen counter variation")?
         .build()?;
 
     let frozen_counter_event_variation = lib
         .define_enum("event_frozen_counter_variation")?
-        .push("group23_var1", "Frozen Counter event - 32-bit with flag")?
-        .push("group23_var2", "Frozen Counter event - 16-bit with flag")?
+        .push(gv(23, 1), "Frozen Counter event - 32-bit with flag")?
+        .push(gv(23, 2), "Frozen Counter event - 16-bit with flag")?
         .push(
-            "group23_var5",
+            gv(23, 5),
             "Frozen Counter event - 32-bit with flag and time",
         )?
         .push(
-            "group23_var6",
+            gv(23, 6),
             "Frozen Counter event - 16-bit with flag and time",
         )?
         .doc("Event frozen counter variation")?
@@ -294,8 +292,8 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<Function
         .doc("Frozen Counter configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "group21_var1")?
-        .default_variant(&event_variation, "group23_var5")?
+        .default_variant(&static_variation, gv(21, 1))?
+        .default_variant(&event_variation, gv(23, 5))?
         .default(&deadband, Number::U32(0))?
         .end_constructor()?
         .build()?;
@@ -306,16 +304,16 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<Function
 pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let analog_static_variation = lib
         .define_enum("static_analog_variation")?
-        .push("group30_var1", "Analog input - 32-bit with flag")?
-        .push("group30_var2", "Analog input - 16-bit with flag")?
-        .push("group30_var3", "Analog input - 32-bit without flag")?
-        .push("group30_var4", "Analog input - 16-bit without flag")?
+        .push(gv(30, 1), "Analog input - 32-bit with flag")?
+        .push(gv(30, 2), "Analog input - 16-bit with flag")?
+        .push(gv(30, 3), "Analog input - 32-bit without flag")?
+        .push(gv(30, 4), "Analog input - 16-bit without flag")?
         .push(
-            "Group30Var5",
+            gv(30, 5),
             "Analog input - single-precision, floating-point with flag",
         )?
         .push(
-            "Group30Var6",
+            gv(30, 6),
             "Analog input - double-precision, floating-point with flag",
         )?
         .doc("Static analog variation")?
@@ -323,24 +321,24 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
 
     let analog_event_variation = lib
         .define_enum("event_analog_variation")?
-        .push("group32_var1", "Analog input event - 32-bit without time")?
-        .push("group32_var2", "Analog input event - 16-bit without time")?
-        .push("group32_var3", "Analog input event - 32-bit with time")?
-        .push("group32_var4", "Analog input event - 16-bit with time")?
+        .push(gv(32, 1), "Analog input event - 32-bit without time")?
+        .push(gv(32, 2), "Analog input event - 16-bit without time")?
+        .push(gv(32, 3), "Analog input event - 32-bit with time")?
+        .push(gv(32, 4), "Analog input event - 16-bit with time")?
         .push(
-            "group32_var5",
+            gv(32, 5),
             "Analog input event - single-precision, floating-point without time",
         )?
         .push(
-            "group32_var6",
+            gv(32, 6),
             "Analog input event - double-precision, floating-point without time",
         )?
         .push(
-            "group32_var7",
+            gv(32, 7),
             "Analog input event - single-precision, floating-point with time",
         )?
         .push(
-            "group32_var8",
+            gv(32, 8),
             "Analog input event - double-precision, floating-point with time",
         )?
         .doc("Event analog variation")?
@@ -367,8 +365,8 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
         .doc("Analog configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "group30_var1")?
-        .default_variant(&event_variation, "group32_var3")?
+        .default_variant(&static_variation, gv(30, 1))?
+        .default_variant(&event_variation, gv(32, 3))?
         .default(&deadband, Number::Double(0.0))?
         .end_constructor()?
         .build()?;
@@ -381,14 +379,14 @@ fn define_analog_output_status_config(
 ) -> BackTraced<FunctionArgStructHandle> {
     let analog_output_status_static_variation = lib
         .define_enum("static_analog_output_status_variation")?
-        .push("group40_var1", "Analog output status - 32-bit with flag")?
-        .push("group40_var2", "Analog output status - 16-bit with flag")?
+        .push(gv(40, 1), "Analog output status - 32-bit with flag")?
+        .push(gv(40, 2), "Analog output status - 16-bit with flag")?
         .push(
-            "group40_var3",
+            gv(40, 3),
             "Analog output status - single-precision, floating-point with flag",
         )?
         .push(
-            "group40_var4",
+            gv(40, 4),
             "Analog output status - double-precision, floating-point with flag",
         )?
         .doc("Static analog output status variation")?
@@ -396,24 +394,24 @@ fn define_analog_output_status_config(
 
     let analog_output_status_event_variation = lib
         .define_enum("event_analog_output_status_variation")?
-        .push("group42_var1", "Analog output event - 32-bit without time")?
-        .push("group42_var2", "Analog output event - 16-bit without time")?
-        .push("group42_var3", "Analog output event - 32-bit with time")?
-        .push("group42_var4", "Analog output event - 16-bit with time")?
+        .push(gv(42, 1), "Analog output event - 32-bit without time")?
+        .push(gv(42, 2), "Analog output event - 16-bit without time")?
+        .push(gv(42, 3), "Analog output event - 32-bit with time")?
+        .push(gv(42, 4), "Analog output event - 16-bit with time")?
         .push(
-            "group42_var5",
+            gv(42, 5),
             "Analog output event - single-precision, floating-point without time",
         )?
         .push(
-            "group42_var6",
+            gv(42, 6),
             "Analog output event - double-precision, floating-point without time",
         )?
         .push(
-            "group42_var7",
+            gv(42, 7),
             "Analog output event - single-precision, floating-point with time",
         )?
         .push(
-            "group42_var8",
+            gv(42, 8),
             "Analog output event - double-precision, floating-point with time",
         )?
         .doc("Event analog output status variation")?
@@ -440,8 +438,8 @@ fn define_analog_output_status_config(
         .doc("Analog Output Status configuration")?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, "group40_var1")?
-        .default_variant(&event_variation, "group42_var3")?
+        .default_variant(&static_variation, gv(40, 1))?
+        .default_variant(&event_variation, gv(42, 3))?
         .default(&deadband, Number::Double(0.0))?
         .end_constructor()?
         .build()?;
@@ -839,7 +837,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .build()?;
 
     // Octet String
-    let octet_string = lib.define_collection("octet_string", BasicType::U8, false)?;
+    let octet_string = lib.define_collection("octet_string_value", BasicType::U8, false)?;
 
     let octet_string_add_fn = lib
         .define_function("database_add_octet_string")?

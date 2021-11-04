@@ -98,7 +98,7 @@ impl From<Option<RestartDelay>> for ffi::RestartDelay {
                 }
                 .into(),
                 RestartDelay::Milliseconds(value) => ffi::RestartDelayFields {
-                    restart_type: ffi::RestartDelayType::Milliseconds,
+                    restart_type: ffi::RestartDelayType::MilliSeconds,
                     value,
                 }
                 .into(),

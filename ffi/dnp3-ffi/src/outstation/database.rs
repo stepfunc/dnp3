@@ -193,17 +193,17 @@ impl OctetStringValue {
     }
 }
 
-pub unsafe fn octet_string_new() -> *mut OctetStringValue {
+pub unsafe fn octet_string_value_create() -> *mut OctetStringValue {
     Box::into_raw(Box::new(OctetStringValue::new()))
 }
 
-pub unsafe fn octet_string_destroy(octet_string: *mut OctetStringValue) {
+pub unsafe fn octet_string_value_destroy(octet_string: *mut OctetStringValue) {
     if !octet_string.is_null() {
         Box::from_raw(octet_string);
     }
 }
 
-pub unsafe fn octet_string_add(octet_string: *mut OctetStringValue, value: u8) {
+pub unsafe fn octet_string_value_add(octet_string: *mut OctetStringValue, value: u8) {
     if let Some(octet_string) = octet_string.as_mut() {
         octet_string.inner.push(value);
     }
@@ -244,11 +244,11 @@ impl From<&ffi::Flags> for Flags {
 impl From<&ffi::Timestamp> for Option<Time> {
     fn from(from: &ffi::Timestamp) -> Self {
         match from.quality() {
-            ffi::TimeQuality::Invalid => None,
-            ffi::TimeQuality::Synchronized => {
+            ffi::TimeQuality::InvalidTime => None,
+            ffi::TimeQuality::SynchronizedTime => {
                 Some(Time::Synchronized(Timestamp::new(from.value())))
             }
-            ffi::TimeQuality::Unsynchronized => {
+            ffi::TimeQuality::UnsynchronizedTime => {
                 Some(Time::Unsynchronized(Timestamp::new(from.value())))
             }
         }

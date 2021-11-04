@@ -45,7 +45,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     let address_filter = define_address_filter(lib, shared_def)?;
 
     // Define the TCP server
-    let tcp_server = lib.declare_class("TCPServer")?;
+    let tcp_server = lib.declare_class("tcp_server")?;
 
     let tcp_server_new_fn = lib
         .define_function("tcpserver_new")?
@@ -66,7 +66,9 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         )?
         .returns(tcp_server.clone(), "New TCP server instance")?
         .fails_with(shared_def.error_type.clone())?
-        .doc(doc("Create a new TCP server.").details("To start it, use {class:TCPServer.bind()}."))?
+        .doc(
+            doc("Create a new TCP server.").details("To start it, use {class:tcp_server.bind()}."),
+        )?
         .build()?;
 
     let tcp_server_destroy_fn = lib.define_function("tcpserver_destroy")?
@@ -87,8 +89,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .returns(outstation.declaration(), "Outstation handle")?
         .fails_with(shared_def.error_type.clone())?
         .doc(doc("Add an outstation to the server.")
-            .details("The returned {class:Outstation} can be used to modify points of the outstation.")
-            .details("In order for the outstation to run, the TCP server must be running. Use {class:TCPServer.bind()} to run it."))?
+            .details("The returned {class:outstation} can be used to modify points of the outstation.")
+            .details("In order for the outstation to run, the TCP server must be running. Use {class:tcp_server.bind()} to run it."))?
         .build()?;
 
     let tcp_server_bind_fn = lib.define_function("tcpserver_bind")?
@@ -105,8 +107,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .method("bind", &tcp_server_bind_fn)?
         .custom_destroy("Shutdown")?
         .doc(doc("TCP server that listens for connections and routes the messages to outstations.")
-        .details("To add outstations to it, use {class:TCPServer.add_outstation()}. Once all the outstations are added, the server can be started with {class:TCPServer.bind()}.")
-        .details("{class:TCPServer.[destructor]} is used to gracefully shutdown all the outstations and the server."))?
+        .details("To add outstations to it, use {class:tcp_server.add_outstation()}. Once all the outstations are added, the server can be started with {class:tcp_server.bind()}.")
+        .details("{class:tcp_server.[destructor]} is used to gracefully shutdown all the outstations and the server."))?
         .build()?;
 
     Ok(())
@@ -118,7 +120,7 @@ fn define_outstation(
     types: &OutstationTypes,
 ) -> BackTraced<ClassHandle> {
     let transaction_interface = lib
-        .define_synchronous_interface("OutstationTransaction", "Outstation transaction interface")?
+        .define_synchronous_interface("outstation_transaction", "Outstation transaction interface")?
         .begin_callback(
             "execute",
             "Execute the transaction with the provided database",
@@ -128,7 +130,7 @@ fn define_outstation(
         .end_callback()?
         .build()?;
 
-    let outstation = lib.declare_class("Outstation")?;
+    let outstation = lib.declare_class("outstation")?;
 
     let outstation_create_serial_session_fn = lib
         .define_function("outstation_create_serial_session")?
@@ -179,11 +181,11 @@ fn define_outstation(
     let outstation_destroy_fn = lib.define_function("outstation_destroy")?
         .param("outstation",outstation.clone(), "Outstation to destroy")?
         .returns_nothing()?
-        .doc(doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:TCPServer.[destructor]} will properly shutdown the outstation."))?
+        .doc(doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:tcp_server.[destructor]} will properly shutdown the outstation."))?
         .build()?;
 
     let outstation_transaction_fn = lib
-        .define_function("outstation_transaction")?
+        .define_function("outstation_execute_transaction")?
         .param("outstation", outstation.clone(), "Outstation")?
         .param(
             "callback",
@@ -199,7 +201,7 @@ fn define_outstation(
         .param(
             "outstation",
             outstation.clone(),
-            "{class:Outstation} on which to set the decoding level",
+            "{class:outstation} on which to set the decoding level",
         )?
         .param("level", shared_def.decode_level.clone(), "Decode log")?
         .returns_nothing()?
@@ -232,7 +234,7 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
     let analog_output_status = Name::create("analog_output_status")?;
     let octet_strings = Name::create("octet_strings")?;
 
-    let class_zero_config = lib.declare_function_arg_struct("ClassZeroConfig")?;
+    let class_zero_config = lib.declare_function_arg_struct("class_zero_config")?;
     let class_zero_config = lib
         .define_function_argument_struct(class_zero_config)?
         .add(
@@ -302,7 +304,7 @@ fn define_outstation_features(lib: &mut LibraryBuilder) -> BackTraced<FunctionAr
     let broadcast = Name::create("broadcast")?;
     let unsolicited = Name::create("unsolicited")?;
 
-    let features = lib.declare_function_arg_struct("OutstationFeatures")?;
+    let features = lib.declare_function_arg_struct("outstation_features")?;
     let features = lib
         .define_function_argument_struct(features)?
         .add(
@@ -357,7 +359,7 @@ fn define_outstation_config(
     let max_controls_per_request = Name::create("max_controls_per_request")?;
     let class_zero = Name::create("class_zero")?;
 
-    let outstation_config = lib.declare_function_arg_struct("OutstationConfig")?;
+    let outstation_config = lib.declare_function_arg_struct("outstation_config")?;
     let outstation_config = lib
         .define_function_argument_struct(outstation_config)?
         .doc("Outstation configuration")?
@@ -412,7 +414,7 @@ fn define_outstation_config(
             &keep_alive_timeout,
             DurationType::Milliseconds,
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the master")
-                .details("A value of zero means no automatic keep-alives."),
+                .details("A value of zero means no automatic keep-alive will be sent."),
         )?
         .add(&max_read_request_headers, BasicType::U16, doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
         .add(&max_controls_per_request, BasicType::U16, doc("Maximum number of controls in a single request."))?
@@ -439,7 +441,7 @@ fn define_outstation_config(
 }
 
 fn define_event_buffer_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
-    let event_buffer_config = lib.declare_function_arg_struct("EventBufferConfig")?;
+    let event_buffer_config = lib.declare_function_arg_struct("event_buffer_config")?;
     let event_buffer_config = lib
         .define_function_argument_struct(event_buffer_config)?
         .add(
@@ -499,7 +501,7 @@ fn define_application_iin(lib: &mut LibraryBuilder) -> BackTraced<UniversalStruc
     let device_trouble = Name::create("device_trouble")?;
     let config_corrupt = Name::create("config_corrupt")?;
 
-    let application_iin = lib.declare_universal_struct("ApplicationIIN")?;
+    let application_iin = lib.declare_universal_struct("application_iin")?;
     let application_iin = lib
         .define_universal_struct(application_iin)?
         .add(
@@ -527,7 +529,7 @@ fn define_application_iin(lib: &mut LibraryBuilder) -> BackTraced<UniversalStruc
         .begin_constructor(
             "init",
             ConstructorType::Normal,
-            "Initialize all fields in {struct:ApplicationIIN} to false",
+            "Initialize all fields in {struct:application_iin} to false",
         )?
         .default(&need_time, false)?
         .default(&local_control, false)?
@@ -541,38 +543,38 @@ fn define_application_iin(lib: &mut LibraryBuilder) -> BackTraced<UniversalStruc
 
 fn define_restart_delay(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
     let restart_delay_type = lib
-        .define_enum("RestartDelayType")?
-        .push("NotSupported", "Restart mode not supported")?
-        .push("Seconds", "Value is in seconds (corresponds to g51v1)")?
+        .define_enum("restart_delay_type")?
+        .push("not_supported", "Restart mode not supported")?
+        .push("seconds", "Value is in seconds (corresponds to g51v1)")?
         .push(
-            "Milliseconds",
+            "milli_seconds",
             "Value is in milliseconds (corresponds to g51v2)",
         )?
-        .doc("Type of restart delay value. Used by {struct:RestartDelay}.")?
+        .doc("Type of restart delay value. Used by {struct:restart_delay}.")?
         .build()?;
 
     let restart_type = Name::create("restart_type")?;
     let value = Name::create("value")?;
 
-    let restart_delay = lib.declare_universal_struct("RestartDelay")?;
+    let restart_delay = lib.declare_universal_struct("restart_delay")?;
     let restart_delay = lib.define_universal_struct(restart_delay)?
-        .add(restart_type.clone(), restart_delay_type, "Indicates what {struct:RestartDelay.value} is.")?
+        .add(restart_type.clone(), restart_delay_type, "Indicates what {struct:restart_delay.value} is.")?
         .add(value.clone(), BasicType::U16, "Expected delay before the outstation comes back online.")?
-        .doc(doc("Restart delay used by {interface:OutstationApplication.cold_restart()} and {interface:OutstationApplication.warm_restart()}")
-            .details("If {struct:RestartDelay.restart_type} is not {enum:RestartDelayType.NotSupported}, then the {struct:RestartDelay.value} is valid. Otherwise, the outstation will return IIN2.0 NO_FUNC_CODE_SUPPORT."))?
+        .doc(doc("Restart delay used by {interface:outstation_application.cold_restart()} and {interface:outstation_application.warm_restart()}")
+            .details("If {struct:restart_delay.restart_type} is not {enum:restart_delay_type.not_supported}, then the {struct:restart_delay.value} is valid. Otherwise, the outstation will return IIN2.0 NO_FUNC_CODE_SUPPORT."))?
         .end_fields()?
         // -----
         .begin_constructor("not_supported", ConstructorType::Static, "RestartDelay indicating that the request is not supported")?
-        .default_variant(&restart_type, "NotSupported")?
+        .default_variant(&restart_type, "not_supported")?
         .default(&value, Number::U16(0))?
         .end_constructor()?
         // -----
         .begin_constructor("seconds", ConstructorType::Static, "RestartDelay with a count of seconds")?
-        .default_variant(&restart_type, "Seconds")?
+        .default_variant(&restart_type, "seconds")?
         .end_constructor()?
         // -----
         .begin_constructor("milliseconds", ConstructorType::Static, "RestartDelay with a count of milliseconds")?
-        .default_variant(&restart_type, "Milliseconds")?
+        .default_variant(&restart_type, "milli_seconds")?
         .end_constructor()?
         // -----
         .build()?;
@@ -586,25 +588,25 @@ fn define_outstation_application(
 ) -> BackTraced<InterfaceHandle> {
     let restart_delay = define_restart_delay(lib)?;
 
-    let write_time_result = lib.define_enum("WriteTimeResult")?
-        .push("NotSupported", "Writing time is not supported by this outstation (translated to NO_FUNC_CODE_SUPPORT).")?
-        .push("InvalidValue", "The provided value was invalid (translated to PARAM_ERROR)")?
-        .push("Ok", "The write time operation succeeded.")?
-        .doc("Write time result used by {interface:OutstationApplication.write_absolute_time()}")?
+    let write_time_result = lib.define_enum("write_time_result")?
+        .push("not_supported", "Writing time is not supported by this outstation (translated to NO_FUNC_CODE_SUPPORT).")?
+        .push("invalid_value", "The provided value was invalid (translated to PARAM_ERROR)")?
+        .push("ok", "The write time operation succeeded.")?
+        .doc("Write time result used by {interface:outstation_application.write_absolute_time()}")?
         .build()?;
 
-    let freeze_type = lib.define_enum("FreezeType")?
-        .push("ImmediateFreeze", "Copy the current value of a counter to the associated point")?
-        .push("FreezeAndClear", "Copy the current value of a counter to the associated point and clear the current value to 0.")?
+    let freeze_type = lib.define_enum("freeze_type")?
+        .push("immediate_freeze", "Copy the current value of a counter to the associated point")?
+        .push("freeze_and_clear", "Copy the current value of a counter to the associated point and clear the current value to 0.")?
         .doc("Freeze operation type")?
         .build()?;
 
     let freeze_result = lib
-        .define_enum("FreezeResult")?
-        .push("Success", "Freeze operation was successful")?
-        .push("ParameterError", "One of the point is invalid")?
+        .define_enum("freeze_result")?
+        .push("success", "Freeze operation was successful")?
+        .push("parameter_error", "One of the point is invalid")?
         .push(
-            "NotSupported",
+            "not_supported",
             "The demanded freeze operation is not supported by this device",
         )?
         .doc("Result of a freeze operation")?
@@ -612,7 +614,7 @@ fn define_outstation_application(
 
     let application_iin = define_application_iin(lib)?;
 
-    let application = lib.define_asynchronous_interface("OutstationApplication", "Dynamic information required by the outstation from the user application")?
+    let application = lib.define_asynchronous_interface("outstation_application", "Dynamic information required by the outstation from the user application")?
         .begin_callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
@@ -657,7 +659,7 @@ fn define_outstation_information(
 ) -> BackTraced<InterfaceHandle> {
     let function_code = define_function_code(lib)?;
 
-    let request_header = lib.declare_callback_arg_struct("RequestHeader")?;
+    let request_header = lib.declare_callback_arg_struct("request_header")?;
     let request_header = lib
         .define_callback_argument_struct(request_header)?
         .add(
@@ -670,15 +672,15 @@ fn define_outstation_information(
         .end_fields()?
         .build()?;
 
-    let broadcast_action = lib.define_enum("BroadcastAction")?
-        .push("Processed", "Outstation processed the broadcast")?
-        .push("IgnoredByConfiguration", "Outstation ignored the broadcast message b/c it is disabled by configuration")?
-        .push("BadObjectHeaders", "Outstation was unable to parse the object headers and ignored the request")?
-        .push("UnsupportedFunction", "Outstation ignore the broadcast message b/c the function is not supported via Broadcast")?
+    let broadcast_action = lib.define_enum("broadcast_action")?
+        .push("processed", "Outstation processed the broadcast")?
+        .push("ignored_by_configuration", "Outstation ignored the broadcast message b/c it is disabled by configuration")?
+        .push("bad_object_headers", "Outstation was unable to parse the object headers and ignored the request")?
+        .push("unsupported_function", "Outstation ignore the broadcast message b/c the function is not supported via Broadcast")?
         .doc("Enumeration describing how the outstation processed a broadcast request")?
         .build()?;
 
-    let information = lib.define_asynchronous_interface("OutstationInformation", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))?
+    let information = lib.define_asynchronous_interface("outstation_information", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))?
         .begin_callback("process_request_from_idle", "Called when a request is processed from the IDLE state")?
             .param("header", request_header, "Request header")?
             .returns_nothing()?
@@ -742,17 +744,17 @@ fn define_control_handler(
     let command_status = define_command_status(lib)?;
 
     let operate_type = lib
-        .define_enum("OperateType")?
+        .define_enum("operate_type")?
         .push(
-            "SelectBeforeOperate",
+            "select_before_operate",
             "control point was properly selected before the operate request",
         )?
         .push(
-            "DirectOperate",
+            "direct_operate",
             "operate the control via a DirectOperate request",
         )?
         .push(
-            "DirectOperateNoAck",
+            "direct_operate_no_ack",
             "operate the control via a DirectOperateNoAck request",
         )?
         .doc("Enumeration describing how the master requested the control operation")?
@@ -768,7 +770,7 @@ fn define_control_handler(
         .details(select_details_2);
 
     let control_handler = lib
-        .define_asynchronous_interface("ControlHandler", "Callbacks for handling controls")?
+        .define_asynchronous_interface("control_handler", "Callbacks for handling controls")?
         //------
         .begin_callback("begin_fragment", "Notifies the start of a command fragment")?
         .returns_nothing()?
@@ -859,15 +861,15 @@ fn define_control_handler(
 
 fn define_connection_state_listener(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let state = lib
-        .define_enum("ConnectionState")?
-        .push("Connected", "Connected to the master")?
-        .push("Disconnected", "Disconnected from the master")?
+        .define_enum("connection_state")?
+        .push("connected", "Connected to the master")?
+        .push("disconnected", "Disconnected from the master")?
         .doc("Outstation connection state for connection-oriented transports, e.g. TCP")?
         .build()?;
 
     let listener = lib
         .define_asynchronous_interface(
-            "ConnectionStateListener",
+            "connection_state_listener",
             "Callback interface for connection state events",
         )?
         .begin_callback("on_change", "Called when the connection state changes")?
@@ -883,7 +885,7 @@ fn define_address_filter(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
 ) -> BackTraced<ClassHandle> {
-    let address_filter = lib.declare_class("AddressFilter")?;
+    let address_filter = lib.declare_class("address_filter")?;
 
     let address_filter_any_fn = lib
         .define_function("address_filter_any")?
@@ -927,8 +929,8 @@ fn define_address_filter(
         .define_class(&address_filter)?
         .constructor(&address_filter_new_fn)?
         .destructor(&address_filter_destroy_fn)?
-        .static_method("Any", &address_filter_any_fn)?
-        .method("Add", &address_filter_add_fn)?
+        .static_method("any", &address_filter_any_fn)?
+        .method("add", &address_filter_add_fn)?
         .doc("Outstation address filter")?
         .build()?;
 
@@ -936,40 +938,40 @@ fn define_address_filter(
 }
 
 fn define_function_code(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
-    let function = lib.define_enum("FunctionCode")?
-        .push("Confirm", "Master sends this to an outstation to confirm the receipt of an Application Layer fragment (value == 0)")?
-        .push("Read", "Outstation shall return the data specified by the objects in the request (value == 1)")?
-        .push("Write", "Outstation shall store the data specified by the objects in the request (value == 2)")?
-        .push("Select", "Outstation shall select (or arm) the output points specified by the objects in the request in preparation for a subsequent operate command (value == 3)")?
-        .push("Operate", "Outstation shall activate the output points selected (or armed) by a previous select function code command (value == 4)")?
-        .push("DirectOperate", "Outstation shall immediately actuate the output points specified by the objects in the request (value == 5)")?
-        .push("DirectOperateNoResponse", "Same as DirectOperate but outstation shall not send a response (value == 6)")?
-        .push("ImmediateFreeze", "Outstation shall copy the point data values specified by the objects in the request to a separate freeze buffer (value == 7)")?
-        .push("ImmediateFreezeNoResponse", "Same as ImmediateFreeze but outstation shall not send a response (value == 8)")?
-        .push("FreezeClear", "Outstation shall copy the point data values specified by the objects in the request into a separate freeze buffer and then clear the values (value == 9)")?
-        .push("FreezeClearNoResponse", "Same as FreezeClear but outstation shall not send a response (value == 10)")?
-        .push("FreezeAtTime", "Outstation shall copy the point data values specified by the objects in the request to a separate freeze buffer at the time and/or time intervals specified in a special time data information object (value == 11)")?
-        .push("FreezeAtTimeNoResponse", "Same as FreezeAtTime but outstation shall not send a response (value == 12)")?
-        .push("ColdRestart", "Outstation shall perform a complete reset of all hardware and software in the device (value == 13)")?
-        .push("WarmRestart", "Outstation shall reset only portions of the device (value == 14)")?
-        .push("InitializeData", "Obsolete-Do not use for new designs (value == 15)")?
-        .push("InitializeApplication", "Outstation shall place the applications specified by the objects in the request into the ready to run state (value == 16)")?
-        .push("StartApplication", "Outstation shall start running the applications specified by the objects in the request (value == 17)")?
-        .push("StopApplication", "Outstation shall stop running the applications specified by the objects in the request (value == 18)")?
-        .push("SaveConfiguration", "This code is deprecated-Do not use for new designs (value == 19)")?
-        .push("EnableUnsolicited", "Enables outstation to initiate unsolicited responses from points specified by the objects in the request (value == 20)")?
-        .push("DisableUnsolicited", "Prevents outstation from initiating unsolicited responses from points specified by the objects in the request (value == 21)")?
-        .push("AssignClass", "Outstation shall assign the events generated by the points specified by the objects in the request to one of the classes (value == 22)")?
-        .push("DelayMeasure", "Outstation shall report the time it takes to process and initiate the transmission of its response (value == 23)")?
-        .push("RecordCurrentTime", "Outstation shall save the time when the last octet of this message is received (value == 24)")?
-        .push("OpenFile", "Outstation shall open a file (value == 25)")?
-        .push("CloseFile", "Outstation shall close a file (value == 26)")?
-        .push("DeleteFile", "Outstation shall delete a file (value == 27)")?
-        .push("GetFileInfo", "Outstation shall retrieve information about a file (value == 28)")?
-        .push("AuthenticateFile", "Outstation shall return a file authentication key (value == 29)")?
-        .push("AbortFile", "Outstation shall abort a file transfer operation (value == 30)")?
-        .push("Response", "Master shall interpret this fragment as an Application Layer response to an ApplicationLayer request (value == 129)")?
-        .push("UnsolicitedResponse", "Master shall interpret this fragment as an unsolicited response that was not prompted by an explicit request (value == 130)")?
+    let function = lib.define_enum("function_code")?
+        .push("confirm", "Master sends this to an outstation to confirm the receipt of an Application Layer fragment (value == 0)")?
+        .push("read", "Outstation shall return the data specified by the objects in the request (value == 1)")?
+        .push("write", "Outstation shall store the data specified by the objects in the request (value == 2)")?
+        .push("select", "Outstation shall select (or arm) the output points specified by the objects in the request in preparation for a subsequent operate command (value == 3)")?
+        .push("operate", "Outstation shall activate the output points selected (or armed) by a previous select function code command (value == 4)")?
+        .push("direct_operate", "Outstation shall immediately actuate the output points specified by the objects in the request (value == 5)")?
+        .push("direct_operate_no_response", "Same as DirectOperate but outstation shall not send a response (value == 6)")?
+        .push("immediate_freeze", "Outstation shall copy the point data values specified by the objects in the request to a separate freeze buffer (value == 7)")?
+        .push("immediate_freeze_no_response", "Same as ImmediateFreeze but outstation shall not send a response (value == 8)")?
+        .push("freeze_clear", "Outstation shall copy the point data values specified by the objects in the request into a separate freeze buffer and then clear the values (value == 9)")?
+        .push("freeze_clear_no_response", "Same as FreezeClear but outstation shall not send a response (value == 10)")?
+        .push("freeze_at_time", "Outstation shall copy the point data values specified by the objects in the request to a separate freeze buffer at the time and/or time intervals specified in a special time data information object (value == 11)")?
+        .push("freeze_at_time_no_response", "Same as FreezeAtTime but outstation shall not send a response (value == 12)")?
+        .push("cold_restart", "Outstation shall perform a complete reset of all hardware and software in the device (value == 13)")?
+        .push("warm_restart", "Outstation shall reset only portions of the device (value == 14)")?
+        .push("initialize_data", "Obsolete-Do not use for new designs (value == 15)")?
+        .push("initialize_application", "Outstation shall place the applications specified by the objects in the request into the ready to run state (value == 16)")?
+        .push("start_application", "Outstation shall start running the applications specified by the objects in the request (value == 17)")?
+        .push("stop_application", "Outstation shall stop running the applications specified by the objects in the request (value == 18)")?
+        .push("save_configuration", "This code is deprecated-Do not use for new designs (value == 19)")?
+        .push("enable_unsolicited", "Enables outstation to initiate unsolicited responses from points specified by the objects in the request (value == 20)")?
+        .push("disable_unsolicited", "Prevents outstation from initiating unsolicited responses from points specified by the objects in the request (value == 21)")?
+        .push("assign_class", "Outstation shall assign the events generated by the points specified by the objects in the request to one of the classes (value == 22)")?
+        .push("delay_measure", "Outstation shall report the time it takes to process and initiate the transmission of its response (value == 23)")?
+        .push("record_current_time", "Outstation shall save the time when the last octet of this message is received (value == 24)")?
+        .push("open_file", "Outstation shall open a file (value == 25)")?
+        .push("close_file", "Outstation shall close a file (value == 26)")?
+        .push("delete_file", "Outstation shall delete a file (value == 27)")?
+        .push("get_file_info", "Outstation shall retrieve information about a file (value == 28)")?
+        .push("authenticate_file", "Outstation shall return a file authentication key (value == 29)")?
+        .push("abort_file", "Outstation shall abort a file transfer operation (value == 30)")?
+        .push("response", "Master shall interpret this fragment as an Application Layer response to an ApplicationLayer request (value == 129)")?
+        .push("unsolicited_response", "Master shall interpret this fragment as an unsolicited response that was not prompted by an explicit request (value == 130)")?
         .doc("Application layer function code")?
         .build()?;
 
@@ -977,28 +979,28 @@ fn define_function_code(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
 }
 
 fn define_command_status(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
-    let command_status = lib.define_enum("CommandStatus")?
-    .push("Success", "command was accepted, initiated, or queued (value == 0)")?
-    .push("Timeout", "command timed out before completing (value == 1)")?
-    .push("NoSelect", "command requires being selected before operate, configuration issue (value == 2)")?
-    .push("FormatError", "bad control code or timing values (value == 3)")?
-    .push("NotSupported", "command is not implemented (value == 4)")?
-    .push("AlreadyActive", "command is all ready in progress or its all ready in that mode (value == 5)")?
-    .push("HardwareError", "something is stopping the command, often a local/remote interlock (value == 6)")?
-    .push("Local", "the function governed by the control is in local only control (value == 7)")?
-    .push("TooManyOps", "the command has been done too often and has been throttled (value == 8)")?
-    .push("NotAuthorized", "the command was rejected because the device denied it or an RTU intercepted it (value == 9)")?
-    .push("AutomationInhibit", "command not accepted because it was prevented or inhibited by a local automation process, such as interlocking logic or synchrocheck (value == 10)")?
-    .push("ProcessingLimited", "command not accepted because the device cannot process any more activities than are presently in progress (value == 11)")?
-    .push("OutOfRange", "command not accepted because the value is outside the acceptable range permitted for this point (value == 12)")?
-    .push("DownstreamLocal", "command not accepted because the outstation is forwarding the request to another downstream device which reported LOCAL (value == 13)")?
-    .push("AlreadyComplete", "command not accepted because the outstation has already completed the requested operation (value == 14)")?
-    .push("Blocked", "command not accepted because the requested function is specifically blocked at the outstation (value == 15)")?
-    .push("Canceled", "command not accepted because the operation was cancelled (value == 16)")?
-    .push("BlockedOtherMaster", "command not accepted because another master is communicating with the outstation and has exclusive rights to operate this control point (value == 17)")?
-    .push("DownstreamFail", "command not accepted because the outstation is forwarding the request to another downstream device which cannot be reached or is otherwise incapable of performing the request (value == 18)")?
-    .push("NonParticipating", "(deprecated) indicates the outstation shall not issue or perform the control operation (value == 126)")?
-    .push("Unknown", "aptures any value not defined in the enumeration")?
+    let command_status = lib.define_enum("command_status")?
+    .push("success", "command was accepted, initiated, or queued (value == 0)")?
+    .push("timeout", "command timed out before completing (value == 1)")?
+    .push("no_select", "command requires being selected before operate, configuration issue (value == 2)")?
+    .push("format_error", "bad control code or timing values (value == 3)")?
+    .push("not_supported", "command is not implemented (value == 4)")?
+    .push("already_active", "command is all ready in progress or its all ready in that mode (value == 5)")?
+    .push("hardware_error", "something is stopping the command, often a local/remote interlock (value == 6)")?
+    .push("local", "the function governed by the control is in local only control (value == 7)")?
+    .push("too_many_ops", "the command has been done too often and has been throttled (value == 8)")?
+    .push("not_authorized", "the command was rejected because the device denied it or an RTU intercepted it (value == 9)")?
+    .push("automation_inhibit", "command not accepted because it was prevented or inhibited by a local automation process, such as interlocking logic or synchrocheck (value == 10)")?
+    .push("processing_limited", "command not accepted because the device cannot process any more activities than are presently in progress (value == 11)")?
+    .push("out_of_range", "command not accepted because the value is outside the acceptable range permitted for this point (value == 12)")?
+    .push("downstream_local", "command not accepted because the outstation is forwarding the request to another downstream device which reported LOCAL (value == 13)")?
+    .push("already_complete", "command not accepted because the outstation has already completed the requested operation (value == 14)")?
+    .push("blocked", "command not accepted because the requested function is specifically blocked at the outstation (value == 15)")?
+    .push("canceled", "command not accepted because the operation was cancelled (value == 16)")?
+    .push("blocked_other_master", "command not accepted because another master is communicating with the outstation and has exclusive rights to operate this control point (value == 17)")?
+    .push("downstream_fail", "command not accepted because the outstation is forwarding the request to another downstream device which cannot be reached or is otherwise incapable of performing the request (value == 18)")?
+    .push("non_participating", "(deprecated) indicates the outstation shall not issue or perform the control operation (value == 126)")?
+    .push("unknown", "captures any value not defined in the enumeration")?
     .doc("Enumeration received from an outstation in response to command request")?
     .build()?;
 

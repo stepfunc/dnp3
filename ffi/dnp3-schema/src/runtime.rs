@@ -8,7 +8,7 @@ use oo_bindgen::*;
 fn define_runtime_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let num_core_threads = Name::create("num_core_threads")?;
 
-    let config_struct = lib.declare_function_arg_struct("RuntimeConfig")?;
+    let config_struct = lib.declare_function_arg_struct("runtime_config")?;
     let config_struct= lib
         .define_function_argument_struct(config_struct)?
         .add(
@@ -32,7 +32,7 @@ pub fn define(
     error_type: ErrorType,
 ) -> BackTraced<ClassDeclarationHandle> {
     // Forward declare the class
-    let runtime_class = lib.declare_class("Runtime")?;
+    let runtime_class = lib.declare_class("runtime")?;
 
     let config_struct = define_runtime_config(lib)?;
 
@@ -70,7 +70,7 @@ pub fn define(
         .define_class(&runtime_class)?
         .constructor(&new_fn)?
         .destructor(&destroy_fn)?
-        .custom_destroy("Shutdown")?
+        .custom_destroy("shutdown")?
         .doc("Handle to the underlying runtime")?
         .build()?;
 

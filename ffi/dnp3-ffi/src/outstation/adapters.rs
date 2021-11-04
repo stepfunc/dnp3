@@ -77,7 +77,7 @@ impl From<ffi::RestartDelay> for Option<RestartDelay> {
         match from.restart_type() {
             ffi::RestartDelayType::NotSupported => None,
             ffi::RestartDelayType::Seconds => Some(RestartDelay::Seconds(from.value())),
-            ffi::RestartDelayType::Milliseconds => Some(RestartDelay::Milliseconds(from.value())),
+            ffi::RestartDelayType::MilliSeconds => Some(RestartDelay::Milliseconds(from.value())),
         }
     }
 }
@@ -400,9 +400,9 @@ impl From<FunctionCode> for ffi::FunctionCode {
     }
 }
 
-impl From<Group12Var1> for ffi::G12v1 {
+impl From<Group12Var1> for ffi::Group12Var1 {
     fn from(from: Group12Var1) -> Self {
-        ffi::G12v1Fields {
+        ffi::Group12Var1Fields {
             code: from.code.into(),
             count: from.count,
             on_time: from.on_time,

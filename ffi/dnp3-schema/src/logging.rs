@@ -54,7 +54,7 @@ fn define_logging_config_struct(
     lib: &mut LibraryBuilder,
     log_level_enum: EnumHandle,
 ) -> BackTraced<FunctionArgStructHandle> {
-    let logging_config_struct = lib.declare_function_arg_struct("LoggingConfig")?;
+    let logging_config_struct = lib.declare_function_arg_struct("logging_config")?;
 
     let log_output_format_enum = define_log_output_format_enum(lib)?;
     let time_format_enum = define_time_format_enum(lib)?;
@@ -91,9 +91,9 @@ fn define_logging_config_struct(
             ConstructorType::Normal,
             "Initialize the configuration to default values",
         )?
-        .default(&level, "Info".default_variant())?
-        .default(&output_format, "Text".default_variant())?
-        .default(&time_format, "System".default_variant())?
+        .default(&level, "info".default_variant())?
+        .default(&output_format, "text".default_variant())?
+        .default(&time_format, "system".default_variant())?
         .default(&print_level, true)?
         .default(&print_module_info, false)?
         .end_constructor()?

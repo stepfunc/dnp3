@@ -13,6 +13,10 @@ mod runtime;
 mod shared;
 mod variation;
 
+pub(crate) fn gv(g: u8, v: u8) -> String {
+    format!("group{}_var{}", g, v)
+}
+
 pub fn build_lib() -> BackTraced<Library> {
     let info = LibraryInfo {
         description: "Safe and fast DNP3 library".to_string(),

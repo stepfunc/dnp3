@@ -5,7 +5,7 @@ use crate::shared::SharedDefinitions;
 use oo_bindgen::types::BasicType;
 
 pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<ClassHandle> {
-    let request = lib.declare_class("Request")?;
+    let request = lib.declare_class("request")?;
 
     let request_new_fn = lib
         .define_function("request_new")?
@@ -25,7 +25,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .doc(
             doc("Create a new request asking for classes")
-            .details("An identical request can be created manually with {class:Request.AddAllObjectsHeader()} and variations {enum:Variation.Group60Var1}, {enum:Variation.Group60Var2}, {enum:Variation.Group60Var3} and {enum:Variation.Group60Var4}.")
+            .details("An identical request can be created manually with {class:request.add_all_objects_header()} and variations {enum:variation.group60_var1}, {enum:variation.group60_var2}, {enum:variation.group60_var3} and {enum:variation.group60_var4}.")
         )?
         .build()?;
 
@@ -37,7 +37,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "Request to destroy",
         )?
         .returns_nothing()?
-        .doc("Destroy a request created with {class:Request.[constructor]} or {class:Request.ClassRequest()}.")?
+        .doc("Destroy a request created with {class:request.[constructor]} or {class:request.class_request()}.")?
         .build()?;
 
     let request_add_one_byte_header_fn = lib
@@ -84,10 +84,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .define_class(&request)?
         .constructor(&request_new_fn)?
         .destructor(&request_destroy_fn)?
-        .static_method("ClassRequest", &request_new_class_fn)?
-        .method("AddOneByteHeader", &request_add_one_byte_header_fn)?
-        .method("AddTwoByteHeader", &request_add_two_byte_header_fn)?
-        .method("AddAllObjectsHeader", &request_add_all_objects_header_fn)?
+        .static_method("class_request", &request_new_class_fn)?
+        .method("add_one_byte_header", &request_add_one_byte_header_fn)?
+        .method("add_two_byte_header", &request_add_two_byte_header_fn)?
+        .method("add_all_objects_header", &request_add_all_objects_header_fn)?
         .doc(
             doc("Custom request")
             .details("Whenever a method takes a request as a parameter, the request is internally copied. Therefore, it is possible to reuse the same requests over and over.")

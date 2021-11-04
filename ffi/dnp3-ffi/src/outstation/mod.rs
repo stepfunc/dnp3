@@ -159,7 +159,7 @@ pub unsafe fn outstation_create_serial_session(
     Ok(Box::into_raw(handle))
 }
 
-pub unsafe fn outstation_transaction(
+pub unsafe fn outstation_execute_transaction(
     outstation: *mut Outstation,
     callback: ffi::OutstationTransaction,
 ) {

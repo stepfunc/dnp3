@@ -76,7 +76,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Create a master channel on the specified serial port")
-                .details("The returned master must be gracefully shutdown with {class:MasterChannel.[destructor]} when done.")
+                .details("The returned master must be gracefully shutdown with {class:master_channel.[destructor]} when done.")
         )?
         .build()?;
 
@@ -85,10 +85,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} to destroy",
+            "{class:master_channel} to destroy",
         )?
         .returns_nothing()?
-        .doc("Shutdown a {class:MasterChannel} and release all resources")?
+        .doc("Shutdown a {class:master_channel} and release all resources")?
         .build()?;
 
     let enable_fn = lib
@@ -96,7 +96,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} to enable",
+            "{class:master_channel} to enable",
         )?
         .returns_nothing()?
         .fails_with(shared.error_type.clone())?
@@ -108,7 +108,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} to disable",
+            "{class:master_channel} to disable",
         )?
         .returns_nothing()?
         .fails_with(shared.error_type.clone())?
@@ -129,7 +129,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} on which the association will be created",
+            "{class:master_channel} on which the association will be created",
         )?
         .param(
             "address",
@@ -157,7 +157,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} on which to apply the operation",
+            "{class:master_channel} on which to apply the operation",
         )?
         .param("id", association_id.clone(), "Id of the association")?
         .returns_nothing()?
@@ -169,7 +169,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} on which to apply the operation",
+            "{class:master_channel} on which to apply the operation",
         )?
         .param("id", association_id.clone(), "Association on which to add the poll")?
         .param("request", request_class.declaration(), "Request to perform")?
@@ -201,7 +201,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
            master_channel_class.clone(),
-            "{class:MasterChannel} on which to apply the operation",
+            "{class:master_channel} on which to apply the operation",
         )?
         .param("poll_id", poll_id, "Id of the poll")?
         .returns_nothing()?
@@ -235,7 +235,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} on which to apply the operation",
+            "{class:master_channel} on which to apply the operation",
         )?
         .returns(shared.decode_level.clone(), "Decode level")?
         .fails_with(shared.error_type.clone())?
@@ -254,7 +254,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Perform a read on the association.")
-                .details("The callback will be called once the read is completely received, but the actual values will be sent to the {interface:ReadHandler} of the association.")
+                .details("The callback will be called once the read is completely received, but the actual values will be sent to the {interface:read_handler} of the association.")
         )?
         .build()?;
 
@@ -267,7 +267,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} on which to perform the operation",
+            "{class:master_channel} on which to perform the operation",
         )?
         .param(
             "association",
@@ -294,7 +294,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} on which to perform the operation",
+            "{class:master_channel} on which to perform the operation",
         )?
         .param(
             "association",
@@ -319,7 +319,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} on which to perform the operation",
+            "{class:master_channel} on which to perform the operation",
         )?
         .param(
             "association",
@@ -341,7 +341,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} on which to perform the operation",
+            "{class:master_channel} on which to perform the operation",
         )?
         .param(
             "association",
@@ -365,7 +365,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param(
             "channel",
             master_channel_class.clone(),
-            "{class:MasterChannel} on which to perform the operation",
+            "{class:master_channel} on which to perform the operation",
         )?
         .param("association", association_id, "Id of the association")?
         .param(
@@ -380,28 +380,28 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     lib.define_class(&master_channel_class)?
         .destructor(&destroy_fn)?
-        .static_method("CreateTCPChannel", &master_channel_create_tcp_fn)?
-        .static_method("CreateSerialChannel", &master_channel_create_serial_fn)?
-        .method("Enable", &enable_fn)?
-        .method("Disable", &disable_fn)?
-        .method("AddAssociation", &add_association_fn)?
-        .method("RemoveAssociation", &remove_association_fn)?
-        .method("SetDecodeLevel", &set_decode_level_fn)?
-        .method("GetDecodeLevel", &get_decode_level_fn)?
-        .method("AddPoll", &add_poll_fn)?
-        .method("RemovePoll", &remove_poll_fn)?
-        .method("DemandPoll", &demand_poll_fn)?
-        .async_method("Read", &read_fn)?
-        .async_method("Operate", &operate_fn)?
-        .async_method("SynchronizeTime", &perform_time_sync_fn)?
-        .async_method("ColdRestart", &cold_restart_fn)?
-        .async_method("WarmRestart", &warm_restart_fn)?
-        .async_method("CheckLinkStatus", &check_link_status_fn)?
-        .custom_destroy("Shutdown")?
+        .static_method("create_tcp_channel", &master_channel_create_tcp_fn)?
+        .static_method("create_serial_channel", &master_channel_create_serial_fn)?
+        .method("enable", &enable_fn)?
+        .method("disable", &disable_fn)?
+        .method("add_association", &add_association_fn)?
+        .method("remove_association", &remove_association_fn)?
+        .method("set_decode_level", &set_decode_level_fn)?
+        .method("get_decode_level", &get_decode_level_fn)?
+        .method("add_poll", &add_poll_fn)?
+        .method("remove_poll", &remove_poll_fn)?
+        .method("demand_poll", &demand_poll_fn)?
+        .async_method("read", &read_fn)?
+        .async_method("operate", &operate_fn)?
+        .async_method("synchronize_time", &perform_time_sync_fn)?
+        .async_method("cold_restart", &cold_restart_fn)?
+        .async_method("warm_restart", &warm_restart_fn)?
+        .async_method("check_link_status", &check_link_status_fn)?
+        .custom_destroy("shutdown")?
         .doc(
             doc("Represents a communication channel for a master station")
-            .details("To communicate with a particular outstation, you need to add an association with {class:MasterChannel.AddAssociation()}.")
-            .warning("The class methods that return a value (e.g. as {class:MasterChannel.AddAssociation()}) cannot be called from within a callback.")
+            .details("To communicate with a particular outstation, you need to add an association with {class:master_channel.add_association()}.")
+            .warning("The class methods that return a value (e.g. as {class:master_channel.add_association()}) cannot be called from within a callback.")
         )?
         .build()?;
 
@@ -413,7 +413,7 @@ fn define_connect_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgSt
     let max_connect_delay = Name::create("max_connect_delay")?;
     let reconnect_delay = Name::create("reconnect_delay")?;
 
-    let strategy = lib.declare_function_arg_struct("ConnectStrategy")?;
+    let strategy = lib.declare_function_arg_struct("connect_strategy")?;
     let strategy = lib
         .define_function_argument_struct(strategy)?
         .add(
@@ -448,7 +448,7 @@ fn define_connect_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgSt
 }
 
 fn define_association_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
-    let id = lib.declare_universal_struct("AssociationId")?;
+    let id = lib.declare_universal_struct("association_id")?;
     let id = lib
         .define_opaque_struct(id)?
         .add(
@@ -464,7 +464,7 @@ fn define_association_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStruct
 }
 
 fn define_poll_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
-    let id = lib.declare_universal_struct("PollId")?;
+    let id = lib.declare_universal_struct("poll_id")?;
     let id = lib
         .define_opaque_struct(id)?
         .add(
@@ -486,14 +486,14 @@ fn define_poll_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle>
 
 fn define_read_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let read_result = lib
-        .define_enum("ReadResult")?
-        .push("Success", "Read was perform successfully")?
+        .define_enum("read_result")?
+        .push("success", "Read was perform successfully")?
         .add_task_errors()?
         .doc("Result of a read operation")?
         .build()?;
 
     let callback = lib
-        .define_asynchronous_interface("ReadTaskCallback", "Handler for read tasks")?
+        .define_asynchronous_interface("read_task_callback", "Handler for read tasks")?
         .begin_callback(
             "on_complete",
             "Called when the read task reached completion or failed",
@@ -514,14 +514,14 @@ fn define_association_config(
     let classes = define_classes(lib)?;
 
     let auto_time_sync_enum = lib
-        .define_enum("AutoTimeSync")?
-        .push("None", "Do not perform automatic time sync")?
+        .define_enum("auto_time_sync")?
+        .push("none", "Do not perform automatic time sync")?
         .push(
-            "Lan",
+            "lan",
             "Perform automatic time sync with Record Current Time (0x18) function code",
         )?
         .push(
-            "NonLan",
+            "non_lan",
             "Perform automatic time sync with Delay Measurement (0x17) function code",
         )?
         .doc("Automatic time synchronization configuration")?
@@ -533,7 +533,7 @@ fn define_association_config(
     let auto_integrity_scan_on_buffer_overflow =
         Name::create("auto_integrity_scan_on_buffer_overflow")?;
     let max_queued_user_requests = Name::create("max_queued_user_requests")?;
-    let association_config = lib.declare_function_arg_struct("AssociationConfig")?;
+    let association_config = lib.declare_function_arg_struct("association_config")?;
 
     let association_config = lib
         .define_function_argument_struct(association_config)?
@@ -581,7 +581,7 @@ fn define_association_config(
         )?
         .end_fields()?
         .begin_constructor("init", ConstructorType::Normal, "Initialize the configuration with the specified values")?
-        .default(&auto_time_sync, ConstructorDefault::Enum("None".to_string()))?
+        .default(&auto_time_sync, ConstructorDefault::Enum("none".to_string()))?
         .default_struct(&auto_tasks_retry_strategy)?
         .default(&keep_alive_timeout, Duration::from_secs(60))?
         .default(&auto_integrity_scan_on_buffer_overflow, true)?
@@ -594,31 +594,31 @@ fn define_association_config(
 
 fn define_tcp_client_state_listener(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let client_state_enum = lib
-        .define_enum("ClientState")?
-        .push("Disabled", "Client is disabled and idle until disabled")?
+        .define_enum("client_state")?
+        .push("disabled", "Client is disabled and idle until disabled")?
         .push(
-            "Connecting",
+            "connecting",
             "Client is trying to establish a connection to the remote device",
         )?
-        .push("Connected", "Client is connected to the remote device")?
+        .push("connected", "Client is connected to the remote device")?
         .push(
-            "WaitAfterFailedConnect",
+            "wait_after_failed_connect",
             "Failed to establish a connection, waiting before retrying",
         )?
         .push(
-            "WaitAfterDisconnect",
+            "wait_after_disconnect",
             "Client was disconnected, waiting before retrying",
         )?
-        .push("Shutdown", "Client is shutting down")?
+        .push("shutdown", "Client is shutting down")?
         .doc(
             doc("State of the client connection.")
-                .details("Use by the {interface:ClientStateListener}."),
+                .details("Use by the {interface:client_state_listener}."),
         )?
         .build()?;
 
     let listener = lib
         .define_asynchronous_interface(
-            "ClientStateListener",
+            "client_state_listener",
             "Callback for monitoring the client TCP connection state",
         )?
         .begin_callback("on_change", "Called when the client state changed")?
@@ -634,7 +634,7 @@ fn define_master_channel_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> BackTraced<FunctionArgStructHandle> {
-    let config = lib.declare_function_arg_struct("MasterChannelConfig")?;
+    let config = lib.declare_function_arg_struct("master_channel_config")?;
 
     let decode_level = Name::create("decode_level")?;
     let response_timeout = Name::create("response_timeout")?;
@@ -644,7 +644,7 @@ fn define_master_channel_config(
     let config = lib.define_function_argument_struct(config)?
         .doc("Generic configuration for a MasterChannel")?
         .add("address", BasicType::U16, "Local DNP3 data-link address")?
-        .add(decode_level.clone(), shared.decode_level.clone(), "Decoding level for this master. You can modify this later on with {class:MasterChannel.SetDecodeLevel()}.")?
+        .add(decode_level.clone(), shared.decode_level.clone(), "Decoding level for this master. You can modify this later on with {class:master_channel.set_decode_level()}.")?
         .add(
             response_timeout.clone(),
             DurationType::Milliseconds,
@@ -653,7 +653,7 @@ fn define_master_channel_config(
         .add(tx_buffer_size.clone(), BasicType::U16, doc("TX buffer size").details("Must be at least 249"))?
         .add(rx_buffer_size.clone(), BasicType::U16, doc("RX buffer size").details("Must be at least 2048"))?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize {struct:MasterChannelConfig} to default values")?
+        .begin_constructor("init", ConstructorType::Normal, "Initialize {struct:master_channel_config} to default values")?
         .default_struct(&decode_level)?
         .default(&response_timeout, Duration::from_secs(5))?
         .default(&tx_buffer_size, Number::U16(2048))?
@@ -665,7 +665,7 @@ fn define_master_channel_config(
 }
 
 fn define_endpoint_list(lib: &mut LibraryBuilder) -> BackTraced<ClassHandle> {
-    let endpoint_list_class = lib.declare_class("EndpointList")?;
+    let endpoint_list_class = lib.declare_class("endpoint_list")?;
 
     let endpoint_list_new = lib.define_function("endpoint_list_new")?
         .param("main_endpoint", StringType, "Main endpoint")?
@@ -694,7 +694,7 @@ fn define_endpoint_list(lib: &mut LibraryBuilder) -> BackTraced<ClassHandle> {
     let endpoint_list_class = lib.define_class(&endpoint_list_class)?
         .constructor(&endpoint_list_new)?
         .destructor(&endpoint_list_destroy)?
-        .method("Add", &endpoint_list_add)?
+        .method("add", &endpoint_list_add)?
         .doc(doc("List of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
         .build()?;
 
@@ -705,16 +705,16 @@ fn define_utc_timestamp(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
     let value = Name::create("value")?;
     let is_valid = Name::create("is_valid")?;
 
-    let timestamp_utc = lib.declare_universal_struct("TimestampUtc")?;
+    let timestamp_utc = lib.declare_universal_struct("utc_timestamp")?;
     let timestamp_utc = lib.define_universal_struct(timestamp_utc)?
         .add(&value, BasicType::U64, doc("Value of the timestamp (in milliseconds from UNIX Epoch).").warning("Only 48 bits are available for timestamps."))?
         .add(&is_valid, BasicType::Bool, "True if the timestamp is valid, false otherwise.")?
-        .doc(doc("Timestamp value returned by {interface:AssociationHandler.get_current_time()}.").details("{struct:TimestampUtc.value} is only valid if {struct:TimestampUtc.is_valid} is true."))?
+        .doc(doc("Timestamp value returned by {interface:association_handler.get_current_time()}.").details("{struct:utc_timestamp.value} is only valid if {struct:utc_timestamp.is_valid} is true."))?
         .end_fields()?
-        .begin_constructor("valid", ConstructorType::Static, "Constructor a valid {struct:TimestampUtc}")?
+        .begin_constructor("valid", ConstructorType::Static, "Construct a valid {struct:utc_timestamp}")?
         .default(&is_valid, true)?
         .end_constructor()?
-        .begin_constructor("invalid", ConstructorType::Static, "Constructor an invalid {struct:TimestampUtc}")?
+        .begin_constructor("invalid", ConstructorType::Static, "Construct an invalid {struct:utc_timestamp}")?
         .default(&is_valid, false)?
         .default(&value, Number::U64(0))?
         .end_constructor()?
@@ -727,7 +727,7 @@ fn define_association_handler(lib: &mut LibraryBuilder) -> BackTraced<InterfaceH
     let timestamp_utc = define_utc_timestamp(lib)?;
 
     let timestamp_utc = lib.define_asynchronous_interface(
-        "AssociationHandler",
+        "association_handler",
         "Callbacks for a particular outstation association",
     )?
     .begin_callback(
@@ -751,7 +751,7 @@ fn define_event_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
     let class2 = Name::create("class2")?;
     let class3 = Name::create("class3")?;
 
-    let event_classes = lib.declare_function_arg_struct("EventClasses")?;
+    let event_classes = lib.declare_function_arg_struct("event_classes")?;
     let event_classes = lib
         .define_function_argument_struct(event_classes)?
         .add(&class1, BasicType::Bool, "Class 1 events")?
@@ -789,7 +789,7 @@ fn define_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandl
     let class2 = Name::create("class2")?;
     let class3 = Name::create("class3")?;
 
-    let classes = lib.declare_function_arg_struct("Classes")?;
+    let classes = lib.declare_function_arg_struct("classes")?;
     let classes = lib
         .define_function_argument_struct(classes)?
         .add(&class0, BasicType::Bool, "Class 0 (static data)")?
@@ -826,10 +826,10 @@ fn define_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandl
 
 fn define_command_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let mode = lib
-        .define_enum("CommandMode")?
-        .push("DirectOperate", "Perform a Direct Operate (0x05)")?
+        .define_enum("command_mode")?
+        .push("direct_operate", "Perform a Direct Operate (0x05)")?
         .push(
-            "SelectBeforeOperate",
+            "select_before_operate",
             "Perform a Select and Operate (0x03 then 0x04)",
         )?
         .doc("Command operation mode")?
@@ -845,22 +845,22 @@ trait TaskErrors: Sized {
 impl TaskErrors for EnumBuilder<'_> {
     fn add_task_errors(self) -> BackTraced<Self> {
         let builder = self
-            .push("TooManyRequests", "too many user requests queued")?
+            .push("too_many_requests", "too many user requests queued")?
             .push(
-                "BadResponse",
+                "bad_response",
                 "response was malformed or contained object headers",
             )?
             .push(
-                "ResponseTimeout",
+                "response_timeout",
                 "timeout occurred before receiving a response",
             )?
             .push(
-                "WriteError",
+                "write_error",
                 "insufficient buffer space to serialize the request",
             )?
-            .push("NoConnection", "no connection")?
-            .push("Shutdown", "master was shutdown")?
-            .push("AssociationRemoved", "association was removed mid-task")?;
+            .push("no_connection", "no connection")?
+            .push("shutdown", "master was shutdown")?
+            .push("association_removed", "association was removed mid-task")?;
 
         Ok(builder)
     }
@@ -868,14 +868,14 @@ impl TaskErrors for EnumBuilder<'_> {
 
 fn define_command_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let command_result = lib
-        .define_enum("CommandResult")?
-        .push("Success", "Command was a success")?
+        .define_enum("command_result")?
+        .push("success", "Command was a success")?
         .push(
-            "BadStatus",
+            "bad_status",
             "Outstation indicated that a command was not SUCCESS",
         )?
         .push(
-            "HeaderMismatch",
+            "header_mismatch",
             "Number of headers or objects in the response didn't match the number in the request",
         )?
         .add_task_errors()?
@@ -883,7 +883,7 @@ fn define_command_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHand
         .build()?;
 
     let callback = lib
-        .define_asynchronous_interface("CommandTaskCallback", "Handler for command tasks")?
+        .define_asynchronous_interface("command_task_callback", "Handler for command tasks")?
         .begin_callback(
             "on_complete",
             "Called when the command task reached completion or failed",
@@ -900,7 +900,7 @@ fn define_command_builder(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> BackTraced<ClassHandle> {
-    let command = lib.declare_class("Commands")?;
+    let command = lib.declare_class("commands")?;
 
     let command_new_fn = lib
         .define_function("commands_new")?
@@ -1076,17 +1076,17 @@ fn define_command_builder(
         .define_class(&command)?
         .constructor(&command_new_fn)?
         .destructor(&command_destroy_fn)?
-        .method("AddG12V1U8", &command_add_u8_g12v1_fn)?
-        .method("AddG12V1U16", &command_add_u16_g12v1_fn)?
-        .method("AddG41V1U8", &command_add_u8_g41v1_fn)?
-        .method("AddG41V1U16", &command_add_u16_g41v1_fn)?
-        .method("AddG41V2U8", &command_add_u8_g41v2_fn)?
-        .method("AddG41V2U16", &command_add_u16_g41v2_fn)?
-        .method("AddG41V3U8", &command_add_u8_g41v3_fn)?
-        .method("AddG41V3U16", &command_add_u16_g41v3_fn)?
-        .method("AddG41V4U8", &command_add_u8_g41v4_fn)?
-        .method("AddG41V4U16", &command_add_u16_g41v4_fn)?
-        .method("FinishHeader", &command_finish_header_fn)?
+        .method("add_g12_v1_u8", &command_add_u8_g12v1_fn)?
+        .method("add_g12_v1_u16", &command_add_u16_g12v1_fn)?
+        .method("add_g41_v1_u8", &command_add_u8_g41v1_fn)?
+        .method("add_g41_v1_u16", &command_add_u16_g41v1_fn)?
+        .method("add_g41_v2_u8", &command_add_u8_g41v2_fn)?
+        .method("add_g41_v2_u16", &command_add_u16_g41v2_fn)?
+        .method("add_g41_v3_u8", &command_add_u8_g41v3_fn)?
+        .method("add_g41_v3_u16", &command_add_u16_g41v3_fn)?
+        .method("add_g41_v4_u8", &command_add_u8_g41v4_fn)?
+        .method("add_g41_v4_u16", &command_add_u16_g41v4_fn)?
+        .method("finish_header", &command_finish_header_fn)?
         .doc("Builder type used to construct command requests")?
         .build()?;
 
@@ -1095,31 +1095,31 @@ fn define_command_builder(
 
 fn define_time_sync_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let timesync_result = lib
-        .define_enum("TimeSyncResult")?
-        .push("Success", "Time synchronization operation was a success")?
-        .push("ClockRollback", "Detected a clock rollback")?
+        .define_enum("time_sync_result")?
+        .push("success", "Time synchronization operation was a success")?
+        .push("clock_rollback", "Detected a clock rollback")?
         .push(
-            "SystemTimeNotUnix",
+            "system_time_not_unix",
             "The system time cannot be converted to a Unix timestamp",
         )?
         .push(
-            "BadOutstationTimeDelay",
+            "bad_outstation_time_delay",
             "Outstation time delay exceeded the response delay",
         )?
-        .push("Overflow", "Overflow in calculation")?
+        .push("overflow", "Overflow in calculation")?
         .push(
-            "StillNeedsTime",
+            "still_needs_time",
             "Outstation did not clear the NEED_TIME IIN bit",
         )?
-        .push("SystemTimeNotAvailable", "System time not available")?
-        .push("IinError", "Outstation indicated an error")?
+        .push("system_time_not_available", "System time not available")?
+        .push("iin_error", "Outstation indicated an error")?
         .add_task_errors()?
         .doc("Result of a time sync operation")?
         .build()?;
 
     let callback = lib
         .define_asynchronous_interface(
-            "TimeSyncTaskCallback",
+            "time_sync_task_callback",
             "Handler for time synchronization tasks",
         )?
         .begin_callback(
@@ -1140,13 +1140,13 @@ fn define_time_sync_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHa
 
 fn define_time_sync_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let mode = lib
-        .define_enum("TimeSyncMode")?
+        .define_enum("time_sync_mode")?
         .push(
-            "Lan",
+            "lan",
             "Perform a LAN time sync with Record Current Time (0x18) function code",
         )?
         .push(
-            "NonLan",
+            "non_lan",
             "Perform a non-LAN time sync with Delay Measurement (0x17) function code",
         )?
         .doc("Time synchronization mode")?
@@ -1157,23 +1157,23 @@ fn define_time_sync_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
 
 fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let restart_error = lib
-        .define_enum("RestartError")?
-        .push("Ok", "Restart was perform successfully")?
+        .define_enum("restart_error")?
+        .push("ok", "Restart was perform successfully")?
         .add_task_errors()?
         .doc("Result of a restart operation")?
         .build()?;
 
-    let restart_result = lib.declare_callback_arg_struct("RestartResult")?;
+    let restart_result = lib.declare_callback_arg_struct("restart_result")?;
     let restart_result = lib.define_callback_argument_struct(restart_result)?
         .add("error", restart_error, "Success/failure of the restart task")?
-        .add("delay", DurationType::Milliseconds, "Delay value returned by the outstation. Valid only if {struct:RestartResult.error} is {enum:RestartError.Ok}.")?
+        .add("delay", DurationType::Milliseconds, "Delay value returned by the outstation. Valid only if {struct:restart_result.error} is {enum:restart_error.ok}.")?
         .doc("Result of a restart task")?
         .end_fields()?
         .add_full_constructor("init")?
         .build()?;
 
     let callback = lib
-        .define_asynchronous_interface("RestartTaskCallback", "Handler for restart tasks")?
+        .define_asynchronous_interface("restart_task_callback", "Handler for restart tasks")?
         .begin_callback(
             "on_complete",
             "Called when the restart task reached completion or failed",
@@ -1188,24 +1188,24 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHand
 
 fn define_link_status_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
     let link_status_enum = lib
-        .define_enum("LinkStatusResult")?
+        .define_enum("link_status_result")?
         .push(
-            "Success",
+            "success",
             "The outstation responded with a valid LINK_STATUS",
         )?
         .push(
-            "UnexpectedResponse",
+            "unexpected_response",
             "There was activity on the link, but it wasn't a LINK_STATUS",
         )?
         .push(
-            "TaskError",
+            "task_error",
             "The task failed for some reason (e.g. the master was shutdown)",
         )?
-        .doc("Result of a link status check. See {class:MasterChannel.CheckLinkStatus()}")?
+        .doc("Result of a link status check. See {class:master_channel.check_link_status()}")?
         .build()?;
 
     let callback = lib
-        .define_asynchronous_interface("LinkStatusCallback", "Handler for link status check")?
+        .define_asynchronous_interface("link_status_callback", "Handler for link status check")?
         .begin_callback("on_complete", "Called when a link status is received")?
         .param("result", link_status_enum, "Result of the link status")?
         .returns_nothing()?

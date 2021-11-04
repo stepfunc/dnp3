@@ -25,8 +25,8 @@ impl From<ffi::ControlCode> for ControlCode {
     }
 }
 
-impl From<ffi::G12v1> for Group12Var1 {
-    fn from(x: ffi::G12v1) -> Self {
+impl From<ffi::Group12Var1> for Group12Var1 {
+    fn from(x: ffi::Group12Var1) -> Self {
         Group12Var1::new(x.code.into(), x.count, x.on_time, x.off_time)
     }
 }
@@ -50,13 +50,13 @@ pub unsafe fn commands_finish_header(commands: *mut crate::Commands) {
     }
 }
 
-pub unsafe fn commands_add_g12v1_u8(commands: *mut Commands, idx: u8, value: ffi::G12v1) {
+pub unsafe fn commands_add_g12v1_u8(commands: *mut Commands, idx: u8, value: ffi::Group12Var1) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group12Var1>::add_u8(commands, value.into(), idx);
     }
 }
 
-pub unsafe fn commands_add_g12v1_u16(commands: *mut Commands, idx: u16, value: ffi::G12v1) {
+pub unsafe fn commands_add_g12v1_u16(commands: *mut Commands, idx: u16, value: ffi::Group12Var1) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group12Var1>::add_u16(commands, value.into(), idx);
     }

@@ -207,30 +207,35 @@ macro_rules! implement_iterator {
     };
 }
 
-implement_iterator!(BinaryIterator, binary_next, Binary, ffi::Binary);
+implement_iterator!(BinaryIterator, binary_iterator_next, Binary, ffi::Binary);
 implement_iterator!(
     DoubleBitBinaryIterator,
-    doublebitbinary_next,
+    double_bit_binary_iterator_next,
     DoubleBitBinary,
     ffi::DoubleBitBinary
 );
 implement_iterator!(
     BinaryOutputStatusIterator,
-    binaryoutputstatus_next,
+    binary_output_status_iterator_next,
     BinaryOutputStatus,
     ffi::BinaryOutputStatus
 );
-implement_iterator!(CounterIterator, counter_next, Counter, ffi::Counter);
+implement_iterator!(
+    CounterIterator,
+    counter_iterator_next,
+    Counter,
+    ffi::Counter
+);
 implement_iterator!(
     FrozenCounterIterator,
-    frozencounter_next,
+    frozen_counter_iterator_next,
     FrozenCounter,
     ffi::FrozenCounter
 );
-implement_iterator!(AnalogIterator, analog_next, Analog, ffi::Analog);
+implement_iterator!(AnalogIterator, analog_iterator_next, Analog, ffi::Analog);
 implement_iterator!(
     AnalogOutputStatusIterator,
-    analogoutputstatus_next,
+    analog_output_status_iterator_next,
     AnalogOutputStatus,
     ffi::AnalogOutputStatus
 );
@@ -345,7 +350,9 @@ impl<'a> OctetStringIterator<'a> {
     }
 }
 
-pub unsafe fn octetstring_next(it: *mut OctetStringIterator) -> Option<&ffi::OctetString> {
+pub unsafe fn octet_string_iterator_next(
+    it: *mut OctetStringIterator,
+) -> Option<&ffi::OctetString> {
     let it = it.as_mut();
     it.map(|it| {
         it.next();
@@ -365,7 +372,7 @@ impl<'a> ffi::OctetString<'a> {
 
 pub struct ByteIterator<'a> {
     inner: std::slice::Iter<'a, u8>,
-    next: Option<ffi::Byte>,
+    next: Option<ffi::ByteValue>,
 }
 
 impl<'a> ByteIterator<'a> {
@@ -377,11 +384,11 @@ impl<'a> ByteIterator<'a> {
     }
 
     fn next(&mut self) {
-        self.next = self.inner.next().map(|value| ffi::Byte::new(*value))
+        self.next = self.inner.next().map(|value| ffi::ByteValue::new(*value))
     }
 }
 
-pub unsafe fn byte_next(it: *mut ByteIterator) -> Option<&ffi::Byte> {
+pub unsafe fn byte_iterator_next(it: *mut ByteIterator) -> Option<&ffi::ByteValue> {
     let it = it.as_mut();
     it.map(|it| {
         it.next();
@@ -390,7 +397,7 @@ pub unsafe fn byte_next(it: *mut ByteIterator) -> Option<&ffi::Byte> {
     .flatten()
 }
 
-impl ffi::Byte {
+impl ffi::ByteValue {
     fn new(value: u8) -> Self {
         Self { value }
     }
@@ -410,9 +417,9 @@ impl From<Option<Time>> for ffi::Timestamp {
                 None => 0,
             },
             quality: match time {
-                Some(Time::Synchronized(_)) => ffi::TimeQuality::Synchronized,
-                Some(Time::Unsynchronized(_)) => ffi::TimeQuality::Unsynchronized,
-                None => ffi::TimeQuality::Invalid,
+                Some(Time::Synchronized(_)) => ffi::TimeQuality::SynchronizedTime,
+                Some(Time::Unsynchronized(_)) => ffi::TimeQuality::UnsynchronizedTime,
+                None => ffi::TimeQuality::InvalidTime,
             },
         }
         .into()

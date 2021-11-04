@@ -11,15 +11,15 @@ pub fn define(
     shared_def: &SharedDefinitions,
 ) -> BackTraced<InterfaceHandle> {
     let response_function = lib
-        .define_enum("ResponseFunction")?
-        .push("Response", "Solicited response")?
-        .push("UnsolicitedResponse", "Unsolicited response")?
+        .define_enum("response_function")?
+        .push("response", "Solicited response")?
+        .push("unsolicited_response", "Unsolicited response")?
         .doc("Type of response")?
         .build()?;
 
     let iin = declare_iin_struct(lib)?;
 
-    let response_header = lib.declare_callback_arg_struct("ResponseHeader")?;
+    let response_header = lib.declare_callback_arg_struct("response_header")?;
     let response_header = lib
         .define_callback_argument_struct(response_header)?
         .add(
@@ -35,19 +35,19 @@ pub fn define(
         .build()?;
 
     let qualifier_code_enum = lib
-        .define_enum("QualifierCode")?
-        .push("Range8", "8-bit start stop (0x00)")?
-        .push("Range16", "16-bit start stop (0x01)")?
-        .push("AllObjects", "All objects (0x06)")?
-        .push("Count8", "8-bit count (0x07)")?
-        .push("Count16", "16-bit count (0x08)")?
-        .push("CountAndPrefix8", "8-bit count and prefix (0x17)")?
-        .push("CountAndPrefix16", "16-bit count and prefix (0x28)")?
-        .push("FreeFormat16", "16-bit free format (0x5B)")?
+        .define_enum("qualifier_code")?
+        .push("range8", "8-bit start stop (0x00)")?
+        .push("range16", "16-bit start stop (0x01)")?
+        .push("all_objects", "All objects (0x06)")?
+        .push("count8", "8-bit count (0x07)")?
+        .push("count16", "16-bit count (0x08)")?
+        .push("count_and_prefix_8", "8-bit count and prefix (0x17)")?
+        .push("count_and_prefix_16", "16-bit count and prefix (0x28)")?
+        .push("free_format_16", "16-bit free format (0x5B)")?
         .doc("Qualifier code used in the response")?
         .build()?;
 
-    let header_info = lib.declare_callback_arg_struct("HeaderInfo")?;
+    let header_info = lib.declare_callback_arg_struct("header_info")?;
     let header_info = lib
         .define_callback_argument_struct(header_info)?
         .add(
@@ -69,7 +69,7 @@ pub fn define(
 
     let read_handler_interface = lib
         .define_asynchronous_interface(
-            "ReadHandler",
+            "read_handler",
             "General handler that will receive all values read from the outstation.",
         )?
         .begin_callback("begin_fragment", "Marks the beginning of a fragment")?
@@ -217,7 +217,7 @@ pub fn define(
 }
 
 fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructHandle> {
-    let iin1 = lib.declare_callback_arg_struct("IIN1")?;
+    let iin1 = lib.declare_callback_arg_struct("iin1")?;
     let iin1 = lib
         .define_callback_argument_struct(iin1)?
         .doc("First IIN byte")?
@@ -261,7 +261,7 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
         // TODO - constructor
         .build()?;
 
-    let iin2 = lib.declare_callback_arg_struct("IIN2")?;
+    let iin2 = lib.declare_callback_arg_struct("iin2")?;
     let iin2 = lib
         .define_callback_argument_struct(iin2)?
         .doc("Second IIN byte")?
@@ -277,7 +277,7 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
         // TODO - constructor
         .build()?;
 
-    let iin = lib.declare_callback_arg_struct("IIN")?;
+    let iin = lib.declare_callback_arg_struct("iin")?;
     let iin = lib
         .define_callback_argument_struct(iin)?
         .add("iin1", iin1, "First IIN byte")?
@@ -292,11 +292,11 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
 
 fn define_read_type_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let read_type = lib
-        .define_enum("ReadType")?
-        .push("StartupIntegrity", "Startup integrity poll")?
-        .push("Unsolicited", "Unsolicited message")?
-        .push("SinglePoll", "Single poll requested by the user")?
-        .push("PeriodicPoll", "Periodic poll configured by the user")?
+        .define_enum("read_type")?
+        .push("startup_integrity", "Startup integrity poll")?
+        .push("unsolicited", "Unsolicited message")?
+        .push("single_poll", "Single poll requested by the user")?
+        .push("periodic_poll", "Periodic poll configured by the user")?
         .doc("Describes the source of a read event")?
         .build()?;
 

@@ -442,22 +442,22 @@ fn convert_auto_time_sync(config: &ffi::AutoTimeSync) -> Option<TimeSyncProcedur
     }
 }
 
-pub fn timestamp_utc_valid(value: u64) -> ffi::TimestampUtc {
-    ffi::TimestampUtc {
+pub fn timestamp_utc_valid(value: u64) -> ffi::UtcTimestamp {
+    ffi::UtcTimestamp {
         value,
         is_valid: true,
     }
 }
 
-pub fn timestamp_utc_invalid() -> ffi::TimestampUtc {
-    ffi::TimestampUtc {
+pub fn timestamp_utc_invalid() -> ffi::UtcTimestamp {
+    ffi::UtcTimestamp {
         value: 0,
         is_valid: false,
     }
 }
 
-impl From<ffi::TimestampUtc> for Option<Timestamp> {
-    fn from(from: ffi::TimestampUtc) -> Self {
+impl From<ffi::UtcTimestamp> for Option<Timestamp> {
+    fn from(from: ffi::UtcTimestamp) -> Self {
         if from.is_valid {
             Some(Timestamp::new(from.value))
         } else {
