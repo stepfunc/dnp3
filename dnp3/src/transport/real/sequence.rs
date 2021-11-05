@@ -1,4 +1,4 @@
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub(crate) struct Sequence {
     value: u8,
 }
@@ -36,12 +36,6 @@ impl Sequence {
         let ret = self.value;
         self.value = Self::calc_next(ret);
         Self { value: ret }
-    }
-}
-
-impl Default for Sequence {
-    fn default() -> Self {
-        Self { value: 0 }
     }
 }
 
