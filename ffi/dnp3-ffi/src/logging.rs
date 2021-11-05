@@ -129,6 +129,18 @@ impl tracing::Subscriber for Adapter {
     fn exit(&self, span: &Id) {
         self.inner.exit(span)
     }
+
+    fn clone_span(&self, span: &Id) -> Id {
+        self.inner.clone_span(span)
+    }
+
+    fn try_close(&self, span: Id) -> bool {
+        self.inner.try_close(span)
+    }
+
+    fn current_span(&self) -> tracing_core::span::Current {
+        self.inner.current_span()
+    }
 }
 
 impl From<tracing::Level> for ffi::LogLevel {
