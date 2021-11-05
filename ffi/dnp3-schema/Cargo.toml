@@ -6,4 +6,4 @@ edition = "2018"
 
 [dependencies]
 dnp3 = { path = "../../dnp3" }
-oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.1.3" }
+oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.1.4" }
