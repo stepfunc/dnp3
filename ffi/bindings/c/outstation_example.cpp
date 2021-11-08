@@ -160,7 +160,7 @@ int main()
             db.add_octet_string(i, dnp3::EventClass::class1);
         }
     });
-    outstation.transaction(setup);
+    outstation.execute_transaction(setup);
 
     server.bind();
 

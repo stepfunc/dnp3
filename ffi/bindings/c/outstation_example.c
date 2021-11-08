@@ -327,7 +327,7 @@ int main()
 
     // ANCHOR: tcp_server_add_outstation
     dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
-    err = dnp3_tcpserver_add_outstation(server, config, get_event_buffer_config(), get_outstation_application(), get_outstation_information(),
+    err = dnp3_tcp_server_add_outstation(server, config, get_event_buffer_config(), get_outstation_application(), get_outstation_information(),
                                         get_control_handler(), get_connection_state_listener(), address_filter, &outstation);
     dnp3_address_filter_destroy(address_filter);
     // ANCHOR_END: tcp_server_add_outstation
@@ -348,7 +348,7 @@ int main()
 
     // Start the outstation
     // ANCHOR: tcp_server_bind
-    err = dnp3_tcpserver_bind(server);
+    err = dnp3_tcp_server_bind(server);
     // ANCHOR_END: tcp_server_bind
     if (err) {
         printf("unable to bind server: %s \n", dnp3_param_error_to_string(err));
@@ -444,7 +444,7 @@ int main()
 // all of the destroy functions are NULL-safe
 cleanup:
     dnp3_outstation_destroy(outstation);
-    dnp3_tcpserver_destroy(server);
+    dnp3_tcp_server_destroy(server);
     dnp3_runtime_destroy(runtime);
     return 0;
 }

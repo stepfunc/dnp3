@@ -243,7 +243,7 @@ pub unsafe fn master_channel_operate(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     mode: ffi::CommandMode,
-    commands: *mut crate::Commands,
+    commands: *mut crate::CommandSet,
     callback: ffi::CommandTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;

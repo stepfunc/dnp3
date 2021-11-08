@@ -251,7 +251,7 @@ public class OutstationExample {
 
     // Setup initial points
     // ANCHOR: database_init
-    outstation.transaction((db) -> initializeDatabase(db));
+    outstation.executeTransaction((db) -> initializeDatabase(db));
     // ANCHOR_END: database_init
 
     // Start the outstation
@@ -280,7 +280,7 @@ public class OutstationExample {
             {
               binaryValue = !binaryValue;
               final boolean pointValue = binaryValue;
-              outstation.transaction(
+              outstation.executeTransaction(
                   db -> {
                     Binary value =
                         new Binary(
@@ -299,7 +299,7 @@ public class OutstationExample {
                       ? DoubleBit.DETERMINED_ON
                       : DoubleBit.DETERMINED_OFF;
               final DoubleBit pointValue = doubleBitBinaryValue;
-              outstation.transaction(
+              outstation.executeTransaction(
                   db -> {
                     DoubleBitBinary value =
                         new DoubleBitBinary(
@@ -315,7 +315,7 @@ public class OutstationExample {
             {
               binaryOutputStatusValue = !binaryOutputStatusValue;
               final boolean pointValue = binaryOutputStatusValue;
-              outstation.transaction(
+              outstation.executeTransaction(
                   db -> {
                     BinaryOutputStatus value =
                         new BinaryOutputStatus(
@@ -331,7 +331,7 @@ public class OutstationExample {
             {
               counterValue = ++counterValue;
               final long pointValue = counterValue;
-              outstation.transaction(
+              outstation.executeTransaction(
                   db -> {
                     Counter value =
                         new Counter(
@@ -347,7 +347,7 @@ public class OutstationExample {
             {
               frozenCounterValue = ++frozenCounterValue;
               final long pointValue = frozenCounterValue;
-              outstation.transaction(
+              outstation.executeTransaction(
                   db -> {
                     FrozenCounter value =
                         new FrozenCounter(
@@ -363,7 +363,7 @@ public class OutstationExample {
             {
               analogValue = ++analogValue;
               final double pointValue = analogValue;
-              outstation.transaction(
+              outstation.executeTransaction(
                   db -> {
                     Analog value =
                         new Analog(
@@ -379,7 +379,7 @@ public class OutstationExample {
             {
               analogOutputStatusValue = ++analogOutputStatusValue;
               final double pointValue = analogOutputStatusValue;
-              outstation.transaction(
+              outstation.executeTransaction(
                   db -> {
                     AnalogOutputStatus value =
                         new AnalogOutputStatus(
@@ -393,7 +393,7 @@ public class OutstationExample {
             }
           case "os":
             {
-              outstation.transaction(
+              outstation.executeTransaction(
                   db -> {
                     List<UByte> octetString = new ArrayList<>();
                     for (byte octet : "Hello".getBytes(StandardCharsets.US_ASCII)) {

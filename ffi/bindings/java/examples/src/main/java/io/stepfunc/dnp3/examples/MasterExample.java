@@ -356,14 +356,14 @@ public class MasterExample {
         case "cmd":
           {
             // ANCHOR: assoc_control
-            Commands commands = new Commands();
+            CommandSet commands = new CommandSet();
             Group12Var1 control =
                 new Group12Var1(
                     new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
                     ubyte(1),
                     uint(1000),
                     uint(1000));
-            commands.addG12V1U16(ushort(3), control);
+            commands.addG12v1U16(ushort(3), control);
 
             CommandResult result =
                 channel

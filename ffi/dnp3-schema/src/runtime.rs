@@ -1,10 +1,10 @@
 use oo_bindgen::class::ClassDeclarationHandle;
+use oo_bindgen::doc::Unvalidated;
 use oo_bindgen::error_type::ErrorType;
 use oo_bindgen::name::Name;
 use oo_bindgen::structs::{ConstructorType, FunctionArgStructHandle, Number};
 use oo_bindgen::types::BasicType;
 use oo_bindgen::*;
-use oo_bindgen::doc::Unvalidated;
 
 fn define_runtime_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let num_core_threads = Name::create("num_core_threads")?;
@@ -56,21 +56,18 @@ pub fn define(
         )?
         .build()?;
 
-    let destroy_fn = lib
-        .define_function("runtime_destroy")?
-        .param("runtime",runtime_class.clone(), "Runtime to destroy")?
-        .returns_nothing()?
-        .doc(
+    let destructor = lib
+        .define_destructor(
+            runtime_class.clone(),
             doc("Destroy a runtime.")
-            .details("This method will gracefully wait for all asynchronous operation to end before returning")
-        )?
-        .build()?;
+                .details("This method will gracefully wait for all asynchronous operation to end before returning")
+        )?;
 
     // Declare the object-oriented class
     let runtime_class = lib
         .define_class(&runtime_class)?
         .constructor(&new_fn)?
-        .destructor(&destroy_fn)?
+        .destructor(destructor)?
         .custom_destroy("shutdown")?
         .doc("Handle to the underlying runtime")?
         .build()?;

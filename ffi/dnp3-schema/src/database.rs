@@ -464,9 +464,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     // Binary Input
     let binary_config = define_binary_config(lib)?;
 
-    let binary_add_fn = lib
-        .define_function("database_add_binary")?
-        .param("db", database.clone(), "Database")?
+    let add_binary = lib
+        .define_method("add_binary", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", binary_config, "Configuration")?
@@ -477,9 +476,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Add a new Binary Input point")?
         .build()?;
 
-    let binary_remove_fn = lib
-        .define_function("database_remove_binary")?
-        .param("db", database.clone(), "Database")?
+    let remove_binary = lib
+        .define_method("remove_binary", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
             BasicType::Bool,
@@ -488,9 +486,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Remove a Binary Input point")?
         .build()?;
 
-    let binary_update_fn = lib
-        .define_function("database_update_binary")?
-        .param("db", database.clone(), "Database")?
+    let update_binary = lib
+        .define_method("update_binary", database.clone())?
         .param(
             "value",
             shared_def.binary_point.clone(),
@@ -504,9 +501,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Update a Binary Input point")?
         .build()?;
 
-    let binary_get_fn = lib
-        .define_function("database_get_binary")?
-        .param("db", database.clone(), "Database")?
+    let get_binary = lib
+        .define_method("get_binary", database.clone())?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(shared_def.binary_point.clone(), "Binary Input point")?
         .fails_with(shared_def.error_type.clone())?
@@ -516,9 +512,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     // Double-bit Binary Input
     let double_bit_binary_config = define_double_bit_binary_config(lib)?;
 
-    let double_bit_binary_add_fn = lib
-        .define_function("database_add_double_bit_binary")?
-        .param("db", database.clone(), "Database")?
+    let add_double_bit_binary = lib
+        .define_method("add_double_bit_binary", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", double_bit_binary_config, "Configuration")?
@@ -529,9 +524,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Add a new Double-Bit Binary Input point")?
         .build()?;
 
-    let double_bit_binary_remove_fn = lib
-        .define_function("database_remove_double_bit_binary")?
-        .param("db", database.clone(), "Database")?
+    let remove_double_bit_binary = lib
+        .define_method("remove_double_bit_binary", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
             BasicType::Bool,
@@ -540,9 +534,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Remove a Double-Bit Binary Input point")?
         .build()?;
 
-    let double_bit_binary_update_fn = lib
-        .define_function("database_update_double_bit_binary")?
-        .param("db", database.clone(), "Database")?
+    let update_double_bit_binary = lib
+        .define_method("update_double_bit_binary", database.clone())?
         .param(
             "value",
             shared_def.double_bit_binary_point.clone(),
@@ -556,9 +549,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Update a Double-Bit Binary Input point")?
         .build()?;
 
-    let double_bit_binary_get_fn = lib
-        .define_function("database_get_double_bit_binary")?
-        .param("db", database.clone(), "Database")?
+    let get_double_bit_binary = lib
+        .define_method("get_double_bit_binary", database.clone())?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(
             shared_def.double_bit_binary_point.clone(),
@@ -571,9 +563,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     // Binary Output Status
     let binary_output_status_config = define_binary_output_status_config(lib)?;
 
-    let binary_output_status_add_fn = lib
-        .define_function("database_add_binary_output_status")?
-        .param("db", database.clone(), "Database")?
+    let add_binary_output_status = lib
+        .define_method("add_binary_output_status", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", binary_output_status_config, "Configuration")?
@@ -584,9 +575,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Add a new Binary Output Status point")?
         .build()?;
 
-    let binary_output_status_remove_fn = lib
-        .define_function("database_remove_binary_output_status")?
-        .param("db", database.clone(), "Database")?
+    let remove_binary_output_status = lib
+        .define_method("remove_binary_output_status", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
             BasicType::Bool,
@@ -595,9 +585,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Remove a Binary Output Status point")?
         .build()?;
 
-    let binary_output_status_update_fn = lib
-        .define_function("database_update_binary_output_status")?
-        .param("db", database.clone(), "Database")?
+    let update_binary_output_status = lib
+        .define_method("update_binary_output_status", database.clone())?
         .param(
             "value",
             shared_def.binary_output_status_point.clone(),
@@ -611,9 +600,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Update a Binary Output Status point")?
         .build()?;
 
-    let binary_output_status_get_fn = lib
-        .define_function("database_get_binary_output_status")?
-        .param("db", database.clone(), "Database")?
+    let get_binary_output_status = lib
+        .define_method("get_binary_output_status", database.clone())?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(
             shared_def.binary_output_status_point.clone(),
@@ -626,9 +614,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     // Counter
     let counter_config = define_counter_config(lib)?;
 
-    let counter_add_fn = lib
-        .define_function("database_add_counter")?
-        .param("db", database.clone(), "Database")?
+    let add_counter = lib
+        .define_method("add_counter", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", counter_config, "Configuration")?
@@ -639,9 +626,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Add a new Counter point")?
         .build()?;
 
-    let counter_remove_fn = lib
-        .define_function("database_remove_counter")?
-        .param("db", database.clone(), "Database")?
+    let remove_counter = lib
+        .define_method("remove_counter", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
             BasicType::Bool,
@@ -650,9 +636,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Remove a Counter point")?
         .build()?;
 
-    let counter_update_fn = lib
-        .define_function("database_update_counter")?
-        .param("db", database.clone(), "Database")?
+    let update_counter = lib
+        .define_method("update_counter", database.clone())?
         .param(
             "value",
             shared_def.counter_point.clone(),
@@ -666,9 +651,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Update a Counter point")?
         .build()?;
 
-    let counter_get_fn = lib
-        .define_function("database_get_counter")?
-        .param("db", database.clone(), "Database")?
+    let get_counter = lib
+        .define_method("get_counter", database.clone())?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(shared_def.counter_point.clone(), "Counter point")?
         .fails_with(shared_def.error_type.clone())?
@@ -678,9 +662,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     // Frozen Counter
     let frozen_counter_config = define_frozen_counter_config(lib)?;
 
-    let frozen_counter_add_fn = lib
-        .define_function("database_add_frozen_counter")?
-        .param("db", database.clone(), "Database")?
+    let add_frozen_counter = lib
+        .define_method("add_frozen_counter", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", frozen_counter_config, "Configuration")?
@@ -691,9 +674,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Add a new Frozen Counter point")?
         .build()?;
 
-    let frozen_counter_remove_fn = lib
-        .define_function("database_remove_frozen_counter")?
-        .param("db", database.clone(), "Database")?
+    let remove_frozen_counter = lib
+        .define_method("remove_frozen_counter", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
             BasicType::Bool,
@@ -702,9 +684,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Remove a Frozen Counter point")?
         .build()?;
 
-    let frozen_counter_update_fn = lib
-        .define_function("database_update_frozen_counter")?
-        .param("db", database.clone(), "Database")?
+    let update_frozen_counter = lib
+        .define_method("update_frozen_counter", database.clone())?
         .param(
             "value",
             shared_def.frozen_counter_point.clone(),
@@ -718,9 +699,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Update an Frozen Counter point")?
         .build()?;
 
-    let frozen_counter_get_fn = lib
-        .define_function("database_get_frozen_counter")?
-        .param("db", database.clone(), "Database")?
+    let get_frozen_counter = lib
+        .define_method("get_frozen_counter", database.clone())?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(
             shared_def.frozen_counter_point.clone(),
@@ -733,9 +713,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     // Analog
     let analog_config = define_analog_config(lib)?;
 
-    let analog_add_fn = lib
-        .define_function("database_add_analog")?
-        .param("db", database.clone(), "Database")?
+    let add_analog = lib
+        .define_method("add_analog", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", analog_config, "Configuration")?
@@ -746,9 +725,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Add a new Analog point")?
         .build()?;
 
-    let analog_remove_fn = lib
-        .define_function("database_remove_analog")?
-        .param("db", database.clone(), "Database")?
+    let remove_analog = lib
+        .define_method("remove_analog", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
             BasicType::Bool,
@@ -757,9 +735,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Remove an Analog point")?
         .build()?;
 
-    let analog_update_fn = lib
-        .define_function("database_update_analog")?
-        .param("db", database.clone(), "Database")?
+    let update_analog = lib
+        .define_method("update_analog", database.clone())?
         .param(
             "value",
             shared_def.analog_point.clone(),
@@ -773,9 +750,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Update a Analog point")?
         .build()?;
 
-    let analog_get_fn = lib
-        .define_function("database_get_analog")?
-        .param("db", database.clone(), "Database")?
+    let get_analog = lib
+        .define_method("get_analog", database.clone())?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(shared_def.analog_point.clone(), "Analog point")?
         .fails_with(shared_def.error_type.clone())?
@@ -784,9 +760,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     // Analog Output Status
     let analog_output_status_config = define_analog_output_status_config(lib)?;
-    let analog_output_status_add_fn = lib
-        .define_function("database_add_analog_output_status")?
-        .param("db", database.clone(), "Database")?
+    let add_analog_output_status = lib
+        .define_method("add_analog_output_status", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", analog_output_status_config, "Configuration")?
@@ -797,9 +772,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Add a new Analog Output Status point")?
         .build()?;
 
-    let analog_output_status_remove_fn = lib
-        .define_function("database_remove_analog_output_status")?
-        .param("db", database.clone(), "Database")?
+    let remove_analog_output_status = lib
+        .define_method("remove_analog_output_status", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
             BasicType::Bool,
@@ -808,9 +782,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Remove an Analog Output Status point")?
         .build()?;
 
-    let analog_output_status_update_fn = lib
-        .define_function("database_update_analog_output_status")?
-        .param("db", database.clone(), "Database")?
+    let update_analog_output_status = lib
+        .define_method("update_analog_output_status", database.clone())?
         .param(
             "value",
             shared_def.analog_output_status_point.clone(),
@@ -824,9 +797,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Update a Analog Output Status point")?
         .build()?;
 
-    let analog_output_status_get_fn = lib
-        .define_function("database_get_analog_output_status")?
-        .param("db", database.clone(), "Database")?
+    let get_analog_output_status = lib
+        .define_method("get_analog_output_status", database.clone())?
         .param("index", BasicType::U16, "Index of the point to get")?
         .returns(
             shared_def.analog_output_status_point.clone(),
@@ -839,9 +811,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     // Octet String
     let octet_string = lib.define_collection("octet_string_value", BasicType::U8, false)?;
 
-    let octet_string_add_fn = lib
-        .define_function("database_add_octet_string")?
-        .param("db", database.clone(), "Database")?
+    let add_octet_string = lib
+        .define_method("add_octet_string", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .param("point_class", event_class, "Event class")?
         .returns(
@@ -851,9 +822,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Add a new Octet String point")?
         .build()?;
 
-    let octet_string_remove_fn = lib
-        .define_function("database_remove_octet_string")?
-        .param("db", database.clone(), "Database")?
+    let remove_octet_string = lib
+        .define_method("remove_octet_string", database.clone())?
         .param("index", BasicType::U16, "Index of the point")?
         .returns(
             BasicType::Bool,
@@ -862,9 +832,8 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .doc("Remove an Octet String point")?
         .build()?;
 
-    let octet_string_update_fn = lib
-        .define_function("database_update_octet_string")?
-        .param("db", database.clone(), "Database")?
+    let update_octet_string = lib
+        .define_method("update_octet_string", database.clone())?
         .param("index", BasicType::U16, "Index of the octet string")?
         .param("value", octet_string, "New value of the point")?
         .param("options", update_options, "Update options")?
@@ -879,52 +848,48 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let database = lib
         .define_class(&database)?
-        .method("add_binary", &binary_add_fn)?
-        .method("remove_binary", &binary_remove_fn)?
-        .method("update_binary", &binary_update_fn)?
-        .method("get_binary", &binary_get_fn)?
-        .method("add_double_bit_binary", &double_bit_binary_add_fn)?
-        .method("remove_double_bit_binary", &double_bit_binary_remove_fn)?
-        .method("update_double_bit_binary", &double_bit_binary_update_fn)?
-        .method("get_double_bit_binary", &double_bit_binary_get_fn)?
-        .method("add_binary_output_status", &binary_output_status_add_fn)?
-        .method(
-            "remove_binary_output_status",
-            &binary_output_status_remove_fn,
-        )?
-        .method(
-            "update_binary_output_status",
-            &binary_output_status_update_fn,
-        )?
-        .method("get_binary_output_status", &binary_output_status_get_fn)?
-        .method("add_counter", &counter_add_fn)?
-        .method("remove_counter", &counter_remove_fn)?
-        .method("update_counter", &counter_update_fn)?
-        .method("get_counter", &counter_get_fn)?
-        .method("add_frozen_counter", &frozen_counter_add_fn)?
-        .method("remove_frozen_counter", &frozen_counter_remove_fn)?
-        .method("update_frozen_counter", &frozen_counter_update_fn)?
-        .method("get_frozen_counter", &frozen_counter_get_fn)?
-        .method("add_analog", &analog_add_fn)?
-        .method("remove_analog", &analog_remove_fn)?
-        .method("update_analog", &analog_update_fn)?
-        .method("get_analog", &analog_get_fn)?
-        .method("add_analog_output_status", &analog_output_status_add_fn)?
-        .method(
-            "remove_analog_output_status",
-            &analog_output_status_remove_fn,
-        )?
-        .method(
-            "update_analog_output_status",
-            &analog_output_status_update_fn,
-        )?
-        .method("get_analog_output_status", &analog_output_status_get_fn)?
-        .method("add_octet_string", &octet_string_add_fn)?
-        .method("remove_octet_string", &octet_string_remove_fn)?
-        .method("update_octet_string", &octet_string_update_fn)?
+        // binary methods
+        .method(add_binary)?
+        .method(remove_binary)?
+        .method(update_binary)?
+        .method(get_binary)?
+        // double-bit binary methods
+        .method(add_double_bit_binary)?
+        .method(remove_double_bit_binary)?
+        .method(update_double_bit_binary)?
+        .method(get_double_bit_binary)?
+        // binary output status methods
+        .method(add_binary_output_status)?
+        .method(remove_binary_output_status)?
+        .method(update_binary_output_status)?
+        .method(get_binary_output_status)?
+        // counter methods
+        .method(add_counter)?
+        .method(remove_counter)?
+        .method(update_counter)?
+        .method(get_counter)?
+        // frozen-counter methods
+        .method(add_frozen_counter)?
+        .method(remove_frozen_counter)?
+        .method(update_frozen_counter)?
+        .method(get_frozen_counter)?
+        // analog methods
+        .method(add_analog)?
+        .method(remove_analog)?
+        .method(update_analog)?
+        .method(get_analog)?
+        // analog output status methods
+        .method(add_analog_output_status)?
+        .method(remove_analog_output_status)?
+        .method(update_analog_output_status)?
+        .method(get_analog_output_status)?
+        // octet-string methods
+        .method(add_octet_string)?
+        .method(remove_octet_string)?
+        .method(update_octet_string)?
         .doc(
             doc("Internal database access")
-                .warning("This object is only valid within the transaction."),
+                .warning("This object is only valid within a transaction"),
         )?
         .build()?;
 

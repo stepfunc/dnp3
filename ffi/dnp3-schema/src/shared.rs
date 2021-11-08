@@ -1,5 +1,6 @@
 use crate::gv;
 use oo_bindgen::class::ClassDeclarationHandle;
+use oo_bindgen::doc::Unvalidated;
 use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::error_type::{ErrorType, ExceptionType};
 use oo_bindgen::interface::InterfaceHandle;
@@ -10,7 +11,6 @@ use oo_bindgen::types::{BasicType, DurationType};
 use oo_bindgen::{doc, BackTraced};
 use oo_bindgen::{BindingError, LibraryBuilder};
 use std::time::Duration;
-use oo_bindgen::doc::Unvalidated;
 
 pub struct SharedDefinitions {
     pub error_type: ErrorType<Unvalidated>,

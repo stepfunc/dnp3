@@ -1,3 +1,4 @@
+use oo_bindgen::doc::Unvalidated;
 use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::error_type::ErrorType;
 use oo_bindgen::name::Name;
@@ -6,7 +7,6 @@ use oo_bindgen::structs::{
 };
 use oo_bindgen::types::{BasicType, StringType};
 use oo_bindgen::*;
-use oo_bindgen::doc::Unvalidated;
 
 fn define_log_level_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let definition = lib

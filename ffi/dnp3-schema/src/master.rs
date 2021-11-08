@@ -80,36 +80,20 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .build()?;
 
-    let destroy_fn = lib
-        .define_function("master_channel_destroy")?
-        .param(
-            "channel",
-            master_channel_class.clone(),
-            "{class:master_channel} to destroy",
-        )?
-        .returns_nothing()?
-        .doc("Shutdown a {class:master_channel} and release all resources")?
-        .build()?;
+    let channel_destructor = lib.define_destructor(
+        master_channel_class.clone(),
+        "Shutdown a {class:master_channel} and release all resources",
+    )?;
 
-    let enable_fn = lib
-        .define_function("master_channel_enable")?
-        .param(
-            "channel",
-            master_channel_class.clone(),
-            "{class:master_channel} to enable",
-        )?
+    let enable_method = lib
+        .define_method("enable", master_channel_class.clone())?
         .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("start communications")?
         .build()?;
 
-    let disable_fn = lib
-        .define_function("master_channel_disable")?
-        .param(
-            "channel",
-            master_channel_class.clone(),
-            "{class:master_channel} to disable",
-        )?
+    let disable_method = lib
+        .define_method("disable", master_channel_class.clone())?
         .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("stop communications")?
@@ -124,13 +108,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let request_class = crate::request::define(lib, shared)?;
 
-    let add_association_fn = lib
-        .define_function("master_channel_add_association")?
-        .param(
-            "channel",
-            master_channel_class.clone(),
-            "{class:master_channel} on which the association will be created",
-        )?
+    let add_association_method = lib
+        .define_method("add_association", master_channel_class.clone())?
         .param(
             "address",
             BasicType::U16,
@@ -152,25 +131,15 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("Add an association to the channel")?
         .build()?;
 
-    let remove_association_fn = lib
-        .define_function("master_channel_remove_association")?
-        .param(
-            "channel",
-            master_channel_class.clone(),
-            "{class:master_channel} on which to apply the operation",
-        )?
+    let remove_association_method = lib
+        .define_method("remove_association", master_channel_class.clone())?
         .param("id", association_id.clone(), "Id of the association")?
         .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Remove an association from the channel")?
         .build()?;
 
-    let add_poll_fn = lib.define_function("master_channel_add_poll")?
-        .param(
-            "channel",
-            master_channel_class.clone(),
-            "{class:master_channel} on which to apply the operation",
-        )?
+    let add_poll_method = lib.define_method("add_poll", master_channel_class.clone())?
         .param("id", association_id.clone(), "Association on which to add the poll")?
         .param("request", request_class.declaration(), "Request to perform")?
         .param("period", DurationType::Milliseconds, "Period to wait between each poll (in ms)")?
@@ -182,12 +151,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .build()?;
 
-    let remove_poll_fn = lib.define_function("master_channel_remove_poll")?
-        .param(
-            "channel",
-           master_channel_class.clone(),
-            "{class:master_channel} on which to apply the operation",
-        )?
+    let remove_poll_method = lib
+        .define_method("remove_poll", master_channel_class.clone())?
         .param("poll_id", poll_id.clone(), "Id of the created poll")?
         .returns_nothing()?
         .fails_with(shared.error_type.clone())?
@@ -197,12 +162,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .build()?;
 
-    let demand_poll_fn = lib.define_function("master_channel_demand_poll")?
-        .param(
-            "channel",
-           master_channel_class.clone(),
-            "{class:master_channel} on which to apply the operation",
-        )?
+    let demand_poll_method = lib.define_method("demand_poll", master_channel_class.clone())?
         .param("poll_id", poll_id, "Id of the poll")?
         .returns_nothing()?
         .fails_with(shared.error_type.clone())?
@@ -213,13 +173,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .build()?;
 
-    let set_decode_level_fn = lib
-        .define_function("master_channel_set_decode_level")?
-        .param(
-            "channel",
-            master_channel_class.clone(),
-            "{class:master_channel} on which to apply the operation",
-        )?
+    let set_decode_level_method = lib
+        .define_method("set_decode_level", master_channel_class.clone())?
         .param(
             "decode_level",
             shared.decode_level.clone(),
@@ -230,13 +185,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("Set the decoding level for the channel")?
         .build()?;
 
-    let get_decode_level_fn = lib
-        .define_function("master_channel_get_decode_level")?
-        .param(
-            "channel",
-            master_channel_class.clone(),
-            "{class:master_channel} on which to apply the operation",
-        )?
+    let get_decode_level_method = lib
+        .define_method("get_decode_level", master_channel_class.clone())?
         .returns(shared.decode_level.clone(), "Decode level")?
         .fails_with(shared.error_type.clone())?
         .doc("Get the decoding level for the channel")?
@@ -379,18 +329,18 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     lib.define_class(&master_channel_class)?
-        .destructor(&destroy_fn)?
+        .destructor(channel_destructor)?
         .static_method("create_tcp_channel", &master_channel_create_tcp_fn)?
         .static_method("create_serial_channel", &master_channel_create_serial_fn)?
-        .method("enable", &enable_fn)?
-        .method("disable", &disable_fn)?
-        .method("add_association", &add_association_fn)?
-        .method("remove_association", &remove_association_fn)?
-        .method("set_decode_level", &set_decode_level_fn)?
-        .method("get_decode_level", &get_decode_level_fn)?
-        .method("add_poll", &add_poll_fn)?
-        .method("remove_poll", &remove_poll_fn)?
-        .method("demand_poll", &demand_poll_fn)?
+        .method(enable_method)?
+        .method(disable_method)?
+        .method(add_association_method)?
+        .method(remove_association_method)?
+        .method(set_decode_level_method)?
+        .method(get_decode_level_method)?
+        .method(add_poll_method)?
+        .method(remove_poll_method)?
+        .method(demand_poll_method)?
         .async_method("read", &read_fn)?
         .async_method("operate", &operate_fn)?
         .async_method("synchronize_time", &perform_time_sync_fn)?
@@ -673,19 +623,12 @@ fn define_endpoint_list(lib: &mut LibraryBuilder) -> BackTraced<ClassHandle> {
         .doc(doc("Create a new list of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
         .build()?;
 
-    let endpoint_list_destroy = lib
-        .define_function("endpoint_list_destroy")?
-        .param(
-            "list",
-            endpoint_list_class.clone(),
-            "Endpoint list to destroy",
-        )?
-        .returns_nothing()?
-        .doc("Delete a previously allocated endpoint list.")?
-        .build()?;
+    let destructor = lib.define_destructor(
+        endpoint_list_class.clone(),
+        "Destroy a previously allocated endpoint list",
+    )?;
 
-    let endpoint_list_add = lib.define_function("endpoint_list_add")?
-        .param("list", endpoint_list_class.clone(), "Endpoint list to modify")?
+    let add_method = lib.define_method("add", endpoint_list_class.clone())?
         .param("endpoint", StringType, "Endpoint to add to the list")?
         .returns_nothing()?
         .doc(doc("Add an IP endpoint to the list.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
@@ -693,8 +636,8 @@ fn define_endpoint_list(lib: &mut LibraryBuilder) -> BackTraced<ClassHandle> {
 
     let endpoint_list_class = lib.define_class(&endpoint_list_class)?
         .constructor(&endpoint_list_new)?
-        .destructor(&endpoint_list_destroy)?
-        .method("add", &endpoint_list_add)?
+        .destructor(destructor)?
+        .method(add_method)?
         .doc(doc("List of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
         .build()?;
 
@@ -900,35 +843,25 @@ fn define_command_builder(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> BackTraced<ClassHandle> {
-    let command = lib.declare_class("commands")?;
+    let command_set = lib.declare_class("command_set")?;
 
-    let command_new_fn = lib
-        .define_function("commands_new")?
-        .returns(command.clone(), "Handle to the created set of commands")?
+    let command_set_new_fn = lib
+        .define_function("command_set_new")?
+        .returns(command_set.clone(), "Handle to the created set of commands")?
         .doc("Create a new set of commands")?
         .build()?;
 
-    let command_destroy_fn = lib
-        .define_function("commands_destroy")?
-        .param("command", command.clone(), "Set of commands to destroy")?
-        .returns_nothing()?
-        .doc("Destroy set of commands")?
-        .build()?;
+    let command_set_destructor =
+        lib.define_destructor(command_set.clone(), "Destroy a set of commands")?;
 
-    let command_finish_header_fn = lib
-        .define_function("commands_finish_header")?
-        .param(
-            "commands",
-          command.clone(),
-            "Commands on which to finish the header",
-        )?
+    let finish_header = lib
+        .define_method("finish_header", command_set.clone())?
         .returns_nothing()?
         .doc("Finish any partially completed header. This allows for the construction of two headers with the same type and index")?
         .build()?;
 
-    let command_add_u8_g12v1_fn = lib
-        .define_function("commands_add_g12v1_u8")?
-        .param("command", command.clone(), "Commands to modify")?
+    let add_u8_g12v1 = lib
+        .define_method("add_g12v1_u8", command_set.clone())?
         .param(
             "idx",
             BasicType::U8,
@@ -939,9 +872,8 @@ fn define_command_builder(
         .doc("Add a CROB with 1-byte prefix index")?
         .build()?;
 
-    let command_add_u16_g12v1_fn = lib
-        .define_function("commands_add_g12v1_u16")?
-        .param("command", command.clone(), "Command to modify")?
+    let add_u16_g12v1 = lib
+        .define_method("add_g12v1_u16", command_set.clone())?
         .param(
             "idx",
             BasicType::U16,
@@ -952,9 +884,8 @@ fn define_command_builder(
         .doc("Add a CROB with 2-byte prefix index")?
         .build()?;
 
-    let command_add_u8_g41v1_fn = lib
-        .define_function("commands_add_g41v1_u8")?
-        .param("command", command.clone(), "Command to modify")?
+    let add_u8_g41v1 = lib
+        .define_method("add_g41v1_u8", command_set.clone())?
         .param(
             "idx",
             BasicType::U8,
@@ -965,9 +896,8 @@ fn define_command_builder(
         .doc("Add a Analog Output command (signed 32-bit integer) with 1-byte prefix index")?
         .build()?;
 
-    let command_add_u16_g41v1_fn = lib
-        .define_function("commands_add_g41v1_u16")?
-        .param("command", command.clone(), "Commands to modify")?
+    let add_u16_g41v1 = lib
+        .define_method("add_g41v1_u16", command_set.clone())?
         .param(
             "idx",
             BasicType::U16,
@@ -978,9 +908,8 @@ fn define_command_builder(
         .doc("Add a Analog Output command (signed 32-bit integer) with 2-byte prefix index")?
         .build()?;
 
-    let command_add_u8_g41v2_fn = lib
-        .define_function("commands_add_g41v2_u8")?
-        .param("command", command.clone(), "Commands to modify")?
+    let add_u8_g41v2 = lib
+        .define_method("add_g41v2_u8", command_set.clone())?
         .param(
             "idx",
             BasicType::U8,
@@ -991,9 +920,8 @@ fn define_command_builder(
         .doc("Add a Analog Output command (signed 16-bit integer) with 1-byte prefix index")?
         .build()?;
 
-    let command_add_u16_g41v2_fn = lib
-        .define_function("commands_add_g41v2_u16")?
-        .param("command", command.clone(), "Commands to modify")?
+    let add_u16_g41v2 = lib
+        .define_method("add_g41v2_u16", command_set.clone())?
         .param(
             "idx",
             BasicType::U16,
@@ -1004,9 +932,8 @@ fn define_command_builder(
         .doc("Add a Analog Output command (signed 16-bit integer) with 2-byte prefix index")?
         .build()?;
 
-    let command_add_u8_g41v3_fn = lib
-        .define_function("commands_add_g41v3_u8")?
-        .param("command", command.clone(), "Commands to modify")?
+    let add_u8_g41v3 = lib
+        .define_method("add_g41v3_u8", command_set.clone())?
         .param(
             "idx",
             BasicType::U8,
@@ -1021,9 +948,8 @@ fn define_command_builder(
         .doc("Add a Analog Output command (single-precision float) with 1-byte prefix index")?
         .build()?;
 
-    let command_add_u16_g41v3_fn = lib
-        .define_function("commands_add_g41v3_u16")?
-        .param("commands", command.clone(), "Commands to modify")?
+    let add_u16_g41v3 = lib
+        .define_method("add_g41v3_u16", command_set.clone())?
         .param(
             "idx",
             BasicType::U16,
@@ -1038,9 +964,8 @@ fn define_command_builder(
         .doc("Add a Analog Output command (single-precision float) with 2-byte prefix index")?
         .build()?;
 
-    let command_add_u8_g41v4_fn = lib
-        .define_function("commands_add_g41v4_u8")?
-        .param("commands", command.clone(), "Commands to modify")?
+    let add_u8_g41v4 = lib
+        .define_method("add_g41v4_u8", command_set.clone())?
         .param(
             "idx",
             BasicType::U8,
@@ -1055,9 +980,8 @@ fn define_command_builder(
         .doc("Add a Analog Output command (double-precision float) with 1-byte prefix index")?
         .build()?;
 
-    let command_add_u16_g41v4_fn = lib
-        .define_function("commands_add_g41v4_u16")?
-        .param("commands", command.clone(), "Commands to modify")?
+    let add_u16_g41v4 = lib
+        .define_method("add_g41v4_u16", command_set.clone())?
         .param(
             "idx",
             BasicType::U16,
@@ -1072,25 +996,25 @@ fn define_command_builder(
         .doc("Add a Analog Output command (double-precision float) with 2-byte prefix index")?
         .build()?;
 
-    let command = lib
-        .define_class(&command)?
-        .constructor(&command_new_fn)?
-        .destructor(&command_destroy_fn)?
-        .method("add_g12_v1_u8", &command_add_u8_g12v1_fn)?
-        .method("add_g12_v1_u16", &command_add_u16_g12v1_fn)?
-        .method("add_g41_v1_u8", &command_add_u8_g41v1_fn)?
-        .method("add_g41_v1_u16", &command_add_u16_g41v1_fn)?
-        .method("add_g41_v2_u8", &command_add_u8_g41v2_fn)?
-        .method("add_g41_v2_u16", &command_add_u16_g41v2_fn)?
-        .method("add_g41_v3_u8", &command_add_u8_g41v3_fn)?
-        .method("add_g41_v3_u16", &command_add_u16_g41v3_fn)?
-        .method("add_g41_v4_u8", &command_add_u8_g41v4_fn)?
-        .method("add_g41_v4_u16", &command_add_u16_g41v4_fn)?
-        .method("finish_header", &command_finish_header_fn)?
+    let command_set = lib
+        .define_class(&command_set)?
+        .constructor(&command_set_new_fn)?
+        .destructor(command_set_destructor)?
+        .method(add_u8_g12v1)?
+        .method(add_u16_g12v1)?
+        .method(add_u8_g41v1)?
+        .method(add_u16_g41v1)?
+        .method(add_u8_g41v2)?
+        .method(add_u16_g41v2)?
+        .method(add_u8_g41v3)?
+        .method(add_u16_g41v3)?
+        .method(add_u8_g41v4)?
+        .method(add_u16_g41v4)?
+        .method(finish_header)?
         .doc("Builder type used to construct command requests")?
         .build()?;
 
-    Ok(command)
+    Ok(command_set)
 }
 
 fn define_time_sync_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {

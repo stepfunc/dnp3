@@ -347,9 +347,9 @@ int main()
         }
         else if (strcmp(cbuf, "cmd\n") == 0) {
             // ANCHOR: assoc_control
-            dnp3_commands_t *commands = dnp3_commands_new();
+            dnp3_command_set_t *commands = dnp3_command_set_new();
             dnp3_group12_var1_t g12v1 = dnp3_group12_var1_init(dnp3_control_code_init(DNP3_TRIP_CLOSE_CODE_NUL, false, DNP3_OP_TYPE_LATCH_ON), 1, 1000, 1000);
-            dnp3_commands_add_g12v1_u16(commands, 3, g12v1);
+            dnp3_command_set_add_g12v1_u16(commands, 3, g12v1);
 
             dnp3_command_task_callback_t cb = {
                 .on_complete = &on_command_complete,
@@ -359,7 +359,7 @@ int main()
 
             dnp3_master_channel_operate(channel, association_id, DNP3_COMMAND_MODE_SELECT_BEFORE_OPERATE, commands, cb);
 
-            dnp3_commands_destroy(commands);
+            dnp3_command_set_destroy(commands);
             // ANCHOR_END: assoc_control
         }
         else if (strcmp(cbuf, "evt\n") == 0) {

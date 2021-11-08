@@ -29,20 +29,14 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .build()?;
 
-    let request_destroy_fn = lib
-        .define_function("request_destroy")?
-        .param(
-            "request",
-          request.clone(),
-            "Request to destroy",
-        )?
-        .returns_nothing()?
-        .doc("Destroy a request created with {class:request.[constructor]} or {class:request.class_request()}.")?
-        .build()?;
+    let destructor = lib
+        .define_destructor(
+            request.clone(),
+            "Destroy a request created with {class:request.[constructor]} or {class:request.class_request()}."
+        )?;
 
-    let request_add_one_byte_header_fn = lib
-        .define_function("request_add_one_byte_header")?
-        .param("request", request.clone(), "Request to modify")?
+    let add_one_byte_header = lib
+        .define_method("add_one_byte_header", request.clone())?
         .param(
             "variation",
             shared.variation_enum.clone(),
@@ -54,9 +48,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("Add a one-byte start/stop variation interrogation")?
         .build()?;
 
-    let request_add_two_byte_header_fn = lib
-        .define_function("request_add_two_byte_header")?
-        .param("request", request.clone(), "Request to modify")?
+    let add_two_byte_header = lib
+        .define_method("add_two_byte_header", request.clone())?
         .param(
             "variation",
             shared.variation_enum.clone(),
@@ -68,9 +61,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("Add a two-byte start/stop variation interrogation")?
         .build()?;
 
-    let request_add_all_objects_header_fn = lib
-        .define_function("request_add_all_objects_header")?
-        .param("request", request.clone(), "Request to modify")?
+    let add_all_objects_header = lib
+        .define_method("add_all_objects_header", request.clone())?
         .param(
             "variation",
             shared.variation_enum.clone(),
@@ -83,11 +75,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let request = lib
         .define_class(&request)?
         .constructor(&request_new_fn)?
-        .destructor(&request_destroy_fn)?
+        .destructor(destructor)?
         .static_method("class_request", &request_new_class_fn)?
-        .method("add_one_byte_header", &request_add_one_byte_header_fn)?
-        .method("add_two_byte_header", &request_add_two_byte_header_fn)?
-        .method("add_all_objects_header", &request_add_all_objects_header_fn)?
+        .method(add_one_byte_header)?
+        .method(add_two_byte_header)?
+        .method(add_all_objects_header)?
         .doc(
             doc("Custom request")
             .details("Whenever a method takes a request as a parameter, the request is internally copied. Therefore, it is possible to reuse the same requests over and over.")

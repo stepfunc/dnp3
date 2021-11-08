@@ -179,7 +179,7 @@ class ExampleOutstation
 
         // Setup initial points
         // ANCHOR: database_init
-        outstation.Transaction(new OutstationTransaction((db) =>
+        outstation.ExecuteTransaction(new OutstationTransaction((db) =>
         {
             for (ushort i = 0; i < 10; i++)
             {
@@ -217,7 +217,7 @@ class ExampleOutstation
                     return;
                 case "bi":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.ExecuteTransaction(new OutstationTransaction((db) =>
                         {
                             binaryValue = !binaryValue;
                             db.UpdateBinary(new Binary(7, binaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
@@ -226,7 +226,7 @@ class ExampleOutstation
                     }
                 case "dbbi":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.ExecuteTransaction(new OutstationTransaction((db) =>
                         {
                             doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DeterminedOff ? DoubleBit.DeterminedOn : DoubleBit.DeterminedOff;
                             db.UpdateDoubleBitBinary(new DoubleBitBinary(7, doubleBitBinaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
@@ -235,7 +235,7 @@ class ExampleOutstation
                     }
                 case "bos":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.ExecuteTransaction(new OutstationTransaction((db) =>
                         {
                             binaryOutputStatusValue = !binaryOutputStatusValue;
                             db.UpdateBinaryOutputStatus(new BinaryOutputStatus(7, binaryOutputStatusValue, new Flags(Flag.Online), Now()), new UpdateOptions());
@@ -244,7 +244,7 @@ class ExampleOutstation
                     }
                 case "co":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.ExecuteTransaction(new OutstationTransaction((db) =>
                         {
                             db.UpdateCounter(new Counter(7, ++counterValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         }));
@@ -252,7 +252,7 @@ class ExampleOutstation
                     }
                 case "fco":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.ExecuteTransaction(new OutstationTransaction((db) =>
                         {
                             db.UpdateFrozenCounter(new FrozenCounter(7, ++frozenCounterValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         }));
@@ -260,7 +260,7 @@ class ExampleOutstation
                     }
                 case "ai":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.ExecuteTransaction(new OutstationTransaction((db) =>
                         {
                             db.UpdateAnalog(new Analog(7, ++analogValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         }));
@@ -268,7 +268,7 @@ class ExampleOutstation
                     }
                 case "aos":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.ExecuteTransaction(new OutstationTransaction((db) =>
                         {
                             db.UpdateAnalogOutputStatus(new AnalogOutputStatus(7, ++analogOutputStatusValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         }));
@@ -276,7 +276,7 @@ class ExampleOutstation
                     }
                 case "os":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.ExecuteTransaction(new OutstationTransaction((db) =>
                         {
                             db.UpdateOctetString(7, System.Text.Encoding.ASCII.GetBytes("Hello"), new UpdateOptions());
                         }));

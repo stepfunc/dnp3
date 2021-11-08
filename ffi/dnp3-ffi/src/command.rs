@@ -32,79 +32,87 @@ impl From<ffi::Group12Var1> for Group12Var1 {
 }
 
 // Commands is just a handle to a CommandBuilder
-pub type Commands = dnp3::master::CommandBuilder;
+pub type CommandSet = dnp3::master::CommandBuilder;
 
-pub unsafe fn commands_new() -> *mut Commands {
+pub unsafe fn command_set_new() -> *mut CommandSet {
     Box::into_raw(Box::new(CommandBuilder::new()))
 }
 
-pub unsafe fn commands_destroy(commands: *mut Commands) {
+pub unsafe fn command_set_destroy(commands: *mut CommandSet) {
     if !commands.is_null() {
         Box::from_raw(commands);
     }
 }
 
-pub unsafe fn commands_finish_header(commands: *mut crate::Commands) {
+pub unsafe fn command_set_finish_header(commands: *mut CommandSet) {
     if let Some(commands) = commands.as_mut() {
         commands.finish_header();
     }
 }
 
-pub unsafe fn commands_add_g12v1_u8(commands: *mut Commands, idx: u8, value: ffi::Group12Var1) {
+pub unsafe fn command_set_add_g12v1_u8(
+    commands: *mut CommandSet,
+    idx: u8,
+    value: ffi::Group12Var1,
+) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group12Var1>::add_u8(commands, value.into(), idx);
     }
 }
 
-pub unsafe fn commands_add_g12v1_u16(commands: *mut Commands, idx: u16, value: ffi::Group12Var1) {
+pub unsafe fn command_set_add_g12v1_u16(
+    commands: *mut CommandSet,
+    idx: u16,
+    value: ffi::Group12Var1,
+) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group12Var1>::add_u16(commands, value.into(), idx);
     }
 }
 
-pub unsafe fn commands_add_g41v1_u8(commands: *mut Commands, idx: u8, value: i32) {
+pub unsafe fn command_set_add_g41v1_u8(commands: *mut CommandSet, idx: u8, value: i32) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group41Var1>::add_u8(commands, Group41Var1::new(value), idx);
     }
 }
 
-pub unsafe fn commands_add_g41v1_u16(commands: *mut Commands, idx: u16, value: i32) {
+pub unsafe fn command_set_add_g41v1_u16(commands: *mut CommandSet, idx: u16, value: i32) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group41Var1>::add_u16(commands, Group41Var1::new(value), idx);
     }
 }
 
-pub unsafe fn commands_add_g41v2_u8(commands: *mut Commands, idx: u8, value: i16) {
+pub unsafe fn command_set_add_g41v2_u8(commands: *mut CommandSet, idx: u8, value: i16) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group41Var2>::add_u8(commands, Group41Var2::new(value), idx);
     }
 }
 
-pub unsafe fn commands_add_g41v2_u16(commands: *mut Commands, idx: u16, value: i16) {
+pub unsafe fn command_set_add_g41v2_u16(commands: *mut CommandSet, idx: u16, value: i16) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group41Var2>::add_u16(commands, Group41Var2::new(value), idx);
     }
 }
 
-pub unsafe fn commands_add_g41v3_u8(commands: *mut Commands, idx: u8, value: f32) {
+pub unsafe fn command_set_add_g41v3_u8(commands: *mut CommandSet, idx: u8, value: f32) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group41Var3>::add_u8(commands, Group41Var3::new(value), idx);
     }
 }
 
-pub unsafe fn commands_add_g41v3_u16(commands: *mut Commands, idx: u16, value: f32) {
+pub unsafe fn command_set_add_g41v3_u16(commands: *mut CommandSet, idx: u16, value: f32) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group41Var3>::add_u16(commands, Group41Var3::new(value), idx);
     }
 }
 
-pub unsafe fn commands_add_g41v4_u8(commands: *mut Commands, idx: u8, value: f64) {
+pub unsafe fn command_set_add_g41v4_u8(commands: *mut CommandSet, idx: u8, value: f64) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group41Var4>::add_u8(commands, Group41Var4::new(value), idx);
     }
 }
 
-pub unsafe fn commands_add_g41v4_u16(commands: *mut Commands, idx: u16, value: f64) {
+pub unsafe fn command_set_add_g41v4_u16(commands: *mut CommandSet, idx: u16, value: f64) {
     if let Some(commands) = commands.as_mut() {
         CommandSupport::<Group41Var4>::add_u16(commands, Group41Var4::new(value), idx);
     }

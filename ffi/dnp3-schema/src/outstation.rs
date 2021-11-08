@@ -47,7 +47,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     // Define the TCP server
     let tcp_server = lib.declare_class("tcp_server")?;
 
-    let tcp_server_new_fn = lib
+    let constructor = lib
         .define_function("tcpserver_new")?
         .param(
             "runtime",
@@ -71,14 +71,10 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         )?
         .build()?;
 
-    let tcp_server_destroy_fn = lib.define_function("tcpserver_destroy")?
-        .param("server",tcp_server.clone(), "Server to shutdown")?
-        .returns_nothing()?
-        .doc("Gracefully shutdown all the outstations associated to this server, stops the server and release resources.")?
-        .build()?;
+    let destructor = lib
+        .define_destructor(tcp_server.clone(), "Gracefully shutdown all the outstations associated to this server, stops the server and release resources.")?;
 
-    let tcp_server_add_outstation_fn = lib.define_function("tcpserver_add_outstation")?
-        .param("server",tcp_server.clone(), "TCP server to add the outstation to")?
+    let add_outstation = lib.define_method("add_outstation", tcp_server.clone())?
         .param("config",types.outstation_config, "Outstation configuration")?
         .param("event_config", types.event_buffer_config, "Event buffer configuration")?
         .param("application", types.outstation_application, "Outstation application callbacks")?
@@ -93,18 +89,17 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
             .details("In order for the outstation to run, the TCP server must be running. Use {class:tcp_server.bind()} to run it."))?
         .build()?;
 
-    let tcp_server_bind_fn = lib.define_function("tcpserver_bind")?
-        .param("server",tcp_server.clone(), "Server to bind")?
+    let bind = lib.define_method("bind", tcp_server.clone())?
         .returns_nothing()?
         .fails_with(shared_def.error_type.clone())?
         .doc("Bind the server to the port and starts listening. Also starts all the outstations associated to it.")?
         .build()?;
 
     lib.define_class(&tcp_server)?
-        .constructor(&tcp_server_new_fn)?
-        .destructor(&tcp_server_destroy_fn)?
-        .method("add_outstation", &tcp_server_add_outstation_fn)?
-        .method("bind", &tcp_server_bind_fn)?
+        .constructor(&constructor)?
+        .destructor(destructor)?
+        .method(add_outstation)?
+        .method(bind)?
         .custom_destroy("Shutdown")?
         .doc(doc("TCP server that listens for connections and routes the messages to outstations.")
         .details("To add outstations to it, use {class:tcp_server.add_outstation()}. Once all the outstations are added, the server can be started with {class:tcp_server.bind()}.")
@@ -178,31 +173,24 @@ fn define_outstation(
         .doc("Create an outstation instance running on a serial port")?
         .build()?;
 
-    let outstation_destroy_fn = lib.define_function("outstation_destroy")?
-        .param("outstation",outstation.clone(), "Outstation to destroy")?
-        .returns_nothing()?
-        .doc(doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:tcp_server.[destructor]} will properly shutdown the outstation."))?
-        .build()?;
+    let destructor = lib.define_destructor(
+        outstation.clone(),
+        doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:tcp_server.[destructor]} will properly shutdown the outstation.")
+    )?;
 
-    let outstation_transaction_fn = lib
-        .define_function("outstation_execute_transaction")?
-        .param("outstation", outstation.clone(), "Outstation")?
+    let execute_transaction = lib
+        .define_method("execute_transaction", outstation.clone())?
         .param(
             "callback",
             transaction_interface,
-            "Method to execute as a transaction",
+            "Interface on which to execute the transaction",
         )?
         .returns_nothing()?
         .doc("Execute transaction to modify the internal database of the outstation")?
         .build()?;
 
-    let outstation_set_decode_level_fn = lib
-        .define_function("outstation_set_decode_level")?
-        .param(
-            "outstation",
-            outstation.clone(),
-            "{class:outstation} on which to set the decoding level",
-        )?
+    let set_decode_level = lib
+        .define_method("set_decode_level", outstation.clone())?
         .param("level", shared_def.decode_level.clone(), "Decode log")?
         .returns_nothing()?
         .fails_with(shared_def.error_type.clone())?
@@ -211,13 +199,13 @@ fn define_outstation(
 
     let outstation = lib
         .define_class(&outstation)?
-        .destructor(&outstation_destroy_fn)?
+        .destructor(destructor)?
         .static_method(
             "create_serial_session",
             &outstation_create_serial_session_fn,
         )?
-        .method("transaction", &outstation_transaction_fn)?
-        .method("set_decode_level", &outstation_set_decode_level_fn)?
+        .method(execute_transaction)?
+        .method(set_decode_level)?
         .doc(doc("Outstation handle").details("Use this handle to modify the internal database."))?
         .build()?;
 
@@ -893,7 +881,7 @@ fn define_address_filter(
         .doc("Create an address filter that accepts any IP address")?
         .build()?;
 
-    let address_filter_new_fn = lib
+    let constructor = lib
         .define_function("address_filter_new")?
         .param("address", StringType, "IP address to accept")?
         .returns(address_filter.clone(), "Address filter")?
@@ -901,36 +889,22 @@ fn define_address_filter(
         .doc("Create an address filter that accepts any IP address")?
         .build()?;
 
-    let address_filter_add_fn = lib
-        .define_function("address_filter_add")?
-        .param(
-            "address_filter",
-            address_filter.clone(),
-            "Address filter to modify",
-        )?
+    let add = lib
+        .define_method("add", address_filter.clone())?
         .param("address", StringType, "IP address to add")?
         .returns_nothing()?
         .fails_with(shared_def.error_type.clone())?
         .doc("Add an accepted IP address to the filter")?
         .build()?;
 
-    let address_filter_destroy_fn = lib
-        .define_function("address_filter_destroy")?
-        .param(
-            "address_filter",
-            address_filter.clone(),
-            "Address filter to destroy",
-        )?
-        .returns_nothing()?
-        .doc("Destroy an address filter")?
-        .build()?;
+    let destructor = lib.define_destructor(address_filter.clone(), "Destroy an address filter")?;
 
     let address_filter = lib
         .define_class(&address_filter)?
-        .constructor(&address_filter_new_fn)?
-        .destructor(&address_filter_destroy_fn)?
+        .constructor(&constructor)?
+        .destructor(destructor)?
         .static_method("any", &address_filter_any_fn)?
-        .method("add", &address_filter_add_fn)?
+        .method(add)?
         .doc("Outstation address filter")?
         .build()?;
 
