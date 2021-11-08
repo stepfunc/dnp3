@@ -159,9 +159,9 @@ pub unsafe fn outstation_create_serial_session(
     Ok(Box::into_raw(handle))
 }
 
-pub unsafe fn outstation_execute_transaction(
+pub unsafe fn outstation_transaction(
     outstation: *mut Outstation,
-    callback: ffi::OutstationTransaction,
+    callback: ffi::DatabaseTransaction,
 ) {
     if let Some(outstation) = outstation.as_mut() {
         outstation.handle.transaction(|database| {

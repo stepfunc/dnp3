@@ -115,11 +115,8 @@ fn define_outstation(
     types: &OutstationTypes,
 ) -> BackTraced<ClassHandle> {
     let transaction_interface = lib
-        .define_synchronous_interface("outstation_transaction", "Outstation transaction interface")?
-        .begin_callback(
-            "execute",
-            "Execute the transaction with the provided database",
-        )?
+        .define_synchronous_interface("database_transaction", "Database transaction interface")?
+        .begin_callback("execute", "Execute a transaction on the provided database")?
         .param("database", types.database.declaration.clone(), "Database")?
         .returns_nothing()?
         .end_callback()?
@@ -179,7 +176,7 @@ fn define_outstation(
     )?;
 
     let execute_transaction = lib
-        .define_method("execute_transaction", outstation.clone())?
+        .define_method("transaction", outstation.clone())?
         .param(
             "callback",
             transaction_interface,

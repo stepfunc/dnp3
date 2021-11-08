@@ -338,12 +338,12 @@ int main()
 
     // setup initial points
     // ANCHOR: database_init
-    dnp3_outstation_transaction_t startup_transaction = {
+    dnp3_database_transaction_t startup_transaction = {
         .execute = &outstation_transaction_startup,
         .on_destroy = NULL,
         .ctx = NULL,
     };
-    dnp3_outstation_execute_transaction(outstation, startup_transaction);
+    dnp3_outstation_transaction(outstation, startup_transaction);
     // ANCHOR_END: database_init
 
     // Start the outstation
@@ -373,68 +373,68 @@ int main()
             goto cleanup;
         }
         else if (strcmp(cbuf, "bi\n") == 0) {
-            dnp3_outstation_transaction_t transaction = {
+            dnp3_database_transaction_t transaction = {
                 .execute = &binary_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_execute_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "dbbi\n") == 0) {
-            dnp3_outstation_transaction_t transaction = {
+            dnp3_database_transaction_t transaction = {
                 .execute = &double_bit_binary_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_execute_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "bos\n") == 0) {
-            dnp3_outstation_transaction_t transaction = {
+            dnp3_database_transaction_t transaction = {
                 .execute = &binary_output_status_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_execute_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "co\n") == 0) {
-            dnp3_outstation_transaction_t transaction = {
+            dnp3_database_transaction_t transaction = {
                 .execute = &counter_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_execute_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "fco\n") == 0) {
-            dnp3_outstation_transaction_t transaction = {
+            dnp3_database_transaction_t transaction = {
                 .execute = &frozen_counter_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_execute_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "ai\n") == 0) {
-            dnp3_outstation_transaction_t transaction = {
+            dnp3_database_transaction_t transaction = {
                 .execute = &analog_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_execute_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "aos\n") == 0) {
-            dnp3_outstation_transaction_t transaction = {
+            dnp3_database_transaction_t transaction = {
                 .execute = &analog_output_status_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_execute_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "os\n") == 0) {
-            dnp3_outstation_transaction_t transaction = {
+            dnp3_database_transaction_t transaction = {
                 .execute = &octet_string_transaction,
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_execute_transaction(outstation, transaction);
+            dnp3_outstation_transaction(outstation, transaction);
         }
         else {
             printf("Unknown command\n");

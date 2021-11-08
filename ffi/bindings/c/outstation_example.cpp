@@ -110,11 +110,11 @@ class ConnectionStateListener : public dnp3::ConnectionStateListener {
 };
 
 template <class T>
-class OutstationTransaction : public dnp3::OutstationTransaction {
+class DatabaseTransaction : public dnp3::DatabaseTransaction {
 
     T expr;
 public:
-    OutstationTransaction(T expr) : expr(expr) {}
+    DatabaseTransaction(T expr) : expr(expr) {}
 
     void execute(dnp3::Database& database) override
     {
@@ -123,9 +123,9 @@ public:
 };
 
 template <class T>
-OutstationTransaction<T> transaction(T expr)
+DatabaseTransaction<T> transaction(T expr)
 {
-    return OutstationTransaction<T>(expr);
+    return DatabaseTransaction<T>(expr);
 }
 
 int main()
@@ -160,7 +160,7 @@ int main()
             db.add_octet_string(i, dnp3::EventClass::class1);
         }
     });
-    outstation.execute_transaction(setup);
+    outstation.transaction(setup);
 
     server.bind();
 
