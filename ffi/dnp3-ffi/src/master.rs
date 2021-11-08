@@ -494,7 +494,7 @@ impl Listener<PortState> for ffi::PortStateListener {
 
 pub type EndpointList = dnp3::tcp::EndpointList;
 
-pub(crate) unsafe fn endpoint_list_new(main_endpoint: &CStr) -> *mut EndpointList {
+pub(crate) unsafe fn endpoint_list_create(main_endpoint: &CStr) -> *mut EndpointList {
     Box::into_raw(Box::new(EndpointList::single(
         main_endpoint.to_string_lossy().to_string(),
     )))

@@ -615,33 +615,32 @@ fn define_master_channel_config(
 }
 
 fn define_endpoint_list(lib: &mut LibraryBuilder) -> BackTraced<ClassHandle> {
-    let endpoint_list_class = lib.declare_class("endpoint_list")?;
+    let endpoint_list = lib.declare_class("endpoint_list")?;
 
-    let endpoint_list_new = lib.define_function("endpoint_list_new")?
+    let constructor = lib.define_constructor(endpoint_list.clone())?
         .param("main_endpoint", StringType, "Main endpoint")?
-        .returns(endpoint_list_class.clone(), "New endpoint list")?
         .doc(doc("Create a new list of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
         .build()?;
 
     let destructor = lib.define_destructor(
-        endpoint_list_class.clone(),
+        endpoint_list.clone(),
         "Destroy a previously allocated endpoint list",
     )?;
 
-    let add_method = lib.define_method("add", endpoint_list_class.clone())?
+    let add_method = lib.define_method("add", endpoint_list.clone())?
         .param("endpoint", StringType, "Endpoint to add to the list")?
         .returns_nothing()?
         .doc(doc("Add an IP endpoint to the list.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
         .build()?;
 
-    let endpoint_list_class = lib.define_class(&endpoint_list_class)?
-        .constructor(&endpoint_list_new)?
+    let endpoint_list = lib.define_class(&endpoint_list)?
+        .constructor(constructor)?
         .destructor(destructor)?
         .method(add_method)?
         .doc(doc("List of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
         .build()?;
 
-    Ok(endpoint_list_class)
+    Ok(endpoint_list)
 }
 
 fn define_utc_timestamp(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
@@ -845,14 +844,12 @@ fn define_command_builder(
 ) -> BackTraced<ClassHandle> {
     let command_set = lib.declare_class("command_set")?;
 
-    let command_set_new_fn = lib
-        .define_function("command_set_new")?
-        .returns(command_set.clone(), "Handle to the created set of commands")?
+    let constructor = lib
+        .define_constructor(command_set.clone())?
         .doc("Create a new set of commands")?
         .build()?;
 
-    let command_set_destructor =
-        lib.define_destructor(command_set.clone(), "Destroy a set of commands")?;
+    let destructor = lib.define_destructor(command_set.clone(), "Destroy a set of commands")?;
 
     let finish_header = lib
         .define_method("finish_header", command_set.clone())?
@@ -998,8 +995,8 @@ fn define_command_builder(
 
     let command_set = lib
         .define_class(&command_set)?
-        .constructor(&command_set_new_fn)?
-        .destructor(command_set_destructor)?
+        .constructor(constructor)?
+        .destructor(destructor)?
         .method(add_u8_g12v1)?
         .method(add_u16_g12v1)?
         .method(add_u8_g41v1)?

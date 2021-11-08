@@ -62,7 +62,7 @@ where
     f(&mut builder).enable_all().build()
 }
 
-pub(crate) unsafe fn runtime_new(
+pub(crate) unsafe fn runtime_create(
     config: ffi::RuntimeConfig,
 ) -> Result<*mut crate::runtime::Runtime, ffi::ParamError> {
     let num_threads = if config.num_core_threads == 0 {

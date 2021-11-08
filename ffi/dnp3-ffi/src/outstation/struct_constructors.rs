@@ -34,7 +34,7 @@ pub fn address_filter_any() -> *mut AddressFilter {
     Box::into_raw(Box::new(AddressFilter::Any))
 }
 
-pub fn address_filter_new(address: &CStr) -> Result<*mut AddressFilter, ffi::ParamError> {
+pub fn address_filter_create(address: &CStr) -> Result<*mut AddressFilter, ffi::ParamError> {
     let address = address.to_string_lossy().parse()?;
 
     let mut set = std::collections::HashSet::new();

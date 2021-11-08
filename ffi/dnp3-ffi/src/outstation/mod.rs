@@ -34,7 +34,7 @@ pub struct Outstation {
     runtime: RuntimeHandle,
 }
 
-pub unsafe fn tcpserver_new(
+pub unsafe fn tcp_server_create(
     runtime: *mut Runtime,
     link_error_mode: ffi::LinkErrorMode,
     address: &CStr,

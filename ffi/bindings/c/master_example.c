@@ -251,7 +251,7 @@ int main()
     // ANCHOR: runtime_create
     dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
     runtime_config.num_core_threads = 4;
-    err = dnp3_runtime_new(runtime_config, &runtime);
+    err = dnp3_runtime_create(runtime_config, &runtime);
     // ANCHOR_END: runtime_create
     if (err) {
         printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
@@ -259,7 +259,7 @@ int main()
     }
 
     // ANCHOR: create_master_channel
-    dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_new("127.0.0.1:20000");
+    dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_create("127.0.0.1:20000");
     err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, get_master_channel_config(), endpoints, dnp3_connect_strategy_init(), get_client_state_listener(), &channel);
     dnp3_endpoint_list_destroy(endpoints);
     // ANCHOR_END: create_master_channel
@@ -319,7 +319,7 @@ int main()
             dnp3_master_channel_set_decode_level(channel, level);
         }
         else if (strcmp(cbuf, "rao\n") == 0) {
-            dnp3_request_t *request = dnp3_request_new();
+            dnp3_request_t *request = dnp3_request_create();
             dnp3_request_add_all_objects_header(request, DNP3_VARIATION_GROUP40_VAR0);
 
             dnp3_read_task_callback_t cb = {
@@ -332,7 +332,7 @@ int main()
             dnp3_request_destroy(request);
         }
         else if (strcmp(cbuf, "rmo\n") == 0) {
-            dnp3_request_t *request = dnp3_request_new();
+            dnp3_request_t *request = dnp3_request_create();
             dnp3_request_add_all_objects_header(request, DNP3_VARIATION_GROUP10_VAR0);
             dnp3_request_add_all_objects_header(request, DNP3_VARIATION_GROUP40_VAR0);
 
@@ -347,7 +347,7 @@ int main()
         }
         else if (strcmp(cbuf, "cmd\n") == 0) {
             // ANCHOR: assoc_control
-            dnp3_command_set_t *commands = dnp3_command_set_new();
+            dnp3_command_set_t *commands = dnp3_command_set_create();
             dnp3_group12_var1_t g12v1 = dnp3_group12_var1_init(dnp3_control_code_init(DNP3_TRIP_CLOSE_CODE_NUL, false, DNP3_OP_TYPE_LATCH_ON), 1, 1000, 1000);
             dnp3_command_set_add_g12_v1_u16(commands, 3, g12v1);
 

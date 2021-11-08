@@ -300,14 +300,14 @@ int main()
     // Create runtime
     dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
     runtime_config.num_core_threads = 4;
-    err = dnp3_runtime_new(runtime_config, &runtime);
+    err = dnp3_runtime_create(runtime_config, &runtime);
     if (err) {
         printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
         goto cleanup;
     }
 
     // ANCHOR: create_tcp_server
-    err = dnp3_tcpserver_new(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", &server);
+    err = dnp3_tcp_server_create(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", &server);
     // ANCHOR_END: create_tcp_server
     if (err) {
         printf("unable to create server: %s \n", dnp3_param_error_to_string(err));

@@ -34,7 +34,7 @@ impl From<ffi::Group12Var1> for Group12Var1 {
 // Commands is just a handle to a CommandBuilder
 pub type CommandSet = dnp3::master::CommandBuilder;
 
-pub unsafe fn command_set_new() -> *mut CommandSet {
+pub unsafe fn command_set_create() -> *mut CommandSet {
     Box::into_raw(Box::new(CommandBuilder::new()))
 }
 

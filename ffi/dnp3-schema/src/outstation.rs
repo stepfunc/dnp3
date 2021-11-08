@@ -48,7 +48,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     let tcp_server = lib.declare_class("tcp_server")?;
 
     let constructor = lib
-        .define_function("tcpserver_new")?
+        .define_constructor(tcp_server.clone())?
         .param(
             "runtime",
             shared_def.runtime_class.clone(),
@@ -64,7 +64,6 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
             StringType,
             "Address to bind the server to e.g. 127.0.0.1:20000",
         )?
-        .returns(tcp_server.clone(), "New TCP server instance")?
         .fails_with(shared_def.error_type.clone())?
         .doc(
             doc("Create a new TCP server.").details("To start it, use {class:tcp_server.bind()}."),
@@ -96,7 +95,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .build()?;
 
     lib.define_class(&tcp_server)?
-        .constructor(&constructor)?
+        .constructor(constructor)?
         .destructor(destructor)?
         .method(add_outstation)?
         .method(bind)?
@@ -879,9 +878,8 @@ fn define_address_filter(
         .build()?;
 
     let constructor = lib
-        .define_function("address_filter_new")?
+        .define_constructor(address_filter.clone())?
         .param("address", StringType, "IP address to accept")?
-        .returns(address_filter.clone(), "Address filter")?
         .fails_with(shared_def.error_type.clone())?
         .doc("Create an address filter that accepts any IP address")?
         .build()?;
@@ -898,7 +896,7 @@ fn define_address_filter(
 
     let address_filter = lib
         .define_class(&address_filter)?
-        .constructor(&constructor)?
+        .constructor(constructor)?
         .destructor(destructor)?
         .static_method("any", &address_filter_any_fn)?
         .method(add)?

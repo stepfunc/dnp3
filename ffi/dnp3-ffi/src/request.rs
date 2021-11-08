@@ -23,7 +23,7 @@ impl Request {
     }
 }
 
-pub unsafe fn request_new() -> *mut Request {
+pub unsafe fn request_create() -> *mut Request {
     let request = Box::new(Request::new());
     Box::into_raw(request)
 }

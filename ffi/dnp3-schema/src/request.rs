@@ -7,9 +7,8 @@ use oo_bindgen::types::BasicType;
 pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<ClassHandle> {
     let request = lib.declare_class("request")?;
 
-    let request_new_fn = lib
-        .define_function("request_new")?
-        .returns(request.clone(), "Handle to the created request")?
+    let constructor = lib
+        .define_constructor(request.clone())?
         .doc("Create a new request")?
         .build()?;
 
@@ -74,7 +73,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let request = lib
         .define_class(&request)?
-        .constructor(&request_new_fn)?
+        .constructor(constructor)?
         .destructor(destructor)?
         .static_method("class_request", &request_new_class_fn)?
         .method(add_one_byte_header)?

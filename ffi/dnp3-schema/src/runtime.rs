@@ -33,21 +33,16 @@ pub fn define(
     error_type: ErrorType<Unvalidated>,
 ) -> BackTraced<ClassDeclarationHandle> {
     // Forward declare the class
-    let runtime_class = lib.declare_class("runtime")?;
+    let runtime = lib.declare_class("runtime")?;
 
     let config_struct = define_runtime_config(lib)?;
 
-    // Declare the native functions
-    let new_fn = lib
-        .define_function("runtime_new")?
+    let constructor = lib
+        .define_constructor(runtime.clone())?
         .param(
             "config",
           config_struct,
             "Runtime configuration",
-        )?
-        .returns(
-          runtime_class.clone(),
-            "Handle to the created runtime, {null} if an error occurred",
         )?
         .fails_with(error_type)?
         .doc(
@@ -58,19 +53,18 @@ pub fn define(
 
     let destructor = lib
         .define_destructor(
-            runtime_class.clone(),
+            runtime.clone(),
             doc("Destroy a runtime.")
                 .details("This method will gracefully wait for all asynchronous operation to end before returning")
         )?;
 
-    // Declare the object-oriented class
-    let runtime_class = lib
-        .define_class(&runtime_class)?
-        .constructor(&new_fn)?
+    let runtime = lib
+        .define_class(&runtime)?
+        .constructor(constructor)?
         .destructor(destructor)?
         .custom_destroy("shutdown")?
         .doc("Handle to the underlying runtime")?
         .build()?;
 
-    Ok(runtime_class.declaration.clone())
+    Ok(runtime.declaration.clone())
 }
