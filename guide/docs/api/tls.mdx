@@ -63,10 +63,41 @@ The fields are the following:
   or the chain of certificates to present to the peer.
 - `private_key_path`: path to the unencrypted PEM file containing the private
   key of the local certificate.
+- `password`: password used to decrypt the private key file. Leave empty if the file
+  is not encrypted. See the next section for more details.
 - `min_tls_version`: minimum TLS version to support. Setting this to `Tls1_3`
   will force TLSv1.3.
 - `certificate_mode`: mode of verification of the presented certificate. See
   the next section for more details.
+
+### Private key encryption
+
+Unencrypted private keys can be stored in PKCS#8 (`-----BEGIN PRIVATE KEY-----`) or
+PKCS#1 format (`----BEGIN RSA PRIVATE KEY-----`).
+
+Encrypted private keys **must** be stored in PKCS#8v2 (`-----BEGIN ENCRYPTED PRIVATE KEY-----`).
+PKCS#1 encryption is **not** supported. The following algorithms are supported:
+
+- Key derivation functions:
+  - scrypt (RFC 7914) **recommended**
+  - PBKDF2 (RFC 8018) SHA-2 based PRF with HMAC-SHA224, HMAC-SHA256, HMAC-SHA384, or HMAC-SHA512
+- Symmetric encryption:
+  - AES-128-CBC
+  - AES-192-CBC
+  - AES-256-CBC **recommended**
+
+Notable unsupported algorithms are all SHA-1 based key derivation and DES/3DES symmetric encryption.
+These are considered insecure and should not be used anymore.
+
+[OpenSSL `pkcs8`](https://www.openssl.org/docs/man1.1.1/man1/openssl-pkcs8.html) tool can help you
+encrypting or converting private keys.
+
+:::warning
+Encrypting private keys is not an automatic security guarantee. Proper access control should be prioritized
+before encrypting the private the key. Keep in mind that encrypting a private key and leaving the password
+somewhere not-so-private (e.g. in the source code of your application) is the equivalent of locking the doors
+of your home and leaving a key in the mailbox.
+:::
 
 ### Certificate mode
 

@@ -41,7 +41,9 @@ public class OutstationTlsExample {
             "test.com",
             "./certs/self_signed/entity1_cert.pem",
             "./certs/self_signed/entity2_cert.pem",
-            "./certs/self_signed/entity2_key.pem");
+            "./certs/self_signed/entity2_key.pem",
+            "" // no password
+            );
     selfSignedTlsConfig.certificateMode = CertificateMode.SELF_SIGNED_CERTIFICATE;
     // ANCHOR_END: tls_self_signed_config
 
@@ -51,7 +53,9 @@ public class OutstationTlsExample {
             "test.com",
             "./certs/ca_chain/ca_cert.pem",
             "./certs/ca_chain/entity2_cert.pem",
-            "./certs/ca_chain/entity2_key.pem");
+            "./certs/ca_chain/entity2_key.pem",
+            "" // no password
+            );
     // ANCHOR_END: tls_ca_chain_config
 
     TlsServerConfig tlsConfig = caChainTlsConfig;
