@@ -363,7 +363,7 @@ public class MasterExample {
                     ubyte(1),
                     uint(1000),
                     uint(1000));
-            commands.addG12v1U16(ushort(3), control);
+            commands.addG12V1U16(ushort(3), control);
 
             CommandResult result =
                 channel

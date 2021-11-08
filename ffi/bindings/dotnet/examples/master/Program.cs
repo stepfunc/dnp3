@@ -279,7 +279,7 @@ class MainClass
                     {
                         // ANCHOR: assoc_control
                         var commands = new CommandSet();
-                        commands.AddG12v1U8(3, new Group12Var1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
+                        commands.AddG12V1U8(3, new Group12Var1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
                         var result = await channel.Operate(association, CommandMode.SelectBeforeOperate, commands);
                         Console.WriteLine($"Result: {result}");
                         // ANCHOR_END: assoc_control

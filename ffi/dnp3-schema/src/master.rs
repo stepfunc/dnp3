@@ -861,7 +861,7 @@ fn define_command_builder(
         .build()?;
 
     let add_u8_g12v1 = lib
-        .define_method("add_g12v1_u8", command_set.clone())?
+        .define_method("add_g12_v1_u8", command_set.clone())?
         .param(
             "idx",
             BasicType::U8,
@@ -873,7 +873,7 @@ fn define_command_builder(
         .build()?;
 
     let add_u16_g12v1 = lib
-        .define_method("add_g12v1_u16", command_set.clone())?
+        .define_method("add_g12_v1_u16", command_set.clone())?
         .param(
             "idx",
             BasicType::U16,
@@ -885,7 +885,7 @@ fn define_command_builder(
         .build()?;
 
     let add_u8_g41v1 = lib
-        .define_method("add_g41v1_u8", command_set.clone())?
+        .define_method("add_g41_v1_u8", command_set.clone())?
         .param(
             "idx",
             BasicType::U8,
@@ -897,7 +897,7 @@ fn define_command_builder(
         .build()?;
 
     let add_u16_g41v1 = lib
-        .define_method("add_g41v1_u16", command_set.clone())?
+        .define_method("add_g41_v1_u16", command_set.clone())?
         .param(
             "idx",
             BasicType::U16,
@@ -909,7 +909,7 @@ fn define_command_builder(
         .build()?;
 
     let add_u8_g41v2 = lib
-        .define_method("add_g41v2_u8", command_set.clone())?
+        .define_method("add_g41_v2_u8", command_set.clone())?
         .param(
             "idx",
             BasicType::U8,
@@ -921,7 +921,7 @@ fn define_command_builder(
         .build()?;
 
     let add_u16_g41v2 = lib
-        .define_method("add_g41v2_u16", command_set.clone())?
+        .define_method("add_g41_v2_u16", command_set.clone())?
         .param(
             "idx",
             BasicType::U16,
@@ -933,7 +933,7 @@ fn define_command_builder(
         .build()?;
 
     let add_u8_g41v3 = lib
-        .define_method("add_g41v3_u8", command_set.clone())?
+        .define_method("add_g41_v3_u8", command_set.clone())?
         .param(
             "idx",
             BasicType::U8,
@@ -949,7 +949,7 @@ fn define_command_builder(
         .build()?;
 
     let add_u16_g41v3 = lib
-        .define_method("add_g41v3_u16", command_set.clone())?
+        .define_method("add_g41_v3_u16", command_set.clone())?
         .param(
             "idx",
             BasicType::U16,
@@ -965,7 +965,7 @@ fn define_command_builder(
         .build()?;
 
     let add_u8_g41v4 = lib
-        .define_method("add_g41v4_u8", command_set.clone())?
+        .define_method("add_g41_v4_u8", command_set.clone())?
         .param(
             "idx",
             BasicType::U8,
@@ -981,7 +981,7 @@ fn define_command_builder(
         .build()?;
 
     let add_u16_g41v4 = lib
-        .define_method("add_g41v4_u16", command_set.clone())?
+        .define_method("add_g41_v4_u16", command_set.clone())?
         .param(
             "idx",
             BasicType::U16,
