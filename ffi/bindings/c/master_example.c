@@ -50,7 +50,7 @@ void handle_binary(dnp3_header_info_t info, dnp3_binary_iterator_t *it, void *ar
     printf("Variation: %s \n", dnp3_variation_to_string(info.variation));
 
     dnp3_binary_t *value = NULL;
-    while (value = dnp3_binary_next(it)) {
+    while (value = dnp3_binary_iterator_next(it)) {
         printf("BI %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
@@ -62,7 +62,7 @@ void handle_double_bit_binary(dnp3_header_info_t info, dnp3_double_bit_binary_it
     printf("Variation: %s \n", dnp3_variation_to_string(info.variation));
 
     dnp3_double_bit_binary_t *value = NULL;
-    while (value = dnp3_doublebitbinary_next(it)) {
+    while (value = dnp3_double_bit_binary_iterator_next(it)) {
         printf("DBBI %u: Value=%X Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
@@ -74,7 +74,7 @@ void handle_binary_output_status(dnp3_header_info_t info, dnp3_binary_output_sta
     printf("Variation: %s \n", dnp3_variation_to_string(info.variation));
 
     dnp3_binary_output_status_t *value = NULL;
-    while (value = dnp3_binaryoutputstatus_next(it)) {
+    while (value = dnp3_binary_output_status_iterator_next(it)) {
         printf("BOS %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
@@ -86,7 +86,7 @@ void handle_counter(dnp3_header_info_t info, dnp3_counter_iterator_t *it, void *
     printf("Variation: %s \n", dnp3_variation_to_string(info.variation));
 
     dnp3_counter_t *value = NULL;
-    while (value = dnp3_counter_next(it)) {
+    while (value = dnp3_counter_iterator_next(it)) {
         printf("Counter %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
@@ -98,7 +98,7 @@ void handle_frozen_counter(dnp3_header_info_t info, dnp3_frozen_counter_iterator
     printf("Variation: %s \n", dnp3_variation_to_string(info.variation));
 
     dnp3_frozen_counter_t *value = NULL;
-    while (value = dnp3_frozencounter_next(it)) {
+    while (value = dnp3_frozen_counter_iterator_next(it)) {
         printf("Frozen Counter %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
@@ -110,7 +110,7 @@ void handle_analog(dnp3_header_info_t info, dnp3_analog_iterator_t *it, void *ar
     printf("Variation: %s \n", dnp3_variation_to_string(info.variation));
 
     dnp3_analog_t *value = NULL;
-    while (value = dnp3_analog_next(it)) {
+    while (value = dnp3_analog_iterator_next(it)) {
         printf("AI %u: Value=%f Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
@@ -122,7 +122,7 @@ void handle_analog_output_status(dnp3_header_info_t info, dnp3_analog_output_sta
     printf("Variation: %s \n", dnp3_variation_to_string(info.variation));
 
     dnp3_analog_output_status_t *value = NULL;
-    while (value = dnp3_analogoutputstatus_next(it)) {
+    while (value = dnp3_analog_output_status_iterator_next(it)) {
         printf("AOS %u: Value=%f Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
@@ -134,12 +134,12 @@ void handle_octet_strings(dnp3_header_info_t info, dnp3_octet_string_iterator_t 
     printf("Variation: %s \n", dnp3_variation_to_string(info.variation));
 
     dnp3_octet_string_t *value = NULL;
-    while (value = dnp3_octetstring_next(it)) {
+    while (value = dnp3_octet_string_iterator_next(it)) {
         printf("Octet String: %u: Value=", value->index);
-        dnp3_byte_t *single_byte = dnp3_byte_next(value->value);
+        dnp3_byte_value_t *single_byte = dnp3_byte_iterator_next(value->value);
         while (single_byte != NULL) {
             printf("%02X", single_byte->value);
-            single_byte = dnp3_byte_next(value->value);
+            single_byte = dnp3_byte_iterator_next(value->value);
         }
 
         printf("\n");
@@ -212,11 +212,11 @@ dnp3_association_config_t get_association_config()
 // ANCHOR_END: association_config
 
 // ANCHOR: association_handler
-dnp3_timestamp_utc_t get_system_time(void *arg)
+dnp3_utc_timestamp_t get_system_time(void *arg)
 {
     time_t timer = time(NULL);
 
-    return dnp3_timestamp_utc_valid(timer * 1000);
+    return dnp3_utc_timestamp_valid(timer * 1000);
 }
 
 dnp3_association_handler_t get_association_handler()
@@ -348,7 +348,7 @@ int main()
         else if (strcmp(cbuf, "cmd\n") == 0) {
             // ANCHOR: assoc_control
             dnp3_commands_t *commands = dnp3_commands_new();
-            dnp3_g12v1_t g12v1 = dnp3_g12v1_init(dnp3_control_code_init(DNP3_TRIP_CLOSE_CODE_NUL, false, DNP3_OP_TYPE_LATCH_ON), 1, 1000, 1000);
+            dnp3_group12_var1_t g12v1 = dnp3_group12_var1_init(dnp3_control_code_init(DNP3_TRIP_CLOSE_CODE_NUL, false, DNP3_OP_TYPE_LATCH_ON), 1, 1000, 1000);
             dnp3_commands_add_g12v1_u16(commands, 3, g12v1);
 
             dnp3_command_task_callback_t cb = {

@@ -70,10 +70,10 @@ class OutstationInformation : public dnp3::OutstationInformation {
 class ControlHandler : public dnp3::ControlHandler {
     void begin_fragment() override {}
     void end_fragment() override {}
-    dnp3::CommandStatus select_g12v1(const dnp3::G12v1& control, uint16_t index, dnp3::Database& database) override {
+    dnp3::CommandStatus select_g12v1(const dnp3::Group12Var1& control, uint16_t index, dnp3::Database& database) override {
         return dnp3::CommandStatus::not_supported;
     }
-    dnp3::CommandStatus operate_g12v1(const dnp3::G12v1& control, uint16_t index, dnp3::OperateType op_type, dnp3::Database& database) override {
+    dnp3::CommandStatus operate_g12v1(const dnp3::Group12Var1& control, uint16_t index, dnp3::OperateType op_type, dnp3::Database& database) override {
         return dnp3::CommandStatus::not_supported;
     }
     dnp3::CommandStatus select_g41v1(int32_t control, uint16_t index, dnp3::Database& database) override {

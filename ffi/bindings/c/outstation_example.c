@@ -98,9 +98,9 @@ void begin_fragment(void *context) {}
 
 void end_fragment(void *context) {}
 
-dnp3_command_status_t select_g12v1(dnp3_g12v1_t control, uint16_t index, dnp3_database_t *database, void *context) { return DNP3_COMMAND_STATUS_NOT_SUPPORTED; }
+dnp3_command_status_t select_g12v1(dnp3_group12_var1_t control, uint16_t index, dnp3_database_t *database, void *context) { return DNP3_COMMAND_STATUS_NOT_SUPPORTED; }
 
-dnp3_command_status_t operate_g12v1(dnp3_g12v1_t control, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
+dnp3_command_status_t operate_g12v1(dnp3_group12_var1_t control, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
 {
     return DNP3_COMMAND_STATUS_NOT_SUPPORTED;
 }
@@ -236,17 +236,17 @@ void analog_output_status_transaction(dnp3_database_t *db, void *context)
 
 void octet_string_transaction(dnp3_database_t *db, void *context)
 {
-    dnp3_octet_string_value_t *octet_string = dnp3_octet_string_new();
-    dnp3_octet_string_add(octet_string, 0x48); // H
-    dnp3_octet_string_add(octet_string, 0x65); // e
-    dnp3_octet_string_add(octet_string, 0x6C); // l
-    dnp3_octet_string_add(octet_string, 0x6C); // l
-    dnp3_octet_string_add(octet_string, 0x6F); // o
-    dnp3_octet_string_add(octet_string, 0x00); // \0
+    dnp3_octet_string_value_t *octet_string = dnp3_octet_string_value_create();
+    dnp3_octet_string_value_add(octet_string, 0x48); // H
+    dnp3_octet_string_value_add(octet_string, 0x65); // e
+    dnp3_octet_string_value_add(octet_string, 0x6C); // l
+    dnp3_octet_string_value_add(octet_string, 0x6C); // l
+    dnp3_octet_string_value_add(octet_string, 0x6F); // o
+    dnp3_octet_string_value_add(octet_string, 0x00); // \0
 
     dnp3_database_update_octet_string(db, 7, octet_string, dnp3_update_options_init());
 
-    dnp3_octet_string_destroy(octet_string);
+    dnp3_octet_string_value_destroy(octet_string);
 }
 
 void on_connection_state_change(dnp3_connection_state_t state, void *ctx) { printf("Connection state change: %s\n", dnp3_connection_state_to_string(state)); }
@@ -343,7 +343,7 @@ int main()
         .on_destroy = NULL,
         .ctx = NULL,
     };
-    dnp3_outstation_transaction(outstation, startup_transaction);
+    dnp3_outstation_execute_transaction(outstation, startup_transaction);
     // ANCHOR_END: database_init
 
     // Start the outstation
@@ -378,7 +378,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_transaction(outstation, transaction);
+            dnp3_outstation_execute_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "dbbi\n") == 0) {
             dnp3_outstation_transaction_t transaction = {
@@ -386,7 +386,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_transaction(outstation, transaction);
+            dnp3_outstation_execute_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "bos\n") == 0) {
             dnp3_outstation_transaction_t transaction = {
@@ -394,7 +394,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_transaction(outstation, transaction);
+            dnp3_outstation_execute_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "co\n") == 0) {
             dnp3_outstation_transaction_t transaction = {
@@ -402,7 +402,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_transaction(outstation, transaction);
+            dnp3_outstation_execute_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "fco\n") == 0) {
             dnp3_outstation_transaction_t transaction = {
@@ -410,7 +410,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_transaction(outstation, transaction);
+            dnp3_outstation_execute_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "ai\n") == 0) {
             dnp3_outstation_transaction_t transaction = {
@@ -418,7 +418,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_transaction(outstation, transaction);
+            dnp3_outstation_execute_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "aos\n") == 0) {
             dnp3_outstation_transaction_t transaction = {
@@ -426,7 +426,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_transaction(outstation, transaction);
+            dnp3_outstation_execute_transaction(outstation, transaction);
         }
         else if (strcmp(cbuf, "os\n") == 0) {
             dnp3_outstation_transaction_t transaction = {
@@ -434,7 +434,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = &database_points,
             };
-            dnp3_outstation_transaction(outstation, transaction);
+            dnp3_outstation_execute_transaction(outstation, transaction);
         }
         else {
             printf("Unknown command\n");

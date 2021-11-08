@@ -92,10 +92,10 @@ class ReadHandler : public dnp3::ReadHandler {
 };
 
 class AssociationHandler : public dnp3::AssociationHandler {
-    dnp3::TimestampUtc get_current_time()
+    dnp3::UtcTimestamp get_current_time()
     {
         const auto time_since_epoch = std::chrono::system_clock::now().time_since_epoch();
-        return dnp3::TimestampUtc::valid(std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count());
+        return dnp3::UtcTimestamp::valid(std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count());
     }
 };
 

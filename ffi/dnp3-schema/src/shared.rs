@@ -10,9 +10,10 @@ use oo_bindgen::types::{BasicType, DurationType};
 use oo_bindgen::{doc, BackTraced};
 use oo_bindgen::{BindingError, LibraryBuilder};
 use std::time::Duration;
+use oo_bindgen::doc::Unvalidated;
 
 pub struct SharedDefinitions {
-    pub error_type: ErrorType,
+    pub error_type: ErrorType<Unvalidated>,
     pub port_state_listener: InterfaceHandle,
     pub variation_enum: EnumHandle,
     pub runtime_class: ClassDeclarationHandle,

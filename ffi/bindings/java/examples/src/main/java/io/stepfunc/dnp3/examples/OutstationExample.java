@@ -108,13 +108,13 @@ class TestControlHandler implements ControlHandler {
   public void endFragment() {}
 
   @Override
-  public CommandStatus selectG12v1(G12v1 control, UShort index, Database database) {
+  public CommandStatus selectG12v1(Group12Var1 control, UShort index, Database database) {
     return CommandStatus.NOT_SUPPORTED;
   }
 
   @Override
   public CommandStatus operateG12v1(
-      G12v1 control, UShort index, OperateType opType, Database database) {
+      Group12Var1 control, UShort index, OperateType opType, Database database) {
     return CommandStatus.NOT_SUPPORTED;
   }
 

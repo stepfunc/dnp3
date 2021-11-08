@@ -4,6 +4,7 @@ use oo_bindgen::name::Name;
 use oo_bindgen::structs::{ConstructorType, FunctionArgStructHandle, Number};
 use oo_bindgen::types::BasicType;
 use oo_bindgen::*;
+use oo_bindgen::doc::Unvalidated;
 
 fn define_runtime_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let num_core_threads = Name::create("num_core_threads")?;
@@ -29,7 +30,7 @@ fn define_runtime_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
 
 pub fn define(
     lib: &mut LibraryBuilder,
-    error_type: ErrorType,
+    error_type: ErrorType<Unvalidated>,
 ) -> BackTraced<ClassDeclarationHandle> {
     // Forward declare the class
     let runtime_class = lib.declare_class("runtime")?;
@@ -51,7 +52,7 @@ pub fn define(
         .fails_with(error_type)?
         .doc(
             doc("Creates a new runtime for running the protocol stack.")
-            .warning("The runtime should be kept alive for as long as it's needed and it should be released with {class:Runtime.[destructor]}")
+            .warning("The runtime should be kept alive for as long as it's needed and it should be released with {class:runtime.[destructor]}")
         )?
         .build()?;
 

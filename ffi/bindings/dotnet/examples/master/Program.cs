@@ -141,9 +141,9 @@ class MainClass
     // ANCHOR: association_handler
     class TestAssocationHandler : IAssociationHandler
     {
-        public TimestampUtc GetCurrentTime()
+        public UtcTimestamp GetCurrentTime()
         {
-            return TimestampUtc.Valid((ulong)DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
+            return UtcTimestamp.Valid((ulong)DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
         }
     }
     // ANCHOR_END: association_handler
@@ -279,7 +279,7 @@ class MainClass
                     {
                         // ANCHOR: assoc_control
                         var commands = new Commands();
-                        commands.AddG12v1u8(3, new G12v1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
+                        commands.AddG12V1U8(3, new Group12Var1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
                         var result = await channel.Operate(association, CommandMode.SelectBeforeOperate, commands);
                         Console.WriteLine($"Result: {result}");
                         // ANCHOR_END: assoc_control

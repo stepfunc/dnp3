@@ -220,8 +220,8 @@ class TestReadHandler implements ReadHandler {
 // ANCHOR: association_handler
 class TestAssociationHandler implements AssociationHandler {
   @Override
-  public TimestampUtc getCurrentTime() {
-    return TimestampUtc.valid(ulong(System.currentTimeMillis()));
+  public UtcTimestamp getCurrentTime() {
+    return UtcTimestamp.valid(ulong(System.currentTimeMillis()));
   }
 }
 // ANCHOR_END: association_handler
@@ -357,13 +357,13 @@ public class MasterExample {
           {
             // ANCHOR: assoc_control
             Commands commands = new Commands();
-            G12v1 g12v1 =
-                new G12v1(
+            Group12Var1 control =
+                new Group12Var1(
                     new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
                     ubyte(1),
                     uint(1000),
                     uint(1000));
-            commands.addG12v1u16(ushort(3), g12v1);
+            commands.addG12V1U16(ushort(3), control);
 
             CommandResult result =
                 channel

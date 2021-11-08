@@ -6,6 +6,7 @@ use oo_bindgen::structs::{
 };
 use oo_bindgen::types::{BasicType, StringType};
 use oo_bindgen::*;
+use oo_bindgen::doc::Unvalidated;
 
 fn define_log_level_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let definition = lib
@@ -106,7 +107,7 @@ const NOTHING: &str = "nothing";
 
 pub fn define(
     lib: &mut LibraryBuilder,
-    error_type: ErrorType,
+    error_type: ErrorType<Unvalidated>,
 ) -> BackTraced<UniversalStructHandle> {
     let log_level_enum = define_log_level_enum(lib)?;
 

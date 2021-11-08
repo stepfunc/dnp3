@@ -78,9 +78,9 @@ class ExampleOutstation
 
         public void EndFragment() { }
 
-        public CommandStatus SelectG12v1(G12v1 control, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG12v1(Group12Var1 control, ushort index, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus OperateG12v1(G12v1 control, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG12v1(Group12Var1 control, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
 
         public CommandStatus SelectG41v1(int control, ushort index, Database database) { return CommandStatus.NotSupported; }
 
