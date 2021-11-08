@@ -1016,6 +1016,11 @@ fn define_tls_server_config(
             "Path to the the PEM-encoded private key",
         )?
         .add(
+            "password",
+            Type::String,
+            doc("Optional password if the private key file is encrypted").details("Only PKCS#8 encrypted files are supported.").details("Pass empty string if the file is not encrypted.")
+        )?
+        .add(
             "min_tls_version",
             StructElementType::Enum(shared.min_tls_version.clone(), Some("Tls1_2".to_owned())),
             "Minimum TLS version allowed",

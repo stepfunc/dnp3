@@ -2,7 +2,7 @@ mod master;
 mod outstation;
 
 use std::convert::TryFrom;
-use std::io::{self, ErrorKind};
+use std::io::{self, ErrorKind, Read};
 use std::path::Path;
 
 pub use master::*;
@@ -191,22 +191,40 @@ fn load_certs(path: &Path, is_local: bool) -> Result<Vec<rustls::Certificate>, T
     }
 }
 
-fn load_private_key(path: &Path) -> Result<rustls::PrivateKey, TlsError> {
+fn load_private_key(path: &Path, password: Option<&str>) -> Result<rustls::PrivateKey, TlsError> {
     let f = std::fs::File::open(path).map_err(TlsError::InvalidPrivateKey)?;
     let mut f = io::BufReader::new(f);
 
-    match rustls_pemfile::read_one(&mut f).map_err(TlsError::InvalidPrivateKey)? {
-        Some(rustls_pemfile::Item::RSAKey(key)) => Ok(rustls::PrivateKey(key)),
-        Some(rustls_pemfile::Item::PKCS8Key(key)) => Ok(rustls::PrivateKey(key)),
-        Some(rustls_pemfile::Item::X509Certificate(_)) => {
-            Err(TlsError::InvalidPrivateKey(io::Error::new(
-                ErrorKind::InvalidData,
-                "file contains cert, not private key",
-            )))
+    match password {
+        // With a password, we parse using pkcs8
+        Some(password) => {
+            let mut file_content = String::new();
+            f.read_to_string(&mut file_content)
+                .map_err(TlsError::InvalidPrivateKey)?;
+            let encrypted = pkcs8::EncryptedPrivateKeyDocument::from_pem(&file_content)?;
+            let decrypted = encrypted.decrypt(password)?;
+            Ok(rustls::PrivateKey(decrypted.as_ref().to_owned()))
         }
-        None => Err(TlsError::InvalidPrivateKey(io::Error::new(
-            ErrorKind::InvalidData,
-            "file does not contain private key",
-        ))),
+        // No password, we parse using rustls-pemfile
+        None => match rustls_pemfile::read_one(&mut f).map_err(TlsError::InvalidPrivateKey)? {
+            Some(rustls_pemfile::Item::RSAKey(key)) => Ok(rustls::PrivateKey(key)),
+            Some(rustls_pemfile::Item::PKCS8Key(key)) => Ok(rustls::PrivateKey(key)),
+            Some(rustls_pemfile::Item::X509Certificate(_)) => {
+                Err(TlsError::InvalidPrivateKey(io::Error::new(
+                    ErrorKind::InvalidData,
+                    "file contains cert, not private key",
+                )))
+            }
+            None => Err(TlsError::InvalidPrivateKey(io::Error::new(
+                ErrorKind::InvalidData,
+                "file does not contain private key",
+            ))),
+        },
+    }
+}
+
+impl From<pkcs8::Error> for TlsError {
+    fn from(from: pkcs8::Error) -> Self {
+        TlsError::InvalidPrivateKey(io::Error::new(ErrorKind::InvalidData, from.to_string()))
     }
 }

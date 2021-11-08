@@ -23,12 +23,13 @@ impl TlsServerConfig {
         peer_cert_path: &Path,
         local_cert_path: &Path,
         private_key_path: &Path,
+        password: Option<&str>,
         min_tls_version: MinTlsVersion,
         certificate_mode: CertificateMode,
     ) -> Result<Self, TlsError> {
         let mut peer_certs = load_certs(peer_cert_path, false)?;
         let local_certs = load_certs(local_cert_path, true)?;
-        let private_key = load_private_key(private_key_path)?;
+        let private_key = load_private_key(private_key_path, password)?;
 
         let verifier = match certificate_mode {
             CertificateMode::TrustChain => {

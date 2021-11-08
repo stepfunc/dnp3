@@ -61,11 +61,18 @@ pub unsafe fn tcpserver_new_tls(
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let address = address.to_string_lossy().parse()?;
 
+    let password = tls_config.password().to_string_lossy();
+    let optional_password = match password.as_ref() {
+        "" => None,
+        password => Some(password),
+    };
+
     let tls_config = TlsServerConfig::new(
         &tls_config.dns_name().to_string_lossy(),
         Path::new(tls_config.peer_cert_path().to_string_lossy().as_ref()),
         Path::new(tls_config.local_cert_path().to_string_lossy().as_ref()),
         Path::new(tls_config.private_key_path().to_string_lossy().as_ref()),
+        optional_password,
         tls_config.min_tls_version().into(),
         tls_config.certificate_mode().into(),
     )
