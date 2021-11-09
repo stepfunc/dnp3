@@ -6,7 +6,7 @@ use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::interface::InterfaceHandle;
 use oo_bindgen::name::Name;
 use oo_bindgen::structs::{
-    ConstructorDefault, ConstructorType, FunctionArgStructHandle, Number, UniversalStructHandle,
+    FunctionArgStructHandle, InitializerDefault, InitializerType, Number, UniversalStructHandle,
 };
 use oo_bindgen::types::{BasicType, DurationType, StringType};
 use std::time::Duration;
@@ -167,7 +167,7 @@ fn define_outstation(
         )?
         .fails_with(shared_def.error_type.clone())?
         .doc("Create an outstation instance running on a serial port")?
-        .build()?;
+        .build_static("create_serial_session")?;
 
     let destructor = lib.define_destructor(
         outstation.clone(),
@@ -196,10 +196,7 @@ fn define_outstation(
     let outstation = lib
         .define_class(&outstation)?
         .destructor(destructor)?
-        .static_method(
-            "create_serial_session",
-            &outstation_create_serial_session_fn,
-        )?
+        .static_method(outstation_create_serial_session_fn)?
         .method(execute_transaction)?
         .method(set_decode_level)?
         .doc(doc("Outstation handle").details("Use this handle to modify the internal database."))?
@@ -264,9 +261,9 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
         )?
         .doc("Controls which types are reported during a Class 0 read.")?
         .end_fields()?
-        .begin_constructor(
+        .begin_initializer(
             "init",
-            ConstructorType::Normal,
+            InitializerType::Normal,
             "Initialize to default values",
         )?
         .default(&binary, true)?
@@ -277,7 +274,7 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
         .default(&analog, true)?
         .default(&analog_output_status, true)?
         .default(&octet_strings, false)?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(class_zero_config)
@@ -308,15 +305,15 @@ fn define_outstation_features(lib: &mut LibraryBuilder) -> BackTraced<FunctionAr
         )?
         .doc("Optional outstation features that can be enabled or disabled")?
         .end_fields()?
-        .begin_constructor(
+        .begin_initializer(
             "init",
-            ConstructorType::Normal,
+            InitializerType::Normal,
             "Initialize to default values",
         )?
         .default(&self_address, false)?
         .default(&broadcast, true)?
         .default(&unsolicited, true)?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(features)
@@ -404,21 +401,21 @@ fn define_outstation_config(
         .add(&max_controls_per_request, BasicType::U16, doc("Maximum number of controls in a single request."))?
         .add(&class_zero, class_zero_config, "Controls responses to Class 0 reads")?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default(&solicited_buffer_size, Number::U16(2048))?
         .default(&unsolicited_buffer_size, Number::U16(2048))?
         .default(&rx_buffer_size, Number::U16(2048))?
         .default_struct(&decode_level)?
         .default(&confirm_timeout, Duration::from_secs(5))?
         .default(&select_timeout, Duration::from_secs(5))?
-        .default(&features, ConstructorDefault::DefaultStruct)?
+        .default(&features, InitializerDefault::DefaultStruct)?
         .default(&max_unsolicited_retries, Number::U32(u32::MAX))?
         .default(&unsolicited_retry_delay, Duration::from_secs(5))?
         .default(&keep_alive_timeout, Duration::from_secs(60))?
         .default(&max_read_request_headers, Number::U16(64))?
         .default(&max_controls_per_request, Number::U16(u16::MAX))?
         .default_struct(&class_zero)?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(outstation_config)
@@ -473,7 +470,7 @@ fn define_event_buffer_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionAr
                 .details("A value of zero means that events will not be buffered for that type."),
         )?
         .end_fields()?
-        .add_full_constructor("init")?
+        .add_full_initializer("init")?
         .build()?;
 
     Ok(event_buffer_config)
@@ -510,16 +507,16 @@ fn define_application_iin(lib: &mut LibraryBuilder) -> BackTraced<UniversalStruc
         )?
         .doc("Application-controlled IIN bits")?
         .end_fields()?
-        .begin_constructor(
+        .begin_initializer(
             "init",
-            ConstructorType::Normal,
+            InitializerType::Normal,
             "Initialize all fields in {struct:application_iin} to false",
         )?
         .default(&need_time, false)?
         .default(&local_control, false)?
         .default(&device_trouble, false)?
         .default(&config_corrupt, false)?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(application_iin)
@@ -548,18 +545,18 @@ fn define_restart_delay(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
             .details("If {struct:restart_delay.restart_type} is not {enum:restart_delay_type.not_supported}, then the {struct:restart_delay.value} is valid. Otherwise, the outstation will return IIN2.0 NO_FUNC_CODE_SUPPORT."))?
         .end_fields()?
         // -----
-        .begin_constructor("not_supported", ConstructorType::Static, "RestartDelay indicating that the request is not supported")?
+        .begin_initializer("not_supported", InitializerType::Static, "RestartDelay indicating that the request is not supported")?
         .default_variant(&restart_type, "not_supported")?
         .default(&value, Number::U16(0))?
-        .end_constructor()?
+        .end_initializer()?
         // -----
-        .begin_constructor("seconds", ConstructorType::Static, "RestartDelay with a count of seconds")?
+        .begin_initializer("seconds", InitializerType::Static, "RestartDelay with a count of seconds")?
         .default_variant(&restart_type, "seconds")?
-        .end_constructor()?
+        .end_initializer()?
         // -----
-        .begin_constructor("milliseconds", ConstructorType::Static, "RestartDelay with a count of milliseconds")?
+        .begin_initializer("milliseconds", InitializerType::Static, "RestartDelay with a count of milliseconds")?
         .default_variant(&restart_type, "milli_seconds")?
-        .end_constructor()?
+        .end_initializer()?
         // -----
         .build()?;
 
@@ -875,7 +872,7 @@ fn define_address_filter(
         .define_function("address_filter_any")?
         .returns(address_filter.clone(), "Address filter")?
         .doc("Create an address filter that accepts any IP address")?
-        .build()?;
+        .build_static("any")?;
 
     let constructor = lib
         .define_constructor(address_filter.clone())?
@@ -898,7 +895,7 @@ fn define_address_filter(
         .define_class(&address_filter)?
         .constructor(constructor)?
         .destructor(destructor)?
-        .static_method("any", &address_filter_any_fn)?
+        .static_method(address_filter_any_fn)?
         .method(add)?
         .doc("Outstation address filter")?
         .build()?;

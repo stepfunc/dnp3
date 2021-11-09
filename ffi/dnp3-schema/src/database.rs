@@ -4,7 +4,7 @@ use oo_bindgen::*;
 use crate::gv;
 use crate::shared::SharedDefinitions;
 use oo_bindgen::name::Name;
-use oo_bindgen::structs::{ConstructorType, FunctionArgStructHandle, Number};
+use oo_bindgen::structs::{FunctionArgStructHandle, InitializerType, Number};
 use oo_bindgen::types::BasicType;
 
 fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
@@ -44,14 +44,14 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
                 .details("99% of the time, the default value should be used."),
         )?
         .end_fields()?
-        .begin_constructor(
+        .begin_initializer(
             "init",
-            ConstructorType::Normal,
+            InitializerType::Normal,
             "Initialize to default values",
         )?
         .default(&update_static, true)?
         .default_variant(&event_mode, "detect")?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(update_options)
@@ -91,10 +91,10 @@ fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
         )?
         .doc("Binary Input configuration")?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(1, 1))?
         .default_variant(&event_variation, gv(2, 2))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(config)
@@ -142,10 +142,10 @@ fn define_double_bit_binary_config(
         )?
         .doc("Double-Bit Binary Input configuration")?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(3, 1))?
         .default_variant(&event_variation, gv(4, 2))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(config)
@@ -186,10 +186,10 @@ fn define_binary_output_status_config(
         )?
         .doc("Binary Output Status configuration")?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(10, 1))?
         .default_variant(&event_variation, gv(11, 2))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(config)
@@ -234,11 +234,11 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
         .add(&deadband, BasicType::U32, "Deadband value")?
         .doc("Counter configuration")?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(20, 1))?
         .default_variant(&event_variation, gv(22, 5))?
         .default(&deadband, Number::U32(0))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(config)
@@ -291,11 +291,11 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<Function
         .add(&deadband, BasicType::U32, "Deadband value")?
         .doc("Frozen Counter configuration")?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(21, 1))?
         .default_variant(&event_variation, gv(23, 5))?
         .default(&deadband, Number::U32(0))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(config)
@@ -364,11 +364,11 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
         .add(&deadband, BasicType::Double64, "Deadband value")?
         .doc("Analog configuration")?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(30, 1))?
         .default_variant(&event_variation, gv(32, 3))?
         .default(&deadband, Number::Double(0.0))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(config)
@@ -437,11 +437,11 @@ fn define_analog_output_status_config(
         .add(&deadband, BasicType::Double64, "Deadband value")?
         .doc("Analog Output Status configuration")?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(40, 1))?
         .default_variant(&event_variation, gv(42, 3))?
         .default(&deadband, Number::Double(0.0))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(config)

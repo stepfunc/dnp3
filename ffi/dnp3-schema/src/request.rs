@@ -26,7 +26,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             doc("Create a new request asking for classes")
             .details("An identical request can be created manually with {class:request.add_all_objects_header()} and variations {enum:variation.group60_var1}, {enum:variation.group60_var2}, {enum:variation.group60_var3} and {enum:variation.group60_var4}.")
         )?
-        .build()?;
+        .build_static("class_request")?;
 
     let destructor = lib
         .define_destructor(
@@ -75,7 +75,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .define_class(&request)?
         .constructor(constructor)?
         .destructor(destructor)?
-        .static_method("class_request", &request_new_class_fn)?
+        .static_method(request_new_class_fn)?
         .method(add_one_byte_header)?
         .method(add_two_byte_header)?
         .method(add_all_objects_header)?

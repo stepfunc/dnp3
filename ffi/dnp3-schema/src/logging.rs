@@ -3,7 +3,7 @@ use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::error_type::ErrorType;
 use oo_bindgen::name::Name;
 use oo_bindgen::structs::{
-    ConstructorType, FunctionArgStructHandle, ToDefaultVariant, UniversalStructHandle,
+    FunctionArgStructHandle, InitializerType, ToDefaultVariant, UniversalStructHandle,
 };
 use oo_bindgen::types::{BasicType, StringType};
 use oo_bindgen::*;
@@ -87,9 +87,9 @@ fn define_logging_config_struct(
         )?
         .doc("Logging configuration options")?
         .end_fields()?
-        .begin_constructor(
+        .begin_initializer(
             "init",
-            ConstructorType::Normal,
+            InitializerType::Normal,
             "Initialize the configuration to default values",
         )?
         .default(&level, "info".default_variant())?
@@ -97,7 +97,7 @@ fn define_logging_config_struct(
         .default(&time_format, "system".default_variant())?
         .default(&print_level, true)?
         .default(&print_module_info, false)?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(logging_config_struct)
@@ -147,11 +147,11 @@ pub fn define(
             .details("There is only a single globally allocated logger. Calling this method a second time will return an error.")
             .details("If this method is never called, no logging will be performed.")
         )?
-        .build()?;
+        .build_static("configure")?;
 
     let _logging_class = lib
         .define_static_class("logging")?
-        .static_method("configure", &configure_logging_fn)?
+        .static_method(configure_logging_fn)?
         .doc("Provides a static method for configuring logging")?
         .build()?;
 
@@ -213,12 +213,12 @@ pub fn define(
         .add(&physical_field, phys_decode_level_enum, "Controls the logging of physical layer read/write")?
         .doc("Controls the decoding of transmitted and received data at the application, transport, link, and physical layers")?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize log levels to defaults")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize log levels to defaults")?
         .default_variant(&application_field, NOTHING)?
         .default_variant(&transport_field, NOTHING)?
         .default_variant(&link_field, NOTHING)?
         .default_variant(&physical_field, NOTHING)?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(decode_level_struct)

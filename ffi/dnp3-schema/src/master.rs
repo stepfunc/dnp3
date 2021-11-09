@@ -7,7 +7,7 @@ use oo_bindgen::enum_type::{EnumBuilder, EnumHandle};
 use oo_bindgen::interface::{FutureInterface, InterfaceHandle};
 use oo_bindgen::name::Name;
 use oo_bindgen::structs::{
-    ConstructorDefault, ConstructorType, FunctionArgStructHandle, Number, UniversalStructHandle,
+    FunctionArgStructHandle, InitializerType, Number, UniversalStructHandle,
 };
 use oo_bindgen::types::{BasicType, DurationType, StringType};
 use std::time::Duration;
@@ -63,7 +63,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .fails_with(shared.error_type.clone())?
         .doc("Create a master channel that connects to the specified TCP endpoint(s)")?
-        .build()?;
+        .build_static("create_tcp_channel")?;
 
     let master_channel_create_serial_fn = lib
         .define_function("master_channel_create_serial")?
@@ -79,7 +79,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             doc("Create a master channel on the specified serial port")
                 .details("The returned master must be gracefully shutdown with {class:master_channel.[destructor]} when done.")
         )?
-        .build()?;
+        .build_static("create_serial_channel")?;
 
     let channel_destructor = lib.define_destructor(
         master_channel_class.clone(),
@@ -196,7 +196,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let read_callback = define_read_callback(lib)?;
 
     let read_async = lib
-        .define_async_method("read", master_channel_class.clone(), read_callback)?
+        .define_future_method("read", master_channel_class.clone(), read_callback)?
         .param("association",association_id.clone(), "Association on which to perform the read")?
         .param("request",request_class.declaration(), "Request to send")?
         .fails_with(shared.error_type.clone())?
@@ -211,7 +211,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let command_cb = define_command_callback(lib)?;
 
     let operate_async = lib
-        .define_async_method("operate", master_channel_class.clone(), command_cb)?
+        .define_future_method("operate", master_channel_class.clone(), command_cb)?
         .param(
             "association",
             association_id.clone(),
@@ -227,7 +227,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let time_sync_cb = define_time_sync_callback(lib)?;
 
     let perform_time_sync_async = lib
-        .define_async_method(
+        .define_future_method(
             "synchronize_time",
             master_channel_class.clone(),
             time_sync_cb,
@@ -245,7 +245,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let restart_cb = define_restart_callback(lib)?;
 
     let cold_restart_async = lib
-        .define_async_method(
+        .define_future_method(
             "cold_restart",
             master_channel_class.clone(),
             restart_cb.clone(),
@@ -260,7 +260,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     let warm_restart_async = lib
-        .define_async_method("warm_restart", master_channel_class.clone(), restart_cb)?
+        .define_future_method("warm_restart", master_channel_class.clone(), restart_cb)?
         .param(
             "association",
             association_id.clone(),
@@ -273,7 +273,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let link_status_cb = define_link_status_callback(lib)?;
 
     let check_link_status_async = lib
-        .define_async_method(
+        .define_future_method(
             "check_link_status",
             master_channel_class.clone(),
             link_status_cb,
@@ -285,8 +285,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     lib.define_class(&master_channel_class)?
         .destructor(channel_destructor)?
-        .static_method("create_tcp_channel", &master_channel_create_tcp_fn)?
-        .static_method("create_serial_channel", &master_channel_create_serial_fn)?
+        .static_method(master_channel_create_tcp_fn)?
+        .static_method(master_channel_create_serial_fn)?
         .method(enable_method)?
         .method(disable_method)?
         .method(add_association_method)?
@@ -338,15 +338,15 @@ fn define_connect_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgSt
         )?
         .doc("Timing parameters for connection attempts")?
         .end_fields()?
-        .begin_constructor(
+        .begin_initializer(
             "init",
-            ConstructorType::Normal,
+            InitializerType::Normal,
             "Initialize to default values",
         )?
         .default(&min_connect_delay, Duration::from_secs(1))?
         .default(&max_connect_delay, Duration::from_secs(10))?
         .default(&reconnect_delay, Duration::from_secs(1))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(strategy)
@@ -481,13 +481,13 @@ fn define_association_config(
             doc("maximum number of user requests (e.g. commands, adhoc reads, etc) that will be queued before back-pressure is applied by failing requests")
         )?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize the configuration with the specified values")?
-        .default(&auto_time_sync, ConstructorDefault::Enum("none".to_string()))?
+        .begin_initializer("init", InitializerType::Normal, "Initialize the configuration with the specified values")?
+        .default_variant(&auto_time_sync, "none")?
         .default_struct(&auto_tasks_retry_strategy)?
         .default(&keep_alive_timeout, Duration::from_secs(60))?
         .default(&auto_integrity_scan_on_buffer_overflow, true)?
         .default(&max_queued_user_requests, Number::U16(16))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(association_config)
@@ -554,12 +554,12 @@ fn define_master_channel_config(
         .add(tx_buffer_size.clone(), BasicType::U16, doc("TX buffer size").details("Must be at least 249"))?
         .add(rx_buffer_size.clone(), BasicType::U16, doc("RX buffer size").details("Must be at least 2048"))?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize {struct:master_channel_config} to default values")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize {struct:master_channel_config} to default values")?
         .default_struct(&decode_level)?
         .default(&response_timeout, Duration::from_secs(5))?
         .default(&tx_buffer_size, Number::U16(2048))?
         .default(&rx_buffer_size, Number::U16(2048))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(config)
@@ -604,13 +604,13 @@ fn define_utc_timestamp(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
         .add(&is_valid, BasicType::Bool, "True if the timestamp is valid, false otherwise.")?
         .doc(doc("Timestamp value returned by {interface:association_handler.get_current_time()}.").details("{struct:utc_timestamp.value} is only valid if {struct:utc_timestamp.is_valid} is true."))?
         .end_fields()?
-        .begin_constructor("valid", ConstructorType::Static, "Construct a valid {struct:utc_timestamp}")?
+        .begin_initializer("valid", InitializerType::Static, "Construct a valid {struct:utc_timestamp}")?
         .default(&is_valid, true)?
-        .end_constructor()?
-        .begin_constructor("invalid", ConstructorType::Static, "Construct an invalid {struct:utc_timestamp}")?
+        .end_initializer()?
+        .begin_initializer("invalid", InitializerType::Static, "Construct an invalid {struct:utc_timestamp}")?
         .default(&is_valid, false)?
         .default(&value, Number::U64(0))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(timestamp_utc)
@@ -652,25 +652,25 @@ fn define_event_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
         .add(&class3, BasicType::Bool, "Class 3 events")?
         .doc("Event classes")?
         .end_fields()?
-        .add_full_constructor("init")?
-        .begin_constructor(
+        .add_full_initializer("init")?
+        .begin_initializer(
             "all",
-            ConstructorType::Static,
+            InitializerType::Static,
             "Initialize all classes to true",
         )?
         .default(&class1, true)?
         .default(&class2, true)?
         .default(&class3, true)?
-        .end_constructor()?
-        .begin_constructor(
+        .end_initializer()?
+        .begin_initializer(
             "none",
-            ConstructorType::Static,
+            InitializerType::Static,
             "Initialize all classes to false",
         )?
         .default(&class1, false)?
         .default(&class2, false)?
         .default(&class3, false)?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(event_classes)
@@ -691,27 +691,27 @@ fn define_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandl
         .add(&class3, BasicType::Bool, "Class 3 events")?
         .doc("Class 0, 1, 2 and 3 config")?
         .end_fields()?
-        .add_full_constructor("init")?
-        .begin_constructor(
+        .add_full_initializer("init")?
+        .begin_initializer(
             "all",
-            ConstructorType::Static,
+            InitializerType::Static,
             "Initialize all classes to true",
         )?
         .default(&class0, true)?
         .default(&class1, true)?
         .default(&class2, true)?
         .default(&class3, true)?
-        .end_constructor()?
-        .begin_constructor(
+        .end_initializer()?
+        .begin_initializer(
             "none",
-            ConstructorType::Static,
+            InitializerType::Static,
             "Initialize all classes to false",
         )?
         .default(&class0, false)?
         .default(&class1, false)?
         .default(&class2, false)?
         .default(&class3, false)?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(classes)
@@ -1026,7 +1026,7 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterfa
         .add("delay", DurationType::Milliseconds, "Delay value returned by the outstation. Valid only if {struct:restart_result.error} is {enum:restart_error.ok}.")?
         .doc("Result of a restart task")?
         .end_fields()?
-        .add_full_constructor("init")?
+        .add_full_initializer("init")?
         .build()?;
 
     let callback = lib.define_future_interface(

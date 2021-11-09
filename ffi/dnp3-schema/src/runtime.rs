@@ -2,7 +2,7 @@ use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::doc::Unvalidated;
 use oo_bindgen::error_type::ErrorType;
 use oo_bindgen::name::Name;
-use oo_bindgen::structs::{ConstructorType, FunctionArgStructHandle, Number};
+use oo_bindgen::structs::{FunctionArgStructHandle, InitializerType, Number};
 use oo_bindgen::types::BasicType;
 use oo_bindgen::*;
 
@@ -20,9 +20,9 @@ fn define_runtime_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
         )?
         .doc("Runtime configuration")?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize the configuration to default values")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize the configuration to default values")?
         .default(&num_core_threads, Number::U16(0))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(config_struct)

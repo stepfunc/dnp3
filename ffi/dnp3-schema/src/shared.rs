@@ -131,9 +131,9 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         .add("op_type", op_type, "This field is used in conjunction with the `tcc` field to specify a control operation")?
         .doc("CROB ({struct:group12_var1}) control code")?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize a {struct:control_code} instance")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize a {struct:control_code} instance")?
         .default(&queue_field, false)?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     let g12v1_struct = lib.declare_universal_struct(gv(12, 1))?;
@@ -153,7 +153,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         )?
         .doc("Control Relay Output Block")?
         .end_fields()?
-        .add_full_constructor("init")?
+        .add_full_initializer("init")?
         .build()?;
 
     // ======
@@ -275,10 +275,10 @@ fn define_retry_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
             "The strategy uses an exponential back-off with a minimum and maximum value.",
         ))?
         .end_fields()?
-        .begin_constructor("init", ConstructorType::Normal, "Initialize to defaults")?
+        .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default(&min_delay, Duration::from_secs(1))?
         .default(&max_delay, Duration::from_secs(10))?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(retry_strategy)
@@ -364,9 +364,9 @@ fn define_serial_port_settings(lib: &mut LibraryBuilder) -> BackTraced<FunctionA
         )?
         .doc("Serial port settings")?
         .end_fields()?
-        .begin_constructor(
+        .begin_initializer(
             "init",
-            ConstructorType::Normal,
+            InitializerType::Normal,
             "Initialize to default values",
         )?
         .default(&baud_rate, Number::U32(9600))?
@@ -374,7 +374,7 @@ fn define_serial_port_settings(lib: &mut LibraryBuilder) -> BackTraced<FunctionA
         .default_variant(&flow_control, "none")?
         .default_variant(&parity, "none")?
         .default_variant(&stop_bits, "one")?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(serial_settings)
@@ -391,7 +391,7 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
         )?
         .doc("Collection of individual flag bits represented by an underlying mask value")?
         .end_fields()?
-        .add_full_constructor("init")?
+        .add_full_initializer("init")?
         .build()?;
 
     Ok(flags_struct)
@@ -449,28 +449,28 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStr
         .add(&quality, time_quality_enum, "Timestamp quality")?
         .doc("Timestamp value")?
         .end_fields()?
-        .begin_constructor(
+        .begin_initializer(
             "invalid_timestamp",
-            ConstructorType::Static,
+            InitializerType::Static,
             "Creates an invalid timestamp struct",
         )?
         .default(&value, Number::U64(0))?
         .default_variant(&quality, "invalid_time")?
-        .end_constructor()?
-        .begin_constructor(
+        .end_initializer()?
+        .begin_initializer(
             "synchronized_timestamp",
-            ConstructorType::Static,
+            InitializerType::Static,
             "Creates a synchronized timestamp struct",
         )?
         .default_variant(&quality, "synchronized_time")?
-        .end_constructor()?
-        .begin_constructor(
+        .end_initializer()?
+        .begin_initializer(
             "unsynchronized_timestamp",
-            ConstructorType::Static,
+            InitializerType::Static,
             "Creates an unsynchronized timestamp struct",
         )?
         .default_variant(&quality, "unsynchronized_time")?
-        .end_constructor()?
+        .end_initializer()?
         .build()?;
 
     Ok(timestamp_struct)
@@ -492,7 +492,7 @@ fn build_iterator<T: Into<UniversalStructField>>(
         .add("time", timestamp_struct.clone(), "Point timestamp")?
         .doc(format!("{} point", name))?
         .end_fields()?
-        .add_full_constructor("init")?
+        .add_full_initializer("init")?
         .build()?;
 
     let value_iterator = lib.define_iterator(format!("{}_iterator", name), value_struct.clone())?;
