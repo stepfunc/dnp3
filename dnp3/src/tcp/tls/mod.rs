@@ -2,7 +2,7 @@ mod master;
 mod outstation;
 
 use std::convert::TryFrom;
-use std::io::{self, ErrorKind, Read};
+use std::io::{self, ErrorKind};
 use std::path::Path;
 
 pub use master::*;
@@ -76,13 +76,6 @@ impl MinTlsVersion {
 
 fn verify_dns_name(cert: &rustls::Certificate, server_name: &str) -> Result<(), rustls::Error> {
     // Extract the DNS name
-    /*let dns_name_str = match server_name {
-        rustls::ServerName::DnsName(dns_name) => dns_name.as_ref(),
-        &_ => {
-            // I don't undertand why I need this, but the compiler keeps complaining otherwise
-            unreachable!()
-        }
-    };*/
     let dns_name = webpki::DnsNameRef::try_from_ascii_str(server_name)
         .map_err(|_| rustls::Error::InvalidCertificateData("invalid DNS name".to_string()))?;
 
@@ -173,54 +166,65 @@ fn load_certs(path: &Path, is_local: bool) -> Result<Vec<rustls::Certificate>, T
         true => TlsError::InvalidLocalCertificate,
     };
 
-    let f = std::fs::File::open(path).map_err(map_error_fn)?;
-    let mut f = io::BufReader::new(f);
-
-    let certs = rustls_pemfile::certs(&mut f)
-        .map_err(map_error_fn)?
-        .iter()
-        .map(|data| rustls::Certificate(data.clone()))
+    let content = std::fs::read(path).map_err(map_error_fn)?;
+    let certs = pem::parse_many(content)
+        .map_err(|err| map_error_fn(io::Error::new(ErrorKind::InvalidData, err.to_string())))?
+        .into_iter()
+        .filter(|x| x.tag == "CERTIFICATE")
+        .map(|x| rustls::Certificate(x.contents))
         .collect::<Vec<_>>();
 
-    match certs.len() {
-        0 => Err(map_error_fn(io::Error::new(
+    if certs.is_empty() {
+        return Err(map_error_fn(io::Error::new(
             ErrorKind::InvalidData,
             "no certificate in pem file",
-        ))),
-        _ => Ok(certs),
+        )));
     }
+
+    Ok(certs)
 }
 
 fn load_private_key(path: &Path, password: Option<&str>) -> Result<rustls::PrivateKey, TlsError> {
-    let f = std::fs::File::open(path).map_err(TlsError::InvalidPrivateKey)?;
-    let mut f = io::BufReader::new(f);
+    let expected_tag = match &password {
+        Some(_) => "ENCRYPTED PRIVATE KEY",
+        None => "PRIVATE KEY",
+    };
 
-    match password {
-        // With a password, we parse using pkcs8
-        Some(password) => {
-            let mut file_content = String::new();
-            f.read_to_string(&mut file_content)
-                .map_err(TlsError::InvalidPrivateKey)?;
-            let encrypted = pkcs8::EncryptedPrivateKeyDocument::from_pem(&file_content)?;
-            let decrypted = encrypted.decrypt(password)?;
-            Ok(rustls::PrivateKey(decrypted.as_ref().to_owned()))
-        }
-        // No password, we parse using rustls-pemfile
-        None => match rustls_pemfile::read_one(&mut f).map_err(TlsError::InvalidPrivateKey)? {
-            Some(rustls_pemfile::Item::RSAKey(key)) => Ok(rustls::PrivateKey(key)),
-            Some(rustls_pemfile::Item::PKCS8Key(key)) => Ok(rustls::PrivateKey(key)),
-            Some(rustls_pemfile::Item::X509Certificate(_)) => {
-                Err(TlsError::InvalidPrivateKey(io::Error::new(
-                    ErrorKind::InvalidData,
-                    "file contains cert, not private key",
-                )))
+    let content = std::fs::read(path).map_err(TlsError::InvalidPrivateKey)?;
+    let mut iter = pem::parse_many(content)
+        .map_err(|err| {
+            TlsError::InvalidPrivateKey(io::Error::new(ErrorKind::InvalidData, err.to_string()))
+        })?
+        .into_iter()
+        .filter(|x| x.tag == expected_tag)
+        .map(|x| x.contents);
+
+    let key = match iter.next() {
+        Some(key) => match password {
+            Some(password) => {
+                let encrypted = pkcs8::EncryptedPrivateKeyDocument::from_der(&key)?;
+                let decrypted = encrypted.decrypt(password)?;
+                rustls::PrivateKey(decrypted.as_ref().to_owned())
             }
-            None => Err(TlsError::InvalidPrivateKey(io::Error::new(
-                ErrorKind::InvalidData,
-                "file does not contain private key",
-            ))),
+            None => rustls::PrivateKey(key),
         },
+        None => {
+            return Err(TlsError::InvalidPrivateKey(io::Error::new(
+                ErrorKind::InvalidData,
+                "no private key found in PEM file",
+            )));
+        }
+    };
+
+    // Check that there are no other keys
+    if iter.next().is_some() {
+        return Err(TlsError::InvalidPrivateKey(io::Error::new(
+            ErrorKind::InvalidData,
+            "more than one private key is present in the PEM file",
+        )));
     }
+
+    Ok(key)
 }
 
 impl From<pkcs8::Error> for TlsError {
