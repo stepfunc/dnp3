@@ -277,7 +277,7 @@ pub unsafe fn master_channel_operate(
     Ok(())
 }
 
-pub(crate) unsafe fn master_channel_sync_time(
+pub(crate) unsafe fn master_channel_synchronize_time(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     mode: ffi::TimeSyncMode,

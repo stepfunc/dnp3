@@ -2,8 +2,9 @@ use oo_bindgen::class::ClassHandle;
 use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
+use oo_bindgen::doc::Unvalidated;
 use oo_bindgen::enum_type::{EnumBuilder, EnumHandle};
-use oo_bindgen::interface::InterfaceHandle;
+use oo_bindgen::interface::{FutureInterface, InterfaceHandle};
 use oo_bindgen::name::Name;
 use oo_bindgen::structs::{
     ConstructorDefault, ConstructorType, FunctionArgStructHandle, Number, UniversalStructHandle,
@@ -194,13 +195,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let read_callback = define_read_callback(lib)?;
 
-    let read_fn = lib
-        .define_function("master_channel_read")?
-        .param("channel",master_channel_class.clone(), "{class:master_channel} on which to perform the operation")?
+    let read_async = lib
+        .define_async_method("read", master_channel_class.clone(), read_callback)?
         .param("association",association_id.clone(), "Association on which to perform the read")?
         .param("request",request_class.declaration(), "Request to send")?
-        .param("callback", read_callback, "Callback that will be invoked once the read is complete")?
-        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Perform a read on the association.")
@@ -212,13 +210,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let command_mode = define_command_mode(lib)?;
     let command_cb = define_command_callback(lib)?;
 
-    let operate_fn = lib
-        .define_function("master_channel_operate")?
-        .param(
-            "channel",
-            master_channel_class.clone(),
-            "{class:master_channel} on which to perform the operation",
-        )?
+    let operate_async = lib
+        .define_async_method("operate", master_channel_class.clone(), command_cb)?
         .param(
             "association",
             association_id.clone(),
@@ -226,12 +219,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .param("mode", command_mode, "Operation mode")?
         .param("command", command.declaration(), "Command to send")?
-        .param(
-            "callback",
-            command_cb,
-            "Callback that will receive the result of the command",
-        )?
-        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a command operation on the association")?
         .build()?;
@@ -239,12 +226,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let time_sync_mode = define_time_sync_mode(lib)?;
     let time_sync_cb = define_time_sync_callback(lib)?;
 
-    let perform_time_sync_fn = lib
-        .define_function("master_channel_sync_time")?
-        .param(
-            "channel",
+    let perform_time_sync_async = lib
+        .define_async_method(
+            "synchronize_time",
             master_channel_class.clone(),
-            "{class:master_channel} on which to perform the operation",
+            time_sync_cb,
         )?
         .param(
             "association",
@@ -252,78 +238,47 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "Id of the association",
         )?
         .param("mode", time_sync_mode, "Time sync mode")?
-        .param(
-            "callback",
-            time_sync_cb,
-            "Callback that will receive the result of the time sync",
-        )?
-        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a time sync operation to the association")?
         .build()?;
 
     let restart_cb = define_restart_callback(lib)?;
 
-    let cold_restart_fn = lib
-        .define_function("master_channel_cold_restart")?
-        .param(
-            "channel",
+    let cold_restart_async = lib
+        .define_async_method(
+            "cold_restart",
             master_channel_class.clone(),
-            "{class:master_channel} on which to perform the operation",
+            restart_cb.clone(),
         )?
         .param(
             "association",
             association_id.clone(),
             "Id of the association",
         )?
-        .param(
-            "callback",
-            restart_cb.clone(),
-            "Callback that will receive the result of the restart",
-        )?
-        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a cold restart operation to the association")?
         .build()?;
 
-    let warm_restart_fn = lib
-        .define_function("master_channel_warm_restart")?
-        .param(
-            "channel",
-            master_channel_class.clone(),
-            "{class:master_channel} on which to perform the operation",
-        )?
+    let warm_restart_async = lib
+        .define_async_method("warm_restart", master_channel_class.clone(), restart_cb)?
         .param(
             "association",
             association_id.clone(),
             "Id of the association",
         )?
-        .param(
-            "callback",
-            restart_cb,
-            "Callback that will receive the result of the restart",
-        )?
-        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a warm restart operation to the association")?
         .build()?;
 
     let link_status_cb = define_link_status_callback(lib)?;
 
-    let check_link_status_fn = lib
-        .define_function("master_channel_check_link_status")?
-        .param(
-            "channel",
+    let check_link_status_async = lib
+        .define_async_method(
+            "check_link_status",
             master_channel_class.clone(),
-            "{class:master_channel} on which to perform the operation",
+            link_status_cb,
         )?
         .param("association", association_id, "Id of the association")?
-        .param(
-            "callback",
-            link_status_cb,
-            "Callback that will receive the result of the link status",
-        )?
-        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a link status check")?
         .build()?;
@@ -341,12 +296,12 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .method(add_poll_method)?
         .method(remove_poll_method)?
         .method(demand_poll_method)?
-        .async_method("read", &read_fn)?
-        .async_method("operate", &operate_fn)?
-        .async_method("synchronize_time", &perform_time_sync_fn)?
-        .async_method("cold_restart", &cold_restart_fn)?
-        .async_method("warm_restart", &warm_restart_fn)?
-        .async_method("check_link_status", &check_link_status_fn)?
+        .async_method(read_async)?
+        .async_method(operate_async)?
+        .async_method(perform_time_sync_async)?
+        .async_method(cold_restart_async)?
+        .async_method(warm_restart_async)?
+        .async_method(check_link_status_async)?
         .custom_destroy("shutdown")?
         .doc(
             doc("Represents a communication channel for a master station")
@@ -434,7 +389,7 @@ fn define_poll_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle>
     Ok(id)
 }
 
-fn define_read_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
+fn define_read_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterface<Unvalidated>> {
     let read_result = lib
         .define_enum("read_result")?
         .push("success", "Read was perform successfully")?
@@ -442,16 +397,12 @@ fn define_read_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle>
         .doc("Result of a read operation")?
         .build()?;
 
-    let callback = lib
-        .define_asynchronous_interface("read_task_callback", "Handler for read tasks")?
-        .begin_callback(
-            "on_complete",
-            "Called when the read task reached completion or failed",
-        )?
-        .param("result", read_result, "Result of the read task")?
-        .returns_nothing()?
-        .end_callback()?
-        .build()?;
+    let callback = lib.define_future_interface(
+        "read_task_callback",
+        "Handler for read tasks",
+        read_result,
+        "Result of the read task",
+    )?;
 
     Ok(callback)
 }
@@ -808,7 +759,7 @@ impl TaskErrors for EnumBuilder<'_> {
     }
 }
 
-fn define_command_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
+fn define_command_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterface<Unvalidated>> {
     let command_result = lib
         .define_enum("command_result")?
         .push("success", "Command was a success")?
@@ -824,16 +775,12 @@ fn define_command_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHand
         .doc("Result of a command")?
         .build()?;
 
-    let callback = lib
-        .define_asynchronous_interface("command_task_callback", "Handler for command tasks")?
-        .begin_callback(
-            "on_complete",
-            "Called when the command task reached completion or failed",
-        )?
-        .param("result", command_result, "Result of the command task")?
-        .returns_nothing()?
-        .end_callback()?
-        .build()?;
+    let callback = lib.define_future_interface(
+        "command_task_callback",
+        "Handler for command tasks",
+        command_result,
+        "Result of the command task",
+    )?;
 
     Ok(callback)
 }
@@ -1014,8 +961,8 @@ fn define_command_builder(
     Ok(command_set)
 }
 
-fn define_time_sync_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
-    let timesync_result = lib
+fn define_time_sync_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterface<Unvalidated>> {
+    let time_sync_result = lib
         .define_enum("time_sync_result")?
         .push("success", "Time synchronization operation was a success")?
         .push("clock_rollback", "Detected a clock rollback")?
@@ -1038,23 +985,12 @@ fn define_time_sync_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHa
         .doc("Result of a time sync operation")?
         .build()?;
 
-    let callback = lib
-        .define_asynchronous_interface(
-            "time_sync_task_callback",
-            "Handler for time synchronization tasks",
-        )?
-        .begin_callback(
-            "on_complete",
-            "Called when the timesync task reached completion or failed",
-        )?
-        .param(
-            "result",
-            timesync_result,
-            "Result of the time synchronization task",
-        )?
-        .returns_nothing()?
-        .end_callback()?
-        .build()?;
+    let callback = lib.define_future_interface(
+        "time_sync_task_callback",
+        "Handler for time synchronization tasks",
+        time_sync_result,
+        "Result of the time synchronization task",
+    )?;
 
     Ok(callback)
 }
@@ -1076,7 +1012,7 @@ fn define_time_sync_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     Ok(mode)
 }
 
-fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
+fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterface<Unvalidated>> {
     let restart_error = lib
         .define_enum("restart_error")?
         .push("ok", "Restart was perform successfully")?
@@ -1093,21 +1029,19 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHand
         .add_full_constructor("init")?
         .build()?;
 
-    let callback = lib
-        .define_asynchronous_interface("restart_task_callback", "Handler for restart tasks")?
-        .begin_callback(
-            "on_complete",
-            "Called when the restart task reached completion or failed",
-        )?
-        .param("result", restart_result, "Result of the restart task")?
-        .returns_nothing()?
-        .end_callback()?
-        .build()?;
+    let callback = lib.define_future_interface(
+        "restart_task_callback",
+        "Handler for restart tasks",
+        restart_result,
+        "Result of the restart task",
+    )?;
 
     Ok(callback)
 }
 
-fn define_link_status_callback(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
+fn define_link_status_callback(
+    lib: &mut LibraryBuilder,
+) -> BackTraced<FutureInterface<Unvalidated>> {
     let link_status_enum = lib
         .define_enum("link_status_result")?
         .push(
@@ -1125,13 +1059,12 @@ fn define_link_status_callback(lib: &mut LibraryBuilder) -> BackTraced<Interface
         .doc("Result of a link status check. See {class:master_channel.check_link_status()}")?
         .build()?;
 
-    let callback = lib
-        .define_asynchronous_interface("link_status_callback", "Handler for link status check")?
-        .begin_callback("on_complete", "Called when a link status is received")?
-        .param("result", link_status_enum, "Result of the link status")?
-        .returns_nothing()?
-        .end_callback()?
-        .build()?;
+    let callback = lib.define_future_interface(
+        "link_status_callback",
+        "Handler for link status check",
+        link_status_enum,
+        "Result of the link status",
+    )?;
 
     Ok(callback)
 }

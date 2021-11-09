@@ -371,7 +371,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
-            dnp3_master_channel_sync_time(channel, association_id, DNP3_TIME_SYNC_MODE_LAN, cb);
+            dnp3_master_channel_synchronize_time(channel, association_id, DNP3_TIME_SYNC_MODE_LAN, cb);
         }
         else if (strcmp(cbuf, "nts\n") == 0) {
             dnp3_time_sync_task_callback_t cb = {
@@ -379,7 +379,7 @@ int main()
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
-            dnp3_master_channel_sync_time(channel, association_id, DNP3_TIME_SYNC_MODE_NON_LAN, cb);
+            dnp3_master_channel_synchronize_time(channel, association_id, DNP3_TIME_SYNC_MODE_NON_LAN, cb);
         }
         else if (strcmp(cbuf, "crt\n") == 0) {
             dnp3_restart_task_callback_t cb = {
