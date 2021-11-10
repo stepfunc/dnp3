@@ -42,7 +42,7 @@ these libraries.
   - `rsa_pkcs1_sha512`
   - `rsa_pkcs1_sha384`
   - `rsa_pkcs1_sha256`
-- Client and server name validation
+- Client and server name validation through SAN and Common Name.
 - Self-signed certificates (with a special configuration)
 
 ## Configuration
@@ -53,10 +53,9 @@ The fields are the following:
 - `name`: name requested. The client will advertise this name through
   a Server Name Indication (SNI) extension in the `Client Hello`. Both
   the client and the server will verify that the presented certificate
-  is valid for this DNS name. Since Common Name is deprecated, the
-  presented certificate **must** have the DNS name appear in in a Subject
-  Alternative Name (SAN) extension. DNS name validation is not performed
-  when `CertificateMode` is `SelfSignedCertificate`.
+  is valid for this DNS name. See the following section for more details
+  about name validation. DNS name validation is not performed when
+  `CertificateMode` is `SelfSignedCertificate`.
 - `peer_cert_path`: path to the unencrypted PEM file containing the trusted
   root certificate(s) or the peer self-signed certificate.
 - `local_cert_path`: path to the unencrypted PEM file containing the certificate
@@ -69,6 +68,39 @@ The fields are the following:
   will force TLSv1.3.
 - `certificate_mode`: mode of verification of the presented certificate. See
   the next section for more details.
+
+### Name validation
+
+Name validation is always performed when `certificate_mode` is `TrustChain`, for
+both the client and the server.
+
+A valid name has the same requirements as a DNS name. This is defined in
+[RFC 1034 Section 3.5](https://datatracker.ietf.org/doc/html/rfc1034#section-3.5),
+updated by [RFC1123 Section 2.1](https://datatracker.ietf.org/doc/html/rfc1123#section-2),
+with the additional exception that underscores `_` are allowed. A brief (but incomplete)
+definition of a valid name would be the following:
+
+- One or more labels separated by a single period
+- Labels are made of alphanumeric characters `[A-Za-z0-9]`, hyphen `-` and underscores `_`
+- A label cannot start or end with an hyphen `-`
+- A label cannot be all numeric
+- A label cannot be empty
+- Maximum of 63 characters per label
+- Maximum of 253 characters total
+
+We first validate the name through the Subject Alternative Name (SAN) extension if it's present.
+The SAN can contain multiple names and each name can contain a wildcard `*` character. The comparison
+is case insensitive.
+
+If and only if no SAN extension is present, then the Common Name from the certificate's Subject
+is extracted and compared. The Common Name cannot contain a wildcard character and the comparison
+is case sensitive. It is effectively compared byte-for-byte with the expected name.
+
+:::note
+Using SAN is the recommended way as Common Name usage is deprecated
+and might be removed in the future. New certificates should provide name
+in a SAN extension.
+:::
 
 ### Private key encryption
 
