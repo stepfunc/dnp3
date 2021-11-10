@@ -134,8 +134,18 @@ int main()
         std::string cmd;
         std::getline(std::cin, cmd);
 
-        if(cmd == "x") {
+        if (cmd == "x") {
             return 0;
+        }
+        else if (cmd == "cmd") {
+            dnp3::CommandSet commands;
+            commands.add_g12_v1_u8(3, dnp3::Group12Var1(dnp3::ControlCode(dnp3::TripCloseCode::nul, false, dnp3::OpType::latch_on), 0, 1000, 1000));            
+            channel.operate(assoc, dnp3::CommandMode::direct_operate, commands, [](dnp3::CommandResult result) {
+                std::cout << "result: " << dnp3::to_string(result) << std::endl;
+            });
+        }
+        else {
+            std::cout << "unknown command: " << cmd << std::endl;
         }
     }
 }
