@@ -99,7 +99,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .destructor(destructor)?
         .method(add_outstation)?
         .method(bind)?
-        .custom_destroy("Shutdown")?
+        .custom_destroy("shutdown")?
         .doc(doc("TCP server that listens for connections and routes the messages to outstations.")
         .details("To add outstations to it, use {class:tcp_server.add_outstation()}. Once all the outstations are added, the server can be started with {class:tcp_server.bind()}.")
         .details("{class:tcp_server.[destructor]} is used to gracefully shutdown all the outstations and the server."))?
