@@ -5,7 +5,7 @@
 #include <string>
 
 using namespace dnp3;
-using namespace functional;
+using namespace dnp3::functional;
 
 std::ostream& write_hex_byte(std::ostream& os, uint8_t value)
 {
@@ -119,7 +119,7 @@ Timestamp now()
 
 int main()
 {
-    Logging::configure(LoggingConfig(), functional::logger(
+    Logging::configure(LoggingConfig(), logger(
         [](LogLevel level, std::string message) {
             std::cout << message;
         }
