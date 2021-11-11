@@ -140,7 +140,6 @@ pub fn define(
            log_callback_interface,
             "Logger that will receive each logged message",
         )?
-        .returns_nothing()?
         .fails_with(error_type)?
         .doc(
             doc("Set the callback that will receive all the log messages")
