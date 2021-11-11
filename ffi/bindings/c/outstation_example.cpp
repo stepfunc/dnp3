@@ -4,19 +4,6 @@
 #include <iomanip>
 #include <string>
 
-class Logger : public dnp3::Logger {
-    void on_message(dnp3::LogLevel level, std::string message) override
-    {
-        std::cout << message;
-    }
-};
-
-class ClientStateListener : public dnp3::ClientStateListener {
-    void on_change(dnp3::ClientState state) override {
-        std::cout << "client state change: " << dnp3::to_string(state) << std::endl;
-    }
-};
-
 std::ostream& write_hex_byte(std::ostream& os, uint8_t value)
 {
     os << "0x" << std::hex << std::setw(2) << std::setfill('0') << (int)value;
@@ -102,35 +89,38 @@ class ControlHandler : public dnp3::ControlHandler {
     }
 };
 
-class ConnectionStateListener : public dnp3::ConnectionStateListener {
-    void on_change(dnp3::ConnectionState state) override
-    {
-        std::cout << "ConnectionState: " << dnp3::to_string(state) << std::endl;
-    }
-};
-
-template <class T>
-class DatabaseTransaction : public dnp3::DatabaseTransaction {
-
-    T expr;
+class State {
 public:
-    DatabaseTransaction(T expr) : expr(expr) {}
+    State() = default;
 
-    void execute(dnp3::Database& database) override
-    {
-        expr(database);
-    }
+    bool binary = false;
+    bool double_bit_binary = false;
+    bool binary_output_status = false;
+    uint32_t counter = 0;
+    uint32_t frozen_counter = 0;
+    double analog = 0.0;
+    double analog_output_status = 0.0;
+
 };
 
-template <class T>
-DatabaseTransaction<T> transaction(T expr)
+dnp3::Flags online()
 {
-    return DatabaseTransaction<T>(expr);
+    return dnp3::Flags(dnp3::flag::online);
+}
+
+dnp3::Timestamp now()
+{
+    const auto time_since_epoch = std::chrono::system_clock::now().time_since_epoch();
+    return dnp3::Timestamp::synchronized_timestamp(std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count());
 }
 
 int main()
 {
-    dnp3::Logging::configure(dnp3::LoggingConfig(), std::make_unique<Logger>());
+    dnp3::Logging::configure(dnp3::LoggingConfig(), dnp3::functional::logger(
+        [](dnp3::LogLevel level, std::string message) {
+            std::cout << message;
+        }
+    ));
 
     auto runtime = dnp3::Runtime(dnp3::RuntimeConfig());
     
@@ -143,13 +133,15 @@ int main()
         std::make_unique<OutstationApplication>(),
         std::make_unique<OutstationInformation>(),
         std::make_unique<ControlHandler>(),
-        std::make_unique<ConnectionStateListener>(),
+        dnp3::functional::connection_state_listener([](dnp3::ConnectionState state) {
+            std::cout << "ConnectionState: " << dnp3::to_string(state) << std::endl;
+        }),
         filter
     );
 
-    auto setup = transaction([](dnp3::Database& db) {
+    auto setup = dnp3::functional::database_transaction([](dnp3::Database& db) {
         // add 5 of each type
-        for (uint16_t i = 0; i < 5; ++i) {
+        for (uint16_t i = 0; i < 10; ++i) {
             db.add_binary(i, dnp3::EventClass::class1, dnp3::BinaryConfig());
             db.add_double_bit_binary(i, dnp3::EventClass::class1, dnp3::DoubleBitBinaryConfig());
             db.add_binary_output_status(i, dnp3::EventClass::class1, dnp3::BinaryOutputStatusConfig());
@@ -164,6 +156,8 @@ int main()
 
     server.bind();
 
+    State state;
+
     while (true)
     {
         std::string cmd;
@@ -171,6 +165,31 @@ int main()
 
         if(cmd == "x") {
             return 0;
+        }
+        else if (cmd == "bi") {
+            auto modify = dnp3::functional::database_transaction([&](dnp3::Database& db) {
+                state.binary = !state.binary;
+                db.update_binary(dnp3::Binary(3, state.binary, online(), now()), dnp3::UpdateOptions());
+            });
+            outstation.transaction(modify);
+        }
+        else if (cmd == "bi") {
+            auto modify = dnp3::functional::database_transaction([&](dnp3::Database& db) {
+                state.binary = !state.binary;
+                db.update_binary(dnp3::Binary(3, state.binary, online(), now()), dnp3::UpdateOptions());
+            });
+            outstation.transaction(modify);
+        }
+        else if (cmd == "dbbi") {
+            auto modify = dnp3::functional::database_transaction([&](dnp3::Database& db) {
+                state.double_bit_binary = !state.double_bit_binary;
+                auto value = state.double_bit_binary ? dnp3::DoubleBit::determined_on : dnp3::DoubleBit::determined_off;
+                db.update_double_bit_binary(dnp3::DoubleBitBinary(3, value, online(), now()), dnp3::UpdateOptions());
+            });
+            outstation.transaction(modify);
+        }
+        else {
+            std::cout << "unknown command: " << cmd << std::endl;
         }
     }
 }

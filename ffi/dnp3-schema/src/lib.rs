@@ -61,6 +61,7 @@ pub fn build_lib() -> BackTraced<Library> {
         IteratorSettings::default(),
         CollectionSettings::default(),
         FutureSettings::default(),
+        InterfaceSettings::default(),
     )?;
 
     let mut builder = LibraryBuilder::new(Version::parse(dnp3::VERSION).unwrap(), info, settings);
