@@ -3,7 +3,7 @@ use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
 use oo_bindgen::enum_type::EnumHandle;
-use oo_bindgen::interface::InterfaceHandle;
+use oo_bindgen::interface::AsynchronousInterface;
 use oo_bindgen::name::Name;
 use oo_bindgen::structs::{
     FunctionArgStructHandle, InitializerDefault, InitializerType, Number, UniversalStructHandle,
@@ -15,10 +15,10 @@ struct OutstationTypes {
     database: ClassHandle,
     outstation_config: FunctionArgStructHandle,
     event_buffer_config: FunctionArgStructHandle,
-    outstation_application: InterfaceHandle,
-    outstation_information: InterfaceHandle,
-    control_handler: InterfaceHandle,
-    connection_state_listener: InterfaceHandle,
+    outstation_application: AsynchronousInterface,
+    outstation_information: AsynchronousInterface,
+    control_handler: AsynchronousInterface,
+    connection_state_listener: AsynchronousInterface,
 }
 
 impl OutstationTypes {
@@ -114,12 +114,12 @@ fn define_outstation(
     types: &OutstationTypes,
 ) -> BackTraced<ClassHandle> {
     let transaction_interface = lib
-        .define_synchronous_interface("database_transaction", "Database transaction interface")?
+        .define_interface("database_transaction", "Database transaction interface")?
         .begin_callback("execute", "Execute a transaction on the provided database")?
         .param("database", types.database.declaration.clone(), "Database")?
         .enable_functional_transform()
         .end_callback()?
-        .build()?;
+        .build_sync()?;
 
     let outstation = lib.declare_class("outstation")?;
 
@@ -564,7 +564,7 @@ fn define_restart_delay(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
 fn define_outstation_application(
     lib: &mut LibraryBuilder,
     database: &ClassHandle,
-) -> BackTraced<InterfaceHandle> {
+) -> BackTraced<AsynchronousInterface> {
     let restart_delay = define_restart_delay(lib)?;
 
     let write_time_result = lib.define_enum("write_time_result")?
@@ -593,7 +593,7 @@ fn define_outstation_application(
 
     let application_iin = define_application_iin(lib)?;
 
-    let application = lib.define_asynchronous_interface("outstation_application", "Dynamic information required by the outstation from the user application")?
+    let application = lib.define_interface("outstation_application", "Dynamic information required by the outstation from the user application")?
         .begin_callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
@@ -627,7 +627,7 @@ fn define_outstation_application(
             .param("database",database.declaration(), "Database")?
             .returns(freeze_result, "Result of the freeze operation")?
             .end_callback()?
-        .build()?;
+        .build_async()?;
 
     Ok(application)
 }
@@ -635,7 +635,7 @@ fn define_outstation_application(
 fn define_outstation_information(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
-) -> BackTraced<InterfaceHandle> {
+) -> BackTraced<AsynchronousInterface> {
     let function_code = define_function_code(lib)?;
 
     let request_header = lib.declare_callback_arg_struct("request_header")?;
@@ -659,7 +659,7 @@ fn define_outstation_information(
         .doc("Enumeration describing how the outstation processed a broadcast request")?
         .build()?;
 
-    let information = lib.define_asynchronous_interface("outstation_information", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))?
+    let information = lib.define_interface("outstation_information", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))?
         .begin_callback("process_request_from_idle", "Called when a request is processed from the IDLE state")?
             .param("header", request_header, "Request header")?
 
@@ -710,7 +710,7 @@ fn define_outstation_information(
         .begin_callback("clear_restart_iin", "Master cleared the restart IIN bit")?
 
             .end_callback()?
-        .build()?;
+        .build_async()?;
 
     Ok(information)
 }
@@ -719,7 +719,7 @@ fn define_control_handler(
     lib: &mut LibraryBuilder,
     database: &ClassHandle,
     shared_def: &SharedDefinitions,
-) -> BackTraced<InterfaceHandle> {
+) -> BackTraced<AsynchronousInterface> {
     let command_status = define_command_status(lib)?;
 
     let operate_type = lib
@@ -749,7 +749,7 @@ fn define_control_handler(
         .details(select_details_2);
 
     let control_handler = lib
-        .define_asynchronous_interface("control_handler", "Callbacks for handling controls")?
+        .define_interface("control_handler", "Callbacks for handling controls")?
         //------
         .begin_callback("begin_fragment", "Notifies the start of a command fragment")?
         .end_callback()?
@@ -831,12 +831,12 @@ fn define_control_handler(
         .returns(command_status, "Command status")?
         .end_callback()?
         //------
-        .build()?;
+        .build_async()?;
 
     Ok(control_handler)
 }
 
-fn define_connection_state_listener(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
+fn define_connection_state_listener(lib: &mut LibraryBuilder) -> BackTraced<AsynchronousInterface> {
     let state = lib
         .define_enum("connection_state")?
         .push("connected", "Connected to the master")?
@@ -845,14 +845,14 @@ fn define_connection_state_listener(lib: &mut LibraryBuilder) -> BackTraced<Inte
         .build()?;
 
     let listener = lib
-        .define_asynchronous_interface(
+        .define_interface(
             "connection_state_listener",
             "Callback interface for connection state events",
         )?
         .begin_callback("on_change", "Called when the connection state changes")?
         .param("state", state, "New state of the connection")?
         .end_callback()?
-        .build()?;
+        .build_async()?;
 
     Ok(listener)
 }

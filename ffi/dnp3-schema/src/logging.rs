@@ -114,7 +114,7 @@ pub fn define(
     let logging_config_struct = define_logging_config_struct(lib, log_level_enum.clone())?;
 
     let log_callback_interface = lib
-        .define_asynchronous_interface(
+        .define_interface(
             "logger",
             "Logging interface that receives the log messages and writes them somewhere.",
         )?
@@ -125,7 +125,7 @@ pub fn define(
         .param("level", log_level_enum, "Level of the message")?
         .param("message", StringType, "Actual formatted message")?
         .end_callback()?
-        .build()?;
+        .build_async()?;
 
     let configure_logging_fn = lib
         .define_function("configure_logging")?

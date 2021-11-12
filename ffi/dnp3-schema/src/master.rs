@@ -4,7 +4,7 @@ use oo_bindgen::*;
 use crate::shared::SharedDefinitions;
 use oo_bindgen::doc::Unvalidated;
 use oo_bindgen::enum_type::{EnumBuilder, EnumHandle};
-use oo_bindgen::interface::{FutureInterface, InterfaceHandle};
+use oo_bindgen::interface::{AsynchronousInterface, FutureInterface};
 use oo_bindgen::name::Name;
 use oo_bindgen::structs::{
     FunctionArgStructHandle, InitializerType, Number, UniversalStructHandle,
@@ -489,7 +489,7 @@ fn define_association_config(
     Ok(association_config)
 }
 
-fn define_tcp_client_state_listener(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
+fn define_tcp_client_state_listener(lib: &mut LibraryBuilder) -> BackTraced<AsynchronousInterface> {
     let client_state_enum = lib
         .define_enum("client_state")?
         .push("disabled", "Client is disabled and idle until disabled")?
@@ -514,14 +514,14 @@ fn define_tcp_client_state_listener(lib: &mut LibraryBuilder) -> BackTraced<Inte
         .build()?;
 
     let listener = lib
-        .define_asynchronous_interface(
+        .define_interface(
             "client_state_listener",
             "Callback for monitoring the client TCP connection state",
         )?
         .begin_callback("on_change", "Called when the client state changed")?
         .param("state", client_state_enum, "New state")?
         .end_callback()?
-        .build()?;
+        .build_async()?;
 
     Ok(listener)
 }
@@ -611,10 +611,10 @@ fn define_utc_timestamp(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
     Ok(timestamp_utc)
 }
 
-fn define_association_handler(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
+fn define_association_handler(lib: &mut LibraryBuilder) -> BackTraced<AsynchronousInterface> {
     let timestamp_utc = define_utc_timestamp(lib)?;
 
-    let timestamp_utc = lib.define_asynchronous_interface(
+    let timestamp_utc = lib.define_interface(
         "association_handler",
         "Callbacks for a particular outstation association",
     )?
@@ -629,7 +629,7 @@ fn define_association_handler(lib: &mut LibraryBuilder) -> BackTraced<InterfaceH
         "The current time",
     )?
     .end_callback()?
-    .build()?;
+    .build_async()?;
 
     Ok(timestamp_utc)
 }

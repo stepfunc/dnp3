@@ -2,14 +2,14 @@ use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
 use oo_bindgen::enum_type::EnumHandle;
-use oo_bindgen::interface::InterfaceHandle;
+use oo_bindgen::interface::AsynchronousInterface;
 use oo_bindgen::structs::CallbackArgStructHandle;
 use oo_bindgen::types::BasicType;
 
 pub fn define(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
-) -> BackTraced<InterfaceHandle> {
+) -> BackTraced<AsynchronousInterface> {
     let response_function = lib
         .define_enum("response_function")?
         .push("response", "Solicited response")?
@@ -31,7 +31,6 @@ pub fn define(
         .add("iin", iin, "IIN bytes")?
         .doc("Response header information")?
         .end_fields()?
-        // TODO - constructor
         .build()?;
 
     let qualifier_code_enum = lib
@@ -62,13 +61,12 @@ pub fn define(
         )?
         .doc("Object header information")?
         .end_fields()?
-        // TODO - constructor
         .build()?;
 
     let read_type = define_read_type_enum(lib)?;
 
     let read_handler_interface = lib
-        .define_asynchronous_interface(
+        .define_interface(
             "read_handler",
             "General handler that will receive all values read from the outstation.",
         )?
@@ -208,7 +206,7 @@ pub fn define(
         )?
 
         .end_callback()?
-        .build()?;
+        .build_async()?;
 
     Ok(read_handler_interface)
 }

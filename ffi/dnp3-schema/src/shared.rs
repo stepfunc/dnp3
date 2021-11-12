@@ -3,7 +3,7 @@ use oo_bindgen::class::ClassDeclarationHandle;
 use oo_bindgen::doc::Unvalidated;
 use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::error_type::{ErrorType, ExceptionType};
-use oo_bindgen::interface::InterfaceHandle;
+use oo_bindgen::interface::AsynchronousInterface;
 use oo_bindgen::iterator::IteratorHandle;
 use oo_bindgen::name::Name;
 use oo_bindgen::structs::*;
@@ -14,7 +14,7 @@ use std::time::Duration;
 
 pub struct SharedDefinitions {
     pub error_type: ErrorType<Unvalidated>,
-    pub port_state_listener: InterfaceHandle,
+    pub port_state_listener: AsynchronousInterface,
     pub variation_enum: EnumHandle,
     pub runtime_class: ClassDeclarationHandle,
     pub decode_level: UniversalStructHandle,
@@ -397,7 +397,7 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
     Ok(flags_struct)
 }
 
-fn define_port_state_listener(lib: &mut LibraryBuilder) -> BackTraced<InterfaceHandle> {
+fn define_port_state_listener(lib: &mut LibraryBuilder) -> BackTraced<AsynchronousInterface> {
     let port_state = lib
         .define_enum("port_state")?
         .push("disabled", "Disabled until enabled")?
@@ -408,14 +408,14 @@ fn define_port_state_listener(lib: &mut LibraryBuilder) -> BackTraced<InterfaceH
         .build()?;
 
     let port_state_listener = lib
-        .define_asynchronous_interface(
+        .define_interface(
             "port_state_listener",
             "Callback interface for receiving updates about the state of a serial port",
         )?
         .begin_callback("on_change", "Invoked when the serial port changes state")?
         .param("state", port_state, "New state of the port")?
         .end_callback()?
-        .build()?;
+        .build_async()?;
 
     Ok(port_state_listener)
 }
