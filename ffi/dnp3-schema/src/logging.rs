@@ -124,7 +124,6 @@ pub fn define(
         )?
         .param("level", log_level_enum, "Level of the message")?
         .param("message", StringType, "Actual formatted message")?
-        .returns_nothing()?
         .end_callback()?
         .build()?;
 

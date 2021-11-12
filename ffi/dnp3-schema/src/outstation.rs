@@ -89,7 +89,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .build()?;
 
     let bind = lib.define_method("bind", tcp_server.clone())?
-        .returns_nothing()?
+
         .fails_with(shared_def.error_type.clone())?
         .doc("Bind the server to the port and starts listening. Also starts all the outstations associated to it.")?
         .build()?;
@@ -117,7 +117,6 @@ fn define_outstation(
         .define_synchronous_interface("database_transaction", "Database transaction interface")?
         .begin_callback("execute", "Execute a transaction on the provided database")?
         .param("database", types.database.declaration.clone(), "Database")?
-        .returns_nothing()?
         .enable_functional_transform()
         .end_callback()?
         .build()?;
@@ -182,14 +181,12 @@ fn define_outstation(
             transaction_interface,
             "Interface on which to execute the transaction",
         )?
-        .returns_nothing()?
         .doc("Execute transaction to modify the internal database of the outstation")?
         .build()?;
 
     let set_decode_level = lib
         .define_method("set_decode_level", outstation.clone())?
         .param("level", shared_def.decode_level.clone(), "Decode log")?
-        .returns_nothing()?
         .fails_with(shared_def.error_type.clone())?
         .doc("Set decoding log level")?
         .build()?;
@@ -665,53 +662,53 @@ fn define_outstation_information(
     let information = lib.define_asynchronous_interface("outstation_information", doc("Informational callbacks that the outstation doesn't rely on to function").details("It may be useful to certain applications to assess the health of the communication or to count statistics"))?
         .begin_callback("process_request_from_idle", "Called when a request is processed from the IDLE state")?
             .param("header", request_header, "Request header")?
-            .returns_nothing()?
+
             .end_callback()?
         .begin_callback("broadcast_received", "Called when a broadcast request is received by the outstation")?
             .param("function_code", function_code, "Function code received")?
             .param("action", broadcast_action, "Broadcast action")?
-            .returns_nothing()?
+
             .end_callback()?
         .begin_callback("enter_solicited_confirm_wait", "Outstation has begun waiting for a solicited confirm")?
             .param("ecsn", BasicType::U8, "Expected sequence number")?
-            .returns_nothing()?
+
             .end_callback()?
         .begin_callback("solicited_confirm_timeout", "Failed to receive a solicited confirm before the timeout occurred")?
             .param("ecsn", BasicType::U8, "Expected sequence number")?
-            .returns_nothing()?
+
             .end_callback()?
         .begin_callback("solicited_confirm_received", "Received the expected confirm")?
             .param("ecsn", BasicType::U8, "Expected sequence number")?
-            .returns_nothing()?
+
             .end_callback()?
         .begin_callback("solicited_confirm_wait_new_request", "Received a new request while waiting for a solicited confirm, aborting the response series")?
-            .returns_nothing()?
+
             .end_callback()?
         .begin_callback("wrong_solicited_confirm_seq", "Received a solicited confirm with the wrong sequence number")?
             .param("ecsn", BasicType::U8, "Expected sequence number")?
             .param("seq", BasicType::U8, "Received sequence number")?
-            .returns_nothing()?
+
             .end_callback()?
         .begin_callback("unexpected_confirm", "Received a confirm when not expecting one")?
             .param("unsolicited", BasicType::Bool, "True if it's an unsolicited response confirm, false if it's a solicited response confirm")?
             .param("seq", BasicType::U8, "Received sequence number")?
-            .returns_nothing()?
+
             .end_callback()?
         .begin_callback("enter_unsolicited_confirm_wait", "Outstation has begun waiting for an unsolicited confirm")?
             .param("ecsn", BasicType::U8, "Expected sequence number")?
-            .returns_nothing()?
+
             .end_callback()?
         .begin_callback("unsolicited_confirm_timeout", "Failed to receive an unsolicited confirm before the timeout occurred")?
             .param("ecsn", BasicType::U8, "Expected sequence number")?
             .param("retry", BasicType::Bool, "Is it a retry")?
-            .returns_nothing()?
+
             .end_callback()?
         .begin_callback("unsolicited_confirmed", "Master confirmed an unsolicited message")?
             .param("ecsn", BasicType::U8, "Expected sequence number")?
-            .returns_nothing()?
+
             .end_callback()?
         .begin_callback("clear_restart_iin", "Master cleared the restart IIN bit")?
-            .returns_nothing()?
+
             .end_callback()?
         .build()?;
 
@@ -755,10 +752,8 @@ fn define_control_handler(
         .define_asynchronous_interface("control_handler", "Callbacks for handling controls")?
         //------
         .begin_callback("begin_fragment", "Notifies the start of a command fragment")?
-        .returns_nothing()?
         .end_callback()?
         .begin_callback("end_fragment", "Notifies the end of a command fragment")?
-        .returns_nothing()?
         .end_callback()?
         //------
         .begin_callback("select_g12v1", select_g12_doc)?
@@ -856,7 +851,6 @@ fn define_connection_state_listener(lib: &mut LibraryBuilder) -> BackTraced<Inte
         )?
         .begin_callback("on_change", "Called when the connection state changes")?
         .param("state", state, "New state of the connection")?
-        .returns_nothing()?
         .end_callback()?
         .build()?;
 
@@ -885,7 +879,6 @@ fn define_address_filter(
     let add = lib
         .define_method("add", address_filter.clone())?
         .param("address", StringType, "IP address to add")?
-        .returns_nothing()?
         .fails_with(shared_def.error_type.clone())?
         .doc("Add an accepted IP address to the filter")?
         .build()?;

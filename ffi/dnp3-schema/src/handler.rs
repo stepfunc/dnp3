@@ -83,7 +83,6 @@ pub fn define(
             response_header.clone(),
             "Header of the fragment",
         )?
-        .returns_nothing()?
         .end_callback()?
         .begin_callback("end_fragment", "Marks the end of a fragment")?
         .param(
@@ -96,7 +95,6 @@ pub fn define(
            response_header,
             "Header of the fragment",
         )?
-        .returns_nothing()?
         .end_callback()?
         .begin_callback("handle_binary", "Handle binary input data")?
         .param(
@@ -109,7 +107,6 @@ pub fn define(
            shared_def.binary_it.clone(),
                 "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .returns_nothing()?
         .end_callback()?
         .begin_callback(
             "handle_double_bit_binary",
@@ -125,7 +122,7 @@ pub fn define(
            shared_def.double_bit_binary_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .returns_nothing()?
+
         .end_callback()?
         .begin_callback(
             "handle_binary_output_status",
@@ -141,7 +138,7 @@ pub fn define(
            shared_def.binary_output_status_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .returns_nothing()?
+
         .end_callback()?
         .begin_callback("handle_counter", "Handle counter data")?
         .param(
@@ -154,7 +151,7 @@ pub fn define(
            shared_def.counter_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .returns_nothing()?
+
         .end_callback()?
         .begin_callback("handle_frozen_counter", "Handle frozen counter input data")?
         .param(
@@ -167,7 +164,7 @@ pub fn define(
            shared_def.frozen_counter_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .returns_nothing()?
+
         .end_callback()?
         .begin_callback("handle_analog", "Handle analog input data")?
         .param(
@@ -180,7 +177,7 @@ pub fn define(
            shared_def.analog_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .returns_nothing()?
+
         .end_callback()?
         .begin_callback(
             "handle_analog_output_status",
@@ -196,7 +193,7 @@ pub fn define(
            shared_def.analog_output_status_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .returns_nothing()?
+
         .end_callback()?
         .begin_callback("handle_octet_string", "Handle octet string data")?
         .param(
@@ -209,7 +206,7 @@ pub fn define(
            shared_def.octet_string_it.clone(),
             "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
         )?
-        .returns_nothing()?
+
         .end_callback()?
         .build()?;
 

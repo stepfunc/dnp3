@@ -88,14 +88,12 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let enable_method = lib
         .define_method("enable", master_channel_class.clone())?
-        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("start communications")?
         .build()?;
 
     let disable_method = lib
         .define_method("disable", master_channel_class.clone())?
-        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("stop communications")?
         .build()?;
@@ -135,7 +133,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let remove_association_method = lib
         .define_method("remove_association", master_channel_class.clone())?
         .param("id", association_id.clone(), "Id of the association")?
-        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Remove an association from the channel")?
         .build()?;
@@ -155,7 +152,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let remove_poll_method = lib
         .define_method("remove_poll", master_channel_class.clone())?
         .param("poll_id", poll_id.clone(), "Id of the created poll")?
-        .returns_nothing()?
+
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Add a periodic poll to an association")
@@ -165,7 +162,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let demand_poll_method = lib.define_method("demand_poll", master_channel_class.clone())?
         .param("poll_id", poll_id, "Id of the poll")?
-        .returns_nothing()?
+
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Demand the immediate execution of a poll previously created with {class:master_channel.add_poll()}.")
@@ -181,7 +178,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             shared.decode_level.clone(),
             "Decoding level",
         )?
-        .returns_nothing()?
         .fails_with(shared.error_type.clone())?
         .doc("Set the decoding level for the channel")?
         .build()?;
@@ -524,7 +520,6 @@ fn define_tcp_client_state_listener(lib: &mut LibraryBuilder) -> BackTraced<Inte
         )?
         .begin_callback("on_change", "Called when the client state changed")?
         .param("state", client_state_enum, "New state")?
-        .returns_nothing()?
         .end_callback()?
         .build()?;
 
@@ -580,7 +575,7 @@ fn define_endpoint_list(lib: &mut LibraryBuilder) -> BackTraced<ClassHandle> {
 
     let add_method = lib.define_method("add", endpoint_list.clone())?
         .param("endpoint", StringType, "Endpoint to add to the list")?
-        .returns_nothing()?
+
         .doc(doc("Add an IP endpoint to the list.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
         .build()?;
 
@@ -800,7 +795,7 @@ fn define_command_builder(
 
     let finish_header = lib
         .define_method("finish_header", command_set.clone())?
-        .returns_nothing()?
+
         .doc("Finish any partially completed header. This allows for the construction of two headers with the same type and index")?
         .build()?;
 
@@ -812,7 +807,6 @@ fn define_command_builder(
             "Index of the point to send the command to",
         )?
         .param("header", shared.g12v1_struct.clone(), "CROB data")?
-        .returns_nothing()?
         .doc("Add a CROB with 1-byte prefix index")?
         .build()?;
 
@@ -824,7 +818,6 @@ fn define_command_builder(
             "Index of the point to send the command to",
         )?
         .param("header", shared.g12v1_struct.clone(), "CROB data")?
-        .returns_nothing()?
         .doc("Add a CROB with 2-byte prefix index")?
         .build()?;
 
@@ -836,7 +829,6 @@ fn define_command_builder(
             "Index of the point to send the command to",
         )?
         .param("value", BasicType::S32, "Value to set the analog output to")?
-        .returns_nothing()?
         .doc("Add a Analog Output command (signed 32-bit integer) with 1-byte prefix index")?
         .build()?;
 
@@ -848,7 +840,6 @@ fn define_command_builder(
             "Index of the point to send the command to",
         )?
         .param("value", BasicType::S32, "Value to set the analog output to")?
-        .returns_nothing()?
         .doc("Add a Analog Output command (signed 32-bit integer) with 2-byte prefix index")?
         .build()?;
 
@@ -860,7 +851,6 @@ fn define_command_builder(
             "Index of the point to send the command to",
         )?
         .param("value", BasicType::S16, "Value to set the analog output to")?
-        .returns_nothing()?
         .doc("Add a Analog Output command (signed 16-bit integer) with 1-byte prefix index")?
         .build()?;
 
@@ -872,7 +862,6 @@ fn define_command_builder(
             "Index of the point to send the command to",
         )?
         .param("value", BasicType::S16, "Value to set the analog output to")?
-        .returns_nothing()?
         .doc("Add a Analog Output command (signed 16-bit integer) with 2-byte prefix index")?
         .build()?;
 
@@ -888,7 +877,6 @@ fn define_command_builder(
             BasicType::Float32,
             "Value to set the analog output to",
         )?
-        .returns_nothing()?
         .doc("Add a Analog Output command (single-precision float) with 1-byte prefix index")?
         .build()?;
 
@@ -904,7 +892,6 @@ fn define_command_builder(
             BasicType::Float32,
             "Value to set the analog output to",
         )?
-        .returns_nothing()?
         .doc("Add a Analog Output command (single-precision float) with 2-byte prefix index")?
         .build()?;
 
@@ -920,7 +907,6 @@ fn define_command_builder(
             BasicType::Double64,
             "Value to set the analog output to",
         )?
-        .returns_nothing()?
         .doc("Add a Analog Output command (double-precision float) with 1-byte prefix index")?
         .build()?;
 
@@ -936,7 +922,6 @@ fn define_command_builder(
             BasicType::Double64,
             "Value to set the analog output to",
         )?
-        .returns_nothing()?
         .doc("Add a Analog Output command (double-precision float) with 2-byte prefix index")?
         .build()?;
 

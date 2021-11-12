@@ -414,7 +414,6 @@ fn define_port_state_listener(lib: &mut LibraryBuilder) -> BackTraced<InterfaceH
         )?
         .begin_callback("on_change", "Invoked when the serial port changes state")?
         .param("state", port_state, "New state of the port")?
-        .returns_nothing()?
         .end_callback()?
         .build()?;
 

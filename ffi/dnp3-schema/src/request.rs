@@ -43,7 +43,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .param("start", BasicType::U8, "Start index to ask")?
         .param("stop", BasicType::U8, "Stop index to ask (inclusive)")?
-        .returns_nothing()?
         .doc("Add a one-byte start/stop variation interrogation")?
         .build()?;
 
@@ -56,7 +55,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .param("start", BasicType::U16, "Start index to ask")?
         .param("stop", BasicType::U16, "Stop index to ask (inclusive)")?
-        .returns_nothing()?
         .doc("Add a two-byte start/stop variation interrogation")?
         .build()?;
 
@@ -67,7 +65,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             shared.variation_enum.clone(),
             "Variation to ask for",
         )?
-        .returns_nothing()?
         .doc("Add an all objects variation interrogation")?
         .build()?;
 
