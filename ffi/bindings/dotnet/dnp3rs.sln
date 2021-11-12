@@ -5,9 +5,9 @@ VisualStudioVersion = 16.0.30128.74
 MinimumVisualStudioVersion = 15.0.26124.0
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "dnp3", "dnp3\dnp3.csproj", "{0D8CEB91-C55F-4C86-9FFC-BB5130634B73}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Master", "examples\master\Master.csproj", "{DA15A95F-F729-4300-8337-E239ABFD909C}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{6F36FF12-34EC-418A-9706-206572E8423E}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Master", "examples\master\Master.csproj", "{DA15A95F-F729-4300-8337-E239ABFD909C}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Outstation", "examples\outstation\Outstation.csproj", "{BA3683F1-B992-4A2E-BC79-ABED0E3E2C8A}"
 EndProject
