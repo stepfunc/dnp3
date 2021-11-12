@@ -118,6 +118,7 @@ fn define_outstation(
         .begin_callback("execute", "Execute a transaction on the provided database")?
         .param("database", types.database.declaration.clone(), "Database")?
         .returns_nothing()?
+        .enable_functional_transform()
         .end_callback()?
         .build()?;
 

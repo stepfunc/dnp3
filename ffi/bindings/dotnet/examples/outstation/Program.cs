@@ -179,12 +179,12 @@ class ExampleOutstation
 
         // Setup initial points
         // ANCHOR: database_init
-        outstation.Transaction(new DatabaseTransaction((db) =>
+        outstation.Transaction(db =>
         {
             for (ushort i = 0; i < 10; i++)
             {
-                        // add points with default values
-                        db.AddBinary(i, EventClass.Class1, new BinaryConfig());
+                // add points with default values
+                db.AddBinary(i, EventClass.Class1, new BinaryConfig());
                 db.AddDoubleBitBinary(i, EventClass.Class1, new DoubleBitBinaryConfig());
                 db.AddBinaryOutputStatus(i, EventClass.Class1, new BinaryOutputStatusConfig());
                 db.AddCounter(i, EventClass.Class1, new CounterConfig());
@@ -193,7 +193,7 @@ class ExampleOutstation
                 db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig());
                 db.AddOctetString(i, EventClass.Class1);
             }
-        }));
+        });
         // ANCHOR_END: database_init
 
         // Start the outstation
@@ -217,69 +217,69 @@ class ExampleOutstation
                     return;
                 case "bi":
                     {
-                        outstation.Transaction(new DatabaseTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             binaryValue = !binaryValue;
                             db.UpdateBinary(new Binary(7, binaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
-                        }));
+                        });
                         break;
                     }
                 case "dbbi":
                     {
-                        outstation.Transaction(new DatabaseTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DeterminedOff ? DoubleBit.DeterminedOn : DoubleBit.DeterminedOff;
                             db.UpdateDoubleBitBinary(new DoubleBitBinary(7, doubleBitBinaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
-                        }));
+                        });
                         break;
                     }
                 case "bos":
                     {
-                        outstation.Transaction(new DatabaseTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             binaryOutputStatusValue = !binaryOutputStatusValue;
                             db.UpdateBinaryOutputStatus(new BinaryOutputStatus(7, binaryOutputStatusValue, new Flags(Flag.Online), Now()), new UpdateOptions());
-                        }));
+                        });
                         break;
                     }
                 case "co":
                     {
-                        outstation.Transaction(new DatabaseTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             db.UpdateCounter(new Counter(7, ++counterValue, new Flags(Flag.Online), Now()), new UpdateOptions());
-                        }));
+                        });
                         break;
                     }
                 case "fco":
                     {
-                        outstation.Transaction(new DatabaseTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             db.UpdateFrozenCounter(new FrozenCounter(7, ++frozenCounterValue, new Flags(Flag.Online), Now()), new UpdateOptions());
-                        }));
+                        });
                         break;
                     }
                 case "ai":
                     {
-                        outstation.Transaction(new DatabaseTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             db.UpdateAnalog(new Analog(7, ++analogValue, new Flags(Flag.Online), Now()), new UpdateOptions());
-                        }));
+                        });
                         break;
                     }
                 case "aos":
                     {
-                        outstation.Transaction(new DatabaseTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             db.UpdateAnalogOutputStatus(new AnalogOutputStatus(7, ++analogOutputStatusValue, new Flags(Flag.Online), Now()), new UpdateOptions());
-                        }));
+                        });
                         break;
                     }
                 case "os":
                     {
-                        outstation.Transaction(new DatabaseTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             db.UpdateOctetString(7, System.Text.Encoding.ASCII.GetBytes("Hello"), new UpdateOptions());
-                        }));
+                        });
                         break;
                     }
                 default:
