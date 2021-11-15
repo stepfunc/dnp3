@@ -20,11 +20,11 @@ target_link_libraries(outstation_example PRIVATE dnp3)
 
 # C++ Master example
 add_executable(cpp_master_example master_example.cpp ${DNP3_CPP_FILE})
-target_link_libraries(cpp_master_example PRIVATE dnp3)
+target_link_libraries(cpp_master_example PRIVATE dnp3_cpp)
 
 # C++ Outstation example
 add_executable(cpp_outstation_example outstation_example.cpp ${DNP3_CPP_FILE})
-target_link_libraries(cpp_outstation_example PRIVATE dnp3)
+target_link_libraries(cpp_outstation_example PRIVATE dnp3_cpp)
 
 # Copy the DLL after build
 add_custom_command(TARGET master_example POST_BUILD 

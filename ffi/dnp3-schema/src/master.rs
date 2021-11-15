@@ -398,6 +398,7 @@ fn define_read_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterface<
         "Handler for read tasks",
         read_result,
         "Result of the read task",
+        None
     )?;
 
     Ok(callback)
@@ -775,6 +776,7 @@ fn define_command_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterfa
         "Handler for command tasks",
         command_result,
         "Result of the command task",
+        None
     )?;
 
     Ok(callback)
@@ -975,6 +977,7 @@ fn define_time_sync_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInter
         "Handler for time synchronization tasks",
         time_sync_result,
         "Result of the time synchronization task",
+        None
     )?;
 
     Ok(callback)
@@ -1019,6 +1022,7 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterfa
         "Handler for restart tasks",
         restart_result,
         "Result of the restart task",
+        None
     )?;
 
     Ok(callback)
@@ -1049,6 +1053,7 @@ fn define_link_status_callback(
         "Handler for link status check",
         link_status_enum,
         "Result of the link status",
+        None
     )?;
 
     Ok(callback)
