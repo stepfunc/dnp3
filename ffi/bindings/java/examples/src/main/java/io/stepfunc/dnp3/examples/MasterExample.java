@@ -401,14 +401,14 @@ public class MasterExample {
         }
       case "crt":
         {
-          RestartResult result = channel.coldRestart(association).toCompletableFuture().get();
-          System.out.println("Result: " + result);
+          Duration delay = channel.coldRestart(association).toCompletableFuture().get();
+          System.out.println("Restart delay: " + delay);
           break;
         }
       case "wrt":
         {
-          RestartResult result = channel.warmRestart(association).toCompletableFuture().get();
-          System.out.println("Result: " + result);
+          Duration delay = channel.warmRestart(association).toCompletableFuture().get();
+          System.out.println("Restart delay: " + delay);
           break;
         }
       case "lsr":

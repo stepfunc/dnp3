@@ -336,12 +336,10 @@ pub(crate) unsafe fn master_channel_cold_restart(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match association.cold_restart().await {
-            Ok(value) => ffi::RestartResult::new_success(value),
-            Err(err) => ffi::RestartResult::new_error(err.into()),
+        match association.cold_restart().await {
+            Ok(x) => callback.on_complete(x),
+            Err(err) => callback.on_failure(err.into()),
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
@@ -359,12 +357,10 @@ pub(crate) unsafe fn master_channel_warm_restart(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match association.warm_restart().await {
-            Ok(value) => ffi::RestartResult::new_success(value),
-            Err(err) => ffi::RestartResult::new_error(err.into()),
+        match association.warm_restart().await {
+            Ok(x) => callback.on_complete(x),
+            Err(err) => callback.on_failure(err.into()),
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
@@ -416,24 +412,6 @@ pub(crate) unsafe fn master_channel_get_decode_level(
         .block_on(channel.handle.get_decode_level())??;
 
     Ok(result.into())
-}
-
-impl ffi::RestartResult {
-    fn new_success(delay: Duration) -> Self {
-        ffi::RestartResultFields {
-            delay,
-            error: ffi::RestartError::Ok,
-        }
-        .into()
-    }
-
-    fn new_error(error: ffi::RestartError) -> Self {
-        ffi::RestartResultFields {
-            delay: Duration::from_millis(0),
-            error,
-        }
-        .into()
-    }
 }
 
 fn convert_event_classes(config: &ffi::EventClasses) -> EventClasses {

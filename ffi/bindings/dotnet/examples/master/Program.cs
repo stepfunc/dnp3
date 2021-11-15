@@ -310,26 +310,26 @@ class MainClass
                 }
             case "lts":
                 {
-                    var result = await channel.SynchronizeTime(association, TimeSyncMode.Lan);
-                    Console.WriteLine($"Time sync: {result}");
+                    await channel.SynchronizeTime(association, TimeSyncMode.Lan);
+                    Console.WriteLine("Time sync success");
                     return true;
                 }
             case "nts":
                 {
-                    var result = await channel.SynchronizeTime(association, TimeSyncMode.NonLan);
-                    Console.WriteLine($"Time sync: {result}");
+                    await channel.SynchronizeTime(association, TimeSyncMode.NonLan);
+                    Console.WriteLine("Time sync success");
                     return true;
                 }
             case "crt":
                 {
-                    var result = await channel.ColdRestart(association);
-                    Console.WriteLine($"Result: {result}");
+                    var delay = await channel.ColdRestart(association);
+                    Console.WriteLine($"Restart delay: {delay}");
                     return true;
                 }
             case "wrt":
                 {
-                    var result = await channel.WarmRestart(association);
-                    Console.WriteLine($"Result: {result}");
+                    var delay = await channel.WarmRestart(association);
+                    Console.WriteLine($"Restart delay: {delay}");
                     return true;
                 }
             case "lsr":

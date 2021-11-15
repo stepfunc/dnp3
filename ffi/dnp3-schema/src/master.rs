@@ -1051,27 +1051,21 @@ fn define_time_sync_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
 
 fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterface<Unvalidated>> {
     let restart_error = lib
-        .define_enum("restart_error")?
-        .push("ok", "Restart was perform successfully")?
+        .define_error_type(
+            "restart_error",
+            "restart_exception",
+            ExceptionType::CheckedException,
+        )?
         .add_task_errors()?
-        .doc("Result of a restart operation")?
-        .build()?;
-
-    let restart_result = lib.declare_callback_arg_struct("restart_result")?;
-    let restart_result = lib.define_callback_argument_struct(restart_result)?
-        .add("error", restart_error, "Success/failure of the restart task")?
-        .add("delay", DurationType::Milliseconds, "Delay value returned by the outstation. Valid only if {struct:restart_result.error} is {enum:restart_error.ok}.")?
-        .doc("Result of a restart task")?
-        .end_fields()?
-        .add_full_initializer("init")?
+        .doc("Errors that can occur during a cold/warm restart operation")?
         .build()?;
 
     let callback = lib.define_future_interface(
         "restart_task_callback",
         "Handler for restart tasks",
-        restart_result,
+        DurationType::Milliseconds,
         "Result of the restart task",
-        None,
+        Some(restart_error),
     )?;
 
     Ok(callback)

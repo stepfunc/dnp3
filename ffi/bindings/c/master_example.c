@@ -170,23 +170,24 @@ void on_read_failure(dnp3_read_error_t error, void* arg) { printf("Read error: %
 
 // Command callbacks
 // ANCHOR: assoc_control_callback
-void on_command_error(dnp3_command_error_t result, void *arg)
-{
-    printf("Command failed: %s\n", dnp3_command_error_to_string(result));
-}
-
 void on_command_success(dnp3_nothing_t nothing, void* arg)
 {
     printf("Command succeeded!\n");
 }
+void on_command_error(dnp3_command_error_t result, void *arg)
+{
+    printf("Command failed: %s\n", dnp3_command_error_to_string(result));
+}
 // ANCHOR_END: assoc_control_callback
 
 // Timesync callbacks
+void on_time_sync_success(dnp3_nothing_t nothing, void* arg) { printf("Time sync success! \n"); }
 void on_time_sync_error(dnp3_time_sync_error_t error, void *arg) { printf("Time sync error: %s\n", dnp3_time_sync_error_to_string(error)); }
-void on_time_sync_success(dnp3_nothing_t success, void* arg) { printf("Time sync success! \n"); }
 
-// Restart callback
-void on_restart_complete(dnp3_restart_result_t result, void *arg) { printf("RestartResult: %s\n", dnp3_restart_error_to_string(result.error)); }
+
+// Restart callbacks
+void on_restart_success(uint64_t delay, void *arg) { printf("restart success: %" PRIu64 "\n", delay); }
+void on_restart_failure(dnp3_restart_error_t error, void* arg) { printf("Restart failure: %s\n", dnp3_restart_error_to_string(error)); }
 
 void on_link_status_complete(dnp3_link_status_result_t result, void *arg) { printf("LinkStatusResult: %s\n", dnp3_link_status_result_to_string(result)); }
 
@@ -395,7 +396,8 @@ int main()
         }
         else if (strcmp(cbuf, "crt\n") == 0) {
             dnp3_restart_task_callback_t cb = {
-                .on_complete = &on_restart_complete,
+                .on_complete = &on_restart_success,
+                .on_failure = &on_restart_failure,
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
@@ -403,7 +405,8 @@ int main()
         }
         else if (strcmp(cbuf, "wrt\n") == 0) {
             dnp3_restart_task_callback_t cb = {
-                .on_complete = &on_restart_complete,
+                .on_complete = &on_restart_success,
+                .on_failure = &on_restart_failure,
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
