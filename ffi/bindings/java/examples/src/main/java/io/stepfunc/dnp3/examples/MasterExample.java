@@ -413,9 +413,8 @@ public class MasterExample {
         }
       case "lsr":
         {
-          LinkStatusResult result =
-              channel.checkLinkStatus(association).toCompletableFuture().get();
-          System.out.println("Result: " + result);
+          channel.checkLinkStatus(association).toCompletableFuture().get();
+          System.out.println("Link status success!");
           break;
         }
       default:

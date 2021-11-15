@@ -3,7 +3,7 @@ use oo_bindgen::*;
 
 use crate::shared::SharedDefinitions;
 use oo_bindgen::doc::Unvalidated;
-use oo_bindgen::enum_type::{EnumBuilder, EnumHandle};
+use oo_bindgen::enum_type::EnumHandle;
 use oo_bindgen::error_type::{ErrorTypeBuilder, ExceptionType};
 use oo_bindgen::interface::{AsynchronousInterface, FutureInterface};
 use oo_bindgen::name::Name;
@@ -227,7 +227,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     let time_sync_mode = define_time_sync_mode(lib)?;
-    let time_sync_cb = define_time_sync_callback(lib, nothing)?;
+    let time_sync_cb = define_time_sync_callback(lib, nothing.clone())?;
 
     let perform_time_sync_async = lib
         .define_future_method(
@@ -273,7 +273,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("Asynchronously perform a warm restart operation to the association")?
         .build()?;
 
-    let link_status_cb = define_link_status_callback(lib)?;
+    let link_status_cb = define_link_status_callback(lib, nothing)?;
 
     let check_link_status_async = lib
         .define_future_method(
@@ -744,30 +744,6 @@ trait TaskErrors: Sized {
     fn add_task_errors(self) -> BackTraced<Self>;
 }
 
-impl TaskErrors for EnumBuilder<'_> {
-    fn add_task_errors(self) -> BackTraced<Self> {
-        let builder = self
-            .push("too_many_requests", "too many user requests queued")?
-            .push(
-                "bad_response",
-                "response was malformed or contained object headers",
-            )?
-            .push(
-                "response_timeout",
-                "timeout occurred before receiving a response",
-            )?
-            .push(
-                "write_error",
-                "insufficient buffer space to serialize the request",
-            )?
-            .push("no_connection", "no connection")?
-            .push("shutdown", "master was shutdown")?
-            .push("association_removed", "association was removed mid-task")?;
-
-        Ok(builder)
-    }
-}
-
 impl TaskErrors for ErrorTypeBuilder<'_> {
     fn add_task_errors(self) -> BackTraced<Self> {
         let builder = self
@@ -1073,30 +1049,24 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterfa
 
 fn define_link_status_callback(
     lib: &mut LibraryBuilder,
+    nothing: EnumHandle,
 ) -> BackTraced<FutureInterface<Unvalidated>> {
-    let link_status_enum = lib
-        .define_enum("link_status_result")?
-        .push(
-            "success",
-            "The outstation responded with a valid LINK_STATUS",
-        )?
-        .push(
+    let link_status_error = lib
+        .define_error_type("link_status_error", "link_status_exception", ExceptionType::CheckedException)?
+        .add_error(
             "unexpected_response",
             "There was activity on the link, but it wasn't a LINK_STATUS",
         )?
-        .push(
-            "task_error",
-            "The task failed for some reason (e.g. the master was shutdown)",
-        )?
-        .doc("Result of a link status check. See {class:master_channel.check_link_status()}")?
+        .add_task_errors()?
+        .doc("Errors that can occur during a manually initiated link status check. See {class:master_channel.check_link_status()}")?
         .build()?;
 
     let callback = lib.define_future_interface(
         "link_status_callback",
         "Handler for link status check",
-        link_status_enum,
+        nothing,
         "Result of the link status",
-        None,
+        Some(link_status_error),
     )?;
 
     Ok(callback)

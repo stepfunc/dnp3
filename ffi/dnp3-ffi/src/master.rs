@@ -2,7 +2,7 @@ use std::ffi::CStr;
 use std::time::Duration;
 
 use dnp3::app::{ConnectStrategy, Listener, RetryStrategy, Timeout, Timestamp};
-use dnp3::link::{EndpointAddress, LinkStatusResult, SpecialAddressError};
+use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::serial::*;
 use dnp3::tcp::ClientState;
@@ -378,13 +378,10 @@ pub(crate) unsafe fn master_channel_check_link_status(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match association.check_link_status().await {
-            Ok(LinkStatusResult::Success) => ffi::LinkStatusResult::Success,
-            Ok(LinkStatusResult::UnexpectedResponse) => ffi::LinkStatusResult::UnexpectedResponse,
-            Err(_) => ffi::LinkStatusResult::TaskError,
+        match association.check_link_status().await {
+            Ok(_) => callback.on_complete(ffi::Nothing::Nothing),
+            Err(err) => callback.on_failure(err.into()),
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
@@ -621,3 +618,4 @@ define_task_from_impl!(CommandError);
 define_task_from_impl!(TimeSyncError);
 define_task_from_impl!(RestartError);
 define_task_from_impl!(ReadError);
+define_task_from_impl!(LinkStatusError);
