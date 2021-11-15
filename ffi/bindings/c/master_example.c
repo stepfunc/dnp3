@@ -164,10 +164,11 @@ dnp3_read_handler_t get_read_handler()
     };
 }
 
-// Single read callback
-void on_read_complete(dnp3_read_result_t result, void *arg) { printf("ReadResult: %s\n", dnp3_read_result_to_string(result)); }
+// read callbacks
+void on_read_success(dnp3_success_t success, void *arg) { printf("Read success! \n"); }
+void on_read_failure(dnp3_read_error_t error, void* arg) { printf("Read error: %s \n", dnp3_read_error_to_string(error)); }
 
-// Command callback
+// Command callbacks
 // ANCHOR: assoc_control_callback
 void on_command_error(dnp3_command_error_t result, void *arg)
 {
@@ -180,8 +181,9 @@ void on_command_success(dnp3_success_t result, void* arg)
 }
 // ANCHOR_END: assoc_control_callback
 
-// Timesync callback
-void on_timesync_complete(dnp3_time_sync_result_t result, void *arg) { printf("TimeSyncResult: %s\n", dnp3_time_sync_result_to_string(result)); }
+// Timesync callbacks
+void on_time_sync_error(dnp3_time_sync_error_t error, void *arg) { printf("Time sync error: %s\n", dnp3_time_sync_error_to_string(error)); }
+void on_time_sync_success(dnp3_success_t success, void* arg) { printf("Time sync success! \n"); }
 
 // Restart callback
 void on_restart_complete(dnp3_restart_result_t result, void *arg) { printf("RestartResult: %s\n", dnp3_restart_error_to_string(result.error)); }
@@ -328,7 +330,8 @@ int main()
             dnp3_request_add_all_objects_header(request, DNP3_VARIATION_GROUP40_VAR0);
 
             dnp3_read_task_callback_t cb = {
-                .on_complete = &on_read_complete,
+                .on_complete = &on_read_success,
+                .on_failure = &on_read_failure,
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
@@ -342,7 +345,8 @@ int main()
             dnp3_request_add_all_objects_header(request, DNP3_VARIATION_GROUP40_VAR0);
 
             dnp3_read_task_callback_t cb = {
-                .on_complete = &on_read_complete,
+                .on_complete = &on_read_success,
+                .on_failure = &on_read_failure,
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
@@ -373,7 +377,8 @@ int main()
         }
         else if (strcmp(cbuf, "lts\n") == 0) {
             dnp3_time_sync_task_callback_t cb = {
-                .on_complete = &on_timesync_complete,
+                .on_complete = &on_time_sync_success,
+                .on_failure = &on_time_sync_error,
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
@@ -381,7 +386,8 @@ int main()
         }
         else if (strcmp(cbuf, "nts\n") == 0) {
             dnp3_time_sync_task_callback_t cb = {
-                .on_complete = &on_timesync_complete,
+                .on_complete = &on_time_sync_success,
+                .on_failure = &on_time_sync_error,
                 .on_destroy = NULL,
                 .ctx = NULL,
             };

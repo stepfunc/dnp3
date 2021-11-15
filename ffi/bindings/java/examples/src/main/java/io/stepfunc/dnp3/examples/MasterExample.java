@@ -350,8 +350,8 @@ public class MasterExample {
         {
           Request request = new Request();
           request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-          ReadResult result = channel.read(association, request).toCompletableFuture().get();
-          System.out.println("Result: " + result);
+          channel.read(association, request).toCompletableFuture().get();
+          System.out.println("read success!");
           break;
         }
       case "rmo":
@@ -359,8 +359,8 @@ public class MasterExample {
           Request request = new Request();
           request.addAllObjectsHeader(Variation.GROUP10_VAR0);
           request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-          ReadResult result = channel.read(association, request).toCompletableFuture().get();
-          System.out.println("Result: " + result);
+          channel.read(association, request).toCompletableFuture().get();
+          System.out.println("read success!");
           break;
         }
       case "cmd":
@@ -389,19 +389,14 @@ public class MasterExample {
 
       case "lts":
         {
-          TimeSyncResult result =
-              channel.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
-          System.out.println("Result: " + result);
+          channel.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
+          System.out.println("Time sync success!");
           break;
         }
       case "nts":
         {
-          TimeSyncResult result =
-              channel
-                  .synchronizeTime(association, TimeSyncMode.NON_LAN)
-                  .toCompletableFuture()
-                  .get();
-          System.out.println("Result: " + result);
+          channel.synchronizeTime(association, TimeSyncMode.NON_LAN).toCompletableFuture().get();
+          System.out.println("Time sync success!");
           break;
         }
       case "crt":

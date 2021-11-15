@@ -26,6 +26,12 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let connect_strategy = define_connect_strategy(lib)?;
 
+    let success = lib
+        .define_enum("success")?
+        .push("ok", "single value which always indicates success")?
+        .doc("A single value enum which is used as a placeholder for futures that don't return a value")?
+        .build()?;
+
     let master_channel_create_tcp_fn = lib
         .define_function("master_channel_create_tcp")?
         .param(
@@ -190,7 +196,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("Get the decoding level for the channel")?
         .build()?;
 
-    let read_callback = define_read_callback(lib)?;
+    let read_callback = define_read_callback(lib, success.clone())?;
 
     let read_async = lib
         .define_future_method("read", master_channel_class.clone(), read_callback)?
@@ -205,7 +211,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let command = define_command_builder(lib, shared)?;
     let command_mode = define_command_mode(lib)?;
-    let command_cb = define_command_callback(lib)?;
+    let command_cb = define_command_callback(lib, success.clone())?;
 
     let operate_async = lib
         .define_future_method("operate", master_channel_class.clone(), command_cb)?
@@ -221,7 +227,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     let time_sync_mode = define_time_sync_mode(lib)?;
-    let time_sync_cb = define_time_sync_callback(lib)?;
+    let time_sync_cb = define_time_sync_callback(lib, success)?;
 
     let perform_time_sync_async = lib
         .define_future_method(
@@ -386,20 +392,26 @@ fn define_poll_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle>
     Ok(id)
 }
 
-fn define_read_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterface<Unvalidated>> {
-    let read_result = lib
-        .define_enum("read_result")?
-        .push("success", "Read was perform successfully")?
+fn define_read_callback(
+    lib: &mut LibraryBuilder,
+    success: EnumHandle,
+) -> BackTraced<FutureInterface<Unvalidated>> {
+    let read_error = lib
+        .define_error_type(
+            "read_error",
+            "read_exception",
+            ExceptionType::CheckedException,
+        )?
         .add_task_errors()?
-        .doc("Result of a read operation")?
+        .doc("Errors that can occur during a read operation")?
         .build()?;
 
     let callback = lib.define_future_interface(
         "read_task_callback",
         "Handler for read tasks",
-        read_result,
+        success,
         "Result of the read task",
-        None,
+        Some(read_error),
     )?;
 
     Ok(callback)
@@ -780,20 +792,16 @@ impl TaskErrors for ErrorTypeBuilder<'_> {
     }
 }
 
-fn define_command_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterface<Unvalidated>> {
-    let success = lib
-        .define_enum("success")?
-        .push("ok", "single value which always indicates success")?
-        .doc("A single value enum which is used as a placeholder for futures that don't return a value")?
-        .build()?;
-
+fn define_command_callback(
+    lib: &mut LibraryBuilder,
+    success: EnumHandle,
+) -> BackTraced<FutureInterface<Unvalidated>> {
     let command_error = lib
         .define_error_type(
             "command_error",
             "command_exception",
             ExceptionType::CheckedException,
         )?
-        .add_error("success", "Command was a success")?
         .add_error(
             "bad_status",
             "Outstation indicated that a command was not SUCCESS",
@@ -983,36 +991,42 @@ fn define_command_builder(
     Ok(command_set)
 }
 
-fn define_time_sync_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterface<Unvalidated>> {
-    let time_sync_result = lib
-        .define_enum("time_sync_result")?
-        .push("success", "Time synchronization operation was a success")?
-        .push("clock_rollback", "Detected a clock rollback")?
-        .push(
+fn define_time_sync_callback(
+    lib: &mut LibraryBuilder,
+    success: EnumHandle,
+) -> BackTraced<FutureInterface<Unvalidated>> {
+    let time_sync_error = lib
+        .define_error_type(
+            "time_sync_error",
+            "time_sync_exception",
+            ExceptionType::CheckedException,
+        )?
+        .add_error("clock_rollback", "Detected a clock rollback")?
+        .add_error(
             "system_time_not_unix",
             "The system time cannot be converted to a Unix timestamp",
         )?
-        .push(
+        .add_error(
             "bad_outstation_time_delay",
             "Outstation time delay exceeded the response delay",
         )?
-        .push("overflow", "Overflow in calculation")?
-        .push(
+        .add_error("overflow", "Overflow in calculation")?
+        .add_error(
             "still_needs_time",
             "Outstation did not clear the NEED_TIME IIN bit",
         )?
-        .push("system_time_not_available", "System time not available")?
-        .push("iin_error", "Outstation indicated an error")?
+        .add_error("system_time_not_available", "System time not available")?
+        .add_error("iin_error", "Outstation indicated an error")?
         .add_task_errors()?
-        .doc("Result of a time sync operation")?
+        .doc("Possible errors that can occur during a time synchronization procedure")?
         .build()?;
 
     let callback = lib.define_future_interface(
         "time_sync_task_callback",
         "Handler for time synchronization tasks",
-        time_sync_result,
+        success,
         "Result of the time synchronization task",
-        None,
+        Some(time_sync_error),
     )?;
 
     Ok(callback)

@@ -227,12 +227,10 @@ pub(crate) unsafe fn master_channel_read(
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match handle.read(request).await {
-            Ok(_) => ffi::ReadResult::Success,
-            Err(err) => err.into(),
+        match handle.read(request).await {
+            Ok(()) => callback.on_complete(ffi::Success::Ok),
+            Err(err) => callback.on_failure(err.into()),
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
@@ -290,6 +288,21 @@ pub unsafe fn master_channel_operate(
     Ok(())
 }
 
+impl From<TimeSyncError> for ffi::TimeSyncError {
+    fn from(err: TimeSyncError) -> Self {
+        match err {
+            TimeSyncError::Task(err) => err.into(),
+            TimeSyncError::ClockRollback => ffi::TimeSyncError::ClockRollback,
+            TimeSyncError::SystemTimeNotUnix => ffi::TimeSyncError::SystemTimeNotUnix,
+            TimeSyncError::BadOutstationTimeDelay(_) => ffi::TimeSyncError::BadOutstationTimeDelay,
+            TimeSyncError::Overflow => ffi::TimeSyncError::Overflow,
+            TimeSyncError::StillNeedsTime => ffi::TimeSyncError::StillNeedsTime,
+            TimeSyncError::SystemTimeNotAvailable => ffi::TimeSyncError::SystemTimeNotAvailable,
+            TimeSyncError::IinError(_) => ffi::TimeSyncError::IinError,
+        }
+    }
+}
+
 pub(crate) unsafe fn master_channel_synchronize_time(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
@@ -302,23 +315,10 @@ pub(crate) unsafe fn master_channel_synchronize_time(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match association.synchronize_time(mode.into()).await {
-            Ok(_) => ffi::TimeSyncResult::Success,
-            Err(TimeSyncError::Task(err)) => err.into(),
-            Err(TimeSyncError::ClockRollback) => ffi::TimeSyncResult::ClockRollback,
-            Err(TimeSyncError::SystemTimeNotUnix) => ffi::TimeSyncResult::SystemTimeNotUnix,
-            Err(TimeSyncError::BadOutstationTimeDelay(_)) => {
-                ffi::TimeSyncResult::BadOutstationTimeDelay
-            }
-            Err(TimeSyncError::Overflow) => ffi::TimeSyncResult::Overflow,
-            Err(TimeSyncError::StillNeedsTime) => ffi::TimeSyncResult::StillNeedsTime,
-            Err(TimeSyncError::SystemTimeNotAvailable) => {
-                ffi::TimeSyncResult::SystemTimeNotAvailable
-            }
-            Err(TimeSyncError::IinError(_)) => ffi::TimeSyncResult::IinError,
+        match association.synchronize_time(mode.into()).await {
+            Ok(()) => callback.on_complete(ffi::Success::Ok),
+            Err(err) => callback.on_failure(err.into()),
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
@@ -640,6 +640,6 @@ macro_rules! define_task_from_impl {
 }
 
 define_task_from_impl!(CommandError);
-define_task_from_impl!(TimeSyncResult);
+define_task_from_impl!(TimeSyncError);
 define_task_from_impl!(RestartError);
-define_task_from_impl!(ReadResult);
+define_task_from_impl!(ReadError);

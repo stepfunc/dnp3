@@ -311,13 +311,13 @@ class MainClass
             case "lts":
                 {
                     var result = await channel.SynchronizeTime(association, TimeSyncMode.Lan);
-                    Console.WriteLine($"Result: {result}");
+                    Console.WriteLine($"Time sync: {result}");
                     return true;
                 }
             case "nts":
                 {
                     var result = await channel.SynchronizeTime(association, TimeSyncMode.NonLan);
-                    Console.WriteLine($"Result: {result}");
+                    Console.WriteLine($"Time sync: {result}");
                     return true;
                 }
             case "crt":
