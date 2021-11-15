@@ -318,107 +318,114 @@ public class MasterExample {
     // Handle user input
     BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
     while (true) {
-      String line = reader.readLine();
-      switch (line) {
-        case "x":
-          return;
-        case "enable":
-          channel.enable();
-          break;
-        case "disable":
-          channel.disable();
-          break;
-        case "dln":
-          channel.setDecodeLevel(new DecodeLevel());
-          break;
-        case "dlv":
-          DecodeLevel level = new DecodeLevel();
-          level.application = AppDecodeLevel.OBJECT_VALUES;
-          channel.setDecodeLevel(level);
-          break;
-        case "rao":
-          {
-            Request request = new Request();
-            request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-            ReadResult result = channel.read(association, request).toCompletableFuture().get();
-            System.out.println("Result: " + result);
-            break;
-          }
-        case "rmo":
-          {
-            Request request = new Request();
-            request.addAllObjectsHeader(Variation.GROUP10_VAR0);
-            request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-            ReadResult result = channel.read(association, request).toCompletableFuture().get();
-            System.out.println("Result: " + result);
-            break;
-          }
-        case "cmd":
-          {
-            // ANCHOR: assoc_control
-            CommandSet commands = new CommandSet();
-            Group12Var1 control =
-                new Group12Var1(
-                    new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
-                    ubyte(1),
-                    uint(1000),
-                    uint(1000));
-            commands.addG12V1U16(ushort(3), control);
-
-            CommandResult result =
-                channel
-                    .operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
-                    .toCompletableFuture()
-                    .get();
-
-            System.out.println("Result: " + result);
-            // ANCHOR_END: assoc_control
-            break;
-          }
-        case "evt":
-          channel.demandPoll(poll);
-          break;
-
-        case "lts":
-          {
-            TimeSyncResult result =
-                channel.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
-            System.out.println("Result: " + result);
-            break;
-          }
-        case "nts":
-          {
-            TimeSyncResult result =
-                channel
-                    .synchronizeTime(association, TimeSyncMode.NON_LAN)
-                    .toCompletableFuture()
-                    .get();
-            System.out.println("Result: " + result);
-            break;
-          }
-        case "crt":
-          {
-            RestartResult result = channel.coldRestart(association).toCompletableFuture().get();
-            System.out.println("Result: " + result);
-            break;
-          }
-        case "wrt":
-          {
-            RestartResult result = channel.warmRestart(association).toCompletableFuture().get();
-            System.out.println("Result: " + result);
-            break;
-          }
-        case "lsr":
-          {
-            LinkStatusResult result =
-                channel.checkLinkStatus(association).toCompletableFuture().get();
-            System.out.println("Result: " + result);
-            break;
-          }
-        default:
-          System.out.println("Unknown command");
-          break;
+      try {
+        runOneCommand(association, channel, poll, reader.readLine());
+      } catch (Exception ex) {
+        System.out.println("Error: " + ex);
       }
+    }
+  }
+
+  private static void runOneCommand(
+      AssociationId association, MasterChannel channel, PollId poll, String command)
+      throws Exception {
+    switch (command) {
+      case "x":
+        return;
+      case "enable":
+        channel.enable();
+        break;
+      case "disable":
+        channel.disable();
+        break;
+      case "dln":
+        channel.setDecodeLevel(new DecodeLevel());
+        break;
+      case "dlv":
+        DecodeLevel level = new DecodeLevel();
+        level.application = AppDecodeLevel.OBJECT_VALUES;
+        channel.setDecodeLevel(level);
+        break;
+      case "rao":
+        {
+          Request request = new Request();
+          request.addAllObjectsHeader(Variation.GROUP40_VAR0);
+          ReadResult result = channel.read(association, request).toCompletableFuture().get();
+          System.out.println("Result: " + result);
+          break;
+        }
+      case "rmo":
+        {
+          Request request = new Request();
+          request.addAllObjectsHeader(Variation.GROUP10_VAR0);
+          request.addAllObjectsHeader(Variation.GROUP40_VAR0);
+          ReadResult result = channel.read(association, request).toCompletableFuture().get();
+          System.out.println("Result: " + result);
+          break;
+        }
+      case "cmd":
+        {
+          // ANCHOR: assoc_control
+          CommandSet commands = new CommandSet();
+          Group12Var1 control =
+              new Group12Var1(
+                  new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
+                  ubyte(1),
+                  uint(1000),
+                  uint(1000));
+          commands.addG12V1U16(ushort(3), control);
+
+          channel
+              .operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
+              .toCompletableFuture()
+              .get();
+
+          // ANCHOR_END: assoc_control
+          break;
+        }
+      case "evt":
+        channel.demandPoll(poll);
+        break;
+
+      case "lts":
+        {
+          TimeSyncResult result =
+              channel.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
+          System.out.println("Result: " + result);
+          break;
+        }
+      case "nts":
+        {
+          TimeSyncResult result =
+              channel
+                  .synchronizeTime(association, TimeSyncMode.NON_LAN)
+                  .toCompletableFuture()
+                  .get();
+          System.out.println("Result: " + result);
+          break;
+        }
+      case "crt":
+        {
+          RestartResult result = channel.coldRestart(association).toCompletableFuture().get();
+          System.out.println("Result: " + result);
+          break;
+        }
+      case "wrt":
+        {
+          RestartResult result = channel.warmRestart(association).toCompletableFuture().get();
+          System.out.println("Result: " + result);
+          break;
+        }
+      case "lsr":
+        {
+          LinkStatusResult result =
+              channel.checkLinkStatus(association).toCompletableFuture().get();
+          System.out.println("Result: " + result);
+          break;
+        }
+      default:
+        System.out.println("Unknown command");
+        break;
     }
   }
 }
