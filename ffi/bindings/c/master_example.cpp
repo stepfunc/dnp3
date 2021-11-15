@@ -100,7 +100,7 @@ class AssociationHandler : public dnp3::AssociationHandler {
 };
 
 class CommandTaskCallback : public dnp3::CommandTaskCallback {
-    void on_complete(dnp3::Success result) override {
+    void on_complete(dnp3::Nothing result) override {
         std::cout << "command succeeded!" << std::endl;
     }
     void on_failure(dnp3::CommandError error) override {

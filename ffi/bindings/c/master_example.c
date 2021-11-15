@@ -165,7 +165,7 @@ dnp3_read_handler_t get_read_handler()
 }
 
 // read callbacks
-void on_read_success(dnp3_success_t success, void *arg) { printf("Read success! \n"); }
+void on_read_success(dnp3_nothing_t nothing, void *arg) { printf("Read success! \n"); }
 void on_read_failure(dnp3_read_error_t error, void* arg) { printf("Read error: %s \n", dnp3_read_error_to_string(error)); }
 
 // Command callbacks
@@ -175,7 +175,7 @@ void on_command_error(dnp3_command_error_t result, void *arg)
     printf("Command failed: %s\n", dnp3_command_error_to_string(result));
 }
 
-void on_command_success(dnp3_success_t result, void* arg)
+void on_command_success(dnp3_nothing_t nothing, void* arg)
 {
     printf("Command succeeded!\n");
 }
@@ -183,7 +183,7 @@ void on_command_success(dnp3_success_t result, void* arg)
 
 // Timesync callbacks
 void on_time_sync_error(dnp3_time_sync_error_t error, void *arg) { printf("Time sync error: %s\n", dnp3_time_sync_error_to_string(error)); }
-void on_time_sync_success(dnp3_success_t success, void* arg) { printf("Time sync success! \n"); }
+void on_time_sync_success(dnp3_nothing_t success, void* arg) { printf("Time sync success! \n"); }
 
 // Restart callback
 void on_restart_complete(dnp3_restart_result_t result, void *arg) { printf("RestartResult: %s\n", dnp3_restart_error_to_string(result.error)); }

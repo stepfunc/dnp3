@@ -26,9 +26,9 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let connect_strategy = define_connect_strategy(lib)?;
 
-    let success = lib
-        .define_enum("success")?
-        .push("ok", "single value which always indicates success")?
+    let nothing = lib
+        .define_enum("nothing")?
+        .push("nothing", "the only value this enum has")?
         .doc("A single value enum which is used as a placeholder for futures that don't return a value")?
         .build()?;
 
@@ -196,7 +196,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("Get the decoding level for the channel")?
         .build()?;
 
-    let read_callback = define_read_callback(lib, success.clone())?;
+    let read_callback = define_read_callback(lib, nothing.clone())?;
 
     let read_async = lib
         .define_future_method("read", master_channel_class.clone(), read_callback)?
@@ -211,7 +211,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let command = define_command_builder(lib, shared)?;
     let command_mode = define_command_mode(lib)?;
-    let command_cb = define_command_callback(lib, success.clone())?;
+    let command_cb = define_command_callback(lib, nothing.clone())?;
 
     let operate_async = lib
         .define_future_method("operate", master_channel_class.clone(), command_cb)?
@@ -227,7 +227,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     let time_sync_mode = define_time_sync_mode(lib)?;
-    let time_sync_cb = define_time_sync_callback(lib, success)?;
+    let time_sync_cb = define_time_sync_callback(lib, nothing)?;
 
     let perform_time_sync_async = lib
         .define_future_method(
@@ -394,7 +394,7 @@ fn define_poll_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle>
 
 fn define_read_callback(
     lib: &mut LibraryBuilder,
-    success: EnumHandle,
+    nothing: EnumHandle,
 ) -> BackTraced<FutureInterface<Unvalidated>> {
     let read_error = lib
         .define_error_type(
@@ -409,7 +409,7 @@ fn define_read_callback(
     let callback = lib.define_future_interface(
         "read_task_callback",
         "Handler for read tasks",
-        success,
+        nothing,
         "Result of the read task",
         Some(read_error),
     )?;
@@ -794,7 +794,7 @@ impl TaskErrors for ErrorTypeBuilder<'_> {
 
 fn define_command_callback(
     lib: &mut LibraryBuilder,
-    success: EnumHandle,
+    nothing: EnumHandle,
 ) -> BackTraced<FutureInterface<Unvalidated>> {
     let command_error = lib
         .define_error_type(
@@ -817,7 +817,7 @@ fn define_command_callback(
     let callback = lib.define_future_interface(
         "command_task_callback",
         "Handler for command tasks",
-        success,
+        nothing,
         "Result of the command task",
         Some(command_error),
     )?;
@@ -993,7 +993,7 @@ fn define_command_builder(
 
 fn define_time_sync_callback(
     lib: &mut LibraryBuilder,
-    success: EnumHandle,
+    nothing: EnumHandle,
 ) -> BackTraced<FutureInterface<Unvalidated>> {
     let time_sync_error = lib
         .define_error_type(
@@ -1024,7 +1024,7 @@ fn define_time_sync_callback(
     let callback = lib.define_future_interface(
         "time_sync_task_callback",
         "Handler for time synchronization tasks",
-        success,
+        nothing,
         "Result of the time synchronization task",
         Some(time_sync_error),
     )?;

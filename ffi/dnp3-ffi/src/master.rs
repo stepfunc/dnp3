@@ -228,7 +228,7 @@ pub(crate) unsafe fn master_channel_read(
 
     let task = async move {
         match handle.read(request).await {
-            Ok(()) => callback.on_complete(ffi::Success::Ok),
+            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
             Err(err) => callback.on_failure(err.into()),
         };
     };
@@ -257,7 +257,7 @@ pub unsafe fn master_channel_operate(
     let task = async move {
         match handle.operate(mode.into(), headers).await {
             Ok(_) => {
-                callback.on_complete(ffi::Success::Ok);
+                callback.on_complete(ffi::Nothing::Nothing);
             }
             Err(err) => {
                 let err: ffi::CommandError = match err {
@@ -316,7 +316,7 @@ pub(crate) unsafe fn master_channel_synchronize_time(
 
     let task = async move {
         match association.synchronize_time(mode.into()).await {
-            Ok(()) => callback.on_complete(ffi::Success::Ok),
+            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
             Err(err) => callback.on_failure(err.into()),
         };
     };
