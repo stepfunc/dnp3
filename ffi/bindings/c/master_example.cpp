@@ -92,10 +92,19 @@ class ReadHandler : public dnp3::ReadHandler {
 };
 
 class AssociationHandler : public dnp3::AssociationHandler {
-    dnp3::UtcTimestamp get_current_time()
+    dnp3::UtcTimestamp get_current_time() override
     {
         const auto time_since_epoch = std::chrono::system_clock::now().time_since_epoch();
         return dnp3::UtcTimestamp::valid(std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count());
+    }
+};
+
+class CommandTaskCallback : public dnp3::CommandTaskCallback {
+    void on_complete(dnp3::Success result) override {
+        std::cout << "command succeeded!" << std::endl;
+    }
+    void on_failure(dnp3::CommandError error) override {
+        std::cout << "command failed: "<< dnp3::to_string(error) << std::endl;
     }
 };
 
@@ -144,11 +153,7 @@ int main()
                 assoc,
                 dnp3::CommandMode::direct_operate,
                 commands,
-                dnp3::functional::command_task_callback(
-                    [](dnp3::CommandResult result) {
-                        std::cout << "result: " << dnp3::to_string(result) << std::endl;
-                    }
-                )
+                std::make_unique<CommandTaskCallback>()
             );
         }
         else {

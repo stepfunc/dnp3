@@ -4,6 +4,7 @@ use oo_bindgen::*;
 use crate::shared::SharedDefinitions;
 use oo_bindgen::doc::Unvalidated;
 use oo_bindgen::enum_type::{EnumBuilder, EnumHandle};
+use oo_bindgen::error_type::{ErrorTypeBuilder, ExceptionType};
 use oo_bindgen::interface::{AsynchronousInterface, FutureInterface};
 use oo_bindgen::name::Name;
 use oo_bindgen::structs::{
@@ -398,7 +399,7 @@ fn define_read_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterface<
         "Handler for read tasks",
         read_result,
         "Result of the read task",
-        None
+        None,
     )?;
 
     Ok(callback)
@@ -755,15 +756,49 @@ impl TaskErrors for EnumBuilder<'_> {
     }
 }
 
+impl TaskErrors for ErrorTypeBuilder<'_> {
+    fn add_task_errors(self) -> BackTraced<Self> {
+        let builder = self
+            .add_error("too_many_requests", "too many user requests queued")?
+            .add_error(
+                "bad_response",
+                "response was malformed or contained object headers",
+            )?
+            .add_error(
+                "response_timeout",
+                "timeout occurred before receiving a response",
+            )?
+            .add_error(
+                "write_error",
+                "insufficient buffer space to serialize the request",
+            )?
+            .add_error("no_connection", "no connection")?
+            .add_error("shutdown", "master was shutdown")?
+            .add_error("association_removed", "association was removed mid-task")?;
+
+        Ok(builder)
+    }
+}
+
 fn define_command_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterface<Unvalidated>> {
-    let command_result = lib
-        .define_enum("command_result")?
-        .push("success", "Command was a success")?
-        .push(
+    let success = lib
+        .define_enum("success")?
+        .push("ok", "single value which always indicates success")?
+        .doc("A single value enum which is used as a placeholder for futures that don't return a value")?
+        .build()?;
+
+    let command_error = lib
+        .define_error_type(
+            "command_error",
+            "command_exception",
+            ExceptionType::CheckedException,
+        )?
+        .add_error("success", "Command was a success")?
+        .add_error(
             "bad_status",
             "Outstation indicated that a command was not SUCCESS",
         )?
-        .push(
+        .add_error(
             "header_mismatch",
             "Number of headers or objects in the response didn't match the number in the request",
         )?
@@ -774,9 +809,9 @@ fn define_command_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterfa
     let callback = lib.define_future_interface(
         "command_task_callback",
         "Handler for command tasks",
-        command_result,
+        success,
         "Result of the command task",
-        None
+        Some(command_error),
     )?;
 
     Ok(callback)
@@ -977,7 +1012,7 @@ fn define_time_sync_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInter
         "Handler for time synchronization tasks",
         time_sync_result,
         "Result of the time synchronization task",
-        None
+        None,
     )?;
 
     Ok(callback)
@@ -1022,7 +1057,7 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterfa
         "Handler for restart tasks",
         restart_result,
         "Result of the restart task",
-        None
+        None,
     )?;
 
     Ok(callback)
@@ -1053,7 +1088,7 @@ fn define_link_status_callback(
         "Handler for link status check",
         link_status_enum,
         "Result of the link status",
-        None
+        None,
     )?;
 
     Ok(callback)

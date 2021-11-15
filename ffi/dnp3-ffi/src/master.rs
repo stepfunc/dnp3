@@ -257,20 +257,33 @@ pub unsafe fn master_channel_operate(
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match handle.operate(mode.into(), headers).await {
-            Ok(_) => ffi::CommandResult::Success,
-            Err(CommandError::Task(err)) => err.into(),
-            Err(CommandError::Response(err)) => match err {
-                CommandResponseError::Request(err) => err.into(),
-                CommandResponseError::BadStatus(_) => ffi::CommandResult::BadStatus,
-                CommandResponseError::HeaderCountMismatch => ffi::CommandResult::HeaderMismatch,
-                CommandResponseError::HeaderTypeMismatch => ffi::CommandResult::HeaderMismatch,
-                CommandResponseError::ObjectCountMismatch => ffi::CommandResult::HeaderMismatch,
-                CommandResponseError::ObjectValueMismatch => ffi::CommandResult::HeaderMismatch,
-            },
+        match handle.operate(mode.into(), headers).await {
+            Ok(_) => {
+                callback.on_complete(ffi::Success::Ok);
+            }
+            Err(err) => {
+                let err: ffi::CommandError = match err {
+                    CommandError::Task(err) => err.into(),
+                    CommandError::Response(err) => match err {
+                        CommandResponseError::Request(err) => err.into(),
+                        CommandResponseError::BadStatus(_) => ffi::CommandError::BadStatus,
+                        CommandResponseError::HeaderCountMismatch => {
+                            ffi::CommandError::HeaderMismatch
+                        }
+                        CommandResponseError::HeaderTypeMismatch => {
+                            ffi::CommandError::HeaderMismatch
+                        }
+                        CommandResponseError::ObjectCountMismatch => {
+                            ffi::CommandError::HeaderMismatch
+                        }
+                        CommandResponseError::ObjectValueMismatch => {
+                            ffi::CommandError::HeaderMismatch
+                        }
+                    },
+                };
+                callback.on_failure(err);
+            }
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
@@ -626,7 +639,7 @@ macro_rules! define_task_from_impl {
     };
 }
 
-define_task_from_impl!(CommandResult);
+define_task_from_impl!(CommandError);
 define_task_from_impl!(TimeSyncResult);
 define_task_from_impl!(RestartError);
 define_task_from_impl!(ReadResult);

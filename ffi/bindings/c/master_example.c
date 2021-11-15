@@ -169,9 +169,14 @@ void on_read_complete(dnp3_read_result_t result, void *arg) { printf("ReadResult
 
 // Command callback
 // ANCHOR: assoc_control_callback
-void on_command_complete(dnp3_command_result_t result, void *arg)
+void on_command_error(dnp3_command_error_t result, void *arg)
 {
-    printf("CommandResult: %s\n", dnp3_command_result_to_string(result));
+    printf("Command failed: %s\n", dnp3_command_error_to_string(result));
+}
+
+void on_command_success(dnp3_success_t result, void* arg)
+{
+    printf("Command succeeded!\n");
 }
 // ANCHOR_END: assoc_control_callback
 
@@ -351,8 +356,9 @@ int main()
             dnp3_group12_var1_t g12v1 = dnp3_group12_var1_init(dnp3_control_code_init(DNP3_TRIP_CLOSE_CODE_NUL, false, DNP3_OP_TYPE_LATCH_ON), 1, 1000, 1000);
             dnp3_command_set_add_g12_v1_u16(commands, 3, g12v1);
 
-            dnp3_command_task_callback_t cb = {
-                .on_complete = &on_command_complete,
+            dnp3_command_task_callback_t cb = {                
+                .on_complete = &on_command_success,
+                .on_failure = &on_command_error,
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
