@@ -161,22 +161,11 @@ class MainClass
 
         // ANCHOR: runtime_init
         var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
-        // ANCHOR_END: runtime_init
-
-        // ANCHOR: create_master_channel
-        var channel = MasterChannel.CreateTcpChannel(
-            runtime,
-            LinkErrorMode.Close,
-            GetMasterChannelConfig(),
-            new EndpointList("127.0.0.1:20000"),
-            new ConnectStrategy(),            
-            new TestListener()
-        );
-        // ANCHOR_END: create_master_channel
+        // ANCHOR_END: runtime_init        
 
         try
         {
-            RunChannel(channel).GetAwaiter().GetResult();
+            Run(runtime);
         }
         finally
         {
@@ -214,8 +203,19 @@ class MainClass
     }
     // ANCHOR_END: association_config
 
-    private static async Task RunChannel(MasterChannel channel)
+    private static void Run(Runtime runtime)
     {
+        // ANCHOR: create_master_channel
+        var channel = MasterChannel.CreateTcpChannel(
+            runtime,
+            LinkErrorMode.Close,
+            GetMasterChannelConfig(),
+            new EndpointList("127.0.0.1:20000"),
+            new ConnectStrategy(),
+            new TestListener()
+        );
+        // ANCHOR_END: create_master_channel
+
         // ANCHOR: association_create
         var association = channel.AddAssociation(
             1024,
@@ -234,101 +234,113 @@ class MainClass
 
         while (true)
         {
-            switch (await GetInputAsync())
+            var input = Console.ReadLine();
+            try
             {
-                case "x":
+                if (!RunOneCommand(channel, association, poll, input).GetAwaiter().GetResult())
+                {
+                    // exit command
                     return;
-                case "enable":
-                    {
-                        channel.Enable();
-                        break;
-                    }
-                case "disable":
-                    {
-                        channel.Disable();
-                        break;
-                    }
-                case "dln":
-                    {
-                        channel.SetDecodeLevel(new DecodeLevel());
-                        break;
-                    }
-                case "dlv":
-                    {
-                        channel.SetDecodeLevel(new DecodeLevel() { Application = AppDecodeLevel.ObjectValues });
-                        break;
-                    }
-                case "rao":
-                    {
-                        var request = new Request();
-                        request.AddAllObjectsHeader(Variation.Group40Var0);
-                        var result = await channel.Read(association, request);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "rmo":
-                    {
-                        var request = new Request();
-                        request.AddAllObjectsHeader(Variation.Group10Var0);
-                        request.AddAllObjectsHeader(Variation.Group40Var0);
-                        var result = await channel.Read(association, request);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "cmd":
-                    {
-                        // ANCHOR: assoc_control
-                        var commands = new CommandSet();
-                        commands.AddG12V1U8(3, new Group12Var1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
-                        var result = await channel.Operate(association, CommandMode.SelectBeforeOperate, commands);
-                        Console.WriteLine($"Result: {result}");
-                        // ANCHOR_END: assoc_control
-                        break;
-                    }
-                case "evt":
-                    {
-                        channel.DemandPoll(poll);
-                        break;
-                    }
-                case "lts":
-                    {
-                        var result = await channel.SynchronizeTime(association, TimeSyncMode.Lan);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "nts":
-                    {
-                        var result = await channel.SynchronizeTime(association, TimeSyncMode.NonLan);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "crt":
-                    {
-                        var result = await channel.ColdRestart(association);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "wrt":
-                    {
-                        var result = await channel.WarmRestart(association);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "lsr":
-                    {
-                        var result = await channel.CheckLinkStatus(association);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                default:
-                    Console.WriteLine("Unknown command");
-                    break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error: " + ex);
             }
         }
     }
 
-    private static Task<string> GetInputAsync()
+    private static async Task<bool> RunOneCommand(MasterChannel channel, AssociationId association, PollId poll, String input)
     {
-        return Task.Run(() => Console.ReadLine());
+        switch (input)
+        {
+            case "x":
+                return false;
+            case "enable":
+                {
+                    channel.Enable();
+                    return true;
+                }
+            case "disable":
+                {
+                    channel.Disable();
+                    return true;
+                }
+            case "dln":
+                {
+                    channel.SetDecodeLevel(new DecodeLevel());
+                    return true;
+                }
+            case "dlv":
+                {
+                    channel.SetDecodeLevel(new DecodeLevel() { Application = AppDecodeLevel.ObjectValues });
+                    return true;
+                }
+            case "rao":
+                {
+                    var request = new Request();
+                    request.AddAllObjectsHeader(Variation.Group40Var0);
+                    var result = await channel.Read(association, request);
+                    Console.WriteLine($"Result: {result}");
+                    return true;
+                }
+            case "rmo":
+                {
+                    var request = new Request();
+                    request.AddAllObjectsHeader(Variation.Group10Var0);
+                    request.AddAllObjectsHeader(Variation.Group40Var0);
+                    var result = await channel.Read(association, request);
+                    Console.WriteLine($"Result: {result}");
+                    return true;
+                }
+            case "cmd":
+                {
+                    // ANCHOR: assoc_control
+                    var commands = new CommandSet();
+                    commands.AddG12V1U8(3, new Group12Var1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
+                    var result = await channel.Operate(association, CommandMode.SelectBeforeOperate, commands);
+                    Console.WriteLine($"Result: {result}");
+                    // ANCHOR_END: assoc_control
+                    return true;
+                }
+            case "evt":
+                {
+                    channel.DemandPoll(poll);
+                    return true;
+                }
+            case "lts":
+                {
+                    var result = await channel.SynchronizeTime(association, TimeSyncMode.Lan);
+                    Console.WriteLine($"Result: {result}");
+                    return true;
+                }
+            case "nts":
+                {
+                    var result = await channel.SynchronizeTime(association, TimeSyncMode.NonLan);
+                    Console.WriteLine($"Result: {result}");
+                    return true;
+                }
+            case "crt":
+                {
+                    var result = await channel.ColdRestart(association);
+                    Console.WriteLine($"Result: {result}");
+                    return true;
+                }
+            case "wrt":
+                {
+                    var result = await channel.WarmRestart(association);
+                    Console.WriteLine($"Result: {result}");
+                    return true;
+                }
+            case "lsr":
+                {
+                    var result = await channel.CheckLinkStatus(association);
+                    Console.WriteLine($"Result: {result}");
+                    return true;
+                }
+            default:
+                Console.WriteLine("Unknown command");
+                return true;
+        }
     }
 }
