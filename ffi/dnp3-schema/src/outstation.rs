@@ -748,14 +748,14 @@ fn define_control_handler(
         .end_callback()?
         //------
         .begin_callback("select_g12v1", select_g12_doc)?
-        .param("control", shared_def.g12v1_struct.clone(), "Received CROB")?
+        .param("value", shared_def.g12v1_struct.clone(), "Received CROB")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g12v1", "Operate a control point")?
-        .param("control", shared_def.g12v1_struct.clone(), "Received CROB")?
+        .param("value", shared_def.g12v1_struct.clone(), "Received CROB")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
         .param("database", database.declaration(), "Database")?
@@ -763,14 +763,14 @@ fn define_control_handler(
         .end_callback()?
         //------
         .begin_callback("select_g41v1", select_g40_doc.clone())?
-        .param("control", BasicType::S32, "Received analog output value")?
+        .param("value", BasicType::S32, "Received analog output value")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v1", "Operate a control point")?
-        .param("control", BasicType::S32, "Received analog output value")?
+        .param("value", BasicType::S32, "Received analog output value")?
         .param("index", BasicType::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
         .param("database", database.declaration(), "Database")?
