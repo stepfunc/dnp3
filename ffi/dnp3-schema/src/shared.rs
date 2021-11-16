@@ -81,11 +81,11 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
     let control_struct = lib.declare_callback_arg_struct("control")?;
     let control_struct = lib
         .define_callback_argument_struct(control_struct)?
-        .add("fir", BasicType::Bool, "First fragment in the message")?
-        .add("fin", BasicType::Bool, "Final fragment of the message")?
-        .add("con", BasicType::Bool, "Requires confirmation")?
-        .add("uns", BasicType::Bool, "Unsolicited response")?
-        .add("seq", BasicType::U8, "Sequence number")?
+        .add("fir", Primitive::Bool, "First fragment in the message")?
+        .add("fin", Primitive::Bool, "Final fragment of the message")?
+        .add("con", Primitive::Bool, "Requires confirmation")?
+        .add("uns", Primitive::Bool, "Unsolicited response")?
+        .add("seq", Primitive::U8, "Sequence number")?
         .doc("APDU Control field")?
         .end_fields()?
         .build()?;
@@ -116,8 +116,8 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
     let control_code = lib
         .define_universal_struct(control_code)?
         .add("tcc", trip_close_code, "This field is used in conjunction with the `op_type` field to specify a control operation")?
-        .add("clear", BasicType::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
-        .add(&queue_field, BasicType::Bool, "This field is obsolete and should always be 0")?
+        .add("clear", Primitive::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
+        .add(&queue_field, Primitive::Bool, "This field is obsolete and should always be 0")?
         .add("op_type", op_type, "This field is used in conjunction with the `tcc` field to specify a control operation")?
         .doc("CROB ({struct:group12_var1}) control code")?
         .end_fields()?
@@ -130,15 +130,15 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
     let g12v1_struct = lib
         .define_universal_struct(g12v1_struct)?
         .add("code", control_code, "Control code")?
-        .add("count", BasicType::U8, "Count")?
+        .add("count", Primitive::U8, "Count")?
         .add(
             "on_time",
-            BasicType::U32,
+            Primitive::U32,
             "Duration the output drive remains active (in milliseconds)",
         )?
         .add(
             "off_time",
-            BasicType::U32,
+            Primitive::U32,
             "Duration the output drive remains non-active (in milliseconds)",
         )?
         .doc("Control Relay Output Block")?
@@ -164,7 +164,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
 
     let (binary_point, binary_it) = build_iterator(
         "binary",
-        BasicType::Bool,
+        Primitive::Bool,
         lib,
         &flags_struct,
         &timestamp_struct,
@@ -178,35 +178,35 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
     )?;
     let (binary_output_status_point, binary_output_status_it) = build_iterator(
         "binary_output_status",
-        BasicType::Bool,
+        Primitive::Bool,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (counter_point, counter_it) = build_iterator(
         "counter",
-        BasicType::U32,
+        Primitive::U32,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (frozen_counter_point, frozen_counter_it) = build_iterator(
         "frozen_counter",
-        BasicType::U32,
+        Primitive::U32,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (analog_point, analog_it) = build_iterator(
         "analog",
-        BasicType::Double64,
+        Primitive::Double,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (analog_output_status_point, analog_output_status_it) = build_iterator(
         "analog_output_status",
-        BasicType::Double64,
+        Primitive::Double,
         lib,
         &flags_struct,
         &timestamp_struct,
@@ -329,7 +329,7 @@ fn define_serial_port_settings(lib: &mut LibraryBuilder) -> BackTraced<FunctionA
         .define_function_argument_struct(serial_settings)?
         .add(
             &baud_rate,
-            BasicType::U32,
+            Primitive::U32,
             "Baud rate (in symbols-per-second)",
         )?
         .add(
@@ -359,7 +359,7 @@ fn define_serial_port_settings(lib: &mut LibraryBuilder) -> BackTraced<FunctionA
             InitializerType::Normal,
             "Initialize to default values",
         )?
-        .default(&baud_rate, Number::U32(9600))?
+        .default(&baud_rate, NumberValue::U32(9600))?
         .default_variant(&data_bits, "eight")?
         .default_variant(&flow_control, "none")?
         .default_variant(&parity, "none")?
@@ -376,7 +376,7 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
         .define_universal_struct(flags_struct)?
         .add(
             "value",
-            BasicType::U8,
+            Primitive::U8,
             "bit-mask representing a set of individual flag bits",
         )?
         .doc("Collection of individual flag bits represented by an underlying mask value")?
@@ -434,7 +434,7 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStr
     let timestamp_struct = lib.declare_universal_struct("timestamp")?;
     let timestamp_struct = lib
         .define_universal_struct(timestamp_struct)?
-        .add(&value, BasicType::U64, "Timestamp value")?
+        .add(&value, Primitive::U64, "Timestamp value")?
         .add(&quality, time_quality_enum, "Timestamp quality")?
         .doc("Timestamp value")?
         .end_fields()?
@@ -443,7 +443,7 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStr
             InitializerType::Static,
             "Creates an invalid timestamp struct",
         )?
-        .default(&value, Number::U64(0))?
+        .default(&value, NumberValue::U64(0))?
         .default_variant(&quality, "invalid_time")?
         .end_initializer()?
         .begin_initializer(
@@ -475,7 +475,7 @@ fn build_iterator<T: Into<UniversalStructField>>(
     let value_struct_decl = lib.declare_universal_struct(name)?;
     let value_struct = lib
         .define_universal_struct(value_struct_decl)?
-        .add("index", BasicType::U16, "Point index")?
+        .add("index", Primitive::U16, "Point index")?
         .add("value", value_type, "Point value")?
         .add("flags", flags_struct.clone(), "Point flags")?
         .add("time", timestamp_struct.clone(), "Point timestamp")?
@@ -496,7 +496,7 @@ fn build_octet_string(
     let byte_struct_decl = lib.declare_function_return_struct("byte_value")?;
     let byte_struct = lib
         .define_function_return_struct(byte_struct_decl)?
-        .add("value", BasicType::U8, "Byte value")?
+        .add("value", Primitive::U8, "Byte value")?
         .doc("Single byte struct")?
         .end_fields()?
         .build()?;
@@ -506,7 +506,7 @@ fn build_octet_string(
     let octet_string_struct_decl = lib.declare_function_return_struct("octet_string")?;
     let octet_string_struct = lib
         .define_function_return_struct(octet_string_struct_decl)?
-        .add("index", BasicType::U16, "Point index")?
+        .add("index", Primitive::U16, "Point index")?
         .add("value", byte_it, "Point value")?
         .doc("Octet String point")?
         .end_fields()?

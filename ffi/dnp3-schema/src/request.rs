@@ -12,10 +12,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let request_new_class_fn = lib
         .define_function("request_new_class")?
-        .param("class0", BasicType::Bool, "Ask for class 0 (static data)")?
-        .param("class1", BasicType::Bool, "Ask for class 1 events")?
-        .param("class2", BasicType::Bool, "Ask for class 2 events")?
-        .param("class3", BasicType::Bool, "Ask for class 3 events")?
+        .param("class0", Primitive::Bool, "Ask for class 0 (static data)")?
+        .param("class1", Primitive::Bool, "Ask for class 1 events")?
+        .param("class2", Primitive::Bool, "Ask for class 2 events")?
+        .param("class3", Primitive::Bool, "Ask for class 3 events")?
         .returns(
           request.clone(),
             "Handle to the created request",
@@ -39,8 +39,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             shared.variation_enum.clone(),
             "Variation to ask for",
         )?
-        .param("start", BasicType::U8, "Start index to ask")?
-        .param("stop", BasicType::U8, "Stop index to ask (inclusive)")?
+        .param("start", Primitive::U8, "Start index to ask")?
+        .param("stop", Primitive::U8, "Stop index to ask (inclusive)")?
         .doc("Add a one-byte start/stop variation interrogation")?
         .build()?;
 
@@ -51,8 +51,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             shared.variation_enum.clone(),
             "Variation to ask for",
         )?
-        .param("start", BasicType::U16, "Start index to ask")?
-        .param("stop", BasicType::U16, "Stop index to ask (inclusive)")?
+        .param("start", Primitive::U16, "Start index to ask")?
+        .param("stop", Primitive::U16, "Stop index to ask (inclusive)")?
         .doc("Add a two-byte start/stop variation interrogation")?
         .build()?;
 

@@ -107,7 +107,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .define_method("add_association", master_channel_class.clone())?
         .param(
             "address",
-            BasicType::U16,
+            Primitive::U16,
             "DNP3 data-link address of the remote outstation",
         )?
         .param("config", association_config, "Association configuration")?
@@ -350,7 +350,7 @@ fn define_association_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStruct
         .define_opaque_struct(id)?
         .add(
             "address",
-            BasicType::U16,
+            Primitive::U16,
             "Outstation address of the association",
         )?
         .doc("Association identifier")?
@@ -366,12 +366,12 @@ fn define_poll_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle>
         .define_opaque_struct(id)?
         .add(
             "association_id",
-            BasicType::U16,
+            Primitive::U16,
             "Outstation address of the association",
         )?
         .add(
             "id",
-            BasicType::U64,
+            Primitive::U64,
             "Unique poll id assigned by the association",
         )?
         .doc("Poll identifier")?
@@ -468,7 +468,7 @@ fn define_association_config(
              doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the outstation").details("A value of zero means no automatic keep-alive.")
         )?
         .add(&auto_integrity_scan_on_buffer_overflow,
-             BasicType::Bool,
+             Primitive::Bool,
              doc("Automatic integrity scan when an EVENT_BUFFER_OVERFLOW is detected")
         )?
         .add("event_scan_on_events_available",
@@ -476,7 +476,7 @@ fn define_association_config(
              doc("Classes to automatically send reads when the IIN bit is asserted")
         )?
         .add(&max_queued_user_requests,
-            BasicType::U16,
+            Primitive::U16,
             doc("maximum number of user requests (e.g. commands, adhoc reads, etc) that will be queued before back-pressure is applied by failing requests")
         )?
         .end_fields()?
@@ -485,7 +485,7 @@ fn define_association_config(
         .default_struct(&auto_tasks_retry_strategy)?
         .default(&keep_alive_timeout, Duration::from_secs(60))?
         .default(&auto_integrity_scan_on_buffer_overflow, true)?
-        .default(&max_queued_user_requests, Number::U16(16))?
+        .default(&max_queued_user_requests, NumberValue::U16(16))?
         .end_initializer()?
         .build()?;
 
@@ -542,21 +542,21 @@ fn define_master_channel_config(
 
     let config = lib.define_function_argument_struct(config)?
         .doc("Generic configuration for a MasterChannel")?
-        .add("address", BasicType::U16, "Local DNP3 data-link address")?
+        .add("address", Primitive::U16, "Local DNP3 data-link address")?
         .add(decode_level.clone(), shared.decode_level.clone(), "Decoding level for this master. You can modify this later on with {class:master_channel.set_decode_level()}.")?
         .add(
             response_timeout.clone(),
             DurationType::Milliseconds,
             "Timeout for receiving a response"
         )?
-        .add(tx_buffer_size.clone(), BasicType::U16, doc("TX buffer size").details("Must be at least 249"))?
-        .add(rx_buffer_size.clone(), BasicType::U16, doc("RX buffer size").details("Must be at least 2048"))?
+        .add(tx_buffer_size.clone(), Primitive::U16, doc("TX buffer size").details("Must be at least 249"))?
+        .add(rx_buffer_size.clone(), Primitive::U16, doc("RX buffer size").details("Must be at least 2048"))?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize {struct:master_channel_config} to default values")?
         .default_struct(&decode_level)?
         .default(&response_timeout, Duration::from_secs(5))?
-        .default(&tx_buffer_size, Number::U16(2048))?
-        .default(&rx_buffer_size, Number::U16(2048))?
+        .default(&tx_buffer_size, NumberValue::U16(2048))?
+        .default(&rx_buffer_size, NumberValue::U16(2048))?
         .end_initializer()?
         .build()?;
 
@@ -598,8 +598,8 @@ fn define_utc_timestamp(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
 
     let timestamp_utc = lib.declare_universal_struct("utc_timestamp")?;
     let timestamp_utc = lib.define_universal_struct(timestamp_utc)?
-        .add(&value, BasicType::U64, doc("Value of the timestamp (in milliseconds from UNIX Epoch).").warning("Only 48 bits are available for timestamps."))?
-        .add(&is_valid, BasicType::Bool, "True if the timestamp is valid, false otherwise.")?
+        .add(&value, Primitive::U64, doc("Value of the timestamp (in milliseconds from UNIX Epoch).").warning("Only 48 bits are available for timestamps."))?
+        .add(&is_valid, Primitive::Bool, "True if the timestamp is valid, false otherwise.")?
         .doc(doc("Timestamp value returned by {interface:association_handler.get_current_time()}.").details("{struct:utc_timestamp.value} is only valid if {struct:utc_timestamp.is_valid} is true."))?
         .end_fields()?
         .begin_initializer("valid", InitializerType::Static, "Construct a valid {struct:utc_timestamp}")?
@@ -607,7 +607,7 @@ fn define_utc_timestamp(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
         .end_initializer()?
         .begin_initializer("invalid", InitializerType::Static, "Construct an invalid {struct:utc_timestamp}")?
         .default(&is_valid, false)?
-        .default(&value, Number::U64(0))?
+        .default(&value, NumberValue::U64(0))?
         .end_initializer()?
         .build()?;
 
@@ -645,9 +645,9 @@ fn define_event_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
     let event_classes = lib.declare_function_arg_struct("event_classes")?;
     let event_classes = lib
         .define_function_argument_struct(event_classes)?
-        .add(&class1, BasicType::Bool, "Class 1 events")?
-        .add(&class2, BasicType::Bool, "Class 2 events")?
-        .add(&class3, BasicType::Bool, "Class 3 events")?
+        .add(&class1, Primitive::Bool, "Class 1 events")?
+        .add(&class2, Primitive::Bool, "Class 2 events")?
+        .add(&class3, Primitive::Bool, "Class 3 events")?
         .doc("Event classes")?
         .end_fields()?
         .add_full_initializer("init")?
@@ -683,10 +683,10 @@ fn define_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandl
     let classes = lib.declare_function_arg_struct("classes")?;
     let classes = lib
         .define_function_argument_struct(classes)?
-        .add(&class0, BasicType::Bool, "Class 0 (static data)")?
-        .add(&class1, BasicType::Bool, "Class 1 events")?
-        .add(&class2, BasicType::Bool, "Class 2 events")?
-        .add(&class3, BasicType::Bool, "Class 3 events")?
+        .add(&class0, Primitive::Bool, "Class 0 (static data)")?
+        .add(&class1, Primitive::Bool, "Class 1 events")?
+        .add(&class2, Primitive::Bool, "Class 2 events")?
+        .add(&class3, Primitive::Bool, "Class 3 events")?
         .doc("Class 0, 1, 2 and 3 config")?
         .end_fields()?
         .add_full_initializer("init")?
@@ -813,7 +813,7 @@ fn define_command_builder(
         .define_method("add_g12_v1_u8", command_set.clone())?
         .param(
             "idx",
-            BasicType::U8,
+            Primitive::U8,
             "Index of the point to send the command to",
         )?
         .param("header", shared.g12v1_struct.clone(), "CROB data")?
@@ -824,7 +824,7 @@ fn define_command_builder(
         .define_method("add_g12_v1_u16", command_set.clone())?
         .param(
             "idx",
-            BasicType::U16,
+            Primitive::U16,
             "Index of the point to send the command to",
         )?
         .param("header", shared.g12v1_struct.clone(), "CROB data")?
@@ -835,10 +835,10 @@ fn define_command_builder(
         .define_method("add_g41_v1_u8", command_set.clone())?
         .param(
             "idx",
-            BasicType::U8,
+            Primitive::U8,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::S32, "Value to set the analog output to")?
+        .param("value", Primitive::S32, "Value to set the analog output to")?
         .doc("Add a Analog Output command (signed 32-bit integer) with 1-byte prefix index")?
         .build()?;
 
@@ -846,10 +846,10 @@ fn define_command_builder(
         .define_method("add_g41_v1_u16", command_set.clone())?
         .param(
             "idx",
-            BasicType::U16,
+            Primitive::U16,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::S32, "Value to set the analog output to")?
+        .param("value", Primitive::S32, "Value to set the analog output to")?
         .doc("Add a Analog Output command (signed 32-bit integer) with 2-byte prefix index")?
         .build()?;
 
@@ -857,10 +857,10 @@ fn define_command_builder(
         .define_method("add_g41_v2_u8", command_set.clone())?
         .param(
             "idx",
-            BasicType::U8,
+            Primitive::U8,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::S16, "Value to set the analog output to")?
+        .param("value", Primitive::S16, "Value to set the analog output to")?
         .doc("Add a Analog Output command (signed 16-bit integer) with 1-byte prefix index")?
         .build()?;
 
@@ -868,10 +868,10 @@ fn define_command_builder(
         .define_method("add_g41_v2_u16", command_set.clone())?
         .param(
             "idx",
-            BasicType::U16,
+            Primitive::U16,
             "Index of the point to send the command to",
         )?
-        .param("value", BasicType::S16, "Value to set the analog output to")?
+        .param("value", Primitive::S16, "Value to set the analog output to")?
         .doc("Add a Analog Output command (signed 16-bit integer) with 2-byte prefix index")?
         .build()?;
 
@@ -879,12 +879,12 @@ fn define_command_builder(
         .define_method("add_g41_v3_u8", command_set.clone())?
         .param(
             "idx",
-            BasicType::U8,
+            Primitive::U8,
             "Index of the point to send the command to",
         )?
         .param(
             "value",
-            BasicType::Float32,
+            Primitive::Float,
             "Value to set the analog output to",
         )?
         .doc("Add a Analog Output command (single-precision float) with 1-byte prefix index")?
@@ -894,12 +894,12 @@ fn define_command_builder(
         .define_method("add_g41_v3_u16", command_set.clone())?
         .param(
             "idx",
-            BasicType::U16,
+            Primitive::U16,
             "Index of the point to send the command to",
         )?
         .param(
             "value",
-            BasicType::Float32,
+            Primitive::Float,
             "Value to set the analog output to",
         )?
         .doc("Add a Analog Output command (single-precision float) with 2-byte prefix index")?
@@ -909,12 +909,12 @@ fn define_command_builder(
         .define_method("add_g41_v4_u8", command_set.clone())?
         .param(
             "idx",
-            BasicType::U8,
+            Primitive::U8,
             "Index of the point to send the command to",
         )?
         .param(
             "value",
-            BasicType::Double64,
+            Primitive::Double,
             "Value to set the analog output to",
         )?
         .doc("Add a Analog Output command (double-precision float) with 1-byte prefix index")?
@@ -924,12 +924,12 @@ fn define_command_builder(
         .define_method("add_g41_v4_u16", command_set.clone())?
         .param(
             "idx",
-            BasicType::U16,
+            Primitive::U16,
             "Index of the point to send the command to",
         )?
         .param(
             "value",
-            BasicType::Double64,
+            Primitive::Double,
             "Value to set the analog output to",
         )?
         .doc("Add a Analog Output command (double-precision float) with 2-byte prefix index")?

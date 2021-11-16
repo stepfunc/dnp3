@@ -26,7 +26,7 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
         .define_function_argument_struct(update_options)?
         .add(
             &update_static,
-            BasicType::Bool,
+            Primitive::Bool,
             "Optionally bypass updating the static database (the current value)",
         )?
         .add(
@@ -226,13 +226,13 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
             counter_event_variation,
             "Default event variation",
         )?
-        .add(&deadband, BasicType::U32, "Deadband value")?
+        .add(&deadband, Primitive::U32, "Deadband value")?
         .doc("Counter configuration")?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(20, 1))?
         .default_variant(&event_variation, gv(22, 5))?
-        .default(&deadband, Number::U32(0))?
+        .default(&deadband, NumberValue::U32(0))?
         .end_initializer()?
         .build()?;
 
@@ -283,13 +283,13 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<Function
             frozen_counter_event_variation,
             "Default event variation",
         )?
-        .add(&deadband, BasicType::U32, "Deadband value")?
+        .add(&deadband, Primitive::U32, "Deadband value")?
         .doc("Frozen Counter configuration")?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(21, 1))?
         .default_variant(&event_variation, gv(23, 5))?
-        .default(&deadband, Number::U32(0))?
+        .default(&deadband, NumberValue::U32(0))?
         .end_initializer()?
         .build()?;
 
@@ -356,13 +356,13 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
             analog_event_variation,
             "Default event variation",
         )?
-        .add(&deadband, BasicType::Double64, "Deadband value")?
+        .add(&deadband, Primitive::Double, "Deadband value")?
         .doc("Analog configuration")?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(30, 1))?
         .default_variant(&event_variation, gv(32, 3))?
-        .default(&deadband, Number::Double(0.0))?
+        .default(&deadband, NumberValue::Double(0.0))?
         .end_initializer()?
         .build()?;
 
@@ -429,13 +429,13 @@ fn define_analog_output_status_config(
             analog_output_status_event_variation,
             "Default event variation",
         )?
-        .add(&deadband, BasicType::Double64, "Deadband value")?
+        .add(&deadband, Primitive::Double, "Deadband value")?
         .doc("Analog Output Status configuration")?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(40, 1))?
         .default_variant(&event_variation, gv(42, 3))?
-        .default(&deadband, Number::Double(0.0))?
+        .default(&deadband, NumberValue::Double(0.0))?
         .end_initializer()?
         .build()?;
 
@@ -461,11 +461,11 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let add_binary = lib
         .define_method("add_binary", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", binary_config, "Configuration")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
         .doc("Add a new Binary Input point")?
@@ -473,9 +473,9 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let remove_binary = lib
         .define_method("remove_binary", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully removed, false otherwise",
         )?
         .doc("Remove a Binary Input point")?
@@ -490,7 +490,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         )?
         .param("options", update_options.clone(), "Update options")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
         )?
         .doc("Update a Binary Input point")?
@@ -498,7 +498,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let get_binary = lib
         .define_method("get_binary", database.clone())?
-        .param("index", BasicType::U16, "Index of the point to get")?
+        .param("index", Primitive::U16, "Index of the point to get")?
         .returns(shared_def.binary_point.clone(), "Binary Input point")?
         .fails_with(shared_def.error_type.clone())?
         .doc("Get a Binary Input point")?
@@ -509,11 +509,11 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let add_double_bit_binary = lib
         .define_method("add_double_bit_binary", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", double_bit_binary_config, "Configuration")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
         .doc("Add a new Double-Bit Binary Input point")?
@@ -521,9 +521,9 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let remove_double_bit_binary = lib
         .define_method("remove_double_bit_binary", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully removed, false otherwise",
         )?
         .doc("Remove a Double-Bit Binary Input point")?
@@ -538,7 +538,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         )?
         .param("options", update_options.clone(), "Update options")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
         )?
         .doc("Update a Double-Bit Binary Input point")?
@@ -546,7 +546,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let get_double_bit_binary = lib
         .define_method("get_double_bit_binary", database.clone())?
-        .param("index", BasicType::U16, "Index of the point to get")?
+        .param("index", Primitive::U16, "Index of the point to get")?
         .returns(
             shared_def.double_bit_binary_point.clone(),
             "Double-Bit Binary Input point",
@@ -560,11 +560,11 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let add_binary_output_status = lib
         .define_method("add_binary_output_status", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", binary_output_status_config, "Configuration")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
         .doc("Add a new Binary Output Status point")?
@@ -572,9 +572,9 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let remove_binary_output_status = lib
         .define_method("remove_binary_output_status", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully removed, false otherwise",
         )?
         .doc("Remove a Binary Output Status point")?
@@ -589,7 +589,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         )?
         .param("options", update_options.clone(), "Update options")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
         )?
         .doc("Update a Binary Output Status point")?
@@ -597,7 +597,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let get_binary_output_status = lib
         .define_method("get_binary_output_status", database.clone())?
-        .param("index", BasicType::U16, "Index of the point to get")?
+        .param("index", Primitive::U16, "Index of the point to get")?
         .returns(
             shared_def.binary_output_status_point.clone(),
             "Binary Output Status point",
@@ -611,11 +611,11 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let add_counter = lib
         .define_method("add_counter", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", counter_config, "Configuration")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
         .doc("Add a new Counter point")?
@@ -623,9 +623,9 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let remove_counter = lib
         .define_method("remove_counter", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully removed, false otherwise",
         )?
         .doc("Remove a Counter point")?
@@ -640,7 +640,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         )?
         .param("options", update_options.clone(), "Update options")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
         )?
         .doc("Update a Counter point")?
@@ -648,7 +648,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let get_counter = lib
         .define_method("get_counter", database.clone())?
-        .param("index", BasicType::U16, "Index of the point to get")?
+        .param("index", Primitive::U16, "Index of the point to get")?
         .returns(shared_def.counter_point.clone(), "Counter point")?
         .fails_with(shared_def.error_type.clone())?
         .doc("Get a Counter point")?
@@ -659,11 +659,11 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let add_frozen_counter = lib
         .define_method("add_frozen_counter", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", frozen_counter_config, "Configuration")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
         .doc("Add a new Frozen Counter point")?
@@ -671,9 +671,9 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let remove_frozen_counter = lib
         .define_method("remove_frozen_counter", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully removed, false otherwise",
         )?
         .doc("Remove a Frozen Counter point")?
@@ -688,7 +688,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         )?
         .param("options", update_options.clone(), "Update options")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
         )?
         .doc("Update an Frozen Counter point")?
@@ -696,7 +696,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let get_frozen_counter = lib
         .define_method("get_frozen_counter", database.clone())?
-        .param("index", BasicType::U16, "Index of the point to get")?
+        .param("index", Primitive::U16, "Index of the point to get")?
         .returns(
             shared_def.frozen_counter_point.clone(),
             "Frozen Counter point",
@@ -710,11 +710,11 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let add_analog = lib
         .define_method("add_analog", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", analog_config, "Configuration")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
         .doc("Add a new Analog point")?
@@ -722,9 +722,9 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let remove_analog = lib
         .define_method("remove_analog", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully removed, false otherwise",
         )?
         .doc("Remove an Analog point")?
@@ -739,7 +739,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         )?
         .param("options", update_options.clone(), "Update options")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
         )?
         .doc("Update a Analog point")?
@@ -747,7 +747,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let get_analog = lib
         .define_method("get_analog", database.clone())?
-        .param("index", BasicType::U16, "Index of the point to get")?
+        .param("index", Primitive::U16, "Index of the point to get")?
         .returns(shared_def.analog_point.clone(), "Analog point")?
         .fails_with(shared_def.error_type.clone())?
         .doc("Get a Analog point")?
@@ -757,11 +757,11 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     let analog_output_status_config = define_analog_output_status_config(lib)?;
     let add_analog_output_status = lib
         .define_method("add_analog_output_status", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", analog_output_status_config, "Configuration")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
         .doc("Add a new Analog Output Status point")?
@@ -769,9 +769,9 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let remove_analog_output_status = lib
         .define_method("remove_analog_output_status", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully removed, false otherwise",
         )?
         .doc("Remove an Analog Output Status point")?
@@ -786,7 +786,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         )?
         .param("options", update_options.clone(), "Update options")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
         )?
         .doc("Update a Analog Output Status point")?
@@ -794,7 +794,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let get_analog_output_status = lib
         .define_method("get_analog_output_status", database.clone())?
-        .param("index", BasicType::U16, "Index of the point to get")?
+        .param("index", Primitive::U16, "Index of the point to get")?
         .returns(
             shared_def.analog_output_status_point.clone(),
             "Analog Output Status point",
@@ -804,14 +804,14 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .build()?;
 
     // Octet String
-    let octet_string = lib.define_collection("octet_string_value", BasicType::U8, false)?;
+    let octet_string = lib.define_collection("octet_string_value", Primitive::U8, false)?;
 
     let add_octet_string = lib
         .define_method("add_octet_string", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("point_class", event_class, "Event class")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
         .doc("Add a new Octet String point")?
@@ -819,9 +819,9 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let remove_octet_string = lib
         .define_method("remove_octet_string", database.clone())?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully removed, false otherwise",
         )?
         .doc("Remove an Octet String point")?
@@ -829,11 +829,11 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
 
     let update_octet_string = lib
         .define_method("update_octet_string", database.clone())?
-        .param("index", BasicType::U16, "Index of the octet string")?
+        .param("index", Primitive::U16, "Index of the octet string")?
         .param("value", octet_string, "New value of the point")?
         .param("options", update_options, "Update options")?
         .returns(
-            BasicType::Bool,
+            Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
         )?
         .doc("Update an Octet String point")?

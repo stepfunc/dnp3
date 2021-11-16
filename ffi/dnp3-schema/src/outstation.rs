@@ -209,42 +209,42 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
         .define_function_argument_struct(class_zero_config)?
         .add(
             &binary,
-            BasicType::Bool,
+            Primitive::Bool,
             "Include Binary Inputs in Class 0 reads",
         )?
         .add(
             &double_bit_binary,
-            BasicType::Bool,
+            Primitive::Bool,
             "Include Double-Bit Binary Inputs in Class 0 reads",
         )?
         .add(
             &binary_output_status,
-            BasicType::Bool,
+            Primitive::Bool,
             "Include Binary Output Status in Class 0 reads",
         )?
         .add(
             &counter,
-            BasicType::Bool,
+            Primitive::Bool,
             "Include Counters in Class 0 reads",
         )?
         .add(
             &frozen_counter,
-            BasicType::Bool,
+            Primitive::Bool,
             "Include Frozen Counters in Class 0 reads",
         )?
         .add(
             &analog,
-            BasicType::Bool,
+            Primitive::Bool,
             "Include Analog Inputs in Class 0 reads",
         )?
         .add(
             &analog_output_status,
-            BasicType::Bool,
+            Primitive::Bool,
             "Include Analog Output Status in Class 0 reads",
         )?
         .add(
             &octet_strings,
-            BasicType::Bool,
+            Primitive::Bool,
             doc("Include Binary Inputs in Class 0 reads")
                 .warning("For conformance, this should be false."),
         )?
@@ -279,17 +279,17 @@ fn define_outstation_features(lib: &mut LibraryBuilder) -> BackTraced<FunctionAr
         .define_function_argument_struct(features)?
         .add(
             &self_address,
-            BasicType::Bool,
+            Primitive::Bool,
             "Respond to the self address",
         )?
         .add(
             &broadcast,
-            BasicType::Bool,
+            Primitive::Bool,
             "Process valid broadcast messages",
         )?
         .add(
             &unsolicited,
-            BasicType::Bool,
+            Primitive::Bool,
             "Respond to enable/disable unsolicited response and produce unsolicited responses",
         )?
         .doc("Optional outstation features that can be enabled or disabled")?
@@ -335,23 +335,23 @@ fn define_outstation_config(
         .doc("Outstation configuration")?
         .add(
             "outstation_address",
-            BasicType::U16,
+            Primitive::U16,
             "Link-layer outstation address",
         )?
-        .add("master_address", BasicType::U16, "Link-layer master address")?
+        .add("master_address", Primitive::U16, "Link-layer master address")?
         .add(
             &solicited_buffer_size,
-            BasicType::U16,
+            Primitive::U16,
             doc("Solicited response buffer size").details("Must be at least 249 bytes"),
         )?
         .add(
             &unsolicited_buffer_size,
-            BasicType::U16,
+            Primitive::U16,
             doc("Unsolicited response buffer size").details("Must be at least 249 bytes"),
         )?
         .add(
             &rx_buffer_size,
-            BasicType::U16,
+            Primitive::U16,
             doc("Receive buffer size").details("Must be at least 249 bytes"),
         )?
         .add(
@@ -372,7 +372,7 @@ fn define_outstation_config(
         .add(&features, outstation_features, "Optional features")?
         .add(
             &max_unsolicited_retries,
-            BasicType::U32,
+            Primitive::U32,
             "Maximum number of unsolicited retries",
         )?
         .add(
@@ -386,23 +386,23 @@ fn define_outstation_config(
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the master")
                 .details("A value of zero means no automatic keep-alive will be sent."),
         )?
-        .add(&max_read_request_headers, BasicType::U16, doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
-        .add(&max_controls_per_request, BasicType::U16, doc("Maximum number of controls in a single request."))?
+        .add(&max_read_request_headers, Primitive::U16, doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
+        .add(&max_controls_per_request, Primitive::U16, doc("Maximum number of controls in a single request."))?
         .add(&class_zero, class_zero_config, "Controls responses to Class 0 reads")?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
-        .default(&solicited_buffer_size, Number::U16(2048))?
-        .default(&unsolicited_buffer_size, Number::U16(2048))?
-        .default(&rx_buffer_size, Number::U16(2048))?
+        .default(&solicited_buffer_size, NumberValue::U16(2048))?
+        .default(&unsolicited_buffer_size, NumberValue::U16(2048))?
+        .default(&rx_buffer_size, NumberValue::U16(2048))?
         .default_struct(&decode_level)?
         .default(&confirm_timeout, Duration::from_secs(5))?
         .default(&select_timeout, Duration::from_secs(5))?
         .default(&features, InitializerDefault::DefaultStruct)?
-        .default(&max_unsolicited_retries, Number::U32(u32::MAX))?
+        .default(&max_unsolicited_retries, NumberValue::U32(u32::MAX))?
         .default(&unsolicited_retry_delay, Duration::from_secs(5))?
         .default(&keep_alive_timeout, Duration::from_secs(60))?
-        .default(&max_read_request_headers, Number::U16(64))?
-        .default(&max_controls_per_request, Number::U16(u16::MAX))?
+        .default(&max_read_request_headers, NumberValue::U16(64))?
+        .default(&max_controls_per_request, NumberValue::U16(u16::MAX))?
         .default_struct(&class_zero)?
         .end_initializer()?
         .build()?;
@@ -416,42 +416,42 @@ fn define_event_buffer_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionAr
         .define_function_argument_struct(event_buffer_config)?
         .add(
             "max_binary",
-            BasicType::U16,
+            Primitive::U16,
             "Maximum number of Binary Input events (g2)",
         )?
         .add(
             "max_double_bit_binary",
-            BasicType::U16,
+            Primitive::U16,
             "Maximum number of Double-Bit Binary Input events (g4)",
         )?
         .add(
             "max_binary_output_status",
-            BasicType::U16,
+            Primitive::U16,
             "Maximum number of Binary Output Status events (g11)",
         )?
         .add(
             "max_counter",
-            BasicType::U16,
+            Primitive::U16,
             "Maximum number of Counter events (g22)",
         )?
         .add(
             "max_frozen_counter",
-            BasicType::U16,
+            Primitive::U16,
             "Maximum number of Frozen Counter events (g23)",
         )?
         .add(
             "max_analog",
-            BasicType::U16,
+            Primitive::U16,
             "Maximum number of Analog Input events (g32)",
         )?
         .add(
             "max_analog_output_status",
-            BasicType::U16,
+            Primitive::U16,
             "Maximum number of Analog Output Status events (g42)",
         )?
         .add(
             "max_octet_string",
-            BasicType::U16,
+            Primitive::U16,
             doc("Maximum number of Octet String events (g111)"),
         )?
         .doc(
@@ -476,22 +476,22 @@ fn define_application_iin(lib: &mut LibraryBuilder) -> BackTraced<UniversalStruc
         .define_universal_struct(application_iin)?
         .add(
             need_time.clone(),
-            BasicType::Bool,
+            Primitive::Bool,
             "IIN1.4 - Time synchronization is required",
         )?
         .add(
             local_control.clone(),
-            BasicType::Bool,
+            Primitive::Bool,
             "IIN1.5 - Some output points are in local mode",
         )?
         .add(
             device_trouble.clone(),
-            BasicType::Bool,
+            Primitive::Bool,
             "IIN1.6 - Device trouble",
         )?
         .add(
             config_corrupt.clone(),
-            BasicType::Bool,
+            Primitive::Bool,
             "IIN2.5 - Configuration corrupt",
         )?
         .doc("Application-controlled IIN bits")?
@@ -529,14 +529,14 @@ fn define_restart_delay(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
     let restart_delay = lib.declare_universal_struct("restart_delay")?;
     let restart_delay = lib.define_universal_struct(restart_delay)?
         .add(restart_type.clone(), restart_delay_type, "Indicates what {struct:restart_delay.value} is.")?
-        .add(value.clone(), BasicType::U16, "Expected delay before the outstation comes back online.")?
+        .add(value.clone(), Primitive::U16, "Expected delay before the outstation comes back online.")?
         .doc(doc("Restart delay used by {interface:outstation_application.cold_restart()} and {interface:outstation_application.warm_restart()}")
             .details("If {struct:restart_delay.restart_type} is not {enum:restart_delay_type.not_supported}, then the {struct:restart_delay.value} is valid. Otherwise, the outstation will return IIN2.0 NO_FUNC_CODE_SUPPORT."))?
         .end_fields()?
         // -----
         .begin_initializer("not_supported", InitializerType::Static, "RestartDelay indicating that the request is not supported")?
         .default_variant(&restart_type, "not_supported")?
-        .default(&value, Number::U16(0))?
+        .default(&value, NumberValue::U16(0))?
         .end_initializer()?
         // -----
         .begin_initializer("seconds", InitializerType::Static, "RestartDelay with a count of seconds")?
@@ -589,10 +589,10 @@ fn define_outstation_application(
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
             .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
             .details("For more information, see IEEE-1815 2012, p. 64."))?
-            .returns(BasicType::U16, "Processing delay, in milliseconds")?
+            .returns(Primitive::U16, "Processing delay, in milliseconds")?
             .end_callback()?
         .begin_callback("write_absolute_time", "Handle a write of the absolute time during time synchronization procedures.")?
-            .param("time", BasicType::U64, "Received time in milliseconds since EPOCH (only 48 bits are used)")?
+            .param("time", Primitive::U64, "Received time in milliseconds since EPOCH (only 48 bits are used)")?
             .returns(write_time_result, "Result of the write time operation")?
             .end_callback()?
         .begin_callback("get_application_iin", "Returns the application-controlled IIN bits")?
@@ -612,8 +612,8 @@ fn define_outstation_application(
             .returns(freeze_result.clone(), "Result of the freeze operation")?
             .end_callback()?
         .begin_callback("freeze_counters_range", "Freeze a range of counters")?
-            .param("start", BasicType::U16, "Start index to freeze (inclusive)")?
-            .param("stop", BasicType::U16, "Stop index to freeze (inclusive)")?
+            .param("start", Primitive::U16, "Start index to freeze (inclusive)")?
+            .param("stop", Primitive::U16, "Stop index to freeze (inclusive)")?
             .param("freeze_type", freeze_type, "Type of freeze operation")?
             .param("database",database.declaration(), "Database")?
             .returns(freeze_result, "Result of the freeze operation")?
@@ -661,41 +661,41 @@ fn define_outstation_information(
 
             .end_callback()?
         .begin_callback("enter_solicited_confirm_wait", "Outstation has begun waiting for a solicited confirm")?
-            .param("ecsn", BasicType::U8, "Expected sequence number")?
+            .param("ecsn", Primitive::U8, "Expected sequence number")?
 
             .end_callback()?
         .begin_callback("solicited_confirm_timeout", "Failed to receive a solicited confirm before the timeout occurred")?
-            .param("ecsn", BasicType::U8, "Expected sequence number")?
+            .param("ecsn", Primitive::U8, "Expected sequence number")?
 
             .end_callback()?
         .begin_callback("solicited_confirm_received", "Received the expected confirm")?
-            .param("ecsn", BasicType::U8, "Expected sequence number")?
+            .param("ecsn", Primitive::U8, "Expected sequence number")?
 
             .end_callback()?
         .begin_callback("solicited_confirm_wait_new_request", "Received a new request while waiting for a solicited confirm, aborting the response series")?
 
             .end_callback()?
         .begin_callback("wrong_solicited_confirm_seq", "Received a solicited confirm with the wrong sequence number")?
-            .param("ecsn", BasicType::U8, "Expected sequence number")?
-            .param("seq", BasicType::U8, "Received sequence number")?
+            .param("ecsn", Primitive::U8, "Expected sequence number")?
+            .param("seq", Primitive::U8, "Received sequence number")?
 
             .end_callback()?
         .begin_callback("unexpected_confirm", "Received a confirm when not expecting one")?
-            .param("unsolicited", BasicType::Bool, "True if it's an unsolicited response confirm, false if it's a solicited response confirm")?
-            .param("seq", BasicType::U8, "Received sequence number")?
+            .param("unsolicited", Primitive::Bool, "True if it's an unsolicited response confirm, false if it's a solicited response confirm")?
+            .param("seq", Primitive::U8, "Received sequence number")?
 
             .end_callback()?
         .begin_callback("enter_unsolicited_confirm_wait", "Outstation has begun waiting for an unsolicited confirm")?
-            .param("ecsn", BasicType::U8, "Expected sequence number")?
+            .param("ecsn", Primitive::U8, "Expected sequence number")?
 
             .end_callback()?
         .begin_callback("unsolicited_confirm_timeout", "Failed to receive an unsolicited confirm before the timeout occurred")?
-            .param("ecsn", BasicType::U8, "Expected sequence number")?
-            .param("retry", BasicType::Bool, "Is it a retry")?
+            .param("ecsn", Primitive::U8, "Expected sequence number")?
+            .param("retry", Primitive::Bool, "Is it a retry")?
 
             .end_callback()?
         .begin_callback("unsolicited_confirmed", "Master confirmed an unsolicited message")?
-            .param("ecsn", BasicType::U8, "Expected sequence number")?
+            .param("ecsn", Primitive::U8, "Expected sequence number")?
 
             .end_callback()?
         .begin_callback("clear_restart_iin", "Master cleared the restart IIN bit")?
@@ -749,74 +749,74 @@ fn define_control_handler(
         //------
         .begin_callback("select_g12v1", select_g12_doc)?
         .param("value", shared_def.g12v1_struct.clone(), "Received CROB")?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g12v1", "Operate a control point")?
         .param("value", shared_def.g12v1_struct.clone(), "Received CROB")?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v1", select_g40_doc.clone())?
-        .param("value", BasicType::S32, "Received analog output value")?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("value", Primitive::S32, "Received analog output value")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v1", "Operate a control point")?
-        .param("value", BasicType::S32, "Received analog output value")?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("value", Primitive::S32, "Received analog output value")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v2", select_g40_doc.clone())?
-        .param("value", BasicType::S16, "Received analog output value")?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("value", Primitive::S16, "Received analog output value")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v2", "Operate a control point")?
-        .param("value", BasicType::S16, "Received analog output value")?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("value", Primitive::S16, "Received analog output value")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v3", select_g40_doc.clone())?
-        .param("value", BasicType::Float32, "Received analog output value")?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("value", Primitive::Float, "Received analog output value")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v3", "Operate a control point")?
-        .param("value", BasicType::Float32, "Received analog output value")?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("value", Primitive::Float, "Received analog output value")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v4", select_g40_doc)?
-        .param("value", BasicType::Double64, "Received analog output value")?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("value", Primitive::Double, "Received analog output value")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v4", "Operate a control point")?
-        .param("value", BasicType::Double64, "Received analog output value")?
-        .param("index", BasicType::U16, "Index of the point")?
+        .param("value", Primitive::Double, "Received analog output value")?
+        .param("index", Primitive::U16, "Index of the point")?
         .param("op_type", operate_type, "Operate type")?
         .param("database", database.declaration(), "Database")?
         .returns(command_status, "Command status")?

@@ -213,40 +213,40 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
         .doc("First IIN byte")?
         .add(
             "broadcast",
-            BasicType::Bool,
+            Primitive::Bool,
             "Broadcast message was received",
         )?
         .add(
             "class_1_events",
-            BasicType::Bool,
+            Primitive::Bool,
             "Outstation has unreported Class 1 events",
         )?
         .add(
             "class_2_events",
-            BasicType::Bool,
+            Primitive::Bool,
             "Outstation has unreported Class 2 events",
         )?
         .add(
             "class_3_events",
-            BasicType::Bool,
+            Primitive::Bool,
             "Outstation has unreported Class 3 events",
         )?
         .add(
             "need_time",
-            BasicType::Bool,
+            Primitive::Bool,
             "Outstation requires time synchronization",
         )?
         .add(
             "local_control",
-            BasicType::Bool,
+            Primitive::Bool,
             "One or more of the outstation’s points are in local control mode",
         )?
         .add(
             "device_trouble",
-            BasicType::Bool,
+            Primitive::Bool,
             "An abnormal, device-specific condition exists in the outstation",
         )?
-        .add("device_restart", BasicType::Bool, "Outstation restarted")?
+        .add("device_restart", Primitive::Bool, "Outstation restarted")?
         .end_fields()?
         // TODO - constructor
         .build()?;
@@ -255,14 +255,14 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
     let iin2 = lib
         .define_callback_argument_struct(iin2)?
         .doc("Second IIN byte")?
-        .add("no_func_code_support", BasicType::Bool, "Outstation does not support this function code")?
-        .add("object_unknown", BasicType::Bool, "Outstation does not support requested operation for objects in the request")?
-        .add("parameter_error", BasicType::Bool, "Outstation does not support requested operation for objects in the request")?
-        .add("event_buffer_overflow", BasicType::Bool, "An event buffer overflow condition exists in the outstation, and at least one unconfirmed event was lost")?
-        .add("already_executing", BasicType::Bool, "The operation requested is already executing (optional support)")?
-        .add("config_corrupt", BasicType::Bool, "The outstation detected corrupt configuration (optional support)")?
-        .add("reserved_2", BasicType::Bool, "Reserved for future use - should always be set to 0")?
-        .add("reserved_1", BasicType::Bool, "Reserved for future use - should always be set to 0")?
+        .add("no_func_code_support", Primitive::Bool, "Outstation does not support this function code")?
+        .add("object_unknown", Primitive::Bool, "Outstation does not support requested operation for objects in the request")?
+        .add("parameter_error", Primitive::Bool, "Outstation does not support requested operation for objects in the request")?
+        .add("event_buffer_overflow", Primitive::Bool, "An event buffer overflow condition exists in the outstation, and at least one unconfirmed event was lost")?
+        .add("already_executing", Primitive::Bool, "The operation requested is already executing (optional support)")?
+        .add("config_corrupt", Primitive::Bool, "The outstation detected corrupt configuration (optional support)")?
+        .add("reserved_2", Primitive::Bool, "Reserved for future use - should always be set to 0")?
+        .add("reserved_1", Primitive::Bool, "Reserved for future use - should always be set to 0")?
         .end_fields()?
         // TODO - constructor
         .build()?;

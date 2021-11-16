@@ -69,12 +69,12 @@ fn define_logging_config_struct(
         .add(&time_format, time_format_enum, "optional time format")?
         .add(
             &print_level,
-            BasicType::Bool,
+            Primitive::Bool,
             "optionally print the log level as part to the message string",
         )?
         .add(
             &print_module_info,
-            BasicType::Bool,
+            Primitive::Bool,
             "optionally print the underlying Rust module information to the message string",
         )?
         .doc("Logging configuration options")?
