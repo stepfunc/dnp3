@@ -108,6 +108,56 @@ class CommandTaskCallback : public dnp3::CommandTaskCallback {
     }
 };
 
+class ReadTaskCallback : public dnp3::ReadTaskCallback {
+    virtual void on_complete(dnp3::Nothing result)
+    {
+        std::cout << "read succeeded!" << std::endl;
+    }
+
+    virtual void on_failure(dnp3::ReadError error) override
+    {
+        std::cout << "read failed: " << dnp3::to_string(error) << std::endl;
+    }
+};
+
+class TimeSyncTaskCallback : public dnp3::TimeSyncTaskCallback {
+    virtual void on_complete(dnp3::Nothing result)
+    {
+        std::cout << "time sync succeeded!" << std::endl;
+    }
+
+    virtual void on_failure(dnp3::TimeSyncError error) override
+    {
+        std::cout << "time sync failed: " << dnp3::to_string(error) << std::endl;
+    }
+};
+
+class RestartTaskCallback : public dnp3::RestartTaskCallback {
+
+    void on_complete(std::chrono::steady_clock::duration result) override
+    {
+        const auto count = std::chrono::duration_cast<std::chrono::milliseconds>(result).count();
+        std::cout << "device will restart in " << count << " milliseconds!" << std::endl;
+    }
+
+    void on_failure(dnp3::RestartError error) override
+    {
+        std::cout << "restart failed failed: " << dnp3::to_string(error) << std::endl;
+    }
+};
+
+class LinkStatusCallback : public dnp3::LinkStatusCallback {
+    void on_complete(dnp3::Nothing result) override
+    {
+        std::cout << "link status succeeded" << std::endl;
+    }
+
+    void on_failure(dnp3::LinkStatusError error) override
+    {
+        std::cout << "link status failed: " << dnp3::to_string(error) << std::endl;
+    }
+};
+
 int main()
 {
     dnp3::Logging::configure(dnp3::LoggingConfig(), std::make_unique<Logger>());
@@ -136,6 +186,10 @@ int main()
         std::make_unique<AssociationHandler>()
     );
 
+    // ANCHOR: add_poll
+    const auto event_poll = channel.add_poll(assoc, dnp3::Request::class_request(false, true, true, true), std::chrono::seconds(10));
+    // ANCHOR_END: add_poll
+
     channel.enable();
 
     while (true)
@@ -145,6 +199,51 @@ int main()
 
         if (cmd == "x") {
             return 0;
+        }
+        else if (cmd == "enable") {
+            channel.enable();
+        } else if (cmd == "disable") {
+            channel.disable();
+        }
+        else if (cmd == "dln") {
+            channel.set_decode_level(dnp3::DecodeLevel());
+        }
+        else if (cmd == "dlv") {
+            dnp3::DecodeLevel level;
+            level.application = dnp3::AppDecodeLevel::object_values;
+            channel.set_decode_level(level);
+        }
+        else if (cmd == "rao") {
+            dnp3::Request request;
+            request.add_all_objects_header(dnp3::Variation::group40_var0);
+            channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
+        }
+        else if (cmd == "rmo") {
+            dnp3::Request request;
+            request.add_all_objects_header(dnp3::Variation::group1_var0);
+            request.add_all_objects_header(dnp3::Variation::group10_var0);
+            channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
+        }
+        else if (cmd == "evt") {
+            channel.demand_poll(event_poll);
+        }
+        else if (cmd == "lts") {
+            channel.synchronize_time(assoc, dnp3::TimeSyncMode::lan, std::make_unique<TimeSyncTaskCallback>());
+        }
+        else if (cmd == "nts") {
+            channel.synchronize_time(assoc, dnp3::TimeSyncMode::non_lan, std::make_unique<TimeSyncTaskCallback>());
+        }
+        else if (cmd == "crt") {
+            channel.cold_restart(assoc, std::make_unique<RestartTaskCallback>());
+        }
+        else if (cmd == "wrt") {
+            channel.warm_restart(assoc, std::make_unique<RestartTaskCallback>());
+        }
+        else if (cmd == "wrt") {
+            channel.warm_restart(assoc, std::make_unique<RestartTaskCallback>());
+        }
+        else if (cmd == "lsr") {
+            channel.check_link_status(assoc, std::make_unique<LinkStatusCallback>());
         }
         else if (cmd == "cmd") {
             dnp3::CommandSet commands;
