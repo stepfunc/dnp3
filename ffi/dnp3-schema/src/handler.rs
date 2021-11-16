@@ -1,10 +1,5 @@
-use oo_bindgen::*;
-
 use crate::shared::SharedDefinitions;
-use oo_bindgen::enum_type::EnumHandle;
-use oo_bindgen::interface::AsynchronousInterface;
-use oo_bindgen::structs::CallbackArgStructHandle;
-use oo_bindgen::types::BasicType;
+use oo_bindgen::model::*;
 
 pub fn define(
     lib: &mut LibraryBuilder,

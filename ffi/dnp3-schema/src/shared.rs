@@ -1,15 +1,5 @@
 use crate::gv;
-use oo_bindgen::class::ClassDeclarationHandle;
-use oo_bindgen::doc::Unvalidated;
-use oo_bindgen::enum_type::EnumHandle;
-use oo_bindgen::error_type::{ErrorType, ExceptionType};
-use oo_bindgen::interface::AsynchronousInterface;
-use oo_bindgen::iterator::IteratorHandle;
-use oo_bindgen::name::Name;
-use oo_bindgen::structs::*;
-use oo_bindgen::types::{BasicType, DurationType};
-use oo_bindgen::{doc, BackTraced};
-use oo_bindgen::{BindingError, LibraryBuilder};
+use oo_bindgen::model::*;
 use std::time::Duration;
 
 pub struct SharedDefinitions {
@@ -24,21 +14,21 @@ pub struct SharedDefinitions {
     pub control_struct: CallbackArgStructHandle,
     pub g12v1_struct: UniversalStructHandle,
     pub binary_point: UniversalStructHandle,
-    pub binary_it: IteratorHandle,
+    pub binary_it: AbstractIteratorHandle,
     pub double_bit_binary_point: UniversalStructHandle,
-    pub double_bit_binary_it: IteratorHandle,
+    pub double_bit_binary_it: AbstractIteratorHandle,
     pub binary_output_status_point: UniversalStructHandle,
-    pub binary_output_status_it: IteratorHandle,
+    pub binary_output_status_it: AbstractIteratorHandle,
     pub counter_point: UniversalStructHandle,
-    pub counter_it: IteratorHandle,
+    pub counter_it: AbstractIteratorHandle,
     pub frozen_counter_point: UniversalStructHandle,
-    pub frozen_counter_it: IteratorHandle,
+    pub frozen_counter_it: AbstractIteratorHandle,
     pub analog_point: UniversalStructHandle,
-    pub analog_it: IteratorHandle,
+    pub analog_it: AbstractIteratorHandle,
     pub analog_output_status_point: UniversalStructHandle,
-    pub analog_output_status_it: IteratorHandle,
+    pub analog_output_status_it: AbstractIteratorHandle,
     pub octet_string: FunctionReturnStructHandle,
-    pub octet_string_it: IteratorHandle,
+    pub octet_string_it: AbstractIteratorHandle,
 }
 
 pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
@@ -481,7 +471,7 @@ fn build_iterator<T: Into<UniversalStructField>>(
     lib: &mut LibraryBuilder,
     flags_struct: &UniversalStructHandle,
     timestamp_struct: &UniversalStructHandle,
-) -> Result<(UniversalStructHandle, IteratorHandle), BindingError> {
+) -> Result<(UniversalStructHandle, AbstractIteratorHandle), BindingError> {
     let value_struct_decl = lib.declare_universal_struct(name)?;
     let value_struct = lib
         .define_universal_struct(value_struct_decl)?
@@ -501,7 +491,7 @@ fn build_iterator<T: Into<UniversalStructField>>(
 
 fn build_octet_string(
     lib: &mut LibraryBuilder,
-) -> Result<(FunctionReturnStructHandle, IteratorHandle), BindingError> {
+) -> Result<(FunctionReturnStructHandle, AbstractIteratorHandle), BindingError> {
     // Octet string stuff
     let byte_struct_decl = lib.declare_function_return_struct("byte_value")?;
     let byte_struct = lib

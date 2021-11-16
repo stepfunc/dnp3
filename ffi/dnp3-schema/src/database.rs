@@ -1,11 +1,6 @@
-use class::ClassHandle;
-use oo_bindgen::*;
-
 use crate::gv;
 use crate::shared::SharedDefinitions;
-use oo_bindgen::name::Name;
-use oo_bindgen::structs::{FunctionArgStructHandle, InitializerType, Number};
-use oo_bindgen::types::BasicType;
+use oo_bindgen::model::*;
 
 fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let event_mode_enum = lib

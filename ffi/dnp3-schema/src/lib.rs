@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use oo_bindgen::*;
+use oo_bindgen::model::*;
 
 mod constants;
 mod database;

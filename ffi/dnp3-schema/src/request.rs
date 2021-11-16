@@ -1,8 +1,6 @@
-use oo_bindgen::class::ClassHandle;
-use oo_bindgen::*;
+use oo_bindgen::model::*;
 
 use crate::shared::SharedDefinitions;
-use oo_bindgen::types::BasicType;
 
 pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<ClassHandle> {
     let request = lib.declare_class("request")?;

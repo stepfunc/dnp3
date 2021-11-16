@@ -1,10 +1,4 @@
-use oo_bindgen::class::ClassDeclarationHandle;
-use oo_bindgen::doc::Unvalidated;
-use oo_bindgen::error_type::ErrorType;
-use oo_bindgen::name::Name;
-use oo_bindgen::structs::{FunctionArgStructHandle, InitializerType, Number};
-use oo_bindgen::types::BasicType;
-use oo_bindgen::*;
+use oo_bindgen::model::*;
 
 fn define_runtime_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let num_core_threads = Name::create("num_core_threads")?;

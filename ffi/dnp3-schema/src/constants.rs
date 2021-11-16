@@ -1,5 +1,4 @@
-use oo_bindgen::constants::{ConstantValue, Representation};
-use oo_bindgen::{BackTraced, LibraryBuilder};
+use oo_bindgen::model::*;
 
 mod bits {
     pub(crate) const BIT_0: u8 = 0b0000_0001;

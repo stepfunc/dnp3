@@ -1,6 +1,5 @@
 use crate::gv;
-use oo_bindgen::enum_type::EnumHandle;
-use oo_bindgen::{BackTraced, LibraryBuilder};
+use oo_bindgen::model::{BackTraced, EnumHandle, LibraryBuilder};
 
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let variation = lib

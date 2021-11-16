@@ -1,14 +1,5 @@
-use oo_bindgen::class::ClassHandle;
-use oo_bindgen::*;
-
 use crate::shared::SharedDefinitions;
-use oo_bindgen::enum_type::EnumHandle;
-use oo_bindgen::interface::AsynchronousInterface;
-use oo_bindgen::name::Name;
-use oo_bindgen::structs::{
-    FunctionArgStructHandle, InitializerDefault, InitializerType, Number, UniversalStructHandle,
-};
-use oo_bindgen::types::{BasicType, DurationType, StringType};
+use oo_bindgen::model::*;
 use std::time::Duration;
 
 struct OutstationTypes {
