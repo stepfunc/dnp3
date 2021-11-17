@@ -297,7 +297,7 @@ fn define_certificate_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle,
         .push(
             "SelfSigned",
             doc("Validates that the peer presents a single certificate which is a byte-for-byte match against the configured peer certificate")
-                .details("The peer certificate is not even parsed in this mode. The byte-for-byte comparison is all the validation that is required.")
+                .details("The certificate is parsed only to ensure that the `NotBefore` and `NotAfter` are valid for the current system time.")
         )?
         .doc(
             doc("Determines how the certificate(s) presented by the peer are validated")

@@ -27,8 +27,8 @@ pub enum CertificateMode {
     /// Validates that the peer presents a single certificate which is a byte-for-byte match
     /// against the configured peer certificate.
     ///
-    /// The peer certificate is not even parsed in this mode. The byte-for-byte comparison is
-    /// all the validation that is required.
+    /// The certificate is parsed only to ensure that the `NotBefore` and `NotAfter`
+    /// are valid for the current system time.
     SelfSigned,
 }
 
