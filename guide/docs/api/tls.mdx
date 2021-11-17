@@ -20,7 +20,7 @@ The multi-user support in SAv5 has been [deprecated](https://rlc.vlinder.ca/blog
 SAv6 aims to reduce the complexity of SAv5, but it has not been standardized yet and there are no full implementations.
 
 :::tip
-We recommend that DNP3 traffic be secured using TLS, and caution the industry to avoid home-grown solutions like secure authentication.
+We recommend using TLS to secure DNP3 and caution the industry to avoid home-grown solutions such as secure authentication.
 :::
 
 
@@ -77,101 +77,104 @@ TLS configuration is configured using the `TlsClientConfig` or `TlsServerConfig`
 - `certificate_mode`:
   * Mode of used to verify the peer certificate.
 
-### Name validation
+### Name Validation
 
-Name validation is always performed when `certificate_mode` is `TrustChain`, for
-both the client and the server.
+The following information describes how name validation is performed when `certificate_mode` is `AuthorityBased`. When the mode
+is `SelfSigned`, name validation is performed indirectly since a byte-for-byte comparison occurs of the entire certificate.
 
 A valid name has the same requirements as a DNS name. This is defined in
 [RFC 1034 Section 3.5](https://datatracker.ietf.org/doc/html/rfc1034#section-3.5),
 updated by [RFC1123 Section 2.1](https://datatracker.ietf.org/doc/html/rfc1123#section-2),
 with the additional exception that underscores `_` are allowed. A brief (but incomplete)
-definition of a valid name would be the following:
+definition of a valid name includes:
 
 - One or more labels separated by a single period
-- Labels are made of alphanumeric characters `[A-Za-z0-9]`, hyphen `-` and underscores `_`
+- Labels are made of alphanumeric characters `[A-Za-z0-9]`, hyphens `-`, and underscores `_`
 - A label cannot start or end with an hyphen `-`
 - A label cannot be all numeric
 - A label cannot be empty
 - Maximum of 63 characters per label
 - Maximum of 253 characters total
 
-We first validate the name through the Subject Alternative Name (SAN) extension if it's present.
-The SAN can contain multiple names and each name can contain a wildcard `*` character. The comparison
-is case insensitive.
+If the SAN extension is prent, the name is name validated against it. The SAN may contain multiple names and each name can contain a wildcard `*` character.
+The comparison is case-insensitive.
 
-If and only if no SAN extension is present, then the Common Name from the certificate's Subject
-is extracted and compared. The Common Name cannot contain a wildcard character and the comparison
-is case sensitive. It is effectively compared byte-for-byte with the expected name.
+If the SAN is absent, then the `Common Name` from the certificate's `Subject` is extracted and compared. The Common Name cannot contain a wildcard character
+and the comparison is case-sensitive. It is effectively compared byte-for-byte with the expected name.
 
-:::note
-Using SAN is the recommended way as Common Name usage is deprecated
-and might be removed in the future. New certificates should provide name
-in a SAN extension.
+:::tip
+New certificates should always include the SAN extension. Performing name verification using the `Common Name`
+is still secure, but it is deprecated for new use cases.
 :::
 
 ### Private key encryption
 
-Unencrypted private keys can be stored in PKCS#8 (`-----BEGIN PRIVATE KEY-----`) or
-PKCS#1 format (`----BEGIN RSA PRIVATE KEY-----`).
+Unencrypted private keys may be stored in PKCS#1 or PKCS#8 formats:
 
-Encrypted private keys **must** be stored in PKCS#8v2 (`-----BEGIN ENCRYPTED PRIVATE KEY-----`).
-PKCS#1 encryption is **not** supported. The following algorithms are supported:
+* `----BEGIN RSA PRIVATE KEY-----`
+
+* `-----BEGIN PRIVATE KEY-----`
+
+Encrypted private keys must be stored in PKCS#8v2 format:
+*  `-----BEGIN ENCRYPTED PRIVATE KEY-----`
+
+Keys encrypted in PKCS#1 format are **not** supported.
+
+The following algorithms are supported when keys are encrypted in PKCS#8v2 format:
 
 - Key derivation functions:
   - scrypt (RFC 7914) **recommended**
-  - PBKDF2 (RFC 8018) SHA-2 based PRF with HMAC-SHA224, HMAC-SHA256, HMAC-SHA384, or HMAC-SHA512
+  - PBKDF2 (RFC 8018) using one of the following HMAC:
+    * HMAC-SHA224
+    * HMAC-SHA256
+    * HMAC-SHA384
+    * HMAC-SHA512
 - Symmetric encryption:
   - AES-128-CBC
   - AES-192-CBC
   - AES-256-CBC **recommended**
 
-Notable unsupported algorithms are all SHA-1 based key derivation and DES/3DES symmetric encryption.
-These are considered insecure and should not be used anymore.
+SHA-1 based key derivation and DES/3DES symmetric encryption are NOT supported because they are insecure.
 
 [OpenSSL `pkcs8`](https://www.openssl.org/docs/man1.1.1/man1/openssl-pkcs8.html) tool can help you
 encrypting or converting private keys.
 
-:::warning
-Encrypting private keys is not an automatic security guarantee. Proper access control should be prioritized
-before encrypting the private the key. Keep in mind that encrypting a private key and leaving the password
-somewhere not-so-private (e.g. in the source code of your application) is the equivalent of locking the doors
-of your home and leaving a key in the mailbox.
+:::tip
+Encrypting private keys when using TLS rarely addresses a meaningful threat model. Encrypting a private key and storing the password in a configuration file
+is equivalent to locking your doors and leaving the key under the doormat.
 :::
 
-### Certificate mode
+### Certificate Mode
 
 The `certificate_mode` parameter determines how the presented peer certificate
-will be validated.
+is validated.
 
-The default `TrustChain` value validates that the presented chain of certificates
-and verify that the root certificate of the chain is one of those provided in
-the `peer_cert_path` file. In the power industry, we recommend having a **single**
-root certificate. It also validates that all critical extensions are handled, the
-time validity, the DNS name and other details. It will **not** accept self-signed
-certificate.
+#### Authority-based
 
-The `SelfSignedCertificate` value validates that only a single certificate is
-presented and that it matches byte-for-byte the configured `peer_cert_path`. It
-also checks the time validity using the system clock. Since the number of checks
-is limited, a **thorough manual inspection of the configured self-signed certificate is
-required beforehand**. Also note that the DNS name is **not** verified with this mode,
-as this check should be performed manually before adding the self-signed certificate
-to the configuration.
+The default `AuthorityBased` uses the normal `rustls` verifier to check the presented chain of certificates
+and verify that the root certificate of the chain is one of those provided in the `peer_cert_path` file.
+Most, if not all applications, in the power industry, will have a **single** root certificate.
 
-DNS name validation is not performed when `CertificateMode` is `SelfSignedCertificate`.
+This mode also validates that all critical extensions are handled, validity of the `NotBefore` and `NotAfter` fields,
+the DNS name, and other details. It will **not** accept self-signed certificate.
 
-### Generating certificates
+#### Self-Signed
 
-The following commands are provided as a guideline to generate certificates using the
-OpenSSL command line interface.
+The `SelfSigned` mode validates that:
 
-#### CA trust chain
+1. Only a single certificate is presented
+2. It is a byte-for-byte match of the one specified in `peer_cert_path`
+3. The `NotBefore` and `NotAfter` time fields are verified against the system clock.
 
-:::warning
-You should probably use an actual CA software instead of manually generating these certificates.
-These commands are provided for testing purposes.
+:::note
+Name validation is performed *indirectly* in self-signed mode, since the byte-for-byte comparison also compares the internal name fields.
 :::
+
+### Generating Certificates
+
+The following OpenSSL commands are provided for testing purposes only. Real systems will use some kind of specialized CA software for certificate procurement.
+
+#### Full CA chain
 
 - Generate the root CA certificate: `openssl req -x509 -newkey rsa:4096 -keyout ./ca_key.pem -out ./ca_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -nodes -days 3650`
 - Generate the master CSR: `openssl req -new -newkey rsa:4096 -keyout ./master_key.pem -out ./master_csr.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365`
