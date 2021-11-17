@@ -708,8 +708,8 @@ impl From<TlsError> for ffi::ParamError {
 impl From<ffi::MinTlsVersion> for MinTlsVersion {
     fn from(from: ffi::MinTlsVersion) -> Self {
         match from {
-            ffi::MinTlsVersion::Tls1_2 => MinTlsVersion::Tls1_2,
-            ffi::MinTlsVersion::Tls1_3 => MinTlsVersion::Tls1_3,
+            ffi::MinTlsVersion::V1_2 => MinTlsVersion::V1_2,
+            ffi::MinTlsVersion::V1_3 => MinTlsVersion::V1_3,
         }
     }
 }
@@ -717,8 +717,8 @@ impl From<ffi::MinTlsVersion> for MinTlsVersion {
 impl From<ffi::CertificateMode> for CertificateMode {
     fn from(from: ffi::CertificateMode) -> Self {
         match from {
-            ffi::CertificateMode::TrustChain => CertificateMode::TrustChain,
-            ffi::CertificateMode::SelfSignedCertificate => CertificateMode::SelfSignedCertificate,
+            ffi::CertificateMode::AuthorityBased => CertificateMode::AuthorityBased,
+            ffi::CertificateMode::SelfSigned => CertificateMode::SelfSigned,
         }
     }
 }

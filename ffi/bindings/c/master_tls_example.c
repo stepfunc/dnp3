@@ -266,7 +266,7 @@ int main()
         "./certs/self_signed/entity1_key.pem",
         "" // no password
     );
-    self_signed_tls_config.certificate_mode = DNP3_CERTIFICATE_MODE_SELF_SIGNED_CERTIFICATE;
+    self_signed_tls_config.certificate_mode = DNP3_CERTIFICATE_MODE_SELF_SIGNED;
     // ANCHOR_END: tls_self_signed_config
 
     // ANCHOR: tls_ca_chain_config
