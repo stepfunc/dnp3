@@ -1,6 +1,6 @@
 ---
 id: tls
-title: TLS
+title: Transport Layer Security
 sidebar_label: TLS
 slug: /api/tls
 ---
@@ -8,12 +8,23 @@ slug: /api/tls
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Both TCP masters and outstations support TLS to enable authentication and privacy of the communication links. The library internally uses
-[rustls](https://github.com/rustls/rustls), a modern TLS library entirely written in Rust. Therefore, it does **not** depend on OpenSSL
-or other third-party library that needs to be present on the system, but will interoperate with peers using
-these libraries.
+Masters and outstations may optionally use TLS which protects DNP3 communication by adding authentication and privacy. The library internally uses
+[rustls](https://github.com/rustls/rustls), a modern TLS library written in safe Rust. It does **not** depend on OpenSSL or other system libraries, but will
+interoperate seamlessly with other TLS implementations.
 
-## Supported features
+# Secure Authentication?
+
+DNP3 SAv5 (and v2) contains a number of [design](https://www.cs.dartmouth.edu/~sergey/langsec/papers/crain-bratus-bolt-on-dnp3sa.pdf)
+[flaws](https://cms-cdn.selinc.com/assets/Literature/Publications/Technical%20Papers/6910_AllAboutEve_CG_20190131_Web2.pdf?v=20191113-212654) and was never widely adopted.
+The multi-user support in SAv5 has been [deprecated](https://rlc.vlinder.ca/blog/2019/10/26/tb2019-001-multi-user-sa) because it could never meet its stated design goals.
+SAv6 aims to reduce the complexity of SAv5, but it has not been standardized yet and there are no full implementations.
+
+:::tip
+We recommend that DNP3 traffic be secured using TLS, and caution the industry to avoid home-grown solutions like secure authentication.
+:::
+
+
+## Supported Features
 
 - TLS v1.2 and v1.3
 - Supported cipher suites (in descending order of preference):
@@ -28,11 +39,11 @@ these libraries.
     - `TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256`
     - `TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384`
     - `TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256`
-- Supported key exchange groups (in descending order of preference):
+- Supported key exchange algorithms (in descending order of preference):
   - `x25519`
   - `secp384r1`
   - `secp256r1`
-- Supported signature hash algorithms (in descending order of preference):
+- Supported signature algorithms (in descending order of preference):
   - `ecdsa_secp384r1_sha384`
   - `ecdsa_secp256r1_sha256`
   - `ed25519` (v1.3 only)
@@ -42,32 +53,29 @@ these libraries.
   - `rsa_pkcs1_sha512`
   - `rsa_pkcs1_sha384`
   - `rsa_pkcs1_sha256`
-- Client and server name validation through SAN and Common Name.
-- Self-signed certificates (with a special configuration)
+- Client and server name validation through the Common Name or Subject Alternative Name (SAN) extension.
+- Self-signed certificates (with a special configuration).
 
 ## Configuration
 
-TLS configuration is done through the `TlsClientConfig` and `TlsServerConfig` structures. They are both very similar.
-The fields are the following:
+TLS configuration is configured using the `TlsClientConfig` or `TlsServerConfig` structures. They are very similar and contain the following fields:
 
-- `name`: name requested. The client will advertise this name through
-  a Server Name Indication (SNI) extension in the `Client Hello`. Both
-  the client and the server will verify that the presented certificate
-  is valid for this DNS name. See the following section for more details
-  about name validation. DNS name validation is not performed when
-  `CertificateMode` is `SelfSignedCertificate`.
-- `peer_cert_path`: path to the unencrypted PEM file containing the trusted
-  root certificate(s) or the peer self-signed certificate.
-- `local_cert_path`: path to the unencrypted PEM file containing the certificate
-  or the chain of certificates to present to the peer.
-- `private_key_path`: path to the unencrypted PEM file containing the private
-  key of the local certificate.
-- `password`: password used to decrypt the private key file. Leave empty if the file
-  is not encrypted. See the next section for more details.
-- `min_tls_version`: minimum TLS version to support. Setting this to `Tls1_3`
-  will force TLSv1.3.
-- `certificate_mode`: mode of verification of the presented certificate. See
-  the next section for more details.
+- `name`:
+  * The client and the server both verify that the certificate presented by the peer is valid for this name. Check out the next section the gory details on
+  name validation.
+  * The client will advertise this name through a Server Name Indication (SNI) extension in the `Client Hello`.
+- `peer_cert_path`:
+  * Path to the unencrypted PEM file containing the trusted root certificate(s) or the peer self-signed certificate.
+- `local_cert_path`:
+  * Path to the unencrypted PEM file containing the certificate(s) to present to the peer.
+- `private_key_path`:
+  * Path to the PEM file containing the encrypted or plaintext private key corresponding to the public key in the presented certificate.
+- `password`:
+  * Password used to decrypt the private key file. This field should be left empty if the file is not encrypted. See the next section for more details.
+- `min_tls_version`:
+  * Minimum TLS version to support. Setting this to `Tls1_3` will force the usage of TLSv1.3.
+- `certificate_mode`:
+  * Mode of used to verify the peer certificate.
 
 ### Name validation
 
@@ -150,6 +158,8 @@ is limited, a **thorough manual inspection of the configured self-signed certifi
 required beforehand**. Also note that the DNS name is **not** verified with this mode,
 as this check should be performed manually before adding the self-signed certificate
 to the configuration.
+
+DNS name validation is not performed when `CertificateMode` is `SelfSignedCertificate`.
 
 ### Generating certificates
 
