@@ -117,6 +117,18 @@ Timestamp now()
     return Timestamp::synchronized_timestamp(std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count());
 }
 
+dnp3::OutstationConfig get_outstation_config()
+{
+    dnp3::OutstationConfig config(1024, 1);
+    config.decode_level.application = dnp3::AppDecodeLevel::object_values;
+    return config;
+}
+
+dnp3::EventBufferConfig get_event_buffer_config()
+{    
+    return EventBufferConfig(10, 10, 10, 10, 10, 10, 10, 10);
+}
+
 int main()
 {
     Logging::configure(LoggingConfig(), logger(
@@ -129,10 +141,13 @@ int main()
     
     TcpServer server(runtime, LinkErrorMode::close, "127.0.0.1:20000");
 
+    dnp3::OutstationConfig config(1024, 1);
+    config.decode_level.application = dnp3::AppDecodeLevel::object_values;
+
     auto filter = AddressFilter::any();
     auto outstation = server.add_outstation(
-        OutstationConfig(1024, 1),
-        EventBufferConfig(10, 10, 10, 10, 10, 10, 10, 10),
+        get_outstation_config(),
+        get_event_buffer_config(),
         std::make_unique<MyOutstationApplication>(),
         std::make_unique<MyOutstationInformation>(),
         std::make_unique<MyControlHandler>(),
@@ -172,22 +187,61 @@ int main()
         else if (cmd == "bi") {
             auto modify = database_transaction([&](Database& db) {
                 state.binary = !state.binary;
-                db.update_binary(Binary(3, state.binary, online(), now()), UpdateOptions());
+                db.update_binary(Binary(7, state.binary, online(), now()), UpdateOptions());
             });
             outstation.transaction(modify);
-        }
-        else if (cmd == "bi") {
-            auto modify = database_transaction([&](Database& db) {
-                state.binary = !state.binary;
-                db.update_binary(Binary(3, state.binary, online(), now()), UpdateOptions());
-            });
-            outstation.transaction(modify);
-        }
+        }       
         else if (cmd == "dbbi") {
             auto modify = database_transaction([&](Database& db) {
                 state.double_bit_binary = !state.double_bit_binary;
                 auto value = state.double_bit_binary ? DoubleBit::determined_on : DoubleBit::determined_off;
                 db.update_double_bit_binary(DoubleBitBinary(3, value, online(), now()), UpdateOptions());
+            });
+            outstation.transaction(modify);
+        }
+        else if (cmd == "bos") {
+            auto modify = database_transaction([&](Database& db) {
+                state.binary_output_status = !state.binary_output_status;
+                db.update_binary_output_status(BinaryOutputStatus(7, state.binary_output_status, online(), now()), UpdateOptions());
+            });
+            outstation.transaction(modify);
+        }
+        else if (cmd == "co") {
+            auto modify = database_transaction([&](Database& db) {
+                state.counter += 1;
+                db.update_counter(Counter(7, state.counter, online(), now()), UpdateOptions());
+            });
+            outstation.transaction(modify);
+        }
+        else if (cmd == "fco") {
+            auto modify = database_transaction([&](Database& db) {
+                state.frozen_counter += 1;
+                db.update_frozen_counter(FrozenCounter(7, state.frozen_counter, online(), now()), UpdateOptions());
+            });
+            outstation.transaction(modify);
+        }
+        else if (cmd == "ai") {
+            auto modify = database_transaction([&](Database& db) {
+                state.analog += 1;
+                db.update_analog(Analog(7, state.analog, online(), now()), UpdateOptions());
+            });
+            outstation.transaction(modify);
+        }
+        else if (cmd == "aos") {
+            auto modify = database_transaction([&](Database& db) {
+                state.analog_output_status += 1;
+                db.update_analog_output_status(AnalogOutputStatus(7, state.analog_output_status, online(), now()), UpdateOptions());
+            });
+            outstation.transaction(modify);
+        }
+        else if (cmd == "os") {
+            std::vector<uint8_t> values;
+            for(auto x : std::string("hello world!")) {
+                values.push_back(x);
+            }
+
+            auto modify = database_transaction([&](Database& db) {
+                db.update_octet_string(7, values, UpdateOptions());
             });
             outstation.transaction(modify);
         }
