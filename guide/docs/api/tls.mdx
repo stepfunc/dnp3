@@ -8,9 +8,13 @@ slug: /api/tls
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Masters and outstations may optionally use TLS which protects DNP3 communication by adding authentication and privacy. The library internally uses
+Masters and outstations may optionally use TLS which protects DNP3 communication by adding encryption and authentication. The DNP3 library uses
 [rustls](https://github.com/rustls/rustls), a modern TLS library written in safe Rust. It does **not** depend on OpenSSL or other system libraries, but will
-interoperate seamlessly with other TLS implementations.
+interoperate seamlessly with other implementations.
+
+Rustls has been [reviewed](https://github.com/rustls/rustls/raw/main/audit/TLS-01-report.pdf) by a third party and is production ready. It
+[outperforms](https://jbp.io/2019/07/01/rustls-vs-openssl-performance.html) OpenSSL in almost every aspect and has the backing of the
+[ISRG](https://www.abetterinternet.org/post/preparing-rustls-for-wider-adoption/).
 
 # Secure Authentication?
 
@@ -79,7 +83,7 @@ TLS configuration is configured using the `TlsClientConfig` or `TlsServerConfig`
 
 ### Name Validation
 
-The following information describes how name validation is performed when `certificate_mode` is `AuthorityBased`. When the mode
+This section describes how name validation is performed when `certificate_mode` is `AuthorityBased`. When the mode
 is `SelfSigned`, name validation is performed indirectly since a byte-for-byte comparison occurs of the entire certificate.
 
 A valid name has the same requirements as a DNS name. This is defined in
@@ -96,7 +100,7 @@ definition of a valid name includes:
 - Maximum of 63 characters per label
 - Maximum of 253 characters total
 
-If the SAN extension is present, the name is name validated against it. The SAN may contain multiple names and each name can contain a wildcard `*` character.
+If the SAN extension is present, the name is validated against it. The SAN may contain multiple names and each name can contain a wildcard `*` character.
 The comparison is case-insensitive.
 
 If the SAN is absent, then the `Common Name` from the certificate's `Subject` is extracted and compared. The Common Name cannot contain a wildcard character
@@ -107,7 +111,7 @@ New certificates should always include the SAN extension. Performing name verifi
 is still secure, but it is deprecated for new use cases.
 :::
 
-### Private key encryption
+### Private Key Encryption
 
 Unencrypted private keys may be stored in PKCS#1 or PKCS#8 formats:
 
@@ -136,11 +140,11 @@ The following algorithms are supported when keys are encrypted in PKCS#8v2 forma
 
 SHA-1 based key derivation and DES/3DES symmetric encryption are **not** supported because they are insecure.
 
-[OpenSSL `pkcs8`](https://www.openssl.org/docs/man1.1.1/man1/openssl-pkcs8.html) tool can help you
-encrypting or converting private keys.
+The OpenSSL [pkcs8 command](https://www.openssl.org/docs/man1.1.1/man1/openssl-pkcs8.html) can be used to
+encrypt keys or convert private key formats.
 
 :::tip
-Encrypting private keys when using TLS rarely addresses a meaningful threat model. Encrypting a private key and storing the password in a configuration file
+Encrypting private keys for use with TLS rarely addresses a meaningful threat model. Encrypting a private key and storing the password in a configuration file
 is equivalent to locking your doors and leaving the key under the doormat.
 :::
 
@@ -151,20 +155,19 @@ is validated.
 
 #### Authority-based
 
-The default `AuthorityBased` uses the normal `rustls` verifier to check the presented chain of certificates
+The default `AuthorityBased` mode uses the default `rustls` implementation to check the presented chain of certificates
 and verify that the root certificate of the chain is one of those provided in the `peer_cert_path` file.
-Most, if not all applications, in the power industry, will have a **single** root certificate.
+Most, if not all applications, in the power industry, will have a single root certificate.
 
-This mode also validates that all critical extensions are handled, validity of the `NotBefore` and `NotAfter` fields,
-the DNS name, and other details. It will **not** accept self-signed certificate.
+This mode validates the chain and the end-entity certificate in accordance with [RFC 5280](https://datatracker.ietf.org/doc/html/rfc5280#section-6).
 
 #### Self-Signed
 
 The `SelfSigned` mode validates that:
 
-1. Only a single certificate is presented
-2. It is a byte-for-byte match of the one specified in `peer_cert_path`
-3. The `NotBefore` and `NotAfter` time fields are verified against the system clock.
+* Only a single certificate is presented
+* It is a byte-for-byte match of the one specified in `peer_cert_path`
+* `NotBefore` and `NotAfter` time fields are valid for the current time
 
 :::note
 Name validation is performed *indirectly* in self-signed mode, since the byte-for-byte comparison also compares the internal name fields.
@@ -176,13 +179,34 @@ The following OpenSSL commands are provided for testing purposes only. Real syst
 
 #### Full CA chain
 
-- Generate the root CA certificate: `openssl req -x509 -newkey rsa:4096 -keyout ./ca_key.pem -out ./ca_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -nodes -days 3650`
-- Generate the master CSR: `openssl req -new -newkey rsa:4096 -keyout ./master_key.pem -out ./master_csr.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365`
-- Generate the master certificate: `openssl x509 -req -days 365 -in ./master_csr.pem -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem -CAkey ./ca_key.pem -set_serial 1 -out ./master_cert.pem -sha256`
-- Generate the outstation CSR: `openssl req -new -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation_csr.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365`
-- Generate the outstation certificate: `openssl x509 -req -days 365 -in ./outstation_csr.pem -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem -CAkey ./ca_key.pem -set_serial 2 -out ./outstation_cert.pem -sha256`
+- Generate the root CA certificate:
+```
+openssl req -x509 -newkey rsa:4096 -keyout ./ca_key.pem -out ./ca_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -nodes -days 3650
+```
+- Generate the master CSR:
+```
+openssl req -new -newkey rsa:4096 -keyout ./master_key.pem -out ./master_csr.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
+```
+- Generate the master certificate:
+```
+openssl x509 -req -days 365 -in ./master_csr.pem -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem -CAkey ./ca_key.pem -set_serial 1 -out ./master_cert.pem -sha256
+```
+- Generate the outstation CSR:
+```
+openssl req -new -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation_csr.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
+```
+- Generate the outstation certificate:
+```
+openssl x509 -req -days 365 -in ./outstation_csr.pem -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem -CAkey ./ca_key.pem -set_serial 2 -out ./outstation_cert.pem -sha256
+```
 
 #### Self-signed certificate
 
-- Generate the master certificate: `openssl req -x509 -newkey rsa:4096 -keyout ./master_key.pem -out ./master_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365`
-- Generate the outstation certificate: `openssl req -x509 -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation/entity2_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365`
+- Generate the master certificate:
+```
+openssl req -x509 -newkey rsa:4096 -keyout ./master_key.pem -out ./master_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
+```
+- Generate the outstation certificate:
+```
+openssl req -x509 -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation/entity2_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
+```
