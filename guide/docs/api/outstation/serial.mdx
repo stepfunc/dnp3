@@ -8,10 +8,6 @@ slug: /api/outstation/serial_outstation
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-:::warning
-We currently only provide serial port support on Linux. We are waiting for Windows support to stabilize in a downstream dependency.
-:::
-
 Use the `Outstation::createSerialSession` method to create an outstation bound to a serial port. In addition to the common components, this method requires
 the following serial port parameters:
 
@@ -28,4 +24,3 @@ The method will then either open the port or fail if the port doesn't exist or i
 :::note
 The `LinkErrorMode` is internally set to `Discard` for serial communication channels since serial ports do not provide data integrity.
 :::
-

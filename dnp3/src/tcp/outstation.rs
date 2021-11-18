@@ -2,14 +2,15 @@ use tracing::Instrument;
 
 use crate::app::{Listener, Shutdown};
 use crate::link::LinkErrorMode;
+use crate::outstation::adapter::{NewSession, OutstationTaskAdapter};
 use crate::outstation::database::EventBufferConfig;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::OutstationHandle;
 use crate::outstation::*;
+use crate::tcp::tls::TlsServerConfig;
 use crate::tcp::{AddressFilter, FilterError};
 use crate::util::channel::Sender;
-
-use crate::outstation::adapter::{NewSession, OutstationTaskAdapter};
+use crate::util::phys::PhysLayer;
 
 struct OutstationInfo {
     filter: AddressFilter,
@@ -25,11 +26,26 @@ pub struct TcpServer {
     connection_id: u64,
     address: std::net::SocketAddr,
     outstations: Vec<OutstationInfo>,
+    connection_handler: TcpServerConnectionHandler,
 }
 
 /// Handle to a running server. Dropping the handle, shuts down the server.
 pub struct ServerHandle {
     _tx: crate::tokio::sync::oneshot::Sender<()>,
+}
+
+enum TcpServerConnectionHandler {
+    Tcp,
+    Tls(TlsServerConfig),
+}
+
+impl TcpServerConnectionHandler {
+    async fn handle(&mut self, socket: crate::tokio::net::TcpStream) -> Result<PhysLayer, String> {
+        match self {
+            Self::Tcp => Ok(PhysLayer::Tcp(socket)),
+            Self::Tls(config) => config.handle_connection(socket).await,
+        }
+    }
 }
 
 impl TcpServer {
@@ -41,6 +57,22 @@ impl TcpServer {
             connection_id: 0,
             address,
             outstations: Vec::new(),
+            connection_handler: TcpServerConnectionHandler::Tcp,
+        }
+    }
+
+    /// create a TLS server builder object that will eventually be bound to the specified address
+    pub fn new_tls_server(
+        link_error_mode: LinkErrorMode,
+        address: std::net::SocketAddr,
+        tls_config: TlsServerConfig,
+    ) -> Self {
+        Self {
+            link_error_mode,
+            connection_id: 0,
+            address,
+            outstations: Vec::new(),
+            connection_handler: TcpServerConnectionHandler::Tls(tls_config),
         }
     }
 
@@ -226,15 +258,14 @@ impl TcpServer {
             None => {
                 tracing::warn!("no matching outstation for: {}", addr)
             }
-            Some(x) => {
-                let _ = x
-                    .sender
-                    .send(NewSession::new(
-                        id,
-                        crate::util::phys::PhysLayer::Tcp(stream),
-                    ))
-                    .await;
-            }
+            Some(x) => match self.connection_handler.handle(stream).await {
+                Err(err) => {
+                    tracing::warn!("error from {}: {}", addr, err);
+                }
+                Ok(phys) => {
+                    let _ = x.sender.send(NewSession::new(id, phys)).await;
+                }
+            },
         }
     }
 }

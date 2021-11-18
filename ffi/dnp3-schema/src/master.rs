@@ -13,6 +13,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let master_channel_class = lib.declare_class("master_channel")?;
 
+    let tls_client_config = define_tls_client_config(lib, shared)?;
+
     let connect_strategy = define_connect_strategy(lib)?;
 
     let nothing = lib
@@ -45,12 +47,12 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .param(
             "connect_strategy",
-            connect_strategy,
+            connect_strategy.clone(),
             "Controls the timing of (re)connection attempts",
         )?
         .param(
             "listener",
-            tcp_client_state_listener,
+            tcp_client_state_listener.clone(),
             "TCP connection listener used to receive updates on the status of the connection",
         )?
         .returns(
@@ -64,7 +66,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let master_channel_create_serial_fn = lib
         .define_function("master_channel_create_serial")?
         .param("runtime",shared.runtime_class.clone(), "Runtime to use to drive asynchronous operations of the master")?
-        .param("config",master_channel_config, "Generic configuration for the channel")?
+        .param("config",master_channel_config.clone(), "Generic configuration for the channel")?
         .param("path", StringType, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
         .param("serial_params",shared.serial_port_settings.clone(), "Serial port settings")?
         .param("open_retry_delay", DurationType::Milliseconds, "delay between attempts to open the serial port")?
@@ -81,6 +83,51 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         master_channel_class.clone(),
         "Shutdown a {class:master_channel} and release all resources",
     )?;
+
+    let master_channel_create_tls_fn = lib
+        .define_function("master_channel_create_tls")?
+        .param(
+            "runtime",
+            shared.runtime_class.clone(),
+            "Runtime to use to drive asynchronous operations of the master",
+        )?
+        .param(
+            "link_error_mode",
+            shared.link_error_mode.clone(),
+            "Controls how link errors are handled with respect to the TCP session",
+        )?
+        .param(
+            "config",
+            master_channel_config,
+            "Generic configuration for the channel",
+        )?
+        .param(
+            "endpoints",
+            endpoint_list.declaration(),
+            "List of IP endpoints.",
+        )?
+        .param(
+            "tls_config",
+            tls_client_config,
+            "TLS client configuration",
+        )?
+        .param(
+            "connect_strategy",
+            connect_strategy,
+            "Controls the timing of (re)connection attempts",
+        )?
+        .param(
+            "listener",
+            tcp_client_state_listener,
+            "TCP connection listener used to receive updates on the status of the connection",
+        )?
+        .returns(
+            master_channel_class.clone(),
+            "Handle to the master created, {null} if an error occurred",
+        )?
+        .fails_with(shared.error_type.clone())?
+        .doc("Create a master channel that connects to the specified TCP endpoint(s) and establish a TLS session with the remote.")?
+        .build_static("create_tls_channel")?;
 
     let enable_method = lib
         .define_method("enable", master_channel_class.clone())?
@@ -276,8 +323,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     lib.define_class(&master_channel_class)?
+
         .destructor(channel_destructor)?
         .static_method(master_channel_create_tcp_fn)?
+        .static_method(master_channel_create_tls_fn)?
         .static_method(master_channel_create_serial_fn)?
         .method(enable_method)?
         .method(disable_method)?
@@ -342,6 +391,53 @@ fn define_connect_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgSt
         .build()?;
 
     Ok(strategy)
+}
+
+fn define_tls_client_config(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> BackTraced<FunctionArgStructHandle> {
+    let min_tls_version = Name::create("min_tls_version")?;
+    let certificate_mode = Name::create("certificate_mode")?;
+
+    let tls_client_config = lib.declare_function_arg_struct("tls_client_config")?;
+    let tls_client_config = lib.define_function_argument_struct(tls_client_config)?
+        .add("dns_name", StringType, "Expected name to validate in the presented certificate (only in {enum:certificate_mode.authority_based} mode)")?
+        .add(
+            "peer_cert_path",
+            StringType,
+            "Path to the PEM-encoded certificate of the peer",
+        )?
+        .add(
+            "local_cert_path",
+            StringType,
+            "Path to the PEM-encoded local certificate",
+        )?
+        .add(
+            "private_key_path",
+            StringType,
+            "Path to the the PEM-encoded private key",
+        )?
+        .add(
+            "password",
+            StringType,
+            doc("Optional password if the private key file is encrypted").details("Only PKCS#8 encrypted files are supported.").details("Pass empty string if the file is not encrypted.")
+        )?
+        .add(
+            min_tls_version.clone(),
+             shared.min_tls_version.clone(),
+            "Minimum TLS version allowed",
+        )?
+        .add(certificate_mode.clone(), shared.certificate_mode.clone(), "Certificate validation mode")?
+        .doc("TLS client configuration")?
+        .end_fields()?
+        .begin_initializer("init", InitializerType::Normal, "construct the configuration with defaults")?
+        .default_variant(&min_tls_version, "v12")?
+        .default_variant(&certificate_mode, "authority_based")?
+        .end_initializer()?
+        .build()?;
+
+    Ok(tls_client_config)
 }
 
 fn define_association_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {

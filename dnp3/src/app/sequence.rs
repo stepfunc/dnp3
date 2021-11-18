@@ -1,5 +1,5 @@
 /// Application-layer sequence number
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Default)]
 pub struct Sequence {
     value: u8,
 }
@@ -34,12 +34,6 @@ impl Sequence {
         let value = self.value;
         self.value = Self::calc_next(value);
         Self { value }
-    }
-}
-
-impl Default for Sequence {
-    fn default() -> Self {
-        Self { value: 0 }
     }
 }
 

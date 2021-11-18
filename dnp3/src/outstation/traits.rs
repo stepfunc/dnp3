@@ -8,7 +8,7 @@ use crate::app::{control::*, Timestamp};
 use crate::outstation::database::Database;
 
 /// Application-controlled IIN bits
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Default)]
 pub struct ApplicationIin {
     /// IIN1.4: Time synchronization is required
     pub need_time: bool,
@@ -18,17 +18,6 @@ pub struct ApplicationIin {
     pub device_trouble: bool,
     /// IIN2.5 Configuration corrupt
     pub config_corrupt: bool,
-}
-
-impl Default for ApplicationIin {
-    fn default() -> Self {
-        Self {
-            need_time: false,
-            local_control: false,
-            device_trouble: false,
-            config_corrupt: false,
-        }
-    }
 }
 
 /// Enumeration returned for cold/warm restart

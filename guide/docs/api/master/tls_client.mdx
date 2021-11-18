@@ -1,0 +1,123 @@
+---
+id: tls_client
+title: TLS Client
+sidebar_label: TLS Client
+slug: /api/master/tls_client
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Creating a TLS client is exactly the same process as a [TCP client](./tcp_client.mdx),
+except that an extra `TlsClientConfig` is required. For more details about TLS support and the configuration options,
+check the [TLS general information](../tls.mdx) page.
+
+## Examples
+
+### Certificate chain configuration
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master_tls_client.rs:tls_ca_chain_config}}
+let tls_config = ca_chain_tls_config;
+
+{{#include ../dnp3/examples/master_tls_client.rs:create_master_channel}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_tls_example.c:channel_decl}}
+{{#include ../ffi/bindings/c/master_tls_example.c:error_decl}}
+
+{{#include ../ffi/bindings/c/master_tls_example.c:tls_ca_chain_config}}
+dnp3_tls_server_config_t tls_config = ca_chain_tls_config;
+{{#include ../ffi/bindings/c/master_tls_example.c:create_master_channel}}
+// check error
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:tls_ca_chain_config}}
+TlsServerConfig tlsConfig = caChainTlsConfig;
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:create_master_channel}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master_tls/Program.cs:tls_ca_chain_config}}
+var tlsConfig = caChainTlsConfig;
+{{#include ../ffi/bindings/dotnet/examples/master_tls/Program.cs:create_master_channel}}
+```
+
+</TabItem>
+</Tabs>
+
+### Self-signed certificate configuration
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master_tls_client.rs:tls_self_signed_config}}
+let tls_config = self_signed_tls_config;
+
+{{#include ../dnp3/examples/master_tls_client.rs:create_master_channel}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_tls_example.c:channel_decl}}
+{{#include ../ffi/bindings/c/master_tls_example.c:error_decl}}
+
+{{#include ../ffi/bindings/c/master_tls_example.c:tls_self_signed_config}}
+dnp3_tls_server_config_t tls_config = self_signed_tls_config;
+{{#include ../ffi/bindings/c/master_tls_example.c:create_master_channel}}
+// check error
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:tls_self_signed_config}}
+TlsServerConfig tlsConfig = selfSignedTlsConfig;
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:create_master_channel}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master_tls/Program.cs:tls_self_signed_config}}
+var tlsConfig = selfSignedTlsConfig;
+{{#include ../ffi/bindings/dotnet/examples/master_tls/Program.cs:create_master_channel}}
+```
+
+</TabItem>
+</Tabs>

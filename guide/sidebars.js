@@ -21,6 +21,7 @@ module.exports = {
     API: [
         'api/logging',
         'api/runtime',
+        'api/tls',
         {
             Outstation: [
                 'api/outstation/configuration',
@@ -32,6 +33,7 @@ module.exports = {
                     ],
                     Transports: [
                         'api/outstation/tcp_server',
+                        'api/outstation/tls_server',
                         'api/outstation/serial_outstation',
                     ],
                     Running: [
@@ -48,6 +50,7 @@ module.exports = {
                     Channels: [
                         'api/master/channel_config',
                         'api/master/tcp_client',
+                        'api/master/tls_client',
                         'api/master/serial_master',
                     ]
                 },
