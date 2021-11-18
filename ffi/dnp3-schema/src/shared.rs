@@ -281,20 +281,27 @@ fn define_link_error_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, 
 
 fn define_min_tls_version(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
     lib.define_native_enum("MinTlsVersion")?
-        .push("Tls1_2", "TLS 1.2")?
-        .push("Tls1_3", "TLS 1.3")?
+        .push("V1_2", "TLS 1.2")?
+        .push("V1_3", "TLS 1.3")?
         .doc("Minimum TLS version to allow")?
         .build()
 }
 
 fn define_certificate_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
     lib.define_native_enum("CertificateMode")?
-        .push("TrustChain", "TrustChain")?
-        .push(
-            "SelfSignedCertificate",
-            "Single pre-shared self-sign certificate compared byte-for-byte",
+        .push("AuthorityBased",
+              doc("Validates the peer certificate against one or more configured trust anchors")
+                  .details("This mode uses the default certificate verifier in `rustls` to ensure that the chain of certificates presented by the peer is valid against one of the configured trust anchors.")
+                  .details("The name verification is relaxed to allow for certificates that do not contain the SAN extension. In these cases the name is verified using the Common Name instead.")
         )?
-        .doc("Certificate validation mode")?
+        .push(
+            "SelfSigned",
+            doc("Validates that the peer presents a single certificate which is a byte-for-byte match against the configured peer certificate")
+                .details("The certificate is parsed only to ensure that the `NotBefore` and `NotAfter` are valid for the current system time.")
+        )?
+        .doc(
+            doc("Determines how the certificate(s) presented by the peer are validated")
+                .details("This validation always occurs **after** the handshake signature has been verified."))?
         .build()
 }
 

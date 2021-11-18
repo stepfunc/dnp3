@@ -106,7 +106,7 @@ impl TlsClientConfig {
             })?;
 
         let config = match certificate_mode {
-            CertificateMode::TrustChain => {
+            CertificateMode::AuthorityBased => {
                 // Build trust roots
                 let mut root = Vec::with_capacity(peer_certs.len());
                 for cert in &peer_certs {
@@ -126,7 +126,7 @@ impl TlsClientConfig {
                     )))
                     .with_single_cert(local_certs, private_key)
             }
-            CertificateMode::SelfSignedCertificate => {
+            CertificateMode::SelfSigned => {
                 // Set the custom certificate verifier
                 if let Some(peer_cert) = peer_certs.pop() {
                     if !peer_certs.is_empty() {

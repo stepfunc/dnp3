@@ -32,7 +32,7 @@ impl TlsServerConfig {
         let private_key = load_private_key(private_key_path, password)?;
 
         let verifier = match certificate_mode {
-            CertificateMode::TrustChain => {
+            CertificateMode::AuthorityBased => {
                 // Build root certificate store
                 let mut roots = rustls::RootCertStore::empty();
                 for cert in &peer_certs {
@@ -49,7 +49,7 @@ impl TlsServerConfig {
 
                 CaChainClientCertVerifier::new(roots, name.to_string())
             }
-            CertificateMode::SelfSignedCertificate => {
+            CertificateMode::SelfSigned => {
                 if let Some(peer_cert) = peer_certs.pop() {
                     if !peer_certs.is_empty() {
                         return Err(TlsError::InvalidPeerCertificate(io::Error::new(

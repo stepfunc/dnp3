@@ -64,8 +64,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &Path::new("./certs/self_signed/entity1_cert.pem"),
         &Path::new("./certs/self_signed/entity1_key.pem"),
         None, // no password
-        MinTlsVersion::Tls1_2,
-        CertificateMode::SelfSignedCertificate,
+        MinTlsVersion::V1_2,
+        CertificateMode::SelfSigned,
     )?;
     // ANCHOR_END: tls_self_signed_config
 
@@ -77,8 +77,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &Path::new("./certs/ca_chain/entity1_cert.pem"),
         &Path::new("./certs/ca_chain/entity1_key.pem"),
         None, // no password
-        MinTlsVersion::Tls1_2,
-        CertificateMode::TrustChain,
+        MinTlsVersion::V1_2,
+        CertificateMode::AuthorityBased,
     )?;
     // ANCHOR_END: tls_ca_chain_config
 

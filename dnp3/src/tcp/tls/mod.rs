@@ -9,13 +9,27 @@ pub use master::*;
 pub use outstation::*;
 use tokio_rustls::{rustls, webpki};
 
-/// Certificate validation mode
+/// Determines how the certificate(s) presented by the peer are validated
+///
+/// This validation always occurs **after** the handshake signature has been
+/// verified.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum CertificateMode {
-    /// Single or chain of certificates validated against trust anchors
-    TrustChain,
-    /// Single pre-shared self-sign certificate compared byte-for-byte
-    SelfSignedCertificate,
+    /// Validates the peer certificate against one or more configured trust anchors
+    ///
+    /// This mode uses the default certificate verifier in `rustls` to ensure that
+    /// the chain of certificates presented by the peer is valid against one of
+    /// the configured trust anchors.
+    ///
+    /// The name verification is relaxed to allow for certificates that do not contain
+    /// the SAN extension. In these cases the name is verified using the Common Name instead.
+    AuthorityBased,
+    /// Validates that the peer presents a single certificate which is a byte-for-byte match
+    /// against the configured peer certificate.
+    ///
+    /// The certificate is parsed only to ensure that the `NotBefore` and `NotAfter`
+    /// are valid for the current system time.
+    SelfSigned,
 }
 
 /// TLS-related errors
@@ -55,9 +69,9 @@ impl std::error::Error for TlsError {}
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum MinTlsVersion {
     /// TLS 1.2
-    Tls1_2,
+    V1_2,
     /// TLS 1.3
-    Tls1_3,
+    V1_3,
 }
 
 impl MinTlsVersion {
@@ -68,8 +82,8 @@ impl MinTlsVersion {
             &[&rustls::version::TLS13];
 
         match self {
-            Self::Tls1_2 => MIN_TLS12_VERSIONS,
-            Self::Tls1_3 => MIN_TLS13_VERSIONS,
+            Self::V1_2 => MIN_TLS12_VERSIONS,
+            Self::V1_3 => MIN_TLS13_VERSIONS,
         }
     }
 }

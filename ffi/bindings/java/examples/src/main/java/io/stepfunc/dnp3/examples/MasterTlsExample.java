@@ -64,7 +64,7 @@ public class MasterTlsExample {
             "./certs/self_signed/entity1_key.pem",
             "" // no password
             );
-    selfSignedTlsConfig.certificateMode = CertificateMode.SELF_SIGNED_CERTIFICATE;
+    selfSignedTlsConfig.certificateMode = CertificateMode.SELF_SIGNED;
     // ANCHOR_END: tls_self_signed_config
 
     // ANCHOR: tls_ca_chain_config
