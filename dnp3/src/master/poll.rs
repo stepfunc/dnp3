@@ -5,7 +5,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::Shutdown;
 use crate::master::association::Next;
 use crate::master::error::PollError;
-use crate::master::handle::{AssociationHandle, Promise};
+use crate::master::handler::{AssociationHandle, Promise};
 use crate::master::request::ReadRequest;
 use crate::tokio::time::Instant;
 use crate::util::cursor::WriteError;

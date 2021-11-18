@@ -3,7 +3,7 @@ use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
 use crate::master::error::PollError;
 use crate::master::error::{AssociationError, TaskError};
-use crate::master::handle::Promise;
+use crate::master::handler::Promise;
 use crate::master::poll::PollMsg;
 use crate::master::tasks::Task;
 use crate::master::{AssociationConfig, AssociationHandler, ReadHandler};

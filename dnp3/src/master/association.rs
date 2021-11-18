@@ -11,7 +11,7 @@ use crate::app::{Iin, ResponseHeader};
 use crate::link::EndpointAddress;
 use crate::master::error::{AssociationError, TaskError, TimeSyncError};
 use crate::master::extract::extract_measurements;
-use crate::master::handle::{AssociationHandler, Promise};
+use crate::master::handler::{AssociationHandler, Promise};
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollHandle, PollMap, PollMsg};
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
