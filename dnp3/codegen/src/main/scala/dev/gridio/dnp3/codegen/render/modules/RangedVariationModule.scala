@@ -126,10 +126,12 @@ object RangedVariationModule extends Module {
 
     def getExtractMatcher(v: Variation): Iterator[String] = {
 
+      val isEvent = v.parent.groupType.isEvent;
+
       def simpleExtract(v: Variation): Iterator[String] = {
         bracket(s"RangedVariation::${v.name}(seq) =>") {
           parenSemi(s"handler.handle_${getMeasName(v)}") {
-            "HeaderInfo::new(self.variation(), qualifier),".eol ++
+            s"HeaderInfo::new(self.variation(), qualifier, ${isEvent}, ${v.hasFlags}),".eol ++
             "&mut seq.iter().map(|(v,i)| (v.into(), i))".eol
           } ++ "true".eol
         }
@@ -156,7 +158,7 @@ object RangedVariationModule extends Module {
           } ++
           bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
             parenSemi("handler.handle_octet_string") {
-              "HeaderInfo::new(self.variation(), qualifier),".eol ++
+              s"HeaderInfo::new(self.variation(), qualifier, ${isEvent}, ${v.hasFlags}),".eol ++
               "&mut seq.iter()".eol
             } ++ "true".eol
           }

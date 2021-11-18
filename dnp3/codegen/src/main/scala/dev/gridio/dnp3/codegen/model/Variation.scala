@@ -24,6 +24,13 @@ trait Variation {
   def parent: ObjectGroup
 
   def desc: String
+
+  def hasFlags: Boolean = {
+    this match {
+      case fs: FixedSize => fs.hasFlags
+      case _ => false
+    }
+  }
 }
 
 class AnyVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g, v, "Any Variation")
@@ -73,6 +80,10 @@ class FixedSize(g: ObjectGroup, v: Byte, description: String)(fs: FixedSizeField
 
   def hasRelativeTime : Boolean = {
     fields.exists(f => f.isRelativeTime)
+  }
+
+  override def hasFlags: Boolean = {
+    fields.exists(f => f.isFlags)
   }
 
   def fields: List[FixedSizeField] = fs.toList
