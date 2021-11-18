@@ -96,7 +96,7 @@ definition of a valid name includes:
 - Maximum of 63 characters per label
 - Maximum of 253 characters total
 
-If the SAN extension is prent, the name is name validated against it. The SAN may contain multiple names and each name can contain a wildcard `*` character.
+If the SAN extension is present, the name is name validated against it. The SAN may contain multiple names and each name can contain a wildcard `*` character.
 The comparison is case-insensitive.
 
 If the SAN is absent, then the `Common Name` from the certificate's `Subject` is extracted and compared. The Common Name cannot contain a wildcard character
