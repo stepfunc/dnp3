@@ -503,7 +503,7 @@ mod tests {
         }
 
         {
-            let value = Binary::new(false, Flags::ONLINE, Time::not_synchronized(2));
+            let value = Binary::new(false, Flags::ONLINE, Time::unsynchronized(2));
             writer
                 .write(&mut cursor, &value, 07, EventBinaryVariation::Group2Var3)
                 .unwrap();
