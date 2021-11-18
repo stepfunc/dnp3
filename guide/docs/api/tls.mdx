@@ -61,7 +61,7 @@ We recommend using TLS to secure DNP3 and caution the industry to avoid home-gro
 TLS configuration is configured using the `TlsClientConfig` or `TlsServerConfig` structures. They are very similar and contain the following fields:
 
 - `name`:
-  * The client and the server both verify that the certificate presented by the peer is valid for this name. Check out the next section the gory details on
+  * The client and the server both verify that the certificate presented by the peer is valid for this name. Check out the next section for the gory details on
   name validation.
   * The client will advertise this name through a Server Name Indication (SNI) extension in the `Client Hello`.
 - `peer_cert_path`:
