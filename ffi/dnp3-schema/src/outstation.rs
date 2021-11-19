@@ -34,6 +34,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     let types = OutstationTypes::define(lib, shared_def)?;
     let outstation = define_outstation(lib, shared_def, &types)?;
     let address_filter = define_address_filter(lib, shared_def)?;
+    let tls_server_config = define_tls_server_config(lib, shared_def)?;
 
     // Define the TCP server
     let tcp_server = lib.declare_class("tcp_server")?;
@@ -64,6 +65,32 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     let destructor = lib
         .define_destructor(tcp_server.clone(), "Gracefully shutdown all the outstations associated to this server, stops the server and release resources.")?;
 
+    let tcp_server_tls_create = lib
+        .define_function("tcp_server_create_tls")?
+        .param(
+            "runtime",
+            shared_def.runtime_class.clone(),
+            "Runtime to execute the server on",
+        )?
+        .param(
+            "link_error_mode",
+            shared_def.link_error_mode.clone(),
+            "Controls how link errors are handled with respect to the TCP session",
+        )?
+        .param(
+            "address",
+            StringType,
+            "Address to bind the server to e.g. 127.0.0.1:20000",
+        )?
+        .param("tls_config", tls_server_config, "TLS server configuration")?
+        .returns(tcp_server.clone(), "New TCP TLS server instance")?
+        .fails_with(shared_def.error_type.clone())?
+        .doc(
+            doc("Create a new TCP server with TLS configuration.")
+                .details("To start it, use {class:tcp_server.bind()}."),
+        )?
+        .build_static("create_tls_server")?;
+
     let add_outstation = lib.define_method("add_outstation", tcp_server.clone())?
         .param("config",types.outstation_config, "Outstation configuration")?
         .param("event_config", types.event_buffer_config, "Event buffer configuration")?
@@ -91,6 +118,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .method(add_outstation)?
         .method(bind)?
         .custom_destroy("shutdown")?
+        .static_method(tcp_server_tls_create)?
         .doc(doc("TCP server that listens for connections and routes the messages to outstations.")
         .details("To add outstations to it, use {class:tcp_server.add_outstation()}. Once all the outstations are added, the server can be started with {class:tcp_server.bind()}.")
         .details("{class:tcp_server.[destructor]} is used to gracefully shutdown all the outstations and the server."))?
@@ -927,6 +955,53 @@ fn define_function_code(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .build()?;
 
     Ok(function)
+}
+
+fn define_tls_server_config(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> BackTraced<FunctionArgStructHandle> {
+    let min_tls_version = Name::create("min_tls_version")?;
+    let certificate_mode = Name::create("certificate_mode")?;
+
+    let tls_server_config = lib.declare_function_arg_struct("tls_server_config")?;
+    let tls_server_config = lib.define_function_argument_struct(tls_server_config)?
+        .add("dns_name", StringType, "Expected name to validate in the presented certificate (only in {enum:certificate_mode.authority_based} mode)")?
+        .add(
+            "peer_cert_path",
+            StringType,
+            "Path to the PEM-encoded certificate of the peer",
+        )?
+        .add(
+            "local_cert_path",
+            StringType,
+            "Path to the PEM-encoded local certificate",
+        )?
+        .add(
+            "private_key_path",
+            StringType,
+            "Path to the the PEM-encoded private key",
+        )?
+        .add(
+            "password",
+            StringType,
+            doc("Optional password if the private key file is encrypted").details("Only PKCS#8 encrypted files are supported.").details("Pass empty string if the file is not encrypted.")
+        )?
+        .add(
+            min_tls_version.clone(),
+            shared.min_tls_version.clone(),
+            "Minimum TLS version allowed",
+        )?
+        .add(certificate_mode.clone(), shared.certificate_mode.clone(), "Certificate validation mode")?
+        .doc("TLS server configuration")?
+        .end_fields()?
+        .begin_initializer("init", InitializerType::Normal, "construct the configuration with defaults")?
+        .default_variant(&min_tls_version, "v12")?
+        .default_variant(&certificate_mode, "authority_based")?
+        .end_initializer()?
+        .build()?;
+
+    Ok(tls_server_config)
 }
 
 fn define_command_status(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {

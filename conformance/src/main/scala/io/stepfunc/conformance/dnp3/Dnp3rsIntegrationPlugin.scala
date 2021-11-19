@@ -1,4 +1,4 @@
-package io.stepfunc.dnp3_conformance
+package io.stepfunc.conformance.dnp3
 
 import com.automatak.dnp4s.dnp3.app._
 import com.automatak.dnp4s.dnp3.{IntegrationPlugin, PluginReporter}
@@ -770,6 +770,20 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     verifyAllClassEvents(reporter, EventClass.All, points)
   }
 
+  private def eventBufferConfig : EventBufferConfig = {
+    val count = ushort(200)
+    new EventBufferConfig(
+      count,
+      count,
+      count,
+      count,
+      count,
+      count,
+      count,
+      count
+    )
+  }
+
   private def startOutstation(): Unit = {
     // Create manager
     val runtimeConfig = new RuntimeConfig()
@@ -805,7 +819,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     dnp3Config.maxUnsolicitedRetries = config.unsolicitedResponseConfig.maxNumRetries.map(x => uint(x)).getOrElse(UInteger.MAX)
 
     // Create the outstation
-    this.outstation = server.addOutstation(dnp3Config, EventBufferConfig.allTypes(ushort(200)), app, information, controlHandler, listener, AddressFilter.any())
+    this.outstation = server.addOutstation(dnp3Config, eventBufferConfig, app, information, controlHandler, listener, AddressFilter.any())
 
     // Create the database
     this.trackingDatabase = new TrackingDatabase(app, this.outstation, config.testDatabaseConfig)

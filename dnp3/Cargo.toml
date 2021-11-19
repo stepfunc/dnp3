@@ -1,14 +1,18 @@
 [package]
 name = "dnp3"
-version = "0.9.1"
+version = "0.10.0-alpha2"
 authors = ["Adam Crain <adam@stepfunc.io>", "Émile Grégoire <emile@stepfunc.io>"]
 edition = "2018"
 
 [dependencies]
 tracing = "0.1"
 chrono = "0.4"
-tokio-mock = { git = "https://github.com/stepfunc/tokio-mock.git", branch="master" }
-tokio-serial = "5.4.0-beta1"
+pem = "1.0"
+pkcs8 = { version = "0.7", features = ["encryption", "pem", "std"] }
+rasn = { git = "https://github.com/stepfunc/rasn", tag = "0.1.2" }
+tokio-mock = { git = "https://github.com/stepfunc/tokio-mock.git", tag = "0.1.0" }
+tokio-rustls = { version = "0.23", features = ["dangerous_configuration", "tls12"], default-features = false }
+tokio-serial = "5.4"
 xxhash-rust = { version = "0.8.2", features = ["xxh64"] }
 
 [dev-dependencies]

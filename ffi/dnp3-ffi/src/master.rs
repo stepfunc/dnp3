@@ -1,10 +1,12 @@
 use std::ffi::CStr;
+use std::path::Path;
 use std::time::Duration;
 
 use dnp3::app::{ConnectStrategy, Listener, RetryStrategy, Timeout, Timestamp};
 use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::serial::*;
+use dnp3::tcp::tls::*;
 use dnp3::tcp::ClientState;
 
 use crate::ffi;
@@ -35,6 +37,63 @@ pub(crate) unsafe fn master_channel_create_tcp(
         link_error_mode.into(),
         config,
         endpoints.clone(),
+        connect_strategy,
+        Box::new(listener),
+    );
+
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    runtime.inner.spawn(future);
+    let channel = MasterChannel {
+        runtime: runtime.handle(),
+        handle,
+    };
+
+    Ok(Box::into_raw(Box::new(channel)))
+}
+
+pub(crate) unsafe fn master_channel_create_tls(
+    runtime: *mut crate::runtime::Runtime,
+    link_error_mode: ffi::LinkErrorMode,
+    config: ffi::MasterChannelConfig,
+    endpoints: *const crate::EndpointList,
+    tls_config: ffi::TlsClientConfig,
+    connect_strategy: ffi::ConnectStrategy,
+    listener: ffi::ClientStateListener,
+) -> Result<*mut MasterChannel, ffi::ParamError> {
+    let config = convert_config(config)?;
+    let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+
+    let password = tls_config.password().to_string_lossy();
+    let optional_password = match password.as_ref() {
+        "" => None,
+        password => Some(password),
+    };
+
+    let tls_config = TlsClientConfig::new(
+        &tls_config.dns_name().to_string_lossy(),
+        Path::new(tls_config.peer_cert_path().to_string_lossy().as_ref()),
+        Path::new(tls_config.local_cert_path().to_string_lossy().as_ref()),
+        Path::new(tls_config.private_key_path().to_string_lossy().as_ref()),
+        optional_password,
+        tls_config.min_tls_version().into(),
+        tls_config.certificate_mode().into(),
+    )
+    .map_err(|err| {
+        tracing::error!("TLS error: {}", err);
+        err
+    })?;
+
+    let connect_strategy = ConnectStrategy::new(
+        connect_strategy.min_connect_delay(),
+        connect_strategy.max_connect_delay(),
+        connect_strategy.reconnect_delay(),
+    );
+
+    let (future, handle) = dnp3::tcp::tls::create_master_tls_client(
+        link_error_mode.into(),
+        config,
+        endpoints.clone(),
+        tls_config,
         connect_strategy,
         Box::new(listener),
     );
@@ -584,6 +643,36 @@ impl From<PollError> for ffi::ParamError {
         match error {
             PollError::Shutdown => ffi::ParamError::MasterAlreadyShutdown,
             PollError::NoSuchAssociation(_) => ffi::ParamError::AssociationDoesNotExist,
+        }
+    }
+}
+
+impl From<TlsError> for ffi::ParamError {
+    fn from(error: TlsError) -> Self {
+        match error {
+            TlsError::InvalidDnsName => ffi::ParamError::InvalidDnsName,
+            TlsError::InvalidPeerCertificate(_) => ffi::ParamError::InvalidPeerCertificate,
+            TlsError::InvalidLocalCertificate(_) => ffi::ParamError::InvalidLocalCertificate,
+            TlsError::InvalidPrivateKey(_) => ffi::ParamError::InvalidPrivateKey,
+            TlsError::Other(_) => ffi::ParamError::OtherTlsError,
+        }
+    }
+}
+
+impl From<ffi::MinTlsVersion> for MinTlsVersion {
+    fn from(from: ffi::MinTlsVersion) -> Self {
+        match from {
+            ffi::MinTlsVersion::V12 => MinTlsVersion::V12,
+            ffi::MinTlsVersion::V13 => MinTlsVersion::V13,
+        }
+    }
+}
+
+impl From<ffi::CertificateMode> for CertificateMode {
+    fn from(from: ffi::CertificateMode) -> Self {
+        match from {
+            ffi::CertificateMode::AuthorityBased => CertificateMode::AuthorityBased,
+            ffi::CertificateMode::SelfSigned => CertificateMode::SelfSigned,
         }
     }
 }

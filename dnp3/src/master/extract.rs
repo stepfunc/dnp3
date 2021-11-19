@@ -259,7 +259,7 @@ mod test {
             Binary {
                 value: false,
                 flags: Flags::ONLINE,
-                time: Some(Time::NotSynchronized(Timestamp::new(65536))), // 0xFFFE + 2
+                time: Some(Time::unsynchronized(65536)), // 0xFFFE + 2
             },
             0x07,
         );

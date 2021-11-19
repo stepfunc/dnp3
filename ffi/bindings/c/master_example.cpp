@@ -35,7 +35,7 @@ class ReadHandler : public dnp3::ReadHandler {
         while (it.next()) {
             const auto value = it.get();
             std::cout << "BinaryInput(" << value.index << "): value: " << value.value << " flags: " << value.flags << " time: " << value.time.value << std::endl;
-        }    
+        }
     }
     void handle_double_bit_binary(const dnp3::HeaderInfo& info, dnp3::DoubleBitBinaryIterator& it) override {
         while (it.next()) {
@@ -87,7 +87,7 @@ class ReadHandler : public dnp3::ReadHandler {
                 first = false;
             }
             std::cout << "]" << std::endl;
-        }    
+        }
     }
 };
 
@@ -163,7 +163,7 @@ int main()
     dnp3::Logging::configure(dnp3::LoggingConfig(), std::make_unique<Logger>());
 
     auto runtime = dnp3::Runtime(dnp3::RuntimeConfig());
-    
+
     dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
     auto channel = dnp3::MasterChannel::create_tcp_channel(
         runtime,
@@ -187,7 +187,8 @@ int main()
     );
 
     // ANCHOR: add_poll
-    const auto event_poll = channel.add_poll(assoc, dnp3::Request::class_request(false, true, true, true), std::chrono::seconds(10));
+    auto event_scan = dnp3::Request::class_request(false, true, true, true);
+    const auto event_poll = channel.add_poll(assoc, event_scan, std::chrono::seconds(10));
     // ANCHOR_END: add_poll
 
     channel.enable();

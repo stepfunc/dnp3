@@ -1,4 +1,4 @@
-package io.stepfunc.dnp3_conformance
+package io.stepfunc.conformance.dnp3
 
 import io.stepfunc.dnp3._
 import org.joou.UShort
@@ -16,7 +16,7 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
 
   override def endFragment(): Unit = {}
 
-  override def selectG12v1(control: G12v1, index: UShort, database: Database): CommandStatus = {
+  override def selectG12v1(control: Group12Var1, index: UShort, database: Database): CommandStatus = {
     checkBinaryOutputCommand(control, index, operate = false)
   }
 
@@ -36,7 +36,7 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
     checkAnalogOutputCommand(control, index, operate = false, database)
   }
 
-  override def operateG12v1(control: G12v1, index: UShort, opType: OperateType, database: Database): CommandStatus = {
+  override def operateG12v1(control: Group12Var1, index: UShort, opType: OperateType, database: Database): CommandStatus = {
     checkBinaryOutputCommand(control, index, operate = true)
   }
 
@@ -110,7 +110,7 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
     }
   }
 
-  private def checkBinaryOutputCommand(crob: G12v1, index: UShort, operate: Boolean) : CommandStatus = {
+  private def checkBinaryOutputCommand(crob: Group12Var1, index: UShort, operate: Boolean) : CommandStatus = {
     if (binaryOutputsDisabled) return CommandStatus.NOT_SUPPORTED
 
     val result = index.intValue() match {

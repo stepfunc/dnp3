@@ -29,6 +29,8 @@ pub struct SharedDefinitions {
     pub analog_output_status_it: AbstractIteratorHandle,
     pub octet_string: FunctionReturnStructHandle,
     pub octet_string_it: AbstractIteratorHandle,
+    pub min_tls_version: EnumHandle,
+    pub certificate_mode: EnumHandle,
 }
 
 pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
@@ -71,6 +73,14 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
             "Logging can only be configured once",
         )?
         .add_error("point_does_not_exist", "Point does not exist")?
+        .add_error("invalid_peer_certificate", "Invalid peer certificate file")?
+        .add_error(
+            "invalid_local_certificate",
+            "Invalid local certificate file",
+        )?
+        .add_error("invalid_private_key", "Invalid private key file")?
+        .add_error("invalid_dns_name", "Invalid DNS name")?
+        .add_error("other_tls_error", "Other TLS error")?
         .doc("Error type used throughout the library")?
         .build()?;
 
@@ -223,6 +233,8 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_port_settings(lib)?,
         link_error_mode: define_link_error_mode(lib)?,
+        min_tls_version: define_min_tls_version(lib)?,
+        certificate_mode: define_certificate_mode(lib)?,
         control_struct,
         g12v1_struct,
         binary_point,
@@ -368,6 +380,37 @@ fn define_serial_port_settings(lib: &mut LibraryBuilder) -> BackTraced<FunctionA
         .build()?;
 
     Ok(serial_settings)
+}
+
+fn define_min_tls_version(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let handle = lib
+        .define_enum("min_tls_version")?
+        .push("v12", "Allow TLS 1.2 and 1.3")?
+        .push("v13", "Only allow TLS 1.3")?
+        .doc("Minimum TLS version to allow")?
+        .build()?;
+
+    Ok(handle)
+}
+
+fn define_certificate_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let handle = lib.define_enum("certificate_mode")?
+        .push("authority_based",
+              doc("Validates the peer certificate against one or more configured trust anchors")
+                  .details("This mode uses the default certificate verifier in `rustls` to ensure that the chain of certificates presented by the peer is valid against one of the configured trust anchors.")
+                  .details("The name verification is relaxed to allow for certificates that do not contain the SAN extension. In these cases the name is verified using the Common Name instead.")
+        )?
+        .push(
+            "self_signed",
+            doc("Validates that the peer presents a single certificate which is a byte-for-byte match against the configured peer certificate")
+                .details("The certificate is parsed only to ensure that the `NotBefore` and `NotAfter` are valid for the current system time.")
+        )?
+        .doc(
+            doc("Determines how the certificate(s) presented by the peer are validated")
+                .details("This validation always occurs **after** the handshake signature has been verified."))?
+        .build()?;
+
+    Ok(handle)
 }
 
 fn declare_flags_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {

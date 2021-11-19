@@ -55,7 +55,7 @@ clippy::all
 )]
 #![forbid(
     unsafe_code,
-    broken_intra_doc_links,
+    rustdoc::broken_intra_doc_links,
     unaligned_references,
     while_true,
     bare_trait_objects

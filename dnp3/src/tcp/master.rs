@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use tracing::Instrument;
@@ -8,6 +9,7 @@ use crate::app::{RetryStrategy, Shutdown};
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::{MasterChannel, MasterChannelConfig};
+use crate::tcp::tls::TlsClientConfig;
 use crate::tcp::ClientState;
 use crate::tcp::EndpointList;
 use crate::tokio::net::TcpStream;
@@ -59,6 +61,7 @@ pub fn create_master_tcp_client(
         endpoints,
         config,
         connect_strategy,
+        MasterTaskConnectionHandler::Tcp,
         listener,
     );
     let future = async move {
@@ -69,10 +72,29 @@ pub fn create_master_tcp_client(
     (future, handle)
 }
 
-struct MasterTask {
+pub(crate) enum MasterTaskConnectionHandler {
+    Tcp,
+    Tls(TlsClientConfig),
+}
+
+impl MasterTaskConnectionHandler {
+    async fn handle(
+        &mut self,
+        socket: TcpStream,
+        endpoint: &SocketAddr,
+    ) -> Result<PhysLayer, String> {
+        match self {
+            Self::Tcp => Ok(PhysLayer::Tcp(socket)),
+            Self::Tls(config) => config.handle_connection(socket, endpoint).await,
+        }
+    }
+}
+
+pub(crate) struct MasterTask {
     endpoints: EndpointList,
     back_off: ExponentialBackOff,
     reconnect_delay: Duration,
+    connection_handler: MasterTaskConnectionHandler,
     session: MasterSession,
     reader: TransportReader,
     writer: TransportWriter,
@@ -80,11 +102,12 @@ struct MasterTask {
 }
 
 impl MasterTask {
-    fn new(
+    pub(crate) fn new(
         link_error_mode: LinkErrorMode,
         endpoints: EndpointList,
         config: MasterChannelConfig,
         connect_strategy: ConnectStrategy,
+        connection_handler: MasterTaskConnectionHandler,
         listener: Box<dyn Listener<ClientState>>,
     ) -> (Self, MasterChannel) {
         let (tx, rx) = crate::util::channel::request_channel();
@@ -107,6 +130,7 @@ impl MasterTask {
                 connect_strategy.max_connect_delay,
             )),
             reconnect_delay: connect_strategy.reconnect_delay,
+            connection_handler,
             session,
             reader,
             writer,
@@ -115,7 +139,7 @@ impl MasterTask {
         (task, MasterChannel::new(tx))
     }
 
-    async fn run(&mut self) {
+    pub(crate) async fn run(&mut self) {
         let _ = self.run_impl().await;
         self.session.shutdown().await;
         self.listener.update(ClientState::Shutdown);
@@ -153,31 +177,35 @@ impl MasterTask {
                         .update(ClientState::WaitAfterFailedConnect(delay));
                     self.session.wait_for_retry(delay).await
                 }
-                Ok(socket) => {
-                    tracing::info!("connected to {}", endpoint);
-                    self.endpoints.reset();
-                    self.back_off.on_success();
-                    self.listener.update(ClientState::Connected);
-                    self.run_socket(socket).await
-                }
+                Ok(socket) => match self.connection_handler.handle(socket, &endpoint).await {
+                    Err(err) => {
+                        let delay = self.back_off.on_failure();
+                        tracing::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
+                        self.on_connection_failure(delay).await
+                    }
+                    Ok(phys) => {
+                        tracing::info!("connected to {}", endpoint);
+                        self.endpoints.reset();
+                        self.back_off.on_success();
+                        self.listener.update(ClientState::Connected);
+                        self.run_phys(phys).await
+                    }
+                },
             }
         } else {
             let delay = self.back_off.on_failure();
             tracing::warn!(
-                "Name resolution failure - waiting {} ms to retry",
+                "name resolution failure - waiting {} ms to retry",
                 delay.as_millis()
             );
-            self.listener
-                .update(ClientState::WaitAfterFailedConnect(delay));
-            self.session.wait_for_retry(delay).await
+            self.on_connection_failure(delay).await
         }
     }
 
-    async fn run_socket(&mut self, socket: TcpStream) -> Result<(), StateChange> {
-        let mut io = PhysLayer::Tcp(socket);
+    async fn run_phys(&mut self, mut phys: PhysLayer) -> Result<(), StateChange> {
         match self
             .session
-            .run(&mut io, &mut self.writer, &mut self.reader)
+            .run(&mut phys, &mut self.writer, &mut self.reader)
             .await
         {
             RunError::State(s) => Err(s),
@@ -188,12 +216,16 @@ impl MasterTask {
                         "waiting {} ms to reconnect",
                         self.reconnect_delay.as_millis()
                     );
-                    self.listener
-                        .update(ClientState::WaitAfterDisconnect(self.reconnect_delay));
-                    self.session.wait_for_retry(self.reconnect_delay).await?;
+                    self.on_connection_failure(self.reconnect_delay).await?;
                 }
                 Ok(())
             }
         }
+    }
+
+    async fn on_connection_failure(&mut self, delay: Duration) -> Result<(), StateChange> {
+        self.listener
+            .update(ClientState::WaitAfterFailedConnect(delay));
+        self.session.wait_for_retry(delay).await
     }
 }

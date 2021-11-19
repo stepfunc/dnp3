@@ -1,0 +1,212 @@
+---
+id: tls
+title: Transport Layer Security
+sidebar_label: TLS
+slug: /api/tls
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Masters and outstations may optionally use TLS which protects DNP3 communication by adding encryption and authentication. The DNP3 library uses
+[rustls](https://github.com/rustls/rustls), a modern TLS library written in safe Rust. It does **not** depend on OpenSSL or other system libraries, but will
+interoperate seamlessly with other implementations.
+
+Rustls has been [reviewed](https://github.com/rustls/rustls/raw/main/audit/TLS-01-report.pdf) by a third party and is production ready. It
+[outperforms](https://jbp.io/2019/07/01/rustls-vs-openssl-performance.html) OpenSSL in almost every aspect and has the backing of the
+[ISRG](https://www.abetterinternet.org/post/preparing-rustls-for-wider-adoption/).
+
+# Secure Authentication?
+
+DNP3 SAv5 (and v2) contains a number of [design](https://www.cs.dartmouth.edu/~sergey/langsec/papers/crain-bratus-bolt-on-dnp3sa.pdf)
+[flaws](https://cms-cdn.selinc.com/assets/Literature/Publications/Technical%20Papers/6910_AllAboutEve_CG_20190131_Web2.pdf?v=20191113-212654) and was never widely adopted.
+The multi-user support in SAv5 has been [deprecated](https://rlc.vlinder.ca/blog/2019/10/26/tb2019-001-multi-user-sa) because it could never meet its stated design goals.
+SAv6 aims to reduce the complexity of SAv5, but it has not been standardized yet and there are no full implementations.
+
+:::tip
+We recommend using TLS to secure DNP3 and caution the industry to avoid home-grown solutions such as secure authentication.
+:::
+
+
+## Supported Features
+
+- TLS v1.2 and v1.3
+- Supported cipher suites (in descending order of preference):
+  - TLS v1.3:
+    - `TLS_CHACHA20_POLY1305_SHA256`
+    - `TLS_AES_256_GCM_SHA384`
+    - `TLS_AES_128_GCM_SHA256`
+  - TLS v1.2:
+    - `TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256`
+    - `TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256`
+    - `TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384`
+    - `TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256`
+    - `TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384`
+    - `TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256`
+- Supported key exchange algorithms (in descending order of preference):
+  - `x25519`
+  - `secp384r1`
+  - `secp256r1`
+- Supported signature algorithms (in descending order of preference):
+  - `ecdsa_secp384r1_sha384`
+  - `ecdsa_secp256r1_sha256`
+  - `ed25519` (v1.3 only)
+  - `rsa_pss_sha512` (v1.3 only)
+  - `rsa_pss_sha384` (v1.3 only)
+  - `rsa_pss_sha256` (v1.3 only)
+  - `rsa_pkcs1_sha512`
+  - `rsa_pkcs1_sha384`
+  - `rsa_pkcs1_sha256`
+- Client and server name validation through the Subject Alternative Name (SAN) extension or the Common Name.
+- Self-signed certificates (with a special configuration).
+
+## Configuration
+
+TLS configuration is configured using the `TlsClientConfig` or `TlsServerConfig` structures. They are very similar and contain the following fields:
+
+- `name`:
+  * The client and the server both verify that the certificate presented by the peer is valid for this name. Check out the next section for the gory details on
+  name validation.
+  * The client will advertise this name through a Server Name Indication (SNI) extension in the `Client Hello`.
+- `peer_cert_path`:
+  * Path to the unencrypted PEM file containing the trusted root certificate(s) or the peer self-signed certificate.
+- `local_cert_path`:
+  * Path to the unencrypted PEM file containing the certificate(s) to present to the peer.
+- `private_key_path`:
+  * Path to the PEM file containing the encrypted or plaintext private key corresponding to the public key in the presented certificate.
+- `password`:
+  * Password used to decrypt the private key file. This field should be left empty if the file is not encrypted. See the next section for more details.
+- `min_tls_version`:
+  * Minimum TLS version to support. Setting this to `Tls1_3` will force the usage of TLSv1.3.
+- `certificate_mode`:
+  * Mode used to verify the peer certificate.
+
+### Name Validation
+
+This section describes how name validation is performed when `certificate_mode` is `AuthorityBased`. When the mode
+is `SelfSigned`, name validation is performed indirectly since a byte-for-byte comparison occurs of the entire certificate.
+
+A valid name has the same requirements as a DNS name. This is defined in
+[RFC 1034 Section 3.5](https://datatracker.ietf.org/doc/html/rfc1034#section-3.5),
+updated by [RFC1123 Section 2.1](https://datatracker.ietf.org/doc/html/rfc1123#section-2),
+with the additional exception that underscores `_` are allowed. A brief (but incomplete)
+definition of a valid name includes:
+
+- One or more labels separated by a single period
+- Labels are made of alphanumeric characters `[A-Za-z0-9]`, hyphens `-`, and underscores `_`
+- A label cannot start or end with an hyphen `-`
+- A label cannot be all numeric
+- A label cannot be empty
+- Maximum of 63 characters per label
+- Maximum of 253 characters total
+
+If the SAN extension is present, the name is validated against it. The SAN may contain multiple names and each name can contain a wildcard `*` character.
+The comparison is case-insensitive.
+
+If the SAN is absent, then the `Common Name` from the certificate's `Subject` is extracted and compared. The Common Name cannot contain a wildcard character
+and the comparison is case-sensitive. It is effectively compared byte-for-byte with the expected name.
+
+:::tip
+New certificates should always include the SAN extension. Performing name verification using the `Common Name`
+is still secure, but it is deprecated for new use cases.
+:::
+
+### Private Key Encryption
+
+Unencrypted private keys may be stored in PKCS#1 or PKCS#8 formats:
+
+* `----BEGIN RSA PRIVATE KEY-----`
+
+* `-----BEGIN PRIVATE KEY-----`
+
+Encrypted private keys must be stored in PKCS#8v2 format:
+*  `-----BEGIN ENCRYPTED PRIVATE KEY-----`
+
+Keys encrypted in PKCS#1 format are **not** supported.
+
+The following algorithms are supported when keys are encrypted in PKCS#8v2 format:
+
+- Key derivation functions:
+  - scrypt (RFC 7914) **recommended**
+  - PBKDF2 (RFC 8018) using one of the following HMAC:
+    * HMAC-SHA224
+    * HMAC-SHA256
+    * HMAC-SHA384
+    * HMAC-SHA512
+- Symmetric encryption:
+  - AES-128-CBC
+  - AES-192-CBC
+  - AES-256-CBC **recommended**
+
+SHA-1 based key derivation and DES/3DES symmetric encryption are **not** supported because they are insecure.
+
+The OpenSSL [pkcs8 command](https://www.openssl.org/docs/man1.1.1/man1/openssl-pkcs8.html) can be used to
+encrypt keys or convert private key formats.
+
+:::tip
+Encrypting private keys for use with TLS rarely addresses a meaningful threat model. Encrypting a private key and storing the password in a configuration file
+is equivalent to locking your doors and leaving the key under the doormat.
+:::
+
+### Certificate Mode
+
+The `certificate_mode` parameter determines how the presented peer certificate
+is validated.
+
+#### Authority-based
+
+The default `AuthorityBased` mode uses the default `rustls` implementation to check the presented chain of certificates
+and verify that the root certificate of the chain is one of those provided in the `peer_cert_path` file.
+Most, if not all applications, in the power industry, will have a single root certificate.
+
+This mode validates the chain and the end-entity certificate in accordance with [RFC 5280](https://datatracker.ietf.org/doc/html/rfc5280#section-6).
+
+#### Self-Signed
+
+The `SelfSigned` mode validates that:
+
+* Only a single certificate is presented
+* It is a byte-for-byte match of the one specified in `peer_cert_path`
+* `NotBefore` and `NotAfter` time fields are valid for the current time
+
+:::note
+Name validation is performed *indirectly* in self-signed mode, since the byte-for-byte comparison also compares the internal name fields.
+:::
+
+### Generating Certificates
+
+The following OpenSSL commands are provided for testing purposes only. Real systems will use some kind of specialized CA software for certificate procurement.
+
+#### Full CA chain
+
+- Generate the root CA certificate:
+```
+openssl req -x509 -newkey rsa:4096 -keyout ./ca_key.pem -out ./ca_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -nodes -days 3650
+```
+- Generate the master CSR:
+```
+openssl req -new -newkey rsa:4096 -keyout ./master_key.pem -out ./master_csr.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
+```
+- Generate the master certificate:
+```
+openssl x509 -req -days 365 -in ./master_csr.pem -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem -CAkey ./ca_key.pem -set_serial 1 -out ./master_cert.pem -sha256
+```
+- Generate the outstation CSR:
+```
+openssl req -new -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation_csr.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
+```
+- Generate the outstation certificate:
+```
+openssl x509 -req -days 365 -in ./outstation_csr.pem -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem -CAkey ./ca_key.pem -set_serial 2 -out ./outstation_cert.pem -sha256
+```
+
+#### Self-signed certificate
+
+- Generate the master certificate:
+```
+openssl req -x509 -newkey rsa:4096 -keyout ./master_key.pem -out ./master_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
+```
+- Generate the outstation certificate:
+```
+openssl req -x509 -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation/entity2_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
+```
