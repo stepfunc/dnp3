@@ -1,4 +1,4 @@
-package io.stepfunc.dnp3_conformance
+package io.stepfunc.conformance.dnp3
 
 import io.stepfunc.dnp3._
 import org.joou.Unsigned.{ulong, ushort, uint}
@@ -26,7 +26,7 @@ class CustomOutstationApplication(val isLocalControl: Boolean) extends Outstatio
     iin
   }
 
-  override def coldRestart: RestartDelay = RestartDelay.validMillis(ushort(5000))
+  override def coldRestart: RestartDelay = RestartDelay.milliseconds(ushort(5000))
 
   override def warmRestart: RestartDelay = RestartDelay.notSupported()
 
@@ -61,9 +61,8 @@ class CustomOutstationApplication(val isLocalControl: Boolean) extends Outstatio
   }
 
   def now(): Timestamp = {
-    val time = this.lastTimestamp.plus(Duration.between(this.lastUpdate, Instant.now))
-    val quality = if (isTimeValid) TimeQuality.SYNCHRONIZED else TimeQuality.NOT_SYNCHRONIZED
-    new Timestamp(ulong(time.toEpochMilli), quality)
+    val time = ulong(this.lastTimestamp.plus(Duration.between(this.lastUpdate, Instant.now)).toEpochMilli)
+    if (isTimeValid) Timestamp.synchronizedTimestamp(time) else Timestamp.unsynchronizedTimestamp(time)
   }
 
   private def isTimeValid: Boolean = {

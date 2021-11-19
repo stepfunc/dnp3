@@ -1,4 +1,4 @@
-package io.stepfunc.dnp3_conformance
+package io.stepfunc.conformance.dnp3
 
 case class TcpConfig(address: String, port: Int)
 

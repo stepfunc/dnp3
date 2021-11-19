@@ -1,4 +1,4 @@
-package io.stepfunc.dnp3_conformance
+package io.stepfunc.conformance.dnp3
 
 object Main {
   def main(args: Array[String]): Unit = {

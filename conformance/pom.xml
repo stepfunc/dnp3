@@ -41,7 +41,7 @@
                     <launchers>
                         <launcher>
                             <id>conformance</id>
-                            <mainClass>io.stepfunc.dnp3_conformance.Main</mainClass>
+                            <mainClass>io.stepfunc.conformance.dnp3.Main</mainClass>
                             <args>
                                 <arg>-config</arg>
                                 <arg>device.ini</arg>

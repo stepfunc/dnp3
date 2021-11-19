@@ -1,4 +1,4 @@
-package io.stepfunc.dnp3_conformance
+package io.stepfunc.conformance.dnp3
 
 import io.stepfunc.dnp3.{BroadcastAction, FunctionCode, OutstationInformation, RequestHeader}
 import org.joou.UByte

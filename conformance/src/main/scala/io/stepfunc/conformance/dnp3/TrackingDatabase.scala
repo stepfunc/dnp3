@@ -1,4 +1,4 @@
-package io.stepfunc.dnp3_conformance
+package io.stepfunc.conformance.dnp3
 
 import com.automatak.dnp4s.dnp3.app.EventClass
 import io.stepfunc.dnp3._
