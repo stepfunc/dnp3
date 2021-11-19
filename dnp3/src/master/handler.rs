@@ -310,20 +310,31 @@ pub trait AssociationHandler: Send {
     }
 }
 
-/// Information about the object header from which the measurement values were mapped
+/// Information about the object header and specific variation
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct HeaderInfo {
-    /// underlying variation
+    /// underlying variation in the response
     pub variation: Variation,
-    /// qualifier code used in the header
+    /// qualifier code used in the response
     pub qualifier: QualifierCode,
+    /// true if the received variation is an event type, false otherwise
+    pub is_event: bool,
+    /// true if a flags byte is present on the underlying variation, false otherwise
+    pub has_flags: bool,
 }
 
 impl HeaderInfo {
-    pub(crate) fn new(variation: Variation, qualifier: QualifierCode) -> Self {
+    pub(crate) fn new(
+        variation: Variation,
+        qualifier: QualifierCode,
+        is_event: bool,
+        has_flags: bool,
+    ) -> Self {
         Self {
             variation,
             qualifier,
+            is_event,
+            has_flags,
         }
     }
 }

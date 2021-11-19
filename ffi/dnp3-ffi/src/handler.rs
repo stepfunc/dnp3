@@ -171,6 +171,8 @@ impl From<HeaderInfo> for ffi::HeaderInfo {
                 QualifierCode::CountAndPrefix16 => ffi::QualifierCode::CountAndPrefix16,
                 QualifierCode::FreeFormat16 => ffi::QualifierCode::FreeFormat16,
             },
+            is_event: info.is_event,
+            has_flags: info.has_flags,
         }
         .into()
     }

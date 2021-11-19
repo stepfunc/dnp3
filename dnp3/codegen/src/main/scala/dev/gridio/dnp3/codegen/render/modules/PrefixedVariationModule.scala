@@ -62,12 +62,13 @@ object PrefixedVariationModule extends Module {
     }
 
     def infoMatcher(v: Variation) : Iterator[String] = {
+      val isEvent = v.parent.groupType.isEvent;
       v match {
         case _ : SizedByVariation =>  {
-          s"PrefixedVariation::${v.parent.name}VarX(x, _) =>  HeaderInfo::new(Variation::${v.parent.name}(*x), I::COUNT_AND_PREFIX_QUALIFIER),".eol
+          s"PrefixedVariation::${v.parent.name}VarX(x, _) =>  HeaderInfo::new(Variation::${v.parent.name}(*x), I::COUNT_AND_PREFIX_QUALIFIER, ${isEvent}, ${v.hasFlags}),".eol
         }
         case _ =>  {
-          s"PrefixedVariation::${v.name}(_) => HeaderInfo::new(Variation::${v.name}, I::COUNT_AND_PREFIX_QUALIFIER),".eol
+          s"PrefixedVariation::${v.name}(_) => HeaderInfo::new(Variation::${v.name}, I::COUNT_AND_PREFIX_QUALIFIER, ${isEvent}, ${v.hasFlags}),".eol
         }
       }
     }

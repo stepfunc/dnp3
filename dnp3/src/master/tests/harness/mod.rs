@@ -7,7 +7,7 @@ use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
-use crate::master::handle::{AssociationHandle, HeaderInfo, MasterChannel, ReadHandler};
+use crate::master::handler::{AssociationHandle, HeaderInfo, MasterChannel, ReadHandler};
 use crate::master::session::{MasterSession, RunError};
 use crate::master::{DefaultAssociationHandler, ReadType};
 use crate::tokio::test::*;

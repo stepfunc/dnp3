@@ -47,14 +47,24 @@ pub fn define(
         .add(
             "variation",
             shared_def.variation_enum.clone(),
-            "Group/Variation used in the response",
+            "underlying variation in the response",
         )?
         .add(
             "qualifier",
             qualifier_code_enum,
-            "Qualifier used in the response",
+            "Qualifier code used in the response",
         )?
-        .doc("Object header information")?
+        .add(
+            "is_event",
+            Primitive::Bool,
+            "true if the received variation is an event type, false otherwise",
+        )?
+        .add(
+            "has_flags",
+            Primitive::Bool,
+            "true if a flags byte is present on the underlying variation, false otherwise",
+        )?
+        .doc("Information about the object header and specific variation")?
         .end_fields()?
         .build()?;
 

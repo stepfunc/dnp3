@@ -5,7 +5,7 @@ use crate::app::ResponseHeader;
 use crate::link::{EndpointAddress, LinkStatusResult};
 use crate::master::association::Association;
 use crate::master::error::TaskError;
-use crate::master::handle::Promise;
+use crate::master::handler::Promise;
 use crate::master::poll::Poll;
 use crate::master::request::{Classes, EventClasses};
 use crate::master::tasks::auto::AutoTask;
