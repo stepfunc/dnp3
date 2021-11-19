@@ -88,7 +88,7 @@ fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(1, 1))?
-        .default_variant(&event_variation, gv(2, 2))?
+        .default_variant(&event_variation, gv(2, 1))?
         .end_initializer()?
         .build()?;
 
@@ -139,7 +139,7 @@ fn define_double_bit_binary_config(
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(3, 1))?
-        .default_variant(&event_variation, gv(4, 2))?
+        .default_variant(&event_variation, gv(4, 1))?
         .end_initializer()?
         .build()?;
 
@@ -231,7 +231,7 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(20, 1))?
-        .default_variant(&event_variation, gv(22, 5))?
+        .default_variant(&event_variation, gv(22, 1))?
         .default(&deadband, NumberValue::U32(0))?
         .end_initializer()?
         .build()?;
@@ -288,7 +288,7 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<Function
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(21, 1))?
-        .default_variant(&event_variation, gv(23, 5))?
+        .default_variant(&event_variation, gv(23, 1))?
         .default(&deadband, NumberValue::U32(0))?
         .end_initializer()?
         .build()?;
@@ -361,7 +361,7 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(30, 1))?
-        .default_variant(&event_variation, gv(32, 3))?
+        .default_variant(&event_variation, gv(32, 1))?
         .default(&deadband, NumberValue::Double(0.0))?
         .end_initializer()?
         .build()?;
@@ -434,7 +434,7 @@ fn define_analog_output_status_config(
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(40, 1))?
-        .default_variant(&event_variation, gv(42, 3))?
+        .default_variant(&event_variation, gv(42, 1))?
         .default(&deadband, NumberValue::Double(0.0))?
         .end_initializer()?
         .build()?;
