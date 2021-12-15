@@ -202,6 +202,23 @@ where
         self.inner.get_mut(&index)
     }
 
+    fn select_range_with_variation(
+        &mut self,
+        range: IndexRange,
+        variation: Option<T::StaticVariation>,
+    ) -> Option<VariationRange> {
+        for (_index, point) in self.inner.range_mut((
+            std::ops::Bound::Included(&range.start),
+            std::ops::Bound::Included(&range.stop),
+        )) {
+            // for every point in the range, we copy the current value into a distinct 'selected' cell
+            // when writing the response(s) we use the selected value
+            // this allows the outstation to send consistent snapshot of the values when a multi-fragment response is required
+            point.selected = point.current.clone();
+        }
+        Some(T::wrap(range, variation))
+    }
+
     fn select_all(&mut self) -> Option<VariationRange> {
         self.select_all_with_variation(None)
     }
@@ -210,10 +227,6 @@ where
         &mut self,
         variation: Option<T::StaticVariation>,
     ) -> Option<VariationRange> {
-        self.inner
-            .values_mut()
-            .for_each(|x| x.selected = x.current.clone());
-
         /*
           TODO - when this feature is stabilized we can use it here
           TODO - #![feature(map_first_last)]
@@ -221,7 +234,9 @@ where
         */
         let start = self.inner.iter().next().map(|(key, _)| *key)?;
         let stop = self.inner.iter().next_back().map(|(key, _)| *key)?;
-        Some(T::wrap(IndexRange::new(start, stop), variation))
+
+        // as far at the processing goes, we treat this just like a range scan over all the values
+        self.select_range_with_variation(IndexRange::new(start, stop), variation)
     }
 }
 
@@ -265,15 +280,6 @@ impl StaticDatabase {
             octet_strings: PointMap::empty(),
         }
     }
-    /*
-       pub(crate) fn exceeded_capacity(&self) -> Option<usize> {
-           if self.selected.capacity_exceeded > 0 {
-               Some(self.selected.capacity_exceeded)
-           } else {
-               None
-           }
-       }
-    */
 
     #[cfg(test)]
     pub(crate) fn selection_capacity(&self) -> usize {
@@ -468,15 +474,14 @@ impl StaticDatabase {
     where
         T: Updatable,
     {
-        match range {
-            Some(range) => self.push_selection(T::wrap(range, variation)),
-            None => {
-                if let Some(x) = T::get_mut_map(self).select_all_with_variation(variation) {
-                    self.push_selection(x)
-                } else {
-                    Iin2::default()
-                }
-            }
+        let selected = match range {
+            Some(range) => T::get_mut_map(self).select_range_with_variation(range, variation),
+            None => T::get_mut_map(self).select_all_with_variation(variation),
+        };
+
+        match selected {
+            None => Iin2::default(),
+            Some(range) => self.push_selection(range),
         }
     }
 
