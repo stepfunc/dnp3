@@ -26,6 +26,30 @@ fn create_binary_and_event(database: &mut Database) {
     );
 }
 
+fn create_one_analog_with_value_42(database: &mut Database) {
+    database.add(0, Some(EventClass::Class1), AnalogConfig::default());
+    database.update(
+        0,
+        &Analog::new(42.0, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+        UpdateOptions::initialize(),
+    );
+}
+
+fn create_five_binary_inputs_with_odd_indices_true(database: &mut Database) {
+    for i in 0..5 {
+        database.add(i, Some(EventClass::Class1), BinaryConfig::default());
+        database.update(
+            i,
+            &Binary::new(
+                i % 2 == 1,
+                Flags::ONLINE,
+                Time::Synchronized(Timestamp::new(0)),
+            ),
+            UpdateOptions::initialize(),
+        );
+    }
+}
+
 #[test]
 fn empty_read_yields_empty_response() {
     let mut harness = new_harness(get_default_config());
@@ -34,23 +58,19 @@ fn empty_read_yields_empty_response() {
 }
 
 #[test]
-fn can_read_one_byte_range() {
+fn can_read_one_byte_range_for_specific_variation() {
     let mut harness = new_harness(get_default_config());
 
-    harness.handle.database.transaction(|database| {
-        database.add(0, Some(EventClass::Class1), AnalogConfig::default());
-        database.update(
-            0,
-            &Analog::new(42.0, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
-            UpdateOptions::initialize(),
-        );
-    });
+    harness
+        .handle
+        .database
+        .transaction(create_one_analog_with_value_42);
 
     const READ_G30_V1_0_TO_0: &[u8] = &[0xC0, 0x01, 0x1E, 0x01, 0x00, 0x00, 0x00];
     harness.test_request_response(
         READ_G30_V1_0_TO_0,
         &[
-            0xC0, 0x81, 0x80, 0x00, 0x1E, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+            0xC0, 0x81, 0x80, 0x00, 0x1E, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x2A, 0x00,
             0x00, 0x00,
         ],
     );
@@ -58,29 +78,59 @@ fn can_read_one_byte_range() {
 }
 
 #[test]
-fn can_read_two_byte_range() {
+fn can_read_one_byte_range_for_default_variation() {
     let mut harness = new_harness(get_default_config());
 
-    harness.handle.database.transaction(|database| {
-        for i in 0..5 {
-            database.add(i, Some(EventClass::Class1), BinaryConfig::default());
-            database.update(
-                i,
-                &Binary::new(
-                    i % 2 == 1,
-                    Flags::ONLINE,
-                    Time::Synchronized(Timestamp::new(0)),
-                ),
-                UpdateOptions::initialize(),
-            );
-        }
-    });
+    harness
+        .handle
+        .database
+        .transaction(create_one_analog_with_value_42);
+
+    const READ_G30_V0_0_TO_0: &[u8] = &[0xC0, 0x01, 0x1E, 0x00, 0x00, 0x00, 0x00];
+    harness.test_request_response(
+        READ_G30_V0_0_TO_0,
+        &[
+            0xC0, 0x81, 0x80, 0x00, 0x1E, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x2A, 0x00,
+            0x00, 0x00,
+        ],
+    );
+    harness.check_events(&[]);
+}
+
+#[test]
+fn can_read_two_byte_range_for_specific_variation() {
+    let mut harness = new_harness(get_default_config());
+
+    harness
+        .handle
+        .database
+        .transaction(create_five_binary_inputs_with_odd_indices_true);
 
     const READ_G1_V2_1_TO_3: &[u8] = &[0xC0, 0x01, 0x01, 0x02, 0x01, 0x01, 0x00, 0x03, 0x00];
     harness.test_request_response(
         READ_G1_V2_1_TO_3,
         &[
             0xC0, 0x81, 0x80, 0x00, 0x01, 0x02, 0x01, 0x01, 0x00, 0x03, 0x00, 0x81, 0x01, 0x81,
+        ],
+    );
+    harness.check_events(&[]);
+}
+
+#[test]
+fn can_read_two_byte_range_for_default_variation() {
+    let mut harness = new_harness(get_default_config());
+
+    harness
+        .handle
+        .database
+        .transaction(create_five_binary_inputs_with_odd_indices_true);
+
+    const READ_G1_V0_1_TO_3: &[u8] = &[0xC0, 0x01, 0x01, 0x00, 0x01, 0x01, 0x00, 0x03, 0x00];
+    harness.test_request_response(
+        READ_G1_V0_1_TO_3,
+        // the response here is g1v1, packed format, the bit pattern is 0b101 == 0x05
+        &[
+            0xC0, 0x81, 0x80, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x03, 0x00, 0x05,
         ],
     );
     harness.check_events(&[]);
