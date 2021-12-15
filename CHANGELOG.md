@@ -1,4 +1,6 @@
 ### Next ###
+* Fix range scan issue where old values were reported.
+  See [#148](https://github.com/stepfunc/dnp3/pull/148).
 * Fix leak of tracing::Span in bindings.
   See [#139](https://github.com/stepfunc/dnp3/pull/139).
 * Add Linux AArch64 support in Java and .NET.
