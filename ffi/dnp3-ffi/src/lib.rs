@@ -19,3 +19,11 @@ mod request;
 mod runtime;
 
 pub mod ffi;
+
+lazy_static::lazy_static! {
+    static ref VERSION: std::ffi::CString = std::ffi::CString::new(dnp3::VERSION).unwrap();
+}
+
+fn version() -> &'static std::ffi::CStr {
+    &VERSION
+}

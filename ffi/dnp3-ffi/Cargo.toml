@@ -8,6 +8,7 @@ edition = "2018"
 crate-type = ["rlib", "staticlib", "cdylib"]
 
 [dependencies]
+lazy_static = "1.4"
 tracing = "0.1"
 tracing-core = "0.1"
 tracing-subscriber = "0.2"
@@ -17,4 +18,4 @@ num_cpus = "1"
 
 [build-dependencies]
 dnp3-schema = { path = "../dnp3-schema" }
-rust-oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.1.4" }
+rust-oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", branch = "feature/version-check" }
