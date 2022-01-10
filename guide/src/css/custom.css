@@ -17,7 +17,7 @@
   --ifm-code-font-size: 95%;
 
   /* this overrides the default color for the admonition "tips" */
-  --ifm-color-success: #737373;
+  --ifm-color-success: #5C7D5E;
 
   --ifm-navbar-background-color: var(--ifm-color-primary);
   --ifm-navbar-link-color: #fff;

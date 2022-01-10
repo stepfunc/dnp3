@@ -20,6 +20,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
 
     let master_channel_class = lib.declare_class("MasterChannel")?;
 
+    let tls_client_config = define_tls_client_config(lib, shared)?;
+
     let connect_strategy = define_connect_strategy(lib)?;
 
     let master_channel_create_tcp_fn = lib
@@ -46,12 +48,12 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         )?
         .param(
             "connect_strategy",
-            Type::Struct(connect_strategy),
+            Type::Struct(connect_strategy.clone()),
             "Controls the timing of (re)connection attempts",
         )?
         .param(
             "listener",
-            Type::Interface(tcp_client_state_listener),
+            Type::Interface(tcp_client_state_listener.clone()),
             "TCP connection listener used to receive updates on the status of the connection",
         )?
         .return_type(ReturnType::new(
@@ -65,7 +67,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
     let master_channel_create_serial_fn = lib
         .declare_native_function("master_channel_create_serial")?
         .param("runtime", Type::ClassRef(shared.runtime_class.clone()), "Runtime to use to drive asynchronous operations of the master")?
-        .param("config", Type::Struct(master_channel_config), "Generic configuration for the channel")?
+        .param("config", Type::Struct(master_channel_config.clone()), "Generic configuration for the channel")?
         .param("path", Type::String, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
         .param("serial_params", Type::Struct(shared.serial_port_settings.clone()), "Serial port settings")?
         .param("open_retry_delay", Type::Duration(DurationMapping::Milliseconds), "delay between attempts to open the serial port")?
@@ -76,6 +78,51 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
             doc("Create a master channel on the specified serial port")
                 .details("The returned master must be gracefully shutdown with {class:MasterChannel.[destructor]} when done.")
         )?
+        .build()?;
+
+    let master_channel_create_tls_fn = lib
+        .declare_native_function("master_channel_create_tls")?
+        .param(
+            "runtime",
+            Type::ClassRef(shared.runtime_class.clone()),
+            "Runtime to use to drive asynchronous operations of the master",
+        )?
+        .param(
+            "link_error_mode",
+            Type::Enum(shared.link_error_mode.clone()),
+            "Controls how link errors are handled with respect to the TCP session",
+        )?
+        .param(
+            "config",
+            Type::Struct(master_channel_config),
+            "Generic configuration for the channel",
+        )?
+        .param(
+            "endpoints",
+            Type::ClassRef(endpoint_list.declaration()),
+            "List of IP endpoints.",
+        )?
+        .param(
+            "tls_config",
+            Type::Struct(tls_client_config),
+            "TLS client configuration",
+        )?
+        .param(
+            "connect_strategy",
+            Type::Struct(connect_strategy),
+            "Controls the timing of (re)connection attempts",
+        )?
+        .param(
+            "listener",
+            Type::Interface(tcp_client_state_listener),
+            "TCP connection listener used to receive updates on the status of the connection",
+        )?
+        .return_type(ReturnType::new(
+            Type::ClassRef(master_channel_class.clone()),
+            "Handle to the master created, {null} if an error occurred",
+        ))?
+        .fails_with(shared.error_type.clone())?
+        .doc("Create a master channel that connects to the specified TCP endpoint(s) and establish a TLS session with the remote.")?
         .build()?;
 
     let destroy_fn = lib
@@ -400,7 +447,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
 
     lib.define_class(&master_channel_class)?
         .destructor(&destroy_fn)?
-        .static_method("CreateTCPChannel", &master_channel_create_tcp_fn)?
+        .static_method("CreateTcpChannel", &master_channel_create_tcp_fn)?
+        .static_method("CreateTlsChannel", &master_channel_create_tls_fn)?
         .static_method("CreateSerialChannel", &master_channel_create_serial_fn)?
         .method("Enable", &enable_fn)?
         .method("Disable", &disable_fn)?
@@ -426,6 +474,43 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Result<()
         .build()?;
 
     Ok(())
+}
+
+fn define_tls_client_config(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> Result<NativeStructHandle, BindingError> {
+    let tls_client_config = lib.declare_native_struct("TlsClientConfig")?;
+    lib.define_native_struct(&tls_client_config)?
+        .add("dns_name", Type::String, "Expected name to validate in the presented certificate (only in {enum:CertificateMode.AuthorityBased} mode)")?
+        .add(
+            "peer_cert_path",
+            Type::String,
+            "Path to the PEM-encoded certificate of the peer",
+        )?
+        .add(
+            "local_cert_path",
+            Type::String,
+            "Path to the PEM-encoded local certificate",
+        )?
+        .add(
+            "private_key_path",
+            Type::String,
+            "Path to the the PEM-encoded private key",
+        )?
+        .add(
+            "password",
+            Type::String,
+            doc("Optional password if the private key file is encrypted").details("Only PKCS#8 encrypted files are supported.").details("Pass empty string if the file is not encrypted.")
+        )?
+        .add(
+            "min_tls_version",
+            StructElementType::Enum(shared.min_tls_version.clone(), Some("V1_2".to_owned())),
+            "Minimum TLS version allowed",
+        )?
+        .add("certificate_mode", StructElementType::Enum(shared.certificate_mode.clone(), Some("AuthorityBased".to_owned())), "Certificate validation mode")?
+        .doc("TLS client configuration")?
+        .build()
 }
 
 fn define_connect_strategy(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {

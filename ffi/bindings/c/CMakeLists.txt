@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.11)
 
 project(dnp3_c LANGUAGES C)
 
-set(DNP3_VERSION 0.9.2)
+set(DNP3_VERSION 0.10.0-alpha6)
 
 # Determine the architecture
 if(WIN32 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64" AND CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -41,6 +41,14 @@ target_link_libraries(master_example PRIVATE dnp3)
 # Outstation example
 add_executable(outstation_example outstation_example.c)
 target_link_libraries(outstation_example PRIVATE dnp3)
+
+# Master TLS example
+add_executable(master_tls_example master_tls_example.c)
+target_link_libraries(master_tls_example PRIVATE dnp3)
+
+# Outstation TLS example
+add_executable(outstation_tls_example outstation_tls_example.c)
+target_link_libraries(outstation_tls_example PRIVATE dnp3)
 
 # Copy the DLL after build
 add_custom_command(TARGET master_example POST_BUILD 
