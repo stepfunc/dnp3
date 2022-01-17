@@ -88,7 +88,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
     let decode_level = crate::logging::define(lib, error_type.clone())?;
     let runtime_class = crate::runtime::define(lib, error_type.clone())?;
 
-    let control_struct = lib.declare_callback_arg_struct("control")?;
+    let control_struct = lib.declare_callback_argument_struct("control")?;
     let control_struct = lib
         .define_callback_argument_struct(control_struct)?
         .add("fir", Primitive::Bool, "First fragment in the message")?
@@ -260,7 +260,7 @@ fn define_retry_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
     let min_delay = Name::create("min_delay")?;
     let max_delay = Name::create("max_delay")?;
 
-    let retry_strategy = lib.declare_function_arg_struct("retry_strategy")?;
+    let retry_strategy = lib.declare_function_argument_struct("retry_strategy")?;
     let retry_strategy = lib
         .define_function_argument_struct(retry_strategy)?
         .add(
@@ -336,7 +336,7 @@ fn define_serial_port_settings(lib: &mut LibraryBuilder) -> BackTraced<FunctionA
     let parity = Name::create("parity")?;
     let stop_bits = Name::create("stop_bits")?;
 
-    let serial_settings = lib.declare_function_arg_struct("serial_port_settings")?;
+    let serial_settings = lib.declare_function_argument_struct("serial_port_settings")?;
     let serial_settings = lib
         .define_function_argument_struct(serial_settings)?
         .add(

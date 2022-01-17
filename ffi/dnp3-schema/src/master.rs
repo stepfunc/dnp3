@@ -359,7 +359,7 @@ fn define_connect_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgSt
     let max_connect_delay = Name::create("max_connect_delay")?;
     let reconnect_delay = Name::create("reconnect_delay")?;
 
-    let strategy = lib.declare_function_arg_struct("connect_strategy")?;
+    let strategy = lib.declare_function_argument_struct("connect_strategy")?;
     let strategy = lib
         .define_function_argument_struct(strategy)?
         .add(
@@ -400,7 +400,7 @@ fn define_tls_client_config(
     let min_tls_version = Name::create("min_tls_version")?;
     let certificate_mode = Name::create("certificate_mode")?;
 
-    let tls_client_config = lib.declare_function_arg_struct("tls_client_config")?;
+    let tls_client_config = lib.declare_function_argument_struct("tls_client_config")?;
     let tls_client_config = lib.define_function_argument_struct(tls_client_config)?
         .add("dns_name", StringType, "Expected name to validate in the presented certificate (only in {enum:certificate_mode.authority_based} mode)")?
         .add(
@@ -529,7 +529,7 @@ fn define_association_config(
     let auto_integrity_scan_on_buffer_overflow =
         Name::create("auto_integrity_scan_on_buffer_overflow")?;
     let max_queued_user_requests = Name::create("max_queued_user_requests")?;
-    let association_config = lib.declare_function_arg_struct("association_config")?;
+    let association_config = lib.declare_function_argument_struct("association_config")?;
 
     let association_config = lib
         .define_function_argument_struct(association_config)?
@@ -629,7 +629,7 @@ fn define_master_channel_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> BackTraced<FunctionArgStructHandle> {
-    let config = lib.declare_function_arg_struct("master_channel_config")?;
+    let config = lib.declare_function_argument_struct("master_channel_config")?;
 
     let decode_level = Name::create("decode_level")?;
     let response_timeout = Name::create("response_timeout")?;
@@ -738,7 +738,7 @@ fn define_event_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
     let class2 = Name::create("class2")?;
     let class3 = Name::create("class3")?;
 
-    let event_classes = lib.declare_function_arg_struct("event_classes")?;
+    let event_classes = lib.declare_function_argument_struct("event_classes")?;
     let event_classes = lib
         .define_function_argument_struct(event_classes)?
         .add(&class1, Primitive::Bool, "Class 1 events")?
@@ -776,7 +776,7 @@ fn define_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandl
     let class2 = Name::create("class2")?;
     let class3 = Name::create("class3")?;
 
-    let classes = lib.declare_function_arg_struct("classes")?;
+    let classes = lib.declare_function_argument_struct("classes")?;
     let classes = lib
         .define_function_argument_struct(classes)?
         .add(&class0, Primitive::Bool, "Class 0 (static data)")?

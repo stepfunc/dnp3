@@ -2,9 +2,9 @@
 name = "dnp3-bindings"
 version = "0.1.0"
 authors = ["Émile Grégoire <emile@stepfunc.io>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-ci-script = { git = "https://github.com/stepfunc/oo_bindgen.git", branch = "feature/c++" }
+ci-script = { git = "https://github.com/stepfunc/oo_bindgen.git", branch = "feature/doc-update" }
 dnp3-schema = { path = "../dnp3-schema" }
 dnp3-ffi = { path = "../dnp3-ffi" }

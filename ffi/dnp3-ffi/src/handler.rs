@@ -356,11 +356,10 @@ pub unsafe fn octet_string_iterator_next(
     it: *mut OctetStringIterator,
 ) -> Option<&ffi::OctetString> {
     let it = it.as_mut();
-    it.map(|it| {
+    it.and_then(|it| {
         it.next();
         it.next.as_ref()
     })
-    .flatten()
 }
 
 impl<'a> ffi::OctetString<'a> {
@@ -392,11 +391,10 @@ impl<'a> ByteIterator<'a> {
 
 pub unsafe fn byte_iterator_next(it: *mut ByteIterator) -> Option<&ffi::ByteValue> {
     let it = it.as_mut();
-    it.map(|it| {
+    it.and_then(|it| {
         it.next();
         it.next.as_ref()
     })
-    .flatten()
 }
 
 impl ffi::ByteValue {

@@ -232,7 +232,7 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
     let analog_output_status = Name::create("analog_output_status")?;
     let octet_strings = Name::create("octet_strings")?;
 
-    let class_zero_config = lib.declare_function_arg_struct("class_zero_config")?;
+    let class_zero_config = lib.declare_function_argument_struct("class_zero_config")?;
     let class_zero_config = lib
         .define_function_argument_struct(class_zero_config)?
         .add(
@@ -302,7 +302,7 @@ fn define_outstation_features(lib: &mut LibraryBuilder) -> BackTraced<FunctionAr
     let broadcast = Name::create("broadcast")?;
     let unsolicited = Name::create("unsolicited")?;
 
-    let features = lib.declare_function_arg_struct("outstation_features")?;
+    let features = lib.declare_function_argument_struct("outstation_features")?;
     let features = lib
         .define_function_argument_struct(features)?
         .add(
@@ -357,7 +357,7 @@ fn define_outstation_config(
     let max_controls_per_request = Name::create("max_controls_per_request")?;
     let class_zero = Name::create("class_zero")?;
 
-    let outstation_config = lib.declare_function_arg_struct("outstation_config")?;
+    let outstation_config = lib.declare_function_argument_struct("outstation_config")?;
     let outstation_config = lib
         .define_function_argument_struct(outstation_config)?
         .doc("Outstation configuration")?
@@ -439,7 +439,7 @@ fn define_outstation_config(
 }
 
 fn define_event_buffer_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
-    let event_buffer_config = lib.declare_function_arg_struct("event_buffer_config")?;
+    let event_buffer_config = lib.declare_function_argument_struct("event_buffer_config")?;
     let event_buffer_config = lib
         .define_function_argument_struct(event_buffer_config)?
         .add(
@@ -657,7 +657,7 @@ fn define_outstation_information(
 ) -> BackTraced<AsynchronousInterface> {
     let function_code = define_function_code(lib)?;
 
-    let request_header = lib.declare_callback_arg_struct("request_header")?;
+    let request_header = lib.declare_callback_argument_struct("request_header")?;
     let request_header = lib
         .define_callback_argument_struct(request_header)?
         .add(
@@ -964,7 +964,7 @@ fn define_tls_server_config(
     let min_tls_version = Name::create("min_tls_version")?;
     let certificate_mode = Name::create("certificate_mode")?;
 
-    let tls_server_config = lib.declare_function_arg_struct("tls_server_config")?;
+    let tls_server_config = lib.declare_function_argument_struct("tls_server_config")?;
     let tls_server_config = lib.define_function_argument_struct(tls_server_config)?
         .add("dns_name", StringType, "Expected name to validate in the presented certificate (only in {enum:certificate_mode.authority_based} mode)")?
         .add(
