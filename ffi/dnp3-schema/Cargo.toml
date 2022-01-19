@@ -6,4 +6,4 @@ edition = "2021"
 
 [dependencies]
 dnp3 = { path = "../../dnp3" }
-oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", branch = "feature/doc-update" }
+oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", branch = "feature/c++" }
