@@ -373,7 +373,7 @@ impl<'a> ffi::OctetString<'a> {
 
 pub struct ByteIterator<'a> {
     inner: std::slice::Iter<'a, u8>,
-    next: Option<ffi::ByteValue>,
+    next: Option<u8>,
 }
 
 impl<'a> ByteIterator<'a> {
@@ -385,21 +385,21 @@ impl<'a> ByteIterator<'a> {
     }
 
     fn next(&mut self) {
-        self.next = self.inner.next().map(|value| ffi::ByteValue::new(*value))
+        self.next = self.inner.next().copied()
     }
 }
 
-pub unsafe fn byte_iterator_next(it: *mut ByteIterator) -> Option<&ffi::ByteValue> {
+pub unsafe fn byte_iterator_next(it: *mut ByteIterator) -> *const u8 {
     let it = it.as_mut();
-    it.and_then(|it| {
-        it.next();
-        it.next.as_ref()
-    })
-}
-
-impl ffi::ByteValue {
-    fn new(value: u8) -> Self {
-        Self { value }
+    match it {
+        None => std::ptr::null(),
+        Some(x) => {
+            x.next();
+            match &x.next {
+                None => std::ptr::null(),
+                Some(x) => x,
+            }
+        }
     }
 }
 

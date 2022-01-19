@@ -136,10 +136,10 @@ void handle_octet_strings(dnp3_header_info_t info, dnp3_octet_string_iterator_t*
     dnp3_octet_string_t* value = NULL;
     while (value = dnp3_octet_string_iterator_next(it)) {
         printf("Octet String: %u: Value=", value->index);
-        dnp3_byte_value_t* single_byte = dnp3_byte_iterator_next(value->value);
-        while (single_byte != NULL) {
-            printf("%02X", single_byte->value);
-            single_byte = dnp3_byte_iterator_next(value->value);
+        uint8_t* byte = dnp3_byte_iterator_next(value->value);
+        while (byte != NULL) {
+            printf("%02X", *byte);
+            byte = dnp3_byte_iterator_next(value->value);
         }
 
         printf("\n");

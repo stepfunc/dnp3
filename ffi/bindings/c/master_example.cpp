@@ -83,7 +83,7 @@ class ReadHandler : public dnp3::ReadHandler {
                 if (!first) {
                     std::cout << ",";
                 }
-                write_hex_byte(std::cout, byte.value);
+                write_hex_byte(std::cout, byte);
                 first = false;
             }
             std::cout << "]" << std::endl;
