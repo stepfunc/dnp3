@@ -465,6 +465,22 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           path: artifacts
+      - name: Checkout stepfunc/docs
+        uses: actions/checkout@v2
+        with:
+          repository: stepfunc/docs
+          ssh-key: ${{ secrets.SFIO_DOCS_SSH_KEY }}
+          path: docs
+      - name: Upload docs
+        working-directory: docs
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          rm -rf ./dnp3/${GITHUB_REF##*/}
+          cp -a ../artifacts/doc/* ./dnp3/${GITHUB_REF##*/}
+          git add -A
+          git commit -m "[dnp3] Release ${GITHUB_REF##*/}"
+          git push
       - name: Import PGP key
         uses: crazy-max/ghaction-import-gpg@v3
         with:
