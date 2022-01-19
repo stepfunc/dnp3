@@ -2,7 +2,7 @@
 name = "dnp3-bindings"
 version = "0.1.0"
 authors = ["Émile Grégoire <emile@stepfunc.io>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 ci-script = { git = "https://github.com/stepfunc/oo_bindgen.git", branch = "feature/c++" }

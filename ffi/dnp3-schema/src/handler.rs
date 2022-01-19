@@ -14,7 +14,7 @@ pub fn define(
 
     let iin = declare_iin_struct(lib)?;
 
-    let response_header = lib.declare_callback_arg_struct("response_header")?;
+    let response_header = lib.declare_callback_argument_struct("response_header")?;
     let response_header = lib
         .define_callback_argument_struct(response_header)?
         .add(
@@ -41,7 +41,7 @@ pub fn define(
         .doc("Qualifier code used in the response")?
         .build()?;
 
-    let header_info = lib.declare_callback_arg_struct("header_info")?;
+    let header_info = lib.declare_callback_argument_struct("header_info")?;
     let header_info = lib
         .define_callback_argument_struct(header_info)?
         .add(
@@ -217,7 +217,7 @@ pub fn define(
 }
 
 fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructHandle> {
-    let iin1 = lib.declare_callback_arg_struct("iin1")?;
+    let iin1 = lib.declare_callback_argument_struct("iin1")?;
     let iin1 = lib
         .define_callback_argument_struct(iin1)?
         .doc("First IIN byte")?
@@ -261,7 +261,7 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
         // TODO - constructor
         .build()?;
 
-    let iin2 = lib.declare_callback_arg_struct("iin2")?;
+    let iin2 = lib.declare_callback_argument_struct("iin2")?;
     let iin2 = lib
         .define_callback_argument_struct(iin2)?
         .doc("Second IIN byte")?
@@ -277,7 +277,7 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
         // TODO - constructor
         .build()?;
 
-    let iin = lib.declare_callback_arg_struct("iin")?;
+    let iin = lib.declare_callback_argument_struct("iin")?;
     let iin = lib
         .define_callback_argument_struct(iin)?
         .add("iin1", iin1, "First IIN byte")?

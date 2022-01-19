@@ -3,7 +3,7 @@ use oo_bindgen::model::*;
 fn define_runtime_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let num_core_threads = Name::create("num_core_threads")?;
 
-    let config_struct = lib.declare_function_arg_struct("runtime_config")?;
+    let config_struct = lib.declare_function_argument_struct("runtime_config")?;
     let config_struct= lib
         .define_function_argument_struct(config_struct)?
         .add(

@@ -79,7 +79,6 @@ impl std::fmt::Display for SpecialAddressError {
 impl EndpointAddress {
     /// try to construct an EndpointAddress from a raw u16
     pub fn from(value: u16) -> Result<Self, SpecialAddressError> {
-        use std::convert::TryInto;
         value.try_into()
     }
 
@@ -97,7 +96,7 @@ impl EndpointAddress {
     }
 }
 
-impl std::convert::TryFrom<u16> for EndpointAddress {
+impl TryFrom<u16> for EndpointAddress {
     type Error = SpecialAddressError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {

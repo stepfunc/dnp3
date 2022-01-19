@@ -2,12 +2,13 @@
 name = "dnp3-ffi"
 version = "0.1.0"
 authors = ["Émile Grégoire <emile@stepfunc.io>"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 crate-type = ["rlib", "staticlib", "cdylib"]
 
 [dependencies]
+lazy_static = "1.0"
 tracing = "0.1"
 tracing-core = "0.1"
 tracing-subscriber = "0.2"

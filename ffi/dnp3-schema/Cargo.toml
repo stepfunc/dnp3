@@ -2,7 +2,7 @@
 name = "dnp3-schema"
 version = "0.1.0"
 authors = ["Émile Grégoire <emile@stepfunc.io>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 dnp3 = { path = "../../dnp3" }

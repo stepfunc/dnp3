@@ -21,7 +21,7 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
     let update_static = Name::create("update_static")?;
     let event_mode = Name::create("event_mode")?;
 
-    let update_options = lib.declare_function_arg_struct("update_options")?;
+    let update_options = lib.declare_function_argument_struct("update_options")?;
     let update_options = lib
         .define_function_argument_struct(update_options)?
         .add(
@@ -71,7 +71,7 @@ fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
 
-    let config = lib.declare_function_arg_struct("binary_config")?;
+    let config = lib.declare_function_argument_struct("binary_config")?;
     let config = lib
         .define_function_argument_struct(config)?
         .add(
@@ -122,7 +122,7 @@ fn define_double_bit_binary_config(
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
 
-    let config = lib.declare_function_arg_struct("double_bit_binary_config")?;
+    let config = lib.declare_function_argument_struct("double_bit_binary_config")?;
     let config = lib
         .define_function_argument_struct(config)?
         .add(
@@ -166,7 +166,7 @@ fn define_binary_output_status_config(
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
 
-    let config = lib.declare_function_arg_struct("binary_output_status_config")?;
+    let config = lib.declare_function_argument_struct("binary_output_status_config")?;
     let config = lib
         .define_function_argument_struct(config)?
         .add(
@@ -213,7 +213,7 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
     let event_variation = Name::create("event_variation")?;
     let deadband = Name::create("deadband")?;
 
-    let config = lib.declare_function_arg_struct("counter_config")?;
+    let config = lib.declare_function_argument_struct("counter_config")?;
     let config = lib
         .define_function_argument_struct(config)?
         .add(
@@ -270,7 +270,7 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<Function
     let event_variation = Name::create("event_variation")?;
     let deadband = Name::create("deadband")?;
 
-    let config = lib.declare_function_arg_struct("frozen_counter_config")?;
+    let config = lib.declare_function_argument_struct("frozen_counter_config")?;
     let config = lib
         .define_function_argument_struct(config)?
         .add(
@@ -343,7 +343,7 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
     let event_variation = Name::create("event_variation")?;
     let deadband = Name::create("deadband")?;
 
-    let analog_config = lib.declare_function_arg_struct("analog_config")?;
+    let analog_config = lib.declare_function_argument_struct("analog_config")?;
     let config = lib
         .define_function_argument_struct(analog_config)?
         .add(
@@ -416,7 +416,7 @@ fn define_analog_output_status_config(
     let event_variation = Name::create("event_variation")?;
     let deadband = Name::create("deadband")?;
 
-    let config = lib.declare_function_arg_struct("analog_output_status_config")?;
+    let config = lib.declare_function_argument_struct("analog_output_status_config")?;
     let config = lib
         .define_function_argument_struct(config)?
         .add(

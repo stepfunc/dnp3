@@ -23,15 +23,11 @@ impl OutstationApplication for ffi::OutstationApplication {
     }
 
     fn cold_restart(&mut self) -> Option<RestartDelay> {
-        ffi::OutstationApplication::cold_restart(self)
-            .map(|delay| delay.into())
-            .flatten()
+        ffi::OutstationApplication::cold_restart(self).and_then(|delay| delay.into())
     }
 
     fn warm_restart(&mut self) -> Option<RestartDelay> {
-        ffi::OutstationApplication::warm_restart(self)
-            .map(|delay| delay.into())
-            .flatten()
+        ffi::OutstationApplication::warm_restart(self).and_then(|delay| delay.into())
     }
 
     fn freeze_counter(
