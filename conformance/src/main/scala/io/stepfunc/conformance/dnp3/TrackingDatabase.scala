@@ -39,10 +39,10 @@ class TypedEvent[T](val idx: Int, val batch: Int, val eventClass: EventClass, va
 
 class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Outstation, testDatabaseConfig: TestDatabaseConfig) {
   // Create all the tracking points
-  private val binaryPoints = mutable.SortedMap((for (i <- 0 to 9) yield i -> new Binary(ushort(i), false, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
-  private val doubleBitPoints = mutable.SortedMap((for (i <- 0 to 9) yield i -> new DoubleBitBinary(ushort(i), DoubleBit.DETERMINED_OFF, new Flags(ubyte(0x41)), Timestamp.invalidTimestamp())): _*)
+  private val binaryPoints = mutable.SortedMap((for (i <- 0 to 9) yield i -> new BinaryInput(ushort(i), false, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
+  private val doubleBitPoints = mutable.SortedMap((for (i <- 0 to 9) yield i -> new DoubleBitBinaryInput(ushort(i), DoubleBit.DETERMINED_OFF, new Flags(ubyte(0x41)), Timestamp.invalidTimestamp())): _*)
   private val counters = mutable.SortedMap((for (i <- 0 to 9) yield i -> new Counter(ushort(i), uint(0), new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
-  private val analogInputs = mutable.SortedMap((for (i <- 0 to 9) yield i -> new Analog(ushort(i), 0.0, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
+  private val analogInputs = mutable.SortedMap((for (i <- 0 to 9) yield i -> new AnalogInput(ushort(i), 0.0, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
 
   private val binaryOutputs = mutable.SortedMap((for (i <- 0 to 19) yield i -> new BinaryOutputStatus(ushort(i), false, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
   private val analogOutputs = mutable.SortedMap((for (i <- 0 to 19) yield i -> new AnalogOutputStatus(ushort(i), 0.0, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
@@ -68,20 +68,20 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     updateOptions.eventMode = EventMode.SUPPRESS
 
     if(!testDatabaseConfig.disableBinaryInputs) {
-      val binaryConfig = new BinaryConfig()
+      val binaryConfig = new BinaryInputConfig()
 
       this.binaryPoints.values.foreach(e => {
-        db.addBinary(e.index, io.stepfunc.dnp3.EventClass.CLASS1, binaryConfig)
-        db.updateBinary(e, updateOptions)
+        db.addBinaryInput(e.index, io.stepfunc.dnp3.EventClass.CLASS1, binaryConfig)
+        db.updateBinaryInput(e, updateOptions)
       })
     }
 
     if(!testDatabaseConfig.disableDoubleBitBinaryInputs) {
-      val doubleBitBinaryConfig = new DoubleBitBinaryConfig()
+      val doubleBitBinaryConfig = new DoubleBitBinaryInputConfig()
 
       this.doubleBitPoints.values.foreach(e => {
-        db.addDoubleBitBinary(e.index, io.stepfunc.dnp3.EventClass.CLASS1, doubleBitBinaryConfig)
-        db.updateDoubleBitBinary(e, updateOptions)
+        db.addDoubleBitBinaryInput(e.index, io.stepfunc.dnp3.EventClass.CLASS1, doubleBitBinaryConfig)
+        db.updateDoubleBitBinaryInput(e, updateOptions)
       })
     }
 
@@ -103,11 +103,11 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     }
 
     this.analogInputs.values.foreach(e => {
-      val aiConfig = new AnalogConfig()
-      aiConfig.staticVariation = StaticAnalogVariation.GROUP30_VAR2
+      val aiConfig = new AnalogInputConfig()
+      aiConfig.staticVariation = StaticAnalogInputVariation.GROUP30_VAR2
 
-      db.addAnalog(e.index, io.stepfunc.dnp3.EventClass.CLASS3, aiConfig)
-      db.updateAnalog(e, updateOptions)
+      db.addAnalogInput(e.index, io.stepfunc.dnp3.EventClass.CLASS3, aiConfig)
+      db.updateAnalogInput(e, updateOptions)
     })
 
     this.binaryOutputs.values.foreach(e => {
@@ -127,33 +127,33 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     })
   })
 
-  def generateBinaryInputEvent(idx: Int, eventBatch: Int): TypedEvent[Binary] = {
+  def generateBinaryInputEvent(idx: Int, eventBatch: Int): TypedEvent[BinaryInput] = {
     val value = !binaryPoints(idx).value
     val flags = if(value) ubyte(0x81) else ubyte(0x01)
-    val newPoint = new Binary(ushort(idx), value, new Flags(flags), app.now())
+    val newPoint = new BinaryInput(ushort(idx), value, new Flags(flags), app.now())
 
     this.binaryPoints(idx) = newPoint
-    val newEvent = new TypedEvent[Binary](idx, eventBatch, EventClass.Class1, newPoint)
+    val newEvent = new TypedEvent[BinaryInput](idx, eventBatch, EventClass.Class1, newPoint)
     this.events.append(newEvent)
 
     outstation.transaction(db => {
-      db.updateBinary(newPoint, new UpdateOptions)
+      db.updateBinaryInput(newPoint, new UpdateOptions)
     })
 
     newEvent
   }
 
-  def generateDoubleBitBinaryInputEvent(idx: Int, eventBatch: Int): TypedEvent[DoubleBitBinary] = {
+  def generateDoubleBitBinaryInputEvent(idx: Int, eventBatch: Int): TypedEvent[DoubleBitBinaryInput] = {
     val value = if (doubleBitPoints(idx).value == DoubleBit.DETERMINED_OFF) DoubleBit.DETERMINED_ON else DoubleBit.DETERMINED_OFF
     val flags = if (value == DoubleBit.DETERMINED_OFF) ubyte(0x41) else ubyte(0x81)
-    val newPoint = new DoubleBitBinary(ushort(idx), value, new Flags(flags), app.now())
+    val newPoint = new DoubleBitBinaryInput(ushort(idx), value, new Flags(flags), app.now())
 
     this.doubleBitPoints(idx) = newPoint
-    val newEvent = new TypedEvent[DoubleBitBinary](idx, eventBatch, EventClass.All, newPoint)
+    val newEvent = new TypedEvent[DoubleBitBinaryInput](idx, eventBatch, EventClass.All, newPoint)
     this.events.append(newEvent)
 
     outstation.transaction(db => {
-      db.updateDoubleBitBinary(newPoint, new UpdateOptions)
+      db.updateDoubleBitBinaryInput(newPoint, new UpdateOptions)
     })
 
     newEvent
@@ -178,16 +178,16 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     this.recordedCounterValues = this.counters.clone()
   }
 
-  def generateAnalogInputEvent(idx: Int, eventBatch: Int): TypedEvent[Analog] = {
+  def generateAnalogInputEvent(idx: Int, eventBatch: Int): TypedEvent[AnalogInput] = {
     val value = analogInputs(idx).value + 100.0
-    val newPoint = new Analog(ushort(idx), value, new Flags(ubyte(0x01)), app.now())
+    val newPoint = new AnalogInput(ushort(idx), value, new Flags(ubyte(0x01)), app.now())
 
     this.analogInputs(idx) = newPoint
-    val newEvent = new TypedEvent[Analog](idx, eventBatch, EventClass.Class3, newPoint)
+    val newEvent = new TypedEvent[AnalogInput](idx, eventBatch, EventClass.Class3, newPoint)
     this.events.append(newEvent)
 
     outstation.transaction(db => {
-      db.updateAnalog(newPoint, new UpdateOptions)
+      db.updateAnalogInput(newPoint, new UpdateOptions)
     })
 
     newEvent
@@ -236,24 +236,24 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     head
   }
 
-  def getAllBinaryInputs: Seq[TypedEvent[Binary]] = {
+  def getAllBinaryInputs: Seq[TypedEvent[BinaryInput]] = {
     this.binaryPoints.map(e => {
       new TypedEvent(e._1, 0, EventClass.All, e._2)
     }).toSeq
   }
 
-  def getAllBinaryInputEvents(batch: BatchSpecifier): Seq[TypedEvent[Binary]] = {
+  def getAllBinaryInputEvents(batch: BatchSpecifier): Seq[TypedEvent[BinaryInput]] = {
     getAllEvents(batch).flatMap {
-      case event @ TypedEvent(_: Binary) => Some(event.asInstanceOf[TypedEvent[Binary]])
+      case event @ TypedEvent(_: BinaryInput) => Some(event.asInstanceOf[TypedEvent[BinaryInput]])
       case _ => None
     }
   }
 
-  def getUnhandledBinaryInputEvents(batch: BatchSpecifier): Seq[TypedEvent[Binary]] = {
+  def getUnhandledBinaryInputEvents(batch: BatchSpecifier): Seq[TypedEvent[BinaryInput]] = {
     getAllBinaryInputEvents(batch).filter(e => !e.isHandled)
   }
 
-  def popBinaryEvent(batch: BatchSpecifier): Option[TypedEvent[Binary]] = {
+  def popBinaryEvent(batch: BatchSpecifier): Option[TypedEvent[BinaryInput]] = {
     val head = getUnhandledBinaryInputEvents(batch).headOption
     head match {
       case Some(event) => event.handle()
@@ -262,24 +262,24 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     head
   }
 
-  def getAllDoubleBitBinaryInputs: Seq[TypedEvent[DoubleBitBinary]] = {
+  def getAllDoubleBitBinaryInputs: Seq[TypedEvent[DoubleBitBinaryInput]] = {
     this.doubleBitPoints.map(e => {
       new TypedEvent(e._1, 0, EventClass.All, e._2)
     }).toSeq
   }
 
-  def getAllDoubleBitBinaryInputEvents(batch: BatchSpecifier): Seq[TypedEvent[DoubleBitBinary]] = {
+  def getAllDoubleBitBinaryInputEvents(batch: BatchSpecifier): Seq[TypedEvent[DoubleBitBinaryInput]] = {
     getAllEvents(batch).flatMap {
-      case event @ TypedEvent(_: DoubleBitBinary) => Some(event.asInstanceOf[TypedEvent[DoubleBitBinary]])
+      case event @ TypedEvent(_: DoubleBitBinaryInput) => Some(event.asInstanceOf[TypedEvent[DoubleBitBinaryInput]])
       case _ => None
     }
   }
 
-  def getUnhandledDoubleBitBinaryInputEvents(batch: BatchSpecifier): Seq[TypedEvent[DoubleBitBinary]] = {
+  def getUnhandledDoubleBitBinaryInputEvents(batch: BatchSpecifier): Seq[TypedEvent[DoubleBitBinaryInput]] = {
     getAllDoubleBitBinaryInputEvents(batch).filter(e => !e.isHandled)
   }
 
-  def popDoubleBitBinaryEvent(batch: BatchSpecifier): Option[TypedEvent[DoubleBitBinary]] = {
+  def popDoubleBitBinaryEvent(batch: BatchSpecifier): Option[TypedEvent[DoubleBitBinaryInput]] = {
     val head = getUnhandledDoubleBitBinaryInputEvents(batch).headOption
     head match {
       case Some(event) => event.handle()
@@ -320,24 +320,24 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     head
   }
 
-  def getAllAnalogInputs: Seq[TypedEvent[Analog]] = {
+  def getAllAnalogInputs: Seq[TypedEvent[AnalogInput]] = {
     this.analogInputs.map(e => {
       new TypedEvent(e._1, 0, EventClass.All, e._2)
     }).toSeq
   }
 
-  def getAllAnalogInputEvents(batch: BatchSpecifier): Seq[TypedEvent[Analog]] = {
+  def getAllAnalogInputEvents(batch: BatchSpecifier): Seq[TypedEvent[AnalogInput]] = {
     getAllEvents(batch).flatMap {
-      case event @ TypedEvent(_: Analog) => Some(event.asInstanceOf[TypedEvent[Analog]])
+      case event @ TypedEvent(_: AnalogInput) => Some(event.asInstanceOf[TypedEvent[AnalogInput]])
       case _ => None
     }
   }
 
-  def getUnhandledAnalogInputEvents(batch: BatchSpecifier): Seq[TypedEvent[Analog]] = {
+  def getUnhandledAnalogInputEvents(batch: BatchSpecifier): Seq[TypedEvent[AnalogInput]] = {
     getAllAnalogInputEvents(batch).filter(e => !e.isHandled)
   }
 
-  def popAnalogInputEvent(batch: BatchSpecifier): Option[TypedEvent[Analog]] = {
+  def popAnalogInputEvent(batch: BatchSpecifier): Option[TypedEvent[AnalogInput]] = {
     val head = getUnhandledAnalogInputEvents(batch).headOption
     head match {
       case Some(event) => event.handle()
