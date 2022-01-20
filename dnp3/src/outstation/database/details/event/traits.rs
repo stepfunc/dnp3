@@ -24,7 +24,7 @@ pub(crate) trait EventVariation<T> {
     }
 }
 
-impl EventVariation<BinaryInput> for EventBinaryVariation {
+impl EventVariation<BinaryInput> for EventBinaryInputVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
@@ -90,7 +90,7 @@ impl EventVariation<BinaryOutputStatus> for EventBinaryOutputStatusVariation {
     }
 }
 
-impl EventVariation<DoubleBitBinaryInput> for EventDoubleBitBinaryVariation {
+impl EventVariation<DoubleBitBinaryInput> for EventDoubleBitBinaryInputVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
@@ -204,7 +204,7 @@ impl EventVariation<FrozenCounter> for EventFrozenCounterVariation {
     }
 }
 
-impl EventVariation<AnalogInput> for EventAnalogVariation {
+impl EventVariation<AnalogInput> for EventAnalogInputVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,

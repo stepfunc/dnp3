@@ -37,12 +37,12 @@ impl HeaderState {
 
 #[derive(Copy, Clone)]
 pub(crate) enum HeaderType {
-    Binary(EventBinaryVariation),
-    DoubleBitBinary(EventDoubleBitBinaryVariation),
+    Binary(EventBinaryInputVariation),
+    DoubleBitBinary(EventDoubleBitBinaryInputVariation),
     BinaryOutputStatus(EventBinaryOutputStatusVariation),
     Counter(EventCounterVariation),
     FrozenCounter(EventFrozenCounterVariation),
-    Analog(EventAnalogVariation),
+    Analog(EventAnalogInputVariation),
     AnalogOutputStatus(EventAnalogOutputStatusVariation),
     OctetString(EventOctetStringVariation),
 }
@@ -217,7 +217,7 @@ impl EventWriter {
 }
 
 impl Writable for BinaryInput {
-    type EventVariation = EventBinaryVariation;
+    type EventVariation = EventBinaryInputVariation;
 
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
@@ -232,7 +232,7 @@ impl Writable for BinaryInput {
 }
 
 impl Writable for DoubleBitBinaryInput {
-    type EventVariation = EventDoubleBitBinaryVariation;
+    type EventVariation = EventDoubleBitBinaryInputVariation;
 
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
@@ -292,7 +292,7 @@ impl Writable for FrozenCounter {
 }
 
 impl Writable for AnalogInput {
-    type EventVariation = EventAnalogVariation;
+    type EventVariation = EventAnalogInputVariation;
 
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
@@ -350,7 +350,12 @@ mod tests {
 
         let value = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0));
         writer
-            .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var1)
+            .write(
+                &mut cursor,
+                &value,
+                06,
+                EventBinaryInputVariation::Group2Var1,
+            )
             .unwrap();
         assert_eq!(
             cursor.written(),
@@ -361,7 +366,12 @@ mod tests {
         );
 
         writer
-            .write(&mut cursor, &value, 07, EventBinaryVariation::Group2Var1)
+            .write(
+                &mut cursor,
+                &value,
+                07,
+                EventBinaryInputVariation::Group2Var1,
+            )
             .unwrap();
         assert_eq!(
             cursor.written(),
@@ -387,7 +397,12 @@ mod tests {
         {
             let value = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0));
             writer
-                .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var1)
+                .write(
+                    &mut cursor,
+                    &value,
+                    06,
+                    EventBinaryInputVariation::Group2Var1,
+                )
                 .unwrap();
             assert_eq!(cursor.written(), &expected);
         }
@@ -396,7 +411,12 @@ mod tests {
             let value = AnalogInput::new(32.0, Flags::ONLINE, Time::synchronized(0));
             // not enough space to write analog header
             assert!(writer
-                .write(&mut cursor, &value, 07, EventAnalogVariation::Group32Var1)
+                .write(
+                    &mut cursor,
+                    &value,
+                    07,
+                    EventAnalogInputVariation::Group32Var1
+                )
                 .is_err());
             // written data should be the same
             assert_eq!(cursor.written(), &expected);
@@ -413,7 +433,12 @@ mod tests {
         let analog = AnalogInput::new(27.0, Flags::ONLINE, Time::synchronized(27));
 
         writer
-            .write(&mut cursor, &binary, 06, EventBinaryVariation::Group2Var1)
+            .write(
+                &mut cursor,
+                &binary,
+                06,
+                EventBinaryInputVariation::Group2Var1,
+            )
             .unwrap();
 
         assert_eq!(
@@ -425,7 +450,12 @@ mod tests {
         );
 
         writer
-            .write(&mut cursor, &analog, 07, EventAnalogVariation::Group32Var1)
+            .write(
+                &mut cursor,
+                &analog,
+                07,
+                EventAnalogInputVariation::Group32Var1,
+            )
             .unwrap();
 
         assert_eq!(
@@ -448,7 +478,12 @@ mod tests {
         {
             let value = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(1));
             writer
-                .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var3)
+                .write(
+                    &mut cursor,
+                    &value,
+                    06,
+                    EventBinaryInputVariation::Group2Var3,
+                )
                 .unwrap();
             assert_eq!(
                 cursor.written(),
@@ -464,7 +499,12 @@ mod tests {
         {
             let value = BinaryInput::new(false, Flags::ONLINE, Time::synchronized(28));
             writer
-                .write(&mut cursor, &value, 07, EventBinaryVariation::Group2Var3)
+                .write(
+                    &mut cursor,
+                    &value,
+                    07,
+                    EventBinaryInputVariation::Group2Var3,
+                )
                 .unwrap();
 
             assert_eq!(
@@ -489,7 +529,12 @@ mod tests {
         {
             let value = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(1));
             writer
-                .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var3)
+                .write(
+                    &mut cursor,
+                    &value,
+                    06,
+                    EventBinaryInputVariation::Group2Var3,
+                )
                 .unwrap();
             assert_eq!(
                 cursor.written(),
@@ -505,7 +550,12 @@ mod tests {
         {
             let value = BinaryInput::new(false, Flags::ONLINE, Time::unsynchronized(2));
             writer
-                .write(&mut cursor, &value, 07, EventBinaryVariation::Group2Var3)
+                .write(
+                    &mut cursor,
+                    &value,
+                    07,
+                    EventBinaryInputVariation::Group2Var3,
+                )
                 .unwrap();
 
             assert_eq!(
@@ -533,7 +583,12 @@ mod tests {
         {
             let value = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0));
             writer
-                .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var3)
+                .write(
+                    &mut cursor,
+                    &value,
+                    06,
+                    EventBinaryInputVariation::Group2Var3,
+                )
                 .unwrap();
             assert_eq!(
                 cursor.written(),
@@ -549,7 +604,12 @@ mod tests {
         {
             let value = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(65536));
             writer
-                .write(&mut cursor, &value, 06, EventBinaryVariation::Group2Var3)
+                .write(
+                    &mut cursor,
+                    &value,
+                    06,
+                    EventBinaryInputVariation::Group2Var3,
+                )
                 .unwrap();
 
             assert_eq!(

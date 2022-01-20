@@ -423,20 +423,20 @@ impl Update<OctetString> for Database {
     }
 }
 
-impl Add<BinaryConfig> for Database {
-    fn add(&mut self, index: u16, class: Option<EventClass>, config: BinaryConfig) -> bool {
+impl Add<BinaryInputConfig> for Database {
+    fn add(&mut self, index: u16, class: Option<EventClass>, config: BinaryInputConfig) -> bool {
         let config =
             PointConfig::<BinaryInput>::new(class, FlagsDetector {}, config.s_var, config.e_var);
         self.inner.add(index, config)
     }
 }
 
-impl Add<DoubleBitBinaryConfig> for Database {
+impl Add<DoubleBitBinaryInputConfig> for Database {
     fn add(
         &mut self,
         index: u16,
         class: Option<EventClass>,
-        config: DoubleBitBinaryConfig,
+        config: DoubleBitBinaryInputConfig,
     ) -> bool {
         let config = PointConfig::<DoubleBitBinaryInput>::new(
             class,
@@ -489,8 +489,8 @@ impl Add<FrozenCounterConfig> for Database {
     }
 }
 
-impl Add<AnalogConfig> for Database {
-    fn add(&mut self, index: u16, class: Option<EventClass>, config: AnalogConfig) -> bool {
+impl Add<AnalogInputConfig> for Database {
+    fn add(&mut self, index: u16, class: Option<EventClass>, config: AnalogInputConfig) -> bool {
         let config = PointConfig::<AnalogInput>::new(
             class,
             Deadband::new(config.deadband),

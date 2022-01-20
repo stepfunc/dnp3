@@ -75,13 +75,13 @@ pub(crate) trait StaticVariation<T>: Copy + PartialEq {
     fn get_write_info(&self, value: &T) -> WriteInfo<T>;
 }
 
-impl StaticVariation<BinaryInput> for StaticBinaryVariation {
+impl StaticVariation<BinaryInput> for StaticBinaryInputVariation {
     fn promote(&self, value: &BinaryInput) -> Self {
-        if let StaticBinaryVariation::Group1Var1 = self {
+        if let StaticBinaryInputVariation::Group1Var1 = self {
             if value.flags.without(BIT_7) == Flags::ONLINE {
                 *self
             } else {
-                StaticBinaryVariation::Group1Var2
+                StaticBinaryInputVariation::Group1Var2
             }
         } else {
             *self
@@ -96,13 +96,13 @@ impl StaticVariation<BinaryInput> for StaticBinaryVariation {
     }
 }
 
-impl StaticVariation<DoubleBitBinaryInput> for StaticDoubleBitBinaryVariation {
+impl StaticVariation<DoubleBitBinaryInput> for StaticDoubleBitBinaryInputVariation {
     fn promote(&self, value: &DoubleBitBinaryInput) -> Self {
-        if let StaticDoubleBitBinaryVariation::Group3Var1 = self {
+        if let StaticDoubleBitBinaryInputVariation::Group3Var1 = self {
             if value.flags.without(BIT_6 | BIT_7) == Flags::ONLINE {
                 *self
             } else {
-                StaticDoubleBitBinaryVariation::Group3Var2
+                StaticDoubleBitBinaryInputVariation::Group3Var2
             }
         } else {
             *self
@@ -164,15 +164,15 @@ impl StaticVariation<FrozenCounter> for StaticFrozenCounterVariation {
     }
 }
 
-impl StaticVariation<AnalogInput> for StaticAnalogVariation {
+impl StaticVariation<AnalogInput> for StaticAnalogInputVariation {
     fn get_write_info(&self, _value: &AnalogInput) -> WriteInfo<AnalogInput> {
         match self {
-            StaticAnalogVariation::Group30Var1 => fixed_type::<AnalogInput, Group30Var1>(),
-            StaticAnalogVariation::Group30Var2 => fixed_type::<AnalogInput, Group30Var2>(),
-            StaticAnalogVariation::Group30Var3 => fixed_type::<AnalogInput, Group30Var3>(),
-            StaticAnalogVariation::Group30Var4 => fixed_type::<AnalogInput, Group30Var4>(),
-            StaticAnalogVariation::Group30Var5 => fixed_type::<AnalogInput, Group30Var5>(),
-            StaticAnalogVariation::Group30Var6 => fixed_type::<AnalogInput, Group30Var6>(),
+            StaticAnalogInputVariation::Group30Var1 => fixed_type::<AnalogInput, Group30Var1>(),
+            StaticAnalogInputVariation::Group30Var2 => fixed_type::<AnalogInput, Group30Var2>(),
+            StaticAnalogInputVariation::Group30Var3 => fixed_type::<AnalogInput, Group30Var3>(),
+            StaticAnalogInputVariation::Group30Var4 => fixed_type::<AnalogInput, Group30Var4>(),
+            StaticAnalogInputVariation::Group30Var5 => fixed_type::<AnalogInput, Group30Var5>(),
+            StaticAnalogInputVariation::Group30Var6 => fixed_type::<AnalogInput, Group30Var6>(),
         }
     }
 }

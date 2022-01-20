@@ -63,12 +63,12 @@ impl VariationRange {
 
 #[derive(Copy, Clone)]
 pub(crate) enum SpecificVariation {
-    Binary(Option<StaticBinaryVariation>),
-    DoubleBitBinary(Option<StaticDoubleBitBinaryVariation>),
+    Binary(Option<StaticBinaryInputVariation>),
+    DoubleBitBinary(Option<StaticDoubleBitBinaryInputVariation>),
     BinaryOutputStatus(Option<StaticBinaryOutputStatusVariation>),
     Counter(Option<StaticCounterVariation>),
     FrozenCounter(Option<StaticFrozenCounterVariation>),
-    Analog(Option<StaticAnalogVariation>),
+    Analog(Option<StaticAnalogInputVariation>),
     AnalogOutputStatus(Option<StaticAnalogOutputStatusVariation>),
     OctetString,
 }
@@ -627,7 +627,7 @@ impl EventDetector<OctetString> for OctetStringDetector {
 }
 
 impl Updatable for BinaryInput {
-    type StaticVariation = StaticBinaryVariation;
+    type StaticVariation = StaticBinaryInputVariation;
     type Detector = FlagsDetector;
 
     fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
@@ -648,7 +648,7 @@ impl Updatable for BinaryInput {
 }
 
 impl Updatable for DoubleBitBinaryInput {
-    type StaticVariation = StaticDoubleBitBinaryVariation;
+    type StaticVariation = StaticDoubleBitBinaryInputVariation;
     type Detector = FlagsDetector;
 
     fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
@@ -732,7 +732,7 @@ impl Updatable for FrozenCounter {
 }
 
 impl Updatable for AnalogInput {
-    type StaticVariation = StaticAnalogVariation;
+    type StaticVariation = StaticAnalogInputVariation;
     type Detector = Deadband<f64>;
 
     fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
@@ -850,11 +850,11 @@ impl Default for OctetString {
 mod tests {
     use super::*;
 
-    fn binary_config(var: StaticBinaryVariation) -> PointConfig<BinaryInput> {
+    fn binary_config(var: StaticBinaryInputVariation) -> PointConfig<BinaryInput> {
         PointConfig {
             class: Some(EventClass::Class1),
             s_var: var,
-            e_var: EventBinaryVariation::Group2Var1,
+            e_var: EventBinaryInputVariation::Group2Var1,
             detector: FlagsDetector {},
         }
     }
@@ -868,11 +868,11 @@ mod tests {
         }
     }
 
-    fn analog_config(var: StaticAnalogVariation) -> PointConfig<AnalogInput> {
+    fn analog_config(var: StaticAnalogInputVariation) -> PointConfig<AnalogInput> {
         PointConfig {
             class: Some(EventClass::Class1),
             s_var: var,
-            e_var: EventAnalogVariation::Group32Var1,
+            e_var: EventAnalogInputVariation::Group32Var1,
             detector: Deadband::new(0.0),
         }
     }
@@ -881,9 +881,9 @@ mod tests {
     fn can_write_integrity() {
         let mut db = StaticDatabase::default();
 
-        assert!(db.add(0, binary_config(StaticBinaryVariation::Group1Var2)));
+        assert!(db.add(0, binary_config(StaticBinaryInputVariation::Group1Var2)));
         assert!(db.add(1, counter_config(StaticCounterVariation::Group20Var1)));
-        assert!(db.add(2, analog_config(StaticAnalogVariation::Group30Var1)));
+        assert!(db.add(2, analog_config(StaticAnalogInputVariation::Group30Var1)));
 
         db.select_class_zero();
 
@@ -909,9 +909,9 @@ mod tests {
     fn can_write_multiple_cycles() {
         let mut db = StaticDatabase::default();
 
-        assert!(db.add(0, binary_config(StaticBinaryVariation::Group1Var2)));
+        assert!(db.add(0, binary_config(StaticBinaryInputVariation::Group1Var2)));
         assert!(db.add(1, counter_config(StaticCounterVariation::Group20Var1)));
-        assert!(db.add(2, analog_config(StaticAnalogVariation::Group30Var1)));
+        assert!(db.add(2, analog_config(StaticAnalogInputVariation::Group30Var1)));
 
         db.select_class_zero();
 
@@ -961,7 +961,7 @@ mod tests {
     fn promotes_g1v1_to_g1v2_if_flags_other_than_just_online() {
         let mut db = StaticDatabase::default();
 
-        assert!(db.add(0, binary_config(StaticBinaryVariation::Group1Var1)));
+        assert!(db.add(0, binary_config(StaticBinaryInputVariation::Group1Var1)));
 
         db.select_class_zero();
 

@@ -93,7 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: database_init
     outstation.transaction(|db| {
         for i in 0..10 {
-            db.add(i, Some(EventClass::Class1), AnalogConfig::default());
+            db.add(i, Some(EventClass::Class1), AnalogInputConfig::default());
             db.update(
                 i,
                 &AnalogInput::new(10.0, Flags::ONLINE, Time::synchronized(0)),

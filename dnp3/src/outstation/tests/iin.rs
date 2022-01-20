@@ -1,6 +1,6 @@
 use crate::app::measurement::{BinaryInput, Flags, Time};
 use crate::app::Timestamp;
-use crate::outstation::database::{Add, BinaryConfig, EventClass, Update, UpdateOptions};
+use crate::outstation::database::{Add, BinaryInputConfig, EventClass, Update, UpdateOptions};
 
 use super::harness::*;
 
@@ -58,7 +58,7 @@ fn buffer_overflow() {
 
     // Generate a buffer overflow
     harness.handle.database.transaction(|database| {
-        database.add(0, Some(EventClass::Class1), BinaryConfig::default());
+        database.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
 
         for i in 0..6 {
             database.update(

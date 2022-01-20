@@ -169,9 +169,9 @@ impl Pair {
                 db.add(
                     i,
                     Some(EventClass::Class1),
-                    BinaryConfig::new(
-                        StaticBinaryVariation::Group1Var2,
-                        EventBinaryVariation::Group2Var2,
+                    BinaryInputConfig::new(
+                        StaticBinaryInputVariation::Group1Var2,
+                        EventBinaryInputVariation::Group2Var2,
                     ),
                 );
                 db.add(
@@ -186,9 +186,9 @@ impl Pair {
                 db.add(
                     i,
                     Some(EventClass::Class1),
-                    AnalogConfig::new(
-                        StaticAnalogVariation::Group30Var1,
-                        EventAnalogVariation::Group32Var3,
+                    AnalogInputConfig::new(
+                        StaticAnalogInputVariation::Group30Var1,
+                        EventAnalogInputVariation::Group32Var3,
                         0.0,
                     ),
                 );

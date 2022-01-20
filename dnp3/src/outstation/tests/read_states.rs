@@ -17,7 +17,7 @@ const BINARY_EVENT_RESPONSE: &[u8] = &[
 ];
 
 fn create_binary_and_event(database: &mut Database) {
-    database.add(0, Some(EventClass::Class1), BinaryConfig::default());
+    database.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
     database.update(
         0,
         &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
