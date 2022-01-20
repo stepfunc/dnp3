@@ -211,7 +211,7 @@ class TestReadHandler implements ReadHandler {
         val -> {
           System.out.print("Octet String " + val.index + ": Value=");
           val.value.forEach(
-              b -> System.out.print(String.format("%02X", b.value.byteValue()) + " "));
+              b -> System.out.print(String.format("%02X", b.byteValue()) + " "));
           System.out.println();
         });
   }
