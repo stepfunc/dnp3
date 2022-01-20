@@ -131,7 +131,7 @@ class MainClass
                 Console.Write($"Octet String {val.Index}: Value=");
                 foreach (var b in val.Value)
                 {
-                    Console.Write($"{b.Value:X2} ");
+                    Console.Write($"{b:X2} ");
                 }
                 Console.WriteLine();
             }

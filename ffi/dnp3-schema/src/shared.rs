@@ -535,16 +535,7 @@ fn build_iterator<T: Into<UniversalStructField>>(
 fn build_octet_string(
     lib: &mut LibraryBuilder,
 ) -> Result<(FunctionReturnStructHandle, AbstractIteratorHandle), BindingError> {
-    // Octet string stuff
-    let byte_struct_decl = lib.declare_function_return_struct("byte_value")?;
-    let byte_struct = lib
-        .define_function_return_struct(byte_struct_decl)?
-        .add("value", Primitive::U8, "Byte value")?
-        .doc("Single byte struct")?
-        .end_fields()?
-        .build()?;
-
-    let byte_it = lib.define_iterator_with_lifetime("byte_iterator", byte_struct)?;
+    let byte_it = lib.define_iterator_with_lifetime("byte_iterator", Primitive::U8)?;
 
     let octet_string_struct_decl = lib.declare_function_return_struct("octet_string")?;
     let octet_string_struct = lib
