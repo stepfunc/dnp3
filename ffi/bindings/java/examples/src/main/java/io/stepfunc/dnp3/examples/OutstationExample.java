@@ -208,12 +208,12 @@ public class OutstationExample {
   // ANCHOR: database_init_function
   public static void initializeDatabase(Database db) {
     for (int i = 0; i < 10; i++) {
-      db.addBinary(ushort(i), EventClass.CLASS1, new BinaryConfig());
-      db.addDoubleBitBinary(ushort(i), EventClass.CLASS1, new DoubleBitBinaryConfig());
+      db.addBinaryInput(ushort(i), EventClass.CLASS1, new BinaryInputConfig());
+      db.addDoubleBitBinaryInput(ushort(i), EventClass.CLASS1, new DoubleBitBinaryInputConfig());
       db.addBinaryOutputStatus(ushort(i), EventClass.CLASS1, new BinaryOutputStatusConfig());
       db.addCounter(ushort(i), EventClass.CLASS1, new CounterConfig());
       db.addFrozenCounter(ushort(i), EventClass.CLASS1, new FrozenCounterConfig());
-      db.addAnalog(ushort(i), EventClass.CLASS1, new AnalogConfig());
+      db.addAnalogInput(ushort(i), EventClass.CLASS1, new AnalogInputConfig());
       db.addAnalogOutputStatus(ushort(i), EventClass.CLASS1, new AnalogOutputStatusConfig());
       db.addOctetString(ushort(i), EventClass.CLASS1);
     }
@@ -288,7 +288,7 @@ public class OutstationExample {
                             pointValue,
                             onlineFlags,
                             Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateBinary(value, new UpdateOptions());
+                    db.updateBinaryInput(value, new UpdateOptions());
                   });
               break;
             }
@@ -307,7 +307,7 @@ public class OutstationExample {
                             pointValue,
                             onlineFlags,
                             Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateDoubleBitBinary(value, new UpdateOptions());
+                    db.updateDoubleBitBinaryInput(value, new UpdateOptions());
                   });
               break;
             }
@@ -371,7 +371,7 @@ public class OutstationExample {
                             pointValue,
                             onlineFlags,
                             Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateAnalog(value, new UpdateOptions());
+                    db.updateAnalogInput(value, new UpdateOptions());
                   });
               break;
             }
