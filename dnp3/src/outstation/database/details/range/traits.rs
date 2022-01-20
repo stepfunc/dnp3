@@ -75,8 +75,8 @@ pub(crate) trait StaticVariation<T>: Copy + PartialEq {
     fn get_write_info(&self, value: &T) -> WriteInfo<T>;
 }
 
-impl StaticVariation<Binary> for StaticBinaryVariation {
-    fn promote(&self, value: &Binary) -> Self {
+impl StaticVariation<BinaryInput> for StaticBinaryVariation {
+    fn promote(&self, value: &BinaryInput) -> Self {
         if let StaticBinaryVariation::Group1Var1 = self {
             if value.flags.without(BIT_7) == Flags::ONLINE {
                 *self
@@ -88,16 +88,16 @@ impl StaticVariation<Binary> for StaticBinaryVariation {
         }
     }
 
-    fn get_write_info(&self, _value: &Binary) -> WriteInfo<Binary> {
+    fn get_write_info(&self, _value: &BinaryInput) -> WriteInfo<BinaryInput> {
         match self {
             Self::Group1Var1 => bit_type(Variation::Group1Var1, |v| v.value),
-            Self::Group1Var2 => fixed_type::<Binary, Group1Var2>(),
+            Self::Group1Var2 => fixed_type::<BinaryInput, Group1Var2>(),
         }
     }
 }
 
-impl StaticVariation<DoubleBitBinary> for StaticDoubleBitBinaryVariation {
-    fn promote(&self, value: &DoubleBitBinary) -> Self {
+impl StaticVariation<DoubleBitBinaryInput> for StaticDoubleBitBinaryVariation {
+    fn promote(&self, value: &DoubleBitBinaryInput) -> Self {
         if let StaticDoubleBitBinaryVariation::Group3Var1 = self {
             if value.flags.without(BIT_6 | BIT_7) == Flags::ONLINE {
                 *self
@@ -109,10 +109,10 @@ impl StaticVariation<DoubleBitBinary> for StaticDoubleBitBinaryVariation {
         }
     }
 
-    fn get_write_info(&self, _value: &DoubleBitBinary) -> WriteInfo<DoubleBitBinary> {
+    fn get_write_info(&self, _value: &DoubleBitBinaryInput) -> WriteInfo<DoubleBitBinaryInput> {
         match self {
             Self::Group3Var1 => double_bit_type(Variation::Group3Var1, |v| v.value),
-            Self::Group3Var2 => fixed_type::<DoubleBitBinary, Group3Var2>(),
+            Self::Group3Var2 => fixed_type::<DoubleBitBinaryInput, Group3Var2>(),
         }
     }
 }
@@ -164,15 +164,15 @@ impl StaticVariation<FrozenCounter> for StaticFrozenCounterVariation {
     }
 }
 
-impl StaticVariation<Analog> for StaticAnalogVariation {
-    fn get_write_info(&self, _value: &Analog) -> WriteInfo<Analog> {
+impl StaticVariation<AnalogInput> for StaticAnalogVariation {
+    fn get_write_info(&self, _value: &AnalogInput) -> WriteInfo<AnalogInput> {
         match self {
-            StaticAnalogVariation::Group30Var1 => fixed_type::<Analog, Group30Var1>(),
-            StaticAnalogVariation::Group30Var2 => fixed_type::<Analog, Group30Var2>(),
-            StaticAnalogVariation::Group30Var3 => fixed_type::<Analog, Group30Var3>(),
-            StaticAnalogVariation::Group30Var4 => fixed_type::<Analog, Group30Var4>(),
-            StaticAnalogVariation::Group30Var5 => fixed_type::<Analog, Group30Var5>(),
-            StaticAnalogVariation::Group30Var6 => fixed_type::<Analog, Group30Var6>(),
+            StaticAnalogVariation::Group30Var1 => fixed_type::<AnalogInput, Group30Var1>(),
+            StaticAnalogVariation::Group30Var2 => fixed_type::<AnalogInput, Group30Var2>(),
+            StaticAnalogVariation::Group30Var3 => fixed_type::<AnalogInput, Group30Var3>(),
+            StaticAnalogVariation::Group30Var4 => fixed_type::<AnalogInput, Group30Var4>(),
+            StaticAnalogVariation::Group30Var5 => fixed_type::<AnalogInput, Group30Var5>(),
+            StaticAnalogVariation::Group30Var6 => fixed_type::<AnalogInput, Group30Var6>(),
         }
     }
 }

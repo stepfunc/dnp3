@@ -229,12 +229,12 @@ pub(crate) struct StaticDatabase {
     class_zero: ClassZeroConfig,
     selected: SelectionQueue,
     // maps for the various types
-    binary: PointMap<Binary>,
-    double_bit_binary: PointMap<DoubleBitBinary>,
+    binary: PointMap<BinaryInput>,
+    double_bit_binary: PointMap<DoubleBitBinaryInput>,
     binary_output_status: PointMap<BinaryOutputStatus>,
     counter: PointMap<Counter>,
     frozen_counter: PointMap<FrozenCounter>,
-    analog: PointMap<Analog>,
+    analog: PointMap<AnalogInput>,
     analog_output_status: PointMap<AnalogOutputStatus>,
     octet_strings: PointMap<OctetString>,
 }
@@ -380,10 +380,10 @@ impl StaticDatabase {
     ) -> Result<(), VariationRange> {
         match range.variation {
             SpecificVariation::Binary(var) => {
-                self.write_typed_range::<Binary>(cursor, range.range, var)
+                self.write_typed_range::<BinaryInput>(cursor, range.range, var)
             }
             SpecificVariation::DoubleBitBinary(var) => {
-                self.write_typed_range::<DoubleBitBinary>(cursor, range.range, var)
+                self.write_typed_range::<DoubleBitBinaryInput>(cursor, range.range, var)
             }
             SpecificVariation::BinaryOutputStatus(var) => {
                 self.write_typed_range::<BinaryOutputStatus>(cursor, range.range, var)
@@ -395,7 +395,7 @@ impl StaticDatabase {
                 self.write_typed_range::<FrozenCounter>(cursor, range.range, var)
             }
             SpecificVariation::Analog(var) => {
-                self.write_typed_range::<Analog>(cursor, range.range, var)
+                self.write_typed_range::<AnalogInput>(cursor, range.range, var)
             }
             SpecificVariation::AnalogOutputStatus(var) => {
                 self.write_typed_range::<AnalogOutputStatus>(cursor, range.range, var)
@@ -436,10 +436,10 @@ impl StaticDatabase {
         match variation {
             StaticReadHeader::Class0 => self.select_class_zero(),
             StaticReadHeader::Binary(variation, range) => {
-                self.select_by_type::<Binary>(variation, range)
+                self.select_by_type::<BinaryInput>(variation, range)
             }
             StaticReadHeader::DoubleBitBinary(variation, range) => {
-                self.select_by_type::<DoubleBitBinary>(variation, range)
+                self.select_by_type::<DoubleBitBinaryInput>(variation, range)
             }
             StaticReadHeader::BinaryOutputStatus(variation, range) => {
                 self.select_by_type::<BinaryOutputStatus>(variation, range)
@@ -451,7 +451,7 @@ impl StaticDatabase {
                 self.select_by_type::<FrozenCounter>(variation, range)
             }
             StaticReadHeader::Analog(variation, range) => {
-                self.select_by_type::<Analog>(variation, range)
+                self.select_by_type::<AnalogInput>(variation, range)
             }
             StaticReadHeader::AnalogOutputStatus(variation, range) => {
                 self.select_by_type::<AnalogOutputStatus>(variation, range)
@@ -524,12 +524,12 @@ impl StaticDatabase {
     }
 
     fn select_class_zero(&mut self) -> Iin2 {
-        self.select_class_zero_type::<Binary>()
-            | self.select_class_zero_type::<DoubleBitBinary>()
+        self.select_class_zero_type::<BinaryInput>()
+            | self.select_class_zero_type::<DoubleBitBinaryInput>()
             | self.select_class_zero_type::<BinaryOutputStatus>()
             | self.select_class_zero_type::<Counter>()
             | self.select_class_zero_type::<FrozenCounter>()
-            | self.select_class_zero_type::<Analog>()
+            | self.select_class_zero_type::<AnalogInput>()
             | self.select_class_zero_type::<AnalogOutputStatus>()
             | self.select_class_zero_type::<OctetString>()
     }
@@ -560,8 +560,8 @@ where
     }
 }
 
-impl EventDetector<Binary> for FlagsDetector {
-    fn is_event(&self, new: &Binary, old: &Binary) -> bool {
+impl EventDetector<BinaryInput> for FlagsDetector {
+    fn is_event(&self, new: &BinaryInput, old: &BinaryInput) -> bool {
         new.get_wire_flags() != old.get_wire_flags()
     }
 }
@@ -572,8 +572,8 @@ impl EventDetector<BinaryOutputStatus> for FlagsDetector {
     }
 }
 
-impl EventDetector<DoubleBitBinary> for FlagsDetector {
-    fn is_event(&self, new: &DoubleBitBinary, old: &DoubleBitBinary) -> bool {
+impl EventDetector<DoubleBitBinaryInput> for FlagsDetector {
+    fn is_event(&self, new: &DoubleBitBinaryInput, old: &DoubleBitBinaryInput) -> bool {
         new.get_wire_flags() != old.get_wire_flags()
     }
 }
@@ -594,7 +594,7 @@ impl HasValue<u32> for FrozenCounter {
     }
 }
 
-impl HasValue<f64> for Analog {
+impl HasValue<f64> for AnalogInput {
     fn value(&self) -> f64 {
         self.value
     }
@@ -626,7 +626,7 @@ impl EventDetector<OctetString> for OctetStringDetector {
     }
 }
 
-impl Updatable for Binary {
+impl Updatable for BinaryInput {
     type StaticVariation = StaticBinaryVariation;
     type Detector = FlagsDetector;
 
@@ -647,7 +647,7 @@ impl Updatable for Binary {
     }
 }
 
-impl Updatable for DoubleBitBinary {
+impl Updatable for DoubleBitBinaryInput {
     type StaticVariation = StaticDoubleBitBinaryVariation;
     type Detector = FlagsDetector;
 
@@ -731,7 +731,7 @@ impl Updatable for FrozenCounter {
     }
 }
 
-impl Updatable for Analog {
+impl Updatable for AnalogInput {
     type StaticVariation = StaticAnalogVariation;
     type Detector = Deadband<f64>;
 
@@ -794,7 +794,7 @@ impl Updatable for OctetString {
     }
 }
 
-impl Default for Binary {
+impl Default for BinaryInput {
     fn default() -> Self {
         Self::new(false, Flags::RESTART, Time::unsynchronized(0))
     }
@@ -806,7 +806,7 @@ impl Default for BinaryOutputStatus {
     }
 }
 
-impl Default for DoubleBitBinary {
+impl Default for DoubleBitBinaryInput {
     fn default() -> Self {
         Self::new(
             DoubleBit::Indeterminate,
@@ -828,7 +828,7 @@ impl Default for FrozenCounter {
     }
 }
 
-impl Default for Analog {
+impl Default for AnalogInput {
     fn default() -> Self {
         Self::new(0.0, Flags::RESTART, Time::unsynchronized(0))
     }
@@ -850,7 +850,7 @@ impl Default for OctetString {
 mod tests {
     use super::*;
 
-    fn binary_config(var: StaticBinaryVariation) -> PointConfig<Binary> {
+    fn binary_config(var: StaticBinaryVariation) -> PointConfig<BinaryInput> {
         PointConfig {
             class: Some(EventClass::Class1),
             s_var: var,
@@ -868,7 +868,7 @@ mod tests {
         }
     }
 
-    fn analog_config(var: StaticAnalogVariation) -> PointConfig<Analog> {
+    fn analog_config(var: StaticAnalogVariation) -> PointConfig<AnalogInput> {
         PointConfig {
             class: Some(EventClass::Class1),
             s_var: var,

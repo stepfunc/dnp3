@@ -1,4 +1,4 @@
-use crate::app::measurement::{Binary, Flags, Time};
+use crate::app::measurement::{BinaryInput, Flags, Time};
 use crate::app::Timestamp;
 use crate::outstation::database::{Add, BinaryConfig, EventClass, Update, UpdateOptions};
 
@@ -63,7 +63,7 @@ fn buffer_overflow() {
         for i in 0..6 {
             database.update(
                 0,
-                &Binary::new(
+                &BinaryInput::new(
                     i % 2 != 0,
                     Flags::ONLINE,
                     Time::Synchronized(Timestamp::new(0)),

@@ -40,7 +40,7 @@ fn generate_binary_event(handle: &mut DatabaseHandle) {
         db.add(0, Some(EventClass::Class1), BinaryConfig::default());
         db.update(
             0,
-            &Binary::new(true, Flags::ONLINE, Time::synchronized(0)),
+            &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
             UpdateOptions::default(),
         )
     });
@@ -289,12 +289,12 @@ fn buffer_overflow_issue() {
         database.transaction(|database| {
             database.update(
                 0,
-                &Binary::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+                &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
                 UpdateOptions::default(),
             );
             database.update(
                 0,
-                &Binary::new(false, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+                &BinaryInput::new(false, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
                 UpdateOptions::default(),
             );
         });

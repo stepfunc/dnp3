@@ -20,7 +20,7 @@ fn create_binary_and_event(database: &mut Database) {
     database.add(0, Some(EventClass::Class1), BinaryConfig::default());
     database.update(
         0,
-        &Binary::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+        &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
         UpdateOptions::default(),
     );
 }

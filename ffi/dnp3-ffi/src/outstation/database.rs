@@ -65,7 +65,7 @@ implement_database_point_operations!(
     database_remove_binary,
     database_update_binary,
     database_get_binary,
-    Binary,
+    BinaryInput,
     BinaryConfig,
     ffi::Binary,
     ffi::BinaryConfig,
@@ -76,7 +76,7 @@ implement_database_point_operations!(
     database_remove_double_bit_binary,
     database_update_double_bit_binary,
     database_get_double_bit_binary,
-    DoubleBitBinary,
+    DoubleBitBinaryInput,
     DoubleBitBinaryConfig,
     ffi::DoubleBitBinary,
     ffi::DoubleBitBinaryConfig,
@@ -120,7 +120,7 @@ implement_database_point_operations!(
     database_remove_analog,
     database_update_analog,
     database_get_analog,
-    Analog,
+    AnalogInput,
     AnalogConfig,
     ffi::Analog,
     ffi::AnalogConfig,
@@ -271,7 +271,7 @@ impl From<ffi::BinaryConfig> for BinaryConfig {
     }
 }
 
-impl From<ffi::Binary> for Binary {
+impl From<ffi::Binary> for BinaryInput {
     fn from(from: ffi::Binary) -> Self {
         Self {
             value: from.value(),
@@ -307,7 +307,7 @@ impl From<ffi::DoubleBitBinaryConfig> for DoubleBitBinaryConfig {
     }
 }
 
-impl From<ffi::DoubleBitBinary> for DoubleBitBinary {
+impl From<ffi::DoubleBitBinary> for DoubleBitBinaryInput {
     fn from(from: ffi::DoubleBitBinary) -> Self {
         Self {
             value: match from.value() {
@@ -463,7 +463,7 @@ impl From<ffi::AnalogConfig> for AnalogConfig {
     }
 }
 
-impl From<ffi::Analog> for Analog {
+impl From<ffi::Analog> for AnalogInput {
     fn from(from: ffi::Analog) -> Self {
         Self {
             value: from.value(),

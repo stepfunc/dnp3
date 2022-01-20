@@ -367,13 +367,17 @@ pub trait ReadHandler: Send {
     fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
 
     /// Process an object header of `Binary` values
-    fn handle_binary(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Binary, u16)>);
+    fn handle_binary(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
+    );
 
     /// Process an object header of `DoubleBitBinary` values
     fn handle_double_bit_binary(
         &mut self,
         info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
+        iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
     );
 
     /// Process an object header of `BinaryOutputStatus` values
@@ -394,7 +398,11 @@ pub trait ReadHandler: Send {
     );
 
     /// Process an object header of `Analog` values
-    fn handle_analog(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Analog, u16)>);
+    fn handle_analog(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
+    );
 
     /// Process an object header of `AnalogOutputStatus` values
     fn handle_analog_output_status(
@@ -440,13 +448,17 @@ impl ReadHandler for NullReadHandler {
 
     fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
-    fn handle_binary(&mut self, _info: HeaderInfo, _iter: &mut dyn Iterator<Item = (Binary, u16)>) {
+    fn handle_binary(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
+    ) {
     }
 
     fn handle_double_bit_binary(
         &mut self,
         _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
+        _iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
     ) {
     }
 
@@ -471,7 +483,11 @@ impl ReadHandler for NullReadHandler {
     ) {
     }
 
-    fn handle_analog(&mut self, _info: HeaderInfo, _iter: &mut dyn Iterator<Item = (Analog, u16)>) {
+    fn handle_analog(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
+    ) {
     }
 
     fn handle_analog_output_status(

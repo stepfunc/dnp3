@@ -129,7 +129,7 @@ impl Time {
 
 /// Measurement type corresponding to groups 1 and 2
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Binary {
+pub struct BinaryInput {
     /// value of the type
     pub value: bool,
     /// associated flags
@@ -138,8 +138,8 @@ pub struct Binary {
     pub time: Option<Time>,
 }
 
-impl Binary {
-    /// construct a `Binary` from its fields
+impl BinaryInput {
+    /// construct a `BinaryInput` from its fields
     pub fn new(value: bool, flags: Flags, time: Time) -> Self {
         Self {
             value,
@@ -151,7 +151,7 @@ impl Binary {
 
 /// Measurement type corresponding to groups 3 and 4
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct DoubleBitBinary {
+pub struct DoubleBitBinaryInput {
     /// value of the type
     pub value: DoubleBit,
     /// associated flags
@@ -160,8 +160,8 @@ pub struct DoubleBitBinary {
     pub time: Option<Time>,
 }
 
-impl DoubleBitBinary {
-    /// construct a `DoubleBitBinary` from its fields
+impl DoubleBitBinaryInput {
+    /// construct a `DoubleBitBinaryInput` from its fields
     pub fn new(value: DoubleBit, flags: Flags, time: Time) -> Self {
         Self {
             value,
@@ -239,7 +239,7 @@ impl FrozenCounter {
 
 /// Measurement type corresponding to groups 30 and 32
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Analog {
+pub struct AnalogInput {
     /// value of the type
     pub value: f64,
     /// associated flags
@@ -248,8 +248,8 @@ pub struct Analog {
     pub time: Option<Time>,
 }
 
-impl Analog {
-    /// construct an `Analog` from its fields
+impl AnalogInput {
+    /// construct an `AnalogInput` from its fields
     pub fn new(value: f64, flags: Flags, time: Time) -> Self {
         Self {
             value,

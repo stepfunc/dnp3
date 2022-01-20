@@ -60,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             db.add(i, Some(EventClass::Class1), AnalogConfig::default());
             db.update(
                 i,
-                &Analog::new(10.0, Flags::ONLINE, Time::synchronized(0)),
+                &AnalogInput::new(10.0, Flags::ONLINE, Time::synchronized(0)),
                 UpdateOptions::initialize(),
             );
         }
@@ -73,7 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         outstation.transaction(|db| {
             db.update(
                 7,
-                &Analog::new(value, Flags::new(0x01), Time::synchronized(1)),
+                &AnalogInput::new(value, Flags::new(0x01), Time::synchronized(1)),
                 UpdateOptions::default(),
             )
         });
