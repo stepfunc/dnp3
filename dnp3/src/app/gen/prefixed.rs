@@ -193,42 +193,42 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
     pub(crate) fn extract_measurements_to(&self, cto: Option<Time>, handler: &mut dyn ReadHandler) -> bool {
         match self {
             PrefixedVariation::Group2Var1(seq) => {
-                handler.handle_binary(
+                handler.handle_binary_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group2Var2(seq) => {
-                handler.handle_binary(
+                handler.handle_binary_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group2Var3(seq) => {
-                handler.handle_binary(
+                handler.handle_binary_input(
                     self.get_header_info(),
                     &mut seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group4Var1(seq) => {
-                handler.handle_double_bit_binary(
+                handler.handle_double_bit_binary_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group4Var2(seq) => {
-                handler.handle_double_bit_binary(
+                handler.handle_double_bit_binary_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group4Var3(seq) => {
-                handler.handle_double_bit_binary(
+                handler.handle_double_bit_binary_input(
                     self.get_header_info(),
                     &mut seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16()))
                 );
@@ -308,56 +308,56 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
                 true
             }
             PrefixedVariation::Group32Var1(seq) => {
-                handler.handle_analog(
+                handler.handle_analog_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group32Var2(seq) => {
-                handler.handle_analog(
+                handler.handle_analog_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group32Var3(seq) => {
-                handler.handle_analog(
+                handler.handle_analog_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group32Var4(seq) => {
-                handler.handle_analog(
+                handler.handle_analog_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group32Var5(seq) => {
-                handler.handle_analog(
+                handler.handle_analog_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group32Var6(seq) => {
-                handler.handle_analog(
+                handler.handle_analog_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group32Var7(seq) => {
-                handler.handle_analog(
+                handler.handle_analog_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );
                 true
             }
             PrefixedVariation::Group32Var8(seq) => {
-                handler.handle_analog(
+                handler.handle_analog_input(
                     self.get_header_info(),
                     &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
                 );

@@ -283,7 +283,7 @@ impl ReadHandler for TestHandler {
         self.tx.try_send(self.count).unwrap();
     }
 
-    fn handle_binary(
+    fn handle_binary_input(
         &mut self,
         _info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
@@ -295,7 +295,7 @@ impl ReadHandler for TestHandler {
         }
     }
 
-    fn handle_double_bit_binary(
+    fn handle_double_bit_binary_input(
         &mut self,
         _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
@@ -331,7 +331,7 @@ impl ReadHandler for TestHandler {
         unimplemented!()
     }
 
-    fn handle_analog(
+    fn handle_analog_input(
         &mut self,
         _info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,

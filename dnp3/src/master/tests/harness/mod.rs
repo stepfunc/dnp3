@@ -89,14 +89,14 @@ impl ReadHandler for CountHandler {
 
     fn end_fragment(&mut self, _read_type: ReadType, _header: crate::app::ResponseHeader) {}
 
-    fn handle_binary(
+    fn handle_binary_input(
         &mut self,
         _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (crate::app::measurement::BinaryInput, u16)>,
     ) {
     }
 
-    fn handle_double_bit_binary(
+    fn handle_double_bit_binary_input(
         &mut self,
         _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (crate::app::measurement::DoubleBitBinaryInput, u16)>,
@@ -124,7 +124,7 @@ impl ReadHandler for CountHandler {
     ) {
     }
 
-    fn handle_analog(
+    fn handle_analog_input(
         &mut self,
         _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (crate::app::measurement::AnalogInput, u16)>,

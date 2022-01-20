@@ -76,12 +76,12 @@ object PrefixedVariationModule extends Module {
 
     def extractMatcher(v: Variation) : Iterator[String] = {
       def getName : String = v.parent.groupType match {
-        case GroupType.BinaryEvent => "binary"
-        case GroupType.DoubleBinaryEvent => "double_bit_binary"
+        case GroupType.BinaryEvent => "binary_input"
+        case GroupType.DoubleBinaryEvent => "double_bit_binary_input"
         case GroupType.BinaryOutputEvent => "binary_output_status"
         case GroupType.CounterEvent => "counter"
         case GroupType.FrozenCounterEvent => "frozen_counter"
-        case GroupType.AnalogEvent => "analog"
+        case GroupType.AnalogEvent => "analog_input"
         case GroupType.AnalogOutputEvent => "analog_output_status"
         case GroupType.AnalogOutputCommandEvent => "analog_output_command"
         case GroupType.BinaryOutputCommandEvent => "binary_output_command"
@@ -104,7 +104,7 @@ object PrefixedVariationModule extends Module {
         }
         case Group2Var3 => {
           bracket(s"PrefixedVariation::${v.name}(seq) =>") {
-            parenSemi("handler.handle_binary") {
+            parenSemi("handler.handle_binary_input") {
               "self.get_header_info(),".eol ++
               "&mut seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16()))".eol
             } ++ "true".eol
@@ -112,7 +112,7 @@ object PrefixedVariationModule extends Module {
         }
         case Group4Var3 => {
           bracket(s"PrefixedVariation::${v.name}(seq) =>") {
-            parenSemi("handler.handle_double_bit_binary") {
+            parenSemi("handler.handle_double_bit_binary_input") {
               "self.get_header_info(),".eol ++
               "&mut seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16()))".eol
             } ++ "true".eol

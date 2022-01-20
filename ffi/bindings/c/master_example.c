@@ -43,7 +43,7 @@ void begin_fragment(dnp3_read_type_t read_type, dnp3_response_header_t header, v
 
 void end_fragment(dnp3_read_type_t read_type, dnp3_response_header_t header, void *arg) { printf("End fragment\n"); }
 
-void handle_binary(dnp3_header_info_t info, dnp3_binary_input_iterator_t *it, void *arg)
+void handle_binary_input(dnp3_header_info_t info, dnp3_binary_input_iterator_t *it, void *arg)
 {
     printf("Binaries:\n");
     printf("Qualifier: %s \n", dnp3_qualifier_code_to_string(info.qualifier));
@@ -55,7 +55,7 @@ void handle_binary(dnp3_header_info_t info, dnp3_binary_input_iterator_t *it, vo
     }
 }
 
-void handle_double_bit_binary(dnp3_header_info_t info, dnp3_double_bit_binary_input_iterator_t *it, void *arg)
+void handle_double_bit_binary_input(dnp3_header_info_t info, dnp3_double_bit_binary_input_iterator_t *it, void *arg)
 {
     printf("Double Bit Binaries:\n");
     printf("Qualifier: %s \n", dnp3_qualifier_code_to_string(info.qualifier));
@@ -103,7 +103,7 @@ void handle_frozen_counter(dnp3_header_info_t info, dnp3_frozen_counter_iterator
     }
 }
 
-void handle_analog(dnp3_header_info_t info, dnp3_analog_input_iterator_t *it, void *arg)
+void handle_analog_input(dnp3_header_info_t info, dnp3_analog_input_iterator_t *it, void *arg)
 {
     printf("Analogs:\n");
     printf("Qualifier: %s \n", dnp3_qualifier_code_to_string(info.qualifier));
@@ -151,12 +151,12 @@ dnp3_read_handler_t get_read_handler()
     return (dnp3_read_handler_t){
         .begin_fragment = &begin_fragment,
         .end_fragment = &end_fragment,
-        .handle_binary = &handle_binary,
-        .handle_double_bit_binary = &handle_double_bit_binary,
+        .handle_binary_input = &handle_binary_input,
+        .handle_double_bit_binary_input = &handle_double_bit_binary_input,
         .handle_binary_output_status = &handle_binary_output_status,
         .handle_counter = &handle_counter,
         .handle_frozen_counter = &handle_frozen_counter,
-        .handle_analog = &handle_analog,
+        .handle_analog_input = &handle_analog_input,
         .handle_analog_output_status = &handle_analog_output_status,
         .handle_octet_string = &handle_octet_strings,
         .on_destroy = NULL,

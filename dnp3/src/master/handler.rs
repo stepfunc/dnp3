@@ -366,15 +366,15 @@ pub trait ReadHandler: Send {
     /// `header` provides the full response header
     fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
 
-    /// Process an object header of `Binary` values
-    fn handle_binary(
+    /// Process an object header of `BinaryInput` values
+    fn handle_binary_input(
         &mut self,
         info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
     );
 
-    /// Process an object header of `DoubleBitBinary` values
-    fn handle_double_bit_binary(
+    /// Process an object header of `DoubleBitBinaryInput` values
+    fn handle_double_bit_binary_input(
         &mut self,
         info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
@@ -397,8 +397,8 @@ pub trait ReadHandler: Send {
         iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
     );
 
-    /// Process an object header of `Analog` values
-    fn handle_analog(
+    /// Process an object header of `AnalogInput` values
+    fn handle_analog_input(
         &mut self,
         info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
@@ -448,14 +448,14 @@ impl ReadHandler for NullReadHandler {
 
     fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
-    fn handle_binary(
+    fn handle_binary_input(
         &mut self,
         _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
     ) {
     }
 
-    fn handle_double_bit_binary(
+    fn handle_double_bit_binary_input(
         &mut self,
         _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
@@ -483,7 +483,7 @@ impl ReadHandler for NullReadHandler {
     ) {
     }
 
-    fn handle_analog(
+    fn handle_analog_input(
         &mut self,
         _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,

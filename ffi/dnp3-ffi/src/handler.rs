@@ -24,24 +24,24 @@ impl ReadHandler for ffi::ReadHandler {
         ffi::ReadHandler::end_fragment(self, read_type.into(), header.into());
     }
 
-    fn handle_binary(
+    fn handle_binary_input(
         &mut self,
         info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
     ) {
         let info = info.into();
         let mut iterator = BinaryInputIterator::new(iter);
-        ffi::ReadHandler::handle_binary(self, info, &mut iterator as *mut _);
+        ffi::ReadHandler::handle_binary_input(self, info, &mut iterator as *mut _);
     }
 
-    fn handle_double_bit_binary(
+    fn handle_double_bit_binary_input(
         &mut self,
         info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
     ) {
         let info = info.into();
         let mut iterator = DoubleBitBinaryInputIterator::new(iter);
-        ffi::ReadHandler::handle_double_bit_binary(self, info, &mut iterator as *mut _);
+        ffi::ReadHandler::handle_double_bit_binary_input(self, info, &mut iterator as *mut _);
     }
 
     fn handle_binary_output_status(
@@ -70,14 +70,14 @@ impl ReadHandler for ffi::ReadHandler {
         ffi::ReadHandler::handle_frozen_counter(self, info, &mut iterator);
     }
 
-    fn handle_analog(
+    fn handle_analog_input(
         &mut self,
         info: HeaderInfo,
         iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
     ) {
         let info = info.into();
         let mut iterator = AnalogInputIterator::new(iter);
-        ffi::ReadHandler::handle_analog(self, info, &mut iterator);
+        ffi::ReadHandler::handle_analog_input(self, info, &mut iterator);
     }
 
     fn handle_analog_output_status(

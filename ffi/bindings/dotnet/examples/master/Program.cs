@@ -36,7 +36,7 @@ class MainClass
             Console.WriteLine("End fragment");
         }
 
-        public void HandleBinary(HeaderInfo info, ICollection<BinaryInput> values)
+        public void HandleBinaryInput(HeaderInfo info, ICollection<BinaryInput> values)
         {
             Console.WriteLine("Binaries:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
@@ -48,7 +48,7 @@ class MainClass
             }
         }
 
-        public void HandleDoubleBitBinary(HeaderInfo info, ICollection<DoubleBitBinaryInput> values)
+        public void HandleDoubleBitBinaryInput(HeaderInfo info, ICollection<DoubleBitBinaryInput> values)
         {
             Console.WriteLine("Double Bit Binaries:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
@@ -96,7 +96,7 @@ class MainClass
             }
         }
 
-        public void HandleAnalog(HeaderInfo info, ICollection<AnalogInput> values)
+        public void HandleAnalogInput(HeaderInfo info, ICollection<AnalogInput> values)
         {
             Console.WriteLine("Analogs:");
             Console.WriteLine("Qualifier: " + info.Qualifier);

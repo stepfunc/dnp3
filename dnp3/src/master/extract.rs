@@ -119,7 +119,7 @@ mod test {
         fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
         fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
-        fn handle_binary(
+        fn handle_binary_input(
             &mut self,
             _info: HeaderInfo,
             x: &mut dyn Iterator<Item = (BinaryInput, u16)>,
@@ -139,7 +139,7 @@ mod test {
             }
         }
 
-        fn handle_double_bit_binary(
+        fn handle_double_bit_binary_input(
             &mut self,
             _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
@@ -171,7 +171,7 @@ mod test {
             unimplemented!()
         }
 
-        fn handle_analog(
+        fn handle_analog_input(
             &mut self,
             _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (AnalogInput, u16)>,

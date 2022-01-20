@@ -97,10 +97,10 @@ object RangedVariationModule extends Module {
 
     def getMeasName(v: Variation): String = {
       v.parent.groupType match {
-        case GroupType.StaticBinary => "binary"
-        case GroupType.StaticDoubleBinary => "double_bit_binary"
+        case GroupType.StaticBinary => "binary_input"
+        case GroupType.StaticDoubleBinary => "double_bit_binary_input"
         case GroupType.StaticBinaryOutputStatus => "binary_output_status"
-        case GroupType.StaticAnalog => "analog"
+        case GroupType.StaticAnalog => "analog_input"
         case GroupType.StaticAnalogOutputStatus => "analog_output_status"
         case GroupType.StaticCounter => "counter"
         case GroupType.StaticFrozenCounter => "frozen_counter"
