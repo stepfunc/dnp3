@@ -187,7 +187,7 @@ int main()
         else if (cmd == "bi") {
             auto modify = database_transaction([&](Database& db) {
                 state.binary = !state.binary;
-                db.update_binary(Binary(7, state.binary, online(), now()), UpdateOptions());
+                db.update_binary(BinaryInput(7, state.binary, online(), now()), UpdateOptions());
             });
             outstation.transaction(modify);
         }       
@@ -195,7 +195,7 @@ int main()
             auto modify = database_transaction([&](Database& db) {
                 state.double_bit_binary = !state.double_bit_binary;
                 auto value = state.double_bit_binary ? DoubleBit::determined_on : DoubleBit::determined_off;
-                db.update_double_bit_binary(DoubleBitBinary(3, value, online(), now()), UpdateOptions());
+                db.update_double_bit_binary(DoubleBitBinaryInput(3, value, online(), now()), UpdateOptions());
             });
             outstation.transaction(modify);
         }
@@ -223,7 +223,7 @@ int main()
         else if (cmd == "ai") {
             auto modify = database_transaction([&](Database& db) {
                 state.analog += 1;
-                db.update_analog(Analog(7, state.analog, online(), now()), UpdateOptions());
+                db.update_analog(AnalogInput(7, state.analog, online(), now()), UpdateOptions());
             });
             outstation.transaction(modify);
         }

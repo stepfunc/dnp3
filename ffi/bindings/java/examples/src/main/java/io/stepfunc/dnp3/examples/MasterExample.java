@@ -41,7 +41,7 @@ class TestReadHandler implements ReadHandler {
   }
 
   @Override
-  public void handleBinary(HeaderInfo info, List<Binary> it) {
+  public void handleBinary(HeaderInfo info, List<BinaryInput> it) {
     System.out.println("Binaries:");
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
@@ -64,7 +64,7 @@ class TestReadHandler implements ReadHandler {
   }
 
   @Override
-  public void handleDoubleBitBinary(HeaderInfo info, List<DoubleBitBinary> it) {
+  public void handleDoubleBitBinary(HeaderInfo info, List<DoubleBitBinaryInput> it) {
     System.out.println("Double Bit Binaries:");
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
@@ -156,7 +156,7 @@ class TestReadHandler implements ReadHandler {
   }
 
   @Override
-  public void handleAnalog(HeaderInfo info, List<Analog> it) {
+  public void handleAnalog(HeaderInfo info, List<AnalogInput> it) {
     System.out.println("Analogs:");
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);

@@ -282,8 +282,8 @@ public class OutstationExample {
               final boolean pointValue = binaryValue;
               outstation.transaction(
                   db -> {
-                    Binary value =
-                        new Binary(
+                    BinaryInput value =
+                        new BinaryInput(
                             ushort(7),
                             pointValue,
                             onlineFlags,
@@ -301,8 +301,8 @@ public class OutstationExample {
               final DoubleBit pointValue = doubleBitBinaryValue;
               outstation.transaction(
                   db -> {
-                    DoubleBitBinary value =
-                        new DoubleBitBinary(
+                    DoubleBitBinaryInput value =
+                        new DoubleBitBinaryInput(
                             ushort(7),
                             pointValue,
                             onlineFlags,
@@ -365,8 +365,8 @@ public class OutstationExample {
               final double pointValue = analogValue;
               outstation.transaction(
                   db -> {
-                    Analog value =
-                        new Analog(
+                    AnalogInput value =
+                        new AnalogInput(
                             ushort(7),
                             pointValue,
                             onlineFlags,

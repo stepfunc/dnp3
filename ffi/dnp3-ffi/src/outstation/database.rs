@@ -67,7 +67,7 @@ implement_database_point_operations!(
     database_get_binary,
     BinaryInput,
     BinaryConfig,
-    ffi::Binary,
+    ffi::BinaryInput,
     ffi::BinaryConfig,
 );
 
@@ -78,7 +78,7 @@ implement_database_point_operations!(
     database_get_double_bit_binary,
     DoubleBitBinaryInput,
     DoubleBitBinaryConfig,
-    ffi::DoubleBitBinary,
+    ffi::DoubleBitBinaryInput,
     ffi::DoubleBitBinaryConfig,
 );
 
@@ -122,7 +122,7 @@ implement_database_point_operations!(
     database_get_analog,
     AnalogInput,
     AnalogConfig,
-    ffi::Analog,
+    ffi::AnalogInput,
     ffi::AnalogConfig,
 );
 
@@ -271,8 +271,8 @@ impl From<ffi::BinaryConfig> for BinaryConfig {
     }
 }
 
-impl From<ffi::Binary> for BinaryInput {
-    fn from(from: ffi::Binary) -> Self {
+impl From<ffi::BinaryInput> for BinaryInput {
+    fn from(from: ffi::BinaryInput) -> Self {
         Self {
             value: from.value(),
             flags: from.flags().into(),
@@ -307,8 +307,8 @@ impl From<ffi::DoubleBitBinaryConfig> for DoubleBitBinaryConfig {
     }
 }
 
-impl From<ffi::DoubleBitBinary> for DoubleBitBinaryInput {
-    fn from(from: ffi::DoubleBitBinary) -> Self {
+impl From<ffi::DoubleBitBinaryInput> for DoubleBitBinaryInput {
+    fn from(from: ffi::DoubleBitBinaryInput) -> Self {
         Self {
             value: match from.value() {
                 ffi::DoubleBit::Intermediate => DoubleBit::Intermediate,
@@ -463,8 +463,8 @@ impl From<ffi::AnalogConfig> for AnalogConfig {
     }
 }
 
-impl From<ffi::Analog> for AnalogInput {
-    fn from(from: ffi::Analog) -> Self {
+impl From<ffi::AnalogInput> for AnalogInput {
+    fn from(from: ffi::AnalogInput) -> Self {
         Self {
             value: from.value(),
             flags: from.flags().into(),

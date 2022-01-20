@@ -31,13 +31,14 @@ std::ostream& operator<<(std::ostream& os, const dnp3::Flags& flags)
 class ReadHandler : public dnp3::ReadHandler {
     void begin_fragment(dnp3::ReadType read_type, const dnp3::ResponseHeader& header) override {}
     void end_fragment(dnp3::ReadType read_type, const dnp3::ResponseHeader& header) override {}
-    void handle_binary(const dnp3::HeaderInfo& info, dnp3::BinaryIterator& it) override {
+    void handle_binary(const dnp3::HeaderInfo& info, dnp3::BinaryInputIterator& it) override {
         while (it.next()) {
             const auto value = it.get();
             std::cout << "BinaryInput(" << value.index << "): value: " << value.value << " flags: " << value.flags << " time: " << value.time.value << std::endl;
         }
     }
-    void handle_double_bit_binary(const dnp3::HeaderInfo& info, dnp3::DoubleBitBinaryIterator& it) override {
+    void handle_double_bit_binary(const dnp3::HeaderInfo &info, dnp3::DoubleBitBinaryInputIterator &it) override
+    {
         while (it.next()) {
             const auto value = it.get();
             std::cout << "DoubleBitBinaryInput(" << value.index << "): value: " << dnp3::to_string(value.value) << " flags: " << value.flags << " time: " << value.time.value << std::endl;
@@ -61,7 +62,8 @@ class ReadHandler : public dnp3::ReadHandler {
             std::cout << "FrozenCounter(" << value.index << "): value: " << value.value << " flags: " << value.flags << " time: " << value.time.value << std::endl;
         }
     }
-    void handle_analog(const dnp3::HeaderInfo& info, dnp3::AnalogIterator& it) override {
+    void handle_analog(const dnp3::HeaderInfo &info, dnp3::AnalogInputIterator &it) override
+    {
         while (it.next()) {
             const auto value = it.get();
             std::cout << "Analog(" << value.index << "): value: " << value.value << " flags: " << value.flags << " time: " << value.time.value << std::endl;

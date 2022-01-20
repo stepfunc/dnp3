@@ -220,7 +220,7 @@ class ExampleOutstation
                         outstation.Transaction(db =>
                         {
                             binaryValue = !binaryValue;
-                            db.UpdateBinary(new Binary(7, binaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                            db.UpdateBinary(new BinaryInput(7, binaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         });
                         break;
                     }
@@ -229,7 +229,7 @@ class ExampleOutstation
                         outstation.Transaction(db =>
                         {
                             doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DeterminedOff ? DoubleBit.DeterminedOn : DoubleBit.DeterminedOff;
-                            db.UpdateDoubleBitBinary(new DoubleBitBinary(7, doubleBitBinaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                            db.UpdateDoubleBitBinary(new DoubleBitBinaryInput(7, doubleBitBinaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         });
                         break;
                     }
@@ -262,7 +262,7 @@ class ExampleOutstation
                     {
                         outstation.Transaction(db =>
                         {
-                            db.UpdateAnalog(new Analog(7, ++analogValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                            db.UpdateAnalog(new AnalogInput(7, ++analogValue, new Flags(Flag.Online), Now()), new UpdateOptions());
                         });
                         break;
                     }

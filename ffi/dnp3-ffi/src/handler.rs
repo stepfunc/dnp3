@@ -30,7 +30,7 @@ impl ReadHandler for ffi::ReadHandler {
         iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
     ) {
         let info = info.into();
-        let mut iterator = BinaryIterator::new(iter);
+        let mut iterator = BinaryInputIterator::new(iter);
         ffi::ReadHandler::handle_binary(self, info, &mut iterator as *mut _);
     }
 
@@ -40,7 +40,7 @@ impl ReadHandler for ffi::ReadHandler {
         iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
     ) {
         let info = info.into();
-        let mut iterator = DoubleBitBinaryIterator::new(iter);
+        let mut iterator = DoubleBitBinaryInputIterator::new(iter);
         ffi::ReadHandler::handle_double_bit_binary(self, info, &mut iterator as *mut _);
     }
 
@@ -76,7 +76,7 @@ impl ReadHandler for ffi::ReadHandler {
         iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
     ) {
         let info = info.into();
-        let mut iterator = AnalogIterator::new(iter);
+        let mut iterator = AnalogInputIterator::new(iter);
         ffi::ReadHandler::handle_analog(self, info, &mut iterator);
     }
 
@@ -218,16 +218,16 @@ macro_rules! implement_iterator {
 }
 
 implement_iterator!(
-    BinaryIterator,
-    binary_iterator_next,
+    BinaryInputIterator,
+    binary_input_iterator_next,
     BinaryInput,
-    ffi::Binary
+    ffi::BinaryInput
 );
 implement_iterator!(
-    DoubleBitBinaryIterator,
-    double_bit_binary_iterator_next,
+    DoubleBitBinaryInputIterator,
+    double_bit_binary_input_iterator_next,
     DoubleBitBinaryInput,
-    ffi::DoubleBitBinary
+    ffi::DoubleBitBinaryInput
 );
 implement_iterator!(
     BinaryOutputStatusIterator,
@@ -248,10 +248,10 @@ implement_iterator!(
     ffi::FrozenCounter
 );
 implement_iterator!(
-    AnalogIterator,
-    analog_iterator_next,
+    AnalogInputIterator,
+    analog_input_iterator_next,
     AnalogInput,
-    ffi::Analog
+    ffi::AnalogInput
 );
 implement_iterator!(
     AnalogOutputStatusIterator,
@@ -260,7 +260,7 @@ implement_iterator!(
     ffi::AnalogOutputStatus
 );
 
-impl ffi::Binary {
+impl ffi::BinaryInput {
     pub(crate) fn new(idx: u16, value: BinaryInput) -> Self {
         Self {
             index: idx,
@@ -271,9 +271,9 @@ impl ffi::Binary {
     }
 }
 
-impl ffi::DoubleBitBinary {
+impl ffi::DoubleBitBinaryInput {
     pub(crate) fn new(idx: u16, value: DoubleBitBinaryInput) -> Self {
-        ffi::DoubleBitBinaryFields {
+        ffi::DoubleBitBinaryInputFields {
             index: idx,
             value: match value.value {
                 DoubleBit::Intermediate => ffi::DoubleBit::Intermediate,
@@ -321,7 +321,7 @@ impl ffi::FrozenCounter {
     }
 }
 
-impl ffi::Analog {
+impl ffi::AnalogInput {
     pub(crate) fn new(idx: u16, value: AnalogInput) -> Self {
         Self {
             index: idx,

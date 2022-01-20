@@ -184,7 +184,8 @@ void binary_transaction(dnp3_database_t *db, void *context)
 {
     ((database_points_t *)context)->binaryValue = !((database_points_t *)context)->binaryValue;
 
-    dnp3_binary_t value = dnp3_binary_init(7, ((database_points_t *)context)->binaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
+    dnp3_binary_input_t value =
+        dnp3_binary_input_init(7, ((database_points_t *)context)->binaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
     dnp3_database_update_binary(db, value, dnp3_update_options_init());
 }
 
@@ -193,8 +194,8 @@ void double_bit_binary_transaction(dnp3_database_t *db, void *context)
     ((database_points_t *)context)->doubleBitBinaryValue =
         ((database_points_t *)context)->doubleBitBinaryValue == DNP3_DOUBLE_BIT_DETERMINED_OFF ? DNP3_DOUBLE_BIT_DETERMINED_ON : DNP3_DOUBLE_BIT_DETERMINED_OFF;
 
-    dnp3_double_bit_binary_t value =
-        dnp3_double_bit_binary_init(7, ((database_points_t *)context)->doubleBitBinaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
+    dnp3_double_bit_binary_input_t value = dnp3_double_bit_binary_input_init(7, ((database_points_t *)context)->doubleBitBinaryValue,
+                                                                             dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
     dnp3_database_update_double_bit_binary(db, value, dnp3_update_options_init());
 }
 
@@ -223,7 +224,8 @@ void frozen_counter_transaction(dnp3_database_t *db, void *context)
 
 void analog_transaction(dnp3_database_t *db, void *context)
 {
-    dnp3_analog_t value = dnp3_analog_init(7, ++((database_points_t *)context)->analogValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
+    dnp3_analog_input_t value =
+        dnp3_analog_input_init(7, ++((database_points_t *)context)->analogValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
     dnp3_database_update_analog(db, value, dnp3_update_options_init());
 }
 

@@ -173,14 +173,14 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         .build()?;
 
     let (binary_point, binary_it) = build_iterator(
-        "binary",
+        "binary_input",
         Primitive::Bool,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (double_bit_binary_point, double_bit_binary_it) = build_iterator(
-        "double_bit_binary",
+        "double_bit_binary_input",
         double_bit_enum,
         lib,
         &flags_struct,
@@ -208,7 +208,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         &timestamp_struct,
     )?;
     let (analog_point, analog_it) = build_iterator(
-        "analog",
+        "analog_input",
         Primitive::Double,
         lib,
         &flags_struct,
