@@ -1,4 +1,4 @@
-use crate::app::measurement::{Binary, DoubleBitBinary, Time, ToVariation, WireFlags};
+use crate::app::measurement::*;
 use crate::app::parse::traits::FixedSize;
 use crate::app::variations::{Group2Var3, Group4Var3};
 use crate::util::cursor::{WriteCursor, WriteError};
@@ -84,7 +84,7 @@ pub(crate) fn write_octet_string(
     Ok(Continue::Ok)
 }
 
-impl ToVariationCto<Group2Var3> for Binary {
+impl ToVariationCto<Group2Var3> for BinaryInput {
     fn get_time(&self) -> Option<Time> {
         self.time
     }
@@ -97,7 +97,7 @@ impl ToVariationCto<Group2Var3> for Binary {
     }
 }
 
-impl ToVariationCto<Group4Var3> for DoubleBitBinary {
+impl ToVariationCto<Group4Var3> for DoubleBitBinaryInput {
     fn get_time(&self) -> Option<Time> {
         self.time
     }

@@ -94,7 +94,7 @@ mod test {
 
     #[derive(Debug)]
     enum Header {
-        Binary(Vec<(Binary, u16)>),
+        Binary(Vec<(BinaryInput, u16)>),
     }
 
     struct MockHandler {
@@ -119,7 +119,11 @@ mod test {
         fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
         fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
 
-        fn handle_binary(&mut self, _info: HeaderInfo, x: &mut dyn Iterator<Item = (Binary, u16)>) {
+        fn handle_binary_input(
+            &mut self,
+            _info: HeaderInfo,
+            x: &mut dyn Iterator<Item = (BinaryInput, u16)>,
+        ) {
             let next_header = match self.expected.pop() {
                 Some(y) => y,
                 None => {
@@ -135,10 +139,10 @@ mod test {
             }
         }
 
-        fn handle_double_bit_binary(
+        fn handle_double_bit_binary_input(
             &mut self,
             _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
+            _x: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
         ) {
             unimplemented!()
         }
@@ -167,10 +171,10 @@ mod test {
             unimplemented!()
         }
 
-        fn handle_analog(
+        fn handle_analog_input(
             &mut self,
             _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (Analog, u16)>,
+            _x: &mut dyn Iterator<Item = (AnalogInput, u16)>,
         ) {
             unimplemented!()
         }
@@ -201,8 +205,8 @@ mod test {
         )
         .unwrap();
 
-        let expected: (Binary, u16) = (
-            Binary {
+        let expected: (BinaryInput, u16) = (
+            BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
                 time: None,
@@ -228,8 +232,8 @@ mod test {
         )
         .unwrap();
 
-        let expected: (Binary, u16) = (
-            Binary {
+        let expected: (BinaryInput, u16) = (
+            BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
                 time: Some(Time::Synchronized(Timestamp::new(65537))), // 0xFFFF + 2
@@ -255,8 +259,8 @@ mod test {
         )
         .unwrap();
 
-        let expected: (Binary, u16) = (
-            Binary {
+        let expected: (BinaryInput, u16) = (
+            BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
                 time: Some(Time::unsynchronized(65536)), // 0xFFFE + 2
@@ -282,8 +286,8 @@ mod test {
         )
         .unwrap();
 
-        let expected: (Binary, u16) = (
-            Binary {
+        let expected: (BinaryInput, u16) = (
+            BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
                 time: Some(Time::Synchronized(Timestamp::max())),
@@ -309,8 +313,8 @@ mod test {
         )
         .unwrap();
 
-        let expected: (Binary, u16) = (
-            Binary {
+        let expected: (BinaryInput, u16) = (
+            BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
                 time: None,

@@ -54,14 +54,14 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
 
 fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let binary_static_variation = lib
-        .define_enum("static_binary_variation")?
+        .define_enum("static_binary_input_variation")?
         .push(gv(1, 1), "Binary input - packed format")?
         .push(gv(1, 2), "Binary input - with flags")?
         .doc("Static binary input variation")?
         .build()?;
 
     let binary_event_variation = lib
-        .define_enum("event_binary_variation")?
+        .define_enum("event_binary_input_variation")?
         .push(gv(2, 1), "Binary input event - without time")?
         .push(gv(2, 2), "Binary input event - with absolute time")?
         .push(gv(2, 3), "Binary input event - with relative time")?
@@ -71,7 +71,7 @@ fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
 
-    let config = lib.declare_function_argument_struct("binary_config")?;
+    let config = lib.declare_function_argument_struct("binary_input_config")?;
     let config = lib
         .define_function_argument_struct(config)?
         .add(
@@ -99,14 +99,14 @@ fn define_double_bit_binary_config(
     lib: &mut LibraryBuilder,
 ) -> BackTraced<FunctionArgStructHandle> {
     let double_bit_binary_static_variation = lib
-        .define_enum("static_double_bit_binary_variation")?
+        .define_enum("static_double_bit_binary_input_variation")?
         .push(gv(3, 1), "Double-bit binary input - packed format")?
         .push(gv(3, 2), "Double-bit binary input - with flags")?
         .doc("Static double-bit binary input variation")?
         .build()?;
 
     let double_bit_binary_event_variation = lib
-        .define_enum("event_double_bit_binary_variation")?
+        .define_enum("event_double_bit_binary_input_variation")?
         .push(gv(4, 1), "Double-bit binary input event - without time")?
         .push(
             gv(4, 2),
@@ -122,7 +122,7 @@ fn define_double_bit_binary_config(
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
 
-    let config = lib.declare_function_argument_struct("double_bit_binary_config")?;
+    let config = lib.declare_function_argument_struct("double_bit_binary_input_config")?;
     let config = lib
         .define_function_argument_struct(config)?
         .add(
@@ -298,7 +298,7 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<Function
 
 pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let analog_static_variation = lib
-        .define_enum("static_analog_variation")?
+        .define_enum("static_analog_input_variation")?
         .push(gv(30, 1), "Analog input - 32-bit with flag")?
         .push(gv(30, 2), "Analog input - 16-bit with flag")?
         .push(gv(30, 3), "Analog input - 32-bit without flag")?
@@ -315,7 +315,7 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
         .build()?;
 
     let analog_event_variation = lib
-        .define_enum("event_analog_variation")?
+        .define_enum("event_analog_input_variation")?
         .push(gv(32, 1), "Analog input event - 32-bit without time")?
         .push(gv(32, 2), "Analog input event - 16-bit without time")?
         .push(gv(32, 3), "Analog input event - 32-bit with time")?
@@ -343,7 +343,7 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
     let event_variation = Name::create("event_variation")?;
     let deadband = Name::create("deadband")?;
 
-    let analog_config = lib.declare_function_argument_struct("analog_config")?;
+    let analog_config = lib.declare_function_argument_struct("analog_input_config")?;
     let config = lib
         .define_function_argument_struct(analog_config)?
         .add(
@@ -460,7 +460,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     let binary_config = define_binary_config(lib)?;
 
     let add_binary = lib
-        .define_method("add_binary", database.clone())?
+        .define_method("add_binary_input", database.clone())?
         .param("index", Primitive::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", binary_config, "Configuration")?
@@ -468,21 +468,21 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
             Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
-        .doc("Add a new Binary Input point")?
+        .doc("Add a new BinaryInput point")?
         .build()?;
 
     let remove_binary = lib
-        .define_method("remove_binary", database.clone())?
+        .define_method("remove_binary_input", database.clone())?
         .param("index", Primitive::U16, "Index of the point")?
         .returns(
             Primitive::Bool,
             "True if the point was successfully removed, false otherwise",
         )?
-        .doc("Remove a Binary Input point")?
+        .doc("Remove a BinaryInput point")?
         .build()?;
 
     let update_binary = lib
-        .define_method("update_binary", database.clone())?
+        .define_method("update_binary_input", database.clone())?
         .param(
             "value",
             shared_def.binary_point.clone(),
@@ -493,22 +493,22 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
             Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
         )?
-        .doc("Update a Binary Input point")?
+        .doc("Update a BinaryInput point")?
         .build()?;
 
     let get_binary = lib
-        .define_method("get_binary", database.clone())?
+        .define_method("get_binary_input", database.clone())?
         .param("index", Primitive::U16, "Index of the point to get")?
         .returns(shared_def.binary_point.clone(), "Binary Input point")?
         .fails_with(shared_def.error_type.clone())?
-        .doc("Get a Binary Input point")?
+        .doc("Get a BinaryInput point")?
         .build()?;
 
     // Double-bit Binary Input
     let double_bit_binary_config = define_double_bit_binary_config(lib)?;
 
     let add_double_bit_binary = lib
-        .define_method("add_double_bit_binary", database.clone())?
+        .define_method("add_double_bit_binary_input", database.clone())?
         .param("index", Primitive::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", double_bit_binary_config, "Configuration")?
@@ -520,7 +520,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .build()?;
 
     let remove_double_bit_binary = lib
-        .define_method("remove_double_bit_binary", database.clone())?
+        .define_method("remove_double_bit_binary_input", database.clone())?
         .param("index", Primitive::U16, "Index of the point")?
         .returns(
             Primitive::Bool,
@@ -530,7 +530,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .build()?;
 
     let update_double_bit_binary = lib
-        .define_method("update_double_bit_binary", database.clone())?
+        .define_method("update_double_bit_binary_input", database.clone())?
         .param(
             "value",
             shared_def.double_bit_binary_point.clone(),
@@ -545,7 +545,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .build()?;
 
     let get_double_bit_binary = lib
-        .define_method("get_double_bit_binary", database.clone())?
+        .define_method("get_double_bit_binary_input", database.clone())?
         .param("index", Primitive::U16, "Index of the point to get")?
         .returns(
             shared_def.double_bit_binary_point.clone(),
@@ -709,7 +709,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     let analog_config = define_analog_config(lib)?;
 
     let add_analog = lib
-        .define_method("add_analog", database.clone())?
+        .define_method("add_analog_input", database.clone())?
         .param("index", Primitive::U16, "Index of the point")?
         .param("point_class", event_class.clone(), "Event class")?
         .param("config", analog_config, "Configuration")?
@@ -717,21 +717,21 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
             Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
-        .doc("Add a new Analog point")?
+        .doc("Add a new AnalogInput point")?
         .build()?;
 
     let remove_analog = lib
-        .define_method("remove_analog", database.clone())?
+        .define_method("remove_analog_input", database.clone())?
         .param("index", Primitive::U16, "Index of the point")?
         .returns(
             Primitive::Bool,
             "True if the point was successfully removed, false otherwise",
         )?
-        .doc("Remove an Analog point")?
+        .doc("Remove an AnalogInput point")?
         .build()?;
 
     let update_analog = lib
-        .define_method("update_analog", database.clone())?
+        .define_method("update_analog_input", database.clone())?
         .param(
             "value",
             shared_def.analog_point.clone(),
@@ -742,15 +742,15 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
             Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
         )?
-        .doc("Update a Analog point")?
+        .doc("Update a AnalogInput point")?
         .build()?;
 
     let get_analog = lib
-        .define_method("get_analog", database.clone())?
+        .define_method("get_analog_input", database.clone())?
         .param("index", Primitive::U16, "Index of the point to get")?
         .returns(shared_def.analog_point.clone(), "Analog point")?
         .fails_with(shared_def.error_type.clone())?
-        .doc("Get a Analog point")?
+        .doc("Get a AnalogInput point")?
         .build()?;
 
     // Analog Output Status

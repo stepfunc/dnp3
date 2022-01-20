@@ -375,14 +375,14 @@ impl DatabaseHandle {
     }
 }
 
-impl Update<Binary> for Database {
-    fn update(&mut self, index: u16, value: &Binary, options: UpdateOptions) -> bool {
+impl Update<BinaryInput> for Database {
+    fn update(&mut self, index: u16, value: &BinaryInput, options: UpdateOptions) -> bool {
         self.inner.update(value, index, options)
     }
 }
 
-impl Update<DoubleBitBinary> for Database {
-    fn update(&mut self, index: u16, value: &DoubleBitBinary, options: UpdateOptions) -> bool {
+impl Update<DoubleBitBinaryInput> for Database {
+    fn update(&mut self, index: u16, value: &DoubleBitBinaryInput, options: UpdateOptions) -> bool {
         self.inner.update(value, index, options)
     }
 }
@@ -405,8 +405,8 @@ impl Update<FrozenCounter> for Database {
     }
 }
 
-impl Update<Analog> for Database {
-    fn update(&mut self, index: u16, value: &Analog, options: UpdateOptions) -> bool {
+impl Update<AnalogInput> for Database {
+    fn update(&mut self, index: u16, value: &AnalogInput, options: UpdateOptions) -> bool {
         self.inner.update(value, index, options)
     }
 }
@@ -423,22 +423,22 @@ impl Update<OctetString> for Database {
     }
 }
 
-impl Add<BinaryConfig> for Database {
-    fn add(&mut self, index: u16, class: Option<EventClass>, config: BinaryConfig) -> bool {
+impl Add<BinaryInputConfig> for Database {
+    fn add(&mut self, index: u16, class: Option<EventClass>, config: BinaryInputConfig) -> bool {
         let config =
-            PointConfig::<Binary>::new(class, FlagsDetector {}, config.s_var, config.e_var);
+            PointConfig::<BinaryInput>::new(class, FlagsDetector {}, config.s_var, config.e_var);
         self.inner.add(index, config)
     }
 }
 
-impl Add<DoubleBitBinaryConfig> for Database {
+impl Add<DoubleBitBinaryInputConfig> for Database {
     fn add(
         &mut self,
         index: u16,
         class: Option<EventClass>,
-        config: DoubleBitBinaryConfig,
+        config: DoubleBitBinaryInputConfig,
     ) -> bool {
-        let config = PointConfig::<DoubleBitBinary>::new(
+        let config = PointConfig::<DoubleBitBinaryInput>::new(
             class,
             FlagsDetector {},
             config.s_var,
@@ -489,9 +489,9 @@ impl Add<FrozenCounterConfig> for Database {
     }
 }
 
-impl Add<AnalogConfig> for Database {
-    fn add(&mut self, index: u16, class: Option<EventClass>, config: AnalogConfig) -> bool {
-        let config = PointConfig::<Analog>::new(
+impl Add<AnalogInputConfig> for Database {
+    fn add(&mut self, index: u16, class: Option<EventClass>, config: AnalogInputConfig) -> bool {
+        let config = PointConfig::<AnalogInput>::new(
             class,
             Deadband::new(config.deadband),
             config.s_var,
@@ -530,15 +530,15 @@ impl Add<OctetStringConfig> for Database {
     }
 }
 
-impl Remove<Binary> for Database {
+impl Remove<BinaryInput> for Database {
     fn remove(&mut self, index: u16) -> bool {
-        self.inner.remove::<Binary>(index)
+        self.inner.remove::<BinaryInput>(index)
     }
 }
 
-impl Remove<DoubleBitBinary> for Database {
+impl Remove<DoubleBitBinaryInput> for Database {
     fn remove(&mut self, index: u16) -> bool {
-        self.inner.remove::<DoubleBitBinary>(index)
+        self.inner.remove::<DoubleBitBinaryInput>(index)
     }
 }
 
@@ -560,9 +560,9 @@ impl Remove<FrozenCounter> for Database {
     }
 }
 
-impl Remove<Analog> for Database {
+impl Remove<AnalogInput> for Database {
     fn remove(&mut self, index: u16) -> bool {
-        self.inner.remove::<Analog>(index)
+        self.inner.remove::<AnalogInput>(index)
     }
 }
 
@@ -578,15 +578,15 @@ impl Remove<OctetString> for Database {
     }
 }
 
-impl Get<Binary> for Database {
-    fn get(&self, index: u16) -> Option<Binary> {
-        self.inner.get::<Binary>(index)
+impl Get<BinaryInput> for Database {
+    fn get(&self, index: u16) -> Option<BinaryInput> {
+        self.inner.get::<BinaryInput>(index)
     }
 }
 
-impl Get<DoubleBitBinary> for Database {
-    fn get(&self, index: u16) -> Option<DoubleBitBinary> {
-        self.inner.get::<DoubleBitBinary>(index)
+impl Get<DoubleBitBinaryInput> for Database {
+    fn get(&self, index: u16) -> Option<DoubleBitBinaryInput> {
+        self.inner.get::<DoubleBitBinaryInput>(index)
     }
 }
 
@@ -608,9 +608,9 @@ impl Get<FrozenCounter> for Database {
     }
 }
 
-impl Get<Analog> for Database {
-    fn get(&self, index: u16) -> Option<Analog> {
-        self.inner.get::<Analog>(index)
+impl Get<AnalogInput> for Database {
+    fn get(&self, index: u16) -> Option<AnalogInput> {
+        self.inner.get::<AnalogInput>(index)
     }
 }
 

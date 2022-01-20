@@ -158,12 +158,12 @@ void outstation_transaction_startup(dnp3_database_t *db, void *context)
 {
     for (uint16_t i = 0; i < 10; ++i) {
         // initialize each point with default configuration
-        dnp3_database_add_binary(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_binary_config_init());
-        dnp3_database_add_double_bit_binary(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_double_bit_binary_config_init());
+        dnp3_database_add_binary_input(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_binary_input_config_init());
+        dnp3_database_add_double_bit_binary_input(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_double_bit_binary_input_config_init());
         dnp3_database_add_binary_output_status(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_binary_output_status_config_init());
         dnp3_database_add_counter(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_counter_config_init());
         dnp3_database_add_frozen_counter(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_frozen_counter_config_init());
-        dnp3_database_add_analog(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_analog_config_init());
+        dnp3_database_add_analog_input(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_analog_input_config_init());
         dnp3_database_add_analog_output_status(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_analog_output_status_config_init());
         dnp3_database_add_octet_string(db, i, DNP3_EVENT_CLASS_CLASS1);
     }
@@ -184,8 +184,9 @@ void binary_transaction(dnp3_database_t *db, void *context)
 {
     ((database_points_t *)context)->binaryValue = !((database_points_t *)context)->binaryValue;
 
-    dnp3_binary_t value = dnp3_binary_init(7, ((database_points_t *)context)->binaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
-    dnp3_database_update_binary(db, value, dnp3_update_options_init());
+    dnp3_binary_input_t value =
+        dnp3_binary_input_init(7, ((database_points_t *)context)->binaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
+    dnp3_database_update_binary_input(db, value, dnp3_update_options_init());
 }
 
 void double_bit_binary_transaction(dnp3_database_t *db, void *context)
@@ -193,9 +194,9 @@ void double_bit_binary_transaction(dnp3_database_t *db, void *context)
     ((database_points_t *)context)->doubleBitBinaryValue =
         ((database_points_t *)context)->doubleBitBinaryValue == DNP3_DOUBLE_BIT_DETERMINED_OFF ? DNP3_DOUBLE_BIT_DETERMINED_ON : DNP3_DOUBLE_BIT_DETERMINED_OFF;
 
-    dnp3_double_bit_binary_t value =
-        dnp3_double_bit_binary_init(7, ((database_points_t *)context)->doubleBitBinaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
-    dnp3_database_update_double_bit_binary(db, value, dnp3_update_options_init());
+    dnp3_double_bit_binary_input_t value = dnp3_double_bit_binary_input_init(7, ((database_points_t *)context)->doubleBitBinaryValue,
+                                                                             dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
+    dnp3_database_update_double_bit_binary_input(db, value, dnp3_update_options_init());
 }
 
 void binary_output_status_transaction(dnp3_database_t *db, void *context)
@@ -223,8 +224,9 @@ void frozen_counter_transaction(dnp3_database_t *db, void *context)
 
 void analog_transaction(dnp3_database_t *db, void *context)
 {
-    dnp3_analog_t value = dnp3_analog_init(7, ++((database_points_t *)context)->analogValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
-    dnp3_database_update_analog(db, value, dnp3_update_options_init());
+    dnp3_analog_input_t value =
+        dnp3_analog_input_init(7, ++((database_points_t *)context)->analogValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
+    dnp3_database_update_analog_input(db, value, dnp3_update_options_init());
 }
 
 void analog_output_status_transaction(dnp3_database_t *db, void *context)

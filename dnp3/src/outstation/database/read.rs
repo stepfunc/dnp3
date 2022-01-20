@@ -8,15 +8,18 @@ use crate::outstation::database::details::range::static_db::IndexRange;
 #[derive(Copy, Clone)]
 pub(crate) enum StaticReadHeader {
     Class0,
-    Binary(Option<StaticBinaryVariation>, Option<IndexRange>),
-    DoubleBitBinary(Option<StaticDoubleBitBinaryVariation>, Option<IndexRange>),
+    Binary(Option<StaticBinaryInputVariation>, Option<IndexRange>),
+    DoubleBitBinary(
+        Option<StaticDoubleBitBinaryInputVariation>,
+        Option<IndexRange>,
+    ),
     BinaryOutputStatus(
         Option<StaticBinaryOutputStatusVariation>,
         Option<IndexRange>,
     ),
     Counter(Option<StaticCounterVariation>, Option<IndexRange>),
     FrozenCounter(Option<StaticFrozenCounterVariation>, Option<IndexRange>),
-    Analog(Option<StaticAnalogVariation>, Option<IndexRange>),
+    Analog(Option<StaticAnalogInputVariation>, Option<IndexRange>),
     AnalogOutputStatus(
         Option<StaticAnalogOutputStatusVariation>,
         Option<IndexRange>,
@@ -31,12 +34,12 @@ pub(crate) enum EventReadHeader {
     Class2(Option<usize>),
     Class3(Option<usize>),
     // events with optional count limits
-    Binary(Option<EventBinaryVariation>, Option<usize>),
-    DoubleBitBinary(Option<EventDoubleBitBinaryVariation>, Option<usize>),
+    Binary(Option<EventBinaryInputVariation>, Option<usize>),
+    DoubleBitBinary(Option<EventDoubleBitBinaryInputVariation>, Option<usize>),
     BinaryOutputStatus(Option<EventBinaryOutputStatusVariation>, Option<usize>),
     Counter(Option<EventCounterVariation>, Option<usize>),
     FrozenCounter(Option<EventFrozenCounterVariation>, Option<usize>),
-    Analog(Option<EventAnalogVariation>, Option<usize>),
+    Analog(Option<EventAnalogInputVariation>, Option<usize>),
     AnalogOutputStatus(Option<EventAnalogOutputStatusVariation>, Option<usize>),
     OctetString(Option<usize>),
 }
@@ -95,37 +98,37 @@ impl ReadHeader {
         match header {
             // group 1
             AllObjectsVariation::Group1Var0 => Some(StaticReadHeader::Binary(None, None).into()),
-            AllObjectsVariation::Group1Var1 => {
-                Some(StaticReadHeader::Binary(Some(StaticBinaryVariation::Group1Var1), None).into())
-            }
-            AllObjectsVariation::Group1Var2 => {
-                Some(StaticReadHeader::Binary(Some(StaticBinaryVariation::Group1Var2), None).into())
-            }
+            AllObjectsVariation::Group1Var1 => Some(
+                StaticReadHeader::Binary(Some(StaticBinaryInputVariation::Group1Var1), None).into(),
+            ),
+            AllObjectsVariation::Group1Var2 => Some(
+                StaticReadHeader::Binary(Some(StaticBinaryInputVariation::Group1Var2), None).into(),
+            ),
             // group 2
             AllObjectsVariation::Group2Var0 => Some(EventReadHeader::Binary(None, None).into()),
-            AllObjectsVariation::Group2Var1 => {
-                Some(EventReadHeader::Binary(Some(EventBinaryVariation::Group2Var1), None).into())
-            }
-            AllObjectsVariation::Group2Var2 => {
-                Some(EventReadHeader::Binary(Some(EventBinaryVariation::Group2Var2), None).into())
-            }
-            AllObjectsVariation::Group2Var3 => {
-                Some(EventReadHeader::Binary(Some(EventBinaryVariation::Group2Var3), None).into())
-            }
+            AllObjectsVariation::Group2Var1 => Some(
+                EventReadHeader::Binary(Some(EventBinaryInputVariation::Group2Var1), None).into(),
+            ),
+            AllObjectsVariation::Group2Var2 => Some(
+                EventReadHeader::Binary(Some(EventBinaryInputVariation::Group2Var2), None).into(),
+            ),
+            AllObjectsVariation::Group2Var3 => Some(
+                EventReadHeader::Binary(Some(EventBinaryInputVariation::Group2Var3), None).into(),
+            ),
             // group 3
             AllObjectsVariation::Group3Var0 => {
                 Some(StaticReadHeader::DoubleBitBinary(None, None).into())
             }
             AllObjectsVariation::Group3Var1 => Some(
                 StaticReadHeader::DoubleBitBinary(
-                    Some(StaticDoubleBitBinaryVariation::Group3Var1),
+                    Some(StaticDoubleBitBinaryInputVariation::Group3Var1),
                     None,
                 )
                 .into(),
             ),
             AllObjectsVariation::Group3Var2 => Some(
                 StaticReadHeader::DoubleBitBinary(
-                    Some(StaticDoubleBitBinaryVariation::Group3Var2),
+                    Some(StaticDoubleBitBinaryInputVariation::Group3Var2),
                     None,
                 )
                 .into(),
@@ -136,21 +139,21 @@ impl ReadHeader {
             }
             AllObjectsVariation::Group4Var1 => Some(
                 EventReadHeader::DoubleBitBinary(
-                    Some(EventDoubleBitBinaryVariation::Group4Var1),
+                    Some(EventDoubleBitBinaryInputVariation::Group4Var1),
                     None,
                 )
                 .into(),
             ),
             AllObjectsVariation::Group4Var2 => Some(
                 EventReadHeader::DoubleBitBinary(
-                    Some(EventDoubleBitBinaryVariation::Group4Var2),
+                    Some(EventDoubleBitBinaryInputVariation::Group4Var2),
                     None,
                 )
                 .into(),
             ),
             AllObjectsVariation::Group4Var3 => Some(
                 EventReadHeader::DoubleBitBinary(
-                    Some(EventDoubleBitBinaryVariation::Group4Var3),
+                    Some(EventDoubleBitBinaryInputVariation::Group4Var3),
                     None,
                 )
                 .into(),
@@ -300,49 +303,55 @@ impl ReadHeader {
             // group 30
             AllObjectsVariation::Group30Var0 => Some(StaticReadHeader::Analog(None, None).into()),
             AllObjectsVariation::Group30Var1 => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var1), None).into(),
+                StaticReadHeader::Analog(Some(StaticAnalogInputVariation::Group30Var1), None)
+                    .into(),
             ),
             AllObjectsVariation::Group30Var2 => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var2), None).into(),
+                StaticReadHeader::Analog(Some(StaticAnalogInputVariation::Group30Var2), None)
+                    .into(),
             ),
             AllObjectsVariation::Group30Var3 => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var3), None).into(),
+                StaticReadHeader::Analog(Some(StaticAnalogInputVariation::Group30Var3), None)
+                    .into(),
             ),
             AllObjectsVariation::Group30Var4 => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var4), None).into(),
+                StaticReadHeader::Analog(Some(StaticAnalogInputVariation::Group30Var4), None)
+                    .into(),
             ),
             AllObjectsVariation::Group30Var5 => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var5), None).into(),
+                StaticReadHeader::Analog(Some(StaticAnalogInputVariation::Group30Var5), None)
+                    .into(),
             ),
             AllObjectsVariation::Group30Var6 => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var6), None).into(),
+                StaticReadHeader::Analog(Some(StaticAnalogInputVariation::Group30Var6), None)
+                    .into(),
             ),
             // group 32
             AllObjectsVariation::Group32Var0 => Some(EventReadHeader::Analog(None, None).into()),
-            AllObjectsVariation::Group32Var1 => {
-                Some(EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var1), None).into())
-            }
-            AllObjectsVariation::Group32Var2 => {
-                Some(EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var2), None).into())
-            }
-            AllObjectsVariation::Group32Var3 => {
-                Some(EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var3), None).into())
-            }
-            AllObjectsVariation::Group32Var4 => {
-                Some(EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var4), None).into())
-            }
-            AllObjectsVariation::Group32Var5 => {
-                Some(EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var5), None).into())
-            }
-            AllObjectsVariation::Group32Var6 => {
-                Some(EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var6), None).into())
-            }
-            AllObjectsVariation::Group32Var7 => {
-                Some(EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var7), None).into())
-            }
-            AllObjectsVariation::Group32Var8 => {
-                Some(EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var8), None).into())
-            }
+            AllObjectsVariation::Group32Var1 => Some(
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var1), None).into(),
+            ),
+            AllObjectsVariation::Group32Var2 => Some(
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var2), None).into(),
+            ),
+            AllObjectsVariation::Group32Var3 => Some(
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var3), None).into(),
+            ),
+            AllObjectsVariation::Group32Var4 => Some(
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var4), None).into(),
+            ),
+            AllObjectsVariation::Group32Var5 => Some(
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var5), None).into(),
+            ),
+            AllObjectsVariation::Group32Var6 => Some(
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var6), None).into(),
+            ),
+            AllObjectsVariation::Group32Var7 => Some(
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var7), None).into(),
+            ),
+            AllObjectsVariation::Group32Var8 => Some(
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var8), None).into(),
+            ),
             // group 40
             AllObjectsVariation::Group40Var0 => {
                 Some(StaticReadHeader::AnalogOutputStatus(None, None).into())
@@ -453,34 +462,37 @@ impl ReadHeader {
         match header {
             CountVariation::Group2Var0 => Some(EventReadHeader::Binary(None, Some(count)).into()),
             CountVariation::Group2Var1 => Some(
-                EventReadHeader::Binary(Some(EventBinaryVariation::Group2Var1), Some(count)).into(),
+                EventReadHeader::Binary(Some(EventBinaryInputVariation::Group2Var1), Some(count))
+                    .into(),
             ),
             CountVariation::Group2Var2 => Some(
-                EventReadHeader::Binary(Some(EventBinaryVariation::Group2Var2), Some(count)).into(),
+                EventReadHeader::Binary(Some(EventBinaryInputVariation::Group2Var2), Some(count))
+                    .into(),
             ),
             CountVariation::Group2Var3 => Some(
-                EventReadHeader::Binary(Some(EventBinaryVariation::Group2Var3), Some(count)).into(),
+                EventReadHeader::Binary(Some(EventBinaryInputVariation::Group2Var3), Some(count))
+                    .into(),
             ),
             CountVariation::Group4Var0 => {
                 Some(EventReadHeader::DoubleBitBinary(None, Some(count)).into())
             }
             CountVariation::Group4Var1 => Some(
                 EventReadHeader::DoubleBitBinary(
-                    Some(EventDoubleBitBinaryVariation::Group4Var1),
+                    Some(EventDoubleBitBinaryInputVariation::Group4Var1),
                     Some(count),
                 )
                 .into(),
             ),
             CountVariation::Group4Var2 => Some(
                 EventReadHeader::DoubleBitBinary(
-                    Some(EventDoubleBitBinaryVariation::Group4Var2),
+                    Some(EventDoubleBitBinaryInputVariation::Group4Var2),
                     Some(count),
                 )
                 .into(),
             ),
             CountVariation::Group4Var3 => Some(
                 EventReadHeader::DoubleBitBinary(
-                    Some(EventDoubleBitBinaryVariation::Group4Var3),
+                    Some(EventDoubleBitBinaryInputVariation::Group4Var3),
                     Some(count),
                 )
                 .into(),
@@ -552,35 +564,35 @@ impl ReadHeader {
             ),
             CountVariation::Group32Var0 => Some(EventReadHeader::Analog(None, Some(count)).into()),
             CountVariation::Group32Var1 => Some(
-                EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var1), Some(count))
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var1), Some(count))
                     .into(),
             ),
             CountVariation::Group32Var2 => Some(
-                EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var2), Some(count))
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var2), Some(count))
                     .into(),
             ),
             CountVariation::Group32Var3 => Some(
-                EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var3), Some(count))
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var3), Some(count))
                     .into(),
             ),
             CountVariation::Group32Var4 => Some(
-                EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var4), Some(count))
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var4), Some(count))
                     .into(),
             ),
             CountVariation::Group32Var5 => Some(
-                EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var5), Some(count))
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var5), Some(count))
                     .into(),
             ),
             CountVariation::Group32Var6 => Some(
-                EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var6), Some(count))
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var6), Some(count))
                     .into(),
             ),
             CountVariation::Group32Var7 => Some(
-                EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var7), Some(count))
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var7), Some(count))
                     .into(),
             ),
             CountVariation::Group32Var8 => Some(
-                EventReadHeader::Analog(Some(EventAnalogVariation::Group32Var8), Some(count))
+                EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var8), Some(count))
                     .into(),
             ),
             CountVariation::Group42Var0 => {
@@ -662,11 +674,11 @@ impl ReadHeader {
             // group 1
             RangedVariation::Group1Var0 => Some(StaticReadHeader::Binary(None, Some(range)).into()),
             RangedVariation::Group1Var1(_) => Some(
-                StaticReadHeader::Binary(Some(StaticBinaryVariation::Group1Var1), Some(range))
+                StaticReadHeader::Binary(Some(StaticBinaryInputVariation::Group1Var1), Some(range))
                     .into(),
             ),
             RangedVariation::Group1Var2(_) => Some(
-                StaticReadHeader::Binary(Some(StaticBinaryVariation::Group1Var2), Some(range))
+                StaticReadHeader::Binary(Some(StaticBinaryInputVariation::Group1Var2), Some(range))
                     .into(),
             ),
             // group 3
@@ -675,14 +687,14 @@ impl ReadHeader {
             }
             RangedVariation::Group3Var1(_) => Some(
                 StaticReadHeader::DoubleBitBinary(
-                    Some(StaticDoubleBitBinaryVariation::Group3Var1),
+                    Some(StaticDoubleBitBinaryInputVariation::Group3Var1),
                     Some(range),
                 )
                 .into(),
             ),
             RangedVariation::Group3Var2(_) => Some(
                 StaticReadHeader::DoubleBitBinary(
-                    Some(StaticDoubleBitBinaryVariation::Group3Var2),
+                    Some(StaticDoubleBitBinaryInputVariation::Group3Var2),
                     Some(range),
                 )
                 .into(),
@@ -776,28 +788,46 @@ impl ReadHeader {
                 Some(StaticReadHeader::Analog(None, Some(range)).into())
             }
             RangedVariation::Group30Var1(_) => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var1), Some(range))
-                    .into(),
+                StaticReadHeader::Analog(
+                    Some(StaticAnalogInputVariation::Group30Var1),
+                    Some(range),
+                )
+                .into(),
             ),
             RangedVariation::Group30Var2(_) => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var2), Some(range))
-                    .into(),
+                StaticReadHeader::Analog(
+                    Some(StaticAnalogInputVariation::Group30Var2),
+                    Some(range),
+                )
+                .into(),
             ),
             RangedVariation::Group30Var3(_) => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var3), Some(range))
-                    .into(),
+                StaticReadHeader::Analog(
+                    Some(StaticAnalogInputVariation::Group30Var3),
+                    Some(range),
+                )
+                .into(),
             ),
             RangedVariation::Group30Var4(_) => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var4), Some(range))
-                    .into(),
+                StaticReadHeader::Analog(
+                    Some(StaticAnalogInputVariation::Group30Var4),
+                    Some(range),
+                )
+                .into(),
             ),
             RangedVariation::Group30Var5(_) => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var5), Some(range))
-                    .into(),
+                StaticReadHeader::Analog(
+                    Some(StaticAnalogInputVariation::Group30Var5),
+                    Some(range),
+                )
+                .into(),
             ),
             RangedVariation::Group30Var6(_) => Some(
-                StaticReadHeader::Analog(Some(StaticAnalogVariation::Group30Var6), Some(range))
-                    .into(),
+                StaticReadHeader::Analog(
+                    Some(StaticAnalogInputVariation::Group30Var6),
+                    Some(range),
+                )
+                .into(),
             ),
             // group 40
             RangedVariation::Group40Var0 => {

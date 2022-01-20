@@ -285,18 +285,18 @@ fn write_header(
 
 #[cfg(test)]
 mod tests {
-    use crate::app::measurement::{Binary, DoubleBitBinary, Flags, Time};
+    use crate::app::measurement::*;
     use crate::outstation::database::config::*;
     use crate::outstation::database::details::range::traits::StaticVariation;
 
     use super::*;
 
-    fn binary(value: bool) -> Binary {
-        Binary::new(value, Flags::ONLINE, Time::synchronized(0))
+    fn binary(value: bool) -> BinaryInput {
+        BinaryInput::new(value, Flags::ONLINE, Time::synchronized(0))
     }
 
-    fn double_bit(bit: DoubleBit) -> DoubleBitBinary {
-        DoubleBitBinary::new(bit, Flags::ONLINE, Time::synchronized(0))
+    fn double_bit(bit: DoubleBit) -> DoubleBitBinaryInput {
+        DoubleBitBinaryInput::new(bit, Flags::ONLINE, Time::synchronized(0))
     }
 
     #[test]
@@ -306,7 +306,7 @@ mod tests {
 
         let mut writer = RangeWriter::new();
 
-        let g1v1 = StaticBinaryVariation::Group1Var1.get_write_info(&binary(false));
+        let g1v1 = StaticBinaryInputVariation::Group1Var1.get_write_info(&binary(false));
 
         fn is_odd(index: u16) -> bool {
             index % 2 == 1
@@ -353,7 +353,7 @@ mod tests {
             }
         }
 
-        let g3v1 = StaticDoubleBitBinaryVariation::Group3Var1
+        let g3v1 = StaticDoubleBitBinaryInputVariation::Group3Var1
             .get_write_info(&double_bit(DoubleBit::DeterminedOff));
 
         for index in 1..=5 {
@@ -397,7 +397,7 @@ mod tests {
             }
         }
 
-        let g3v1 = StaticDoubleBitBinaryVariation::Group3Var1
+        let g3v1 = StaticDoubleBitBinaryInputVariation::Group3Var1
             .get_write_info(&double_bit(DoubleBit::DeterminedOff));
 
         for index in 1..=9 {
@@ -435,7 +435,7 @@ mod tests {
         let mut cursor = WriteCursor::new(buffer.as_mut());
         let mut writer = RangeWriter::new();
 
-        let g1v2 = StaticBinaryVariation::Group1Var2.get_write_info(&binary(false));
+        let g1v2 = StaticBinaryInputVariation::Group1Var2.get_write_info(&binary(false));
 
         writer.write(&mut cursor, 2, &binary(true), g1v2).unwrap();
         writer.write(&mut cursor, 2, &binary(true), g1v2).unwrap();
@@ -459,7 +459,7 @@ mod tests {
         let mut cursor = WriteCursor::new(buffer.as_mut());
         let mut writer = RangeWriter::new();
 
-        let g1v2 = StaticBinaryVariation::Group1Var2.get_write_info(&binary(false));
+        let g1v2 = StaticBinaryInputVariation::Group1Var2.get_write_info(&binary(false));
 
         writer.write(&mut cursor, 1, &binary(true), g1v2).unwrap();
         writer.write(&mut cursor, 3, &binary(true), g1v2).unwrap();

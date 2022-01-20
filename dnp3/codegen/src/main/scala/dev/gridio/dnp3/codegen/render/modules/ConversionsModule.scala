@@ -89,7 +89,7 @@ object ConversionsModule extends Module {
         }
     }
 
-    spaced(binaryVariations.map(single("Binary")).iterator) ++
+    spaced(binaryVariations.map(single("BinaryInput")).iterator) ++
     space ++
     spaced(binaryOutputStatusVariations.map(single("BinaryOutputStatus")).iterator)
   }
@@ -107,7 +107,7 @@ object ConversionsModule extends Module {
     def single(fs: FixedSize) : Iterator[String] = {
       def variationToMeas : Iterator[String] = {
         "let flags = Flags::new(v.flags);".eol ++
-          bracket("DoubleBitBinary") {
+          bracket("DoubleBitBinaryInput") {
             "value : flags.double_bit_state(),".eol ++
               "flags,".eol ++
               s"time : ${timeConversion(fs)},".eol
@@ -127,12 +127,12 @@ object ConversionsModule extends Module {
         }
       }
 
-      bracket(s"impl From<${fs.name}> for DoubleBitBinary") {
+      bracket(s"impl From<${fs.name}> for DoubleBitBinaryInput") {
         bracket(s"fn from(v: ${fs.name}) -> Self") {
           variationToMeas
         }
       } ++ space ++
-        bracket(s"impl ToVariation<${fs.name}> for DoubleBitBinary") {
+        bracket(s"impl ToVariation<${fs.name}> for DoubleBitBinaryInput") {
           bracket(s"fn to_variation(&self) -> ${fs.name}") {
             measToVariation
           }
@@ -310,7 +310,7 @@ object ConversionsModule extends Module {
 
     }
 
-    spaced(analogVariations.map(single("Analog")).iterator) ++
+    spaced(analogVariations.map(single("AnalogInput")).iterator) ++
     space ++
     spaced(analogOutputStatusVariations.map(single("AnalogOutputStatus")).iterator)
   }

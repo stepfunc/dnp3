@@ -99,7 +99,7 @@ pub fn define(
             "Header of the fragment",
         )?
         .end_callback()?
-        .begin_callback("handle_binary", "Handle binary input data")?
+        .begin_callback("handle_binary_input", "Handle binary input data")?
         .param(
             "info",
            header_info.clone(),
@@ -112,7 +112,7 @@ pub fn define(
         )?
         .end_callback()?
         .begin_callback(
-            "handle_double_bit_binary",
+            "handle_double_bit_binary_input",
             "Handle double-bit binary input data",
         )?
         .param(
@@ -169,7 +169,7 @@ pub fn define(
         )?
 
         .end_callback()?
-        .begin_callback("handle_analog", "Handle analog input data")?
+        .begin_callback("handle_analog_input", "Handle analog input data")?
         .param(
             "info",
            header_info.clone(),

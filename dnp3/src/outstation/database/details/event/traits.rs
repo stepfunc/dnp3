@@ -24,18 +24,22 @@ pub(crate) trait EventVariation<T> {
     }
 }
 
-impl EventVariation<Binary> for EventBinaryVariation {
+impl EventVariation<BinaryInput> for EventBinaryInputVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
-        event: &Binary,
+        event: &BinaryInput,
         index: u16,
         cto: Time,
     ) -> Result<Continue, WriteError> {
         match self {
-            Self::Group2Var1 => write_fixed_size::<Group2Var1, Binary>(cursor, event, index, cto),
-            Self::Group2Var2 => write_fixed_size::<Group2Var2, Binary>(cursor, event, index, cto),
-            Self::Group2Var3 => write_cto::<Group2Var3, Binary>(cursor, event, index, cto),
+            Self::Group2Var1 => {
+                write_fixed_size::<Group2Var1, BinaryInput>(cursor, event, index, cto)
+            }
+            Self::Group2Var2 => {
+                write_fixed_size::<Group2Var2, BinaryInput>(cursor, event, index, cto)
+            }
+            Self::Group2Var3 => write_cto::<Group2Var3, BinaryInput>(cursor, event, index, cto),
         }
     }
 
@@ -43,7 +47,7 @@ impl EventVariation<Binary> for EventBinaryVariation {
         HeaderType::Binary(*self)
     }
 
-    fn get_group_var(&self, _event: &Binary) -> (u8, u8) {
+    fn get_group_var(&self, _event: &BinaryInput) -> (u8, u8) {
         match self {
             Self::Group2Var1 => (2, 1),
             Self::Group2Var2 => (2, 2),
@@ -86,22 +90,24 @@ impl EventVariation<BinaryOutputStatus> for EventBinaryOutputStatusVariation {
     }
 }
 
-impl EventVariation<DoubleBitBinary> for EventDoubleBitBinaryVariation {
+impl EventVariation<DoubleBitBinaryInput> for EventDoubleBitBinaryInputVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
-        event: &DoubleBitBinary,
+        event: &DoubleBitBinaryInput,
         index: u16,
         cto: Time,
     ) -> Result<Continue, WriteError> {
         match self {
             Self::Group4Var1 => {
-                write_fixed_size::<Group4Var1, DoubleBitBinary>(cursor, event, index, cto)
+                write_fixed_size::<Group4Var1, DoubleBitBinaryInput>(cursor, event, index, cto)
             }
             Self::Group4Var2 => {
-                write_fixed_size::<Group4Var2, DoubleBitBinary>(cursor, event, index, cto)
+                write_fixed_size::<Group4Var2, DoubleBitBinaryInput>(cursor, event, index, cto)
             }
-            Self::Group4Var3 => write_cto::<Group4Var3, DoubleBitBinary>(cursor, event, index, cto),
+            Self::Group4Var3 => {
+                write_cto::<Group4Var3, DoubleBitBinaryInput>(cursor, event, index, cto)
+            }
         }
     }
 
@@ -109,7 +115,7 @@ impl EventVariation<DoubleBitBinary> for EventDoubleBitBinaryVariation {
         HeaderType::DoubleBitBinary(*self)
     }
 
-    fn get_group_var(&self, _event: &DoubleBitBinary) -> (u8, u8) {
+    fn get_group_var(&self, _event: &DoubleBitBinaryInput) -> (u8, u8) {
         match self {
             Self::Group4Var1 => (4, 1),
             Self::Group4Var2 => (4, 2),
@@ -198,23 +204,39 @@ impl EventVariation<FrozenCounter> for EventFrozenCounterVariation {
     }
 }
 
-impl EventVariation<Analog> for EventAnalogVariation {
+impl EventVariation<AnalogInput> for EventAnalogInputVariation {
     fn write(
         &self,
         cursor: &mut WriteCursor,
-        event: &Analog,
+        event: &AnalogInput,
         index: u16,
         cto: Time,
     ) -> Result<Continue, WriteError> {
         match self {
-            Self::Group32Var1 => write_fixed_size::<Group32Var1, Analog>(cursor, event, index, cto),
-            Self::Group32Var2 => write_fixed_size::<Group32Var2, Analog>(cursor, event, index, cto),
-            Self::Group32Var3 => write_fixed_size::<Group32Var3, Analog>(cursor, event, index, cto),
-            Self::Group32Var4 => write_fixed_size::<Group32Var4, Analog>(cursor, event, index, cto),
-            Self::Group32Var5 => write_fixed_size::<Group32Var5, Analog>(cursor, event, index, cto),
-            Self::Group32Var6 => write_fixed_size::<Group32Var6, Analog>(cursor, event, index, cto),
-            Self::Group32Var7 => write_fixed_size::<Group32Var7, Analog>(cursor, event, index, cto),
-            Self::Group32Var8 => write_fixed_size::<Group32Var8, Analog>(cursor, event, index, cto),
+            Self::Group32Var1 => {
+                write_fixed_size::<Group32Var1, AnalogInput>(cursor, event, index, cto)
+            }
+            Self::Group32Var2 => {
+                write_fixed_size::<Group32Var2, AnalogInput>(cursor, event, index, cto)
+            }
+            Self::Group32Var3 => {
+                write_fixed_size::<Group32Var3, AnalogInput>(cursor, event, index, cto)
+            }
+            Self::Group32Var4 => {
+                write_fixed_size::<Group32Var4, AnalogInput>(cursor, event, index, cto)
+            }
+            Self::Group32Var5 => {
+                write_fixed_size::<Group32Var5, AnalogInput>(cursor, event, index, cto)
+            }
+            Self::Group32Var6 => {
+                write_fixed_size::<Group32Var6, AnalogInput>(cursor, event, index, cto)
+            }
+            Self::Group32Var7 => {
+                write_fixed_size::<Group32Var7, AnalogInput>(cursor, event, index, cto)
+            }
+            Self::Group32Var8 => {
+                write_fixed_size::<Group32Var8, AnalogInput>(cursor, event, index, cto)
+            }
         }
     }
 
@@ -222,7 +244,7 @@ impl EventVariation<Analog> for EventAnalogVariation {
         HeaderType::Analog(*self)
     }
 
-    fn get_group_var(&self, _event: &Analog) -> (u8, u8) {
+    fn get_group_var(&self, _event: &AnalogInput) -> (u8, u8) {
         match self {
             Self::Group32Var1 => (32, 1),
             Self::Group32Var2 => (32, 2),

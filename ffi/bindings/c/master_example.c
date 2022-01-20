@@ -43,26 +43,26 @@ void begin_fragment(dnp3_read_type_t read_type, dnp3_response_header_t header, v
 
 void end_fragment(dnp3_read_type_t read_type, dnp3_response_header_t header, void *arg) { printf("End fragment\n"); }
 
-void handle_binary(dnp3_header_info_t info, dnp3_binary_iterator_t *it, void *arg)
+void handle_binary_input(dnp3_header_info_t info, dnp3_binary_input_iterator_t *it, void *arg)
 {
     printf("Binaries:\n");
     printf("Qualifier: %s \n", dnp3_qualifier_code_to_string(info.qualifier));
     printf("Variation: %s \n", dnp3_variation_to_string(info.variation));
 
-    dnp3_binary_t *value = NULL;
-    while (value = dnp3_binary_iterator_next(it)) {
+    dnp3_binary_input_t *value = NULL;
+    while (value = dnp3_binary_input_iterator_next(it)) {
         printf("BI %u: Value=%u Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
 
-void handle_double_bit_binary(dnp3_header_info_t info, dnp3_double_bit_binary_iterator_t *it, void *arg)
+void handle_double_bit_binary_input(dnp3_header_info_t info, dnp3_double_bit_binary_input_iterator_t *it, void *arg)
 {
     printf("Double Bit Binaries:\n");
     printf("Qualifier: %s \n", dnp3_qualifier_code_to_string(info.qualifier));
     printf("Variation: %s \n", dnp3_variation_to_string(info.variation));
 
-    dnp3_double_bit_binary_t *value = NULL;
-    while (value = dnp3_double_bit_binary_iterator_next(it)) {
+    dnp3_double_bit_binary_input_t *value = NULL;
+    while (value = dnp3_double_bit_binary_input_iterator_next(it)) {
         printf("DBBI %u: Value=%X Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
@@ -103,14 +103,14 @@ void handle_frozen_counter(dnp3_header_info_t info, dnp3_frozen_counter_iterator
     }
 }
 
-void handle_analog(dnp3_header_info_t info, dnp3_analog_iterator_t *it, void *arg)
+void handle_analog_input(dnp3_header_info_t info, dnp3_analog_input_iterator_t *it, void *arg)
 {
     printf("Analogs:\n");
     printf("Qualifier: %s \n", dnp3_qualifier_code_to_string(info.qualifier));
     printf("Variation: %s \n", dnp3_variation_to_string(info.variation));
 
-    dnp3_analog_t *value = NULL;
-    while (value = dnp3_analog_iterator_next(it)) {
+    dnp3_analog_input_t *value = NULL;
+    while (value = dnp3_analog_input_iterator_next(it)) {
         printf("AI %u: Value=%f Flags=0x%02X Time=%" PRIu64 "\n", value->index, value->value, value->flags.value, value->time.value);
     }
 }
@@ -151,12 +151,12 @@ dnp3_read_handler_t get_read_handler()
     return (dnp3_read_handler_t){
         .begin_fragment = &begin_fragment,
         .end_fragment = &end_fragment,
-        .handle_binary = &handle_binary,
-        .handle_double_bit_binary = &handle_double_bit_binary,
+        .handle_binary_input = &handle_binary_input,
+        .handle_double_bit_binary_input = &handle_double_bit_binary_input,
         .handle_binary_output_status = &handle_binary_output_status,
         .handle_counter = &handle_counter,
         .handle_frozen_counter = &handle_frozen_counter,
-        .handle_analog = &handle_analog,
+        .handle_analog_input = &handle_analog_input,
         .handle_analog_output_status = &handle_analog_output_status,
         .handle_octet_string = &handle_octet_strings,
         .on_destroy = NULL,

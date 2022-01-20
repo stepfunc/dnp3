@@ -87,13 +87,13 @@ impl Group41Var4 {
     }
 }
 
-impl WireFlags for Binary {
+impl WireFlags for BinaryInput {
     fn get_wire_flags(&self) -> u8 {
         self.flags.with_bits_set_to(BIT_7, self.value).value
     }
 }
 
-impl WireFlags for DoubleBitBinary {
+impl WireFlags for DoubleBitBinaryInput {
     fn get_wire_flags(&self) -> u8 {
         let pair = self.value.to_bit_pair();
         self.flags
@@ -121,7 +121,7 @@ impl WireFlags for FrozenCounter {
     }
 }
 
-impl WireFlags for Analog {
+impl WireFlags for AnalogInput {
     fn get_wire_flags(&self) -> u8 {
         self.flags.value
     }
@@ -133,7 +133,7 @@ impl WireFlags for AnalogOutputStatus {
     }
 }
 
-impl AnalogConversions for Analog {
+impl AnalogConversions for AnalogInput {
     fn get_value(&self) -> f64 {
         self.value
     }

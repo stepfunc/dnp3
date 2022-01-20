@@ -160,12 +160,12 @@ int main()
     auto setup = database_transaction([](Database& db) {
         // add 5 of each type
         for (uint16_t i = 0; i < 10; ++i) {
-            db.add_binary(i, EventClass::class1, BinaryConfig());
-            db.add_double_bit_binary(i, EventClass::class1, DoubleBitBinaryConfig());
+            db.add_binary_input(i, EventClass::class1, BinaryInputConfig());
+            db.add_double_bit_binary_input(i, EventClass::class1, DoubleBitBinaryInputConfig());
             db.add_binary_output_status(i, EventClass::class1, BinaryOutputStatusConfig());
             db.add_counter(i, EventClass::class1, CounterConfig());
             db.add_frozen_counter(i, EventClass::class1, FrozenCounterConfig());
-            db.add_analog(i, EventClass::class1, AnalogConfig());
+            db.add_analog_input(i, EventClass::class1, AnalogInputConfig());
             db.add_analog_output_status(i, EventClass::class1, AnalogOutputStatusConfig());
             db.add_octet_string(i, EventClass::class1);
         }
@@ -187,7 +187,7 @@ int main()
         else if (cmd == "bi") {
             auto modify = database_transaction([&](Database& db) {
                 state.binary = !state.binary;
-                db.update_binary(Binary(7, state.binary, online(), now()), UpdateOptions());
+                db.update_binary_input(BinaryInput(7, state.binary, online(), now()), UpdateOptions());
             });
             outstation.transaction(modify);
         }       
@@ -195,7 +195,7 @@ int main()
             auto modify = database_transaction([&](Database& db) {
                 state.double_bit_binary = !state.double_bit_binary;
                 auto value = state.double_bit_binary ? DoubleBit::determined_on : DoubleBit::determined_off;
-                db.update_double_bit_binary(DoubleBitBinary(3, value, online(), now()), UpdateOptions());
+                db.update_double_bit_binary_input(DoubleBitBinaryInput(3, value, online(), now()), UpdateOptions());
             });
             outstation.transaction(modify);
         }
@@ -223,7 +223,7 @@ int main()
         else if (cmd == "ai") {
             auto modify = database_transaction([&](Database& db) {
                 state.analog += 1;
-                db.update_analog(Analog(7, state.analog, online(), now()), UpdateOptions());
+                db.update_analog_input(AnalogInput(7, state.analog, online(), now()), UpdateOptions());
             });
             outstation.transaction(modify);
         }

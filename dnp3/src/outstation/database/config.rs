@@ -1,6 +1,6 @@
-/// Enum representing all possible `Binary` event variations
+/// Enum representing all possible `BinaryInput` event variations
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum EventBinaryVariation {
+pub enum EventBinaryInputVariation {
     /// Binary Input Event - Without Time
     Group2Var1,
     /// Binary Input Event - With Absolute Time
@@ -18,9 +18,9 @@ pub enum EventBinaryOutputStatusVariation {
     Group11Var2,
 }
 
-/// Enum representing all possible `DoubleBitBinary` event variations
+/// Enum representing all possible `DoubleBitBinaryInput` event variations
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum EventDoubleBitBinaryVariation {
+pub enum EventDoubleBitBinaryInputVariation {
     /// Double-bit Binary Input Event - Without Time
     Group4Var1,
     /// Double-bit Binary Input Event - With Absolute Time
@@ -55,9 +55,9 @@ pub enum EventFrozenCounterVariation {
     Group23Var6,
 }
 
-/// Enum representing all possible `Analog` event variations
+/// Enum representing all possible `AnalogInput` event variations
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum EventAnalogVariation {
+pub enum EventAnalogInputVariation {
     /// Analog Input Event - 32-bit With Flag
     Group32Var1,
     /// Analog Input Event - 16-bit With Flag
@@ -101,9 +101,9 @@ pub enum EventAnalogOutputStatusVariation {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct EventOctetStringVariation;
 
-/// Enum representing all possible `Binary` static variations
+/// Enum representing all possible `BinaryInput` static variations
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum StaticBinaryVariation {
+pub enum StaticBinaryInputVariation {
     /// Binary Input - Packed Format
     Group1Var1,
     /// Binary Input - With Flags
@@ -119,9 +119,9 @@ pub enum StaticBinaryOutputStatusVariation {
     Group10Var2,
 }
 
-/// Enum representing all possible `DoubleBitBinary` static variations
+/// Enum representing all possible `DoubleBitBinaryInput` static variations
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum StaticDoubleBitBinaryVariation {
+pub enum StaticDoubleBitBinaryInputVariation {
     /// Double-bit Binary Input - Packed Format
     Group3Var1,
     /// Double-bit Binary Input - With Flags
@@ -158,9 +158,9 @@ pub enum StaticFrozenCounterVariation {
     Group21Var10,
 }
 
-/// Enum representing all possible `Analog` static variations
+/// Enum representing all possible `AnalogInput` static variations
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum StaticAnalogVariation {
+pub enum StaticAnalogInputVariation {
     /// Analog Input - 32-bit With Flag
     Group30Var1,
     /// Analog Input - 16-bit With Flag
@@ -192,22 +192,22 @@ pub enum StaticAnalogOutputStatusVariation {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct StaticOctetStringVariation;
 
-/// configuration for a `Binary` point
+/// configuration for a `BinaryInput` point
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct BinaryConfig {
+pub struct BinaryInputConfig {
     /// default static variation
-    pub s_var: StaticBinaryVariation,
+    pub s_var: StaticBinaryInputVariation,
     /// default event variation
-    pub e_var: EventBinaryVariation,
+    pub e_var: EventBinaryInputVariation,
 }
 
-/// configuration for a `DoubleBitBinary` point
+/// configuration for a `DoubleBitBinaryInput` point
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct DoubleBitBinaryConfig {
+pub struct DoubleBitBinaryInputConfig {
     /// default static variation
-    pub s_var: StaticDoubleBitBinaryVariation,
+    pub s_var: StaticDoubleBitBinaryInputVariation,
     /// default event variation
-    pub e_var: EventDoubleBitBinaryVariation,
+    pub e_var: EventDoubleBitBinaryInputVariation,
 }
 
 /// configuration for a `BinaryOutputStatus` point
@@ -241,13 +241,13 @@ pub struct FrozenCounterConfig {
     pub deadband: u32,
 }
 
-/// configuration for an `Analog` point
+/// configuration for an `AnalogInput` point
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct AnalogConfig {
+pub struct AnalogInputConfig {
     /// default static variation
-    pub s_var: StaticAnalogVariation,
+    pub s_var: StaticAnalogInputVariation,
     /// default event variation
-    pub e_var: EventAnalogVariation,
+    pub e_var: EventAnalogInputVariation,
     /// deadband - value of 0 means that any change will trigger an event
     pub deadband: f64,
 }
@@ -267,18 +267,18 @@ pub struct AnalogOutputStatusConfig {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OctetStringConfig;
 
-impl BinaryConfig {
+impl BinaryInputConfig {
     /// construct a `BinaryConfig` from its fields
-    pub fn new(s_var: StaticBinaryVariation, e_var: EventBinaryVariation) -> Self {
+    pub fn new(s_var: StaticBinaryInputVariation, e_var: EventBinaryInputVariation) -> Self {
         Self { s_var, e_var }
     }
 }
 
-impl DoubleBitBinaryConfig {
+impl DoubleBitBinaryInputConfig {
     /// construct a `DoubleBitBinaryConfig` from its fields
     pub fn new(
-        s_var: StaticDoubleBitBinaryVariation,
-        e_var: EventDoubleBitBinaryVariation,
+        s_var: StaticDoubleBitBinaryInputVariation,
+        e_var: EventDoubleBitBinaryInputVariation,
     ) -> Self {
         Self { s_var, e_var }
     }
@@ -320,9 +320,13 @@ impl FrozenCounterConfig {
     }
 }
 
-impl AnalogConfig {
+impl AnalogInputConfig {
     /// construct an `AnalogConfig` from its fields
-    pub fn new(s_var: StaticAnalogVariation, e_var: EventAnalogVariation, deadband: f64) -> Self {
+    pub fn new(
+        s_var: StaticAnalogInputVariation,
+        e_var: EventAnalogInputVariation,
+        deadband: f64,
+    ) -> Self {
         Self {
             s_var,
             e_var,
@@ -346,20 +350,20 @@ impl AnalogOutputStatusConfig {
     }
 }
 
-impl Default for BinaryConfig {
+impl Default for BinaryInputConfig {
     fn default() -> Self {
         Self::new(
-            StaticBinaryVariation::Group1Var1,
-            EventBinaryVariation::Group2Var1,
+            StaticBinaryInputVariation::Group1Var1,
+            EventBinaryInputVariation::Group2Var1,
         )
     }
 }
 
-impl Default for DoubleBitBinaryConfig {
+impl Default for DoubleBitBinaryInputConfig {
     fn default() -> Self {
         Self::new(
-            StaticDoubleBitBinaryVariation::Group3Var1,
-            EventDoubleBitBinaryVariation::Group4Var1,
+            StaticDoubleBitBinaryInputVariation::Group3Var1,
+            EventDoubleBitBinaryInputVariation::Group4Var1,
         )
     }
 }
@@ -393,11 +397,11 @@ impl Default for FrozenCounterConfig {
     }
 }
 
-impl Default for AnalogConfig {
+impl Default for AnalogInputConfig {
     fn default() -> Self {
         Self::new(
-            StaticAnalogVariation::Group30Var1,
-            EventAnalogVariation::Group32Var1,
+            StaticAnalogInputVariation::Group30Var1,
+            EventAnalogInputVariation::Group32Var1,
             0.0,
         )
     }
