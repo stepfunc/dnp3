@@ -284,7 +284,7 @@ impl ReadHandler for TestHandler {
         let sender = self.tx.clone();
         let count = self.count;
         MaybeAsync::asynchronous(async move {
-            let _ = sender.send(count);
+            let _ = sender.send(count).await;
         })
     }
 
