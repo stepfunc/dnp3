@@ -5,7 +5,7 @@ enum Value<T> {
 
 /// Represents a result that may be computed synchronously or asynchronously
 ///
-/// Since Rust (as of 1.52)  does not allow `async fn` in trait methods, we need
+/// Rust does not currently allow `async fn` in trait methods, we need
 /// a workaround. There are crates such as `async_trait` which provide proc_macros
 /// that do this, but they don't provide an optimization to *avoid* the heap allocation
 /// if the underlying implementation is synchronous.
