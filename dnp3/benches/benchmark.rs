@@ -275,12 +275,19 @@ struct TestHandler {
 }
 
 impl ReadHandler for TestHandler {
-    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {
+    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
         self.count = 0;
+        MaybeAsync::ready(())
     }
 
-    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {
-        self.tx.try_send(self.count).unwrap();
+    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
+        let sender = self.tx.clone();
+        let count = self.count;
+        MaybeAsync::asynchronous(async move {
+            println!("sending counter!");
+            let _ = sender.send(count);
+            println!("done sending counter!");
+        })
     }
 
     fn handle_binary_input(

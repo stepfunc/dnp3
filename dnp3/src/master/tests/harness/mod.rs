@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
 
+use crate::app::MaybeAsync;
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
@@ -85,9 +86,21 @@ impl CountHandler {
 }
 
 impl ReadHandler for CountHandler {
-    fn begin_fragment(&mut self, _read_type: ReadType, _header: crate::app::ResponseHeader) {}
+    fn begin_fragment(
+        &mut self,
+        _read_type: ReadType,
+        _header: crate::app::ResponseHeader,
+    ) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
 
-    fn end_fragment(&mut self, _read_type: ReadType, _header: crate::app::ResponseHeader) {}
+    fn end_fragment(
+        &mut self,
+        _read_type: ReadType,
+        _header: crate::app::ResponseHeader,
+    ) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
 
     fn handle_binary_input(
         &mut self,

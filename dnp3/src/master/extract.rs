@@ -8,10 +8,21 @@ use crate::master::ReadType;
 
 /// Extract measurements from a HeaderCollection, sinking them into
 /// something that implements `MeasurementHandler`
-pub(crate) fn extract_measurements(
+pub(crate) async fn extract_measurements(
     read_type: ReadType,
     header: ResponseHeader,
-    objects: HeaderCollection,
+    objects: HeaderCollection<'_>,
+    handler: &mut dyn ReadHandler,
+) {
+    handler.begin_fragment(read_type, header).get().await;
+    extract_measurements_inner(objects, handler);
+    handler.end_fragment(read_type, header).get().await;
+}
+
+/// Extract measurements from a HeaderCollection, sinking them into
+/// something that implements `MeasurementHandler`
+pub(crate) fn extract_measurements_inner(
+    objects: HeaderCollection<'_>,
     handler: &mut dyn ReadHandler,
 ) {
     fn extract_cto_g51v1(prev: Option<Time>, item: Option<Group51Var1>) -> Option<Time> {
@@ -69,11 +80,9 @@ pub(crate) fn extract_measurements(
         cto
     }
 
-    handler.begin_fragment(read_type, header);
     objects
         .iter()
         .fold(None, |cto, header| handle(cto, header, handler));
-    handler.end_fragment(read_type, header);
 }
 
 #[cfg(test)]
@@ -116,8 +125,20 @@ mod test {
     }
 
     impl ReadHandler for MockHandler {
-        fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
-        fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
+        fn begin_fragment(
+            &mut self,
+            _read_type: ReadType,
+            _header: ResponseHeader,
+        ) -> MaybeAsync<()> {
+            MaybeAsync::ready(())
+        }
+        fn end_fragment(
+            &mut self,
+            _read_type: ReadType,
+            _header: ResponseHeader,
+        ) -> MaybeAsync<()> {
+            MaybeAsync::ready(())
+        }
 
         fn handle_binary_input(
             &mut self,
@@ -215,7 +236,7 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(ReadType::PeriodicPoll, header(), objects, &mut handler);
+        extract_measurements_inner(objects, &mut handler);
         assert!(handler.is_empty());
     }
 
@@ -242,7 +263,7 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(ReadType::PeriodicPoll, header(), objects, &mut handler);
+        extract_measurements_inner(objects, &mut handler);
         assert!(handler.is_empty());
     }
 
@@ -269,7 +290,7 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(ReadType::PeriodicPoll, header(), objects, &mut handler);
+        extract_measurements_inner(objects, &mut handler);
         assert!(handler.is_empty());
     }
 
@@ -296,7 +317,7 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(ReadType::PeriodicPoll, header(), objects, &mut handler);
+        extract_measurements_inner(objects, &mut handler);
         assert!(handler.is_empty());
     }
 
@@ -323,7 +344,7 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(ReadType::PeriodicPoll, header(), objects, &mut handler);
+        extract_measurements_inner(objects, &mut handler);
         assert!(handler.is_empty());
     }
 }

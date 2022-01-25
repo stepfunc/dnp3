@@ -358,13 +358,18 @@ pub trait ReadHandler: Send {
     ///
     /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
     /// `header` provides the full response header
-    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
+    ///
+    /// Note: The operation may or may not be async depending
+    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()>;
 
     /// Called as the last action after all of the type-specific handle methods have been invoked
     ///
     /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
     /// `header` provides the full response header
-    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
+    ///
+    /// Note: The operation may or may not be async depending. A typical use case for using async
+    /// here would be to publish a message to an async MPSC.
+    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()>;
 
     /// Process an object header of `BinaryInput` values
     fn handle_binary_input(
@@ -444,9 +449,13 @@ impl NullReadHandler {
 }
 
 impl ReadHandler for NullReadHandler {
-    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
+    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
 
-    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
+    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
 
     fn handle_binary_input(
         &mut self,

@@ -480,7 +480,7 @@ impl Association {
             .map(|timeout| Instant::now() + timeout)
     }
 
-    pub(crate) fn handle_unsolicited_response(&mut self, response: &Response) -> bool {
+    pub(crate) async fn handle_unsolicited_response(&mut self, response: &Response<'_>) -> bool {
         // Accept the fragment only if the startup sequence was completed or if it's a null response.
         //
         // Now here's the deal. According to TB2015-002a, we should also ignore null responses without
@@ -508,7 +508,8 @@ impl Association {
                     response.header,
                     objects,
                     self.read_handler.as_mut(),
-                );
+                )
+                .await;
             }
 
             true
@@ -520,56 +521,60 @@ impl Association {
         }
     }
 
-    pub(crate) fn handle_integrity_response(
+    pub(crate) async fn handle_integrity_response(
         &mut self,
         header: ResponseHeader,
-        objects: HeaderCollection,
+        objects: HeaderCollection<'_>,
     ) {
         extract_measurements(
             ReadType::StartupIntegrity,
             header,
             objects,
             self.read_handler.as_mut(),
-        );
+        )
+        .await;
     }
 
-    pub(crate) fn handle_poll_response(
+    pub(crate) async fn handle_poll_response(
         &mut self,
         header: ResponseHeader,
-        objects: HeaderCollection,
+        objects: HeaderCollection<'_>,
     ) {
         extract_measurements(
             ReadType::PeriodicPoll,
             header,
             objects,
             self.read_handler.as_mut(),
-        );
+        )
+        .await;
     }
 
-    pub(crate) fn handle_event_scan_response(
+    pub(crate) async fn handle_event_scan_response(
         &mut self,
         header: ResponseHeader,
-        objects: HeaderCollection,
+        objects: HeaderCollection<'_>,
     ) {
         extract_measurements(
             ReadType::PeriodicPoll,
             header,
             objects,
             self.read_handler.as_mut(),
-        );
+        )
+        .await;
     }
 
-    pub(crate) fn handle_read_response(
+    pub(crate) async fn handle_read_response(
         &mut self,
         header: ResponseHeader,
-        objects: HeaderCollection,
+        objects: HeaderCollection<'_>,
     ) {
         extract_measurements(
             ReadType::SinglePoll,
             header,
             objects,
             self.read_handler.as_mut(),
-        );
+        )
+        .await;
     }
 
     pub(crate) fn priority_task(&mut self) -> Option<Task> {

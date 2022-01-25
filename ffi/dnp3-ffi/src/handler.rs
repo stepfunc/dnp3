@@ -16,12 +16,14 @@ impl AssociationHandler for ffi::AssociationHandler {
 }
 
 impl ReadHandler for ffi::ReadHandler {
-    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) {
+    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
         ffi::ReadHandler::begin_fragment(self, read_type.into(), header.into());
+        MaybeAsync::ready(())
     }
 
-    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader) {
+    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
         ffi::ReadHandler::end_fragment(self, read_type.into(), header.into());
+        MaybeAsync::ready(())
     }
 
     fn handle_binary_input(

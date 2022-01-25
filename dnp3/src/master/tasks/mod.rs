@@ -144,17 +144,23 @@ impl ReadTask {
         Task::Read(self)
     }
 
-    pub(crate) fn process_response(
+    pub(crate) async fn process_response(
         &self,
         association: &mut Association,
         header: ResponseHeader,
-        objects: HeaderCollection,
+        objects: HeaderCollection<'_>,
     ) {
         match self {
-            ReadTask::StartupIntegrity(_) => association.handle_integrity_response(header, objects),
-            ReadTask::PeriodicPoll(_) => association.handle_poll_response(header, objects),
-            ReadTask::EventScan(_) => association.handle_event_scan_response(header, objects),
-            ReadTask::SingleRead(_) => association.handle_read_response(header, objects),
+            ReadTask::StartupIntegrity(_) => {
+                association.handle_integrity_response(header, objects).await
+            }
+            ReadTask::PeriodicPoll(_) => association.handle_poll_response(header, objects).await,
+            ReadTask::EventScan(_) => {
+                association
+                    .handle_event_scan_response(header, objects)
+                    .await
+            }
+            ReadTask::SingleRead(_) => association.handle_read_response(header, objects).await,
         }
     }
 
