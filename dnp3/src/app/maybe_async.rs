@@ -1,5 +1,5 @@
 enum Value<T> {
-    Sync(T),
+    Ready(T),
     Async(core::pin::Pin<Box<dyn core::future::Future<Output = T> + Send + 'static>>),
 }
 
@@ -21,7 +21,7 @@ impl<T> MaybeAsync<T> {
     /// retrieve the value, which might be available immediately or require awaiting
     pub async fn get(self) -> T {
         match self.inner {
-            Value::Sync(x) => x,
+            Value::Ready(x) => x,
             Value::Async(x) => x.await,
         }
     }
@@ -29,7 +29,7 @@ impl<T> MaybeAsync<T> {
     /// construct a new `MaybeAsync` from an already available result
     pub fn ready(result: T) -> Self {
         MaybeAsync {
-            inner: Value::Sync(result),
+            inner: Value::Ready(result),
         }
     }
 
