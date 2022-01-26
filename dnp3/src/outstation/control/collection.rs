@@ -12,30 +12,28 @@ use crate::outstation::traits::{ControlHandler, ControlSupport, OperateType};
 use crate::util::cursor::{WriteCursor, WriteError};
 
 pub(crate) struct ControlTransaction<'a> {
-    stared: bool,
+    started: bool,
     handler: &'a mut dyn ControlHandler,
 }
 
 impl<'a> ControlTransaction<'a> {
-    pub(crate) fn new(handler: &'a mut dyn ControlHandler) -> Self {
+    pub(crate) fn create(handler: &'a mut dyn ControlHandler) -> Self {
         ControlTransaction {
-            stared: false,
+            started: false,
             handler,
         }
     }
 
-    fn start(&mut self) {
-        if !self.stared {
-            self.stared = true;
-            self.handler.begin_fragment();
+    pub(crate) async fn end(&mut self) {
+        if self.started {
+            self.handler.end_fragment().get().await
         }
     }
-}
 
-impl<'a> Drop for ControlTransaction<'a> {
-    fn drop(&mut self) {
-        if self.stared {
-            self.handler.end_fragment();
+    fn start(&mut self) {
+        if !self.started {
+            self.started = true;
+            self.handler.begin_fragment();
         }
     }
 }

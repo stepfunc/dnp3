@@ -757,7 +757,8 @@ impl OutstationSession {
             }
             FragmentType::Broadcast(mode) => {
                 self.state.deferred_read.clear();
-                self.process_broadcast(info.id, database, mode, request);
+                self.process_broadcast(info.id, database, mode, request)
+                    .await;
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::MalformedRequest(_, err) => {
@@ -771,13 +772,15 @@ impl OutstationSession {
             }
             FragmentType::NewNonRead(hash, objects) => {
                 self.state.deferred_read.clear();
-                let mut response = self.handle_non_read(
-                    database,
-                    request.header.function,
-                    request.header.control.seq,
-                    info.id,
-                    objects,
-                );
+                let mut response = self
+                    .handle_non_read(
+                        database,
+                        request.header.function,
+                        request.header.control.seq,
+                        info.id,
+                        objects,
+                    )
+                    .await;
                 if let Some(response) = &mut response {
                     *response = self
                         .write_solicited(io, writer, *response, database)
@@ -934,7 +937,10 @@ impl OutstationSession {
         match guard.get() {
             Some(TransportRequest::Request(info, request)) => {
                 self.on_link_activity();
-                if let Some(mut result) = self.process_request_from_idle(info, request, database) {
+                if let Some(mut result) = self
+                    .process_request_from_idle(info, request, database)
+                    .await
+                {
                     // optional response
                     if let Some(response) = &mut result.response {
                         *response = self
@@ -976,10 +982,10 @@ impl OutstationSession {
         Ok(())
     }
 
-    fn process_request_from_idle(
+    async fn process_request_from_idle(
         &mut self,
         info: FragmentInfo,
-        request: Request,
+        request: Request<'_>,
         database: &mut DatabaseHandle,
     ) -> Option<LastValidRequest> {
         self.info.process_request_from_idle(request.header);
@@ -1006,8 +1012,9 @@ impl OutstationSession {
                 Some(LastValidRequest::new(seq, hash, Some(response), series))
             }
             FragmentType::NewNonRead(hash, objects) => {
-                let response =
-                    self.handle_non_read(database, request.header.function, seq, info.id, objects);
+                let response = self
+                    .handle_non_read(database, request.header.function, seq, info.id, objects)
+                    .await;
                 Some(LastValidRequest::new(seq, hash, response, None))
             }
             FragmentType::RepeatNonRead(hash, last_response) => {
@@ -1020,7 +1027,8 @@ impl OutstationSession {
                 Some(LastValidRequest::new(seq, hash, last_response, None))
             }
             FragmentType::Broadcast(mode) => {
-                self.process_broadcast(info.id, database, mode, request);
+                self.process_broadcast(info.id, database, mode, request)
+                    .await;
                 None
             }
             FragmentType::SolicitedConfirm(seq) => {
@@ -1095,13 +1103,13 @@ impl OutstationSession {
         (Response::new(header, len), info.get_response_series(seq))
     }
 
-    fn handle_non_read(
+    async fn handle_non_read(
         &mut self,
         database: &mut DatabaseHandle,
         function: FunctionCode,
         seq: Sequence,
         frame_id: u32,
-        object_headers: HeaderCollection,
+        object_headers: HeaderCollection<'_>,
     ) -> Option<Response> {
         let mut result = match function {
             FunctionCode::Write => Some(self.handle_write(seq, object_headers)),
@@ -1119,28 +1127,38 @@ impl OutstationSession {
             // controls
             FunctionCode::Select => {
                 self.handle_controls(ControlType::Select, database, seq, frame_id, object_headers)
+                    .await
             }
-            FunctionCode::Operate => self.handle_controls(
-                ControlType::Operate,
-                database,
-                seq,
-                frame_id,
-                object_headers,
-            ),
-            FunctionCode::DirectOperate => self.handle_controls(
-                ControlType::DirectOperate,
-                database,
-                seq,
-                frame_id,
-                object_headers,
-            ),
-            FunctionCode::DirectOperateNoResponse => self.handle_controls(
-                ControlType::DirectOperateNoAck,
-                database,
-                seq,
-                frame_id,
-                object_headers,
-            ),
+            FunctionCode::Operate => {
+                self.handle_controls(
+                    ControlType::Operate,
+                    database,
+                    seq,
+                    frame_id,
+                    object_headers,
+                )
+                .await
+            }
+            FunctionCode::DirectOperate => {
+                self.handle_controls(
+                    ControlType::DirectOperate,
+                    database,
+                    seq,
+                    frame_id,
+                    object_headers,
+                )
+                .await
+            }
+            FunctionCode::DirectOperateNoResponse => {
+                self.handle_controls(
+                    ControlType::DirectOperateNoAck,
+                    database,
+                    seq,
+                    frame_id,
+                    object_headers,
+                )
+                .await
+            }
             FunctionCode::ImmediateFreeze => self.handle_freeze(
                 database,
                 seq,
@@ -1359,18 +1377,18 @@ impl OutstationSession {
         Response::new(header, cursor.written().len())
     }
 
-    fn handle_direct_operate(
+    async fn handle_direct_operate(
         &mut self,
         database: &mut DatabaseHandle,
         seq: Sequence,
-        controls: ControlCollection,
+        controls: ControlCollection<'_>,
     ) -> Response {
         // Handle each operate and write the response
         let (result, len) = {
             let mut cursor = self.sol_tx_buffer.write_cursor();
             let _ = cursor.skip(ResponseHeader::LENGTH);
 
-            let mut control_tx = ControlTransaction::new(self.control_handler.borrow_mut());
+            let mut control_tx = ControlTransaction::create(self.control_handler.borrow_mut());
             let max_controls_per_request = self.config.max_controls_per_request;
 
             let result = database.transaction(|database| {
@@ -1382,6 +1400,8 @@ impl OutstationSession {
                     max_controls_per_request,
                 )
             });
+
+            control_tx.end().await;
 
             (result, cursor.written().len())
         };
@@ -1443,26 +1463,28 @@ impl OutstationSession {
         Response::empty_solicited(seq, Iin::default() | iin2)
     }
 
-    fn handle_direct_operate_no_ack(
+    async fn handle_direct_operate_no_ack(
         &mut self,
         database: &mut DatabaseHandle,
-        controls: ControlCollection,
+        controls: ControlCollection<'_>,
     ) {
-        let mut control_tx = ControlTransaction::new(self.control_handler.borrow_mut());
+        let mut control_tx = ControlTransaction::create(self.control_handler.borrow_mut());
         let max_controls_per_request = self.config.max_controls_per_request;
 
         let _ = database.transaction(|database| {
             controls.operate_no_ack(&mut control_tx, database, max_controls_per_request)
         });
+
+        control_tx.end().await
     }
 
-    fn handle_controls(
+    async fn handle_controls(
         &mut self,
         ct: ControlType,
         database: &mut DatabaseHandle,
         seq: Sequence,
         frame_id: u32,
-        object_headers: HeaderCollection,
+        object_headers: HeaderCollection<'_>,
     ) -> Option<Response> {
         let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
@@ -1488,29 +1510,35 @@ impl OutstationSession {
         };
 
         match ct {
-            ControlType::Select => Some(self.handle_select(database, seq, frame_id, controls)),
-            ControlType::Operate => Some(self.handle_operate(database, seq, frame_id, controls)),
-            ControlType::DirectOperate => Some(self.handle_direct_operate(database, seq, controls)),
+            ControlType::Select => {
+                Some(self.handle_select(database, seq, frame_id, controls).await)
+            }
+            ControlType::Operate => {
+                Some(self.handle_operate(database, seq, frame_id, controls).await)
+            }
+            ControlType::DirectOperate => {
+                Some(self.handle_direct_operate(database, seq, controls).await)
+            }
             ControlType::DirectOperateNoAck => {
-                self.handle_direct_operate_no_ack(database, controls);
+                self.handle_direct_operate_no_ack(database, controls).await;
                 None
             }
         }
     }
 
-    fn handle_select(
+    async fn handle_select(
         &mut self,
         database: &mut DatabaseHandle,
         seq: Sequence,
         frame_id: u32,
-        controls: ControlCollection,
+        controls: ControlCollection<'_>,
     ) -> Response {
         // Handle each select and write the response
         let (result, len) = {
             let mut cursor = self.sol_tx_buffer.write_cursor();
             let _ = cursor.skip(ResponseHeader::LENGTH);
 
-            let mut transaction = ControlTransaction::new(self.control_handler.borrow_mut());
+            let mut transaction = ControlTransaction::create(self.control_handler.borrow_mut());
             let max_controls_per_request = self.config.max_controls_per_request;
 
             let result: Result<CommandStatus, WriteError> = database.transaction(|database| {
@@ -1521,6 +1549,8 @@ impl OutstationSession {
                     max_controls_per_request,
                 )
             });
+
+            transaction.end().await;
 
             (result, cursor.written().len())
         };
@@ -1550,12 +1580,12 @@ impl OutstationSession {
         Response::new(header, len)
     }
 
-    fn handle_operate(
+    async fn handle_operate(
         &mut self,
         database: &mut DatabaseHandle,
         seq: Sequence,
         frame_id: u32,
-        controls: ControlCollection,
+        controls: ControlCollection<'_>,
     ) -> Response {
         // Handle each operate and write the response
         let (status, len) = {
@@ -1577,9 +1607,9 @@ impl OutstationSession {
                         }
                         Ok(()) => {
                             let mut control_tx =
-                                ControlTransaction::new(self.control_handler.borrow_mut());
+                                ControlTransaction::create(self.control_handler.borrow_mut());
                             let max_controls_per_request = self.config.max_controls_per_request;
-                            database
+                            let res = database
                                 .transaction(|db| {
                                     controls.operate_with_response(
                                         &mut cursor,
@@ -1589,7 +1619,9 @@ impl OutstationSession {
                                         max_controls_per_request,
                                     )
                                 })
-                                .unwrap()
+                                .unwrap();
+                            control_tx.end().await;
+                            res
                         }
                     }
                 }
@@ -1703,24 +1735,26 @@ impl OutstationSession {
         iin
     }
 
-    fn process_broadcast(
+    async fn process_broadcast(
         &mut self,
         frame_id: u32,
         database: &mut DatabaseHandle,
         mode: BroadcastConfirmMode,
-        request: Request,
+        request: Request<'_>,
     ) {
         self.state.last_broadcast_type = Some(mode);
-        let action = self.process_broadcast_get_action(frame_id, database, request);
+        let action = self
+            .process_broadcast_get_action(frame_id, database, request)
+            .await;
         self.info
             .broadcast_received(request.header.function, action)
     }
 
-    fn process_broadcast_get_action(
+    async fn process_broadcast_get_action(
         &mut self,
         frame_id: u32,
         database: &mut DatabaseHandle,
-        request: Request,
+        request: Request<'_>,
     ) -> BroadcastAction {
         if self.config.broadcast.is_disabled() {
             tracing::warn!(
@@ -1755,7 +1789,8 @@ impl OutstationSession {
                     seq,
                     frame_id,
                     objects,
-                );
+                )
+                .await;
                 BroadcastAction::Processed
             }
             FunctionCode::ImmediateFreezeNoResponse => {
