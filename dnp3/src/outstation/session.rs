@@ -1388,20 +1388,19 @@ impl OutstationSession {
             let mut cursor = self.sol_tx_buffer.write_cursor();
             let _ = cursor.skip(ResponseHeader::LENGTH);
 
-            let mut control_tx = ControlTransaction::create(self.control_handler.borrow_mut());
             let max_controls_per_request = self.config.max_controls_per_request;
-
-            let result = database.transaction(|database| {
-                controls.operate_with_response(
-                    &mut cursor,
-                    OperateType::DirectOperate,
-                    &mut control_tx,
-                    database,
-                    max_controls_per_request,
-                )
-            });
-
-            control_tx.end().await;
+            let result = ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
+                database.transaction(|database| {
+                    controls.operate_with_response(
+                        &mut cursor,
+                        OperateType::DirectOperate,
+                        tx,
+                        database,
+                        max_controls_per_request,
+                    )
+                })
+            })
+            .await;
 
             (result, cursor.written().len())
         };
@@ -1468,14 +1467,13 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
         controls: ControlCollection<'_>,
     ) {
-        let mut control_tx = ControlTransaction::create(self.control_handler.borrow_mut());
         let max_controls_per_request = self.config.max_controls_per_request;
-
-        let _ = database.transaction(|database| {
-            controls.operate_no_ack(&mut control_tx, database, max_controls_per_request)
-        });
-
-        control_tx.end().await
+        ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
+            database.transaction(|database| {
+                controls.operate_no_ack(tx, database, max_controls_per_request)
+            })
+        })
+        .await;
     }
 
     async fn handle_controls(
@@ -1538,19 +1536,19 @@ impl OutstationSession {
             let mut cursor = self.sol_tx_buffer.write_cursor();
             let _ = cursor.skip(ResponseHeader::LENGTH);
 
-            let mut transaction = ControlTransaction::create(self.control_handler.borrow_mut());
             let max_controls_per_request = self.config.max_controls_per_request;
-
-            let result: Result<CommandStatus, WriteError> = database.transaction(|database| {
-                controls.select_with_response(
-                    &mut cursor,
-                    &mut transaction,
-                    database,
-                    max_controls_per_request,
-                )
-            });
-
-            transaction.end().await;
+            let result: Result<CommandStatus, WriteError> =
+                ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
+                    database.transaction(|database| {
+                        controls.select_with_response(
+                            &mut cursor,
+                            tx,
+                            database,
+                            max_controls_per_request,
+                        )
+                    })
+                })
+                .await;
 
             (result, cursor.written().len())
         };
@@ -1606,22 +1604,21 @@ impl OutstationSession {
                             status
                         }
                         Ok(()) => {
-                            let mut control_tx =
-                                ControlTransaction::create(self.control_handler.borrow_mut());
                             let max_controls_per_request = self.config.max_controls_per_request;
-                            let res = database
-                                .transaction(|db| {
-                                    controls.operate_with_response(
-                                        &mut cursor,
-                                        OperateType::SelectBeforeOperate,
-                                        &mut control_tx,
-                                        db,
-                                        max_controls_per_request,
-                                    )
-                                })
-                                .unwrap();
-                            control_tx.end().await;
-                            res
+                            ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
+                                database
+                                    .transaction(|db| {
+                                        controls.operate_with_response(
+                                            &mut cursor,
+                                            OperateType::SelectBeforeOperate,
+                                            tx,
+                                            db,
+                                            max_controls_per_request,
+                                        )
+                                    })
+                                    .unwrap()
+                            })
+                            .await
                         }
                     }
                 }
