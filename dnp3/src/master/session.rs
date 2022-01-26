@@ -611,7 +611,8 @@ impl MasterSession {
 
         let association = self.associations.get_mut(destination)?;
         association.process_iin(response.header.iin);
-        task.process_response(association, response.header, response.objects?);
+        task.process_response(association, response.header, response.objects?)
+            .await;
 
         if response.header.control.con {
             self.confirm_solicited(io, destination, seq, writer).await?;
@@ -671,7 +672,7 @@ impl MasterSession {
 
         association.process_iin(response.header.iin);
 
-        let valid = association.handle_unsolicited_response(response);
+        let valid = association.handle_unsolicited_response(response).await;
 
         // Send confirmation if required and wasn't ignored
         if valid && response.header.control.con {

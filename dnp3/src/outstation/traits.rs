@@ -1,10 +1,10 @@
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::app::FunctionCode;
 use crate::app::RequestHeader;
 use crate::app::Sequence;
 use crate::app::{control::*, Timestamp};
+use crate::app::{FunctionCode, MaybeAsync};
 use crate::outstation::database::Database;
 
 /// Application-controlled IIN bits
@@ -255,7 +255,11 @@ pub trait ControlHandler:
     /// called before any controls are processed
     fn begin_fragment(&mut self) {}
     /// called after all controls have been processed
-    fn end_fragment(&mut self) {}
+    ///
+    /// note: This operation may be asynchronous if required
+    fn end_fragment(&mut self) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
 }
 
 /// Struct with a default implementation [OutstationApplication](crate::outstation::OutstationApplication)

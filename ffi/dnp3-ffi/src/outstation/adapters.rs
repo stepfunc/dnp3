@@ -143,8 +143,9 @@ impl ControlHandler for ffi::ControlHandler {
         ffi::ControlHandler::begin_fragment(self);
     }
 
-    fn end_fragment(&mut self) {
+    fn end_fragment(&mut self) -> MaybeAsync<()> {
         ffi::ControlHandler::end_fragment(self);
+        MaybeAsync::ready(())
     }
 }
 
