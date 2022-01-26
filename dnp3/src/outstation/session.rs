@@ -42,6 +42,14 @@ enum Timeout {
 }
 
 #[derive(Copy, Clone)]
+enum ControlType {
+    Select,
+    Operate,
+    DirectOperate,
+    DirectOperateNoAck,
+}
+
+#[derive(Copy, Clone)]
 struct Response {
     header: ResponseHeader,
     size: usize,
@@ -749,7 +757,7 @@ impl OutstationSession {
             }
             FragmentType::Broadcast(mode) => {
                 self.state.deferred_read.clear();
-                self.process_broadcast(database, mode, request);
+                self.process_broadcast(info.id, database, mode, request);
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::MalformedRequest(_, err) => {
@@ -1012,7 +1020,7 @@ impl OutstationSession {
                 Some(LastValidRequest::new(seq, hash, last_response, None))
             }
             FragmentType::Broadcast(mode) => {
-                self.process_broadcast(database, mode, request);
+                self.process_broadcast(info.id, database, mode, request);
                 None
             }
             FragmentType::SolicitedConfirm(seq) => {
@@ -1110,18 +1118,29 @@ impl OutstationSession {
             }
             // controls
             FunctionCode::Select => {
-                Some(self.handle_select(database, seq, frame_id, object_headers))
+                self.handle_controls(ControlType::Select, database, seq, frame_id, object_headers)
             }
-            FunctionCode::Operate => {
-                Some(self.handle_operate(database, seq, frame_id, object_headers))
-            }
-            FunctionCode::DirectOperate => {
-                Some(self.handle_direct_operate(database, seq, object_headers))
-            }
-            FunctionCode::DirectOperateNoResponse => {
-                self.handle_direct_operate_no_ack(database, object_headers);
-                None
-            }
+            FunctionCode::Operate => self.handle_controls(
+                ControlType::Operate,
+                database,
+                seq,
+                frame_id,
+                object_headers,
+            ),
+            FunctionCode::DirectOperate => self.handle_controls(
+                ControlType::DirectOperate,
+                database,
+                seq,
+                frame_id,
+                object_headers,
+            ),
+            FunctionCode::DirectOperateNoResponse => self.handle_controls(
+                ControlType::DirectOperateNoAck,
+                database,
+                seq,
+                frame_id,
+                object_headers,
+            ),
             FunctionCode::ImmediateFreeze => self.handle_freeze(
                 database,
                 seq,
@@ -1344,20 +1363,8 @@ impl OutstationSession {
         &mut self,
         database: &mut DatabaseHandle,
         seq: Sequence,
-        object_headers: HeaderCollection,
+        controls: ControlCollection,
     ) -> Response {
-        let controls = match ControlCollection::from(object_headers) {
-            Err(err) => {
-                tracing::warn!(
-                    "ignoring control request containing non-control object header {} - {}",
-                    err.variation,
-                    err.qualifier
-                );
-                return Response::empty_solicited(seq, Iin::default() | Iin2::PARAMETER_ERROR);
-            }
-            Ok(controls) => controls,
-        };
-
         // Handle each operate and write the response
         let (result, len) = {
             let mut cursor = self.sol_tx_buffer.write_cursor();
@@ -1439,20 +1446,8 @@ impl OutstationSession {
     fn handle_direct_operate_no_ack(
         &mut self,
         database: &mut DatabaseHandle,
-        object_headers: HeaderCollection,
+        controls: ControlCollection,
     ) {
-        let controls = match ControlCollection::from(object_headers) {
-            Err(err) => {
-                tracing::warn!(
-                    "ignoring control request containing non-control object header {} - {}",
-                    err.variation,
-                    err.qualifier
-                );
-                return;
-            }
-            Ok(controls) => controls,
-        };
-
         let mut control_tx = ControlTransaction::new(self.control_handler.borrow_mut());
         let max_controls_per_request = self.config.max_controls_per_request;
 
@@ -1461,13 +1456,14 @@ impl OutstationSession {
         });
     }
 
-    fn handle_select(
+    fn handle_controls(
         &mut self,
+        ct: ControlType,
         database: &mut DatabaseHandle,
         seq: Sequence,
         frame_id: u32,
         object_headers: HeaderCollection,
-    ) -> Response {
+    ) -> Option<Response> {
         let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
                 tracing::warn!(
@@ -1475,11 +1471,40 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return Response::empty_solicited(seq, Iin::default() | Iin2::PARAMETER_ERROR);
+
+                let err = Some(Response::empty_solicited(
+                    seq,
+                    Iin::default() | Iin2::PARAMETER_ERROR,
+                ));
+
+                return match ct {
+                    ControlType::Select => err,
+                    ControlType::Operate => err,
+                    ControlType::DirectOperate => err,
+                    ControlType::DirectOperateNoAck => None,
+                };
             }
             Ok(controls) => controls,
         };
 
+        match ct {
+            ControlType::Select => Some(self.handle_select(database, seq, frame_id, controls)),
+            ControlType::Operate => Some(self.handle_operate(database, seq, frame_id, controls)),
+            ControlType::DirectOperate => Some(self.handle_direct_operate(database, seq, controls)),
+            ControlType::DirectOperateNoAck => {
+                self.handle_direct_operate_no_ack(database, controls);
+                None
+            }
+        }
+    }
+
+    fn handle_select(
+        &mut self,
+        database: &mut DatabaseHandle,
+        seq: Sequence,
+        frame_id: u32,
+        controls: ControlCollection,
+    ) -> Response {
         // Handle each select and write the response
         let (result, len) = {
             let mut cursor = self.sol_tx_buffer.write_cursor();
@@ -1506,7 +1531,7 @@ impl OutstationSession {
                 seq,
                 frame_id,
                 crate::tokio::time::Instant::now(),
-                object_headers.hash(),
+                controls.hash(),
             ))
         }
 
@@ -1530,20 +1555,8 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
         seq: Sequence,
         frame_id: u32,
-        object_headers: HeaderCollection,
+        controls: ControlCollection,
     ) -> Response {
-        let controls = match ControlCollection::from(object_headers) {
-            Err(err) => {
-                tracing::warn!(
-                    "ignoring OPERATE request containing non-control object header {} - {}",
-                    err.variation,
-                    err.qualifier
-                );
-                return Response::empty_solicited(seq, Iin::default() | Iin2::PARAMETER_ERROR);
-            }
-            Ok(controls) => controls,
-        };
-
         // Handle each operate and write the response
         let (status, len) = {
             let mut cursor = self.sol_tx_buffer.write_cursor();
@@ -1556,7 +1569,7 @@ impl OutstationSession {
                         self.config.select_timeout,
                         seq,
                         frame_id,
-                        object_headers.hash(),
+                        controls.hash(),
                     ) {
                         Err(status) => {
                             controls.respond_with_status(&mut cursor, status).unwrap();
@@ -1692,18 +1705,20 @@ impl OutstationSession {
 
     fn process_broadcast(
         &mut self,
+        frame_id: u32,
         database: &mut DatabaseHandle,
         mode: BroadcastConfirmMode,
         request: Request,
     ) {
         self.state.last_broadcast_type = Some(mode);
-        let action = self.process_broadcast_get_action(database, request);
+        let action = self.process_broadcast_get_action(frame_id, database, request);
         self.info
             .broadcast_received(request.header.function, action)
     }
 
     fn process_broadcast_get_action(
         &mut self,
+        frame_id: u32,
         database: &mut DatabaseHandle,
         request: Request,
     ) -> BroadcastAction {
@@ -1734,7 +1749,13 @@ impl OutstationSession {
                 BroadcastAction::Processed
             }
             FunctionCode::DirectOperateNoResponse => {
-                self.handle_direct_operate_no_ack(database, objects);
+                self.handle_controls(
+                    ControlType::DirectOperateNoAck,
+                    database,
+                    seq,
+                    frame_id,
+                    objects,
+                );
                 BroadcastAction::Processed
             }
             FunctionCode::ImmediateFreezeNoResponse => {

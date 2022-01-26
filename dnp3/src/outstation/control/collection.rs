@@ -232,6 +232,10 @@ pub(crate) struct ControlCollection<'a> {
 }
 
 impl<'a> ControlCollection<'a> {
+    pub(crate) fn hash(&self) -> u64 {
+        self.inner.hash()
+    }
+
     pub(crate) fn from(headers: HeaderCollection<'a>) -> Result<Self, BadControlHeader> {
         // do one pass to ensure that all headers are control headers
         let non_control_header: Option<BadControlHeader> = headers.iter().find_map(|x| {
