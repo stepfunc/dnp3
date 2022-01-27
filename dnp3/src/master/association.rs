@@ -27,7 +27,7 @@ use crate::util::Smallest;
 /// Configuration for a master association
 #[derive(Debug, Copy, Clone)]
 pub struct AssociationConfig {
-    /// timeouts for response on this association
+    /// timeout for responses on this association
     pub response_timeout: Timeout,
     /// The event classes to disable on startup
     pub disable_unsol_classes: EventClasses,
