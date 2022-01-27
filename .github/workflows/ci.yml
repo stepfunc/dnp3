@@ -184,7 +184,7 @@ jobs:
         with:
           name: doc
           path: ~/doc
-  # Build bindings on Windows x64 and Linux x64
+  # Build bindings on Windows x64 [64-bit MSVC (Windows 7+) (x86_64-pc-windows-msvc)]
   bindings-windows:
     needs: lock
     runs-on: windows-latest
@@ -231,6 +231,60 @@ jobs:
         with:
           name: ffi-modules
           path: ffi/bindings/c/generated/x86_64-pc-windows-msvc/lib
+      - name: Upload C bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: c-bindings
+          path: ffi/bindings/c/generated
+      - name: Upload compiled Java bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/java/dnp3/src/main/resources
+  # Build bindings on MacOS [64-bit macOS (10.7+, Lion+) (x86_64-apple-darwin)]
+  bindings-macos:
+    needs: lock
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Caching
+        uses: Swatinem/rust-cache@v1
+      - name: Download Cargo.lock
+        uses: actions/download-artifact@v2
+        with:
+          name: dependencies
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - name: C bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --c
+      - name: .NET bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --dotnet
+      - name: Java bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --java
+      - name: Upload compiled FFI modules
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/c/generated/x86_64-apple-darwin/lib
       - name: Upload C bindings
         uses: actions/upload-artifact@v2
         with:
@@ -368,7 +422,7 @@ jobs:
           path: ~/doc
   # Package all the generated bindings
   packaging:
-    needs: [lock, bindings-linux, bindings-windows, bindings-aarch64, cross]
+    needs: [lock, bindings-linux, bindings-windows, bindings-macos, bindings-aarch64, cross]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
