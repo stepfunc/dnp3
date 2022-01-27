@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
 
-use crate::app::MaybeAsync;
+use crate::app::{MaybeAsync, Timeout};
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
@@ -18,8 +18,11 @@ use crate::util::phys::PhysLayer;
 pub(crate) mod requests;
 
 pub(crate) fn create_association(
-    config: AssociationConfig,
+    mut config: AssociationConfig,
 ) -> TestHarness<impl Future<Output = RunError>> {
+    // use a 1 second timeout for all tests
+    config.response_timeout = Timeout::from_secs(1).unwrap();
+
     let (io, io_handle) = io::mock();
 
     let mut io = PhysLayer::Mock(io);
@@ -31,7 +34,6 @@ pub(crate) fn create_association(
     let mut runner = MasterSession::new(
         true,
         AppDecodeLevel::ObjectValues.into(),
-        crate::app::Timeout::from_secs(1).unwrap(),
         MasterSession::MIN_TX_BUFFER_SIZE,
         rx,
     );

@@ -9,7 +9,6 @@ use crate::app::parse::parser::Response;
 use crate::app::ControlField;
 use crate::app::Sequence;
 use crate::app::Shutdown;
-use crate::app::Timeout;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
@@ -28,7 +27,6 @@ use crate::util::phys::PhysLayer;
 pub(crate) struct MasterSession {
     enabled: bool,
     decode_level: DecodeLevel,
-    timeout: Timeout,
     associations: AssociationMap,
     messages: Receiver<Message>,
     tx_buffer: Buffer,
@@ -86,7 +84,6 @@ impl MasterSession {
     pub(crate) fn new(
         enabled: bool,
         decode_level: DecodeLevel,
-        response_timeout: Timeout,
         tx_buffer_size: usize,
         messages: Receiver<Message>,
     ) -> Self {
@@ -100,7 +97,6 @@ impl MasterSession {
         Self {
             enabled,
             decode_level,
-            timeout: response_timeout,
             associations: AssociationMap::new(),
             messages,
             tx_buffer: Buffer::new(tx_buffer_size),
@@ -365,12 +361,13 @@ impl MasterSession {
                 }
             };
 
-            let deadline = self.timeout.deadline_from_now();
+            let timeout = self.associations.get_timeout(destination)?;
+            let deadline = timeout.deadline_from_now();
 
             loop {
                 crate::tokio::select! {
                     _ = crate::tokio::time::sleep_until(deadline) => {
-                        tracing::warn!("no response within timeout: {}", self.timeout);
+                        tracing::warn!("no response within timeout: {}", timeout);
                         task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
                         return Err(TaskError::ResponseTimeout);
                     }
@@ -519,12 +516,13 @@ impl MasterSession {
 
         // read responses until we get a FIN or an error occurs
         loop {
-            let deadline = self.timeout.deadline_from_now();
+            let timeout = self.associations.get_timeout(destination)?;
+            let deadline = timeout.deadline_from_now();
 
             loop {
                 crate::tokio::select! {
                     _ = crate::tokio::time::sleep_until(deadline) => {
-                            tracing::warn!("no response within timeout: {}", self.timeout);
+                            tracing::warn!("no response within timeout: {}", timeout);
                             return Err(TaskError::ResponseTimeout);
                     }
                     x = reader.read(io, self.decode_level) => {
@@ -756,10 +754,11 @@ impl MasterSession {
             .await?;
 
         loop {
+            let timeout = self.associations.get_timeout(destination)?;
             // Wait for something on the link
             crate::tokio::select! {
-                _ = crate::tokio::time::sleep_until(self.timeout.deadline_from_now()) => {
-                    tracing::warn!("no response within timeout: {}", self.timeout);
+                _ = crate::tokio::time::sleep_until(timeout.deadline_from_now()) => {
+                    tracing::warn!("no response within timeout: {}", timeout);
                     return Err(TaskError::ResponseTimeout);
                 }
                 x = reader.read(io, self.decode_level) => {

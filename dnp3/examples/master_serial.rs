@@ -22,7 +22,6 @@ fn get_serial_port_path() -> String {
 fn get_master_channel_config() -> Result<MasterChannelConfig, Box<dyn std::error::Error>> {
     let mut config = MasterChannelConfig::new(EndpointAddress::from(1)?);
     config.decode_level = AppDecodeLevel::ObjectValues.into();
-    config.response_timeout = Timeout::from_secs(1)?;
     Ok(config)
 }
 
@@ -45,6 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create the association
     let mut config = AssociationConfig::default();
+    config.response_timeout = Timeout::from_secs(1)?;
     config.auto_time_sync = Some(TimeSyncProcedure::Lan);
     config.keep_alive_timeout = Some(Duration::from_secs(60));
     let mut association = master

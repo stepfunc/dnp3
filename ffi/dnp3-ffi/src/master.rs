@@ -2,7 +2,7 @@ use std::ffi::CStr;
 use std::path::Path;
 use std::time::Duration;
 
-use dnp3::app::{ConnectStrategy, Listener, RetryStrategy, Timeout, Timestamp};
+use dnp3::app::{ConnectStrategy, Listener, RangeError, RetryStrategy, Timeout, Timestamp};
 use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::serial::*;
@@ -170,6 +170,7 @@ pub unsafe fn master_channel_add_association(
     let address = EndpointAddress::from(address)?;
 
     let config = AssociationConfig {
+        response_timeout: Timeout::from_duration(Duration::from_millis(config.response_timeout))?,
         disable_unsol_classes: convert_event_classes(config.disable_unsol_classes()),
         enable_unsol_classes: convert_event_classes(config.enable_unsol_classes()),
         startup_integrity_classes: convert_classes(config.startup_integrity_classes()),
@@ -199,6 +200,12 @@ pub unsafe fn master_channel_add_association(
     Ok(ffi::AssociationId {
         address: address.raw_value(),
     })
+}
+
+impl From<RangeError> for ffi::ParamError {
+    fn from(_: RangeError) -> Self {
+        ffi::ParamError::InvalidTimeout
+    }
 }
 
 pub(crate) unsafe fn master_channel_remove_association(
@@ -565,7 +572,6 @@ fn convert_config(
     Ok(MasterChannelConfig {
         master_address: address,
         decode_level: config.decode_level().clone().into(),
-        response_timeout: Timeout::from_duration(config.response_timeout()).unwrap(),
         tx_buffer_size: config.tx_buffer_size() as usize,
         rx_buffer_size: config.rx_buffer_size() as usize,
     })
