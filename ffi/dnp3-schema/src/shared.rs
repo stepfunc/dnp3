@@ -40,6 +40,10 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
             "param_exception",
             ExceptionType::UncheckedException,
         )?
+        .add_error(
+            "invalid_timeout",
+            "The supplied timeout value is too small or too large",
+        )?
         .add_error("null_parameter", "Null parameter")?
         .add_error(
             "association_does_not_exist",

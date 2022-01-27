@@ -42,8 +42,6 @@ pub struct MasterChannelConfig {
     pub master_address: EndpointAddress,
     /// Decode-level for DNP3 objects
     pub decode_level: DecodeLevel,
-    /// Response timeout
-    pub response_timeout: Timeout,
     /// TX buffer size
     ///
     /// Must be at least 249.
@@ -60,7 +58,6 @@ impl MasterChannelConfig {
         Self {
             master_address,
             decode_level: DecodeLevel::nothing(),
-            response_timeout: Timeout::default(),
             tx_buffer_size: MasterSession::DEFAULT_TX_BUFFER_SIZE,
             rx_buffer_size: MasterSession::DEFAULT_RX_BUFFER_SIZE,
         }

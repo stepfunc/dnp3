@@ -529,11 +529,17 @@ fn define_association_config(
     let auto_integrity_scan_on_buffer_overflow =
         Name::create("auto_integrity_scan_on_buffer_overflow")?;
     let max_queued_user_requests = Name::create("max_queued_user_requests")?;
+    let response_timeout = Name::create("response_timeout")?;
     let association_config = lib.declare_function_argument_struct("association_config")?;
 
     let association_config = lib
         .define_function_argument_struct(association_config)?
         .doc("Association configuration")?
+        .add(
+            response_timeout.clone(),
+            DurationType::Milliseconds,
+            "Timeout for receiving a response on this association"
+        )?
         .add(
             "disable_unsol_classes",
           event_classes.clone(),
@@ -577,6 +583,7 @@ fn define_association_config(
         )?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize the configuration with the specified values")?
+        .default(&response_timeout, Duration::from_secs(5))?
         .default_variant(&auto_time_sync, "none")?
         .default_struct(&auto_tasks_retry_strategy)?
         .default(&keep_alive_timeout, Duration::from_secs(60))?
@@ -632,7 +639,7 @@ fn define_master_channel_config(
     let config = lib.declare_function_argument_struct("master_channel_config")?;
 
     let decode_level = Name::create("decode_level")?;
-    let response_timeout = Name::create("response_timeout")?;
+
     let tx_buffer_size = Name::create("tx_buffer_size")?;
     let rx_buffer_size = Name::create("rx_buffer_size")?;
 
@@ -640,17 +647,11 @@ fn define_master_channel_config(
         .doc("Generic configuration for a MasterChannel")?
         .add("address", Primitive::U16, "Local DNP3 data-link address")?
         .add(decode_level.clone(), shared.decode_level.clone(), "Decoding level for this master. You can modify this later on with {class:master_channel.set_decode_level()}.")?
-        .add(
-            response_timeout.clone(),
-            DurationType::Milliseconds,
-            "Timeout for receiving a response"
-        )?
         .add(tx_buffer_size.clone(), Primitive::U16, doc("TX buffer size").details("Must be at least 249"))?
         .add(rx_buffer_size.clone(), Primitive::U16, doc("RX buffer size").details("Must be at least 2048"))?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize {struct:master_channel_config} to default values")?
         .default_struct(&decode_level)?
-        .default(&response_timeout, Duration::from_secs(5))?
         .default(&tx_buffer_size, NumberValue::U16(2048))?
         .default(&rx_buffer_size, NumberValue::U16(2048))?
         .end_initializer()?

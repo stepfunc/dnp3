@@ -111,13 +111,7 @@ impl MasterTask {
         listener: Box<dyn Listener<ClientState>>,
     ) -> (Self, MasterChannel) {
         let (tx, rx) = crate::util::channel::request_channel();
-        let session = MasterSession::new(
-            false,
-            config.decode_level,
-            config.response_timeout,
-            config.tx_buffer_size,
-            rx,
-        );
+        let session = MasterSession::new(false, config.decode_level, config.tx_buffer_size, rx);
         let (reader, writer) = crate::transport::create_master_transport_layer(
             link_error_mode,
             config.master_address,
