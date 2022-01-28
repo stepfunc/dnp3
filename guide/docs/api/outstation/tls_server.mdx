@@ -28,10 +28,9 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/outstation_tls_server.rs:tls_ca_chain_config}}
-let tls_config = ca_chain_tls_config;
+{{#include ../dnp3/examples/outstation.rs:tls_ca_chain_config}}
 
-{{#include ../dnp3/examples/outstation_tls_server.rs:create_tls_server}}
+{{#include ../dnp3/examples/outstation.rs:create_tls_server}}
 ```
 
 </TabItem>
@@ -81,10 +80,9 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/outstation_tls_server.rs:tls_self_signed_config}}
-let tls_config = self_signed_tls_config;
+{{#include ../dnp3/examples/outstation.rs:tls_self_signed_config}}
 
-{{#include ../dnp3/examples/outstation_tls_server.rs:create_tls_server}}
+{{#include ../dnp3/examples/outstation.rs:create_tls_server}}
 ```
 
 </TabItem>
