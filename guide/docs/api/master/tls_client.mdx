@@ -14,7 +14,7 @@ check the [TLS general information](../tls.mdx) page.
 
 ## Examples
 
-### Certificate chain configuration
+### Certificate Authority-based configuration
 
 <Tabs
 groupId="language"
@@ -28,10 +28,10 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/master_tls_client.rs:tls_ca_chain_config}}
-let tls_config = ca_chain_tls_config;
+{{#include ../dnp3/examples/master.rs:tls_ca_chain_config}}
 
-{{#include ../dnp3/examples/master_tls_client.rs:create_master_channel}}
+
+{{#include ../dnp3/examples/master.rs:create_master_tls_channel}}
 ```
 
 </TabItem>
@@ -82,10 +82,9 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/master_tls_client.rs:tls_self_signed_config}}
-let tls_config = self_signed_tls_config;
+{{#include ../dnp3/examples/master.rs:tls_self_signed_config}}
 
-{{#include ../dnp3/examples/master_tls_client.rs:create_master_channel}}
+{{#include ../dnp3/examples/master.rs:create_master_tls_channel}}
 ```
 
 </TabItem>
