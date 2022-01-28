@@ -156,7 +156,7 @@ fn create_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
         [_, x] => x,
         _ => {
             eprintln!("please specify a transport:");
-            eprintln!("usage: master <transport> (tcp, serial, tls-ca, tls-self-signed)>");
+            eprintln!("usage: master <transport> (tcp, serial, tls-ca, tls-self-signed)");
             exit(-1);
         }
     };
@@ -167,7 +167,7 @@ fn create_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
         "tls-self-signed" => create_tls_channel(get_tls_self_signed_config()?),
         _ => {
             eprintln!(
-                "unknown transport '{}', options are (tcp, serial, tls-ca, tls-self-signed)>",
+                "unknown transport '{}', options are (tcp, serial, tls-ca, tls-self-signed)",
                 transport
             );
             exit(-1);
