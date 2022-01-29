@@ -38,12 +38,11 @@ values={[
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/master_tls_example.c:channel_decl}}
-{{#include ../ffi/bindings/c/master_tls_example.c:error_decl}}
+{{#include ../ffi/bindings/c/master_example.c:channel_decl}}
 
-{{#include ../ffi/bindings/c/master_tls_example.c:tls_ca_chain_config}}
-dnp3_tls_server_config_t tls_config = ca_chain_tls_config;
-{{#include ../ffi/bindings/c/master_tls_example.c:create_master_channel}}
+{{#include ../ffi/bindings/c/master_example.c:tls_ca_chain_config}}
+
+{{#include ../ffi/bindings/c/master_example.c:create_master_tls_channel}}
 // check error
 ```
 
@@ -91,12 +90,11 @@ values={[
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/master_tls_example.c:channel_decl}}
-{{#include ../ffi/bindings/c/master_tls_example.c:error_decl}}
+{{#include ../ffi/bindings/c/master_example.c:channel_decl}}
 
-{{#include ../ffi/bindings/c/master_tls_example.c:tls_self_signed_config}}
-dnp3_tls_server_config_t tls_config = self_signed_tls_config;
-{{#include ../ffi/bindings/c/master_tls_example.c:create_master_channel}}
+{{#include ../ffi/bindings/c/master_example.c:tls_self_signed_config}}
+
+{{#include ../ffi/bindings/c/master_example.c:create_master_tls_channel}}
 // check error
 ```
 

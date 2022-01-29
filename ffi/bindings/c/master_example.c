@@ -257,38 +257,58 @@ dnp3_param_error_t create_tcp_channel(dnp3_runtime_t *runtime, dnp3_master_chann
     dnp3_param_error_t err;
     // ANCHOR: create_master_tcp_channel
     dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_create("127.0.0.1:20000");
-    err = dnp3_master_channel_create_tcp(runtime, DNP3_LINK_ERROR_MODE_CLOSE, get_master_channel_config(), endpoints, dnp3_connect_strategy_init(),
-                                         get_client_state_listener(), channel);
+    err = dnp3_master_channel_create_tcp(
+        runtime,
+        DNP3_LINK_ERROR_MODE_CLOSE,
+        get_master_channel_config(),
+        endpoints,
+        dnp3_connect_strategy_init(),
+        get_client_state_listener(),
+        channel
+    );
     dnp3_endpoint_list_destroy(endpoints);
     // ANCHOR_END: create_master_tcp_channel
     return err;
 }
 
 dnp3_param_error_t create_serial_channel(dnp3_runtime_t *runtime, dnp3_master_channel_t **channel)
-{
-    dnp3_param_error_t err;
+{    
     // ANCHOR: create_master_serial_channel
-    err = dnp3_master_channel_create_serial(runtime, get_master_channel_config(), "/dev/pts/4", dnp3_serial_port_settings_init(), 1000,
-                                            get_port_state_listener(), channel);               
+    dnp3_param_error_t err = dnp3_master_channel_create_serial(
+        runtime,
+        get_master_channel_config(),
+        "/dev/pts/4",
+        dnp3_serial_port_settings_init(),
+        1000,
+        get_port_state_listener(),
+        channel
+    );               
     // ANCHOR_END: create_master_serial_channel
     return err;
 }
 
 dnp3_param_error_t create_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t config, dnp3_master_channel_t **channel)
-{
-    dnp3_param_error_t err;
-    
+{        
     // ANCHOR: create_master_tls_channel
     dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_create("127.0.0.1:20000");
-    err = dnp3_master_channel_create_tls(runtime, DNP3_LINK_ERROR_MODE_CLOSE, get_master_channel_config(), endpoints, config, dnp3_connect_strategy_init(),
-                                         get_client_state_listener(), channel);                                            
+    dnp3_param_error_t err = dnp3_master_channel_create_tls(
+        runtime,
+        DNP3_LINK_ERROR_MODE_CLOSE,
+        get_master_channel_config(),
+        endpoints,
+        config,
+        dnp3_connect_strategy_init(),
+        get_client_state_listener(),
+        channel
+    );                                            
     dnp3_endpoint_list_destroy(endpoints);
     // ANCHOR_END: create_master_tls_channel
     return err;
 }
 
 dnp3_tls_client_config_t get_ca_tls_config()
-{    
+{   
+    // ANCHOR: tls_ca_chain_config
     dnp3_tls_client_config_t config = dnp3_tls_client_config_init(
         "test.com", 
         "./certs/ca_chain/ca_cert.pem",
@@ -298,12 +318,14 @@ dnp3_tls_client_config_t get_ca_tls_config()
     );
 
     config.certificate_mode = DNP3_CERTIFICATE_MODE_AUTHORITY_BASED;
+    // ANCHOR_END: tls_ca_chain_config
 
     return config;
 }
 
 dnp3_tls_client_config_t get_self_signed_tls_config()
 {
+    // ANCHOR: tls_self_signed_config
     dnp3_tls_client_config_t config = dnp3_tls_client_config_init(
         "test.com", 
         "./certs/self_signed/entity2_cert.pem",
@@ -313,6 +335,7 @@ dnp3_tls_client_config_t get_self_signed_tls_config()
     );
 
     config.certificate_mode = DNP3_CERTIFICATE_MODE_SELF_SIGNED;
+    // ANCHOR_END: tls_self_signed_config
 
     return config;
 }
