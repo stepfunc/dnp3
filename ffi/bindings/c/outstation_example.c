@@ -484,7 +484,9 @@ int run_tcp_server(dnp3_runtime_t *runtime)
         return -1;
     }
 
-    return run_server(server);
+    int ret = run_server(server);
+    dnp3_tcp_server_destroy(server);
+    return ret;
 }
 
 int run_tls_server(dnp3_runtime_t *runtime, dnp3_tls_server_config_t config)
@@ -497,7 +499,9 @@ int run_tls_server(dnp3_runtime_t *runtime, dnp3_tls_server_config_t config)
         return -1;
     }
 
-    return run_server(server);
+    int ret = run_server(server);
+    dnp3_tcp_server_destroy(server);
+    return ret;
 }
 
 
