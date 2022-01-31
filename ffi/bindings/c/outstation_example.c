@@ -412,11 +412,6 @@ dnp3_tls_server_config_t get_tls_ca_config()
     return config;
 }
 
-dnp3_param_error_t create_tls_server(dnp3_runtime_t* runtime, dnp3_tls_server_config_t config, dnp3_tcp_server_t** server)
-{
-    return dnp3_tcp_server_create_tls(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20001", config, server);
-}
-
 void init_database(dnp3_outstation_t *outstation)
 {
     // setup initial points
@@ -475,8 +470,10 @@ int run_server(dnp3_tcp_server_t *server)
 
 int run_tcp_server(dnp3_runtime_t *runtime)
 {
+    // ANCHOR: create_tcp_server
     dnp3_tcp_server_t* server = NULL;
     dnp3_param_error_t err = dnp3_tcp_server_create(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", &server);
+    // ANCHOR_END: create_tcp_server
 
     if (err) {    
         printf("unable to create TCP server: %s \n", dnp3_param_error_to_string(err));        
@@ -490,8 +487,10 @@ int run_tcp_server(dnp3_runtime_t *runtime)
 
 int run_tls_server(dnp3_runtime_t *runtime, dnp3_tls_server_config_t config)
 {
+    // ANCHOR: create_tls_server
     dnp3_tcp_server_t *server = NULL;
     dnp3_param_error_t err = dnp3_tcp_server_create_tls(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", config, &server);
+    // ANCHOR_END: create_tls_server
 
     if (err) {
         printf("unable to create TLS server: %s \n", dnp3_param_error_to_string(err));

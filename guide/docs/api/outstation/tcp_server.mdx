@@ -50,8 +50,6 @@ values={[
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/outstation_example.c:tcp_server_decl}}
-{{#include ../ffi/bindings/c/outstation_example.c:common_error_code}}
 {{#include ../ffi/bindings/c/outstation_example.c:create_tcp_server}}
 // check error
 ```
@@ -105,9 +103,6 @@ The terminology differs here between Rust and the bindings. The Rust API's 'add_
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/outstation_example.c:tcp_server_decl}}
-{{#include ../ffi/bindings/c/outstation_example.c:common_error_code}}
-
 {{#include ../ffi/bindings/c/outstation_example.c:tcp_server_add_outstation}}
 // check error
 ```
@@ -175,7 +170,6 @@ The terminology differs here between Rust and the bindings.
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/outstation_example.c:common_error_code}}
 {{#include ../ffi/bindings/c/outstation_example.c:tcp_server_bind}}
 // check error
 ```

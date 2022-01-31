@@ -492,9 +492,7 @@ dnp3_tls_client_config_t get_ca_tls_config()
         "./certs/ca_chain/entity1_cert.pem",
         "./certs/ca_chain/entity1_key.pem",
         "" // no password
-    );
-
-    config.certificate_mode = DNP3_CERTIFICATE_MODE_AUTHORITY_BASED;
+    );    
     // ANCHOR_END: tls_ca_chain_config
 
     return config;
