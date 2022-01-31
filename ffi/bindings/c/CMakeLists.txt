@@ -45,10 +45,6 @@ target_link_libraries(master_example PRIVATE dnp3)
 add_executable(outstation_example outstation_example.c)
 target_link_libraries(outstation_example PRIVATE dnp3)
 
-# Outstation TLS example
-add_executable(outstation_tls_example outstation_tls_example.c)
-target_link_libraries(outstation_tls_example PRIVATE dnp3)
-
 # -------------- C++ examples -----------------
 
 # C++ Master example

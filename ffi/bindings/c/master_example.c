@@ -394,7 +394,7 @@ int main(int argc, char *argv[])
 
     if (err) {
         printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
-        return -1;
+        goto cleanup;
     }
 
     // create a channel based on the cmd line arguments
@@ -402,7 +402,7 @@ int main(int argc, char *argv[])
 
     if (err) {
         printf("unable to create master channel: %s \n", dnp3_param_error_to_string(err));
-        return -1;
+        goto cleanup;
     }
 
     // Create the association
@@ -412,7 +412,7 @@ int main(int argc, char *argv[])
     // ANCHOR_END: association_create
     if (err) {
         printf("unable to add association: %s \n", dnp3_param_error_to_string(err));
-        return -1;
+        goto cleanup;
     }
 
 
@@ -425,7 +425,7 @@ int main(int argc, char *argv[])
     // ANCHOR_END: add_poll
     if (err) {
         printf("unable to add poll: %s \n", dnp3_param_error_to_string(err));
-        return -1;
+        goto cleanup;
     }
 
     // start communications
@@ -436,7 +436,7 @@ int main(int argc, char *argv[])
         fgets(cbuf, 10, stdin);
 
         if (strcmp(cbuf, "x\n") == 0) {
-            break;
+            goto cleanup;
         }
         else if (strcmp(cbuf, "enable\n") == 0) {
             printf("calling enable\n");
@@ -554,6 +554,7 @@ int main(int argc, char *argv[])
         }
     }
 
+cleanup:
     dnp3_master_channel_destroy(channel);
     // ANCHOR: runtime_destroy
     dnp3_runtime_destroy(runtime);
