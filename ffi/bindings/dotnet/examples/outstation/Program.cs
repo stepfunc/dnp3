@@ -221,7 +221,7 @@ class ExampleOutstation
         if(args.Length != 2)
         {
             System.Console.WriteLine("You must specify the transport type");
-            System.Console.WriteLine("Usage: master-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
+            System.Console.WriteLine("Usage: outstation-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
             return;
         }
 
