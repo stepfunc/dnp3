@@ -250,8 +250,8 @@ void run_serial(dnp3::Runtime &runtime)
 {    
     auto outstation = dnp3::Outstation::create_serial_session(
         runtime,
-        "/dev/pts/4",
-        dnp3::SerialPortSettings(),
+        "/dev/pts/4",  // change this to a real port
+        dnp3::SerialPortSettings(), // default settings
         get_outstation_config(),
         get_event_buffer_config(),
         std::make_unique<MyOutstationApplication>(),

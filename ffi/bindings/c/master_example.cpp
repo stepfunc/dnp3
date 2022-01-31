@@ -17,6 +17,10 @@ class ClientStateListener : public dnp3::ClientStateListener {
     }
 };
 
+class PortStateListener : public dnp3::PortStateListener {
+    void on_change(dnp3::PortState state) override { std::cout << "port state change: " << dnp3::to_string(state) << std::endl; }
+};
+
 std::ostream& write_hex_byte(std::ostream& os, uint8_t value)
 {
     os << "0x" << std::hex << std::setw(2) << std::setfill('0') << (int)value;
@@ -161,31 +165,24 @@ class LinkStatusCallback : public dnp3::LinkStatusCallback {
     }
 };
 
-int main()
+dnp3::AssociationConfig get_association_config()
 {
-    dnp3::Logging::configure(dnp3::LoggingConfig(), std::make_unique<Logger>());
-
-    auto runtime = dnp3::Runtime(dnp3::RuntimeConfig());
-
-    dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
-    auto channel = dnp3::MasterChannel::create_tcp_channel(
-        runtime,
-        dnp3::LinkErrorMode::close,
-        dnp3::MasterChannelConfig(1),
-        endpoints,
-        dnp3::ConnectStrategy(),
-        std::make_unique<ClientStateListener>()
+    dnp3::AssociationConfig config(
+        dnp3::EventClasses::all(),
+        dnp3::EventClasses::all(), 
+        dnp3::Classes::all(),
+        dnp3::EventClasses::none()
     );
 
+    return config;
+}
+
+void run_channel(dnp3::MasterChannel &channel)
+{
     auto assoc = channel.add_association(
-        1024,
-        dnp3::AssociationConfig(
-           dnp3::EventClasses::all(),
-           dnp3::EventClasses::all(),
-           dnp3::Classes::all(),
-           dnp3::EventClasses::none()
-        ),
-        std::make_unique<ReadHandler>(),
+        1024, 
+        get_association_config(),
+        std::make_unique<ReadHandler>(), 
         std::make_unique<AssociationHandler>()
     );
 
@@ -196,17 +193,17 @@ int main()
 
     channel.enable();
 
-    while (true)
-    {
+    while (true) {
         std::string cmd;
         std::getline(std::cin, cmd);
 
         if (cmd == "x") {
-            return 0;
+            return;
         }
         else if (cmd == "enable") {
             channel.enable();
-        } else if (cmd == "disable") {
+        }
+        else if (cmd == "disable") {
             channel.disable();
         }
         else if (cmd == "dln") {
@@ -251,16 +248,126 @@ int main()
         }
         else if (cmd == "cmd") {
             dnp3::CommandSet commands;
-            commands.add_g12_v1_u8(3, dnp3::Group12Var1(dnp3::ControlCode(dnp3::TripCloseCode::nul, false, dnp3::OpType::latch_on), 0, 1000, 1000));            
-            channel.operate(
-                assoc,
-                dnp3::CommandMode::direct_operate,
-                commands,
-                std::make_unique<CommandTaskCallback>()
-            );
+            commands.add_g12_v1_u8(3, dnp3::Group12Var1(dnp3::ControlCode(dnp3::TripCloseCode::nul, false, dnp3::OpType::latch_on), 0, 1000, 1000));
+            channel.operate(assoc, dnp3::CommandMode::direct_operate, commands, std::make_unique<CommandTaskCallback>());
         }
         else {
             std::cout << "unknown command: " << cmd << std::endl;
         }
     }
+}
+
+void run_tcp_client(dnp3::Runtime &runtime)
+{
+    dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
+
+    auto channel = dnp3::MasterChannel::create_tcp_channel(
+        runtime,
+        dnp3::LinkErrorMode::close,
+        dnp3::MasterChannelConfig(1), endpoints,
+        dnp3::ConnectStrategy(),
+        std::make_unique<ClientStateListener>()
+    );
+
+    run_channel(channel);
+}
+
+void run_tls_client(dnp3::Runtime &runtime, const dnp3::TlsClientConfig& config)
+{
+    dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
+
+    auto channel = dnp3::MasterChannel::create_tls_channel(
+        runtime, 
+        dnp3::LinkErrorMode::close,
+        dnp3::MasterChannelConfig(1),
+        endpoints,
+        config,
+        dnp3::ConnectStrategy(),
+        std::make_unique<ClientStateListener>()
+    );
+
+    run_channel(channel);
+}
+
+void run_serial(dnp3::Runtime &runtime)
+{
+    dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
+
+    auto channel = dnp3::MasterChannel::create_serial_channel(
+        runtime,
+        dnp3::MasterChannelConfig(1), 
+        "/dev/pts/4",
+        dnp3::SerialPortSettings(),
+        std::chrono::seconds(5),
+        std::make_unique<PortStateListener>()
+    );
+
+    run_channel(channel);
+}
+
+dnp3::TlsClientConfig get_ca_tls_config()
+{
+    // ANCHOR: tls_ca_chain_config
+    // defaults to CA mode
+    dnp3::TlsClientConfig config(
+        "test.com", 
+        "./certs/ca_chain/ca_cert.pem",
+        "./certs/ca_chain/entity1_cert.pem",
+        "./certs/ca_chain/entity1_key.pem",
+        "" // no password
+    );
+    // ANCHOR_END: tls_ca_chain_config
+
+    return config;
+}
+
+dnp3::TlsClientConfig get_self_signed_tls_config()
+{
+    // ANCHOR: tls_self_signed_config
+    dnp3::TlsClientConfig config(
+        "test.com", 
+        "./certs/self_signed/entity2_cert.pem", 
+        "./certs/self_signed/entity1_cert.pem",
+        "./certs/self_signed/entity1_key.pem",
+        "" // no password
+    );
+
+    config.certificate_mode = dnp3::CertificateMode::self_signed;
+    // ANCHOR_END: tls_self_signed_config
+
+    return config;
+}
+
+int main(int argc, char *argv[])
+{
+    dnp3::Logging::configure(dnp3::LoggingConfig(), std::make_unique<Logger>());
+
+    auto runtime = dnp3::Runtime(dnp3::RuntimeConfig());    
+
+    if (argc != 2) {
+        std::cout << "you must specify a transport type" << std::endl;
+        std::cout << "usage: cpp-outstation-example <channel> (tcp, serial, tls-ca, tls-self-signed)" << std::endl;
+        return -1;
+    }
+
+    const auto type = argv[1];
+
+    if (strcmp(type, "tcp") == 0) {
+        run_tcp_client(runtime);
+    }
+    else if (strcmp(type, "serial") == 0) {
+        run_serial(runtime);
+    }
+    else if (strcmp(type, "tls-ca") == 0) {
+        run_tls_client(runtime, get_ca_tls_config());
+    }
+    else if (strcmp(type, "tls-self-signed") == 0) {
+        run_tls_client(runtime, get_self_signed_tls_config());
+    }
+    else {
+        std::cout << "unknown channel type: " << type << std::endl;
+        return -1;
+    }
+
+    return 0;
 }
