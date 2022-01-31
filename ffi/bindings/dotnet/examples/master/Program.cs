@@ -256,6 +256,7 @@ class MainClass
     }
     private static TlsClientConfig GetCaTlsConfig()
     {
+        // ANCHOR: tls_ca_chain_config
         // defaults to CA mode
         var config = new TlsClientConfig(
             "test.com",
@@ -264,11 +265,13 @@ class MainClass
             "./certs/ca_chain/entity1_key.pem",
             "" // no password
         );
+        // ANCHOR_END: tls_ca_chain_config
         return config;
     }
 
     private static TlsClientConfig GetSelfSignedTlsConfig()
     {
+        // ANCHOR: tls_self_signed_config
         var config = new TlsClientConfig(
             "test.com",
             "./certs/self_signed/entity2_cert.pem",
@@ -277,6 +280,7 @@ class MainClass
             "" // no password
         );
         config.CertificateMode = CertificateMode.SelfSigned;
+        // ANCHOR_END: tls_self_signed_config
         return config;
     }
 
@@ -294,7 +298,6 @@ class MainClass
         // ANCHOR: runtime_init
         var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
         // ANCHOR_END: runtime_init        
-
 
         if (args.Length != 2)
         {

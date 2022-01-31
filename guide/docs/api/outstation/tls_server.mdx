@@ -56,9 +56,9 @@ TlsServerConfig tlsConfig = caChainTlsConfig;
 <TabItem value="C#">
 
 ```csharp
-{{#include ../ffi/bindings/dotnet/examples/outstation_tls/Program.cs:tls_ca_chain_config}}
-var tlsConfig = caChainTlsConfig;
-{{#include ../ffi/bindings/dotnet/examples/outstation_tls/Program.cs:create_tls_server}}
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:tls_ca_chain_config}}
+
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:create_tls_server}}
 ```
 
 </TabItem>
@@ -106,9 +106,9 @@ TlsServerConfig tlsConfig = selfSignedTlsConfig;
 <TabItem value="C#">
 
 ```csharp
-{{#include ../ffi/bindings/dotnet/examples/outstation_tls/Program.cs:tls_self_signed_config}}
-var tlsConfig = selfSignedTlsConfig;
-{{#include ../ffi/bindings/dotnet/examples/outstation_tls/Program.cs:create_tls_server}}
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:tls_self_signed_config}}
+
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:create_tls_server}}
 ```
 
 </TabItem>
