@@ -278,7 +278,7 @@ dnp3_event_buffer_config_t get_event_buffer_config()
 // ANCHOR_END: event_buffer_config
 
 // loop that accepts user input and updates values
-void run_outstation(dnp3_outstation_t *outstation)
+int run_outstation(dnp3_outstation_t *outstation)
 {
     database_points_t database_points = {
         .binaryValue = false,
@@ -295,7 +295,7 @@ void run_outstation(dnp3_outstation_t *outstation)
         fgets(cbuf, 6, stdin);
 
         if (strcmp(cbuf, "x\n") == 0) {
-            return;
+            return 0;
         }
         else if (strcmp(cbuf, "bi\n") == 0) {
             dnp3_database_transaction_t transaction = {
@@ -368,7 +368,7 @@ void run_outstation(dnp3_outstation_t *outstation)
 }
 
 // ANCHOR: create_outstation_config
-dnp3_outstation_config_t create_outstation_config()
+dnp3_outstation_config_t get_outstation_config()
 {
     
     // create an outstation configuration with default values
@@ -437,7 +437,7 @@ int run_server(dnp3_tcp_server_t *server)
     dnp3_address_filter_t *address_filter = dnp3_address_filter_any();
     dnp3_param_error_t err = dnp3_tcp_server_add_outstation(
         server,
-        create_outstation_config(),
+        get_outstation_config(),
         get_event_buffer_config(),
         get_outstation_application(),
         get_outstation_information(),
@@ -467,11 +467,10 @@ int run_server(dnp3_tcp_server_t *server)
         return -1;
     }
 
-    run_outstation(outstation);
-
+    int ret = run_outstation(outstation);
     // cleanup the outstation before exit
     dnp3_outstation_destroy(outstation);
-    return 0;
+    return ret;
 }
 
 int run_tcp_server(dnp3_runtime_t *runtime)
@@ -504,6 +503,28 @@ int run_tls_server(dnp3_runtime_t *runtime, dnp3_tls_server_config_t config)
     return ret;
 }
 
+int run_serial(dnp3_runtime_t* runtime)
+{
+    dnp3_outstation_t* outstation = NULL;
+    dnp3_param_error_t err = dnp3_outstation_create_serial_session(
+        runtime,
+        "/dev/pts/4",                     // change to a real port
+        dnp3_serial_port_settings_init(), // default settings
+        get_outstation_config(),
+        get_event_buffer_config(),
+        get_outstation_application(),
+        get_outstation_information(),
+        get_control_handler(),
+        &outstation
+    );
+
+    if (err) {
+        printf("unable to create serial outstation: %s \n", dnp3_param_error_to_string(err));
+        return -1;
+    }
+
+    return run_outstation(outstation);    
+}
 
 int run_transport(int argc, char *argv[], dnp3_runtime_t* runtime)
 {    
@@ -519,8 +540,7 @@ int run_transport(int argc, char *argv[], dnp3_runtime_t* runtime)
         return run_tcp_server(runtime);        
     }
     else if (strcmp(type, "serial") == 0) {
-        //return create_serial_channel(runtime, channel);
-        return -1;
+        return run_serial(runtime);        
     }
     else if (strcmp(type, "tls-ca") == 0) {
         return run_tls_server(runtime, get_tls_ca_config());
