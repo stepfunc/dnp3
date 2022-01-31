@@ -252,169 +252,18 @@ dnp3_association_handler_t get_association_handler()
 }
 // ANCHOR_END: association_handler
 
-dnp3_param_error_t create_tcp_channel(dnp3_runtime_t *runtime, dnp3_master_channel_t **channel)
+int run_channel(dnp3_master_channel_t *channel)
 {
-    dnp3_param_error_t err;
-    // ANCHOR: create_master_tcp_channel
-    dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_create("127.0.0.1:20000");
-    err = dnp3_master_channel_create_tcp(
-        runtime,
-        DNP3_LINK_ERROR_MODE_CLOSE,
-        get_master_channel_config(),
-        endpoints,
-        dnp3_connect_strategy_init(),
-        get_client_state_listener(),
-        channel
-    );
-    dnp3_endpoint_list_destroy(endpoints);
-    // ANCHOR_END: create_master_tcp_channel
-    return err;
-}
-
-dnp3_param_error_t create_serial_channel(dnp3_runtime_t *runtime, dnp3_master_channel_t **channel)
-{    
-    // ANCHOR: create_master_serial_channel
-    dnp3_param_error_t err = dnp3_master_channel_create_serial(
-        runtime,
-        get_master_channel_config(),
-        "/dev/pts/4",
-        dnp3_serial_port_settings_init(),
-        1000,
-        get_port_state_listener(),
-        channel
-    );               
-    // ANCHOR_END: create_master_serial_channel
-    return err;
-}
-
-dnp3_param_error_t create_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t config, dnp3_master_channel_t **channel)
-{        
-    // ANCHOR: create_master_tls_channel
-    dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_create("127.0.0.1:20000");
-    dnp3_param_error_t err = dnp3_master_channel_create_tls(
-        runtime,
-        DNP3_LINK_ERROR_MODE_CLOSE,
-        get_master_channel_config(),
-        endpoints,
-        config,
-        dnp3_connect_strategy_init(),
-        get_client_state_listener(),
-        channel
-    );                                            
-    dnp3_endpoint_list_destroy(endpoints);
-    // ANCHOR_END: create_master_tls_channel
-    return err;
-}
-
-dnp3_tls_client_config_t get_ca_tls_config()
-{   
-    // ANCHOR: tls_ca_chain_config
-    dnp3_tls_client_config_t config = dnp3_tls_client_config_init(
-        "test.com", 
-        "./certs/ca_chain/ca_cert.pem",
-        "./certs/ca_chain/entity1_cert.pem",
-        "./certs/ca_chain/entity1_key.pem",
-        "" // no password
-    );
-
-    config.certificate_mode = DNP3_CERTIFICATE_MODE_AUTHORITY_BASED;
-    // ANCHOR_END: tls_ca_chain_config
-
-    return config;
-}
-
-dnp3_tls_client_config_t get_self_signed_tls_config()
-{
-    // ANCHOR: tls_self_signed_config
-    dnp3_tls_client_config_t config = dnp3_tls_client_config_init(
-        "test.com", 
-        "./certs/self_signed/entity2_cert.pem",
-        "./certs/self_signed/entity1_cert.pem",
-        "./certs/self_signed/entity1_key.pem",
-        "" // no password
-    );
-
-    config.certificate_mode = DNP3_CERTIFICATE_MODE_SELF_SIGNED;
-    // ANCHOR_END: tls_self_signed_config
-
-    return config;
-}
-
-// create a channel based on the command line arguments
-dnp3_param_error_t create_channel(int argc, char *argv[], dnp3_runtime_t *runtime, dnp3_master_channel_t **channel)
-{
-    if(argc != 2) {
-        printf("you must specify a transport type\n");
-        printf("usage: master-example <channel> (tcp, serial, tls-ca, tls-self-signed)\n");
-        exit(-1);
-    }
-
-    if (strcmp(argv[1], "tcp") == 0) {
-        return create_tcp_channel(runtime, channel);
-    }
-    else if (strcmp(argv[1], "serial") == 0) {
-        return create_serial_channel(runtime, channel);
-    }
-    else if (strcmp(argv[1], "tls-ca") == 0) {
-        return create_tls_channel(runtime, get_ca_tls_config(), channel);
-    }
-    else if (strcmp(argv[1], "tls-self-signed") == 0) {
-        return create_tls_channel(runtime, get_self_signed_tls_config(), channel);
-    }
-    else {
-        printf("unknown channel type: %s\n", argv[1]);
-        exit(-1);
-    }
-}
-
-int main(int argc, char *argv[])
-{
-    // ANCHOR: logging_init
-    // initialize logging with the default configuration
-    dnp3_configure_logging(dnp3_logging_config_init(), get_logger());
-    // ANCHOR_END: logging_init
-
-    // long-lived types that must be freed before exit
-    // ANCHOR: runtime_decl
-    dnp3_runtime_t *runtime = NULL;
-    // ANCHOR_END: runtime_decl
-    // ANCHOR: channel_decl
-    dnp3_master_channel_t *channel = NULL;
-    // ANCHOR_END: channel_decl
-    // ANCHOR: error_decl
-    dnp3_param_error_t err = DNP3_PARAM_ERROR_OK;
-    // ANCHOR_END: error_decl
-
-    // create the runtime
-    // ANCHOR: runtime_create
-    dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
-    runtime_config.num_core_threads = 4;
-    err = dnp3_runtime_create(runtime_config, &runtime);
-    // ANCHOR_END: runtime_create
-
-    if (err) {
-        printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
-        goto cleanup;
-    }
-
-    // create a channel based on the cmd line arguments
-    err = create_channel(argc, argv, runtime, &channel);        
-
-    if (err) {
-        printf("unable to create master channel: %s \n", dnp3_param_error_to_string(err));
-        goto cleanup;
-    }
-
     // Create the association
     // ANCHOR: association_create
     dnp3_association_id_t association_id;
-    err = dnp3_master_channel_add_association(channel, 1024, get_association_config(), get_read_handler(), get_association_handler(), &association_id);
+    dnp3_param_error_t err =
+        dnp3_master_channel_add_association(channel, 1024, get_association_config(), get_read_handler(), get_association_handler(), &association_id);
     // ANCHOR_END: association_create
     if (err) {
         printf("unable to add association: %s \n", dnp3_param_error_to_string(err));
-        goto cleanup;
+        return -1;
     }
-
 
     // Add an event poll
     // ANCHOR: add_poll
@@ -425,18 +274,22 @@ int main(int argc, char *argv[])
     // ANCHOR_END: add_poll
     if (err) {
         printf("unable to add poll: %s \n", dnp3_param_error_to_string(err));
-        goto cleanup;
+        return -1;
     }
 
     // start communications
-    dnp3_master_channel_enable(channel);
+    err = dnp3_master_channel_enable(channel);
+    if (err) {
+        printf("unable to start channel: %s \n", dnp3_param_error_to_string(err));
+        return -1;
+    }
 
     char cbuf[10];
     while (true) {
         fgets(cbuf, 10, stdin);
 
         if (strcmp(cbuf, "x\n") == 0) {
-            goto cleanup;
+            return 0;
         }
         else if (strcmp(cbuf, "enable\n") == 0) {
             printf("calling enable\n");
@@ -489,7 +342,7 @@ int main(int argc, char *argv[])
             dnp3_group12_var1_t g12v1 = dnp3_group12_var1_init(dnp3_control_code_init(DNP3_TRIP_CLOSE_CODE_NUL, false, DNP3_OP_TYPE_LATCH_ON), 1, 1000, 1000);
             dnp3_command_set_add_g12_v1_u16(commands, 3, g12v1);
 
-            dnp3_command_task_callback_t cb = {                
+            dnp3_command_task_callback_t cb = {
                 .on_complete = &on_command_success,
                 .on_failure = &on_command_error,
                 .on_destroy = NULL,
@@ -553,9 +406,166 @@ int main(int argc, char *argv[])
             printf("Unknown command\n");
         }
     }
+}
 
-cleanup:
-    dnp3_master_channel_destroy(channel);
+int run_tcp_channel(dnp3_runtime_t *runtime)
+{    
+    // ANCHOR: create_master_tcp_channel
+    dnp3_master_channel_t* channel = NULL;
+    dnp3_endpoint_list_t* endpoints = dnp3_endpoint_list_create("127.0.0.1:20000");
+    dnp3_param_error_t err = dnp3_master_channel_create_tcp(
+        runtime,
+        DNP3_LINK_ERROR_MODE_CLOSE,
+        get_master_channel_config(),
+        endpoints,
+        dnp3_connect_strategy_init(),
+        get_client_state_listener(),
+        &channel
+    );
+    dnp3_endpoint_list_destroy(endpoints);
+    // ANCHOR_END: create_master_tcp_channel
+
+
+    if (err) {
+        printf("unable to create TCP channel: %s \n", dnp3_param_error_to_string(err));
+        return -1;
+    }
+
+    return run_channel(channel);
+}
+
+int run_serial_channel(dnp3_runtime_t *runtime)
+{    
+    // ANCHOR: create_master_serial_channel
+    dnp3_master_channel_t *channel = NULL;
+    dnp3_param_error_t err = dnp3_master_channel_create_serial(
+        runtime,
+        get_master_channel_config(),
+        "/dev/pts/4",
+        dnp3_serial_port_settings_init(),
+        1000,
+        get_port_state_listener(),
+        &channel
+    );               
+    // ANCHOR_END: create_master_serial_channel
+
+    if (err) {
+        printf("unable to create serial channel: %s \n", dnp3_param_error_to_string(err));
+        return -1;
+    }
+
+    return run_channel(channel);
+}
+
+int run_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t config)
+{        
+    // ANCHOR: create_master_tls_channel
+    dnp3_master_channel_t *channel = NULL;
+    dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_create("127.0.0.1:20000");
+    dnp3_param_error_t err = dnp3_master_channel_create_tls(
+        runtime,
+        DNP3_LINK_ERROR_MODE_CLOSE,
+        get_master_channel_config(),
+        endpoints,
+        config,
+        dnp3_connect_strategy_init(),
+        get_client_state_listener(),
+        &channel
+    );                                            
+    dnp3_endpoint_list_destroy(endpoints);
+    // ANCHOR_END: create_master_tls_channel
+    
+    if (err) {
+        printf("unable to create TLS channel: %s \n", dnp3_param_error_to_string(err));
+        return -1;
+    }
+
+    return run_channel(channel);
+}
+
+dnp3_tls_client_config_t get_ca_tls_config()
+{   
+    // ANCHOR: tls_ca_chain_config
+    dnp3_tls_client_config_t config = dnp3_tls_client_config_init(
+        "test.com", 
+        "./certs/ca_chain/ca_cert.pem",
+        "./certs/ca_chain/entity1_cert.pem",
+        "./certs/ca_chain/entity1_key.pem",
+        "" // no password
+    );
+
+    config.certificate_mode = DNP3_CERTIFICATE_MODE_AUTHORITY_BASED;
+    // ANCHOR_END: tls_ca_chain_config
+
+    return config;
+}
+
+dnp3_tls_client_config_t get_self_signed_tls_config()
+{
+    // ANCHOR: tls_self_signed_config
+    dnp3_tls_client_config_t config = dnp3_tls_client_config_init(
+        "test.com", 
+        "./certs/self_signed/entity2_cert.pem",
+        "./certs/self_signed/entity1_cert.pem",
+        "./certs/self_signed/entity1_key.pem",
+        "" // no password
+    );
+
+    config.certificate_mode = DNP3_CERTIFICATE_MODE_SELF_SIGNED;
+    // ANCHOR_END: tls_self_signed_config
+
+    return config;
+}
+
+// create a channel based on the command line arguments
+dnp3_param_error_t create_and_run_channel(int argc, char *argv[], dnp3_runtime_t *runtime)
+{
+    if(argc != 2) {
+        printf("you must specify a transport type\n");
+        printf("usage: master-example <channel> (tcp, serial, tls-ca, tls-self-signed)\n");
+        return -1;
+    }
+
+    if (strcmp(argv[1], "tcp") == 0) {
+        return run_tcp_channel(runtime);
+    }
+    else if (strcmp(argv[1], "serial") == 0) {
+        return run_serial_channel(runtime);
+    }
+    else if (strcmp(argv[1], "tls-ca") == 0) {
+        return run_tls_channel(runtime, get_ca_tls_config());
+    }
+    else if (strcmp(argv[1], "tls-self-signed") == 0) {
+        return run_tls_channel(runtime, get_self_signed_tls_config());
+    }
+    else {
+        printf("unknown channel type: %s\n", argv[1]);
+        return -1;
+    }
+}
+
+int main(int argc, char *argv[])
+{
+    // ANCHOR: logging_init
+    // initialize logging with the default configuration
+    dnp3_configure_logging(dnp3_logging_config_init(), get_logger());
+    // ANCHOR_END: logging_init
+                    
+    // ANCHOR: runtime_create
+    dnp3_runtime_t *runtime = NULL;
+    dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();
+    runtime_config.num_core_threads = 4;
+    dnp3_param_error_t err = dnp3_runtime_create(runtime_config, &runtime);
+    // ANCHOR_END: runtime_create
+
+    if (err) {
+        printf("unable to create runtime: %s \n", dnp3_param_error_to_string(err));
+        return -1;
+    }
+
+    // create a channel based on the cmd line arguments and run it
+    int res = create_and_run_channel(argc, argv, runtime);        
+    
     // ANCHOR: runtime_destroy
     dnp3_runtime_destroy(runtime);
     // ANCHOR_END: runtime_destroy
