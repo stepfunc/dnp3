@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let args: Vec<String> = std::env::args().collect();
-    let transport: &str = match &args {
+    let transport: &str = match args.as_slice() {
         [_, x] => x,
         _ => {
             eprintln!("please specify a transport:");

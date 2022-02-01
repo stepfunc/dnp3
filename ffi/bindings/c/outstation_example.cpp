@@ -3,6 +3,7 @@
 #include <iostream>
 #include <iomanip>
 #include <string>
+#include <cstring>
 
 using namespace dnp3;
 using namespace dnp3::functional;

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <iomanip>
 #include <string>
+#include <cstring>
 
 class Logger : public dnp3::Logger {
     void on_message(dnp3::LogLevel level, std::string message) override
