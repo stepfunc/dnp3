@@ -29,8 +29,7 @@ values={[
 
 ```rust
 {{#include ../dnp3/examples/master.rs:tls_ca_chain_config}}
-
-
+    
 {{#include ../dnp3/examples/master.rs:create_master_tls_channel}}
 ```
 
@@ -48,9 +47,9 @@ values={[
 <TabItem value="Java">
 
 ```java
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:tls_ca_chain_config}}
-TlsServerConfig tlsConfig = caChainTlsConfig;
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:create_master_channel}}
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:tls_ca_chain_config}}
+
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:create_tls_channel}}
 ```
 
 </TabItem>
@@ -98,9 +97,9 @@ values={[
 <TabItem value="Java">
 
 ```java
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:tls_self_signed_config}}
-TlsServerConfig tlsConfig = selfSignedTlsConfig;
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:create_master_channel}}
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:tls_self_signed_config}}
+
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:create_tls_channel}}
 ```
 
 </TabItem>
