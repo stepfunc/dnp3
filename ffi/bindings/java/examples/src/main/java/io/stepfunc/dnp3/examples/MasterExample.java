@@ -310,7 +310,13 @@ public class MasterExample {
                     new ConnectStrategy(),
                     new TestClientStateListener());
     // ANCHOR_END: create_tcp_channel
-    runChannel(channel);
+
+    try {
+      runChannel(channel);
+    }
+    finally {
+      channel.shutdown();
+    }
   }
 
   private static void runTls(Runtime runtime, TlsClientConfig config) throws Exception {
@@ -325,7 +331,13 @@ public class MasterExample {
                     new ConnectStrategy(),
                     new TestClientStateListener());
     // ANCHOR_END: create_tls_channel
-    runChannel(channel);
+
+    try {
+      runChannel(channel);
+    }
+    finally {
+      channel.shutdown();
+    }
   }
 
   private static void runSerial(Runtime runtime) throws Exception {
@@ -339,7 +351,13 @@ public class MasterExample {
                     Duration.ofSeconds(5),
                     new TestPortStateListener());
     // ANCHOR_END: create_serial_channel
-    runChannel(channel);
+
+    try {
+      runChannel(channel);
+    }
+    finally {
+      channel.shutdown();
+    }
   }
 
   public static int main(String[] args) throws Exception {
