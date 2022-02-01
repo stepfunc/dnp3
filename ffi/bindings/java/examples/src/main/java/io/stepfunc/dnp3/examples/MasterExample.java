@@ -20,10 +20,18 @@ class ConsoleLogger implements Logger {
 }
 // ANCHOR_END: logging_interface
 
-class TestListener implements ClientStateListener {
+class TestClientStateListener implements ClientStateListener {
 
   @Override
   public void onChange(ClientState state) {
+    System.out.println(state);
+  }
+}
+
+class TestPortStateListener implements PortStateListener {
+
+  @Override
+  public void onChange(PortState state) {
     System.out.println(state);
   }
 }
@@ -255,14 +263,86 @@ public class MasterExample {
   // ANCHOR_END: association_config
 
   // ANCHOR: runtime_config
-  public static RuntimeConfig getRuntimeConfig() {
+  private static RuntimeConfig getRuntimeConfig() {
     RuntimeConfig config = new RuntimeConfig();
     config.numCoreThreads = ushort(4);
     return config;
   }
   // ANCHOR_END: runtime_config
 
-  public static void main(String[] args) throws Exception {
+  private static TlsClientConfig getTlsSelfSignedConfig() {
+    // ANCHOR: tls_self_signed_config
+    TlsClientConfig config =
+            new TlsClientConfig(
+                    "test.com",
+                    "./certs/self_signed/entity2_cert.pem",
+                    "./certs/self_signed/entity1_cert.pem",
+                    "./certs/self_signed/entity1_key.pem",
+                    "" // no password
+            );
+    config.certificateMode = CertificateMode.SELF_SIGNED;
+    // ANCHOR_END: tls_self_signed_config
+    return config;
+  }
+
+  private static TlsClientConfig getTlsCAConfig() {
+    // ANCHOR: tls_ca_chain_config
+    TlsClientConfig config =
+            new TlsClientConfig(
+                    "test.com",
+                    "./certs/ca_chain/ca_cert.pem",
+                    "./certs/ca_chain/entity1_cert.pem",
+                    "./certs/ca_chain/entity1_key.pem",
+                    "" // no password
+            );
+    // ANCHOR_END: tls_ca_chain_config
+    return config;
+  }
+
+  private static void runTcp(Runtime runtime) throws Exception {
+    // ANCHOR: create_tcp_channel
+    MasterChannel channel =
+            MasterChannel.createTcpChannel(
+                    runtime,
+                    LinkErrorMode.CLOSE,
+                    getMasterChannelConfig(),
+                    new EndpointList("127.0.0.1:20000"),
+                    new ConnectStrategy(),
+                    new TestClientStateListener());
+    // ANCHOR_END: create_tcp_channel
+    runChannel(channel);
+  }
+
+  private static void runTls(Runtime runtime, TlsClientConfig config) throws Exception {
+    // ANCHOR: create_tls_channel
+    MasterChannel channel =
+            MasterChannel.createTlsChannel(
+                    runtime,
+                    LinkErrorMode.CLOSE,
+                    getMasterChannelConfig(),
+                    new EndpointList("127.0.0.1:20000"),
+                    config,
+                    new ConnectStrategy(),
+                    new TestClientStateListener());
+    // ANCHOR_END: create_tls_channel
+    runChannel(channel);
+  }
+
+  private static void runSerial(Runtime runtime) throws Exception {
+    // ANCHOR: create_serial_channel
+    MasterChannel channel =
+            MasterChannel.createSerialChannel(
+                    runtime,
+                    getMasterChannelConfig(),
+                    "/dev/pts/4", // replace with a real port
+                    new SerialPortSettings(),
+                    Duration.ofSeconds(5),
+                    new TestPortStateListener());
+    // ANCHOR_END: create_serial_channel
+    runChannel(channel);
+  }
+
+  public static int main(String[] args) throws Exception {
     // Initialize logging with the default configuration
     // This may only be called once during program initialization
     // ANCHOR: logging_init
@@ -273,19 +353,8 @@ public class MasterExample {
     Runtime runtime = new Runtime(getRuntimeConfig());
     // ANCHOR_END: runtime
 
-    // ANCHOR: create_master_channel
-    MasterChannel channel =
-        MasterChannel.createTcpChannel(
-            runtime,
-            LinkErrorMode.CLOSE,
-            getMasterChannelConfig(),
-            new EndpointList("127.0.0.1:20000"),
-            new ConnectStrategy(),
-            new TestListener());
-    // ANCHOR_END: create_master_channel
-
     try {
-      run(channel);
+      return run(runtime, args);
     } finally {
       // ANCHOR: runtime_shutdown
       runtime.shutdown();
@@ -293,7 +362,34 @@ public class MasterExample {
     }
   }
 
-  private static void run(MasterChannel channel) throws Exception {
+  private static int run(Runtime runtime, String[] args) throws Exception {
+    if(args.length != 2) {
+      System.err.println("You must specify a transport");
+      System.err.println("Usage: master-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
+      return -1;
+    }
+
+    final String type = args[1];
+    switch(type) {
+      case "tcp":
+        runTcp(runtime);
+        return 0;
+      case "serial":
+        runSerial(runtime);
+        return 0;
+      case "tls-ca":
+        runTls(runtime, getTlsCAConfig());
+        return 0;
+      case "tls-self-signed":
+        runTls(runtime, getTlsSelfSignedConfig());
+        return 0;
+      default:
+        System.err.printf("Unknown transport: %s%n", type);
+        return -1;
+    }
+  }
+
+  private static void runChannel(MasterChannel channel) throws Exception {
 
     // Create the association
     // ANCHOR: association_create
@@ -319,107 +415,101 @@ public class MasterExample {
     BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
     while (true) {
       try {
-        runOneCommand(association, channel, poll, reader.readLine());
-      } catch (Exception ex) {
+        switch (reader.readLine()) {
+          case "x":
+            return;
+          case "enable":
+            channel.enable();
+            break;
+          case "disable":
+            channel.disable();
+            break;
+          case "dln":
+            channel.setDecodeLevel(new DecodeLevel());
+            break;
+          case "dlv":
+            DecodeLevel level = new DecodeLevel();
+            level.application = AppDecodeLevel.OBJECT_VALUES;
+            channel.setDecodeLevel(level);
+            break;
+          case "rao":
+          {
+            Request request = new Request();
+            request.addAllObjectsHeader(Variation.GROUP40_VAR0);
+            channel.read(association, request).toCompletableFuture().get();
+            System.out.println("read success!");
+            break;
+          }
+          case "rmo":
+          {
+            Request request = new Request();
+            request.addAllObjectsHeader(Variation.GROUP10_VAR0);
+            request.addAllObjectsHeader(Variation.GROUP40_VAR0);
+            channel.read(association, request).toCompletableFuture().get();
+            System.out.println("read success!");
+            break;
+          }
+          case "cmd":
+          {
+            // ANCHOR: assoc_control
+            CommandSet commands = new CommandSet();
+            Group12Var1 control =
+                    new Group12Var1(
+                            new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
+                            ubyte(1),
+                            uint(1000),
+                            uint(1000));
+            commands.addG12V1U16(ushort(3), control);
+
+            channel
+                    .operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
+                    .toCompletableFuture()
+                    .get();
+
+            // ANCHOR_END: assoc_control
+            break;
+          }
+          case "evt":
+            channel.demandPoll(poll);
+            break;
+
+          case "lts":
+          {
+            channel.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
+            System.out.println("Time sync success!");
+            break;
+          }
+          case "nts":
+          {
+            channel.synchronizeTime(association, TimeSyncMode.NON_LAN).toCompletableFuture().get();
+            System.out.println("Time sync success!");
+            break;
+          }
+          case "crt":
+          {
+            Duration delay = channel.coldRestart(association).toCompletableFuture().get();
+            System.out.println("Restart delay: " + delay);
+            break;
+          }
+          case "wrt":
+          {
+            Duration delay = channel.warmRestart(association).toCompletableFuture().get();
+            System.out.println("Restart delay: " + delay);
+            break;
+          }
+          case "lsr":
+          {
+            channel.checkLinkStatus(association).toCompletableFuture().get();
+            System.out.println("Link status success!");
+            break;
+          }
+          default:
+            System.out.println("Unknown command");
+            break;
+        }
+      } catch (ParamException ex) {
         System.out.println("Error: " + ex);
       }
-    }
-  }
-
-  private static void runOneCommand(
-      AssociationId association, MasterChannel channel, PollId poll, String command)
-      throws Exception {
-    switch (command) {
-      case "x":
-        return;
-      case "enable":
-        channel.enable();
-        break;
-      case "disable":
-        channel.disable();
-        break;
-      case "dln":
-        channel.setDecodeLevel(new DecodeLevel());
-        break;
-      case "dlv":
-        DecodeLevel level = new DecodeLevel();
-        level.application = AppDecodeLevel.OBJECT_VALUES;
-        channel.setDecodeLevel(level);
-        break;
-      case "rao":
-        {
-          Request request = new Request();
-          request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-          channel.read(association, request).toCompletableFuture().get();
-          System.out.println("read success!");
-          break;
-        }
-      case "rmo":
-        {
-          Request request = new Request();
-          request.addAllObjectsHeader(Variation.GROUP10_VAR0);
-          request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-          channel.read(association, request).toCompletableFuture().get();
-          System.out.println("read success!");
-          break;
-        }
-      case "cmd":
-        {
-          // ANCHOR: assoc_control
-          CommandSet commands = new CommandSet();
-          Group12Var1 control =
-              new Group12Var1(
-                  new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
-                  ubyte(1),
-                  uint(1000),
-                  uint(1000));
-          commands.addG12V1U16(ushort(3), control);
-
-          channel
-              .operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
-              .toCompletableFuture()
-              .get();
-
-          // ANCHOR_END: assoc_control
-          break;
-        }
-      case "evt":
-        channel.demandPoll(poll);
-        break;
-
-      case "lts":
-        {
-          channel.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
-          System.out.println("Time sync success!");
-          break;
-        }
-      case "nts":
-        {
-          channel.synchronizeTime(association, TimeSyncMode.NON_LAN).toCompletableFuture().get();
-          System.out.println("Time sync success!");
-          break;
-        }
-      case "crt":
-        {
-          Duration delay = channel.coldRestart(association).toCompletableFuture().get();
-          System.out.println("Restart delay: " + delay);
-          break;
-        }
-      case "wrt":
-        {
-          Duration delay = channel.warmRestart(association).toCompletableFuture().get();
-          System.out.println("Restart delay: " + delay);
-          break;
-        }
-      case "lsr":
-        {
-          channel.checkLinkStatus(association).toCompletableFuture().get();
-          System.out.println("Link status success!");
-          break;
-        }
-      default:
-        System.out.println("Unknown command");
-        break;
     }
   }
 }
