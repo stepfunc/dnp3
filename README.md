@@ -1,3 +1,5 @@
+![Step Function I/O](./sfio_logo.png)
+
 Commercial library by [Step Function I/O](https://stepfunc.io/)
 
 # dnp3

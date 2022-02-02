@@ -1,8 +1,8 @@
 [package]
 name = "dnp3"
-version = "0.10.0"
+version = "1.0.0-alpha1"
 authors = ["Adam Crain <adam@stepfunc.io>", "Émile Grégoire <emile@stepfunc.io>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 tracing = "0.1"

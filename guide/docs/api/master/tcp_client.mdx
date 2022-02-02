@@ -23,7 +23,7 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/master_tcp_client.rs:create_master_channel}}
+{{#include ../dnp3/examples/master.rs:create_master_tcp_channel}}
 ```
 
 :::note
@@ -34,10 +34,7 @@ The function is called within the context of the Tokio runtime, and is therefore
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/master_example.c:channel_decl}}
-{{#include ../ffi/bindings/c/master_example.c:error_decl}}
-
-{{#include ../ffi/bindings/c/master_example.c:create_master_channel}}
+{{#include ../ffi/bindings/c/master_example.c:create_master_tcp_channel}}
 // check error
 ```
 
@@ -45,14 +42,14 @@ The function is called within the context of the Tokio runtime, and is therefore
 <TabItem value="Java">
 
 ```java
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:create_master_channel}}
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:create_tcp_channel}}
 ```
 
 </TabItem>
 <TabItem value="C#">
 
 ```csharp
-{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:create_master_channel}}
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:create_tcp_channel}}
 ```
 
 </TabItem>

@@ -89,7 +89,7 @@ object ConversionsModule extends Module {
         }
     }
 
-    spaced(binaryVariations.map(single("Binary")).iterator) ++
+    spaced(binaryVariations.map(single("BinaryInput")).iterator) ++
     space ++
     spaced(binaryOutputStatusVariations.map(single("BinaryOutputStatus")).iterator)
   }
@@ -107,7 +107,7 @@ object ConversionsModule extends Module {
     def single(fs: FixedSize) : Iterator[String] = {
       def variationToMeas : Iterator[String] = {
         "let flags = Flags::new(v.flags);".eol ++
-          bracket("DoubleBitBinary") {
+          bracket("DoubleBitBinaryInput") {
             "value : flags.double_bit_state(),".eol ++
               "flags,".eol ++
               s"time : ${timeConversion(fs)},".eol
@@ -127,12 +127,12 @@ object ConversionsModule extends Module {
         }
       }
 
-      bracket(s"impl From<${fs.name}> for DoubleBitBinary") {
+      bracket(s"impl From<${fs.name}> for DoubleBitBinaryInput") {
         bracket(s"fn from(v: ${fs.name}) -> Self") {
           variationToMeas
         }
       } ++ space ++
-        bracket(s"impl ToVariation<${fs.name}> for DoubleBitBinary") {
+        bracket(s"impl ToVariation<${fs.name}> for DoubleBitBinaryInput") {
           bracket(s"fn to_variation(&self) -> ${fs.name}") {
             measToVariation
           }
@@ -269,8 +269,8 @@ object ConversionsModule extends Module {
       def measToVariationWithCast : Iterator[String] = {
         def getFlagsAndValue: String = {
            fs.fields.find(_.isValue).get.typ match {
-             case SInt16Field => "self.to_i16()"
-             case SInt32Field => "self.to_i32()"
+             case S16Field => "self.to_i16()"
+             case S32Field => "self.to_i32()"
              case Float32Field => "self.to_f32()"
            }
         }
@@ -310,7 +310,7 @@ object ConversionsModule extends Module {
 
     }
 
-    spaced(analogVariations.map(single("Analog")).iterator) ++
+    spaced(analogVariations.map(single("AnalogInput")).iterator) ++
     space ++
     spaced(analogOutputStatusVariations.map(single("AnalogOutputStatus")).iterator)
   }

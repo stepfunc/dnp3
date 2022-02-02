@@ -1,89 +1,90 @@
-use oo_bindgen::callback::InterfaceHandle;
-use oo_bindgen::class::ClassDeclarationHandle;
-use oo_bindgen::doc;
-use oo_bindgen::error_type::{ErrorType, ExceptionType};
-use oo_bindgen::iterator::IteratorHandle;
-use oo_bindgen::native_enum::NativeEnumHandle;
-use oo_bindgen::native_function::{DurationMapping, ReturnType, Type};
-use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
-use oo_bindgen::{BindingError, LibraryBuilder};
+use crate::gv;
+use oo_bindgen::model::*;
+use std::time::Duration;
 
 pub struct SharedDefinitions {
-    pub error_type: ErrorType,
-    pub port_state_listener: InterfaceHandle,
-    pub variation_enum: NativeEnumHandle,
+    pub error_type: ErrorType<Unvalidated>,
+    pub port_state_listener: AsynchronousInterface,
+    pub variation_enum: EnumHandle,
     pub runtime_class: ClassDeclarationHandle,
-    pub decode_level: NativeStructHandle,
-    pub serial_port_settings: NativeStructHandle,
-    pub link_error_mode: NativeEnumHandle,
-    pub min_tls_version: NativeEnumHandle,
-    pub certificate_mode: NativeEnumHandle,
-    pub retry_strategy: NativeStructHandle,
-    pub control_struct: NativeStructHandle,
-    pub g12v1_struct: NativeStructHandle,
-    pub binary_point: NativeStructHandle,
-    pub binary_it: IteratorHandle,
-    pub double_bit_binary_point: NativeStructHandle,
-    pub double_bit_binary_it: IteratorHandle,
-    pub binary_output_status_point: NativeStructHandle,
-    pub binary_output_status_it: IteratorHandle,
-    pub counter_point: NativeStructHandle,
-    pub counter_it: IteratorHandle,
-    pub frozen_counter_point: NativeStructHandle,
-    pub frozen_counter_it: IteratorHandle,
-    pub analog_point: NativeStructHandle,
-    pub analog_it: IteratorHandle,
-    pub analog_output_status_point: NativeStructHandle,
-    pub analog_output_status_it: IteratorHandle,
-    pub octet_string: NativeStructHandle,
-    pub octet_string_it: IteratorHandle,
+    pub decode_level: UniversalStructHandle,
+    pub serial_port_settings: FunctionArgStructHandle,
+    pub link_error_mode: EnumHandle,
+    pub retry_strategy: FunctionArgStructHandle,
+    pub control_struct: CallbackArgStructHandle,
+    pub g12v1_struct: UniversalStructHandle,
+    pub binary_point: UniversalStructHandle,
+    pub binary_it: AbstractIteratorHandle,
+    pub double_bit_binary_point: UniversalStructHandle,
+    pub double_bit_binary_it: AbstractIteratorHandle,
+    pub binary_output_status_point: UniversalStructHandle,
+    pub binary_output_status_it: AbstractIteratorHandle,
+    pub counter_point: UniversalStructHandle,
+    pub counter_it: AbstractIteratorHandle,
+    pub frozen_counter_point: UniversalStructHandle,
+    pub frozen_counter_it: AbstractIteratorHandle,
+    pub analog_point: UniversalStructHandle,
+    pub analog_it: AbstractIteratorHandle,
+    pub analog_output_status_point: UniversalStructHandle,
+    pub analog_output_status_it: AbstractIteratorHandle,
+    pub octet_string: FunctionReturnStructHandle,
+    pub octet_string_it: AbstractIteratorHandle,
+    pub min_tls_version: EnumHandle,
+    pub certificate_mode: EnumHandle,
 }
 
-pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingError> {
+pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
     let error_type = lib
         .define_error_type(
-            "ParamError",
-            "ParamException",
+            "param_error",
+            "param_exception",
             ExceptionType::UncheckedException,
         )?
-        .add_error("NullParameter", "Null parameter")?
         .add_error(
-            "AssociationDoesNotExist",
+            "invalid_timeout",
+            "The supplied timeout value is too small or too large",
+        )?
+        .add_error("null_parameter", "Null parameter")?
+        .add_error(
+            "association_does_not_exist",
             "The specified association does not exist",
         )?
         .add_error(
-            "AssociationDuplicateAddress",
+            "association_duplicate_address",
             "Duplicate association address",
         )?
-        .add_error("InvalidSocketAddress", "Invalid socket address")?
-        .add_error("InvalidDnp3Address", "Invalid link-layer DNP3 address")?
-        .add_error("InvalidBufferSize", "Invalid buffer size")?
+        .add_error("invalid_socket_address", "Invalid socket address")?
+        .add_error("invalid_dnp3_address", "Invalid link-layer DNP3 address")?
+        .add_error("invalid_buffer_size", "Invalid buffer size")?
         .add_error(
-            "AddressFilterConflict",
+            "address_filter_conflict",
             "Conflict in the address filter specification",
         )?
-        .add_error("ServerAlreadyStarted", "Server already started")?
+        .add_error("server_already_started", "Server already started")?
         .add_error(
-            "ServerBindError",
+            "server_bind_error",
             "Server failed to bind to the specified port",
         )?
-        .add_error("MasterAlreadyShutdown", "Master was already shutdown")?
-        .add_error("RuntimeCreationFailure", "Failed to create tokio runtime")?
-        .add_error("RuntimeDestroyed", "Runtime was already disposed of")?
+        .add_error("master_already_shutdown", "Master was already shutdown")?
+        .add_error("runtime_creation_failure", "Failed to create Tokio runtime")?
+        .add_error("runtime_destroyed", "Runtime has already been disposed")?
         .add_error(
-            "RuntimeCannotBlockWithinAsync",
+            "runtime_cannot_block_within_async",
             "Runtime cannot execute blocking call within asynchronous context",
         )?
         .add_error(
-            "LoggingAlreadyConfigured",
+            "logging_already_configured",
             "Logging can only be configured once",
         )?
-        .add_error("PointDoesNotExist", "Point does not exist")?
-        .add_error("InvalidPeerCertificate", "Invalid peer certificate file")?
-        .add_error("InvalidLocalCertificate", "Invalid local certificate file")?
-        .add_error("InvalidPrivateKey", "Invalid private key file")?
-        .add_error("InvalidDnsName", "Invalid DNS name")?
-        .add_error("MiscellaneousTlsError", "Miscellaneous tls error")?
+        .add_error("point_does_not_exist", "Point does not exist")?
+        .add_error("invalid_peer_certificate", "Invalid peer certificate file")?
+        .add_error(
+            "invalid_local_certificate",
+            "Invalid local certificate file",
+        )?
+        .add_error("invalid_private_key", "Invalid private key file")?
+        .add_error("invalid_dns_name", "Invalid DNS name")?
+        .add_error("other_tls_error", "Other TLS error")?
         .doc("Error type used throughout the library")?
         .build()?;
 
@@ -91,63 +92,72 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     let decode_level = crate::logging::define(lib, error_type.clone())?;
     let runtime_class = crate::runtime::define(lib, error_type.clone())?;
 
-    let control_struct = lib.declare_native_struct("Control")?;
+    let control_struct = lib.declare_callback_argument_struct("control")?;
     let control_struct = lib
-        .define_native_struct(&control_struct)?
-        .add("fir", Type::Bool, "First fragment in the message")?
-        .add("fin", Type::Bool, "Final fragment of the message")?
-        .add("con", Type::Bool, "Requires confirmation")?
-        .add("uns", Type::Bool, "Unsolicited response")?
-        .add("seq", Type::Uint8, "Sequence number")?
+        .define_callback_argument_struct(control_struct)?
+        .add("fir", Primitive::Bool, "First fragment in the message")?
+        .add("fin", Primitive::Bool, "Final fragment of the message")?
+        .add("con", Primitive::Bool, "Requires confirmation")?
+        .add("uns", Primitive::Bool, "Unsolicited response")?
+        .add("seq", Primitive::U8, "Sequence number")?
         .doc("APDU Control field")?
+        .end_fields()?
         .build()?;
 
     let trip_close_code = lib
-        .define_native_enum("TripCloseCode")?
-        .variant("Nul", 0, "NUL (0)")?
-        .variant("Close", 1, "CLOSE (1)")?
-        .variant("Trip", 2, "TRIP (2)")?
-        .variant("Reserved", 3, "RESERVED (3)")?
+        .define_enum("trip_close_code")?
+        .variant("nul", 0, "NUL (0)")?
+        .variant("close", 1, "CLOSE (1)")?
+        .variant("trip", 2, "TRIP (2)")?
+        .variant("reserved", 3, "RESERVED (3)")?
         .doc(
-            "Trip-Close Code field, used in conjunction with {enum:OpType} to specify a control operation")?
+            "Trip-Close Code field, used in conjunction with {enum:op_type} to specify a control operation")?
         .build()?;
 
     let op_type = lib
-        .define_native_enum("OpType")?
-        .variant("Nul", 0, "NUL (0)")?
-        .variant("PulseOn", 1, "PULSE_ON (1)")?
-        .variant("PulseOff", 2, "PULSE_OFF (2)")?
-        .variant("LatchOn", 3, "LATCH_ON (3)")?
-        .variant("LatchOff", 4, "LATCH_OFF(4)")?
-        .doc("Operation Type field, used in conjunction with {enum:TripCloseCode} to specify a control operation")?
+        .define_enum("op_type")?
+        .variant("nul", 0, "NUL (0)")?
+        .variant("pulse_on", 1, "PULSE_ON (1)")?
+        .variant("pulse_off", 2, "PULSE_OFF (2)")?
+        .variant("latch_on", 3, "LATCH_ON (3)")?
+        .variant("latch_off", 4, "LATCH_OFF(4)")?
+        .doc("Operation Type field, used in conjunction with {enum:trip_close_code} to specify a control operation")?
         .build()?;
 
-    let control_code = lib.declare_native_struct("ControlCode")?;
+    let queue_field = Name::create("queue")?;
+
+    let control_code = lib.declare_universal_struct("control_code")?;
     let control_code = lib
-        .define_native_struct(&control_code)?
-        .add("tcc", Type::Enum(trip_close_code), "This field is used in conjunction with the `op_type` field to specify a control operation")?
-        .add("clear", Type::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
-        .add("queue", StructElementType::Bool(Some(false)), "This field is obsolete and should always be 0")?
-        .add("op_type", Type::Enum(op_type), "This field is used in conjunction with the `tcc` field to specify a control operation")?
-        .doc("CROB ({struct:G12V1}) control code")?
+        .define_universal_struct(control_code)?
+        .add("tcc", trip_close_code, "This field is used in conjunction with the `op_type` field to specify a control operation")?
+        .add("clear", Primitive::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
+        .add(&queue_field, Primitive::Bool, "This field is obsolete and should always be 0")?
+        .add("op_type", op_type, "This field is used in conjunction with the `tcc` field to specify a control operation")?
+        .doc("CROB ({struct:group12_var1}) control code")?
+        .end_fields()?
+        .begin_initializer("init", InitializerType::Normal, "Initialize a {struct:control_code} instance")?
+        .default(&queue_field, false)?
+        .end_initializer()?
         .build()?;
 
-    let g12v1_struct = lib.declare_native_struct("G12V1")?;
+    let g12v1_struct = lib.declare_universal_struct(gv(12, 1))?;
     let g12v1_struct = lib
-        .define_native_struct(&g12v1_struct)?
-        .add("code", Type::Struct(control_code), "Control code")?
-        .add("count", Type::Uint8, "Count")?
+        .define_universal_struct(g12v1_struct)?
+        .add("code", control_code, "Control code")?
+        .add("count", Primitive::U8, "Count")?
         .add(
             "on_time",
-            Type::Uint32,
+            Primitive::U32,
             "Duration the output drive remains active (in milliseconds)",
         )?
         .add(
             "off_time",
-            Type::Uint32,
+            Primitive::U32,
             "Duration the output drive remains non-active (in milliseconds)",
         )?
         .doc("Control Relay Output Block")?
+        .end_fields()?
+        .add_full_initializer("init")?
         .build()?;
 
     // ======
@@ -158,54 +168,59 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     let timestamp_struct = declare_timestamp_struct(lib)?;
 
     let double_bit_enum = lib
-        .define_native_enum("DoubleBit")?
-        .push("Intermediate", "Transition between conditions")?
-        .push("DeterminedOff", "Determined to be OFF")?
-        .push("DeterminedOn", "Determined to be ON")?
-        .push("Indeterminate", "Abnormal or custom condition")?
+        .define_enum("double_bit")?
+        .push("intermediate", "Transition between conditions")?
+        .push("determined_off", "Determined to be OFF")?
+        .push("determined_on", "Determined to be ON")?
+        .push("indeterminate", "Abnormal or custom condition")?
         .doc("Double-bit binary input value")?
         .build()?;
 
-    let (binary_point, binary_it) =
-        build_iterator("Binary", Type::Bool, lib, &flags_struct, &timestamp_struct)?;
+    let (binary_point, binary_it) = build_iterator(
+        "binary_input",
+        Primitive::Bool,
+        lib,
+        &flags_struct,
+        &timestamp_struct,
+    )?;
     let (double_bit_binary_point, double_bit_binary_it) = build_iterator(
-        "DoubleBitBinary",
-        Type::Enum(double_bit_enum),
+        "double_bit_binary_input",
+        double_bit_enum,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (binary_output_status_point, binary_output_status_it) = build_iterator(
-        "BinaryOutputStatus",
-        Type::Bool,
+        "binary_output_status",
+        Primitive::Bool,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (counter_point, counter_it) = build_iterator(
-        "Counter",
-        Type::Uint32,
+        "counter",
+        Primitive::U32,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (frozen_counter_point, frozen_counter_it) = build_iterator(
-        "FrozenCounter",
-        Type::Uint32,
+        "frozen_counter",
+        Primitive::U32,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (analog_point, analog_it) = build_iterator(
-        "Analog",
-        Type::Double,
+        "analog_input",
+        Primitive::Double,
         lib,
         &flags_struct,
         &timestamp_struct,
     )?;
     let (analog_output_status_point, analog_output_status_it) = build_iterator(
-        "AnalogOutputStatus",
-        Type::Double,
+        "analog_output_status",
+        Primitive::Double,
         lib,
         &flags_struct,
         &timestamp_struct,
@@ -220,7 +235,7 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
         runtime_class,
         decode_level,
         retry_strategy: define_retry_strategy(lib)?,
-        serial_port_settings: define_serial_params(lib)?,
+        serial_port_settings: define_serial_port_settings(lib)?,
         link_error_mode: define_link_error_mode(lib)?,
         min_tls_version: define_min_tls_version(lib)?,
         certificate_mode: define_certificate_mode(lib)?,
@@ -245,327 +260,298 @@ pub fn define(lib: &mut LibraryBuilder) -> Result<SharedDefinitions, BindingErro
     })
 }
 
-fn define_retry_strategy(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
-    let retry_strategy = lib.declare_native_struct("RetryStrategy")?;
-    lib.define_native_struct(&retry_strategy)?
+fn define_retry_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
+    let min_delay = Name::create("min_delay")?;
+    let max_delay = Name::create("max_delay")?;
+
+    let retry_strategy = lib.declare_function_argument_struct("retry_strategy")?;
+    let retry_strategy = lib
+        .define_function_argument_struct(retry_strategy)?
         .add(
-            "min_delay",
-            StructElementType::Duration(
-                DurationMapping::Milliseconds,
-                Some(std::time::Duration::from_secs(1)),
-            ),
+            &min_delay,
+            DurationType::Milliseconds,
             "Minimum delay between two retries",
         )?
         .add(
-            "max_delay",
-            StructElementType::Duration(
-                DurationMapping::Milliseconds,
-                Some(std::time::Duration::from_secs(10)),
-            ),
+            &max_delay,
+            DurationType::Milliseconds,
             "Maximum delay between two retries",
         )?
         .doc(doc("Retry strategy configuration.").details(
             "The strategy uses an exponential back-off with a minimum and maximum value.",
         ))?
-        .build()
+        .end_fields()?
+        .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
+        .default(&min_delay, Duration::from_secs(1))?
+        .default(&max_delay, Duration::from_secs(10))?
+        .end_initializer()?
+        .build()?;
+
+    Ok(retry_strategy)
 }
 
-fn define_link_error_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
-    lib
-        .define_native_enum("LinkErrorMode")?
-        .push("Discard", "Framing errors are discarded. The link-layer parser is reset on any error, and the parser begins scanning for 0x0564. This is always the behavior for serial ports.")?
-        .push("Close", "Framing errors are bubbled up to calling code, closing the session. Suitable for physical layers that provide error correction like TCP.")?
+fn define_link_error_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let mode = lib
+        .define_enum("link_error_mode")?
+        .push("discard", "Framing errors are discarded. The link-layer parser is reset on any error, and the parser begins scanning for 0x0564. This is always the behavior for serial ports.")?
+        .push("close", "Framing errors are bubbled up to calling code, closing the session. Suitable for physical layers that provide error correction like TCP.")?
         .doc("Controls how errors in parsed link-layer frames are handled. This behavior is configurable for physical layers with built-in error correction like TCP as the connection might be through a terminal server.")?
-        .build()
+        .build()?;
+
+    Ok(mode)
 }
 
-fn define_min_tls_version(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
-    lib.define_native_enum("MinTlsVersion")?
-        .push("V1_2", "TLS 1.2")?
-        .push("V1_3", "TLS 1.3")?
+fn define_serial_port_settings(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
+    let data_bits_enum = lib
+        .define_enum("data_bits")?
+        .push("five", "5 bits per character")?
+        .push("six", "6 bits per character")?
+        .push("seven", "7 bits per character")?
+        .push("eight", "8 bits per character")?
+        .doc("Number of bits per character")?
+        .build()?;
+
+    let flow_control_enum = lib
+        .define_enum("flow_control")?
+        .push("none", "No flow control")?
+        .push("software", "Flow control using XON/XOFF bytes")?
+        .push("hardware", "Flow control using RTS/CTS signals")?
+        .doc("Flow control modes")?
+        .build()?;
+
+    let parity_enum = lib
+        .define_enum("parity")?
+        .push("none", "No parity bit")?
+        .push("odd", "Parity bit sets odd number of 1 bits")?
+        .push("even", "Parity bit sets even number of 1 bits")?
+        .doc("Parity checking modes")?
+        .build()?;
+
+    let stop_bits_enum = lib
+        .define_enum("stop_bits")?
+        .push("one", "One stop bit")?
+        .push("two", "Two stop bits")?
+        .doc("Number of stop bits")?
+        .build()?;
+
+    let baud_rate = Name::create("baud_rate")?;
+    let data_bits = Name::create("data_bits")?;
+    let flow_control = Name::create("flow_control")?;
+    let parity = Name::create("parity")?;
+    let stop_bits = Name::create("stop_bits")?;
+
+    let serial_settings = lib.declare_function_argument_struct("serial_port_settings")?;
+    let serial_settings = lib
+        .define_function_argument_struct(serial_settings)?
+        .add(
+            &baud_rate,
+            Primitive::U32,
+            "Baud rate (in symbols-per-second)",
+        )?
+        .add(
+            &data_bits,
+            data_bits_enum,
+            "Number of bits used to represent a character sent on the line",
+        )?
+        .add(
+            &flow_control,
+            flow_control_enum,
+            "Type of signalling to use for controlling data transfer",
+        )?
+        .add(
+            &parity,
+            parity_enum,
+            "Type of parity to use for error checking",
+        )?
+        .add(
+            &stop_bits,
+            stop_bits_enum,
+            "Number of bits to use to signal the end of a character",
+        )?
+        .doc("Serial port settings")?
+        .end_fields()?
+        .begin_initializer(
+            "init",
+            InitializerType::Normal,
+            "Initialize to default values",
+        )?
+        .default(&baud_rate, NumberValue::U32(9600))?
+        .default_variant(&data_bits, "eight")?
+        .default_variant(&flow_control, "none")?
+        .default_variant(&parity, "none")?
+        .default_variant(&stop_bits, "one")?
+        .end_initializer()?
+        .build()?;
+
+    Ok(serial_settings)
+}
+
+fn define_min_tls_version(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let handle = lib
+        .define_enum("min_tls_version")?
+        .push("v12", "Allow TLS 1.2 and 1.3")?
+        .push("v13", "Only allow TLS 1.3")?
         .doc("Minimum TLS version to allow")?
-        .build()
+        .build()?;
+
+    Ok(handle)
 }
 
-fn define_certificate_mode(lib: &mut LibraryBuilder) -> Result<NativeEnumHandle, BindingError> {
-    lib.define_native_enum("CertificateMode")?
-        .push("AuthorityBased",
+fn define_certificate_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let handle = lib.define_enum("certificate_mode")?
+        .push("authority_based",
               doc("Validates the peer certificate against one or more configured trust anchors")
                   .details("This mode uses the default certificate verifier in `rustls` to ensure that the chain of certificates presented by the peer is valid against one of the configured trust anchors.")
                   .details("The name verification is relaxed to allow for certificates that do not contain the SAN extension. In these cases the name is verified using the Common Name instead.")
         )?
         .push(
-            "SelfSigned",
+            "self_signed",
             doc("Validates that the peer presents a single certificate which is a byte-for-byte match against the configured peer certificate")
                 .details("The certificate is parsed only to ensure that the `NotBefore` and `NotAfter` are valid for the current system time.")
         )?
         .doc(
             doc("Determines how the certificate(s) presented by the peer are validated")
                 .details("This validation always occurs **after** the handshake signature has been verified."))?
-        .build()
+        .build()?;
+
+    Ok(handle)
 }
 
-fn define_serial_params(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
-    let data_bits = lib
-        .define_native_enum("DataBits")?
-        .push("Five", "5 bits per character")?
-        .push("Six", "6 bits per character")?
-        .push("Seven", "7 bits per character")?
-        .push("Eight", "8 bits per character")?
-        .doc("Number of bits per character")?
-        .build()?;
-
-    let flow_control = lib
-        .define_native_enum("FlowControl")?
-        .push("None", "No flow control")?
-        .push("Software", "Flow control using XON/XOFF bytes")?
-        .push("Hardware", "Flow control using RTS/CTS signals")?
-        .doc("Flow control modes")?
-        .build()?;
-
-    let parity = lib
-        .define_native_enum("Parity")?
-        .push("None", "No parity bit")?
-        .push("Odd", "Parity bit sets odd number of 1 bits")?
-        .push("Even", "Parity bit sets even number of 1 bits")?
-        .doc("Parity checking modes")?
-        .build()?;
-
-    let stop_bits = lib
-        .define_native_enum("StopBits")?
-        .push("One", "One stop bit")?
-        .push("Two", "Two stop bits")?
-        .doc("Number of stop bits")?
-        .build()?;
-
-    let serial_params = lib.declare_native_struct("SerialPortSettings")?;
-    lib.define_native_struct(&serial_params)?
-        .add(
-            "baud_rate",
-            StructElementType::Uint32(Some(9600)),
-            "Baud rate (in symbols-per-second)",
-        )?
-        .add(
-            "data_bits",
-            StructElementType::Enum(data_bits, Some("Eight".to_string())),
-            "Number of bits used to represent a character sent on the line",
-        )?
-        .add(
-            "flow_control",
-            StructElementType::Enum(flow_control, Some("None".to_string())),
-            "Type of signalling to use for controlling data transfer",
-        )?
-        .add(
-            "parity",
-            StructElementType::Enum(parity, Some("None".to_string())),
-            "Type of parity to use for error checking",
-        )?
-        .add(
-            "stop_bits",
-            StructElementType::Enum(stop_bits, Some("One".to_string())),
-            "Number of bits to use to signal the end of a character",
-        )?
-        .doc("Serial port settings")?
-        .build()
-}
-
-fn declare_flags_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
-    let flags_struct = lib.declare_native_struct("Flags")?;
+fn declare_flags_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+    let flags_struct = lib.declare_universal_struct("flags")?;
     let flags_struct = lib
-        .define_native_struct(&flags_struct)?
+        .define_universal_struct(flags_struct)?
         .add(
             "value",
-            Type::Uint8,
+            Primitive::U8,
             "bit-mask representing a set of individual flag bits",
         )?
         .doc("Collection of individual flag bits represented by an underlying mask value")?
+        .end_fields()?
+        .add_full_initializer("init")?
         .build()?;
 
     Ok(flags_struct)
 }
 
-fn define_port_state_listener(lib: &mut LibraryBuilder) -> Result<InterfaceHandle, BindingError> {
+fn define_port_state_listener(lib: &mut LibraryBuilder) -> BackTraced<AsynchronousInterface> {
     let port_state = lib
-        .define_native_enum("PortState")?
-        .push("Disabled", "Disabled until enabled")?
-        .push("Wait", "Waiting to perform an open retry")?
-        .push("Open", "Port is open")?
-        .push("Shutdown", "Task has been shut down")?
+        .define_enum("port_state")?
+        .push("disabled", "Disabled until enabled")?
+        .push("wait", "Waiting to perform an open retry")?
+        .push("open", "Port is open")?
+        .push("shutdown", "Task has been shut down")?
         .doc("State of the serial port")?
         .build()?;
 
     let port_state_listener = lib
         .define_interface(
-            "PortStateListener",
+            "port_state_listener",
             "Callback interface for receiving updates about the state of a serial port",
         )?
-        .callback("on_change", "Invoked when the serial port changes state")?
-        .param("state", Type::Enum(port_state), "New state of the port")?
-        .return_type(ReturnType::Void)?
-        .build()?
-        .destroy_callback("on_destroy")?
-        .build()?;
+        .begin_callback("on_change", "Invoked when the serial port changes state")?
+        .param("state", port_state, "New state of the port")?
+        .end_callback()?
+        .build_async()?;
 
     Ok(port_state_listener)
 }
 
-fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> Result<NativeStructHandle, BindingError> {
+fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
     let time_quality_enum = lib
-        .define_native_enum("TimeQuality")?
+        .define_enum("time_quality")?
         .push(
-            "Synchronized",
+            "synchronized_time",
             "The timestamp is UTC synchronized at the remote device",
         )?
         .push(
-            "NotSynchronized",
+            "unsynchronized_time",
             "The device indicates the timestamp may be not be synchronized",
         )?
         .push(
-            "Invalid",
+            "invalid_time",
             "Timestamp is not valid, ignore the value and use a local timestamp",
         )?
         .doc("Timestamp quality")?
         .build()?;
 
-    let timestamp_struct = lib.declare_native_struct("Timestamp")?;
+    let value = Name::create("value")?;
+    let quality = Name::create("quality")?;
+
+    let timestamp_struct = lib.declare_universal_struct("timestamp")?;
     let timestamp_struct = lib
-        .define_native_struct(&timestamp_struct)?
-        .add("value", Type::Uint64, "Timestamp value")?
-        .add(
-            "quality",
-            Type::Enum(time_quality_enum),
-            "Timestamp quality",
-        )?
+        .define_universal_struct(timestamp_struct)?
+        .add(&value, Primitive::U64, "Timestamp value")?
+        .add(&quality, time_quality_enum, "Timestamp quality")?
         .doc("Timestamp value")?
-        .build()?;
-
-    let timestamp_invalid_fn = lib
-        .declare_native_function("timestamp_invalid")?
-        .return_type(ReturnType::new(
-            Type::Struct(timestamp_struct.clone()),
-            "Invalid timestamp",
-        ))?
-        .doc("Creates an invalid timestamp struct")?
-        .build()?;
-
-    let timestamp_synchronized_fn = lib
-        .declare_native_function("timestamp_synchronized")?
-        .param(
-            "value",
-            Type::Uint64,
-            "Timestamp value in milliseconds since EPOCH",
+        .end_fields()?
+        .begin_initializer(
+            "invalid_timestamp",
+            InitializerType::Static,
+            "Creates an invalid timestamp struct",
         )?
-        .return_type(ReturnType::new(
-            Type::Struct(timestamp_struct.clone()),
-            "Synchronized timestamp",
-        ))?
-        .doc("Creates a synchronized timestamp struct")?
-        .build()?;
-
-    let timestamp_not_synchronized_fn = lib
-        .declare_native_function("timestamp_not_synchronized")?
-        .param(
-            "value",
-            Type::Uint64,
-            "Timestamp value in milliseconds since EPOCH",
+        .default(&value, NumberValue::U64(0))?
+        .default_variant(&quality, "invalid_time")?
+        .end_initializer()?
+        .begin_initializer(
+            "synchronized_timestamp",
+            InitializerType::Static,
+            "Creates a synchronized timestamp struct",
         )?
-        .return_type(ReturnType::new(
-            Type::Struct(timestamp_struct.clone()),
-            "Not synchronized timestamp",
-        ))?
-        .doc("Creates a not synchronized timestamp struct")?
+        .default_variant(&quality, "synchronized_time")?
+        .end_initializer()?
+        .begin_initializer(
+            "unsynchronized_timestamp",
+            InitializerType::Static,
+            "Creates an unsynchronized timestamp struct",
+        )?
+        .default_variant(&quality, "unsynchronized_time")?
+        .end_initializer()?
         .build()?;
-
-    lib.define_struct(&timestamp_struct)?
-        .static_method("invalid_timestamp", &timestamp_invalid_fn)?
-        .static_method("synchronized_timestamp", &timestamp_synchronized_fn)?
-        .static_method("not_synchronized_timestamp", &timestamp_not_synchronized_fn)?
-        .build();
 
     Ok(timestamp_struct)
 }
 
-fn build_iterator(
+fn build_iterator<T: Into<UniversalStructField>>(
     name: &str,
-    value_type: Type,
+    value_type: T,
     lib: &mut LibraryBuilder,
-    flags_struct: &NativeStructHandle,
-    timestamp_struct: &NativeStructHandle,
-) -> Result<(NativeStructHandle, IteratorHandle), BindingError> {
-    let value_struct = lib.declare_native_struct(name)?;
+    flags_struct: &UniversalStructHandle,
+    timestamp_struct: &UniversalStructHandle,
+) -> Result<(UniversalStructHandle, AbstractIteratorHandle), BindingError> {
+    let value_struct_decl = lib.declare_universal_struct(name)?;
     let value_struct = lib
-        .define_native_struct(&value_struct)?
-        .add("index", Type::Uint16, "Point index")?
+        .define_universal_struct(value_struct_decl)?
+        .add("index", Primitive::U16, "Point index")?
         .add("value", value_type, "Point value")?
-        .add("flags", Type::Struct(flags_struct.clone()), "Point flags")?
-        .add(
-            "time",
-            Type::Struct(timestamp_struct.clone()),
-            "Point timestamp",
-        )?
+        .add("flags", flags_struct.clone(), "Point flags")?
+        .add("time", timestamp_struct.clone(), "Point timestamp")?
         .doc(format!("{} point", name))?
+        .end_fields()?
+        .add_full_initializer("init")?
         .build()?;
 
-    let value_iterator = lib.declare_class(&format!("{}Iterator", name))?;
-    let iterator_next_fn = lib
-        .declare_native_function(&format!("{}_next", name.to_lowercase()))?
-        .param("it", Type::ClassRef(value_iterator), "Iterator")?
-        .return_type(ReturnType::new(
-            Type::StructRef(value_struct.declaration()),
-            "Next value of the iterator or {null} if the iterator reached the end",
-        ))?
-        .doc("Get the next value of the iterator")?
-        .build()?;
-
-    let value_iterator = lib.define_iterator(&iterator_next_fn, &value_struct)?;
+    let value_iterator = lib.define_iterator(format!("{}_iterator", name), value_struct.clone())?;
 
     Ok((value_struct, value_iterator))
 }
 
 fn build_octet_string(
     lib: &mut LibraryBuilder,
-) -> Result<(NativeStructHandle, IteratorHandle), BindingError> {
-    // Octet string stuff
-    let byte_struct = lib.declare_native_struct("Byte")?;
-    let byte_struct = lib
-        .define_native_struct(&byte_struct)?
-        .add("value", Type::Uint8, "Byte value")?
-        .doc("Single byte struct")?
-        .build()?;
+) -> Result<(FunctionReturnStructHandle, AbstractIteratorHandle), BindingError> {
+    let byte_it = lib.define_iterator_with_lifetime("byte_iterator", Primitive::U8)?;
 
-    let byte_it = lib.declare_class("ByteIterator")?;
-    let byte_it_next_fn = lib
-        .declare_native_function("byte_next")?
-        .param("it", Type::ClassRef(byte_it), "Iterator")?
-        .return_type(ReturnType::new(
-            Type::StructRef(byte_struct.declaration()),
-            "Next value of the iterator or {null} if the iterator reached the end",
-        ))?
-        .doc("Get the next value of the iterator")?
-        .build()?;
-    let byte_it = lib.define_iterator_with_lifetime(&byte_it_next_fn, &byte_struct)?;
-
-    let octet_string_struct = lib.declare_native_struct("OctetString")?;
+    let octet_string_struct_decl = lib.declare_function_return_struct("octet_string")?;
     let octet_string_struct = lib
-        .define_native_struct(&octet_string_struct)?
-        .add("index", Type::Uint16, "Point index")?
-        .add("value", Type::Iterator(byte_it), "Point value")?
+        .define_function_return_struct(octet_string_struct_decl)?
+        .add("index", Primitive::U16, "Point index")?
+        .add("value", byte_it, "Point value")?
         .doc("Octet String point")?
-        .build()?;
-
-    let octet_string_iterator = lib.declare_class("OctetStringIterator")?;
-    let iterator_next_fn = lib
-        .declare_native_function("octetstring_next")?
-        .param("it", Type::ClassRef(octet_string_iterator), "Iterator")?
-        .return_type(ReturnType::new(
-            Type::StructRef(octet_string_struct.declaration()),
-            "Next value of the iterator or {null} if the iterator reached the end",
-        ))?
-        .doc("Get the next value of the iterator")?
+        .end_fields()?
         .build()?;
 
     let octet_string_iterator =
-        lib.define_iterator_with_lifetime(&iterator_next_fn, &octet_string_struct)?;
+        lib.define_iterator_with_lifetime("octet_string_iterator", octet_string_struct.clone())?;
 
     Ok((octet_string_struct, octet_string_iterator))
 }

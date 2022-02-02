@@ -2,6 +2,7 @@ pub use app_enums::*;
 pub use bytes::*;
 pub use header::*;
 pub use listener::*;
+pub use maybe_async::MaybeAsync;
 pub use parse_error::*;
 pub use retry::*;
 pub use sequence::*;
@@ -39,6 +40,7 @@ mod control_enums;
 mod extensions;
 mod header;
 mod listener;
+mod maybe_async;
 /// measurement types, e.g. Binary, Analog, Counter, etc
 pub mod measurement;
 /// application layer parser

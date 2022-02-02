@@ -32,14 +32,14 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/outstation_tcp_server.rs:outstation_config}}
+{{#include ../dnp3/examples/outstation.rs:outstation_config}}
 ```
 
 </TabItem>
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/outstation_example.c:outstation_config}}
+{{#include ../ffi/bindings/c/outstation_example.c:create_outstation_config}}
 ```
 
 </TabItem>
@@ -88,7 +88,7 @@ values={[
 
 ```rust
 // Rust example only uses analogs so that's all we need to configure
-{{#include ../dnp3/examples/outstation_tcp_server.rs:event_buffer_config}}
+{{#include ../dnp3/examples/outstation.rs:event_buffer_config}}
 ```
 
 </TabItem>

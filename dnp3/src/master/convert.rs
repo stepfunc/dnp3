@@ -1,12 +1,10 @@
-use crate::app::measurement::{
-    Binary, BinaryOutputStatus, DoubleBit, DoubleBitBinary, Flags, Time,
-};
+use crate::app::measurement::*;
 use crate::app::variations::{Group2Var3, Group4Var3};
 
 impl Group2Var3 {
-    pub(crate) fn to_measurement(self, cto: Option<Time>) -> Binary {
+    pub(crate) fn to_measurement(self, cto: Option<Time>) -> BinaryInput {
         let flags = Flags::new(self.flags);
-        Binary {
+        BinaryInput {
             value: flags.state(),
             flags,
             time: cto.and_then(|x| x.checked_add(self.time)),
@@ -15,9 +13,9 @@ impl Group2Var3 {
 }
 
 impl Group4Var3 {
-    pub(crate) fn to_measurement(self, cto: Option<Time>) -> DoubleBitBinary {
+    pub(crate) fn to_measurement(self, cto: Option<Time>) -> DoubleBitBinaryInput {
         let flags = Flags::new(self.flags);
-        DoubleBitBinary {
+        DoubleBitBinaryInput {
             value: flags.double_bit_state(),
             flags,
             time: cto.and_then(|x| x.checked_add(self.time)),
@@ -25,7 +23,7 @@ impl Group4Var3 {
     }
 }
 
-impl From<bool> for Binary {
+impl From<bool> for BinaryInput {
     fn from(x: bool) -> Self {
         Self {
             value: x,
@@ -45,7 +43,7 @@ impl From<bool> for BinaryOutputStatus {
     }
 }
 
-impl From<DoubleBit> for DoubleBitBinary {
+impl From<DoubleBit> for DoubleBitBinaryInput {
     fn from(x: DoubleBit) -> Self {
         Self {
             value: x,

@@ -20,10 +20,18 @@ class ConsoleLogger implements Logger {
 }
 // ANCHOR_END: logging_interface
 
-class TestListener implements ClientStateListener {
+class TestClientStateListener implements ClientStateListener {
 
   @Override
   public void onChange(ClientState state) {
+    System.out.println(state);
+  }
+}
+
+class TestPortStateListener implements PortStateListener {
+
+  @Override
+  public void onChange(PortState state) {
     System.out.println(state);
   }
 }
@@ -32,8 +40,7 @@ class TestReadHandler implements ReadHandler {
 
   @Override
   public void beginFragment(ReadType readType, ResponseHeader header) {
-    System.out.println(
-        "Beginning fragment (broadcast: " + header.iin.iin1.isSet(Iin1Flag.BROADCAST) + ")");
+    System.out.println("Beginning fragment (broadcast: " + header.iin.iin1.broadcast + ")");
   }
 
   @Override
@@ -42,7 +49,7 @@ class TestReadHandler implements ReadHandler {
   }
 
   @Override
-  public void handleBinary(HeaderInfo info, List<Binary> it) {
+  public void handleBinaryInput(HeaderInfo info, List<BinaryInput> it) {
     System.out.println("Binaries:");
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
@@ -65,7 +72,7 @@ class TestReadHandler implements ReadHandler {
   }
 
   @Override
-  public void handleDoubleBitBinary(HeaderInfo info, List<DoubleBitBinary> it) {
+  public void handleDoubleBitBinaryInput(HeaderInfo info, List<DoubleBitBinaryInput> it) {
     System.out.println("Double Bit Binaries:");
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
@@ -157,7 +164,7 @@ class TestReadHandler implements ReadHandler {
   }
 
   @Override
-  public void handleAnalog(HeaderInfo info, List<Analog> it) {
+  public void handleAnalogInput(HeaderInfo info, List<AnalogInput> it) {
     System.out.println("Analogs:");
     System.out.println("Qualifier: " + info.qualifier);
     System.out.println("Variation: " + info.variation);
@@ -212,7 +219,7 @@ class TestReadHandler implements ReadHandler {
         val -> {
           System.out.print("Octet String " + val.index + ": Value=");
           val.value.forEach(
-              b -> System.out.print(String.format("%02X", b.value.byteValue()) + " "));
+              b -> System.out.print(String.format("%02X", b.byteValue()) + " "));
           System.out.println();
         });
   }
@@ -221,8 +228,8 @@ class TestReadHandler implements ReadHandler {
 // ANCHOR: association_handler
 class TestAssociationHandler implements AssociationHandler {
   @Override
-  public TimestampUtc getCurrentTime() {
-    return TimestampUtc.valid(ulong(System.currentTimeMillis()));
+  public UtcTimestamp getCurrentTime() {
+    return UtcTimestamp.valid(ulong(System.currentTimeMillis()));
   }
 }
 // ANCHOR_END: association_handler
@@ -256,14 +263,104 @@ public class MasterExample {
   // ANCHOR_END: association_config
 
   // ANCHOR: runtime_config
-  public static RuntimeConfig getRuntimeConfig() {
+  private static RuntimeConfig getRuntimeConfig() {
     RuntimeConfig config = new RuntimeConfig();
     config.numCoreThreads = ushort(4);
     return config;
   }
   // ANCHOR_END: runtime_config
 
-  public static void main(String[] args) throws Exception {
+  private static TlsClientConfig getTlsSelfSignedConfig() {
+    // ANCHOR: tls_self_signed_config
+    TlsClientConfig config =
+            new TlsClientConfig(
+                    "test.com",
+                    "./certs/self_signed/entity2_cert.pem",
+                    "./certs/self_signed/entity1_cert.pem",
+                    "./certs/self_signed/entity1_key.pem",
+                    "" // no password
+            );
+    config.certificateMode = CertificateMode.SELF_SIGNED;
+    // ANCHOR_END: tls_self_signed_config
+    return config;
+  }
+
+  private static TlsClientConfig getTlsCAConfig() {
+    // ANCHOR: tls_ca_chain_config
+    TlsClientConfig config =
+            new TlsClientConfig(
+                    "test.com",
+                    "./certs/ca_chain/ca_cert.pem",
+                    "./certs/ca_chain/entity1_cert.pem",
+                    "./certs/ca_chain/entity1_key.pem",
+                    "" // no password
+            );
+    // ANCHOR_END: tls_ca_chain_config
+    return config;
+  }
+
+  private static void runTcp(Runtime runtime) throws Exception {
+    // ANCHOR: create_tcp_channel
+    MasterChannel channel =
+            MasterChannel.createTcpChannel(
+                    runtime,
+                    LinkErrorMode.CLOSE,
+                    getMasterChannelConfig(),
+                    new EndpointList("127.0.0.1:20000"),
+                    new ConnectStrategy(),
+                    new TestClientStateListener());
+    // ANCHOR_END: create_tcp_channel
+
+    try {
+      runChannel(channel);
+    }
+    finally {
+      channel.shutdown();
+    }
+  }
+
+  private static void runTls(Runtime runtime, TlsClientConfig config) throws Exception {
+    // ANCHOR: create_tls_channel
+    MasterChannel channel =
+            MasterChannel.createTlsChannel(
+                    runtime,
+                    LinkErrorMode.CLOSE,
+                    getMasterChannelConfig(),
+                    new EndpointList("127.0.0.1:20000"),
+                    config,
+                    new ConnectStrategy(),
+                    new TestClientStateListener());
+    // ANCHOR_END: create_tls_channel
+
+    try {
+      runChannel(channel);
+    }
+    finally {
+      channel.shutdown();
+    }
+  }
+
+  private static void runSerial(Runtime runtime) throws Exception {
+    // ANCHOR: create_serial_channel
+    MasterChannel channel =
+            MasterChannel.createSerialChannel(
+                    runtime,
+                    getMasterChannelConfig(),
+                    "/dev/pts/4", // replace with a real port
+                    new SerialPortSettings(),
+                    Duration.ofSeconds(5),
+                    new TestPortStateListener());
+    // ANCHOR_END: create_serial_channel
+
+    try {
+      runChannel(channel);
+    }
+    finally {
+      channel.shutdown();
+    }
+  }
+
+  public static int main(String[] args) throws Exception {
     // Initialize logging with the default configuration
     // This may only be called once during program initialization
     // ANCHOR: logging_init
@@ -274,19 +371,8 @@ public class MasterExample {
     Runtime runtime = new Runtime(getRuntimeConfig());
     // ANCHOR_END: runtime
 
-    // ANCHOR: create_master_channel
-    MasterChannel channel =
-        MasterChannel.createTcpChannel(
-            runtime,
-            LinkErrorMode.CLOSE,
-            getMasterChannelConfig(),
-            new EndpointList("127.0.0.1:20000"),
-            new ConnectStrategy(),
-            new TestListener());
-    // ANCHOR_END: create_master_channel
-
     try {
-      run(channel);
+      return run(runtime, args);
     } finally {
       // ANCHOR: runtime_shutdown
       runtime.shutdown();
@@ -294,7 +380,34 @@ public class MasterExample {
     }
   }
 
-  private static void run(MasterChannel channel) throws Exception {
+  private static int run(Runtime runtime, String[] args) throws Exception {
+    if(args.length != 2) {
+      System.err.println("You must specify a transport");
+      System.err.println("Usage: master-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
+      return -1;
+    }
+
+    final String type = args[1];
+    switch(type) {
+      case "tcp":
+        runTcp(runtime);
+        return 0;
+      case "serial":
+        runSerial(runtime);
+        return 0;
+      case "tls-ca":
+        runTls(runtime, getTlsCAConfig());
+        return 0;
+      case "tls-self-signed":
+        runTls(runtime, getTlsSelfSignedConfig());
+        return 0;
+      default:
+        System.err.printf("Unknown transport: %s%n", type);
+        return -1;
+    }
+  }
+
+  private static void runChannel(MasterChannel channel) throws Exception {
 
     // Create the association
     // ANCHOR: association_create
@@ -319,106 +432,101 @@ public class MasterExample {
     // Handle user input
     BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
     while (true) {
-      String line = reader.readLine();
-      switch (line) {
-        case "x":
-          return;
-        case "enable":
-          channel.enable();
-          break;
-        case "disable":
-          channel.disable();
-          break;
-        case "dln":
-          channel.setDecodeLevel(new DecodeLevel());
-          break;
-        case "dlv":
-          DecodeLevel level = new DecodeLevel();
-          level.application = AppDecodeLevel.OBJECT_VALUES;
-          channel.setDecodeLevel(level);
-          break;
-        case "rao":
+      try {
+        switch (reader.readLine()) {
+          case "x":
+            return;
+          case "enable":
+            channel.enable();
+            break;
+          case "disable":
+            channel.disable();
+            break;
+          case "dln":
+            channel.setDecodeLevel(new DecodeLevel());
+            break;
+          case "dlv":
+            DecodeLevel level = new DecodeLevel();
+            level.application = AppDecodeLevel.OBJECT_VALUES;
+            channel.setDecodeLevel(level);
+            break;
+          case "rao":
           {
             Request request = new Request();
             request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-            ReadResult result = channel.read(association, request).toCompletableFuture().get();
-            System.out.println("Result: " + result);
+            channel.read(association, request).toCompletableFuture().get();
+            System.out.println("read success!");
             break;
           }
-        case "rmo":
+          case "rmo":
           {
             Request request = new Request();
             request.addAllObjectsHeader(Variation.GROUP10_VAR0);
             request.addAllObjectsHeader(Variation.GROUP40_VAR0);
-            ReadResult result = channel.read(association, request).toCompletableFuture().get();
-            System.out.println("Result: " + result);
+            channel.read(association, request).toCompletableFuture().get();
+            System.out.println("read success!");
             break;
           }
-        case "cmd":
+          case "cmd":
           {
             // ANCHOR: assoc_control
-            Commands commands = new Commands();
-            G12v1 g12v1 =
-                new G12v1(
-                    new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
-                    ubyte(1),
-                    uint(1000),
-                    uint(1000));
-            commands.addG12v1u16(ushort(3), g12v1);
+            CommandSet commands = new CommandSet();
+            Group12Var1 control =
+                    new Group12Var1(
+                            new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
+                            ubyte(1),
+                            uint(1000),
+                            uint(1000));
+            commands.addG12V1U16(ushort(3), control);
 
-            CommandResult result =
-                channel
+            channel
                     .operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
                     .toCompletableFuture()
                     .get();
 
-            System.out.println("Result: " + result);
             // ANCHOR_END: assoc_control
             break;
           }
-        case "evt":
-          channel.demandPoll(poll);
-          break;
+          case "evt":
+            channel.demandPoll(poll);
+            break;
 
-        case "lts":
+          case "lts":
           {
-            TimeSyncResult result =
-                channel.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
-            System.out.println("Result: " + result);
+            channel.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
+            System.out.println("Time sync success!");
             break;
           }
-        case "nts":
+          case "nts":
           {
-            TimeSyncResult result =
-                channel
-                    .synchronizeTime(association, TimeSyncMode.NON_LAN)
-                    .toCompletableFuture()
-                    .get();
-            System.out.println("Result: " + result);
+            channel.synchronizeTime(association, TimeSyncMode.NON_LAN).toCompletableFuture().get();
+            System.out.println("Time sync success!");
             break;
           }
-        case "crt":
+          case "crt":
           {
-            RestartResult result = channel.coldRestart(association).toCompletableFuture().get();
-            System.out.println("Result: " + result);
+            Duration delay = channel.coldRestart(association).toCompletableFuture().get();
+            System.out.println("Restart delay: " + delay);
             break;
           }
-        case "wrt":
+          case "wrt":
           {
-            RestartResult result = channel.warmRestart(association).toCompletableFuture().get();
-            System.out.println("Result: " + result);
+            Duration delay = channel.warmRestart(association).toCompletableFuture().get();
+            System.out.println("Restart delay: " + delay);
             break;
           }
-        case "lsr":
+          case "lsr":
           {
-            LinkStatusResult result =
-                channel.checkLinkStatus(association).toCompletableFuture().get();
-            System.out.println("Result: " + result);
+            channel.checkLinkStatus(association).toCompletableFuture().get();
+            System.out.println("Link status success!");
             break;
           }
-        default:
-          System.out.println("Unknown command");
-          break;
+          default:
+            System.out.println("Unknown command");
+            break;
+        }
+      } catch (ParamException ex) {
+        System.out.println("Error: " + ex);
       }
     }
   }

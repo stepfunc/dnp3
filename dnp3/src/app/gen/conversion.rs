@@ -13,10 +13,10 @@
 use crate::app::measurement::*;
 use crate::app::variations::*;
 
-impl From<Group2Var2> for Binary {
+impl From<Group2Var2> for BinaryInput {
     fn from(v: Group2Var2) -> Self {
         let flags = Flags::new(v.flags);
-        Binary {
+        BinaryInput {
             value : flags.state(),
             flags,
             time : Some(Time::Synchronized(v.time)),
@@ -24,7 +24,7 @@ impl From<Group2Var2> for Binary {
     }
 }
 
-impl ToVariation<Group2Var2> for Binary {
+impl ToVariation<Group2Var2> for BinaryInput {
     fn to_variation(&self) -> Group2Var2 {
         Group2Var2 {
             flags: self.get_wire_flags(),
@@ -33,10 +33,10 @@ impl ToVariation<Group2Var2> for Binary {
     }
 }
 
-impl From<Group2Var1> for Binary {
+impl From<Group2Var1> for BinaryInput {
     fn from(v: Group2Var1) -> Self {
         let flags = Flags::new(v.flags);
-        Binary {
+        BinaryInput {
             value : flags.state(),
             flags,
             time : None,
@@ -44,7 +44,7 @@ impl From<Group2Var1> for Binary {
     }
 }
 
-impl ToVariation<Group2Var1> for Binary {
+impl ToVariation<Group2Var1> for BinaryInput {
     fn to_variation(&self) -> Group2Var1 {
         Group2Var1 {
             flags: self.get_wire_flags(),
@@ -52,10 +52,10 @@ impl ToVariation<Group2Var1> for Binary {
     }
 }
 
-impl From<Group1Var2> for Binary {
+impl From<Group1Var2> for BinaryInput {
     fn from(v: Group1Var2) -> Self {
         let flags = Flags::new(v.flags);
-        Binary {
+        BinaryInput {
             value : flags.state(),
             flags,
             time : None,
@@ -63,7 +63,7 @@ impl From<Group1Var2> for Binary {
     }
 }
 
-impl ToVariation<Group1Var2> for Binary {
+impl ToVariation<Group1Var2> for BinaryInput {
     fn to_variation(&self) -> Group1Var2 {
         Group1Var2 {
             flags: self.get_wire_flags(),
@@ -131,10 +131,10 @@ impl ToVariation<Group10Var2> for BinaryOutputStatus {
 }
 
 
-impl From<Group4Var2> for DoubleBitBinary {
+impl From<Group4Var2> for DoubleBitBinaryInput {
     fn from(v: Group4Var2) -> Self {
         let flags = Flags::new(v.flags);
-        DoubleBitBinary {
+        DoubleBitBinaryInput {
             value : flags.double_bit_state(),
             flags,
             time : Some(Time::Synchronized(v.time)),
@@ -142,7 +142,7 @@ impl From<Group4Var2> for DoubleBitBinary {
     }
 }
 
-impl ToVariation<Group4Var2> for DoubleBitBinary {
+impl ToVariation<Group4Var2> for DoubleBitBinaryInput {
     fn to_variation(&self) -> Group4Var2 {
         Group4Var2 {
             flags: self.get_wire_flags(),
@@ -151,10 +151,10 @@ impl ToVariation<Group4Var2> for DoubleBitBinary {
     }
 }
 
-impl From<Group4Var1> for DoubleBitBinary {
+impl From<Group4Var1> for DoubleBitBinaryInput {
     fn from(v: Group4Var1) -> Self {
         let flags = Flags::new(v.flags);
-        DoubleBitBinary {
+        DoubleBitBinaryInput {
             value : flags.double_bit_state(),
             flags,
             time : None,
@@ -162,7 +162,7 @@ impl From<Group4Var1> for DoubleBitBinary {
     }
 }
 
-impl ToVariation<Group4Var1> for DoubleBitBinary {
+impl ToVariation<Group4Var1> for DoubleBitBinaryInput {
     fn to_variation(&self) -> Group4Var1 {
         Group4Var1 {
             flags: self.get_wire_flags(),
@@ -170,10 +170,10 @@ impl ToVariation<Group4Var1> for DoubleBitBinary {
     }
 }
 
-impl From<Group3Var2> for DoubleBitBinary {
+impl From<Group3Var2> for DoubleBitBinaryInput {
     fn from(v: Group3Var2) -> Self {
         let flags = Flags::new(v.flags);
-        DoubleBitBinary {
+        DoubleBitBinaryInput {
             value : flags.double_bit_state(),
             flags,
             time : None,
@@ -181,7 +181,7 @@ impl From<Group3Var2> for DoubleBitBinary {
     }
 }
 
-impl ToVariation<Group3Var2> for DoubleBitBinary {
+impl ToVariation<Group3Var2> for DoubleBitBinaryInput {
     fn to_variation(&self) -> Group3Var2 {
         Group3Var2 {
             flags: self.get_wire_flags(),
@@ -536,9 +536,9 @@ impl ToVariation<Group21Var1> for FrozenCounter {
 }
 
 
-impl From<Group32Var8> for Analog {
+impl From<Group32Var8> for AnalogInput {
     fn from(v: Group32Var8) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value,
             flags: Flags::new(v.flags),
             time : Some(Time::Synchronized(v.time)),
@@ -546,7 +546,7 @@ impl From<Group32Var8> for Analog {
     }
 }
 
-impl ToVariation<Group32Var8> for Analog {
+impl ToVariation<Group32Var8> for AnalogInput {
     fn to_variation(&self) -> Group32Var8 {
         Group32Var8 {
             flags: self.flags.value,
@@ -556,9 +556,9 @@ impl ToVariation<Group32Var8> for Analog {
     }
 }
 
-impl From<Group32Var7> for Analog {
+impl From<Group32Var7> for AnalogInput {
     fn from(v: Group32Var7) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value as f64,
             flags: Flags::new(v.flags),
             time : Some(Time::Synchronized(v.time)),
@@ -566,7 +566,7 @@ impl From<Group32Var7> for Analog {
     }
 }
 
-impl ToVariation<Group32Var7> for Analog {
+impl ToVariation<Group32Var7> for AnalogInput {
     fn to_variation(&self) -> Group32Var7 {
         let (_wire_flags, _wire_value) = self.to_f32();
         Group32Var7 {
@@ -577,9 +577,9 @@ impl ToVariation<Group32Var7> for Analog {
     }
 }
 
-impl From<Group32Var6> for Analog {
+impl From<Group32Var6> for AnalogInput {
     fn from(v: Group32Var6) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value,
             flags: Flags::new(v.flags),
             time : None,
@@ -587,7 +587,7 @@ impl From<Group32Var6> for Analog {
     }
 }
 
-impl ToVariation<Group32Var6> for Analog {
+impl ToVariation<Group32Var6> for AnalogInput {
     fn to_variation(&self) -> Group32Var6 {
         Group32Var6 {
             flags: self.flags.value,
@@ -596,9 +596,9 @@ impl ToVariation<Group32Var6> for Analog {
     }
 }
 
-impl From<Group32Var5> for Analog {
+impl From<Group32Var5> for AnalogInput {
     fn from(v: Group32Var5) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value as f64,
             flags: Flags::new(v.flags),
             time : None,
@@ -606,7 +606,7 @@ impl From<Group32Var5> for Analog {
     }
 }
 
-impl ToVariation<Group32Var5> for Analog {
+impl ToVariation<Group32Var5> for AnalogInput {
     fn to_variation(&self) -> Group32Var5 {
         let (_wire_flags, _wire_value) = self.to_f32();
         Group32Var5 {
@@ -616,9 +616,9 @@ impl ToVariation<Group32Var5> for Analog {
     }
 }
 
-impl From<Group32Var4> for Analog {
+impl From<Group32Var4> for AnalogInput {
     fn from(v: Group32Var4) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value as f64,
             flags: Flags::new(v.flags),
             time : Some(Time::Synchronized(v.time)),
@@ -626,7 +626,7 @@ impl From<Group32Var4> for Analog {
     }
 }
 
-impl ToVariation<Group32Var4> for Analog {
+impl ToVariation<Group32Var4> for AnalogInput {
     fn to_variation(&self) -> Group32Var4 {
         let (_wire_flags, _wire_value) = self.to_i16();
         Group32Var4 {
@@ -637,9 +637,9 @@ impl ToVariation<Group32Var4> for Analog {
     }
 }
 
-impl From<Group32Var3> for Analog {
+impl From<Group32Var3> for AnalogInput {
     fn from(v: Group32Var3) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value as f64,
             flags: Flags::new(v.flags),
             time : Some(Time::Synchronized(v.time)),
@@ -647,7 +647,7 @@ impl From<Group32Var3> for Analog {
     }
 }
 
-impl ToVariation<Group32Var3> for Analog {
+impl ToVariation<Group32Var3> for AnalogInput {
     fn to_variation(&self) -> Group32Var3 {
         let (_wire_flags, _wire_value) = self.to_i32();
         Group32Var3 {
@@ -658,9 +658,9 @@ impl ToVariation<Group32Var3> for Analog {
     }
 }
 
-impl From<Group32Var2> for Analog {
+impl From<Group32Var2> for AnalogInput {
     fn from(v: Group32Var2) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value as f64,
             flags: Flags::new(v.flags),
             time : None,
@@ -668,7 +668,7 @@ impl From<Group32Var2> for Analog {
     }
 }
 
-impl ToVariation<Group32Var2> for Analog {
+impl ToVariation<Group32Var2> for AnalogInput {
     fn to_variation(&self) -> Group32Var2 {
         let (_wire_flags, _wire_value) = self.to_i16();
         Group32Var2 {
@@ -678,9 +678,9 @@ impl ToVariation<Group32Var2> for Analog {
     }
 }
 
-impl From<Group32Var1> for Analog {
+impl From<Group32Var1> for AnalogInput {
     fn from(v: Group32Var1) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value as f64,
             flags: Flags::new(v.flags),
             time : None,
@@ -688,7 +688,7 @@ impl From<Group32Var1> for Analog {
     }
 }
 
-impl ToVariation<Group32Var1> for Analog {
+impl ToVariation<Group32Var1> for AnalogInput {
     fn to_variation(&self) -> Group32Var1 {
         let (_wire_flags, _wire_value) = self.to_i32();
         Group32Var1 {
@@ -698,9 +698,9 @@ impl ToVariation<Group32Var1> for Analog {
     }
 }
 
-impl From<Group30Var6> for Analog {
+impl From<Group30Var6> for AnalogInput {
     fn from(v: Group30Var6) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value,
             flags: Flags::new(v.flags),
             time : None,
@@ -708,7 +708,7 @@ impl From<Group30Var6> for Analog {
     }
 }
 
-impl ToVariation<Group30Var6> for Analog {
+impl ToVariation<Group30Var6> for AnalogInput {
     fn to_variation(&self) -> Group30Var6 {
         Group30Var6 {
             flags: self.flags.value,
@@ -717,9 +717,9 @@ impl ToVariation<Group30Var6> for Analog {
     }
 }
 
-impl From<Group30Var5> for Analog {
+impl From<Group30Var5> for AnalogInput {
     fn from(v: Group30Var5) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value as f64,
             flags: Flags::new(v.flags),
             time : None,
@@ -727,7 +727,7 @@ impl From<Group30Var5> for Analog {
     }
 }
 
-impl ToVariation<Group30Var5> for Analog {
+impl ToVariation<Group30Var5> for AnalogInput {
     fn to_variation(&self) -> Group30Var5 {
         let (_wire_flags, _wire_value) = self.to_f32();
         Group30Var5 {
@@ -737,9 +737,9 @@ impl ToVariation<Group30Var5> for Analog {
     }
 }
 
-impl From<Group30Var4> for Analog {
+impl From<Group30Var4> for AnalogInput {
     fn from(v: Group30Var4) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value as f64,
             flags: Flags::ONLINE,
             time : None,
@@ -747,7 +747,7 @@ impl From<Group30Var4> for Analog {
     }
 }
 
-impl ToVariation<Group30Var4> for Analog {
+impl ToVariation<Group30Var4> for AnalogInput {
     fn to_variation(&self) -> Group30Var4 {
         let (_wire_flags, _wire_value) = self.to_i16();
         Group30Var4 {
@@ -756,9 +756,9 @@ impl ToVariation<Group30Var4> for Analog {
     }
 }
 
-impl From<Group30Var3> for Analog {
+impl From<Group30Var3> for AnalogInput {
     fn from(v: Group30Var3) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value as f64,
             flags: Flags::ONLINE,
             time : None,
@@ -766,7 +766,7 @@ impl From<Group30Var3> for Analog {
     }
 }
 
-impl ToVariation<Group30Var3> for Analog {
+impl ToVariation<Group30Var3> for AnalogInput {
     fn to_variation(&self) -> Group30Var3 {
         let (_wire_flags, _wire_value) = self.to_i32();
         Group30Var3 {
@@ -775,9 +775,9 @@ impl ToVariation<Group30Var3> for Analog {
     }
 }
 
-impl From<Group30Var2> for Analog {
+impl From<Group30Var2> for AnalogInput {
     fn from(v: Group30Var2) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value as f64,
             flags: Flags::new(v.flags),
             time : None,
@@ -785,7 +785,7 @@ impl From<Group30Var2> for Analog {
     }
 }
 
-impl ToVariation<Group30Var2> for Analog {
+impl ToVariation<Group30Var2> for AnalogInput {
     fn to_variation(&self) -> Group30Var2 {
         let (_wire_flags, _wire_value) = self.to_i16();
         Group30Var2 {
@@ -795,9 +795,9 @@ impl ToVariation<Group30Var2> for Analog {
     }
 }
 
-impl From<Group30Var1> for Analog {
+impl From<Group30Var1> for AnalogInput {
     fn from(v: Group30Var1) -> Self {
-        Analog {
+        AnalogInput {
             value : v.value as f64,
             flags: Flags::new(v.flags),
             time : None,
@@ -805,7 +805,7 @@ impl From<Group30Var1> for Analog {
     }
 }
 
-impl ToVariation<Group30Var1> for Analog {
+impl ToVariation<Group30Var1> for AnalogInput {
     fn to_variation(&self) -> Group30Var1 {
         let (_wire_flags, _wire_value) = self.to_i32();
         Group30Var1 {

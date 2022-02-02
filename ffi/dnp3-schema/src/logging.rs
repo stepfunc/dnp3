@@ -1,169 +1,214 @@
-use oo_bindgen::error_type::ErrorType;
-use oo_bindgen::native_function::*;
-use oo_bindgen::native_struct::{NativeStructHandle, StructElementType};
-use oo_bindgen::*;
+use oo_bindgen::model::*;
 
-pub fn define(
-    lib: &mut LibraryBuilder,
-    error_type: ErrorType,
-) -> Result<NativeStructHandle, BindingError> {
-    let log_level_enum = lib
-        .define_native_enum("LogLevel")?
-        .push("Error", "Error log level")?
-        .push("Warn", "Warning log level")?
-        .push("Info", "Information log level")?
-        .push("Debug", "Debugging log level")?
-        .push("Trace", "Trace log level")?
+fn define_log_level_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let definition = lib
+        .define_enum("log_level")?
+        .push("error", "Error log level")?
+        .push("warn", "Warning log level")?
+        .push("info", "Information log level")?
+        .push("debug", "Debugging log level")?
+        .push("trace", "Trace log level")?
         .doc(
             doc("Log level")
-            .details("Used in {interface:Logger.on_message()} callback to identify the log level of a message.")
+                .details("Used in {interface:logger.on_message()} callback to identify the log level of a message.")
         )?
         .build()?;
 
-    let time_format_enum = lib
-        .define_native_enum("TimeFormat")?
-        .push("None", "Don't format the timestamp as part of the message")?
-        .push("Rfc3339", "Format the time using RFC 3339")?
+    Ok(definition)
+}
+
+fn define_time_format_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let definition = lib
+        .define_enum("time_format")?
+        .push("none", "Don't format the timestamp as part of the message")?
+        .push("rfc_3339", "Format the time using RFC 3339")?
         .push(
-            "System",
+            "system",
             "Format the time in a human readable format e.g. 'Jun 25 14:27:12.955'",
         )?
         .doc("Describes if and how the time will be formatted in log messages")?
         .build()?;
 
-    let log_output_format_enum = lib
-        .define_native_enum("LogOutputFormat")?
-        .push("Text", "A simple text-based format")?
-        .push("Json", "Output formatted as JSON")?
+    Ok(definition)
+}
+
+fn define_log_output_format_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let definition = lib
+        .define_enum("log_output_format")?
+        .push("text", "A simple text-based format")?
+        .push("json", "Output formatted as JSON")?
         .doc("Describes how each log event is formatted")?
         .build()?;
 
-    let logging_config_struct = lib.declare_native_struct("LoggingConfig")?;
+    Ok(definition)
+}
+
+fn define_logging_config_struct(
+    lib: &mut LibraryBuilder,
+    log_level_enum: EnumHandle,
+) -> BackTraced<FunctionArgStructHandle> {
+    let logging_config_struct = lib.declare_function_argument_struct("logging_config")?;
+
+    let log_output_format_enum = define_log_output_format_enum(lib)?;
+    let time_format_enum = define_time_format_enum(lib)?;
+
+    let level = Name::create("level")?;
+    let output_format = Name::create("output_format")?;
+    let time_format = Name::create("time_format")?;
+    let print_level = Name::create("print_level")?;
+    let print_module_info = Name::create("print_module_info")?;
+
     let logging_config_struct = lib
-        .define_native_struct(&logging_config_struct)?
+        .define_function_argument_struct(logging_config_struct)?
+        .add(&level, log_level_enum, "logging level")?
         .add(
-            "level",
-            StructElementType::Enum(log_level_enum.clone(), Some("Info".to_string())),
-            "logging level",
-        )?
-        .add(
-            "output_format",
-            StructElementType::Enum(log_output_format_enum, Some("Text".to_string())),
+            &output_format,
+            log_output_format_enum,
             "output formatting options",
         )?
+        .add(&time_format, time_format_enum, "optional time format")?
         .add(
-            "time_format",
-            StructElementType::Enum(time_format_enum, Some("System".to_string())),
-            "optional time format",
-        )?
-        .add(
-            "print_level",
-            StructElementType::Bool(Some(true)),
+            &print_level,
+            Primitive::Bool,
             "optionally print the log level as part to the message string",
         )?
         .add(
-            "print_module_info",
-            StructElementType::Bool(Some(false)),
+            &print_module_info,
+            Primitive::Bool,
             "optionally print the underlying Rust module information to the message string",
         )?
         .doc("Logging configuration options")?
+        .end_fields()?
+        .begin_initializer(
+            "init",
+            InitializerType::Normal,
+            "Initialize the configuration to default values",
+        )?
+        .default(&level, "info".default_variant())?
+        .default(&output_format, "text".default_variant())?
+        .default(&time_format, "system".default_variant())?
+        .default(&print_level, true)?
+        .default(&print_module_info, false)?
+        .end_initializer()?
         .build()?;
+
+    Ok(logging_config_struct)
+}
+
+const NOTHING: &str = "nothing";
+
+pub fn define(
+    lib: &mut LibraryBuilder,
+    error_type: ErrorType<Unvalidated>,
+) -> BackTraced<UniversalStructHandle> {
+    let log_level_enum = define_log_level_enum(lib)?;
+
+    let logging_config_struct = define_logging_config_struct(lib, log_level_enum.clone())?;
 
     let log_callback_interface = lib
         .define_interface(
-            "Logger",
+            "logger",
             "Logging interface that receives the log messages and writes them somewhere.",
         )?
-        .callback(
+        .begin_callback(
             "on_message",
             "Called when a log message was received and should be logged",
         )?
-        .param("level", Type::Enum(log_level_enum), "Level of the message")?
-        .param("message", Type::String, "Actual formatted message")?
-        .return_type(ReturnType::void())?
-        .build()?
-        .destroy_callback("on_destroy")?
-        .build()?;
+        .param("level", log_level_enum, "Level of the message")?
+        .param("message", StringType, "Actual formatted message")?
+        .end_callback()?
+        .build_async()?;
 
     let configure_logging_fn = lib
-        .declare_native_function("configure_logging")?
+        .define_function("configure_logging")?
         .param(
             "config",
-            Type::Struct(logging_config_struct),
+           logging_config_struct,
             "Configuration options for logging"
         )?
         .param(
             "logger",
-            Type::Interface(log_callback_interface),
+           log_callback_interface,
             "Logger that will receive each logged message",
         )?
-        .return_type(ReturnType::void())?
         .fails_with(error_type)?
         .doc(
             doc("Set the callback that will receive all the log messages")
             .details("There is only a single globally allocated logger. Calling this method a second time will return an error.")
             .details("If this method is never called, no logging will be performed.")
         )?
-        .build()?;
+        .build_static("configure")?;
 
     let _logging_class = lib
-        .define_static_class("Logging")?
-        .static_method("Configure", &configure_logging_fn)?
+        .define_static_class("logging")?
+        .static_method(configure_logging_fn)?
         .doc("Provides a static method for configuring logging")?
         .build()?;
 
     let app_decode_level_enum = lib
-        .define_native_enum("AppDecodeLevel")?
-        .push("Nothing", "Decode nothing")?
-        .push("Header", " Decode the header-only")?
-        .push("ObjectHeaders", "Decode the header and the object headers")?
+        .define_enum("app_decode_level")?
+        .push(NOTHING, "Decode nothing")?
+        .push("header", " Decode the header-only")?
+        .push("object_headers", "Decode the header and the object headers")?
         .push(
-            "ObjectValues",
+            "object_values",
             "Decode the header, the object headers, and the object values",
         )?
         .doc("Controls how transmitted and received application-layer fragments are decoded at the INFO log level")?
         .build()?;
 
     let transport_decode_level_enum = lib
-        .define_native_enum("TransportDecodeLevel")?
-        .push("Nothing", "Decode nothing")?
-        .push("Header", " Decode the header")?
-        .push("Payload", "Decode the header and the raw payload as hexadecimal")?
+        .define_enum("transport_decode_level")?
+        .push(NOTHING, "Decode nothing")?
+        .push("header", " Decode the header")?
+        .push("payload", "Decode the header and the raw payload as hexadecimal")?
         .doc("Controls how transmitted and received transport segments are decoded at the INFO log level")?
         .build()?;
 
     let link_decode_level_enum = lib
-        .define_native_enum("LinkDecodeLevel")?
-        .push("Nothing", "Decode nothing")?
-        .push("Header", " Decode the header")?
+        .define_enum("link_decode_level")?
+        .push(NOTHING, "Decode nothing")?
+        .push("header", " Decode the header")?
         .push(
-            "Payload",
+            "payload",
             "Decode the header and the raw payload as hexadecimal",
         )?
         .doc("Controls how transmitted and received link frames are decoded at the INFO log level")?
         .build()?;
 
     let phys_decode_level_enum = lib
-        .define_native_enum("PhysDecodeLevel")?
-        .push("Nothing", "Log nothing")?
+        .define_enum("phys_decode_level")?
+        .push(NOTHING, "Log nothing")?
         .push(
-            "Length",
+            "length",
             "Log only the length of data that is sent and received",
         )?
         .push(
-            "Data",
+            "data",
             "Log the length and the actual data that is sent and received",
         )?
         .doc("Controls how data transmitted at the physical layer (TCP, serial, etc) is logged")?
         .build()?;
 
-    let decode_level_struct = lib.declare_native_struct("DecodeLevel")?;
-    let decode_level_struct = lib.define_native_struct(&decode_level_struct)?
-        .add("application", StructElementType::Enum(app_decode_level_enum, Some("Nothing".to_string())), "Controls application fragment decoding")?
-        .add("transport", StructElementType::Enum(transport_decode_level_enum, Some("Nothing".to_string())), "Controls transport segment layer decoding")?
-        .add("link", StructElementType::Enum(link_decode_level_enum, Some("Nothing".to_string())), "Controls link frame decoding")?
-        .add("physical", StructElementType::Enum(phys_decode_level_enum, Some("Nothing".to_string())), "Controls the logging of physical layer read/write")?
+    let application_field = Name::create("application")?;
+    let transport_field = Name::create("transport")?;
+    let link_field = Name::create("link")?;
+    let physical_field = Name::create("physical")?;
+
+    let decode_level_struct = lib.declare_universal_struct("decode_level")?;
+    let decode_level_struct = lib.define_universal_struct(decode_level_struct)?
+        .add(&application_field, app_decode_level_enum, "Controls application fragment decoding")?
+        .add(&transport_field, transport_decode_level_enum, "Controls transport segment layer decoding")?
+        .add(&link_field, link_decode_level_enum, "Controls link frame decoding")?
+        .add(&physical_field, phys_decode_level_enum, "Controls the logging of physical layer read/write")?
         .doc("Controls the decoding of transmitted and received data at the application, transport, link, and physical layers")?
+        .end_fields()?
+        .begin_initializer("init", InitializerType::Normal, "Initialize log levels to defaults")?
+        .default_variant(&application_field, NOTHING)?
+        .default_variant(&transport_field, NOTHING)?
+        .default_variant(&link_field, NOTHING)?
+        .default_variant(&physical_field, NOTHING)?
+        .end_initializer()?
         .build()?;
 
     Ok(decode_level_struct)

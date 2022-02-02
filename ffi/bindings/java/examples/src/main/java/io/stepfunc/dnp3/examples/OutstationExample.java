@@ -21,7 +21,7 @@ class TestLogger implements Logger {
   }
 }
 
-class TestApplication implements OutstationApplication {
+class TestOutstationApplication implements OutstationApplication {
 
   @Override
   public UShort getProcessingDelayMs() {
@@ -40,7 +40,7 @@ class TestApplication implements OutstationApplication {
 
   @Override
   public RestartDelay coldRestart() {
-    return RestartDelay.validSeconds(ushort(60));
+    return RestartDelay.seconds(ushort(60));
   }
 
   @Override
@@ -108,13 +108,13 @@ class TestControlHandler implements ControlHandler {
   public void endFragment() {}
 
   @Override
-  public CommandStatus selectG12v1(G12v1 control, UShort index, Database database) {
+  public CommandStatus selectG12v1(Group12Var1 control, UShort index, Database database) {
     return CommandStatus.NOT_SUPPORTED;
   }
 
   @Override
   public CommandStatus operateG12v1(
-      G12v1 control, UShort index, OperateType opType, Database database) {
+      Group12Var1 control, UShort index, OperateType opType, Database database) {
     return CommandStatus.NOT_SUPPORTED;
   }
 
@@ -187,6 +187,75 @@ public class OutstationExample {
     return config;
   }
 
+  private static int run(Runtime runtime, String[] args) {
+
+    if(args.length != 2) {
+      System.err.println("You must specify a transport");
+      System.err.println("Usage: outstation-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
+      return -1;
+    }
+
+    final String type = args[1];
+    switch(type) {
+      case "tcp":
+        runTcp(runtime);
+        return 0;
+      case "serial":
+        runSerial(runtime);
+        return 0;
+      case "tls-ca":
+        runTls(runtime, getCaTlsConfig());
+        return 0;
+      case "tls-self-signed":
+        runTls(runtime, getSelfSignedTlsConfig());
+        return 0;
+      default:
+        System.err.printf("Unknown transport: %s%n", type);
+        return -1;
+    }
+  }
+
+  private static void runTcp(Runtime runtime) {
+    // ANCHOR: create_tcp_server
+    TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
+    // ANCHOR_END: create_tcp_server
+
+    try {
+      runServer(server);
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  private static void runTls(Runtime runtime, TlsServerConfig config) {
+    // ANCHOR: create_tls_server
+    TcpServer server = TcpServer.createTlsServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000", config);
+    // ANCHOR_END: create_tls_server
+
+    try {
+      runServer(server);
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  private static void runSerial(Runtime runtime) {
+    // ANCHOR: create_serial_session
+    Outstation outstation = Outstation.createSerialSession(
+            runtime,
+            "/dev/pts/4",
+            new SerialPortSettings(),
+            getOutstationConfig(),
+            getEventBufferConfig(),
+            new TestOutstationApplication(),
+            new TestOutstationInformation(),
+            new TestControlHandler()
+    );
+    // ANCHOR_END: create_serial_session
+
+    runOutstation(outstation);
+  }
+
   public static void main(String[] args) {
     // Setup logging
     Logging.configure(new LoggingConfig(), new TestLogger());
@@ -198,22 +267,56 @@ public class OutstationExample {
     TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
     // ANCHOR_END: create_tcp_server
 
+    // Start the outstation
+    // ANCHOR: tcp_server_bind
+    server.bind();
+    // ANCHOR_END: tcp_server_bind
+
     try {
-      run(server);
+      runServer(server);
     } finally {
       runtime.shutdown();
     }
   }
 
+  private static TlsServerConfig getSelfSignedTlsConfig() {
+    // ANCHOR: tls_self_signed_config
+    TlsServerConfig config =
+            new TlsServerConfig(
+                    "test.com",
+                    "./certs/self_signed/entity1_cert.pem",
+                    "./certs/self_signed/entity2_cert.pem",
+                    "./certs/self_signed/entity2_key.pem",
+                    "" // no password
+            );
+    config.certificateMode = CertificateMode.SELF_SIGNED;
+    // ANCHOR_END: tls_self_signed_config
+    return config;
+  }
+
+  private static TlsServerConfig getCaTlsConfig() {
+    // ANCHOR: tls_ca_chain_config
+    TlsServerConfig config =
+            new TlsServerConfig(
+                    "test.com",
+                    "./certs/ca_chain/ca_cert.pem",
+                    "./certs/ca_chain/entity2_cert.pem",
+                    "./certs/ca_chain/entity2_key.pem",
+                    "" // no password
+            );
+    // ANCHOR_END: tls_ca_chain_config
+    return config;
+  }
+
   // ANCHOR: database_init_function
-  public static void initializeDatabase(Database db) {
+  private static void initializeDatabase(Database db) {
     for (int i = 0; i < 10; i++) {
-      db.addBinary(ushort(i), EventClass.CLASS1, new BinaryConfig());
-      db.addDoubleBitBinary(ushort(i), EventClass.CLASS1, new DoubleBitBinaryConfig());
+      db.addBinaryInput(ushort(i), EventClass.CLASS1, new BinaryInputConfig());
+      db.addDoubleBitBinaryInput(ushort(i), EventClass.CLASS1, new DoubleBitBinaryInputConfig());
       db.addBinaryOutputStatus(ushort(i), EventClass.CLASS1, new BinaryOutputStatusConfig());
       db.addCounter(ushort(i), EventClass.CLASS1, new CounterConfig());
       db.addFrozenCounter(ushort(i), EventClass.CLASS1, new FrozenCounterConfig());
-      db.addAnalog(ushort(i), EventClass.CLASS1, new AnalogConfig());
+      db.addAnalogInput(ushort(i), EventClass.CLASS1, new AnalogInputConfig());
       db.addAnalogOutputStatus(ushort(i), EventClass.CLASS1, new AnalogOutputStatusConfig());
       db.addOctetString(ushort(i), EventClass.CLASS1);
     }
@@ -235,29 +338,31 @@ public class OutstationExample {
   }
   // ANCHOR_END: event_buffer_config
 
-  public static void run(TcpServer server) {
+  private static void runServer(TcpServer server) {
 
     // ANCHOR: tcp_server_add_outstation
     final Outstation outstation =
-        server.addOutstation(
-            getOutstationConfig(),
-            getEventBufferConfig(),
-            new TestApplication(),
-            new TestOutstationInformation(),
-            new TestControlHandler(),
-            new TestConnectionStateListener(),
-            AddressFilter.any());
+            server.addOutstation(
+                    getOutstationConfig(),
+                    getEventBufferConfig(),
+                    new TestOutstationApplication(),
+                    new TestOutstationInformation(),
+                    new TestControlHandler(),
+                    new TestConnectionStateListener(),
+                    AddressFilter.any());
     // ANCHOR_END: tcp_server_add_outstation
+
+    server.bind();
+
+    runOutstation(outstation);
+  }
+
+  private static void runOutstation(Outstation outstation) {
 
     // Setup initial points
     // ANCHOR: database_init
     outstation.transaction((db) -> initializeDatabase(db));
     // ANCHOR_END: database_init
-
-    // Start the outstation
-    // ANCHOR: tcp_server_bind
-    server.bind();
-    // ANCHOR_END: tcp_server_bind
 
     boolean binaryValue = false;
     DoubleBit doubleBitBinaryValue = DoubleBit.DETERMINED_OFF;
@@ -282,13 +387,13 @@ public class OutstationExample {
               final boolean pointValue = binaryValue;
               outstation.transaction(
                   db -> {
-                    Binary value =
-                        new Binary(
+                    BinaryInput value =
+                        new BinaryInput(
                             ushort(7),
                             pointValue,
                             onlineFlags,
                             Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateBinary(value, new UpdateOptions());
+                    db.updateBinaryInput(value, new UpdateOptions());
                   });
               break;
             }
@@ -301,13 +406,13 @@ public class OutstationExample {
               final DoubleBit pointValue = doubleBitBinaryValue;
               outstation.transaction(
                   db -> {
-                    DoubleBitBinary value =
-                        new DoubleBitBinary(
+                    DoubleBitBinaryInput value =
+                        new DoubleBitBinaryInput(
                             ushort(7),
                             pointValue,
                             onlineFlags,
                             Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateDoubleBitBinary(value, new UpdateOptions());
+                    db.updateDoubleBitBinaryInput(value, new UpdateOptions());
                   });
               break;
             }
@@ -329,7 +434,7 @@ public class OutstationExample {
             }
           case "co":
             {
-              counterValue = ++counterValue;
+              counterValue += 1;
               final long pointValue = counterValue;
               outstation.transaction(
                   db -> {
@@ -345,7 +450,7 @@ public class OutstationExample {
             }
           case "fco":
             {
-              frozenCounterValue = ++frozenCounterValue;
+              frozenCounterValue += 1;
               final long pointValue = frozenCounterValue;
               outstation.transaction(
                   db -> {
@@ -361,23 +466,23 @@ public class OutstationExample {
             }
           case "ai":
             {
-              analogValue = ++analogValue;
+              analogValue += 1;
               final double pointValue = analogValue;
               outstation.transaction(
                   db -> {
-                    Analog value =
-                        new Analog(
+                    AnalogInput value =
+                        new AnalogInput(
                             ushort(7),
                             pointValue,
                             onlineFlags,
                             Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateAnalog(value, new UpdateOptions());
+                    db.updateAnalogInput(value, new UpdateOptions());
                   });
               break;
             }
           case "aos":
             {
-              analogOutputStatusValue = ++analogOutputStatusValue;
+              analogOutputStatusValue += 1;
               final double pointValue = analogOutputStatusValue;
               outstation.transaction(
                   db -> {

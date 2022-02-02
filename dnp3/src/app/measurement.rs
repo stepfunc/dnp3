@@ -24,7 +24,7 @@ pub enum Time {
     /// The timestamp is UTC synchronized at the remote device
     Synchronized(Timestamp),
     /// The device indicates the timestamp may be not be synchronized
-    NotSynchronized(Timestamp),
+    Unsynchronized(Timestamp),
 }
 
 impl Time {
@@ -38,9 +38,9 @@ impl Time {
         Self::Synchronized(Timestamp::new(ts))
     }
 
-    /// created a unsynchronized `Time` from a u64
-    pub fn not_synchronized(ts: u64) -> Time {
-        Self::NotSynchronized(Timestamp::new(ts))
+    /// created an unsynchronized `Time` from a u64
+    pub fn unsynchronized(ts: u64) -> Time {
+        Self::Unsynchronized(Timestamp::new(ts))
     }
 }
 
@@ -96,7 +96,7 @@ pub(crate) trait WireFlags {
 
 impl From<Option<Time>> for Time {
     fn from(x: Option<Time>) -> Self {
-        x.unwrap_or_else(|| Time::NotSynchronized(Timestamp::new(0)))
+        x.unwrap_or_else(|| Time::Unsynchronized(Timestamp::new(0)))
     }
 }
 
@@ -112,9 +112,9 @@ impl Time {
             Time::Synchronized(ts) => ts
                 .checked_add(Duration::from_millis(x as u64))
                 .map(Time::Synchronized),
-            Time::NotSynchronized(ts) => ts
+            Time::Unsynchronized(ts) => ts
                 .checked_add(Duration::from_millis(x as u64))
-                .map(Time::NotSynchronized),
+                .map(Time::Unsynchronized),
         }
     }
 
@@ -122,14 +122,14 @@ impl Time {
     pub fn timestamp(&self) -> Timestamp {
         match self {
             Time::Synchronized(ts) => *ts,
-            Time::NotSynchronized(ts) => *ts,
+            Time::Unsynchronized(ts) => *ts,
         }
     }
 }
 
 /// Measurement type corresponding to groups 1 and 2
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Binary {
+pub struct BinaryInput {
     /// value of the type
     pub value: bool,
     /// associated flags
@@ -138,8 +138,8 @@ pub struct Binary {
     pub time: Option<Time>,
 }
 
-impl Binary {
-    /// construct a `Binary` from its fields
+impl BinaryInput {
+    /// construct a `BinaryInput` from its fields
     pub fn new(value: bool, flags: Flags, time: Time) -> Self {
         Self {
             value,
@@ -151,7 +151,7 @@ impl Binary {
 
 /// Measurement type corresponding to groups 3 and 4
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct DoubleBitBinary {
+pub struct DoubleBitBinaryInput {
     /// value of the type
     pub value: DoubleBit,
     /// associated flags
@@ -160,8 +160,8 @@ pub struct DoubleBitBinary {
     pub time: Option<Time>,
 }
 
-impl DoubleBitBinary {
-    /// construct a `DoubleBitBinary` from its fields
+impl DoubleBitBinaryInput {
+    /// construct a `DoubleBitBinaryInput` from its fields
     pub fn new(value: DoubleBit, flags: Flags, time: Time) -> Self {
         Self {
             value,
@@ -239,7 +239,7 @@ impl FrozenCounter {
 
 /// Measurement type corresponding to groups 30 and 32
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Analog {
+pub struct AnalogInput {
     /// value of the type
     pub value: f64,
     /// associated flags
@@ -248,8 +248,8 @@ pub struct Analog {
     pub time: Option<Time>,
 }
 
-impl Analog {
-    /// construct an `Analog` from its fields
+impl AnalogInput {
+    /// construct an `AnalogInput` from its fields
     pub fn new(value: f64, flags: Flags, time: Time) -> Self {
         Self {
             value,

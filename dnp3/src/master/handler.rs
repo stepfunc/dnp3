@@ -42,8 +42,6 @@ pub struct MasterChannelConfig {
     pub master_address: EndpointAddress,
     /// Decode-level for DNP3 objects
     pub decode_level: DecodeLevel,
-    /// Response timeout
-    pub response_timeout: Timeout,
     /// TX buffer size
     ///
     /// Must be at least 249.
@@ -60,7 +58,6 @@ impl MasterChannelConfig {
         Self {
             master_address,
             decode_level: DecodeLevel::nothing(),
-            response_timeout: Timeout::default(),
             tx_buffer_size: MasterSession::DEFAULT_TX_BUFFER_SIZE,
             rx_buffer_size: MasterSession::DEFAULT_RX_BUFFER_SIZE,
         }
@@ -310,20 +307,31 @@ pub trait AssociationHandler: Send {
     }
 }
 
-/// Information about the object header from which the measurement values were mapped
+/// Information about the object header and specific variation
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct HeaderInfo {
-    /// underlying variation
+    /// underlying variation in the response
     pub variation: Variation,
-    /// qualifier code used in the header
+    /// qualifier code used in the response
     pub qualifier: QualifierCode,
+    /// true if the received variation is an event type, false otherwise
+    pub is_event: bool,
+    /// true if a flags byte is present on the underlying variation, false otherwise
+    pub has_flags: bool,
 }
 
 impl HeaderInfo {
-    pub(crate) fn new(variation: Variation, qualifier: QualifierCode) -> Self {
+    pub(crate) fn new(
+        variation: Variation,
+        qualifier: QualifierCode,
+        is_event: bool,
+        has_flags: bool,
+    ) -> Self {
         Self {
             variation,
             qualifier,
+            is_event,
+            has_flags,
         }
     }
 }
@@ -347,22 +355,31 @@ pub trait ReadHandler: Send {
     ///
     /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
     /// `header` provides the full response header
-    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
+    ///
+    /// Note: The operation may or may not be async depending
+    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()>;
 
     /// Called as the last action after all of the type-specific handle methods have been invoked
     ///
     /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
     /// `header` provides the full response header
-    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader);
+    ///
+    /// Note: The operation may or may not be async depending. A typical use case for using async
+    /// here would be to publish a message to an async MPSC.
+    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()>;
 
-    /// Process an object header of `Binary` values
-    fn handle_binary(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Binary, u16)>);
-
-    /// Process an object header of `DoubleBitBinary` values
-    fn handle_double_bit_binary(
+    /// Process an object header of `BinaryInput` values
+    fn handle_binary_input(
         &mut self,
         info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
+        iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
+    );
+
+    /// Process an object header of `DoubleBitBinaryInput` values
+    fn handle_double_bit_binary_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
     );
 
     /// Process an object header of `BinaryOutputStatus` values
@@ -382,8 +399,12 @@ pub trait ReadHandler: Send {
         iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
     );
 
-    /// Process an object header of `Analog` values
-    fn handle_analog(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Analog, u16)>);
+    /// Process an object header of `AnalogInput` values
+    fn handle_analog_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
+    );
 
     /// Process an object header of `AnalogOutputStatus` values
     fn handle_analog_output_status(
@@ -425,17 +446,25 @@ impl NullReadHandler {
 }
 
 impl ReadHandler for NullReadHandler {
-    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
-
-    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
-
-    fn handle_binary(&mut self, _info: HeaderInfo, _iter: &mut dyn Iterator<Item = (Binary, u16)>) {
+    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
     }
 
-    fn handle_double_bit_binary(
+    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
+
+    fn handle_binary_input(
         &mut self,
         _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
+        _iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
+    ) {
+    }
+
+    fn handle_double_bit_binary_input(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
     ) {
     }
 
@@ -460,7 +489,11 @@ impl ReadHandler for NullReadHandler {
     ) {
     }
 
-    fn handle_analog(&mut self, _info: HeaderInfo, _iter: &mut dyn Iterator<Item = (Analog, u16)>) {
+    fn handle_analog_input(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
+    ) {
     }
 
     fn handle_analog_output_status(

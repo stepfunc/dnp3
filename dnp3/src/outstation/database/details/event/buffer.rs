@@ -270,10 +270,13 @@ where
 
 #[derive(Debug, PartialEq)]
 enum Event {
-    Binary(measurement::Binary, Variation<EventBinaryVariation>),
+    Binary(
+        measurement::BinaryInput,
+        Variation<EventBinaryInputVariation>,
+    ),
     DoubleBitBinary(
-        measurement::DoubleBitBinary,
-        Variation<EventDoubleBitBinaryVariation>,
+        measurement::DoubleBitBinaryInput,
+        Variation<EventDoubleBitBinaryInputVariation>,
     ),
     BinaryOutputStatus(
         measurement::BinaryOutputStatus,
@@ -284,7 +287,10 @@ enum Event {
         measurement::FrozenCounter,
         Variation<EventFrozenCounterVariation>,
     ),
-    Analog(measurement::Analog, Variation<EventAnalogVariation>),
+    Analog(
+        measurement::AnalogInput,
+        Variation<EventAnalogInputVariation>,
+    ),
     AnalogOutputStatus(
         measurement::AnalogOutputStatus,
         Variation<EventAnalogOutputStatusVariation>,
@@ -461,10 +467,10 @@ impl EventBuffer {
                 self.select_by_class(EventClass::Class3.into(), limit)
             }
             EventReadHeader::Binary(v, limit) => {
-                self.select_by_type::<measurement::Binary>(v, limit)
+                self.select_by_type::<measurement::BinaryInput>(v, limit)
             }
             EventReadHeader::DoubleBitBinary(v, limit) => {
-                self.select_by_type::<measurement::DoubleBitBinary>(v, limit)
+                self.select_by_type::<measurement::DoubleBitBinaryInput>(v, limit)
             }
             EventReadHeader::BinaryOutputStatus(v, limit) => {
                 self.select_by_type::<measurement::BinaryOutputStatus>(v, limit)
@@ -476,7 +482,7 @@ impl EventBuffer {
                 self.select_by_type::<measurement::FrozenCounter>(v, limit)
             }
             EventReadHeader::Analog(v, limit) => {
-                self.select_by_type::<measurement::Analog>(v, limit)
+                self.select_by_type::<measurement::AnalogInput>(v, limit)
             }
             EventReadHeader::AnalogOutputStatus(v, limit) => {
                 self.select_by_type::<measurement::AnalogOutputStatus>(v, limit)
@@ -595,12 +601,12 @@ impl EventBuffer {
     }
 
     fn is_any_full(&self) -> bool {
-        self.is_full::<measurement::Binary>()
-            || self.is_full::<measurement::DoubleBitBinary>()
+        self.is_full::<measurement::BinaryInput>()
+            || self.is_full::<measurement::DoubleBitBinaryInput>()
             || self.is_full::<measurement::BinaryOutputStatus>()
             || self.is_full::<measurement::Counter>()
             || self.is_full::<measurement::FrozenCounter>()
-            || self.is_full::<measurement::Analog>()
+            || self.is_full::<measurement::AnalogInput>()
             || self.is_full::<measurement::AnalogOutputStatus>()
             || self.is_full::<measurement::OctetString>()
     }
@@ -646,8 +652,8 @@ impl EventBuffer {
     }
 }
 
-impl Insertable for measurement::Binary {
-    type EventVariation = EventBinaryVariation;
+impl Insertable for measurement::BinaryInput {
+    type EventVariation = EventBinaryInputVariation;
 
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_binary
@@ -673,7 +679,7 @@ impl Insertable for measurement::Binary {
         &self,
         index: u16,
         class: EventClass,
-        default_variation: EventBinaryVariation,
+        default_variation: EventBinaryInputVariation,
     ) -> EventRecord {
         EventRecord::new(
             index,
@@ -692,8 +698,8 @@ impl Insertable for measurement::Binary {
     }
 }
 
-impl Insertable for measurement::DoubleBitBinary {
-    type EventVariation = EventDoubleBitBinaryVariation;
+impl Insertable for measurement::DoubleBitBinaryInput {
+    type EventVariation = EventDoubleBitBinaryInputVariation;
 
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_double_binary
@@ -719,7 +725,7 @@ impl Insertable for measurement::DoubleBitBinary {
         &self,
         index: u16,
         class: EventClass,
-        default_variation: EventDoubleBitBinaryVariation,
+        default_variation: EventDoubleBitBinaryInputVariation,
     ) -> EventRecord {
         EventRecord::new(
             index,
@@ -876,8 +882,8 @@ impl Insertable for measurement::FrozenCounter {
     }
 }
 
-impl Insertable for measurement::Analog {
-    type EventVariation = EventAnalogVariation;
+impl Insertable for measurement::AnalogInput {
+    type EventVariation = EventAnalogInputVariation;
 
     fn get_max(config: &EventBufferConfig) -> u16 {
         config.max_analog
@@ -903,7 +909,7 @@ impl Insertable for measurement::Analog {
         &self,
         index: u16,
         class: EventClass,
-        default_variation: EventAnalogVariation,
+        default_variation: EventAnalogInputVariation,
     ) -> EventRecord {
         EventRecord::new(
             index,
@@ -1025,8 +1031,8 @@ mod tests {
             .insert(
                 1,
                 EventClass::Class1,
-                &Binary::new(true, Flags::ONLINE, Time::synchronized(0)),
-                EventBinaryVariation::Group2Var1,
+                &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
+                EventBinaryInputVariation::Group2Var1,
             )
             .unwrap();
 
@@ -1043,12 +1049,12 @@ mod tests {
             .insert(
                 3,
                 EventClass::Class3,
-                &DoubleBitBinary::new(
+                &DoubleBitBinaryInput::new(
                     DoubleBit::DeterminedOn,
                     Flags::ONLINE,
                     Time::synchronized(0),
                 ),
-                EventDoubleBitBinaryVariation::Group4Var3,
+                EventDoubleBitBinaryInputVariation::Group4Var3,
             )
             .unwrap();
 
@@ -1056,8 +1062,8 @@ mod tests {
             .insert(
                 4,
                 EventClass::Class2,
-                &Binary::new(true, Flags::ONLINE, Time::synchronized(1234)),
-                EventBinaryVariation::Group2Var1,
+                &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(1234)),
+                EventBinaryInputVariation::Group2Var1,
             )
             .unwrap();
 
@@ -1065,8 +1071,8 @@ mod tests {
             .insert(
                 5,
                 EventClass::Class1,
-                &Analog::new(42.0, Flags::ONLINE, Time::synchronized(0)),
-                EventAnalogVariation::Group32Var1,
+                &AnalogInput::new(42.0, Flags::ONLINE, Time::synchronized(0)),
+                EventAnalogInputVariation::Group32Var1,
             )
             .unwrap();
     }
@@ -1079,8 +1085,8 @@ mod tests {
             buffer.insert(
                 1,
                 EventClass::Class1,
-                &Binary::new(true, Flags::ONLINE, Time::synchronized(0)),
-                EventBinaryVariation::Group2Var1,
+                &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
+                EventBinaryInputVariation::Group2Var1,
             ),
             Err(InsertError::TypeMaxIsZero)
         )
@@ -1090,14 +1096,14 @@ mod tests {
     fn overflows_when_max_for_type_is_exceeded() {
         let mut buffer = EventBuffer::new(EventBufferConfig::all_types(1));
 
-        let binary = Binary::new(true, Flags::ONLINE, Time::synchronized(0));
+        let binary = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0));
 
         buffer
             .insert(
                 1,
                 EventClass::Class1,
                 &binary,
-                EventBinaryVariation::Group2Var1,
+                EventBinaryInputVariation::Group2Var1,
             )
             .unwrap();
 
@@ -1106,7 +1112,7 @@ mod tests {
                 1,
                 EventClass::Class1,
                 &binary,
-                EventBinaryVariation::Group2Var1
+                EventBinaryInputVariation::Group2Var1
             ),
             Err(InsertError::Overflow)
         )
@@ -1152,12 +1158,15 @@ mod tests {
         insert_events(&mut buffer);
 
         // ignore the 2nd binary
-        assert_eq!(1, buffer.select_default_variation::<Binary>(Some(1)));
+        assert_eq!(1, buffer.select_default_variation::<BinaryInput>(Some(1)));
 
         // select remaining binary events using g2v2
         assert_eq!(
             1,
-            buffer.select_specific_variation::<Binary>(None, EventBinaryVariation::Group2Var2)
+            buffer.select_specific_variation::<BinaryInput>(
+                None,
+                EventBinaryInputVariation::Group2Var2
+            )
         );
 
         let mut backing = [0u8; 64];

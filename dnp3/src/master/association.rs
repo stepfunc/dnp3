@@ -4,14 +4,14 @@ use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;
 
 use crate::app::parse::parser::{HeaderCollection, Response};
-use crate::app::Sequence;
 use crate::app::Timestamp;
 use crate::app::{ExponentialBackOff, RetryStrategy};
 use crate::app::{Iin, ResponseHeader};
+use crate::app::{Sequence, Timeout};
 use crate::link::EndpointAddress;
 use crate::master::error::{AssociationError, TaskError, TimeSyncError};
 use crate::master::extract::extract_measurements;
-use crate::master::handle::{AssociationHandler, Promise};
+use crate::master::handler::{AssociationHandler, Promise};
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollHandle, PollMap, PollMsg};
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
@@ -27,6 +27,8 @@ use crate::util::Smallest;
 /// Configuration for a master association
 #[derive(Debug, Copy, Clone)]
 pub struct AssociationConfig {
+    /// timeout for responses on this association
+    pub response_timeout: Timeout,
     /// The event classes to disable on startup
     pub disable_unsol_classes: EventClasses,
     /// The event classes to enable on startup
@@ -66,6 +68,7 @@ impl AssociationConfig {
         event_scan_on_events_available: EventClasses,
     ) -> Self {
         Self {
+            response_timeout: Timeout::default(),
             disable_unsol_classes,
             enable_unsol_classes,
             startup_integrity_classes,
@@ -82,6 +85,7 @@ impl AssociationConfig {
     /// at the beginning of the communications session.
     pub fn quiet() -> Self {
         Self {
+            response_timeout: Timeout::default(),
             disable_unsol_classes: EventClasses::none(),
             enable_unsol_classes: EventClasses::none(),
             startup_integrity_classes: Classes::none(),
@@ -98,6 +102,7 @@ impl AssociationConfig {
 impl Default for AssociationConfig {
     fn default() -> Self {
         Self {
+            response_timeout: Timeout::default(),
             disable_unsol_classes: EventClasses::all(),
             enable_unsol_classes: EventClasses::all(),
             startup_integrity_classes: Classes::all(),
@@ -270,6 +275,7 @@ impl LastUnsolFragment {
 /// and responses for multiple associations (i.e. multi-drop).
 pub(crate) struct Association {
     address: EndpointAddress,
+    response_timeout: Timeout,
     seq: Sequence,
     last_unsol_frag: Option<LastUnsolFragment>,
     request_queue: VecDeque<Task>,
@@ -292,6 +298,7 @@ impl Association {
         assoc_handler: Box<dyn AssociationHandler>,
     ) -> Self {
         Self {
+            response_timeout: config.response_timeout,
             address,
             seq: Sequence::default(),
             last_unsol_frag: None,
@@ -480,7 +487,7 @@ impl Association {
             .map(|timeout| Instant::now() + timeout)
     }
 
-    pub(crate) fn handle_unsolicited_response(&mut self, response: &Response) -> bool {
+    pub(crate) async fn handle_unsolicited_response(&mut self, response: &Response<'_>) -> bool {
         // Accept the fragment only if the startup sequence was completed or if it's a null response.
         //
         // Now here's the deal. According to TB2015-002a, we should also ignore null responses without
@@ -508,7 +515,8 @@ impl Association {
                     response.header,
                     objects,
                     self.read_handler.as_mut(),
-                );
+                )
+                .await;
             }
 
             true
@@ -520,56 +528,60 @@ impl Association {
         }
     }
 
-    pub(crate) fn handle_integrity_response(
+    pub(crate) async fn handle_integrity_response(
         &mut self,
         header: ResponseHeader,
-        objects: HeaderCollection,
+        objects: HeaderCollection<'_>,
     ) {
         extract_measurements(
             ReadType::StartupIntegrity,
             header,
             objects,
             self.read_handler.as_mut(),
-        );
+        )
+        .await;
     }
 
-    pub(crate) fn handle_poll_response(
+    pub(crate) async fn handle_poll_response(
         &mut self,
         header: ResponseHeader,
-        objects: HeaderCollection,
+        objects: HeaderCollection<'_>,
     ) {
         extract_measurements(
             ReadType::PeriodicPoll,
             header,
             objects,
             self.read_handler.as_mut(),
-        );
+        )
+        .await;
     }
 
-    pub(crate) fn handle_event_scan_response(
+    pub(crate) async fn handle_event_scan_response(
         &mut self,
         header: ResponseHeader,
-        objects: HeaderCollection,
+        objects: HeaderCollection<'_>,
     ) {
         extract_measurements(
             ReadType::PeriodicPoll,
             header,
             objects,
             self.read_handler.as_mut(),
-        );
+        )
+        .await;
     }
 
-    pub(crate) fn handle_read_response(
+    pub(crate) async fn handle_read_response(
         &mut self,
         header: ResponseHeader,
-        objects: HeaderCollection,
+        objects: HeaderCollection<'_>,
     ) {
         extract_measurements(
             ReadType::SinglePoll,
             header,
             objects,
             self.read_handler.as_mut(),
-        );
+        )
+        .await;
     }
 
     pub(crate) fn priority_task(&mut self) -> Option<Task> {
@@ -657,6 +669,13 @@ impl AssociationMap {
         Self {
             map: BTreeMap::new(),
             priority: VecDeque::new(),
+        }
+    }
+
+    pub(crate) fn get_timeout(&self, address: EndpointAddress) -> Result<Timeout, TaskError> {
+        match self.map.get(&address) {
+            Some(x) => Ok(x.response_timeout),
+            None => Err(TaskError::NoSuchAssociation(address)),
         }
     }
 

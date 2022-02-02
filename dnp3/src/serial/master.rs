@@ -75,13 +75,7 @@ impl MasterTask {
         listener: Box<dyn Listener<PortState>>,
     ) -> (Self, MasterChannel) {
         let (tx, rx) = crate::util::channel::request_channel();
-        let session = MasterSession::new(
-            false,
-            config.decode_level,
-            config.response_timeout,
-            config.tx_buffer_size,
-            rx,
-        );
+        let session = MasterSession::new(false, config.decode_level, config.tx_buffer_size, rx);
         let (reader, writer) = crate::transport::create_master_transport_layer(
             // serial ports always discard link parsing errors
             LinkErrorMode::Discard,

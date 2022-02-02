@@ -36,7 +36,7 @@ pub struct Outstation {
     runtime: RuntimeHandle,
 }
 
-pub unsafe fn tcpserver_new(
+pub unsafe fn tcp_server_create(
     runtime: *mut Runtime,
     link_error_mode: ffi::LinkErrorMode,
     address: &CStr,
@@ -52,7 +52,13 @@ pub unsafe fn tcpserver_new(
     })))
 }
 
-pub unsafe fn tcpserver_new_tls(
+pub unsafe fn tcp_server_destroy(server: *mut TcpServer) {
+    if !server.is_null() {
+        Box::from_raw(server);
+    }
+}
+
+pub unsafe fn tcp_server_create_tls(
     runtime: *mut Runtime,
     link_error_mode: ffi::LinkErrorMode,
     address: &CStr,
@@ -96,7 +102,7 @@ pub unsafe fn tcpserver_destroy(server: *mut TcpServer) {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn tcpserver_add_outstation(
+pub unsafe fn tcp_server_add_outstation(
     server: *mut TcpServer,
     config: ffi::OutstationConfig,
     event_config: ffi::EventBufferConfig,
@@ -137,7 +143,7 @@ pub unsafe fn tcpserver_add_outstation(
     })))
 }
 
-pub unsafe fn tcpserver_bind(server: *mut TcpServer) -> Result<(), ffi::ParamError> {
+pub unsafe fn tcp_server_bind(server: *mut TcpServer) -> Result<(), ffi::ParamError> {
     if server.is_null() {
         return Err(ffi::ParamError::NullParameter);
     }
@@ -200,7 +206,7 @@ pub unsafe fn outstation_create_serial_session(
 
 pub unsafe fn outstation_transaction(
     outstation: *mut Outstation,
-    callback: ffi::OutstationTransaction,
+    callback: ffi::DatabaseTransaction,
 ) {
     if let Some(outstation) = outstation.as_mut() {
         outstation.handle.transaction(|database| {

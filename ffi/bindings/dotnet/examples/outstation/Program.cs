@@ -32,7 +32,7 @@ class ExampleOutstation
 
         public RestartDelay ColdRestart()
         {
-            return RestartDelay.ValidSeconds(60);
+            return RestartDelay.Seconds(60);
         }
 
         public RestartDelay WarmRestart()
@@ -78,9 +78,9 @@ class ExampleOutstation
 
         public void EndFragment() { }
 
-        public CommandStatus SelectG12v1(G12v1 control, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG12v1(Group12Var1 control, ushort index, Database database) { return CommandStatus.NotSupported; }
 
-        public CommandStatus OperateG12v1(G12v1 control, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG12v1(Group12Var1 control, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
 
         public CommandStatus SelectG41v1(int control, ushort index, Database database) { return CommandStatus.NotSupported; }
 
@@ -107,15 +107,29 @@ class ExampleOutstation
         }
     }
 
-    public static void Main(string[] args)
+    private static void RunServer(TcpServer server)
     {
-        // Initialize logging with the default configuration
-        Logging.Configure(
-            new LoggingConfig(),
-            new TestLogger()
+        // ANCHOR: tcp_server_add_outstation
+        var outstation = server.AddOutstation(
+            GetOutstationConfig(),
+            GetEventBufferConfig(),
+            new TestOutstationApplication(),
+            new TestOutstationInformation(),
+            new TestControlHandler(),
+            new TestConnectionStateListener(),
+            AddressFilter.Any()
         );
+        // ANCHOR_END: tcp_server_add_outstation
 
-        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
+        // ANCHOR: tcp_server_bind
+        server.Bind();
+        // ANCHOR_END: tcp_server_bind
+
+        RunOutstation(outstation);
+    }
+
+    private static void RunTcp(Runtime runtime)
+    {
         // ANCHOR: create_tcp_server
         var server = new TcpServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000");
         // ANCHOR_END: create_tcp_server
@@ -123,6 +137,114 @@ class ExampleOutstation
         try
         {
             RunServer(server);
+        }
+        finally
+        {
+            server.Shutdown();
+        }        
+    }
+
+    private static void RunSerial(Runtime runtime)
+    {
+        // ANCHOR: create_serial
+        var outstation = Outstation.CreateSerialSession(
+            runtime,
+            "COM1",
+            new SerialPortSettings(),
+            GetOutstationConfig(),
+            GetEventBufferConfig(),
+            new TestOutstationApplication(),
+            new TestOutstationInformation(),
+            new TestControlHandler()
+        );        
+        // ANCHOR_END: create_serial
+
+        
+        RunOutstation(outstation);
+    }
+
+    private static void RunTls(Runtime runtime, TlsServerConfig config)
+    {
+        // ANCHOR: create_tls_server
+        var server = TcpServer.CreateTlsServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000", config);
+        // ANCHOR_END: create_tls_server
+
+        try
+        {
+            RunServer(server);
+        }
+        finally
+        {
+            server.Shutdown();
+        }
+    }
+
+    private static TlsServerConfig GetCaTlsConfig()
+    {
+        // ANCHOR: tls_ca_chain_config
+        var config = new TlsServerConfig(
+           "test.com",
+           "./certs/ca_chain/ca_cert.pem",
+           "./certs/ca_chain/entity2_cert.pem",
+           "./certs/ca_chain/entity2_key.pem",
+           "" // no password
+       );        
+        // ANCHOR_END: tls_ca_chain_config
+        return config;
+    }
+
+    private static TlsServerConfig GetSelfSignedTlsConfig()
+    {
+        // ANCHOR: tls_self_signed_config
+        var config = new TlsServerConfig(
+            "test.com",
+            "./certs/self_signed/entity1.pem",
+            "./certs/self_signed/entity2_cert.pem",
+            "./certs/self_signed/entity2_key.pem",
+            "" // no password
+        );
+        config.CertificateMode = CertificateMode.SelfSigned;
+        // ANCHOR_END: tls_self_signed_config
+        return config;
+    }
+         
+    public static void Main(string[] args)
+    {
+        // Initialize logging with the default configuration
+        Logging.Configure(
+            new LoggingConfig(),
+            new TestLogger()
+        );
+        
+        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
+       
+        if(args.Length != 2)
+        {
+            System.Console.WriteLine("You must specify the transport type");
+            System.Console.WriteLine("Usage: outstation-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
+            return;
+        }
+
+        try
+        {
+            var type = args[1];
+            switch(type) {
+                case "tcp":
+                    RunTcp(runtime);
+                    break;
+                case "serial":
+                    RunSerial(runtime);
+                    break;
+                case "tls-ca":
+                    RunTls(runtime, GetCaTlsConfig());
+                    break;
+                case "tls-self-signed":
+                    RunTls(runtime, GetSelfSignedTlsConfig());
+                    break;
+                default:
+                    System.Console.WriteLine("Unknown transport: %s", type);
+                    break;
+            }
         }
         finally
         {
@@ -146,7 +268,12 @@ class ExampleOutstation
     }
     // ANCHOR_END: event_buffer_config
 
-    private static void RunServer(TcpServer server)
+    private static Timestamp Now()
+    {
+        return Timestamp.SynchronizedTimestamp((ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+    }
+
+    private static OutstationConfig GetOutstationConfig()
     {
         // ANCHOR: outstation_config
         // create an outstation configuration with default values
@@ -159,42 +286,29 @@ class ExampleOutstation
         // override the default application decoding level
         config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
         // ANCHOR_END: outstation_config
+        return config;
+    }
 
-        // ANCHOR: tcp_server_add_outstation
-        var outstation = server.AddOutstation(
-            config,
-            GetEventBufferConfig(),
-            new TestOutstationApplication(),
-            new TestOutstationInformation(),
-            new TestControlHandler(),
-            new TestConnectionStateListener(),
-            AddressFilter.Any()
-        );
-        // ANCHOR_END: tcp_server_add_outstation
-
+    private static void RunOutstation(Outstation outstation)
+    {
         // Setup initial points
         // ANCHOR: database_init
-        outstation.Transaction(new OutstationTransaction((db) =>
+        outstation.Transaction(db =>
         {
             for (ushort i = 0; i < 10; i++)
             {
-                        // add points with default values
-                        db.AddBinary(i, EventClass.Class1, new BinaryConfig());
-                db.AddDoubleBitBinary(i, EventClass.Class1, new DoubleBitBinaryConfig());
+                // add points with default values
+                db.AddBinaryInput(i, EventClass.Class1, new BinaryInputConfig());
+                db.AddDoubleBitBinaryInput(i, EventClass.Class1, new DoubleBitBinaryInputConfig());
                 db.AddBinaryOutputStatus(i, EventClass.Class1, new BinaryOutputStatusConfig());
                 db.AddCounter(i, EventClass.Class1, new CounterConfig());
                 db.AddFrozenCounter(i, EventClass.Class1, new FrozenCounterConfig());
-                db.AddAnalog(i, EventClass.Class1, new AnalogConfig());
+                db.AddAnalogInput(i, EventClass.Class1, new AnalogInputConfig());
                 db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig());
                 db.AddOctetString(i, EventClass.Class1);
             }
-        }));
+        });
         // ANCHOR_END: database_init
-
-        // Start the outstation
-        // ANCHOR: tcp_server_bind
-        server.Bind();
-        // ANCHOR_END: tcp_server_bind
 
         var binaryValue = false;
         var doubleBitBinaryValue = DoubleBit.DeterminedOff;
@@ -212,69 +326,69 @@ class ExampleOutstation
                     return;
                 case "bi":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             binaryValue = !binaryValue;
-                            db.UpdateBinary(new Binary(7, binaryValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                        }));
+                            db.UpdateBinaryInput(new BinaryInput(7, binaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                        });
                         break;
                     }
                 case "dbbi":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DeterminedOff ? DoubleBit.DeterminedOn : DoubleBit.DeterminedOff;
-                            db.UpdateDoubleBitBinary(new DoubleBitBinary(7, doubleBitBinaryValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                        }));
+                            db.UpdateDoubleBitBinaryInput(new DoubleBitBinaryInput(7, doubleBitBinaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                        });
                         break;
                     }
                 case "bos":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             binaryOutputStatusValue = !binaryOutputStatusValue;
-                            db.UpdateBinaryOutputStatus(new BinaryOutputStatus(7, binaryOutputStatusValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                        }));
+                            db.UpdateBinaryOutputStatus(new BinaryOutputStatus(7, binaryOutputStatusValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                        });
                         break;
                     }
                 case "co":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
-                            db.UpdateCounter(new Counter(7, ++counterValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                        }));
+                            db.UpdateCounter(new Counter(7, ++counterValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                        });
                         break;
                     }
                 case "fco":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
-                            db.UpdateFrozenCounter(new FrozenCounter(7, ++frozenCounterValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                        }));
+                            db.UpdateFrozenCounter(new FrozenCounter(7, ++frozenCounterValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                        });
                         break;
                     }
                 case "ai":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
-                            db.UpdateAnalog(new Analog(7, ++analogValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                        }));
+                            db.UpdateAnalogInput(new AnalogInput(7, ++analogValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                        });
                         break;
                     }
                 case "aos":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
-                            db.UpdateAnalogOutputStatus(new AnalogOutputStatus(7, ++analogOutputStatusValue, new Flags(Flag.Online), Timestamp.SynchronizedTimestamp(0)), new UpdateOptions());
-                        }));
+                            db.UpdateAnalogOutputStatus(new AnalogOutputStatus(7, ++analogOutputStatusValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                        });
                         break;
                     }
                 case "os":
                     {
-                        outstation.Transaction(new OutstationTransaction((db) =>
+                        outstation.Transaction(db =>
                         {
                             db.UpdateOctetString(7, System.Text.Encoding.ASCII.GetBytes("Hello"), new UpdateOptions());
-                        }));
+                        });
                         break;
                     }
                 default:
@@ -283,4 +397,6 @@ class ExampleOutstation
             }
         }
     }
+
+    
 }

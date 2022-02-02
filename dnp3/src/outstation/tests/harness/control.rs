@@ -1,5 +1,6 @@
 use crate::app::control::CommandStatus;
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
+use crate::app::MaybeAsync;
 use crate::outstation::database::Database;
 use crate::outstation::tests::harness::{Control, Event, EventHandle};
 use crate::outstation::traits::{ControlHandler, ControlSupport, OperateType};
@@ -119,7 +120,8 @@ impl ControlHandler for MockControlHandler {
         self.events.push(Event::BeginControls);
     }
 
-    fn end_fragment(&mut self) {
+    fn end_fragment(&mut self) -> MaybeAsync<()> {
         self.events.push(Event::EndControls);
+        MaybeAsync::ready(())
     }
 }

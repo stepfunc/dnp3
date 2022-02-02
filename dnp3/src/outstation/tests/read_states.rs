@@ -18,29 +18,29 @@ const BINARY_EVENT_RESPONSE: &[u8] = &[
 ];
 
 fn create_binary_and_event(database: &mut Database) {
-    database.add(0, Some(EventClass::Class1), BinaryConfig::default());
+    database.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
     database.update(
         0,
-        &Binary::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+        &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
         UpdateOptions::default(),
     );
 }
 
 fn create_one_analog_with_value_42(database: &mut Database) {
-    database.add(0, Some(EventClass::Class1), AnalogConfig::default());
+    database.add(0, Some(EventClass::Class1), AnalogInputConfig::default());
     database.update(
         0,
-        &Analog::new(42.0, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+        &AnalogInput::new(42.0, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
         UpdateOptions::initialize(),
     );
 }
 
 fn create_five_binary_inputs_with_odd_indices_true(database: &mut Database) {
     for i in 0..5 {
-        database.add(i, Some(EventClass::Class1), BinaryConfig::default());
+        database.add(i, Some(EventClass::Class1), BinaryInputConfig::default());
         database.update(
             i,
-            &Binary::new(
+            &BinaryInput::new(
                 i % 2 == 1,
                 Flags::ONLINE,
                 Time::Synchronized(Timestamp::new(0)),

@@ -16,9 +16,17 @@ class MainClass
     }
     // ANCHOR_END: logging_interface
 
-    class TestListener : IClientStateListener
+    class TestClientStateListener : IClientStateListener
     {
         public void OnChange(ClientState state)
+        {
+            Console.WriteLine(state);
+        }
+    }
+
+    class TestPortStateListener : IPortStateListener
+    {
+        public void OnChange(PortState state)
         {
             Console.WriteLine(state);
         }
@@ -28,7 +36,7 @@ class MainClass
     {
         public void BeginFragment(ReadType readType, ResponseHeader header)
         {
-            Console.WriteLine($"Beginning fragment (broadcast: {header.Iin.Iin1.IsSet(Iin1Flag.Broadcast)})");
+            Console.WriteLine($"Beginning fragment (broadcast: {header.Iin.Iin1.Broadcast})");
         }
 
         public void EndFragment(ReadType readType, ResponseHeader header)
@@ -36,7 +44,7 @@ class MainClass
             Console.WriteLine("End fragment");
         }
 
-        public void HandleBinary(HeaderInfo info, ICollection<Binary> values)
+        public void HandleBinaryInput(HeaderInfo info, ICollection<BinaryInput> values)
         {
             Console.WriteLine("Binaries:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
@@ -48,7 +56,7 @@ class MainClass
             }
         }
 
-        public void HandleDoubleBitBinary(HeaderInfo info, ICollection<DoubleBitBinary> values)
+        public void HandleDoubleBitBinaryInput(HeaderInfo info, ICollection<DoubleBitBinaryInput> values)
         {
             Console.WriteLine("Double Bit Binaries:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
@@ -96,7 +104,7 @@ class MainClass
             }
         }
 
-        public void HandleAnalog(HeaderInfo info, ICollection<Analog> values)
+        public void HandleAnalogInput(HeaderInfo info, ICollection<AnalogInput> values)
         {
             Console.WriteLine("Analogs:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
@@ -131,7 +139,7 @@ class MainClass
                 Console.Write($"Octet String {val.Index}: Value=");
                 foreach (var b in val.Value)
                 {
-                    Console.Write($"{b.Value:X2} ");
+                    Console.Write($"{b:X2} ");
                 }
                 Console.WriteLine();
             }
@@ -141,50 +149,13 @@ class MainClass
     // ANCHOR: association_handler
     class TestAssocationHandler : IAssociationHandler
     {
-        public TimestampUtc GetCurrentTime()
+        public UtcTimestamp GetCurrentTime()
         {
-            return TimestampUtc.Valid((ulong)DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
+            return UtcTimestamp.Valid((ulong)DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds);
         }
     }
     // ANCHOR_END: association_handler
 
-    public static void Main(string[] args)
-    {
-        // ANCHOR: logging_init
-        // Initialize logging with the default configuration
-        // This may only be called once during program initialization
-        Logging.Configure(
-            new LoggingConfig(),
-            new ConsoleLogger()
-        );
-        // ANCHOR_END: logging_init
-
-        // ANCHOR: runtime_init
-        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
-        // ANCHOR_END: runtime_init
-
-        // ANCHOR: create_master_channel
-        var channel = MasterChannel.CreateTcpChannel(
-            runtime,
-            LinkErrorMode.Close,
-            GetMasterChannelConfig(),
-            new EndpointList("127.0.0.1:20000"),
-            new ConnectStrategy(),            
-            new TestListener()
-        );
-        // ANCHOR_END: create_master_channel
-
-        try
-        {
-            RunChannel(channel).GetAwaiter().GetResult();
-        }
-        finally
-        {
-            // ANCHOR: runtime_shutdown
-            runtime.Shutdown();
-            // ANCHOR_END: runtime_shutdown
-        }
-    }
 
     // ANCHOR: master_channel_config
     private static MasterChannelConfig GetMasterChannelConfig()
@@ -214,8 +185,159 @@ class MainClass
     }
     // ANCHOR_END: association_config
 
-    private static async Task RunChannel(MasterChannel channel)
+    private static void RunTcp(Runtime runtime)
     {
+        // ANCHOR: create_tcp_channel
+        var channel = MasterChannel.CreateTcpChannel(
+            runtime,
+            LinkErrorMode.Close,
+            GetMasterChannelConfig(),
+            new EndpointList("127.0.0.1:20000"),
+            new ConnectStrategy(),
+            new TestClientStateListener()
+        );
+        // ANCHOR_END: create_tcp_channel
+
+        try
+        {
+            RunChannel(channel);
+        }
+        finally
+        {
+            channel.Shutdown();
+        }        
+    }
+
+    private static void RunTls (Runtime runtime, TlsClientConfig config)
+    {
+        // ANCHOR: create_tls_channel
+        var channel = MasterChannel.CreateTlsChannel(
+            runtime,
+            LinkErrorMode.Close,
+            GetMasterChannelConfig(),
+            new EndpointList("127.0.0.1:20000"),
+            config,
+            new ConnectStrategy(),
+            new TestClientStateListener()
+        );
+        // ANCHOR_END: create_tls_channel
+
+        try
+        {
+            RunChannel(channel);
+        }
+        finally
+        {
+            channel.Shutdown();
+        }
+    }
+
+    private static void RunSerial(Runtime runtime)
+    {
+        // ANCHOR: create_tcp_channel
+        var channel = MasterChannel.CreateSerialChannel(
+            runtime,            
+            GetMasterChannelConfig(),
+            "COM1",
+            new SerialPortSettings(),
+            TimeSpan.FromSeconds(5),
+            new TestPortStateListener()
+        );
+        // ANCHOR_END: create_tcp_channel
+
+        try
+        {
+            RunChannel(channel);
+        }
+        finally
+        {
+            channel.Shutdown();
+        }
+    }
+    private static TlsClientConfig GetCaTlsConfig()
+    {
+        // ANCHOR: tls_ca_chain_config
+        // defaults to CA mode
+        var config = new TlsClientConfig(
+            "test.com",
+            "./certs/ca_chain/ca_cert.pem",
+            "./certs/ca_chain/entity1_cert.pem",
+            "./certs/ca_chain/entity1_key.pem",
+            "" // no password
+        );
+        // ANCHOR_END: tls_ca_chain_config
+        return config;
+    }
+
+    private static TlsClientConfig GetSelfSignedTlsConfig()
+    {
+        // ANCHOR: tls_self_signed_config
+        var config = new TlsClientConfig(
+            "test.com",
+            "./certs/self_signed/entity2_cert.pem",
+            "./certs/self_signed/entity1_cert.pem",
+            "./certs/self_signed/entity1_key.pem",
+            "" // no password
+        );
+        config.CertificateMode = CertificateMode.SelfSigned;
+        // ANCHOR_END: tls_self_signed_config
+        return config;
+    }
+
+    public static void Main(string[] args)
+    {
+        // ANCHOR: logging_init
+        // Initialize logging with the default configuration
+        // This may only be called once during program initialization
+        Logging.Configure(
+            new LoggingConfig(),
+            new ConsoleLogger()
+        );
+        // ANCHOR_END: logging_init
+
+        // ANCHOR: runtime_init
+        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
+        // ANCHOR_END: runtime_init        
+
+        if (args.Length != 2)
+        {
+            System.Console.WriteLine("You must specify the transport type");
+            System.Console.WriteLine("Usage: master-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
+            return;
+        }
+
+        try
+        {
+            var type = args[1];
+            switch (type)
+            {
+                case "tcp":
+                    RunTcp(runtime);
+                    break;
+                case "serial":
+                    RunSerial(runtime);
+                    break;
+                case "tls-ca":
+                    RunTls(runtime, GetCaTlsConfig());
+                    break;
+                case "tls-self-signed":
+                    RunTls(runtime, GetSelfSignedTlsConfig());
+                    break;
+                default:
+                    System.Console.WriteLine("Unknown transport: %s", type);
+                    break;
+            }
+        }
+        finally
+        {
+            // ANCHOR: runtime_shutdown
+            runtime.Shutdown();
+            // ANCHOR_END: runtime_shutdown
+        }
+    }
+
+    private static void RunChannel(MasterChannel channel)
+    {        
         // ANCHOR: association_create
         var association = channel.AddAssociation(
             1024,
@@ -234,101 +356,113 @@ class MainClass
 
         while (true)
         {
-            switch (await GetInputAsync())
+            var input = Console.ReadLine();
+            try
             {
-                case "x":
+                if (!RunOneCommand(channel, association, poll, input).GetAwaiter().GetResult())
+                {
+                    // exit command
                     return;
-                case "enable":
-                    {
-                        channel.Enable();
-                        break;
-                    }
-                case "disable":
-                    {
-                        channel.Disable();
-                        break;
-                    }
-                case "dln":
-                    {
-                        channel.SetDecodeLevel(new DecodeLevel());
-                        break;
-                    }
-                case "dlv":
-                    {
-                        channel.SetDecodeLevel(new DecodeLevel() { Application = AppDecodeLevel.ObjectValues });
-                        break;
-                    }
-                case "rao":
-                    {
-                        var request = new Request();
-                        request.AddAllObjectsHeader(Variation.Group40Var0);
-                        var result = await channel.Read(association, request);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "rmo":
-                    {
-                        var request = new Request();
-                        request.AddAllObjectsHeader(Variation.Group10Var0);
-                        request.AddAllObjectsHeader(Variation.Group40Var0);
-                        var result = await channel.Read(association, request);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "cmd":
-                    {
-                        // ANCHOR: assoc_control
-                        var commands = new Commands();
-                        commands.AddG12v1u8(3, new G12v1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
-                        var result = await channel.Operate(association, CommandMode.SelectBeforeOperate, commands);
-                        Console.WriteLine($"Result: {result}");
-                        // ANCHOR_END: assoc_control
-                        break;
-                    }
-                case "evt":
-                    {
-                        channel.DemandPoll(poll);
-                        break;
-                    }
-                case "lts":
-                    {
-                        var result = await channel.SynchronizeTime(association, TimeSyncMode.Lan);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "nts":
-                    {
-                        var result = await channel.SynchronizeTime(association, TimeSyncMode.NonLan);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "crt":
-                    {
-                        var result = await channel.ColdRestart(association);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "wrt":
-                    {
-                        var result = await channel.WarmRestart(association);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                case "lsr":
-                    {
-                        var result = await channel.CheckLinkStatus(association);
-                        Console.WriteLine($"Result: {result}");
-                        break;
-                    }
-                default:
-                    Console.WriteLine("Unknown command");
-                    break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error: " + ex);
             }
         }
     }
 
-    private static Task<string> GetInputAsync()
+    private static async Task<bool> RunOneCommand(MasterChannel channel, AssociationId association, PollId poll, String input)
     {
-        return Task.Run(() => Console.ReadLine());
+        switch (input)
+        {
+            case "x":
+                return false;
+            case "enable":
+                {
+                    channel.Enable();
+                    return true;
+                }
+            case "disable":
+                {
+                    channel.Disable();
+                    return true;
+                }
+            case "dln":
+                {
+                    channel.SetDecodeLevel(new DecodeLevel());
+                    return true;
+                }
+            case "dlv":
+                {
+                    channel.SetDecodeLevel(new DecodeLevel() { Application = AppDecodeLevel.ObjectValues });
+                    return true;
+                }
+            case "rao":
+                {
+                    var request = new Request();
+                    request.AddAllObjectsHeader(Variation.Group40Var0);
+                    var result = await channel.Read(association, request);
+                    Console.WriteLine($"Result: {result}");
+                    return true;
+                }
+            case "rmo":
+                {
+                    var request = new Request();
+                    request.AddAllObjectsHeader(Variation.Group10Var0);
+                    request.AddAllObjectsHeader(Variation.Group40Var0);
+                    var result = await channel.Read(association, request);
+                    Console.WriteLine($"Result: {result}");
+                    return true;
+                }
+            case "cmd":
+                {
+                    // ANCHOR: assoc_control
+                    var commands = new CommandSet();
+                    commands.AddG12V1U8(3, new Group12Var1(new ControlCode(TripCloseCode.Nul, false, OpType.LatchOn), 1, 1000, 1000));
+                    var result = await channel.Operate(association, CommandMode.SelectBeforeOperate, commands);
+                    Console.WriteLine($"Result: {result}");
+                    // ANCHOR_END: assoc_control
+                    return true;
+                }
+            case "evt":
+                {
+                    channel.DemandPoll(poll);
+                    return true;
+                }
+            case "lts":
+                {
+                    await channel.SynchronizeTime(association, TimeSyncMode.Lan);
+                    Console.WriteLine("Time sync success");
+                    return true;
+                }
+            case "nts":
+                {
+                    await channel.SynchronizeTime(association, TimeSyncMode.NonLan);
+                    Console.WriteLine("Time sync success");
+                    return true;
+                }
+            case "crt":
+                {
+                    var delay = await channel.ColdRestart(association);
+                    Console.WriteLine($"Restart delay: {delay}");
+                    return true;
+                }
+            case "wrt":
+                {
+                    var delay = await channel.WarmRestart(association);
+                    Console.WriteLine($"Restart delay: {delay}");
+                    return true;
+                }
+            case "lsr":
+                {
+                    var result = await channel.CheckLinkStatus(association);
+                    Console.WriteLine($"Result: {result}");
+                    return true;
+                }
+            default:
+                Console.WriteLine("Unknown command");
+                return true;
+        }
     }
 }

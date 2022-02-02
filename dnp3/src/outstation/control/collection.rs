@@ -12,30 +12,33 @@ use crate::outstation::traits::{ControlHandler, ControlSupport, OperateType};
 use crate::util::cursor::{WriteCursor, WriteError};
 
 pub(crate) struct ControlTransaction<'a> {
-    stared: bool,
+    started: bool,
     handler: &'a mut dyn ControlHandler,
 }
 
 impl<'a> ControlTransaction<'a> {
-    pub(crate) fn new(handler: &'a mut dyn ControlHandler) -> Self {
-        ControlTransaction {
-            stared: false,
+    pub(crate) async fn execute<F, R>(handler: &'a mut dyn ControlHandler, mut func: F) -> R
+    where
+        F: FnMut(&mut Self) -> R,
+    {
+        let mut tx = ControlTransaction {
+            started: false,
             handler,
+        };
+
+        let ret = func(&mut tx);
+
+        if tx.started {
+            tx.handler.end_fragment().get().await
         }
+
+        ret
     }
 
     fn start(&mut self) {
-        if !self.stared {
-            self.stared = true;
+        if !self.started {
+            self.started = true;
             self.handler.begin_fragment();
-        }
-    }
-}
-
-impl<'a> Drop for ControlTransaction<'a> {
-    fn drop(&mut self) {
-        if self.stared {
-            self.handler.end_fragment();
         }
     }
 }
@@ -232,6 +235,10 @@ pub(crate) struct ControlCollection<'a> {
 }
 
 impl<'a> ControlCollection<'a> {
+    pub(crate) fn hash(&self) -> u64 {
+        self.inner.hash()
+    }
+
     pub(crate) fn from(headers: HeaderCollection<'a>) -> Result<Self, BadControlHeader> {
         // do one pass to ensure that all headers are control headers
         let non_control_header: Option<BadControlHeader> = headers.iter().find_map(|x| {

@@ -102,7 +102,7 @@ impl TlsClientConfig {
             .with_safe_default_kx_groups()
             .with_protocol_versions(min_tls_version.to_rustls())
             .map_err(|err| {
-                TlsError::Miscellaneous(io::Error::new(ErrorKind::InvalidData, err.to_string()))
+                TlsError::Other(io::Error::new(ErrorKind::InvalidData, err.to_string()))
             })?;
 
         let config = match certificate_mode {

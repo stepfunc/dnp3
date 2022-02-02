@@ -34,7 +34,7 @@ pub fn address_filter_any() -> *mut AddressFilter {
     Box::into_raw(Box::new(AddressFilter::Any))
 }
 
-pub fn address_filter_new(address: &CStr) -> Result<*mut AddressFilter, ffi::ParamError> {
+pub fn address_filter_create(address: &CStr) -> Result<*mut AddressFilter, ffi::ParamError> {
     let address = address.to_string_lossy().parse()?;
 
     let mut set = std::collections::HashSet::new();
@@ -65,30 +65,6 @@ pub unsafe fn address_filter_destroy(address_filter: *mut AddressFilter) {
     if !address_filter.is_null() {
         Box::from_raw(address_filter);
     }
-}
-
-pub fn timestamp_invalid() -> ffi::Timestamp {
-    ffi::TimestampFields {
-        value: 0,
-        quality: ffi::TimeQuality::Invalid,
-    }
-    .into()
-}
-
-pub fn timestamp_synchronized(value: u64) -> ffi::Timestamp {
-    ffi::TimestampFields {
-        value,
-        quality: ffi::TimeQuality::Synchronized,
-    }
-    .into()
-}
-
-pub fn timestamp_not_synchronized(value: u64) -> ffi::Timestamp {
-    ffi::TimestampFields {
-        value,
-        quality: ffi::TimeQuality::NotSynchronized,
-    }
-    .into()
 }
 
 impl From<EventBufferConfig> for ffi::EventBufferConfig {
@@ -122,7 +98,7 @@ impl From<Option<RestartDelay>> for ffi::RestartDelay {
                 }
                 .into(),
                 RestartDelay::Milliseconds(value) => ffi::RestartDelayFields {
-                    restart_type: ffi::RestartDelayType::Milliseconds,
+                    restart_type: ffi::RestartDelayType::MilliSeconds,
                     value,
                 }
                 .into(),

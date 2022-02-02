@@ -43,8 +43,8 @@ pub enum TlsError {
     InvalidPrivateKey(io::Error),
     /// DNS name is invalid
     InvalidDnsName,
-    /// Miscellaneous error
-    Miscellaneous(io::Error),
+    /// Other error
+    Other(io::Error),
 }
 
 impl std::fmt::Display for TlsError {
@@ -58,7 +58,7 @@ impl std::fmt::Display for TlsError {
             }
             Self::InvalidPrivateKey(err) => write!(f, "invalid private key file: {}", err),
             Self::InvalidDnsName => write!(f, "invalid DNS name"),
-            Self::Miscellaneous(err) => write!(f, "miscellaneous TLS error: {}", err),
+            Self::Other(err) => write!(f, "miscellaneous TLS error: {}", err),
         }
     }
 }
@@ -69,9 +69,9 @@ impl std::error::Error for TlsError {}
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum MinTlsVersion {
     /// TLS 1.2
-    V1_2,
+    V12,
     /// TLS 1.3
-    V1_3,
+    V13,
 }
 
 impl MinTlsVersion {
@@ -82,8 +82,8 @@ impl MinTlsVersion {
             &[&rustls::version::TLS13];
 
         match self {
-            Self::V1_2 => MIN_TLS12_VERSIONS,
-            Self::V1_3 => MIN_TLS13_VERSIONS,
+            Self::V12 => MIN_TLS12_VERSIONS,
+            Self::V13 => MIN_TLS13_VERSIONS,
         }
     }
 }

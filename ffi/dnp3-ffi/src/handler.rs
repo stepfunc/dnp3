@@ -1,6 +1,6 @@
 use dnp3::app::measurement::*;
 use dnp3::app::*;
-use dnp3::app::{Iin1, Iin2, ResponseFunction, ResponseHeader};
+use dnp3::app::{ResponseFunction, ResponseHeader};
 use dnp3::master::{AssociationHandler, HeaderInfo, ReadHandler, ReadType};
 
 use crate::ffi;
@@ -16,28 +16,34 @@ impl AssociationHandler for ffi::AssociationHandler {
 }
 
 impl ReadHandler for ffi::ReadHandler {
-    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) {
+    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
         ffi::ReadHandler::begin_fragment(self, read_type.into(), header.into());
+        MaybeAsync::ready(())
     }
 
-    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader) {
+    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
         ffi::ReadHandler::end_fragment(self, read_type.into(), header.into());
+        MaybeAsync::ready(())
     }
 
-    fn handle_binary(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Binary, u16)>) {
-        let info = info.into();
-        let mut iterator = BinaryIterator::new(iter);
-        ffi::ReadHandler::handle_binary(self, info, &mut iterator as *mut _);
-    }
-
-    fn handle_double_bit_binary(
+    fn handle_binary_input(
         &mut self,
         info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
+        iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
     ) {
         let info = info.into();
-        let mut iterator = DoubleBitBinaryIterator::new(iter);
-        ffi::ReadHandler::handle_double_bit_binary(self, info, &mut iterator as *mut _);
+        let mut iterator = BinaryInputIterator::new(iter);
+        ffi::ReadHandler::handle_binary_input(self, info, &mut iterator as *mut _);
+    }
+
+    fn handle_double_bit_binary_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
+    ) {
+        let info = info.into();
+        let mut iterator = DoubleBitBinaryInputIterator::new(iter);
+        ffi::ReadHandler::handle_double_bit_binary_input(self, info, &mut iterator as *mut _);
     }
 
     fn handle_binary_output_status(
@@ -66,10 +72,14 @@ impl ReadHandler for ffi::ReadHandler {
         ffi::ReadHandler::handle_frozen_counter(self, info, &mut iterator);
     }
 
-    fn handle_analog(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Analog, u16)>) {
+    fn handle_analog_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
+    ) {
         let info = info.into();
-        let mut iterator = AnalogIterator::new(iter);
-        ffi::ReadHandler::handle_analog(self, info, &mut iterator);
+        let mut iterator = AnalogInputIterator::new(iter);
+        ffi::ReadHandler::handle_analog_input(self, info, &mut iterator);
     }
 
     fn handle_analog_output_status(
@@ -104,6 +114,36 @@ impl From<ReadType> for ffi::ReadType {
     }
 }
 
+impl From<Iin1> for ffi::Iin1 {
+    fn from(x: Iin1) -> Self {
+        Self {
+            broadcast: x.get_broadcast(),
+            class_1_events: x.get_class_1_events(),
+            class_2_events: x.get_class_2_events(),
+            class_3_events: x.get_class_3_events(),
+            device_restart: x.get_device_restart(),
+            device_trouble: x.get_device_trouble(),
+            local_control: x.get_local_control(),
+            need_time: x.get_need_time(),
+        }
+    }
+}
+
+impl From<Iin2> for ffi::Iin2 {
+    fn from(x: Iin2) -> Self {
+        Self {
+            no_func_code_support: x.get_no_func_code_support(),
+            object_unknown: x.get_object_unknown(),
+            parameter_error: x.get_parameter_error(),
+            event_buffer_overflow: x.get_event_buffer_overflow(),
+            already_executing: x.get_already_executing(),
+            config_corrupt: x.get_config_corrupt(),
+            reserved_2: x.get_reserved_2(),
+            reserved_1: x.get_reserved_1(),
+        }
+    }
+}
+
 impl From<ResponseHeader> for ffi::ResponseHeader {
     fn from(header: ResponseHeader) -> ffi::ResponseHeader {
         ffi::ResponseHeaderFields {
@@ -119,12 +159,8 @@ impl From<ResponseHeader> for ffi::ResponseHeader {
                 ResponseFunction::UnsolicitedResponse => ffi::ResponseFunction::UnsolicitedResponse,
             },
             iin: ffi::Iin {
-                iin1: ffi::Iin1 {
-                    value: header.iin.iin1.value,
-                },
-                iin2: ffi::Iin2 {
-                    value: header.iin.iin2.value,
-                },
+                iin1: header.iin.iin1.into(),
+                iin2: header.iin.iin2.into(),
             },
         }
         .into()
@@ -145,6 +181,8 @@ impl From<HeaderInfo> for ffi::HeaderInfo {
                 QualifierCode::CountAndPrefix16 => ffi::QualifierCode::CountAndPrefix16,
                 QualifierCode::FreeFormat16 => ffi::QualifierCode::FreeFormat16,
             },
+            is_event: info.is_event,
+            has_flags: info.has_flags,
         }
         .into()
     }
@@ -181,36 +219,51 @@ macro_rules! implement_iterator {
     };
 }
 
-implement_iterator!(BinaryIterator, binary_next, Binary, ffi::Binary);
 implement_iterator!(
-    DoubleBitBinaryIterator,
-    doublebitbinary_next,
-    DoubleBitBinary,
-    ffi::DoubleBitBinary
+    BinaryInputIterator,
+    binary_input_iterator_next,
+    BinaryInput,
+    ffi::BinaryInput
+);
+implement_iterator!(
+    DoubleBitBinaryInputIterator,
+    double_bit_binary_input_iterator_next,
+    DoubleBitBinaryInput,
+    ffi::DoubleBitBinaryInput
 );
 implement_iterator!(
     BinaryOutputStatusIterator,
-    binaryoutputstatus_next,
+    binary_output_status_iterator_next,
     BinaryOutputStatus,
     ffi::BinaryOutputStatus
 );
-implement_iterator!(CounterIterator, counter_next, Counter, ffi::Counter);
+implement_iterator!(
+    CounterIterator,
+    counter_iterator_next,
+    Counter,
+    ffi::Counter
+);
 implement_iterator!(
     FrozenCounterIterator,
-    frozencounter_next,
+    frozen_counter_iterator_next,
     FrozenCounter,
     ffi::FrozenCounter
 );
-implement_iterator!(AnalogIterator, analog_next, Analog, ffi::Analog);
+implement_iterator!(
+    AnalogInputIterator,
+    analog_input_iterator_next,
+    AnalogInput,
+    ffi::AnalogInput
+);
 implement_iterator!(
     AnalogOutputStatusIterator,
-    analogoutputstatus_next,
+    analog_output_status_iterator_next,
     AnalogOutputStatus,
     ffi::AnalogOutputStatus
 );
 
-impl ffi::Binary {
-    pub(crate) fn new(idx: u16, value: Binary) -> Self {
+impl ffi::BinaryInput {
+    pub(crate) fn new(idx: u16, value: BinaryInput) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -220,9 +273,9 @@ impl ffi::Binary {
     }
 }
 
-impl ffi::DoubleBitBinary {
-    pub(crate) fn new(idx: u16, value: DoubleBitBinary) -> Self {
-        ffi::DoubleBitBinaryFields {
+impl ffi::DoubleBitBinaryInput {
+    pub(crate) fn new(idx: u16, value: DoubleBitBinaryInput) -> Self {
+        ffi::DoubleBitBinaryInputFields {
             index: idx,
             value: match value.value {
                 DoubleBit::Intermediate => ffi::DoubleBit::Intermediate,
@@ -270,8 +323,8 @@ impl ffi::FrozenCounter {
     }
 }
 
-impl ffi::Analog {
-    pub(crate) fn new(idx: u16, value: Analog) -> Self {
+impl ffi::AnalogInput {
+    pub(crate) fn new(idx: u16, value: AnalogInput) -> Self {
         Self {
             index: idx,
             value: value.value,
@@ -319,13 +372,14 @@ impl<'a> OctetStringIterator<'a> {
     }
 }
 
-pub unsafe fn octetstring_next(it: *mut OctetStringIterator) -> Option<&ffi::OctetString> {
+pub unsafe fn octet_string_iterator_next(
+    it: *mut OctetStringIterator,
+) -> Option<&ffi::OctetString> {
     let it = it.as_mut();
-    it.map(|it| {
+    it.and_then(|it| {
         it.next();
         it.next.as_ref()
     })
-    .flatten()
 }
 
 impl<'a> ffi::OctetString<'a> {
@@ -339,7 +393,7 @@ impl<'a> ffi::OctetString<'a> {
 
 pub struct ByteIterator<'a> {
     inner: std::slice::Iter<'a, u8>,
-    next: Option<ffi::Byte>,
+    next: Option<u8>,
 }
 
 impl<'a> ByteIterator<'a> {
@@ -351,62 +405,27 @@ impl<'a> ByteIterator<'a> {
     }
 
     fn next(&mut self) {
-        self.next = self.inner.next().map(|value| ffi::Byte::new(*value))
+        self.next = self.inner.next().copied()
     }
 }
 
-pub unsafe fn byte_next(it: *mut ByteIterator) -> Option<&ffi::Byte> {
+pub unsafe fn byte_iterator_next(it: *mut ByteIterator) -> *const u8 {
     let it = it.as_mut();
-    it.map(|it| {
-        it.next();
-        it.next.as_ref()
-    })
-    .flatten()
-}
-
-impl ffi::Byte {
-    fn new(value: u8) -> Self {
-        Self { value }
+    match it {
+        None => std::ptr::null(),
+        Some(x) => {
+            x.next();
+            match &x.next {
+                None => std::ptr::null(),
+                Some(x) => x,
+            }
+        }
     }
 }
 
 impl From<Flags> for ffi::Flags {
     fn from(flags: Flags) -> ffi::Flags {
         ffi::Flags { value: flags.value }
-    }
-}
-
-pub unsafe fn iin1_is_set(iin1: Option<&ffi::Iin1>, flag: ffi::Iin1Flag) -> bool {
-    if let Some(iin1) = iin1 {
-        let iin1 = Iin1::new(iin1.value);
-        match flag {
-            ffi::Iin1Flag::Broadcast => iin1.get_broadcast(),
-            ffi::Iin1Flag::Class1Events => iin1.get_class_1_events(),
-            ffi::Iin1Flag::Class2Events => iin1.get_class_2_events(),
-            ffi::Iin1Flag::Class3Events => iin1.get_class_3_events(),
-            ffi::Iin1Flag::NeedTime => iin1.get_need_time(),
-            ffi::Iin1Flag::LocalControl => iin1.get_local_control(),
-            ffi::Iin1Flag::DeviceTrouble => iin1.get_device_trouble(),
-            ffi::Iin1Flag::DeviceRestart => iin1.get_device_restart(),
-        }
-    } else {
-        false
-    }
-}
-
-pub unsafe fn iin2_is_set(iin2: Option<&ffi::Iin2>, flag: ffi::Iin2Flag) -> bool {
-    if let Some(iin1) = iin2 {
-        let iin1 = Iin2::new(iin1.value);
-        match flag {
-            ffi::Iin2Flag::NoFuncCodeSupport => iin1.get_no_func_code_support(),
-            ffi::Iin2Flag::ObjectUnknown => iin1.get_object_unknown(),
-            ffi::Iin2Flag::ParameterError => iin1.get_parameter_error(),
-            ffi::Iin2Flag::EventBufferOverflow => iin1.get_event_buffer_overflow(),
-            ffi::Iin2Flag::AlreadyExecuting => iin1.get_already_executing(),
-            ffi::Iin2Flag::ConfigCorrupt => iin1.get_config_corrupt(),
-        }
-    } else {
-        false
     }
 }
 
@@ -418,9 +437,9 @@ impl From<Option<Time>> for ffi::Timestamp {
                 None => 0,
             },
             quality: match time {
-                Some(Time::Synchronized(_)) => ffi::TimeQuality::Synchronized,
-                Some(Time::NotSynchronized(_)) => ffi::TimeQuality::NotSynchronized,
-                None => ffi::TimeQuality::Invalid,
+                Some(Time::Synchronized(_)) => ffi::TimeQuality::SynchronizedTime,
+                Some(Time::Unsynchronized(_)) => ffi::TimeQuality::UnsynchronizedTime,
+                None => ffi::TimeQuality::InvalidTime,
             },
         }
         .into()

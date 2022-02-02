@@ -8,7 +8,7 @@ use crate::app::FunctionCode;
 use crate::app::Timestamp;
 use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
-use crate::master::handle::Promise;
+use crate::master::handler::Promise;
 use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::NonReadTask;
 use crate::tokio::time::Instant;
@@ -315,7 +315,7 @@ mod tests {
     use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
     use crate::app::Sequence;
     use crate::app::*;
-    use crate::master::handle::{AssociationHandler, NullReadHandler};
+    use crate::master::handler::{AssociationHandler, NullReadHandler};
     use crate::master::tasks::RequestWriter;
     use crate::util::cursor::WriteCursor;
 

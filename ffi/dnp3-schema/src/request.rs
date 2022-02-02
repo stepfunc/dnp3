@@ -1,111 +1,79 @@
-use oo_bindgen::class::ClassHandle;
-use oo_bindgen::native_function::*;
-use oo_bindgen::*;
+use oo_bindgen::model::*;
 
 use crate::shared::SharedDefinitions;
 
-pub fn define(
-    lib: &mut LibraryBuilder,
-    shared: &SharedDefinitions,
-) -> Result<ClassHandle, BindingError> {
-    let request = lib.declare_class("Request")?;
+pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<ClassHandle> {
+    let request = lib.declare_class("request")?;
 
-    let request_new_fn = lib
-        .declare_native_function("request_new")?
-        .return_type(ReturnType::new(
-            Type::ClassRef(request.clone()),
-            "Handle to the created request",
-        ))?
+    let constructor = lib
+        .define_constructor(request.clone())?
         .doc("Create a new request")?
         .build()?;
 
     let request_new_class_fn = lib
-        .declare_native_function("request_new_class")?
-        .param("class0", Type::Bool, "Ask for class 0 (static data)")?
-        .param("class1", Type::Bool, "Ask for class 1 events")?
-        .param("class2", Type::Bool, "Ask for class 2 events")?
-        .param("class3", Type::Bool, "Ask for class 3 events")?
-        .return_type(ReturnType::new(
-            Type::ClassRef(request.clone()),
+        .define_function("request_new_class")?
+        .param("class0", Primitive::Bool, "Ask for class 0 (static data)")?
+        .param("class1", Primitive::Bool, "Ask for class 1 events")?
+        .param("class2", Primitive::Bool, "Ask for class 2 events")?
+        .param("class3", Primitive::Bool, "Ask for class 3 events")?
+        .returns(
+          request.clone(),
             "Handle to the created request",
-        ))?
+        )?
         .doc(
             doc("Create a new request asking for classes")
-            .details("An identical request can be created manually with {class:Request.AddAllObjectsHeader()} and variations {enum:Variation.Group60Var1}, {enum:Variation.Group60Var2}, {enum:Variation.Group60Var3} and {enum:Variation.Group60Var4}.")
+            .details("An identical request can be created manually with {class:request.add_all_objects_header()} and variations {enum:variation.group60_var1}, {enum:variation.group60_var2}, {enum:variation.group60_var3} and {enum:variation.group60_var4}.")
         )?
-        .build()?;
+        .build_static("class_request")?;
 
-    let request_destroy_fn = lib
-        .declare_native_function("request_destroy")?
-        .param(
-            "request",
-            Type::ClassRef(request.clone()),
-            "Request to destroy",
-        )?
-        .return_type(ReturnType::void())?
-        .doc("Destroy a request created with {class:Request.[constructor]} or {class:Request.ClassRequest()}.")?
-        .build()?;
+    let destructor = lib
+        .define_destructor(
+            request.clone(),
+            "Destroy a request created with {class:request.[constructor]} or {class:request.class_request()}."
+        )?;
 
-    let request_add_one_byte_header_fn = lib
-        .declare_native_function("request_add_one_byte_header")?
-        .param(
-            "request",
-            Type::ClassRef(request.clone()),
-            "Request to modify",
-        )?
+    let add_one_byte_header = lib
+        .define_method("add_one_byte_header", request.clone())?
         .param(
             "variation",
-            Type::Enum(shared.variation_enum.clone()),
+            shared.variation_enum.clone(),
             "Variation to ask for",
         )?
-        .param("start", Type::Uint8, "Start index to ask")?
-        .param("stop", Type::Uint8, "Stop index to ask (inclusive)")?
-        .return_type(ReturnType::void())?
+        .param("start", Primitive::U8, "Start index to ask")?
+        .param("stop", Primitive::U8, "Stop index to ask (inclusive)")?
         .doc("Add a one-byte start/stop variation interrogation")?
         .build()?;
 
-    let request_add_two_byte_header_fn = lib
-        .declare_native_function("request_add_two_byte_header")?
-        .param(
-            "request",
-            Type::ClassRef(request.clone()),
-            "Request to modify",
-        )?
+    let add_two_byte_header = lib
+        .define_method("add_two_byte_header", request.clone())?
         .param(
             "variation",
-            Type::Enum(shared.variation_enum.clone()),
+            shared.variation_enum.clone(),
             "Variation to ask for",
         )?
-        .param("start", Type::Uint16, "Start index to ask")?
-        .param("stop", Type::Uint16, "Stop index to ask (inclusive)")?
-        .return_type(ReturnType::void())?
+        .param("start", Primitive::U16, "Start index to ask")?
+        .param("stop", Primitive::U16, "Stop index to ask (inclusive)")?
         .doc("Add a two-byte start/stop variation interrogation")?
         .build()?;
 
-    let request_add_all_objects_header_fn = lib
-        .declare_native_function("request_add_all_objects_header")?
-        .param(
-            "request",
-            Type::ClassRef(request.clone()),
-            "Request to modify",
-        )?
+    let add_all_objects_header = lib
+        .define_method("add_all_objects_header", request.clone())?
         .param(
             "variation",
-            Type::Enum(shared.variation_enum.clone()),
+            shared.variation_enum.clone(),
             "Variation to ask for",
         )?
-        .return_type(ReturnType::void())?
         .doc("Add an all objects variation interrogation")?
         .build()?;
 
     let request = lib
         .define_class(&request)?
-        .constructor(&request_new_fn)?
-        .destructor(&request_destroy_fn)?
-        .static_method("ClassRequest", &request_new_class_fn)?
-        .method("AddOneByteHeader", &request_add_one_byte_header_fn)?
-        .method("AddTwoByteHeader", &request_add_two_byte_header_fn)?
-        .method("AddAllObjectsHeader", &request_add_all_objects_header_fn)?
+        .constructor(constructor)?
+        .destructor(destructor)?
+        .static_method(request_new_class_fn)?
+        .method(add_one_byte_header)?
+        .method(add_two_byte_header)?
+        .method(add_all_objects_header)?
         .doc(
             doc("Custom request")
             .details("Whenever a method takes a request as a parameter, the request is internally copied. Therefore, it is possible to reuse the same requests over and over.")

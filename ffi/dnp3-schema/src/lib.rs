@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use oo_bindgen::*;
+use oo_bindgen::model::*;
 
 mod constants;
 mod database;
@@ -13,7 +13,11 @@ mod runtime;
 mod shared;
 mod variation;
 
-pub fn build_lib() -> Result<Library, BindingError> {
+pub(crate) fn gv(g: u8, v: u8) -> String {
+    format!("group{}_var{}", g, v)
+}
+
+pub fn build_lib() -> BackTraced<Library> {
     let info = LibraryInfo {
         description: "Safe and fast DNP3 library".to_string(),
         project_url: "https://stepfunc.io/products/libraries/dnp3/".to_string(),
@@ -48,9 +52,20 @@ pub fn build_lib() -> Result<Library, BindingError> {
                 organization_url: "https://stepfunc.io/".to_string(),
             },
         ],
+        logo_png: include_bytes!("../../../sfio_logo.png"),
     };
-    let mut builder = LibraryBuilder::new("dnp3", Version::parse(dnp3::VERSION).unwrap(), info);
-    builder.c_ffi_prefix("dnp3")?;
+
+    let settings = LibrarySettings::create(
+        "dnp3",
+        "dnp3",
+        ClassSettings::default(),
+        IteratorSettings::default(),
+        CollectionSettings::default(),
+        FutureSettings::default(),
+        InterfaceSettings::default(),
+    )?;
+
+    let mut builder = LibraryBuilder::new(Version::parse(dnp3::VERSION).unwrap(), info, settings);
 
     // Shared stuff
     let shared_def = shared::define(&mut builder)?;
@@ -58,5 +73,7 @@ pub fn build_lib() -> Result<Library, BindingError> {
     master::define(&mut builder, &shared_def)?;
     outstation::define(&mut builder, &shared_def)?;
 
-    builder.build()
+    let library = builder.build()?;
+
+    Ok(library)
 }

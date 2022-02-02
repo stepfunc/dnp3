@@ -3,11 +3,12 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
 
+use crate::app::{MaybeAsync, Timeout};
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
-use crate::master::handle::{AssociationHandle, HeaderInfo, MasterChannel, ReadHandler};
+use crate::master::handler::{AssociationHandle, HeaderInfo, MasterChannel, ReadHandler};
 use crate::master::session::{MasterSession, RunError};
 use crate::master::{DefaultAssociationHandler, ReadType};
 use crate::tokio::test::*;
@@ -17,8 +18,11 @@ use crate::util::phys::PhysLayer;
 pub(crate) mod requests;
 
 pub(crate) fn create_association(
-    config: AssociationConfig,
+    mut config: AssociationConfig,
 ) -> TestHarness<impl Future<Output = RunError>> {
+    // use a 1 second timeout for all tests
+    config.response_timeout = Timeout::from_secs(1).unwrap();
+
     let (io, io_handle) = io::mock();
 
     let mut io = PhysLayer::Mock(io);
@@ -30,7 +34,6 @@ pub(crate) fn create_association(
     let mut runner = MasterSession::new(
         true,
         AppDecodeLevel::ObjectValues.into(),
-        crate::app::Timeout::from_secs(1).unwrap(),
         MasterSession::MIN_TX_BUFFER_SIZE,
         rx,
     );
@@ -85,21 +88,33 @@ impl CountHandler {
 }
 
 impl ReadHandler for CountHandler {
-    fn begin_fragment(&mut self, _read_type: ReadType, _header: crate::app::ResponseHeader) {}
+    fn begin_fragment(
+        &mut self,
+        _read_type: ReadType,
+        _header: crate::app::ResponseHeader,
+    ) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
 
-    fn end_fragment(&mut self, _read_type: ReadType, _header: crate::app::ResponseHeader) {}
+    fn end_fragment(
+        &mut self,
+        _read_type: ReadType,
+        _header: crate::app::ResponseHeader,
+    ) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
 
-    fn handle_binary(
+    fn handle_binary_input(
         &mut self,
         _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::Binary, u16)>,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::BinaryInput, u16)>,
     ) {
     }
 
-    fn handle_double_bit_binary(
+    fn handle_double_bit_binary_input(
         &mut self,
         _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::DoubleBitBinary, u16)>,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::DoubleBitBinaryInput, u16)>,
     ) {
     }
 
@@ -124,10 +139,10 @@ impl ReadHandler for CountHandler {
     ) {
     }
 
-    fn handle_analog(
+    fn handle_analog_input(
         &mut self,
         _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::Analog, u16)>,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::AnalogInput, u16)>,
     ) {
         self.num_requests.fetch_add(1, Ordering::SeqCst);
     }

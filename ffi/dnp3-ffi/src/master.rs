@@ -2,8 +2,8 @@ use std::ffi::CStr;
 use std::path::Path;
 use std::time::Duration;
 
-use dnp3::app::{ConnectStrategy, Listener, RetryStrategy, Timeout, Timestamp};
-use dnp3::link::{EndpointAddress, LinkStatusResult, SpecialAddressError};
+use dnp3::app::{ConnectStrategy, Listener, RangeError, RetryStrategy, Timeout, Timestamp};
+use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::serial::*;
 use dnp3::tcp::tls::*;
@@ -170,6 +170,7 @@ pub unsafe fn master_channel_add_association(
     let address = EndpointAddress::from(address)?;
 
     let config = AssociationConfig {
+        response_timeout: Timeout::from_duration(Duration::from_millis(config.response_timeout))?,
         disable_unsol_classes: convert_event_classes(config.disable_unsol_classes()),
         enable_unsol_classes: convert_event_classes(config.enable_unsol_classes()),
         startup_integrity_classes: convert_classes(config.startup_integrity_classes()),
@@ -199,6 +200,12 @@ pub unsafe fn master_channel_add_association(
     Ok(ffi::AssociationId {
         address: address.raw_value(),
     })
+}
+
+impl From<RangeError> for ffi::ParamError {
+    fn from(_: RangeError) -> Self {
+        ffi::ParamError::InvalidTimeout
+    }
 }
 
 pub(crate) unsafe fn master_channel_remove_association(
@@ -286,12 +293,10 @@ pub(crate) unsafe fn master_channel_read(
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match handle.read(request).await {
-            Ok(_) => ffi::ReadResult::Success,
-            Err(err) => err.into(),
+        match handle.read(request).await {
+            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
+            Err(err) => callback.on_failure(err.into()),
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
@@ -302,7 +307,7 @@ pub unsafe fn master_channel_operate(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     mode: ffi::CommandMode,
-    commands: *mut crate::Commands,
+    commands: *mut crate::CommandSet,
     callback: ffi::CommandTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
@@ -316,27 +321,55 @@ pub unsafe fn master_channel_operate(
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match handle.operate(mode.into(), headers).await {
-            Ok(_) => ffi::CommandResult::Success,
-            Err(CommandError::Task(err)) => err.into(),
-            Err(CommandError::Response(err)) => match err {
-                CommandResponseError::Request(err) => err.into(),
-                CommandResponseError::BadStatus(_) => ffi::CommandResult::BadStatus,
-                CommandResponseError::HeaderCountMismatch => ffi::CommandResult::HeaderMismatch,
-                CommandResponseError::HeaderTypeMismatch => ffi::CommandResult::HeaderMismatch,
-                CommandResponseError::ObjectCountMismatch => ffi::CommandResult::HeaderMismatch,
-                CommandResponseError::ObjectValueMismatch => ffi::CommandResult::HeaderMismatch,
-            },
+        match handle.operate(mode.into(), headers).await {
+            Ok(_) => {
+                callback.on_complete(ffi::Nothing::Nothing);
+            }
+            Err(err) => {
+                let err: ffi::CommandError = match err {
+                    CommandError::Task(err) => err.into(),
+                    CommandError::Response(err) => match err {
+                        CommandResponseError::Request(err) => err.into(),
+                        CommandResponseError::BadStatus(_) => ffi::CommandError::BadStatus,
+                        CommandResponseError::HeaderCountMismatch => {
+                            ffi::CommandError::HeaderMismatch
+                        }
+                        CommandResponseError::HeaderTypeMismatch => {
+                            ffi::CommandError::HeaderMismatch
+                        }
+                        CommandResponseError::ObjectCountMismatch => {
+                            ffi::CommandError::HeaderMismatch
+                        }
+                        CommandResponseError::ObjectValueMismatch => {
+                            ffi::CommandError::HeaderMismatch
+                        }
+                    },
+                };
+                callback.on_failure(err);
+            }
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
     Ok(())
 }
 
-pub(crate) unsafe fn master_channel_sync_time(
+impl From<TimeSyncError> for ffi::TimeSyncError {
+    fn from(err: TimeSyncError) -> Self {
+        match err {
+            TimeSyncError::Task(err) => err.into(),
+            TimeSyncError::ClockRollback => ffi::TimeSyncError::ClockRollback,
+            TimeSyncError::SystemTimeNotUnix => ffi::TimeSyncError::SystemTimeNotUnix,
+            TimeSyncError::BadOutstationTimeDelay(_) => ffi::TimeSyncError::BadOutstationTimeDelay,
+            TimeSyncError::Overflow => ffi::TimeSyncError::Overflow,
+            TimeSyncError::StillNeedsTime => ffi::TimeSyncError::StillNeedsTime,
+            TimeSyncError::SystemTimeNotAvailable => ffi::TimeSyncError::SystemTimeNotAvailable,
+            TimeSyncError::IinError(_) => ffi::TimeSyncError::IinError,
+        }
+    }
+}
+
+pub(crate) unsafe fn master_channel_synchronize_time(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     mode: ffi::TimeSyncMode,
@@ -348,23 +381,10 @@ pub(crate) unsafe fn master_channel_sync_time(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match association.synchronize_time(mode.into()).await {
-            Ok(_) => ffi::TimeSyncResult::Success,
-            Err(TimeSyncError::Task(err)) => err.into(),
-            Err(TimeSyncError::ClockRollback) => ffi::TimeSyncResult::ClockRollback,
-            Err(TimeSyncError::SystemTimeNotUnix) => ffi::TimeSyncResult::SystemTimeNotUnix,
-            Err(TimeSyncError::BadOutstationTimeDelay(_)) => {
-                ffi::TimeSyncResult::BadOutstationTimeDelay
-            }
-            Err(TimeSyncError::Overflow) => ffi::TimeSyncResult::Overflow,
-            Err(TimeSyncError::StillNeedsTime) => ffi::TimeSyncResult::StillNeedsTime,
-            Err(TimeSyncError::SystemTimeNotAvailable) => {
-                ffi::TimeSyncResult::SystemTimeNotAvailable
-            }
-            Err(TimeSyncError::IinError(_)) => ffi::TimeSyncResult::IinError,
+        match association.synchronize_time(mode.into()).await {
+            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
+            Err(err) => callback.on_failure(err.into()),
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
@@ -382,12 +402,10 @@ pub(crate) unsafe fn master_channel_cold_restart(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match association.cold_restart().await {
-            Ok(value) => ffi::RestartResult::new_success(value),
-            Err(err) => ffi::RestartResult::new_error(err.into()),
+        match association.cold_restart().await {
+            Ok(x) => callback.on_complete(x),
+            Err(err) => callback.on_failure(err.into()),
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
@@ -405,12 +423,10 @@ pub(crate) unsafe fn master_channel_warm_restart(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match association.warm_restart().await {
-            Ok(value) => ffi::RestartResult::new_success(value),
-            Err(err) => ffi::RestartResult::new_error(err.into()),
+        match association.warm_restart().await {
+            Ok(x) => callback.on_complete(x),
+            Err(err) => callback.on_failure(err.into()),
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
@@ -428,13 +444,10 @@ pub(crate) unsafe fn master_channel_check_link_status(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let result = match association.check_link_status().await {
-            Ok(LinkStatusResult::Success) => ffi::LinkStatusResult::Success,
-            Ok(LinkStatusResult::UnexpectedResponse) => ffi::LinkStatusResult::UnexpectedResponse,
-            Err(_) => ffi::LinkStatusResult::TaskError,
+        match association.check_link_status().await {
+            Ok(_) => callback.on_complete(ffi::Nothing::Nothing),
+            Err(err) => callback.on_failure(err.into()),
         };
-
-        callback.on_complete(result);
     };
 
     channel.runtime.spawn(task)?;
@@ -464,58 +477,6 @@ pub(crate) unsafe fn master_channel_get_decode_level(
     Ok(result.into())
 }
 
-impl ffi::RestartResult {
-    fn new_success(delay: Duration) -> Self {
-        ffi::RestartResultFields {
-            delay,
-            error: ffi::RestartError::Ok,
-        }
-        .into()
-    }
-
-    fn new_error(error: ffi::RestartError) -> Self {
-        ffi::RestartResultFields {
-            delay: Duration::from_millis(0),
-            error,
-        }
-        .into()
-    }
-}
-
-pub(crate) fn classes_all() -> ffi::Classes {
-    ffi::Classes {
-        class0: true,
-        class1: true,
-        class2: true,
-        class3: true,
-    }
-}
-
-pub(crate) fn classes_none() -> ffi::Classes {
-    ffi::Classes {
-        class0: false,
-        class1: false,
-        class2: false,
-        class3: false,
-    }
-}
-
-pub(crate) fn event_classes_all() -> ffi::EventClasses {
-    ffi::EventClasses {
-        class1: true,
-        class2: true,
-        class3: true,
-    }
-}
-
-pub(crate) fn event_classes_none() -> ffi::EventClasses {
-    ffi::EventClasses {
-        class1: false,
-        class2: false,
-        class3: false,
-    }
-}
-
 fn convert_event_classes(config: &ffi::EventClasses) -> EventClasses {
     EventClasses::new(config.class1, config.class2, config.class3)
 }
@@ -535,22 +496,22 @@ fn convert_auto_time_sync(config: &ffi::AutoTimeSync) -> Option<TimeSyncProcedur
     }
 }
 
-pub fn timestamp_utc_valid(value: u64) -> ffi::TimestampUtc {
-    ffi::TimestampUtc {
+pub fn timestamp_utc_valid(value: u64) -> ffi::UtcTimestamp {
+    ffi::UtcTimestamp {
         value,
         is_valid: true,
     }
 }
 
-pub fn timestamp_utc_invalid() -> ffi::TimestampUtc {
-    ffi::TimestampUtc {
+pub fn timestamp_utc_invalid() -> ffi::UtcTimestamp {
+    ffi::UtcTimestamp {
         value: 0,
         is_valid: false,
     }
 }
 
-impl From<ffi::TimestampUtc> for Option<Timestamp> {
-    fn from(from: ffi::TimestampUtc) -> Self {
+impl From<ffi::UtcTimestamp> for Option<Timestamp> {
+    fn from(from: ffi::UtcTimestamp) -> Self {
         if from.is_valid {
             Some(Timestamp::new(from.value))
         } else {
@@ -587,7 +548,7 @@ impl Listener<PortState> for ffi::PortStateListener {
 
 pub type EndpointList = dnp3::tcp::EndpointList;
 
-pub(crate) unsafe fn endpoint_list_new(main_endpoint: &CStr) -> *mut EndpointList {
+pub(crate) unsafe fn endpoint_list_create(main_endpoint: &CStr) -> *mut EndpointList {
     Box::into_raw(Box::new(EndpointList::single(
         main_endpoint.to_string_lossy().to_string(),
     )))
@@ -611,7 +572,6 @@ fn convert_config(
     Ok(MasterChannelConfig {
         master_address: address,
         decode_level: config.decode_level().clone().into(),
-        response_timeout: Timeout::from_duration(config.response_timeout()).unwrap(),
         tx_buffer_size: config.tx_buffer_size() as usize,
         rx_buffer_size: config.rx_buffer_size() as usize,
     })
@@ -700,7 +660,7 @@ impl From<TlsError> for ffi::ParamError {
             TlsError::InvalidPeerCertificate(_) => ffi::ParamError::InvalidPeerCertificate,
             TlsError::InvalidLocalCertificate(_) => ffi::ParamError::InvalidLocalCertificate,
             TlsError::InvalidPrivateKey(_) => ffi::ParamError::InvalidPrivateKey,
-            TlsError::Miscellaneous(_) => ffi::ParamError::MiscellaneousTlsError,
+            TlsError::Other(_) => ffi::ParamError::OtherTlsError,
         }
     }
 }
@@ -708,8 +668,8 @@ impl From<TlsError> for ffi::ParamError {
 impl From<ffi::MinTlsVersion> for MinTlsVersion {
     fn from(from: ffi::MinTlsVersion) -> Self {
         match from {
-            ffi::MinTlsVersion::V1_2 => MinTlsVersion::V1_2,
-            ffi::MinTlsVersion::V1_3 => MinTlsVersion::V1_3,
+            ffi::MinTlsVersion::V12 => MinTlsVersion::V12,
+            ffi::MinTlsVersion::V13 => MinTlsVersion::V13,
         }
     }
 }
@@ -749,7 +709,8 @@ macro_rules! define_task_from_impl {
     };
 }
 
-define_task_from_impl!(CommandResult);
-define_task_from_impl!(TimeSyncResult);
+define_task_from_impl!(CommandError);
+define_task_from_impl!(TimeSyncError);
 define_task_from_impl!(RestartError);
-define_task_from_impl!(ReadResult);
+define_task_from_impl!(ReadError);
+define_task_from_impl!(LinkStatusError);

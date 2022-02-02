@@ -12,8 +12,11 @@ The `MasterChannelConfig` struct contains the following generic settings that ar
 
 * Master station address (different addresses may be used for different channels)
 * Initial decoding level
-* Timeout for responses from each outstation
 * Transmit and receive buffer sizes
+
+:::note
+The timeout for responses is configured for each association individually. This is useful if the outstation is a gateway services with varying latency.
+:::
 
 The constructor takes the master address and has reasonable defaults for all other settings. The default response timeout is 5 seconds; you may need to increase it for high-latency communication links. You should only need to adjust the default buffer size of 2,048 bytes if an outstation has a non-standard configuration.
 
@@ -29,7 +32,7 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/master_tcp_client.rs:master_channel_config}}
+{{#include ../dnp3/examples/master.rs:master_channel_config}}
 ```
 
 </TabItem>

@@ -105,10 +105,6 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: Copy-Item -Path .cargo/config-windows.toml -Destination .cargo/config.toml
-      - name: Copy Linux config
-        if: ${{ runner.os == 'Linux' }}
-        shell: pwsh
-        run: Copy-Item -Path .cargo/config-linux.toml -Destination .cargo/config.toml
       - name: Caching
         uses: Swatinem/rust-cache@v1
       - name: Download Cargo.lock
@@ -119,16 +115,79 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-  # Build bindings on Windows x64 and Linux x64
-  bindings:
+  # Build bindings on Linux x64 [64-bit Linux (kernel 2.6.32+, glibc 2.11+) (x86_64-unknown-linux-gnu)]
+  bindings-linux:
     needs: lock
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest # 64-bit Linux (kernel 2.6.32+, glibc 2.11+) (x86_64-unknown-linux-gnu)
-          - windows-latest # 64-bit MSVC (Windows 7+) (x86_64-pc-windows-msvc)
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Install doxygen 1.9.3
+        run: wget -q https://www.doxygen.nl/files/doxygen-1.9.3.linux.bin.tar.gz -O- | sudo tar --strip-components=1 -C /usr -xz doxygen-1.9.3
+      - name: Caching
+        uses: Swatinem/rust-cache@v1
+      - name: Download Cargo.lock
+        uses: actions/download-artifact@v2
+        with:
+          name: dependencies
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - name: C bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --c --doxygen
+      - name: .NET bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --dotnet --doxygen
+      - name: Java bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --java
+      - name: Extract documentation
+        run: |
+          mkdir -p ~/doc
+          cp -a ffi/bindings/c/generated/doc/c ~/doc/c
+          cp -a ffi/bindings/c/generated/doc/cpp ~/doc/cpp
+          cp -a ffi/bindings/dotnet/dnp3/doc ~/doc/dotnet
+          cp -a ffi/bindings/java/dnp3/target/apidocs ~/doc/java
+          rm ffi/bindings/c/generated/logo.png ffi/bindings/c/generated/doxygen-awesome.css
+      - name: Upload compiled FFI modules
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/c/generated/x86_64-unknown-linux-gnu/lib
+      - name: Upload C bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: c-bindings
+          path: ffi/bindings/c/generated
+      - name: Upload compiled Java bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/java/dnp3/src/main/resources
+      - name: Upload documentation
+        uses: actions/upload-artifact@v2
+        with:
+          name: doc
+          path: ~/doc
+  # Build bindings on Windows x64 [64-bit MSVC (Windows 7+) (x86_64-pc-windows-msvc)]
+  bindings-windows:
+    needs: lock
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -139,13 +198,8 @@ jobs:
           toolchain: stable
           override: true
       - name: Copy Windows config
-        if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: Copy-Item -Path .cargo/config-windows.toml -Destination .cargo/config.toml
-      - name: Copy Linux config
-        if: ${{ runner.os == 'Linux' }}
-        shell: pwsh
-        run: Copy-Item -Path .cargo/config-linux.toml -Destination .cargo/config.toml
       - name: Caching
         uses: Swatinem/rust-cache@v1
       - name: Download Cargo.lock
@@ -172,18 +226,65 @@ jobs:
         with:
           command: run
           args: --release --bin dnp3-bindings -- --java
-      - name: Upload compiled FFI modules (Windows)
-        if: ${{ runner.os == 'Windows' }}
+      - name: Upload compiled FFI modules
         uses: actions/upload-artifact@v2
         with:
           name: ffi-modules
           path: ffi/bindings/c/generated/x86_64-pc-windows-msvc/lib
-      - name: Upload compiled FFI modules (Linux)
-        if: ${{ runner.os == 'Linux' }}
+      - name: Upload C bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: c-bindings
+          path: ffi/bindings/c/generated
+      - name: Upload compiled Java bindings
         uses: actions/upload-artifact@v2
         with:
           name: ffi-modules
-          path: ffi/bindings/c/generated/x86_64-unknown-linux-gnu/lib
+          path: ffi/bindings/java/dnp3/src/main/resources
+  # Build bindings on MacOS [64-bit macOS (10.7+, Lion+) (x86_64-apple-darwin)]
+  bindings-macos:
+    needs: lock
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Caching
+        uses: Swatinem/rust-cache@v1
+      - name: Download Cargo.lock
+        uses: actions/download-artifact@v2
+        with:
+          name: dependencies
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - name: C bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --c
+      - name: .NET bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --dotnet
+      - name: Java bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --release --bin dnp3-bindings -- --java
+      - name: Upload compiled FFI modules
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/c/generated/x86_64-apple-darwin/lib
       - name: Upload C bindings
         uses: actions/upload-artifact@v2
         with:
@@ -300,9 +401,28 @@ jobs:
         with:
           name: c-bindings
           path: ffi/bindings/c/generated
+  guide:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install dependencies
+        working-directory: guide
+        run: yarn install
+      - name: Build guide
+        working-directory: guide
+        run: |
+         yarn build
+         mkdir -p ~/doc/guide
+         mv build/* ~/doc/guide
+      - name: Upload guide
+        uses: actions/upload-artifact@v2
+        with:
+          name: doc
+          path: ~/doc
   # Package all the generated bindings
   packaging:
-    needs: [lock, bindings, bindings-aarch64, cross]
+    needs: [lock, bindings-linux, bindings-windows, bindings-macos, bindings-aarch64, cross]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -357,10 +477,6 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - name: Copy Linux config
-        if: ${{ runner.os == 'Linux' }}
-        shell: pwsh
-        run: Copy-Item -Path .cargo/config-linux.toml -Destination .cargo/config.toml
       - name: Caching
         uses: Swatinem/rust-cache@v1
       - name: Download Cargo.lock
@@ -395,7 +511,7 @@ jobs:
           name: conformance-results
           path: conformance/results
   release:
-    needs: [packaging, conformance]
+    needs: [packaging, conformance, guide]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -403,6 +519,22 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           path: artifacts
+      - name: Checkout stepfunc/docs
+        uses: actions/checkout@v2
+        with:
+          repository: stepfunc/docs
+          ssh-key: ${{ secrets.SFIO_DOCS_SSH_KEY }}
+          path: docs
+      - name: Upload docs
+        working-directory: docs
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          rm -rf ./dnp3/${GITHUB_REF##*/}
+          cp -a ../artifacts/doc/* ./dnp3/${GITHUB_REF##*/}
+          git add -A
+          git commit -m "[dnp3] Release ${GITHUB_REF##*/}"
+          git push
       - name: Import PGP key
         uses: crazy-max/ghaction-import-gpg@v3
         with:

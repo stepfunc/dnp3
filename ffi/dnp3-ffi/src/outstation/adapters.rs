@@ -23,15 +23,11 @@ impl OutstationApplication for ffi::OutstationApplication {
     }
 
     fn cold_restart(&mut self) -> Option<RestartDelay> {
-        ffi::OutstationApplication::cold_restart(self)
-            .map(|delay| delay.into())
-            .flatten()
+        ffi::OutstationApplication::cold_restart(self).and_then(|delay| delay.into())
     }
 
     fn warm_restart(&mut self) -> Option<RestartDelay> {
-        ffi::OutstationApplication::warm_restart(self)
-            .map(|delay| delay.into())
-            .flatten()
+        ffi::OutstationApplication::warm_restart(self).and_then(|delay| delay.into())
     }
 
     fn freeze_counter(
@@ -77,7 +73,7 @@ impl From<ffi::RestartDelay> for Option<RestartDelay> {
         match from.restart_type() {
             ffi::RestartDelayType::NotSupported => None,
             ffi::RestartDelayType::Seconds => Some(RestartDelay::Seconds(from.value())),
-            ffi::RestartDelayType::Milliseconds => Some(RestartDelay::Milliseconds(from.value())),
+            ffi::RestartDelayType::MilliSeconds => Some(RestartDelay::Milliseconds(from.value())),
         }
     }
 }
@@ -147,8 +143,9 @@ impl ControlHandler for ffi::ControlHandler {
         ffi::ControlHandler::begin_fragment(self);
     }
 
-    fn end_fragment(&mut self) {
+    fn end_fragment(&mut self) -> MaybeAsync<()> {
         ffi::ControlHandler::end_fragment(self);
+        MaybeAsync::ready(())
     }
 }
 
@@ -400,9 +397,9 @@ impl From<FunctionCode> for ffi::FunctionCode {
     }
 }
 
-impl From<Group12Var1> for ffi::G12v1 {
+impl From<Group12Var1> for ffi::Group12Var1 {
     fn from(from: Group12Var1) -> Self {
-        ffi::G12v1Fields {
+        ffi::Group12Var1Fields {
             code: from.code.into(),
             count: from.count,
             on_time: from.on_time,

@@ -3,15 +3,26 @@ use crate::app::measurement::*;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
 use crate::app::variations::*;
 use crate::app::ResponseHeader;
-use crate::master::handle::ReadHandler;
+use crate::master::handler::ReadHandler;
 use crate::master::ReadType;
 
 /// Extract measurements from a HeaderCollection, sinking them into
 /// something that implements `MeasurementHandler`
-pub(crate) fn extract_measurements(
+pub(crate) async fn extract_measurements(
     read_type: ReadType,
     header: ResponseHeader,
-    objects: HeaderCollection,
+    objects: HeaderCollection<'_>,
+    handler: &mut dyn ReadHandler,
+) {
+    handler.begin_fragment(read_type, header).get().await;
+    extract_measurements_inner(objects, handler);
+    handler.end_fragment(read_type, header).get().await;
+}
+
+/// Extract measurements from a HeaderCollection, sinking them into
+/// something that implements `MeasurementHandler`
+pub(crate) fn extract_measurements_inner(
+    objects: HeaderCollection<'_>,
     handler: &mut dyn ReadHandler,
 ) {
     fn extract_cto_g51v1(prev: Option<Time>, item: Option<Group51Var1>) -> Option<Time> {
@@ -19,7 +30,7 @@ pub(crate) fn extract_measurements(
     }
 
     fn extract_cto_g51v2(prev: Option<Time>, item: Option<Group51Var2>) -> Option<Time> {
-        item.map_or(prev, |x| Some(Time::NotSynchronized(x.time)))
+        item.map_or(prev, |x| Some(Time::Unsynchronized(x.time)))
     }
 
     fn handle(
@@ -69,18 +80,16 @@ pub(crate) fn extract_measurements(
         cto
     }
 
-    handler.begin_fragment(read_type, header);
     objects
         .iter()
         .fold(None, |cto, header| handle(cto, header, handler));
-    handler.end_fragment(read_type, header);
 }
 
 #[cfg(test)]
 mod test {
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::*;
-    use crate::master::handle::{HeaderInfo, ReadHandler};
+    use crate::master::handler::{HeaderInfo, ReadHandler};
 
     use super::*;
 
@@ -94,7 +103,7 @@ mod test {
 
     #[derive(Debug)]
     enum Header {
-        Binary(Vec<(Binary, u16)>),
+        Binary(Vec<(BinaryInput, u16)>),
     }
 
     struct MockHandler {
@@ -116,10 +125,26 @@ mod test {
     }
 
     impl ReadHandler for MockHandler {
-        fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
-        fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {}
+        fn begin_fragment(
+            &mut self,
+            _read_type: ReadType,
+            _header: ResponseHeader,
+        ) -> MaybeAsync<()> {
+            MaybeAsync::ready(())
+        }
+        fn end_fragment(
+            &mut self,
+            _read_type: ReadType,
+            _header: ResponseHeader,
+        ) -> MaybeAsync<()> {
+            MaybeAsync::ready(())
+        }
 
-        fn handle_binary(&mut self, _info: HeaderInfo, x: &mut dyn Iterator<Item = (Binary, u16)>) {
+        fn handle_binary_input(
+            &mut self,
+            _info: HeaderInfo,
+            x: &mut dyn Iterator<Item = (BinaryInput, u16)>,
+        ) {
             let next_header = match self.expected.pop() {
                 Some(y) => y,
                 None => {
@@ -135,10 +160,10 @@ mod test {
             }
         }
 
-        fn handle_double_bit_binary(
+        fn handle_double_bit_binary_input(
             &mut self,
             _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
+            _x: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
         ) {
             unimplemented!()
         }
@@ -167,10 +192,10 @@ mod test {
             unimplemented!()
         }
 
-        fn handle_analog(
+        fn handle_analog_input(
             &mut self,
             _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (Analog, u16)>,
+            _x: &mut dyn Iterator<Item = (AnalogInput, u16)>,
         ) {
             unimplemented!()
         }
@@ -201,8 +226,8 @@ mod test {
         )
         .unwrap();
 
-        let expected: (Binary, u16) = (
-            Binary {
+        let expected: (BinaryInput, u16) = (
+            BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
                 time: None,
@@ -211,7 +236,7 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(ReadType::PeriodicPoll, header(), objects, &mut handler);
+        extract_measurements_inner(objects, &mut handler);
         assert!(handler.is_empty());
     }
 
@@ -228,8 +253,8 @@ mod test {
         )
         .unwrap();
 
-        let expected: (Binary, u16) = (
-            Binary {
+        let expected: (BinaryInput, u16) = (
+            BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
                 time: Some(Time::Synchronized(Timestamp::new(65537))), // 0xFFFF + 2
@@ -238,7 +263,7 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(ReadType::PeriodicPoll, header(), objects, &mut handler);
+        extract_measurements_inner(objects, &mut handler);
         assert!(handler.is_empty());
     }
 
@@ -255,17 +280,17 @@ mod test {
         )
         .unwrap();
 
-        let expected: (Binary, u16) = (
-            Binary {
+        let expected: (BinaryInput, u16) = (
+            BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
-                time: Some(Time::NotSynchronized(Timestamp::new(65536))), // 0xFFFE + 2
+                time: Some(Time::unsynchronized(65536)), // 0xFFFE + 2
             },
             0x07,
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(ReadType::PeriodicPoll, header(), objects, &mut handler);
+        extract_measurements_inner(objects, &mut handler);
         assert!(handler.is_empty());
     }
 
@@ -282,8 +307,8 @@ mod test {
         )
         .unwrap();
 
-        let expected: (Binary, u16) = (
-            Binary {
+        let expected: (BinaryInput, u16) = (
+            BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
                 time: Some(Time::Synchronized(Timestamp::max())),
@@ -292,7 +317,7 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(ReadType::PeriodicPoll, header(), objects, &mut handler);
+        extract_measurements_inner(objects, &mut handler);
         assert!(handler.is_empty());
     }
 
@@ -309,8 +334,8 @@ mod test {
         )
         .unwrap();
 
-        let expected: (Binary, u16) = (
-            Binary {
+        let expected: (BinaryInput, u16) = (
+            BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
                 time: None,
@@ -319,7 +344,7 @@ mod test {
         );
 
         handler.expect(Header::Binary(vec![expected]));
-        extract_measurements(ReadType::PeriodicPoll, header(), objects, &mut handler);
+        extract_measurements_inner(objects, &mut handler);
         assert!(handler.is_empty());
     }
 }

@@ -1,9 +1,9 @@
-package io.stepfunc.dnp3_conformance
+package io.stepfunc.conformance.dnp3
 
 import com.automatak.dnp4s.dnp3.app._
 import com.automatak.dnp4s.dnp3.{IntegrationPlugin, PluginReporter}
 import com.automatak.dnp4s.protocol.parsing.UInt8
-import io.stepfunc.dnp3.{AddressFilter, Analog, AnalogOutputStatus, Binary, BinaryOutputStatus, Counter, DoubleBit, DoubleBitBinary, EventBufferConfig, FrozenCounter, LinkErrorMode, Outstation, Runtime, RuntimeConfig, TcpServer}
+import io.stepfunc.dnp3.{AddressFilter, AnalogInput, AnalogOutputStatus, BinaryInput, BinaryOutputStatus, Counter, DoubleBit, DoubleBitBinaryInput, EventBufferConfig, FrozenCounter, LinkErrorMode, Outstation, Runtime, RuntimeConfig, TcpServer}
 import org.joou.UInteger
 import org.joou.Unsigned.{uint, ushort}
 
@@ -284,11 +284,11 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     points.foreach(receivedPoint => {
       receivedPoint.point match {
         case _: BinaryPoint => {
-          val expectedPoint = findPoint[Binary](receivedPoint.idx)
+          val expectedPoint = findPoint[BinaryInput](receivedPoint.idx)
           checkBinaryInput(expectedPoint, receivedPoint.asInstanceOf[GenIndexedPoint[BinaryPoint]])
         }
         case _: DoubleBitPoint => {
-          val expectedPoint = findPoint[DoubleBitBinary](receivedPoint.idx)
+          val expectedPoint = findPoint[DoubleBitBinaryInput](receivedPoint.idx)
           checkDoubleBitBinaryInput(expectedPoint, receivedPoint.asInstanceOf[GenIndexedPoint[DoubleBitPoint]])
         }
         case p: CounterPoint if !p.isFrozen => {
@@ -300,7 +300,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
           checkFrozenCounter(expectedPoint, receivedPoint.asInstanceOf[GenIndexedPoint[CounterPoint]])
         }
         case _: AnalogPoint => {
-          val expectedPoint = findPoint[Analog](receivedPoint.idx)
+          val expectedPoint = findPoint[AnalogInput](receivedPoint.idx)
           checkAnalogInput(expectedPoint, receivedPoint.asInstanceOf[GenIndexedPoint[AnalogPoint]])
         }
         case _: BinaryOutputStatusPoint => {
@@ -333,11 +333,11 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     points.foreach(receivedEvent => {
       val expectedEvent = trackingDatabase.popEvent(BatchSpecifier.Specific(this.eventBatch), eventClass).getOrElse(throw new Exception("Unexpected event"))
       expectedEvent match {
-        case TypedEvent(_: Binary) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[Binary]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: DoubleBitBinary) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinary]], getTypedEvent(receivedEvent))
+        case TypedEvent(_: BinaryInput) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[BinaryInput]], getTypedEvent(receivedEvent))
+        case TypedEvent(_: DoubleBitBinaryInput) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinaryInput]], getTypedEvent(receivedEvent))
         case TypedEvent(_: Counter) => checkCounter(expectedEvent.asInstanceOf[TypedEvent[Counter]], getTypedEvent(receivedEvent))
         case TypedEvent(_: FrozenCounter) => checkFrozenCounter(expectedEvent.asInstanceOf[TypedEvent[FrozenCounter]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: Analog) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[Analog]], getTypedEvent(receivedEvent))
+        case TypedEvent(_: AnalogInput) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[AnalogInput]], getTypedEvent(receivedEvent))
         case TypedEvent(_: BinaryOutputStatus) => checkBinaryOutput(expectedEvent.asInstanceOf[TypedEvent[BinaryOutputStatus]], getTypedEvent(receivedEvent))
         case TypedEvent(_: AnalogOutputStatus) => checkAnalogOutput(expectedEvent.asInstanceOf[TypedEvent[AnalogOutputStatus]], getTypedEvent(receivedEvent))
       }
@@ -358,11 +358,11 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
 
     val expectedEvent = trackingDatabase.popEvent(BatchSpecifier.Specific(this.eventBatch), eventClass).getOrElse(throw new Exception("Unexpected event"))
     expectedEvent match {
-      case TypedEvent(_: Binary) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[Binary]], getTypedEvent(point))
-      case TypedEvent(_: DoubleBitBinary) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinary]], getTypedEvent(point))
+      case TypedEvent(_: BinaryInput) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[BinaryInput]], getTypedEvent(point))
+      case TypedEvent(_: DoubleBitBinaryInput) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinaryInput]], getTypedEvent(point))
       case TypedEvent(_: Counter) => checkCounter(expectedEvent.asInstanceOf[TypedEvent[Counter]], getTypedEvent(point))
       case TypedEvent(_: FrozenCounter) => checkFrozenCounter(expectedEvent.asInstanceOf[TypedEvent[FrozenCounter]], getTypedEvent(point))
-      case TypedEvent(_: Analog) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[Analog]], getTypedEvent(point))
+      case TypedEvent(_: AnalogInput) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[AnalogInput]], getTypedEvent(point))
       case TypedEvent(_: BinaryOutputStatus) => checkBinaryOutput(expectedEvent.asInstanceOf[TypedEvent[BinaryOutputStatus]], getTypedEvent(point))
       case TypedEvent(_: AnalogOutputStatus) => checkAnalogOutput(expectedEvent.asInstanceOf[TypedEvent[AnalogOutputStatus]], getTypedEvent(point))
     }
@@ -381,11 +381,11 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     points.foreach(receivedEvent => {
       val expectedEvent = trackingDatabase.popEvent(BatchSpecifier.Specific(this.eventBatch), eventClass).getOrElse(throw new Exception("Unexpected event"))
       expectedEvent match {
-        case TypedEvent(_: Binary) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[Binary]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: DoubleBitBinary) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinary]], getTypedEvent(receivedEvent))
+        case TypedEvent(_: BinaryInput) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[BinaryInput]], getTypedEvent(receivedEvent))
+        case TypedEvent(_: DoubleBitBinaryInput) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinaryInput]], getTypedEvent(receivedEvent))
         case TypedEvent(_: Counter) => checkCounter(expectedEvent.asInstanceOf[TypedEvent[Counter]], getTypedEvent(receivedEvent))
         case TypedEvent(_: FrozenCounter) => checkFrozenCounter(expectedEvent.asInstanceOf[TypedEvent[FrozenCounter]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: Analog) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[Analog]], getTypedEvent(receivedEvent))
+        case TypedEvent(_: AnalogInput) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[AnalogInput]], getTypedEvent(receivedEvent))
         case TypedEvent(_: BinaryOutputStatus) => checkBinaryOutput(expectedEvent.asInstanceOf[TypedEvent[BinaryOutputStatus]], getTypedEvent(receivedEvent))
         case TypedEvent(_: AnalogOutputStatus) => checkAnalogOutput(expectedEvent.asInstanceOf[TypedEvent[AnalogOutputStatus]], getTypedEvent(receivedEvent))
       }
@@ -409,11 +409,11 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     points.foreach(receivedEvent => {
       val expectedEvent = trackingDatabase.popEvent(BatchSpecifier.All, eventClass).getOrElse(throw new Exception("Unexpected event"))
       expectedEvent match {
-        case TypedEvent(_: Binary) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[Binary]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: DoubleBitBinary) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinary]], getTypedEvent(receivedEvent))
+        case TypedEvent(_: BinaryInput) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[BinaryInput]], getTypedEvent(receivedEvent))
+        case TypedEvent(_: DoubleBitBinaryInput) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinaryInput]], getTypedEvent(receivedEvent))
         case TypedEvent(_: Counter) => checkCounter(expectedEvent.asInstanceOf[TypedEvent[Counter]], getTypedEvent(receivedEvent))
         case TypedEvent(_: FrozenCounter) => checkFrozenCounter(expectedEvent.asInstanceOf[TypedEvent[FrozenCounter]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: Analog) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[Analog]], getTypedEvent(receivedEvent))
+        case TypedEvent(_: AnalogInput) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[AnalogInput]], getTypedEvent(receivedEvent))
         case TypedEvent(_: BinaryOutputStatus) => checkBinaryOutput(expectedEvent.asInstanceOf[TypedEvent[BinaryOutputStatus]], getTypedEvent(receivedEvent))
         case TypedEvent(_: AnalogOutputStatus) => checkAnalogOutput(expectedEvent.asInstanceOf[TypedEvent[AnalogOutputStatus]], getTypedEvent(receivedEvent))
       }
@@ -593,11 +593,11 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
   // Verify individual points
   // ========================
 
-  private def printBinaryInput(reporter: PluginReporter, event: TypedEvent[Binary]): Unit = {
+  private def printBinaryInput(reporter: PluginReporter, event: TypedEvent[BinaryInput]): Unit = {
     reporter.log(f"Updated BI ${event.idx}: value=${event.value.value}, flags=${UInt8.fromByte(event.value.flags.value.byteValue()).value.toHexString}, timestamp=${event.value.time.value} (${event.value.time.quality})")
   }
 
-  private def checkBinaryInput(expectedValue: TypedEvent[Binary], receivedValue: GenIndexedPoint[BinaryPoint]): Unit = {
+  private def checkBinaryInput(expectedValue: TypedEvent[BinaryInput], receivedValue: GenIndexedPoint[BinaryPoint]): Unit = {
     // Check index
     if (expectedValue.idx != receivedValue.idx) throw new Exception("Unknown binary point event reported")
 
@@ -617,11 +617,11 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     }
   }
 
-  private def printDoubleBitBinaryInput(reporter: PluginReporter, event: TypedEvent[DoubleBitBinary]): Unit = {
+  private def printDoubleBitBinaryInput(reporter: PluginReporter, event: TypedEvent[DoubleBitBinaryInput]): Unit = {
     reporter.log(f"Updated DBBI ${event.idx}: value=${event.value.value}, flags=${UInt8.fromByte(event.value.flags.value.byteValue()).value.toHexString}, timestamp=${event.value.time.value} (${event.value.time.quality})")
   }
 
-  private def checkDoubleBitBinaryInput(expectedValue: TypedEvent[DoubleBitBinary], receivedValue: GenIndexedPoint[DoubleBitPoint]): Unit = {
+  private def checkDoubleBitBinaryInput(expectedValue: TypedEvent[DoubleBitBinaryInput], receivedValue: GenIndexedPoint[DoubleBitPoint]): Unit = {
     // Check index
     if (expectedValue.idx != receivedValue.idx) throw new Exception("Unknown double-bit binary point event reported")
 
@@ -690,11 +690,11 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     }
   }
 
-  private def printAnalogInput(reporter: PluginReporter, event: TypedEvent[Analog]): Unit = {
+  private def printAnalogInput(reporter: PluginReporter, event: TypedEvent[AnalogInput]): Unit = {
     reporter.log(f"Updated AI ${event.idx}: value=${event.value.value}, flags=${UInt8.fromByte(event.value.flags.value.byteValue()).value.toHexString}, timestamp=${event.value.time.value} (${event.value.time.quality})")
   }
 
-  private def checkAnalogInput(expectedValue: TypedEvent[Analog], receivedValue: GenIndexedPoint[AnalogPoint]): Unit = {
+  private def checkAnalogInput(expectedValue: TypedEvent[AnalogInput], receivedValue: GenIndexedPoint[AnalogPoint]): Unit = {
     // Check index
     if (expectedValue.idx != receivedValue.idx) throw new Exception("Unknown analog input point reported")
 
@@ -770,6 +770,20 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     verifyAllClassEvents(reporter, EventClass.All, points)
   }
 
+  private def eventBufferConfig : EventBufferConfig = {
+    val count = ushort(200)
+    new EventBufferConfig(
+      count,
+      count,
+      count,
+      count,
+      count,
+      count,
+      count,
+      count
+    )
+  }
+
   private def startOutstation(): Unit = {
     // Create manager
     val runtimeConfig = new RuntimeConfig()
@@ -805,7 +819,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     dnp3Config.maxUnsolicitedRetries = config.unsolicitedResponseConfig.maxNumRetries.map(x => uint(x)).getOrElse(UInteger.MAX)
 
     // Create the outstation
-    this.outstation = server.addOutstation(dnp3Config, EventBufferConfig.allTypes(ushort(200)), app, information, controlHandler, listener, AddressFilter.any())
+    this.outstation = server.addOutstation(dnp3Config, eventBufferConfig, app, information, controlHandler, listener, AddressFilter.any())
 
     // Create the database
     this.trackingDatabase = new TrackingDatabase(app, this.outstation, config.testDatabaseConfig)

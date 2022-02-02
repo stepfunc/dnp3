@@ -37,10 +37,10 @@ const CLASS_0_RESPONSE_SEQ0_WITH_PENDING_EVENTS: &[u8] = &[
 
 fn generate_binary_event(handle: &mut DatabaseHandle) {
     handle.transaction(|db| {
-        db.add(0, Some(EventClass::Class1), BinaryConfig::default());
+        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
         db.update(
             0,
-            &Binary::new(true, Flags::ONLINE, Time::synchronized(0)),
+            &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
             UpdateOptions::default(),
         )
     });
@@ -289,12 +289,12 @@ fn buffer_overflow_issue() {
         database.transaction(|database| {
             database.update(
                 0,
-                &Binary::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+                &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
                 UpdateOptions::default(),
             );
             database.update(
                 0,
-                &Binary::new(false, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+                &BinaryInput::new(false, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
                 UpdateOptions::default(),
             );
         });
@@ -302,7 +302,7 @@ fn buffer_overflow_issue() {
 
     // Add the point
     harness.handle.database.transaction(|database| {
-        database.add(0, Some(EventClass::Class1), BinaryConfig::default());
+        database.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
     });
 
     generate_overflow(&mut harness.handle.database);

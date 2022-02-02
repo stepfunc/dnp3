@@ -169,9 +169,9 @@ impl Pair {
                 db.add(
                     i,
                     Some(EventClass::Class1),
-                    BinaryConfig::new(
-                        StaticBinaryVariation::Group1Var2,
-                        EventBinaryVariation::Group2Var2,
+                    BinaryInputConfig::new(
+                        StaticBinaryInputVariation::Group1Var2,
+                        EventBinaryInputVariation::Group2Var2,
                     ),
                 );
                 db.add(
@@ -186,9 +186,9 @@ impl Pair {
                 db.add(
                     i,
                     Some(EventClass::Class1),
-                    AnalogConfig::new(
-                        StaticAnalogVariation::Group30Var1,
-                        EventAnalogVariation::Group32Var3,
+                    AnalogInputConfig::new(
+                        StaticAnalogInputVariation::Group30Var1,
+                        EventAnalogInputVariation::Group32Var3,
                         0.0,
                     ),
                 );
@@ -275,15 +275,24 @@ struct TestHandler {
 }
 
 impl ReadHandler for TestHandler {
-    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {
+    fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
         self.count = 0;
+        MaybeAsync::ready(())
     }
 
-    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) {
-        self.tx.try_send(self.count).unwrap();
+    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
+        let sender = self.tx.clone();
+        let count = self.count;
+        MaybeAsync::asynchronous(async move {
+            let _ = sender.send(count).await;
+        })
     }
 
-    fn handle_binary(&mut self, _info: HeaderInfo, iter: &mut dyn Iterator<Item = (Binary, u16)>) {
+    fn handle_binary_input(
+        &mut self,
+        _info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
+    ) {
         for (v, i) in iter {
             if self.measurements.expect(Measurement::Binary(v, i)) {
                 self.count += 1;
@@ -291,10 +300,10 @@ impl ReadHandler for TestHandler {
         }
     }
 
-    fn handle_double_bit_binary(
+    fn handle_double_bit_binary_input(
         &mut self,
         _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (DoubleBitBinary, u16)>,
+        _iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
     ) {
         unimplemented!()
     }
@@ -327,7 +336,11 @@ impl ReadHandler for TestHandler {
         unimplemented!()
     }
 
-    fn handle_analog(&mut self, _info: HeaderInfo, iter: &mut dyn Iterator<Item = (Analog, u16)>) {
+    fn handle_analog_input(
+        &mut self,
+        _info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
+    ) {
         for (v, i) in iter {
             if self.measurements.expect(Measurement::Analog(v, i)) {
                 self.count += 1;
@@ -357,9 +370,9 @@ impl AssociationHandler for TestHandler {}
 // don't need to send every type
 #[derive(Copy, Clone, PartialEq, Debug)]
 enum Measurement {
-    Binary(Binary, u16),
+    Binary(BinaryInput, u16),
     Counter(Counter, u16),
-    Analog(Analog, u16),
+    Analog(AnalogInput, u16),
 }
 
 impl Measurement {
@@ -388,23 +401,27 @@ impl Random {
     }
 
     // make sure the value and flags are consistent
-    fn normalize_flags(binary: Binary) -> Binary {
+    fn normalize_flags(binary: BinaryInput) -> BinaryInput {
         if binary.value {
-            Binary::new(
+            BinaryInput::new(
                 binary.value,
                 binary.flags | Flags::new(0b1000_0000),
                 binary.time.unwrap(),
             )
         } else {
             let raw = binary.flags.value & 0b0111_1111;
-            Binary::new(binary.value, Flags::new(raw), binary.time.unwrap())
+            BinaryInput::new(binary.value, Flags::new(raw), binary.time.unwrap())
         }
     }
 
     fn measurement(&mut self) -> Measurement {
         match self.inner.gen_range(0..=2) {
             0 => Measurement::Binary(
-                Self::normalize_flags(Binary::new(self.inner.gen(), self.flags(), self.time())),
+                Self::normalize_flags(BinaryInput::new(
+                    self.inner.gen(),
+                    self.flags(),
+                    self.time(),
+                )),
                 self.index(),
             ),
             1 => Measurement::Counter(
@@ -414,7 +431,7 @@ impl Random {
             2 => {
                 let value: u16 = self.inner.gen();
                 Measurement::Analog(
-                    Analog::new(value as f64, self.flags(), self.time()),
+                    AnalogInput::new(value as f64, self.flags(), self.time()),
                     self.index(),
                 )
             }

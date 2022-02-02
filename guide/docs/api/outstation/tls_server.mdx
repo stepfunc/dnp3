@@ -28,21 +28,18 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/outstation_tls_server.rs:tls_ca_chain_config}}
-let tls_config = ca_chain_tls_config;
+{{#include ../dnp3/examples/outstation.rs:tls_ca_chain_config}}
 
-{{#include ../dnp3/examples/outstation_tls_server.rs:create_tls_server}}
+{{#include ../dnp3/examples/outstation.rs:create_tls_server}}
 ```
 
 </TabItem>
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/outstation_tls_example.c:tcp_server_decl}}
-{{#include ../ffi/bindings/c/outstation_tls_example.c:common_error_code}}
-{{#include ../ffi/bindings/c/outstation_tls_example.c:tls_ca_chain_config}}
-dnp3_tls_server_config_t tls_config = ca_chain_tls_config;
-{{#include ../ffi/bindings/c/outstation_tls_example.c:create_tls_server}}
+{{#include ../ffi/bindings/c/outstation_example.c:tls_ca_chain_config}}
+
+{{#include ../ffi/bindings/c/outstation_example.c:create_tls_server}}
 // check error
 ```
 
@@ -50,18 +47,18 @@ dnp3_tls_server_config_t tls_config = ca_chain_tls_config;
 <TabItem value="Java">
 
 ```java
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationTlsExample.java:tls_ca_chain_config}}
-TlsServerConfig tlsConfig = caChainTlsConfig;
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationTlsExample.java:create_tls_server}}
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationExample.java:tls_ca_chain_config}}
+
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationExample.java:create_tls_server}}
 ```
 
 </TabItem>
 <TabItem value="C#">
 
 ```csharp
-{{#include ../ffi/bindings/dotnet/examples/outstation_tls/Program.cs:tls_ca_chain_config}}
-var tlsConfig = caChainTlsConfig;
-{{#include ../ffi/bindings/dotnet/examples/outstation_tls/Program.cs:create_tls_server}}
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:tls_ca_chain_config}}
+
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:create_tls_server}}
 ```
 
 </TabItem>
@@ -81,21 +78,18 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/outstation_tls_server.rs:tls_self_signed_config}}
-let tls_config = self_signed_tls_config;
+{{#include ../dnp3/examples/outstation.rs:tls_self_signed_config}}
 
-{{#include ../dnp3/examples/outstation_tls_server.rs:create_tls_server}}
+{{#include ../dnp3/examples/outstation.rs:create_tls_server}}
 ```
 
 </TabItem>
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/outstation_tls_example.c:tcp_server_decl}}
-{{#include ../ffi/bindings/c/outstation_tls_example.c:common_error_code}}
-{{#include ../ffi/bindings/c/outstation_tls_example.c:tls_self_signed_config}}
-dnp3_tls_server_config_t tls_config = self_signed_tls_config;
-{{#include ../ffi/bindings/c/outstation_tls_example.c:create_tls_server}}
+{{#include ../ffi/bindings/c/outstation_example.c:tls_self_signed_config}}
+
+{{#include ../ffi/bindings/c/outstation_example.c:create_tls_server}}
 // check error
 ```
 
@@ -103,18 +97,18 @@ dnp3_tls_server_config_t tls_config = self_signed_tls_config;
 <TabItem value="Java">
 
 ```java
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationTlsExample.java:tls_self_signed_config}}
-TlsServerConfig tlsConfig = selfSignedTlsConfig;
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationTlsExample.java:create_tls_server}}
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationExample.java:tls_self_signed_config}}
+
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationExample.java:create_tls_server}}
 ```
 
 </TabItem>
 <TabItem value="C#">
 
 ```csharp
-{{#include ../ffi/bindings/dotnet/examples/outstation_tls/Program.cs:tls_self_signed_config}}
-var tlsConfig = selfSignedTlsConfig;
-{{#include ../ffi/bindings/dotnet/examples/outstation_tls/Program.cs:create_tls_server}}
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:tls_self_signed_config}}
+
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:create_tls_server}}
 ```
 
 </TabItem>
