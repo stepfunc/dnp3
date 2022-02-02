@@ -16,9 +16,17 @@ class MainClass
     }
     // ANCHOR_END: logging_interface
 
-    class TestListener : IClientStateListener
+    class TestClientStateListener : IClientStateListener
     {
         public void OnChange(ClientState state)
+        {
+            Console.WriteLine(state);
+        }
+    }
+
+    class TestPortStateListener : IPortStateListener
+    {
+        public void OnChange(PortState state)
         {
             Console.WriteLine(state);
         }
@@ -148,32 +156,6 @@ class MainClass
     }
     // ANCHOR_END: association_handler
 
-    public static void Main(string[] args)
-    {
-        // ANCHOR: logging_init
-        // Initialize logging with the default configuration
-        // This may only be called once during program initialization
-        Logging.Configure(
-            new LoggingConfig(),
-            new ConsoleLogger()
-        );
-        // ANCHOR_END: logging_init
-
-        // ANCHOR: runtime_init
-        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
-        // ANCHOR_END: runtime_init        
-
-        try
-        {
-            Run(runtime);
-        }
-        finally
-        {
-            // ANCHOR: runtime_shutdown
-            runtime.Shutdown();
-            // ANCHOR_END: runtime_shutdown
-        }
-    }
 
     // ANCHOR: master_channel_config
     private static MasterChannelConfig GetMasterChannelConfig()
@@ -203,19 +185,159 @@ class MainClass
     }
     // ANCHOR_END: association_config
 
-    private static void Run(Runtime runtime)
+    private static void RunTcp(Runtime runtime)
     {
-        // ANCHOR: create_master_channel
+        // ANCHOR: create_tcp_channel
         var channel = MasterChannel.CreateTcpChannel(
             runtime,
             LinkErrorMode.Close,
             GetMasterChannelConfig(),
             new EndpointList("127.0.0.1:20000"),
             new ConnectStrategy(),
-            new TestListener()
+            new TestClientStateListener()
         );
-        // ANCHOR_END: create_master_channel
+        // ANCHOR_END: create_tcp_channel
 
+        try
+        {
+            RunChannel(channel);
+        }
+        finally
+        {
+            channel.Shutdown();
+        }        
+    }
+
+    private static void RunTls (Runtime runtime, TlsClientConfig config)
+    {
+        // ANCHOR: create_tls_channel
+        var channel = MasterChannel.CreateTlsChannel(
+            runtime,
+            LinkErrorMode.Close,
+            GetMasterChannelConfig(),
+            new EndpointList("127.0.0.1:20000"),
+            config,
+            new ConnectStrategy(),
+            new TestClientStateListener()
+        );
+        // ANCHOR_END: create_tls_channel
+
+        try
+        {
+            RunChannel(channel);
+        }
+        finally
+        {
+            channel.Shutdown();
+        }
+    }
+
+    private static void RunSerial(Runtime runtime)
+    {
+        // ANCHOR: create_tcp_channel
+        var channel = MasterChannel.CreateSerialChannel(
+            runtime,            
+            GetMasterChannelConfig(),
+            "COM1",
+            new SerialPortSettings(),
+            TimeSpan.FromSeconds(5),
+            new TestPortStateListener()
+        );
+        // ANCHOR_END: create_tcp_channel
+
+        try
+        {
+            RunChannel(channel);
+        }
+        finally
+        {
+            channel.Shutdown();
+        }
+    }
+    private static TlsClientConfig GetCaTlsConfig()
+    {
+        // ANCHOR: tls_ca_chain_config
+        // defaults to CA mode
+        var config = new TlsClientConfig(
+            "test.com",
+            "./certs/ca_chain/ca_cert.pem",
+            "./certs/ca_chain/entity1_cert.pem",
+            "./certs/ca_chain/entity1_key.pem",
+            "" // no password
+        );
+        // ANCHOR_END: tls_ca_chain_config
+        return config;
+    }
+
+    private static TlsClientConfig GetSelfSignedTlsConfig()
+    {
+        // ANCHOR: tls_self_signed_config
+        var config = new TlsClientConfig(
+            "test.com",
+            "./certs/self_signed/entity2_cert.pem",
+            "./certs/self_signed/entity1_cert.pem",
+            "./certs/self_signed/entity1_key.pem",
+            "" // no password
+        );
+        config.CertificateMode = CertificateMode.SelfSigned;
+        // ANCHOR_END: tls_self_signed_config
+        return config;
+    }
+
+    public static void Main(string[] args)
+    {
+        // ANCHOR: logging_init
+        // Initialize logging with the default configuration
+        // This may only be called once during program initialization
+        Logging.Configure(
+            new LoggingConfig(),
+            new ConsoleLogger()
+        );
+        // ANCHOR_END: logging_init
+
+        // ANCHOR: runtime_init
+        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
+        // ANCHOR_END: runtime_init        
+
+        if (args.Length != 2)
+        {
+            System.Console.WriteLine("You must specify the transport type");
+            System.Console.WriteLine("Usage: master-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
+            return;
+        }
+
+        try
+        {
+            var type = args[1];
+            switch (type)
+            {
+                case "tcp":
+                    RunTcp(runtime);
+                    break;
+                case "serial":
+                    RunSerial(runtime);
+                    break;
+                case "tls-ca":
+                    RunTls(runtime, GetCaTlsConfig());
+                    break;
+                case "tls-self-signed":
+                    RunTls(runtime, GetSelfSignedTlsConfig());
+                    break;
+                default:
+                    System.Console.WriteLine("Unknown transport: %s", type);
+                    break;
+            }
+        }
+        finally
+        {
+            // ANCHOR: runtime_shutdown
+            runtime.Shutdown();
+            // ANCHOR_END: runtime_shutdown
+        }
+    }
+
+    private static void RunChannel(MasterChannel channel)
+    {        
         // ANCHOR: association_create
         var association = channel.AddAssociation(
             1024,

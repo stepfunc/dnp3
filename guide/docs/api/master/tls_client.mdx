@@ -14,7 +14,7 @@ check the [TLS general information](../tls.mdx) page.
 
 ## Examples
 
-### Certificate chain configuration
+### Certificate Authority-based configuration
 
 <Tabs
 groupId="language"
@@ -28,22 +28,18 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/master_tls_client.rs:tls_ca_chain_config}}
-let tls_config = ca_chain_tls_config;
+{{#include ../dnp3/examples/master.rs:tls_ca_chain_config}}
 
-{{#include ../dnp3/examples/master_tls_client.rs:create_master_channel}}
+{{#include ../dnp3/examples/master.rs:create_master_tls_channel}}
 ```
 
 </TabItem>
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/master_tls_example.c:channel_decl}}
-{{#include ../ffi/bindings/c/master_tls_example.c:error_decl}}
+{{#include ../ffi/bindings/c/master_example.c:tls_ca_chain_config}}
 
-{{#include ../ffi/bindings/c/master_tls_example.c:tls_ca_chain_config}}
-dnp3_tls_server_config_t tls_config = ca_chain_tls_config;
-{{#include ../ffi/bindings/c/master_tls_example.c:create_master_channel}}
+{{#include ../ffi/bindings/c/master_example.c:create_master_tls_channel}}
 // check error
 ```
 
@@ -51,18 +47,18 @@ dnp3_tls_server_config_t tls_config = ca_chain_tls_config;
 <TabItem value="Java">
 
 ```java
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:tls_ca_chain_config}}
-TlsServerConfig tlsConfig = caChainTlsConfig;
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:create_master_channel}}
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:tls_ca_chain_config}}
+
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:create_tls_channel}}
 ```
 
 </TabItem>
 <TabItem value="C#">
 
 ```csharp
-{{#include ../ffi/bindings/dotnet/examples/master_tls/Program.cs:tls_ca_chain_config}}
-var tlsConfig = caChainTlsConfig;
-{{#include ../ffi/bindings/dotnet/examples/master_tls/Program.cs:create_master_channel}}
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:tls_ca_chain_config}}
+
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:create_tls_channel}}
 ```
 
 </TabItem>
@@ -82,22 +78,18 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/master_tls_client.rs:tls_self_signed_config}}
-let tls_config = self_signed_tls_config;
+{{#include ../dnp3/examples/master.rs:tls_self_signed_config}}
 
-{{#include ../dnp3/examples/master_tls_client.rs:create_master_channel}}
+{{#include ../dnp3/examples/master.rs:create_master_tls_channel}}
 ```
 
 </TabItem>
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/master_tls_example.c:channel_decl}}
-{{#include ../ffi/bindings/c/master_tls_example.c:error_decl}}
+{{#include ../ffi/bindings/c/master_example.c:tls_self_signed_config}}
 
-{{#include ../ffi/bindings/c/master_tls_example.c:tls_self_signed_config}}
-dnp3_tls_server_config_t tls_config = self_signed_tls_config;
-{{#include ../ffi/bindings/c/master_tls_example.c:create_master_channel}}
+{{#include ../ffi/bindings/c/master_example.c:create_master_tls_channel}}
 // check error
 ```
 
@@ -105,18 +97,18 @@ dnp3_tls_server_config_t tls_config = self_signed_tls_config;
 <TabItem value="Java">
 
 ```java
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:tls_self_signed_config}}
-TlsServerConfig tlsConfig = selfSignedTlsConfig;
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTlsExample.java:create_master_channel}}
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:tls_self_signed_config}}
+
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:create_tls_channel}}
 ```
 
 </TabItem>
 <TabItem value="C#">
 
 ```csharp
-{{#include ../ffi/bindings/dotnet/examples/master_tls/Program.cs:tls_self_signed_config}}
-var tlsConfig = selfSignedTlsConfig;
-{{#include ../ffi/bindings/dotnet/examples/master_tls/Program.cs:create_master_channel}}
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:tls_self_signed_config}}
+
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:create_tls_channel}}
 ```
 
 </TabItem>

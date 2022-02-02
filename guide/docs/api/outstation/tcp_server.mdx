@@ -43,15 +43,13 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/outstation_tcp_server.rs:create_tcp_server}}
+{{#include ../dnp3/examples/outstation.rs:create_tcp_server}}
 ```
 
 </TabItem>
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/outstation_example.c:tcp_server_decl}}
-{{#include ../ffi/bindings/c/outstation_example.c:common_error_code}}
 {{#include ../ffi/bindings/c/outstation_example.c:create_tcp_server}}
 // check error
 ```
@@ -94,7 +92,7 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/outstation_tcp_server.rs:tcp_server_spawn_outstation}}
+{{#include ../dnp3/examples/outstation.rs:tcp_server_spawn_outstation}}
 ```
 
 :::note
@@ -105,9 +103,6 @@ The terminology differs here between Rust and the bindings. The Rust API's 'add_
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/outstation_example.c:tcp_server_decl}}
-{{#include ../ffi/bindings/c/outstation_example.c:common_error_code}}
-
 {{#include ../ffi/bindings/c/outstation_example.c:tcp_server_add_outstation}}
 // check error
 ```
@@ -164,7 +159,7 @@ values={[
 <TabItem value="Rust">
 
 ```rust
-{{#include ../dnp3/examples/outstation_tcp_server.rs:server_bind}}
+{{#include ../dnp3/examples/outstation.rs:server_bind}}
 ```
 
 :::note
@@ -175,7 +170,6 @@ The terminology differs here between Rust and the bindings.
 <TabItem value="C">
 
 ```c
-{{#include ../ffi/bindings/c/outstation_example.c:common_error_code}}
 {{#include ../ffi/bindings/c/outstation_example.c:tcp_server_bind}}
 // check error
 ```

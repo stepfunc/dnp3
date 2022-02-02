@@ -107,15 +107,29 @@ class ExampleOutstation
         }
     }
 
-    public static void Main(string[] args)
+    private static void RunServer(TcpServer server)
     {
-        // Initialize logging with the default configuration
-        Logging.Configure(
-            new LoggingConfig(),
-            new TestLogger()
+        // ANCHOR: tcp_server_add_outstation
+        var outstation = server.AddOutstation(
+            GetOutstationConfig(),
+            GetEventBufferConfig(),
+            new TestOutstationApplication(),
+            new TestOutstationInformation(),
+            new TestControlHandler(),
+            new TestConnectionStateListener(),
+            AddressFilter.Any()
         );
+        // ANCHOR_END: tcp_server_add_outstation
 
-        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
+        // ANCHOR: tcp_server_bind
+        server.Bind();
+        // ANCHOR_END: tcp_server_bind
+
+        RunOutstation(outstation);
+    }
+
+    private static void RunTcp(Runtime runtime)
+    {
         // ANCHOR: create_tcp_server
         var server = new TcpServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000");
         // ANCHOR_END: create_tcp_server
@@ -123,6 +137,114 @@ class ExampleOutstation
         try
         {
             RunServer(server);
+        }
+        finally
+        {
+            server.Shutdown();
+        }        
+    }
+
+    private static void RunSerial(Runtime runtime)
+    {
+        // ANCHOR: create_serial
+        var outstation = Outstation.CreateSerialSession(
+            runtime,
+            "COM1",
+            new SerialPortSettings(),
+            GetOutstationConfig(),
+            GetEventBufferConfig(),
+            new TestOutstationApplication(),
+            new TestOutstationInformation(),
+            new TestControlHandler()
+        );        
+        // ANCHOR_END: create_serial
+
+        
+        RunOutstation(outstation);
+    }
+
+    private static void RunTls(Runtime runtime, TlsServerConfig config)
+    {
+        // ANCHOR: create_tls_server
+        var server = TcpServer.CreateTlsServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000", config);
+        // ANCHOR_END: create_tls_server
+
+        try
+        {
+            RunServer(server);
+        }
+        finally
+        {
+            server.Shutdown();
+        }
+    }
+
+    private static TlsServerConfig GetCaTlsConfig()
+    {
+        // ANCHOR: tls_ca_chain_config
+        var config = new TlsServerConfig(
+           "test.com",
+           "./certs/ca_chain/ca_cert.pem",
+           "./certs/ca_chain/entity2_cert.pem",
+           "./certs/ca_chain/entity2_key.pem",
+           "" // no password
+       );        
+        // ANCHOR_END: tls_ca_chain_config
+        return config;
+    }
+
+    private static TlsServerConfig GetSelfSignedTlsConfig()
+    {
+        // ANCHOR: tls_self_signed_config
+        var config = new TlsServerConfig(
+            "test.com",
+            "./certs/self_signed/entity1.pem",
+            "./certs/self_signed/entity2_cert.pem",
+            "./certs/self_signed/entity2_key.pem",
+            "" // no password
+        );
+        config.CertificateMode = CertificateMode.SelfSigned;
+        // ANCHOR_END: tls_self_signed_config
+        return config;
+    }
+         
+    public static void Main(string[] args)
+    {
+        // Initialize logging with the default configuration
+        Logging.Configure(
+            new LoggingConfig(),
+            new TestLogger()
+        );
+        
+        var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
+       
+        if(args.Length != 2)
+        {
+            System.Console.WriteLine("You must specify the transport type");
+            System.Console.WriteLine("Usage: outstation-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
+            return;
+        }
+
+        try
+        {
+            var type = args[1];
+            switch(type) {
+                case "tcp":
+                    RunTcp(runtime);
+                    break;
+                case "serial":
+                    RunSerial(runtime);
+                    break;
+                case "tls-ca":
+                    RunTls(runtime, GetCaTlsConfig());
+                    break;
+                case "tls-self-signed":
+                    RunTls(runtime, GetSelfSignedTlsConfig());
+                    break;
+                default:
+                    System.Console.WriteLine("Unknown transport: %s", type);
+                    break;
+            }
         }
         finally
         {
@@ -147,11 +269,11 @@ class ExampleOutstation
     // ANCHOR_END: event_buffer_config
 
     private static Timestamp Now()
-    {        
-        return Timestamp.SynchronizedTimestamp((ulong) DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+    {
+        return Timestamp.SynchronizedTimestamp((ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
     }
 
-    private static void RunServer(TcpServer server)
+    private static OutstationConfig GetOutstationConfig()
     {
         // ANCHOR: outstation_config
         // create an outstation configuration with default values
@@ -164,19 +286,11 @@ class ExampleOutstation
         // override the default application decoding level
         config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
         // ANCHOR_END: outstation_config
+        return config;
+    }
 
-        // ANCHOR: tcp_server_add_outstation
-        var outstation = server.AddOutstation(
-            config,
-            GetEventBufferConfig(),
-            new TestOutstationApplication(),
-            new TestOutstationInformation(),
-            new TestControlHandler(),
-            new TestConnectionStateListener(),
-            AddressFilter.Any()
-        );
-        // ANCHOR_END: tcp_server_add_outstation
-
+    private static void RunOutstation(Outstation outstation)
+    {
         // Setup initial points
         // ANCHOR: database_init
         outstation.Transaction(db =>
@@ -195,11 +309,6 @@ class ExampleOutstation
             }
         });
         // ANCHOR_END: database_init
-
-        // Start the outstation
-        // ANCHOR: tcp_server_bind
-        server.Bind();
-        // ANCHOR_END: tcp_server_bind
 
         var binaryValue = false;
         var doubleBitBinaryValue = DoubleBit.DeterminedOff;
@@ -288,4 +397,6 @@ class ExampleOutstation
             }
         }
     }
+
+    
 }
