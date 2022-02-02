@@ -7,13 +7,15 @@ edition = "2021"
 [dependencies]
 tracing = "0.1"
 chrono = "0.4"
-pem = "1.0"
-pkcs8 = { version = "0.7", features = ["encryption", "pem", "std"] }
-rasn = { git = "https://github.com/stepfunc/rasn", tag = "0.1.2" }
 tokio-mock = { git = "https://github.com/stepfunc/tokio-mock.git", tag = "0.1.0" }
-tokio-rustls = { version = "0.23", features = ["dangerous_configuration", "tls12"], default-features = false }
 tokio-serial = "5.4"
 xxhash-rust = { version = "0.8.2", features = ["xxh64"] }
+
+# TLS dependencies
+pem = { version = "1.0", optional = true }
+pkcs8 = { version = "0.7", features = ["encryption", "pem", "std"], optional = true }
+rasn = { git = "https://github.com/stepfunc/rasn", tag = "0.1.2", optional = true }
+tokio-rustls = { version = "0.23", features = ["dangerous_configuration", "tls12"], default-features = false, optional = true }
 
 [dev-dependencies]
 assert_matches = "1.2"
@@ -25,8 +27,9 @@ criterion = "0.3"
 rand = "0.8"
 
 [features]
-# this feature flag is only used when building the FFI
-ffi = []
+default = ["tls"]
+ffi = [] # this feature flag is only used when building the FFI
+tls = ["pem", "pkcs8", "rasn", "tokio-rustls"]
 
 [[bench]]
 name = "benchmark"

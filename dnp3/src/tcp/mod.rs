@@ -4,6 +4,7 @@ pub use master::*;
 pub use outstation::*;
 
 /// Entry points and types for TLS
+#[cfg(feature = "tls")]
 pub mod tls;
 
 mod address_filter;

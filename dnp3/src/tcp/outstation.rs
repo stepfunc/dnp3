@@ -7,7 +7,6 @@ use crate::outstation::database::EventBufferConfig;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::OutstationHandle;
 use crate::outstation::*;
-use crate::tcp::tls::TlsServerConfig;
 use crate::tcp::{AddressFilter, FilterError};
 use crate::util::channel::Sender;
 use crate::util::phys::PhysLayer;
@@ -36,13 +35,15 @@ pub struct ServerHandle {
 
 enum TcpServerConnectionHandler {
     Tcp,
-    Tls(TlsServerConfig),
+    #[cfg(feature = "tls")]
+    Tls(crate::tcp::tls::TlsServerConfig),
 }
 
 impl TcpServerConnectionHandler {
     async fn handle(&mut self, socket: crate::tokio::net::TcpStream) -> Result<PhysLayer, String> {
         match self {
             Self::Tcp => Ok(PhysLayer::Tcp(socket)),
+            #[cfg(feature = "tls")]
             Self::Tls(config) => config.handle_connection(socket).await,
         }
     }
@@ -62,10 +63,11 @@ impl TcpServer {
     }
 
     /// create a TLS server builder object that will eventually be bound to the specified address
+    #[cfg(feature = "tls")]
     pub fn new_tls_server(
         link_error_mode: LinkErrorMode,
         address: std::net::SocketAddr,
-        tls_config: TlsServerConfig,
+        tls_config: crate::tcp::tls::TlsServerConfig,
     ) -> Self {
         Self {
             link_error_mode,
