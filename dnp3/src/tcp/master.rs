@@ -9,7 +9,6 @@ use crate::app::{RetryStrategy, Shutdown};
 use crate::link::LinkErrorMode;
 use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::tcp::tls::TlsClientConfig;
 use crate::tcp::ClientState;
 use crate::tcp::EndpointList;
 use crate::tokio::net::TcpStream;
@@ -74,7 +73,8 @@ pub fn create_master_tcp_client(
 
 pub(crate) enum MasterTaskConnectionHandler {
     Tcp,
-    Tls(TlsClientConfig),
+    #[cfg(feature = "tls")]
+    Tls(crate::tcp::tls::TlsClientConfig),
 }
 
 impl MasterTaskConnectionHandler {
@@ -85,6 +85,7 @@ impl MasterTaskConnectionHandler {
     ) -> Result<PhysLayer, String> {
         match self {
             Self::Tcp => Ok(PhysLayer::Tcp(socket)),
+            #[cfg(feature = "tls")]
             Self::Tls(config) => config.handle_connection(socket, endpoint).await,
         }
     }

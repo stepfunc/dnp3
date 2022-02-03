@@ -8,10 +8,12 @@ use dnp3::link::*;
 use dnp3::outstation::database::*;
 use dnp3::outstation::*;
 use dnp3::serial::{spawn_outstation_serial, SerialSettings};
-use dnp3::tcp::tls::{CertificateMode, MinTlsVersion, TlsServerConfig};
 use dnp3::tcp::*;
 use std::path::Path;
 use std::process::exit;
+
+#[cfg(feature = "tls")]
+use dnp3::tcp::tls::*;
 
 /// example of using the outstation API asynchronously from within the Tokio runtime
 ///
@@ -35,7 +37,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match transport {
         "tcp" => run_tcp().await,
         "serial" => run_serial().await,
+        #[cfg(feature = "tls")]
         "tls-ca" => run_tls(get_ca_chain_config()?).await,
+        #[cfg(feature = "tls")]
         "tls-self-signed" => run_tls(get_self_signed_config()?).await,
         _ => {
             eprintln!(
@@ -91,6 +95,7 @@ async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
     run_outstation(outstation).await
 }
 
+#[cfg(feature = "tls")]
 async fn run_tls(config: TlsServerConfig) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_tls_server
     let server =
@@ -147,6 +152,7 @@ async fn run_outstation(outstation: OutstationHandle) -> Result<(), Box<dyn std:
     }
 }
 
+#[cfg(feature = "tls")]
 fn get_ca_chain_config() -> Result<TlsServerConfig, Box<dyn std::error::Error>> {
     // ANCHOR: tls_ca_chain_config
     let config = TlsServerConfig::new(
@@ -163,6 +169,7 @@ fn get_ca_chain_config() -> Result<TlsServerConfig, Box<dyn std::error::Error>> 
     Ok(config)
 }
 
+#[cfg(feature = "tls")]
 fn get_self_signed_config() -> Result<TlsServerConfig, Box<dyn std::error::Error>> {
     // ANCHOR: tls_self_signed_config
     let config = TlsServerConfig::new(

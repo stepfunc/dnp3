@@ -9,8 +9,10 @@ use dnp3::decode::*;
 use dnp3::link::*;
 use dnp3::master::*;
 use dnp3::serial::*;
-use dnp3::tcp::tls::*;
 use dnp3::tcp::*;
+
+#[cfg(feature = "tls")]
+use dnp3::tcp::tls::*;
 
 use std::path::Path;
 use std::process::exit;
@@ -163,7 +165,9 @@ fn create_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
     match transport {
         "tcp" => create_tcp_channel(),
         "serial" => create_serial_channel(),
+        #[cfg(feature = "tls")]
         "tls-ca" => create_tls_channel(get_tls_authority_config()?),
+        #[cfg(feature = "tls")]
         "tls-self-signed" => create_tls_channel(get_tls_self_signed_config()?),
         _ => {
             eprintln!(
@@ -201,6 +205,7 @@ fn get_association_config() -> AssociationConfig {
 }
 // ANCHOR_END: association_config
 
+#[cfg(feature = "tls")]
 fn get_tls_self_signed_config() -> Result<TlsClientConfig, Box<dyn std::error::Error>> {
     // ANCHOR: tls_self_signed_config
     let config = TlsClientConfig::new(
@@ -216,6 +221,7 @@ fn get_tls_self_signed_config() -> Result<TlsClientConfig, Box<dyn std::error::E
     Ok(config)
 }
 
+#[cfg(feature = "tls")]
 fn get_tls_authority_config() -> Result<TlsClientConfig, Box<dyn std::error::Error>> {
     // ANCHOR: tls_ca_chain_config
     let config = TlsClientConfig::new(
@@ -257,6 +263,7 @@ fn create_serial_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> 
     Ok(channel)
 }
 
+#[cfg(feature = "tls")]
 fn create_tls_channel(
     config: TlsClientConfig,
 ) -> Result<MasterChannel, Box<dyn std::error::Error>> {
