@@ -19,6 +19,7 @@ defaultValue="Rust"
 values={[
 {label: 'Rust', value: 'Rust'},
 {label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
 {label: 'Java', value: 'Java'},
 {label: 'C#', value: 'C#'},
 ]}>
@@ -33,6 +34,13 @@ Rust's 'AssociationHandler' trait has a default implementation of `get_current_t
 
 ```c
 {{#include ../ffi/bindings/c/master_example.c:association_handler}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/master_example.cpp:association_handler}}
 ```
 
 </TabItem>

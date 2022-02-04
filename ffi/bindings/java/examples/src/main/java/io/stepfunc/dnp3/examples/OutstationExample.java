@@ -240,7 +240,7 @@ public class OutstationExample {
   }
 
   private static void runSerial(Runtime runtime) {
-    // ANCHOR: create_serial_session
+    // ANCHOR: create_serial_server
     Outstation outstation = Outstation.createSerialSession(
             runtime,
             "/dev/pts/4",
@@ -251,7 +251,7 @@ public class OutstationExample {
             new TestOutstationInformation(),
             new TestControlHandler()
     );
-    // ANCHOR_END: create_serial_session
+    // ANCHOR_END: create_serial_server
 
     runOutstation(outstation);
   }

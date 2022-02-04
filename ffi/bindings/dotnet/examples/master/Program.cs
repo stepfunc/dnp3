@@ -234,16 +234,16 @@ class MainClass
 
     private static void RunSerial(Runtime runtime)
     {
-        // ANCHOR: create_tcp_channel
+        // ANCHOR: create_serial_channel
         var channel = MasterChannel.CreateSerialChannel(
-            runtime,            
+            runtime,
             GetMasterChannelConfig(),
             "COM1",
             new SerialPortSettings(),
             TimeSpan.FromSeconds(5),
             new TestPortStateListener()
         );
-        // ANCHOR_END: create_tcp_channel
+        // ANCHOR_END: create_serial_channel
 
         try
         {

@@ -141,12 +141,12 @@ class ExampleOutstation
         finally
         {
             server.Shutdown();
-        }        
+        }
     }
 
     private static void RunSerial(Runtime runtime)
     {
-        // ANCHOR: create_serial
+        // ANCHOR: create_serial_server
         var outstation = Outstation.CreateSerialSession(
             runtime,
             "COM1",
@@ -156,8 +156,8 @@ class ExampleOutstation
             new TestOutstationApplication(),
             new TestOutstationInformation(),
             new TestControlHandler()
-        );        
-        // ANCHOR_END: create_serial
+        );
+        // ANCHOR_END: create_serial_server
 
         
         RunOutstation(outstation);

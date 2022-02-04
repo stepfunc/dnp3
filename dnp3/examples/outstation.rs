@@ -68,6 +68,20 @@ async fn run_tcp() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     // ANCHOR_END: tcp_server_spawn_outstation
 
+    // setup the outstation's database before we spawn it
+    // ANCHOR: database_init
+    outstation.transaction(|db| {
+        for i in 0..10 {
+            db.add(i, Some(EventClass::Class1), AnalogInputConfig::default());
+            db.update(
+                i,
+                &AnalogInput::new(10.0, Flags::ONLINE, Time::synchronized(0)),
+                UpdateOptions::initialize(),
+            );
+        }
+    });
+    // ANCHOR_END: database_init
+
     // ANCHOR: server_bind
     // dropping the ServerHandle shuts down the server and outstation(s)
     let _server_handle = server.bind().await?;
@@ -77,6 +91,7 @@ async fn run_tcp() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
+    // ANCHOR: create_serial_server
     let outstation = spawn_outstation_serial(
         // change this for a real port
         "/dev/pts/4",
@@ -91,6 +106,7 @@ async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
         // customizable trait to process control requests from the master
         DefaultControlHandler::with_status(CommandStatus::NotSupported),
     )?;
+    // ANCHOR_END: create_serial_server
 
     run_outstation(outstation).await
 }
@@ -123,20 +139,6 @@ async fn run_tcp_server(mut server: TcpServer) -> Result<(), Box<dyn std::error:
 
 // run the same logic regardless of the transport type
 async fn run_outstation(outstation: OutstationHandle) -> Result<(), Box<dyn std::error::Error>> {
-    // setup the outstation's database before we spawn it
-    // ANCHOR: database_init
-    outstation.transaction(|db| {
-        for i in 0..10 {
-            db.add(i, Some(EventClass::Class1), AnalogInputConfig::default());
-            db.update(
-                i,
-                &AnalogInput::new(10.0, Flags::ONLINE, Time::synchronized(0)),
-                UpdateOptions::initialize(),
-            );
-        }
-    });
-    // ANCHOR_END: database_init
-
     let mut value = 0.0;
 
     loop {

@@ -22,6 +22,7 @@ defaultValue="Rust"
 values={[
 {label: 'Rust', value: 'Rust'},
 {label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
 {label: 'Java', value: 'Java'},
 {label: 'C#', value: 'C#'},
 ]}>
@@ -41,6 +42,15 @@ values={[
 
 {{#include ../ffi/bindings/c/master_example.c:create_master_tls_channel}}
 // check error
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/master_example.cpp:tls_ca_chain_config}}
+
+{{#include ../ffi/bindings/c/master_example.cpp:create_master_tls_channel}}
 ```
 
 </TabItem>
@@ -72,6 +82,7 @@ defaultValue="Rust"
 values={[
 {label: 'Rust', value: 'Rust'},
 {label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
 {label: 'Java', value: 'Java'},
 {label: 'C#', value: 'C#'},
 ]}>
@@ -91,6 +102,15 @@ values={[
 
 {{#include ../ffi/bindings/c/master_example.c:create_master_tls_channel}}
 // check error
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/master_example.cpp:tls_self_signed_config}}
+
+{{#include ../ffi/bindings/c/master_example.cpp:create_master_tls_channel}}
 ```
 
 </TabItem>

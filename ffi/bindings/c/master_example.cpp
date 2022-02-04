@@ -5,12 +5,14 @@
 #include <string>
 #include <cstring>
 
+// ANCHOR: logging_callback
 class Logger : public dnp3::Logger {
     void on_message(dnp3::LogLevel level, std::string message) override
     {
         std::cout << message;
     }
 };
+// ANCHOR_END: logging_callback
 
 class ClientStateListener : public dnp3::ClientStateListener {
     void on_change(dnp3::ClientState state) override {
@@ -99,6 +101,7 @@ class ReadHandler : public dnp3::ReadHandler {
     }
 };
 
+// ANCHOR: association_handler
 class AssociationHandler : public dnp3::AssociationHandler {
     dnp3::UtcTimestamp get_current_time() override
     {
@@ -106,7 +109,9 @@ class AssociationHandler : public dnp3::AssociationHandler {
         return dnp3::UtcTimestamp::valid(std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count());
     }
 };
+// ANCHOR_END: association_handler
 
+// ANCHOR: assoc_control_callback
 class CommandTaskCallback : public dnp3::CommandTaskCallback {
     void on_complete(dnp3::Nothing result) override {
         std::cout << "command succeeded!" << std::endl;
@@ -115,6 +120,7 @@ class CommandTaskCallback : public dnp3::CommandTaskCallback {
         std::cout << "command failed: "<< dnp3::to_string(error) << std::endl;
     }
 };
+// ANCHOR_END: assoc_control_callback
 
 class ReadTaskCallback : public dnp3::ReadTaskCallback {
     virtual void on_complete(dnp3::Nothing result)
@@ -166,26 +172,39 @@ class LinkStatusCallback : public dnp3::LinkStatusCallback {
     }
 };
 
+dnp3::MasterChannelConfig get_master_channel_config()
+{
+    // ANCHOR: master_channel_config
+    dnp3::MasterChannelConfig config(1);
+    config.decode_level.application = dnp3::AppDecodeLevel::object_values;
+    return config;
+    // ANCHOR_END: master_channel_config
+}
+
 dnp3::AssociationConfig get_association_config()
 {
+    // ANCHOR: association_config
     dnp3::AssociationConfig config(
         dnp3::EventClasses::all(),
         dnp3::EventClasses::all(), 
         dnp3::Classes::all(),
         dnp3::EventClasses::none()
     );
+    // ANCHOR_END: association_config
 
     return config;
 }
 
 void run_channel(dnp3::MasterChannel &channel)
 {
+    // ANCHOR: association_create
     auto assoc = channel.add_association(
         1024, 
         get_association_config(),
         std::make_unique<ReadHandler>(), 
         std::make_unique<AssociationHandler>()
     );
+    // ANCHOR_END: association_create
 
     // ANCHOR: add_poll
     auto event_scan = dnp3::Request::class_request(false, true, true, true);
@@ -248,9 +267,11 @@ void run_channel(dnp3::MasterChannel &channel)
             channel.check_link_status(assoc, std::make_unique<LinkStatusCallback>());
         }
         else if (cmd == "cmd") {
+            // ANCHOR: assoc_control
             dnp3::CommandSet commands;
             commands.add_g12_v1_u8(3, dnp3::Group12Var1(dnp3::ControlCode(dnp3::TripCloseCode::nul, false, dnp3::OpType::latch_on), 0, 1000, 1000));
             channel.operate(assoc, dnp3::CommandMode::direct_operate, commands, std::make_unique<CommandTaskCallback>());
+            // ANCHOR_END: assoc_control
         }
         else {
             std::cout << "unknown command: " << cmd << std::endl;
@@ -260,48 +281,54 @@ void run_channel(dnp3::MasterChannel &channel)
 
 void run_tcp_client(dnp3::Runtime &runtime)
 {
+    // ANCHOR: create_master_tcp_channel
     dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
 
     auto channel = dnp3::MasterChannel::create_tcp_channel(
         runtime,
         dnp3::LinkErrorMode::close,
-        dnp3::MasterChannelConfig(1), endpoints,
+        get_master_channel_config(), endpoints,
         dnp3::ConnectStrategy(),
         std::make_unique<ClientStateListener>()
     );
-
-    run_channel(channel);
-}
-
-void run_tls_client(dnp3::Runtime &runtime, const dnp3::TlsClientConfig& config)
-{
-    dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
-
-    auto channel = dnp3::MasterChannel::create_tls_channel(
-        runtime, 
-        dnp3::LinkErrorMode::close,
-        dnp3::MasterChannelConfig(1),
-        endpoints,
-        config,
-        dnp3::ConnectStrategy(),
-        std::make_unique<ClientStateListener>()
-    );
+    // ANCHOR_END: create_master_tcp_channel
 
     run_channel(channel);
 }
 
 void run_serial(dnp3::Runtime &runtime)
 {
+    // ANCHOR: create_master_serial_channel
     dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
 
     auto channel = dnp3::MasterChannel::create_serial_channel(
         runtime,
-        dnp3::MasterChannelConfig(1), 
+        get_master_channel_config(),
         "/dev/pts/4",
         dnp3::SerialPortSettings(),
         std::chrono::seconds(5),
         std::make_unique<PortStateListener>()
     );
+    // ANCHOR_END: create_master_serial_channel
+
+    run_channel(channel);
+}
+
+void run_tls_client(dnp3::Runtime &runtime, const dnp3::TlsClientConfig& config)
+{
+    // ANCHOR: create_master_tls_channel
+    dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
+
+    auto channel = dnp3::MasterChannel::create_tls_channel(
+        runtime, 
+        dnp3::LinkErrorMode::close,
+        get_master_channel_config(),
+        endpoints,
+        config,
+        dnp3::ConnectStrategy(),
+        std::make_unique<ClientStateListener>()
+    );
+    // ANCHOR_END: create_master_tls_channel
 
     run_channel(channel);
 }
@@ -341,9 +368,13 @@ dnp3::TlsClientConfig get_self_signed_tls_config()
 
 int main(int argc, char *argv[])
 {
+    // ANCHOR: logging_init
     dnp3::Logging::configure(dnp3::LoggingConfig(), std::make_unique<Logger>());
+    // ANCHOR_END: logging_init
 
-    auto runtime = dnp3::Runtime(dnp3::RuntimeConfig());    
+    // ANCHOR: runtime_create
+    auto runtime = dnp3::Runtime(dnp3::RuntimeConfig());
+    // ANCHOR_END: runtime_create
 
     if (argc != 2) {
         std::cout << "you must specify a transport type" << std::endl;

@@ -34,6 +34,7 @@ defaultValue="Rust"
 values={[
 {label: 'Rust', value: 'Rust'},
 {label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
 {label: 'Java', value: 'Java'},
 {label: 'C#', value: 'C#'},
 ]}>
@@ -52,6 +53,14 @@ values={[
 
 // during program initialization - "outstation" already created
 {{#include ../ffi/bindings/c/outstation_example.c:database_init}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+// initialize 10 of every point type
+{{#include ../ffi/bindings/c/outstation_example.cpp:database_init_transaction}}
 ```
 
 </TabItem>
