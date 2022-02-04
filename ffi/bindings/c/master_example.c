@@ -409,7 +409,7 @@ int run_channel(dnp3_master_channel_t *channel)
 }
 
 int run_tcp_channel(dnp3_runtime_t *runtime)
-{    
+{
     // ANCHOR: create_master_tcp_channel
     dnp3_master_channel_t* channel = NULL;
     dnp3_endpoint_list_t* endpoints = dnp3_endpoint_list_create("127.0.0.1:20000");
@@ -424,7 +424,6 @@ int run_tcp_channel(dnp3_runtime_t *runtime)
     );
     dnp3_endpoint_list_destroy(endpoints);
     // ANCHOR_END: create_master_tcp_channel
-
 
     if (err) {
         printf("unable to create TCP channel: %s \n", dnp3_param_error_to_string(err));
@@ -458,7 +457,7 @@ int run_serial_channel(dnp3_runtime_t *runtime)
 }
 
 int run_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t config)
-{        
+{
     // ANCHOR: create_master_tls_channel
     dnp3_master_channel_t *channel = NULL;
     dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_create("127.0.0.1:20000");
@@ -471,7 +470,7 @@ int run_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t config)
         dnp3_connect_strategy_init(),
         get_client_state_listener(),
         &channel
-    );                                            
+    );
     dnp3_endpoint_list_destroy(endpoints);
     // ANCHOR_END: create_master_tls_channel
     
@@ -548,7 +547,7 @@ int main(int argc, char *argv[])
     // initialize logging with the default configuration
     dnp3_configure_logging(dnp3_logging_config_init(), get_logger());
     // ANCHOR_END: logging_init
-                    
+
     // ANCHOR: runtime_create
     dnp3_runtime_t *runtime = NULL;
     dnp3_runtime_config_t runtime_config = dnp3_runtime_config_init();

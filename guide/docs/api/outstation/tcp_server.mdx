@@ -37,6 +37,7 @@ defaultValue="Rust"
 values={[
 {label: 'Rust', value: 'Rust'},
 {label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
 {label: 'Java', value: 'Java'},
 {label: 'C#', value: 'C#'},
 ]}>
@@ -52,6 +53,13 @@ values={[
 ```c
 {{#include ../ffi/bindings/c/outstation_example.c:create_tcp_server}}
 // check error
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/outstation_example.cpp:create_tcp_server}}
 ```
 
 </TabItem>
@@ -86,6 +94,7 @@ defaultValue="Rust"
 values={[
 {label: 'Rust', value: 'Rust'},
 {label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
 {label: 'Java', value: 'Java'},
 {label: 'C#', value: 'C#'},
 ]}>
@@ -104,6 +113,14 @@ The terminology differs here between Rust and the bindings. The Rust API's 'add_
 
 ```c
 {{#include ../ffi/bindings/c/outstation_example.c:tcp_server_add_outstation}}
+// check error
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/outstation_example.cpp:tcp_server_add_outstation}}
 // check error
 ```
 
@@ -153,6 +170,7 @@ defaultValue="Rust"
 values={[
 {label: 'Rust', value: 'Rust'},
 {label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
 {label: 'Java', value: 'Java'},
 {label: 'C#', value: 'C#'},
 ]}>
@@ -172,6 +190,13 @@ The terminology differs here between Rust and the bindings.
 ```c
 {{#include ../ffi/bindings/c/outstation_example.c:tcp_server_bind}}
 // check error
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/outstation_example.cpp:tcp_server_bind}}
 ```
 
 </TabItem>

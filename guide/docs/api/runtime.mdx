@@ -32,6 +32,7 @@ defaultValue="Rust"
 values={[
 {label: 'Rust', value: 'Rust'},
 {label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
 {label: 'Java', value: 'Java'},
 {label: 'C#', value: 'C#'},
 ]}>
@@ -49,6 +50,13 @@ values={[
 
 ```c
 {{#include ../ffi/bindings/c/master_example.c:runtime_create}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/master_example.cpp:runtime_create}}
 ```
 
 </TabItem>
@@ -98,6 +106,7 @@ defaultValue="Rust"
 values={[
 {label: 'Rust', value: 'Rust'},
 {label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
 {label: 'Java', value: 'Java'},
 {label: 'C#', value: 'C#'},
 ]}>
@@ -113,6 +122,13 @@ Runtime shutdown is implicit in Rust when tokio::main returns.
 ```c
 {{#include ../ffi/bindings/c/master_example.c:runtime_destroy}}
 ```
+
+</TabItem>
+<TabItem value="C++">
+
+:::note
+Runtime shutdown is implicit when the runtime object gets destroyed.
+:::
 
 </TabItem>
 <TabItem value="Java">

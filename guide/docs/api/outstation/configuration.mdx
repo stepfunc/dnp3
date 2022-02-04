@@ -26,6 +26,7 @@ defaultValue="Rust"
 values={[
 {label: 'Rust', value: 'Rust'},
 {label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
 {label: 'Java', value: 'Java'},
 {label: 'C#', value: 'C#'},
 ]}>
@@ -40,6 +41,13 @@ values={[
 
 ```c
 {{#include ../ffi/bindings/c/outstation_example.c:create_outstation_config}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/outstation_example.cpp:create_outstation_config}}
 ```
 
 </TabItem>
@@ -81,6 +89,7 @@ defaultValue="Rust"
 values={[
     {label: 'Rust', value: 'Rust'},
     {label: 'C', value: 'C'},
+    {label: 'C++', value: 'C++'},
     {label: 'Java', value: 'Java'},
     {label: 'C#', value: 'C#'},
 ]}>
@@ -96,6 +105,13 @@ values={[
 
 ```c
 {{#include ../ffi/bindings/c/outstation_example.c:event_buffer_config}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/outstation_example.cpp:event_buffer_config}}
 ```
 
 </TabItem>
