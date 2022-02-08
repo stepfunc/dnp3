@@ -187,31 +187,30 @@ public class OutstationExample {
     return config;
   }
 
-  private static int run(Runtime runtime, String[] args) {
+  private static void run(Runtime runtime, String[] args) {
 
-    if(args.length != 2) {
+    if(args.length != 1) {
       System.err.println("You must specify a transport");
       System.err.println("Usage: outstation-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
-      return -1;
+      return;
     }
 
-    final String type = args[1];
+    final String type = args[0];
     switch(type) {
       case "tcp":
         runTcp(runtime);
-        return 0;
+        break;
       case "serial":
         runSerial(runtime);
-        return 0;
+        break;
       case "tls-ca":
         runTls(runtime, getCaTlsConfig());
-        return 0;
+        break;
       case "tls-self-signed":
         runTls(runtime, getSelfSignedTlsConfig());
-        return 0;
+        break;
       default:
         System.err.printf("Unknown transport: %s%n", type);
-        return -1;
     }
   }
 
@@ -229,7 +228,7 @@ public class OutstationExample {
 
   private static void runTls(Runtime runtime, TlsServerConfig config) {
     // ANCHOR: create_tls_server
-    TcpServer server = TcpServer.createTlsServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000", config);
+    TcpServer server = TcpServer.createTlsServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20001", config);
     // ANCHOR_END: create_tls_server
 
     try {
@@ -263,17 +262,8 @@ public class OutstationExample {
     // Create the Tokio runtime
     Runtime runtime = new Runtime(new RuntimeConfig());
 
-    // ANCHOR: create_tcp_server
-    TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
-    // ANCHOR_END: create_tcp_server
-
-    // Start the outstation
-    // ANCHOR: tcp_server_bind
-    server.bind();
-    // ANCHOR_END: tcp_server_bind
-
     try {
-      runServer(server);
+      run(runtime, args);
     } finally {
       runtime.shutdown();
     }
@@ -352,7 +342,9 @@ public class OutstationExample {
                     AddressFilter.any());
     // ANCHOR_END: tcp_server_add_outstation
 
+    // ANCHOR: tcp_server_bind
     server.bind();
+    // ANCHOR_END: tcp_server_bind
 
     runOutstation(outstation);
   }

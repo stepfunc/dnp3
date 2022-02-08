@@ -317,7 +317,7 @@ void run_serial(dnp3::Runtime &runtime)
 void run_tls_client(dnp3::Runtime &runtime, const dnp3::TlsClientConfig& config)
 {
     // ANCHOR: create_master_tls_channel
-    dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
+    dnp3::EndpointList endpoints(std::string("127.0.0.1:20001"));
 
     auto channel = dnp3::MasterChannel::create_tls_channel(
         runtime, 

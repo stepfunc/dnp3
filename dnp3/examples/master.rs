@@ -254,7 +254,7 @@ fn create_serial_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> 
     // ANCHOR: create_master_serial_channel
     let channel = spawn_master_serial(
         get_master_channel_config()?,
-        "/dev/pts/4", // change this for your system
+        "/dev/ttySIM0", // change this for your system
         SerialSettings::default(),
         Duration::from_secs(1),
         NullListener::create(),

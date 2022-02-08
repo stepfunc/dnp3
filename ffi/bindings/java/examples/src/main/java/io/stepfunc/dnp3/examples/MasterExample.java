@@ -326,7 +326,7 @@ public class MasterExample {
                     runtime,
                     LinkErrorMode.CLOSE,
                     getMasterChannelConfig(),
-                    new EndpointList("127.0.0.1:20000"),
+                    new EndpointList("127.0.0.1:20001"),
                     config,
                     new ConnectStrategy(),
                     new TestClientStateListener());
@@ -360,7 +360,7 @@ public class MasterExample {
     }
   }
 
-  public static int main(String[] args) throws Exception {
+  public static void main(String[] args) throws Exception {
     // Initialize logging with the default configuration
     // This may only be called once during program initialization
     // ANCHOR: logging_init
@@ -372,7 +372,7 @@ public class MasterExample {
     // ANCHOR_END: runtime
 
     try {
-      return run(runtime, args);
+      run(runtime, args);
     } finally {
       // ANCHOR: runtime_shutdown
       runtime.shutdown();
@@ -380,30 +380,29 @@ public class MasterExample {
     }
   }
 
-  private static int run(Runtime runtime, String[] args) throws Exception {
-    if(args.length != 2) {
+  private static void run(Runtime runtime, String[] args) throws Exception {
+    if(args.length != 1) {
       System.err.println("You must specify a transport");
       System.err.println("Usage: master-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
-      return -1;
+      return;
     }
 
-    final String type = args[1];
+    final String type = args[0];
     switch(type) {
       case "tcp":
         runTcp(runtime);
-        return 0;
+        break;
       case "serial":
         runSerial(runtime);
-        return 0;
+        break;
       case "tls-ca":
         runTls(runtime, getTlsCAConfig());
-        return 0;
+        break;
       case "tls-self-signed":
         runTls(runtime, getTlsSelfSignedConfig());
-        return 0;
+        break;
       default:
         System.err.printf("Unknown transport: %s%n", type);
-        return -1;
     }
   }
 

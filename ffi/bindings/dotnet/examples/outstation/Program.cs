@@ -166,7 +166,7 @@ class ExampleOutstation
     private static void RunTls(Runtime runtime, TlsServerConfig config)
     {
         // ANCHOR: create_tls_server
-        var server = TcpServer.CreateTlsServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000", config);
+        var server = TcpServer.CreateTlsServer(runtime, LinkErrorMode.Close, "127.0.0.1:20001", config);
         // ANCHOR_END: create_tls_server
 
         try
@@ -218,7 +218,7 @@ class ExampleOutstation
         
         var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
        
-        if(args.Length != 2)
+        if(args.Length != 1)
         {
             System.Console.WriteLine("You must specify the transport type");
             System.Console.WriteLine("Usage: outstation-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
@@ -227,7 +227,7 @@ class ExampleOutstation
 
         try
         {
-            var type = args[1];
+            var type = args[0];
             switch(type) {
                 case "tcp":
                     RunTcp(runtime);

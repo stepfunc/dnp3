@@ -289,7 +289,7 @@ int run_channel(dnp3_master_channel_t *channel)
         fgets(cbuf, 10, stdin);
 
         if (strcmp(cbuf, "x\n") == 0) {
-            return 0;
+            break;
         }
         else if (strcmp(cbuf, "enable\n") == 0) {
             printf("calling enable\n");
@@ -406,6 +406,8 @@ int run_channel(dnp3_master_channel_t *channel)
             printf("Unknown command\n");
         }
     }
+
+    dnp3_master_channel_destroy(channel);
 }
 
 int run_tcp_channel(dnp3_runtime_t *runtime)
@@ -460,7 +462,7 @@ int run_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t config)
 {
     // ANCHOR: create_master_tls_channel
     dnp3_master_channel_t *channel = NULL;
-    dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_create("127.0.0.1:20000");
+    dnp3_endpoint_list_t *endpoints = dnp3_endpoint_list_create("127.0.0.1:20001");
     dnp3_param_error_t err = dnp3_master_channel_create_tls(
         runtime,
         DNP3_LINK_ERROR_MODE_CLOSE,
@@ -491,7 +493,7 @@ dnp3_tls_client_config_t get_ca_tls_config()
         "./certs/ca_chain/entity1_cert.pem",
         "./certs/ca_chain/entity1_key.pem",
         "" // no password
-    );    
+    );
     // ANCHOR_END: tls_ca_chain_config
 
     return config;
@@ -561,11 +563,11 @@ int main(int argc, char *argv[])
     }
 
     // create a channel based on the cmd line arguments and run it
-    int res = create_and_run_channel(argc, argv, runtime);        
+    int res = create_and_run_channel(argc, argv, runtime);
     
     // ANCHOR: runtime_destroy
     dnp3_runtime_destroy(runtime);
     // ANCHOR_END: runtime_destroy
 
-    return 0;
+    return res;
 }

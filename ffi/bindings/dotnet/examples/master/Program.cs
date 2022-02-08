@@ -215,7 +215,7 @@ class MainClass
             runtime,
             LinkErrorMode.Close,
             GetMasterChannelConfig(),
-            new EndpointList("127.0.0.1:20000"),
+            new EndpointList("127.0.0.1:20001"),
             config,
             new ConnectStrategy(),
             new TestClientStateListener()
@@ -299,7 +299,7 @@ class MainClass
         var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
         // ANCHOR_END: runtime_init        
 
-        if (args.Length != 2)
+        if (args.Length != 1)
         {
             System.Console.WriteLine("You must specify the transport type");
             System.Console.WriteLine("Usage: master-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
@@ -308,7 +308,7 @@ class MainClass
 
         try
         {
-            var type = args[1];
+            var type = args[0];
             switch (type)
             {
                 case "tcp":

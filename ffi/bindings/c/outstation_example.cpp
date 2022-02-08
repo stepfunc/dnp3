@@ -275,7 +275,7 @@ void run_serial(dnp3::Runtime &runtime)
 void run_tls_server(dnp3::Runtime &runtime, const dnp3::TlsServerConfig &config)
 {
     // ANCHOR: create_tls_server
-    dnp3::TcpServer server = dnp3::TcpServer::create_tls_server(runtime, LinkErrorMode::close, "127.0.0.1:20000", config);
+    dnp3::TcpServer server = dnp3::TcpServer::create_tls_server(runtime, LinkErrorMode::close, "127.0.0.1:20001", config);
     // ANCHOR_END: create_tls_server
 
     run_server(server);

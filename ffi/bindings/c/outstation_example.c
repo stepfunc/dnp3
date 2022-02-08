@@ -377,7 +377,7 @@ dnp3_outstation_config_t get_outstation_config()
         // master address
         1);
     // override the default application decoding level
-    config.decode_level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;    
+    config.decode_level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
     return config;
 }
 // ANCHOR_END: create_outstation_config
@@ -475,7 +475,7 @@ int run_tcp_server(dnp3_runtime_t *runtime)
     // ANCHOR_END: create_tcp_server
 
     if (err) {    
-        printf("unable to create TCP server: %s \n", dnp3_param_error_to_string(err));        
+        printf("unable to create TCP server: %s \n", dnp3_param_error_to_string(err));
         return -1;
     }
 
@@ -513,7 +513,7 @@ int run_tls_server(dnp3_runtime_t *runtime, dnp3_tls_server_config_t config)
 {
     // ANCHOR: create_tls_server
     dnp3_tcp_server_t *server = NULL;
-    dnp3_param_error_t err = dnp3_tcp_server_create_tls(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20000", config, &server);
+    dnp3_param_error_t err = dnp3_tcp_server_create_tls(runtime, DNP3_LINK_ERROR_MODE_CLOSE, "127.0.0.1:20001", config, &server);
     // ANCHOR_END: create_tls_server
 
     if (err) {
