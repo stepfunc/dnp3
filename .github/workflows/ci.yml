@@ -36,8 +36,8 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
-  # Lock the dependencies
-  lock:
+  # Check dependencies
+  dependencies:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -62,9 +62,6 @@ jobs:
         with:
           command: install
           args: cargo-license
-      - name: Update dependencies
-        working-directory: dnp3
-        run: cargo update
       - name: Generate dependencies.json
         working-directory: dnp3/dnp3
         run: cargo-license --avoid-dev-deps --avoid-build-deps -j > ../dependencies.json
@@ -76,12 +73,10 @@ jobs:
         with:
           name: dependencies
           path: |
-            dnp3/Cargo.lock
             dnp3/dependencies.json
             dnp3/dependencies.txt
   # Run the unit tests on Windows and Linux
   test:
-    needs: lock
     strategy:
       fail-fast: false
       matrix:
@@ -107,17 +102,12 @@ jobs:
         run: Copy-Item -Path .cargo/config-windows.toml -Destination .cargo/config.toml
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Download Cargo.lock
-        uses: actions/download-artifact@v2
-        with:
-          name: dependencies
       - name: Run Rust unit tests
         uses: actions-rs/cargo@v1
         with:
           command: test
   # Build bindings on Linux x64 [64-bit Linux (kernel 2.6.32+, glibc 2.11+) (x86_64-unknown-linux-gnu)]
   bindings-linux:
-    needs: lock
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -132,10 +122,6 @@ jobs:
         run: wget -q https://www.doxygen.nl/files/doxygen-1.9.3.linux.bin.tar.gz -O- | sudo tar --strip-components=1 -C /usr -xz doxygen-1.9.3
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Download Cargo.lock
-        uses: actions/download-artifact@v2
-        with:
-          name: dependencies
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -186,7 +172,6 @@ jobs:
           path: ~/doc
   # Build bindings on Windows x64 [64-bit MSVC (Windows 7+) (x86_64-pc-windows-msvc)]
   bindings-windows:
-    needs: lock
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -202,10 +187,6 @@ jobs:
         run: Copy-Item -Path .cargo/config-windows.toml -Destination .cargo/config.toml
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Download Cargo.lock
-        uses: actions/download-artifact@v2
-        with:
-          name: dependencies
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -243,7 +224,6 @@ jobs:
           path: ffi/bindings/java/dnp3/src/main/resources
   # Build bindings on MacOS [64-bit macOS (10.7+, Lion+) (x86_64-apple-darwin)]
   bindings-macos:
-    needs: lock
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -256,10 +236,6 @@ jobs:
           override: true
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Download Cargo.lock
-        uses: actions/download-artifact@v2
-        with:
-          name: dependencies
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -297,7 +273,6 @@ jobs:
           path: ffi/bindings/java/dnp3/src/main/resources
   # Build bindings on Linux AArch64
   bindings-aarch64:
-    needs: lock
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -311,10 +286,6 @@ jobs:
           override: true
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Download Cargo.lock
-        uses: actions/download-artifact@v2
-        with:
-          name: dependencies
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -356,7 +327,6 @@ jobs:
           path: ffi/bindings/java/dnp3/src/main/resources
   # Cross-compilation for ARM devices and produce C bindings
   cross:
-    needs: lock
     strategy:
       fail-fast: false
       matrix:
@@ -375,10 +345,6 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
-      - name: Download Cargo.lock
-        uses: actions/download-artifact@v2
-        with:
-          name: dependencies
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -422,7 +388,7 @@ jobs:
           path: ~/doc
   # Package all the generated bindings
   packaging:
-    needs: [lock, bindings-linux, bindings-windows, bindings-macos, bindings-aarch64, cross]
+    needs: [dependencies, bindings-linux, bindings-windows, bindings-macos, bindings-aarch64, cross]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -466,7 +432,6 @@ jobs:
           path: ffi/bindings/java/dnp3/pom.xml
   # Run the conformance tests
   conformance:
-    needs: lock
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -479,10 +444,6 @@ jobs:
           override: true
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Download Cargo.lock
-        uses: actions/download-artifact@v2
-        with:
-          name: dependencies
       - name: Build Java bindings
         uses: actions-rs/cargo@v1
         with:
