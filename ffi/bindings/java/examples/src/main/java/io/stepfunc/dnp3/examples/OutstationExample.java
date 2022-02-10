@@ -180,9 +180,8 @@ public class OutstationExample {
             // outstation address
             ushort(1024),
             // master address
-            ushort(1));
-    // override the default decode log level
-    config.decodeLevel.application = AppDecodeLevel.OBJECT_VALUES;
+            ushort(1))
+    .withDecodeLevel(new DecodeLevel().withApplication(AppDecodeLevel.OBJECT_VALUES));
     // ANCHOR_END: outstation_config
     return config;
   }
@@ -278,8 +277,7 @@ public class OutstationExample {
                     "./certs/self_signed/entity2_cert.pem",
                     "./certs/self_signed/entity2_key.pem",
                     "" // no password
-            );
-    config.certificateMode = CertificateMode.SELF_SIGNED;
+            ).withCertificateMode(CertificateMode.SELF_SIGNED);
     // ANCHOR_END: tls_self_signed_config
     return config;
   }

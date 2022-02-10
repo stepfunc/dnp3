@@ -246,8 +246,7 @@ public class MasterExample {
 
   // ANCHOR: association_config
   private static AssociationConfig getAssociationConfig() {
-    AssociationConfig config =
-        new AssociationConfig(
+    return new AssociationConfig(
             // disable unsolicited first (Class 1/2/3)
             EventClasses.all(),
             // after the integrity poll, enable unsolicited (Class 1/2/3)
@@ -255,18 +254,15 @@ public class MasterExample {
             // perform startup integrity poll with Class 1/2/3/0
             Classes.all(),
             // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
-            EventClasses.none());
-    config.autoTimeSync = AutoTimeSync.LAN;
-    config.keepAliveTimeout = Duration.ofSeconds(60);
-    return config;
+            EventClasses.none())
+      .withAutoTimeSync(AutoTimeSync.LAN)
+      .withKeepAliveTimeout(Duration.ofSeconds(60));
   }
   // ANCHOR_END: association_config
 
   // ANCHOR: runtime_config
   private static RuntimeConfig getRuntimeConfig() {
-    RuntimeConfig config = new RuntimeConfig();
-    config.numCoreThreads = ushort(4);
-    return config;
+    return new RuntimeConfig().withNumCoreThreads(ushort(4));
   }
   // ANCHOR_END: runtime_config
 
@@ -279,8 +275,7 @@ public class MasterExample {
                     "./certs/self_signed/entity1_cert.pem",
                     "./certs/self_signed/entity1_key.pem",
                     "" // no password
-            );
-    config.certificateMode = CertificateMode.SELF_SIGNED;
+            ).withCertificateMode(CertificateMode.SELF_SIGNED);
     // ANCHOR_END: tls_self_signed_config
     return config;
   }
