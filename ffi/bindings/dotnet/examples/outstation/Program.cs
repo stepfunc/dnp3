@@ -202,8 +202,7 @@ class ExampleOutstation
             "./certs/self_signed/entity2_cert.pem",
             "./certs/self_signed/entity2_key.pem",
             "" // no password
-        );
-        config.CertificateMode = CertificateMode.SelfSigned;
+        ).WithCertificateMode(CertificateMode.SelfSigned);
         // ANCHOR_END: tls_self_signed_config
         return config;
     }
@@ -282,9 +281,7 @@ class ExampleOutstation
             1024,
             // master address
             1
-        );
-        // override the default application decoding level
-        config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
+        ).WithDecodeLevel(new DecodeLevel().WithApplication(AppDecodeLevel.ObjectValues));
         // ANCHOR_END: outstation_config
         return config;
     }

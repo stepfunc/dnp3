@@ -160,16 +160,15 @@ class MainClass
     // ANCHOR: master_channel_config
     private static MasterChannelConfig GetMasterChannelConfig()
     {
-        var config = new MasterChannelConfig(1);
-        config.DecodeLevel.Application = AppDecodeLevel.ObjectValues;
-        return config;
+        return new MasterChannelConfig(1)
+            .WithDecodeLevel(new DecodeLevel().WithApplication(AppDecodeLevel.ObjectValues));
     }
     // ANCHOR_END: master_channel_config
 
     // ANCHOR: association_config
     private static AssociationConfig GetAssociationConfig()
     {
-        var config = new AssociationConfig(
+        return new AssociationConfig(
             // disable unsolicited first (Class 1/2/3)
             EventClasses.All(),
             // after the integrity poll, enable unsolicited (Class 1/2/3)
@@ -178,10 +177,9 @@ class MainClass
             Classes.All(),
             // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
             EventClasses.None()
-        );
-        config.AutoTimeSync = AutoTimeSync.Lan;
-        config.KeepAliveTimeout = TimeSpan.FromSeconds(60);
-        return config;
+        )
+        .WithAutoTimeSync(AutoTimeSync.Lan)
+        .WithKeepAliveTimeout(TimeSpan.FromSeconds(60));
     }
     // ANCHOR_END: association_config
 
@@ -278,8 +276,7 @@ class MainClass
             "./certs/self_signed/entity1_cert.pem",
             "./certs/self_signed/entity1_key.pem",
             "" // no password
-        );
-        config.CertificateMode = CertificateMode.SelfSigned;
+        ).WithCertificateMode(CertificateMode.SelfSigned);
         // ANCHOR_END: tls_self_signed_config
         return config;
     }
@@ -297,7 +294,7 @@ class MainClass
 
         // ANCHOR: runtime_init
         var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
-        // ANCHOR_END: runtime_init        
+        // ANCHOR_END: runtime_init
 
         if (args.Length != 1)
         {
