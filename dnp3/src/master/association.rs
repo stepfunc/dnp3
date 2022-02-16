@@ -449,7 +449,7 @@ impl Association {
     }
 
     pub(crate) fn on_clear_restart_iin_failure(&mut self) {
-        tracing::warn!("device failed to clear restart IIN bit");
+        tracing::warn!("failed to clear restart IIN bit");
         self.auto_tasks.clear_restart_iin.failure(&self.config);
     }
 
@@ -467,7 +467,7 @@ impl Association {
     }
 
     pub(crate) fn on_enable_unsolicited_failure(&mut self) {
-        tracing::warn!("device failed to enable unsolicited responses");
+        tracing::warn!("failed to enable unsolicited responses");
         self.auto_tasks.enabled_unsolicited.failure(&self.config);
     }
 
@@ -476,7 +476,7 @@ impl Association {
     }
 
     pub(crate) fn on_disable_unsolicited_failure(&mut self) {
-        tracing::warn!("device failed to disable unsolicited responses");
+        tracing::warn!("failed to disable unsolicited responses");
         self.auto_tasks.disable_unsolicited.failure(&self.config);
     }
 
@@ -505,7 +505,7 @@ impl Association {
 
             // Ignore repeat
             if last_frag == Some(new_frag) {
-                tracing::warn!("Ignoring duplicate unsolicited response");
+                tracing::warn!("ignoring duplicate unsolicited response");
                 return true; // still want to send confirmation if requested
             }
 

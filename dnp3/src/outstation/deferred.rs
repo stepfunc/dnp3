@@ -67,7 +67,7 @@ impl DeferredRead {
                     self.vec.push(r)
                 } else {
                     tracing::warn!(
-                        "Insufficient capacity ({}) for READ header: {} - {}",
+                        "insufficient capacity ({}) for READ header: {} - {}",
                         self.vec.capacity(),
                         h.variation,
                         h.details.qualifier()

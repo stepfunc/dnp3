@@ -83,7 +83,7 @@ impl OutstationTaskAdapter {
                     self.listener.update(ConnectionState::Connected);
                     let result = self
                         .run_one_session(&mut s.phys)
-                        .instrument(tracing::info_span!("Session", "id" = id))
+                        .instrument(tracing::info_span!("session", "id" = id))
                         .await;
                     self.listener.update(ConnectionState::Disconnected);
 
@@ -102,7 +102,7 @@ impl OutstationTaskAdapter {
                         }
                         Err(RunError::Link(err)) => {
                             // go to next iteration to get a new session
-                            tracing::warn!("Session error: {}", err);
+                            tracing::warn!("session error: {}", err);
                         }
                         Err(RunError::Shutdown) => return Err(Shutdown),
                     }

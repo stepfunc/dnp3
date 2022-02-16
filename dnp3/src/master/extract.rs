@@ -70,7 +70,7 @@ pub(crate) fn extract_measurements_inner(
 
         if !handled {
             tracing::warn!(
-                "Ignored header variation: {} qualifier: {:?}",
+                "ignored header variation: {} qualifier: {:?}",
                 &header.variation,
                 &header.details.qualifier()
             );

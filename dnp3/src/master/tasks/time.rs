@@ -142,7 +142,7 @@ impl TimeSyncTask {
         let interval = match now.checked_duration_since(request_tx) {
             Some(x) => x,
             None => {
-                // This should NEVER happen. `crate::tokio::time::Instant` is guaranteed to be monotonic and nondecreasing.
+                // This should NEVER happen. `crate::tokio::time::Instant` is guaranteed to be monotonic
                 tracing::error!("clock rollback detected while synchronizing outstation");
                 self.report_error(association, TimeSyncError::ClockRollback);
                 return None;

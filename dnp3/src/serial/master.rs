@@ -50,7 +50,7 @@ pub fn create_master_serial(
     let future = async move {
         let _ = task
             .run()
-            .instrument(tracing::info_span!("DNP3-Master-Serial", "port" = ?log_path))
+            .instrument(tracing::info_span!("dnp3-master-serial", "port" = ?log_path))
             .await;
     };
     (future, handle)

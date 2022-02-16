@@ -119,7 +119,7 @@ impl TcpServer {
         let future = async move {
             let _ = adapter.run()
                 .instrument(
-                    tracing::info_span!("DNP3-Outstation-TCP", "listen" = ?endpoint, "addr" = address),
+                    tracing::info_span!("dnp3-outstation-tcp", "listen" = ?endpoint, "addr" = address),
                 )
                 .await;
         };
@@ -168,7 +168,7 @@ impl TcpServer {
         let task = async move {
             let local = self.address;
             self.run(listener, rx)
-                .instrument(tracing::info_span!("TCPServer", "listen" = ?local))
+                .instrument(tracing::info_span!("tcp-server", "listen" = ?local))
                 .await
         };
 

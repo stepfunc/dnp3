@@ -1218,7 +1218,7 @@ impl OutstationSession {
         if object_headers.is_empty() {
             Iin2::default()
         } else {
-            tracing::warn!("Ignoring object headers in {:?} request", function);
+            tracing::warn!("ignoring object headers in {:?} request", function);
             Iin2::PARAMETER_ERROR
         }
     }
@@ -1232,7 +1232,7 @@ impl OutstationSession {
                         if index == 7 {
                             // restart IIN
                             if value {
-                                tracing::warn!("cannot write IIN 1.7 to TRUE");
+                                tracing::warn!("ignoring request to write IIN 1.7 to TRUE");
                                 iin2 |= Iin2::PARAMETER_ERROR;
                             } else {
                                 // clear the restart bit
@@ -1258,7 +1258,7 @@ impl OutstationSession {
                             WriteTimeResult::Ok => Iin2::default(),
                         }
                     } else {
-                        tracing::warn!("request didn't have a single g50v1");
+                        tracing::warn!("request lacks a single g50v1");
                         Iin2::PARAMETER_ERROR
                     }
                 }
@@ -1301,7 +1301,7 @@ impl OutstationSession {
         let delay = if let Some(delay) = now.checked_duration_since(last_recorded_time) {
             delay
         } else {
-            tracing::warn!("clock rollback detected (this should never happen per tokio statement in the docs)");
+            tracing::warn!("clock rollback detected (Tokio error)");
             return Iin2::PARAMETER_ERROR;
         };
 

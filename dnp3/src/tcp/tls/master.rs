@@ -76,7 +76,7 @@ pub fn create_master_tls_client(
     );
     let future = async move {
         task.run()
-            .instrument(tracing::info_span!("DNP3-Master-TLS", "endpoint" = ?main_addr))
+            .instrument(tracing::info_span!("dnp3-master-tls", "endpoint" = ?main_addr))
             .await;
     };
     (future, handle)

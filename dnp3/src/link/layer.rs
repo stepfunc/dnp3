@@ -115,7 +115,7 @@ impl Layer {
             AnyAddress::Endpoint(x) => x,
             _ => {
                 tracing::warn!(
-                    "ignoring frame from disallowed source address: {}",
+                    "ignoring frame from unknown source address: {}",
                     header.source
                 );
                 return (None, None);
@@ -171,7 +171,7 @@ impl Layer {
         match header.control.func {
             Function::PriUnconfirmedUserData => {
                 if header.control.fcv {
-                    tracing::warn!("ignoring frame of unconfirmed user data with FCV bit set");
+                    tracing::warn!("ignoring unconfirmed user data with FCV bit set");
                     return (None, None);
                 }
 
@@ -182,7 +182,7 @@ impl Layer {
             }
             Function::PriResetLinkStates => {
                 if header.control.fcv {
-                    tracing::warn!("ignoring reset link states with FCV bit set");
+                    tracing::warn!("ignoring reset link states request with FCV bit set");
                     return (None, None);
                 }
 
@@ -191,7 +191,7 @@ impl Layer {
             }
             Function::PriConfirmedUserData => {
                 if !header.control.fcv {
-                    tracing::warn!("ignoring frame of confirmed user data with FCV bit unset");
+                    tracing::warn!("ignoring confirmed user data with FCV bit NOT set");
                     return (None, None);
                 }
 

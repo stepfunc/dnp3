@@ -88,7 +88,7 @@ impl MasterSession {
         messages: Receiver<Message>,
     ) -> Self {
         let tx_buffer_size = if tx_buffer_size < Self::MIN_TX_BUFFER_SIZE {
-            tracing::warn!("Minimum TX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", Self::MIN_TX_BUFFER_SIZE, tx_buffer_size);
+            tracing::warn!("minimum TX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", Self::MIN_TX_BUFFER_SIZE, tx_buffer_size);
             Self::MIN_TX_BUFFER_SIZE
         } else {
             tx_buffer_size
@@ -148,7 +148,7 @@ impl MasterSession {
                     let id = task.details.get_id();
                     let address = task.address.raw_value();
                     self.run_task(io, task, writer, reader)
-                        .instrument(tracing::info_span!("Task", "type" = ?id, "dest" = address))
+                        .instrument(tracing::info_span!("task", "type" = ?id, "dest" = address))
                         .await
                 }
                 Next::NotBefore(time) => self.idle_until(time, io, writer, reader).await,
@@ -748,7 +748,7 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> Result<LinkStatusResult, TaskError> {
         // Send link status request
-        tracing::info!("Sending link status request (for {})", destination);
+        tracing::info!("sending link status request (for {})", destination);
         writer
             .write_link_status_request(io, self.decode_level, destination.wrap())
             .await?;

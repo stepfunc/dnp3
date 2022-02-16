@@ -71,7 +71,7 @@ pub fn create_outstation_serial(
         let mut io = PhysLayer::Serial(serial);
         let _ = task
             .run(&mut io)
-            .instrument(tracing::info_span!("DNP3-Master-Serial", "port" = ?log_path))
+            .instrument(tracing::info_span!("dnp3-master-serial", "port" = ?log_path))
             .await;
     };
     Ok((future, handle))
