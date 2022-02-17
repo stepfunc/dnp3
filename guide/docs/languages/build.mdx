@@ -1,0 +1,48 @@
+---
+id: build
+title: Manual Build
+sidebar_label: Manual Build
+slug: /build
+---
+
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
+We provide pre-built packages for many platforms either as a ZIP package (for C/C++) or with the standard packaging utility of the target language
+(Maven or NuGet). However, if your platform is not officially supported, it is possible to build the bindings manually. Please note that we don't
+officially support these custom builds.
+
+## Pre-requisites
+
+- Latest Rust stable (see [rustup](https://rustup.rs/))
+- C and C++
+  - CMake 3.12+
+  - A C and C++ compiler recognized by CMake
+- C# (one of the following)
+  - .NET Core 2.0+
+  - .NET 5+
+  - .NET Framework 4.6.1+ (avoid earlier than Framework 4.7, and prefer .NET Core or .NET 5)
+- Java:
+  - JDK 8+
+  - Maven
+- doxygen 1.9.1+ (for C, C++ and C# documentation)
+
+## Steps
+
+- Clone the repository: `git clone https://github.com/stepfunc/dnp3.git`
+- Build the bindings: `cargo run --release --bin dnp3-bindings -- <target language>`
+  - After the `-- `, specify the target language with the following flags:
+    - `--c` for both C and C++ bindings
+    - `--dotnet` for the C# bindings
+    - `--java` for Java bindings
+  - On unsupported platforms, some tests might fail. You can add `--no-tests` to skip them.
+  - Documentation can be built with the `--doxygen` flag. Note that the javadoc is always generated.
+- The generated files will be available at:
+  - C and C++:
+    - Generated code: `ffi/bindings/c/generated` (can be built with CMake)
+  - C#:
+    - Generated code: `ffi/bindings/dotnet/dnp3` (can be built with `dotnet build`)
+  - Java:
+    - Maven Package: `ffi/bindings/java/dnp3/target/dnp3-X.Y.Z.jar` (installable with mvn org.apache.maven.plugins:maven-install-plugin:3.0.0-M1:install-file -Dfile=dnp3-X.Y.Z.jar)
+    - Javadoc: `ffi/bindings/java/dnp3/target/dnp3-X.Y.Z-javadoc.jar` (ZIP file that can be extracted)
+    - Generated code: `ffi/bindings/java/dnp3` (can be installed locally with `mvn install`)
+    - JNI library: `target/release/dnp3_ffi_java.<dll|so>` (or somewhere similar depending on the platform)

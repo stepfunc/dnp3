@@ -10,9 +10,11 @@ module.exports = {
     ],
     Languages: [
         'languages/bindings',
+        'languages/build',
         {
             Bindings: [
                 'languages/c_bindings',
+                'languages/cpp_bindings',
                 'languages/java',
                 'languages/c_sharp',
             ]

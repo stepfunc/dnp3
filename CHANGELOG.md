@@ -1,3 +1,47 @@
+### 1.0.0 ###
+* Merge all examples in a single executable. See [#170](https://github.com/stepfunc/dnp3/pull/170).
+* Add feature flag for TLS support. See [#171](https://github.com/stepfunc/dnp3/pull/171).
+* Move response timeouts from `MasterChannelConfig` to `AssociationConfig`. See [#167](https://github.com/stepfunc/dnp3/pull/167).
+* `ReadHandler::begin()`, `ReadHandler::end()` and `ControlHandler::end()` now returns a
+  `MaybeAsync` type to allow for asynchronous operations. See [#166](https://github.com/stepfunc/dnp3/pull/166).
+* MacOS x64 builds are now included in the pre-built packages (**but not officially supported**).
+  See [#168](https://github.com/stepfunc/dnp3/pull/168).
+* Documentation is now built by the CI pipeline. See [#161](https://github.com/stepfunc/dnp3/pull/161).
+* Octet string is now a byte iterator instead of an iterator of a struct. See [#162](https://github.com/stepfunc/dnp3/pull/162).
+* Add `HeaderInfo::is_event` and `HeaderInfo::has_flags` fields. See [#143](https://github.com/stepfunc/dnp3/pull/143).
+* Renamings to more closely follow the spec. See [#164](https://github.com/stepfunc/dnp3/pull/164).
+  * `Binary` -> `BinaryInput`
+  * `BinaryConfig`-> `BinaryInputConfig`
+  * `StaticBinaryVariation` -> `StaticBinaryInputVariation`
+  * `EventBinaryVariation` -> `EventBinaryInputVariation`
+  * `ReadHandler::handle_binary()` -> `ReadHandler::handle_binary_input()`
+  * `Database::add_binary()` -> `Database::add_binary_input()`
+  * `Database::update_binary()` -> `Database::update_binary_input()`
+  * `Database::remove_binary()` -> `Database::remove_binary_input()`
+  * `Database::get_binary()` -> `Database::get_binary_input()`
+  * `DoubleBitBinary` -> `DoubleBitBinaryInput`
+  * `DoubleBitBinaryConfig`-> `DoubleBitBinaryInputConfig`
+  * `StaticDoubleBitBinaryVariation` -> `StaticDoubleBitBinaryInputVariation`
+  * `EventDoubleBitBinaryVariation` -> `EventDoubleBitBinaryInputVariation`
+  * `ReadHandler::handle_double_bit_binary()` -> `ReadHandler::handle_double_bit_binary_input()`
+  * `Database::add_double_bit_binary()` -> `Database::add_double_bit_binary_input()`
+  * `Database::update_double_bit_binary()` -> `Database::update_double_bit_binary_input()`
+  * `Database::remove_double_bit_binary()` -> `Database::remove_double_bit_binary_input()`
+  * `Database::get_double_bit_binary()` -> `Database::get_double_bit_binary_input()`
+  * `Analog` -> `AnalogInput`
+  * `AnalogConfig`-> `AnalogInputConfig`
+  * `StaticAnalogVariation` -> `StaticAnalogInputVariation`
+  * `EventAnalogVariation` -> `EventAnalogInputVariation`
+  * `ReadHandler::handle_analog()` -> `ReadHandler::handle_analog_input()`
+  * `Database::add_analog()` -> `Database::add_analog_input()`
+  * `Database::update_analog()` -> `Database::update_analog_input()`
+  * `Database::remove_analog()` -> `Database::remove_analog_input()`
+  * `Database::get_analog()` -> `Database::get_analog_input()`
+
+* C# and Java now has builder methods that can be chained. See [oo-bindgen#79](https://github.com/stepfunc/oo_bindgen/pull/79).
+* Add C++ bindings. See [oo-bindgen#79](https://github.com/stepfunc/oo_bindgen/pull/79).
+* 
+
 ### 0.10.0 ###
 * :star: Add TLS support through `rustls`.
   See [#135](https://github.com/stepfunc/dnp3/pull/135).

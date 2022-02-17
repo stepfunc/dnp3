@@ -199,9 +199,9 @@ void run_channel(dnp3::MasterChannel &channel)
 {
     // ANCHOR: association_create
     auto assoc = channel.add_association(
-        1024, 
+        1024,
         get_association_config(),
-        std::make_unique<ReadHandler>(), 
+        std::make_unique<ReadHandler>(),
         std::make_unique<AssociationHandler>()
     );
     // ANCHOR_END: association_create

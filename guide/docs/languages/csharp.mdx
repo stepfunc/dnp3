@@ -8,7 +8,19 @@ slug: /c_sharp
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
 We distribute the C# bindings as a [Nuget package](https://www.nuget.org/packages/dnp3). Internally, the C API is called using [P/Invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke)
-The bindings are .NET standard 2.0 compatible and include platform-specific shared libraries for 64-bit Windows and Linux. They are automatically loaded by the .NET runtime.
+The bindings are .NET standard 2.0 compatible and include platform-specific shared libraries that are automatically loaded by the .NET runtime.
+
+The currently embedded shared libraries are the following:
+
+- Windows x64 (Windows 7+)
+- Linux x64 (kernel 2.6.32+, glibc 2.11+)
+- Linux AArch64 (kernel 4.2, glibc 2.17+)
+- MacOS x64 (MacOS 10.7+, Lion+)
+
+:::warning
+MacOS x64 libraries are included in the package but are not officially supported. They can be useful for developers using MacOS, but
+they should **never be used in production**.
+:::
 
 ## Mapping
 
@@ -28,7 +40,8 @@ The code generator transforms iterators into `ICollection<T>`. This means that t
 
 ### Structs
 
-Native structs are mapped to C# classes. They have public member visibility, and the constructor ensures that all values are initialized.
+Native structs are mapped to C# classes. They have public member visibility, and the constructor ensures that all values without a reasonable default are initialized.
+Each field has a `With<FieldName>` method that sets the field and returns the struct for chaining operations.
 
 ### Classes
 
@@ -37,8 +50,6 @@ Abstract classes are mapped to C# classes. They have a private pointer to the un
 types of classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`.
 * Generated classes that also provide a public `Shutdown` method: These represent long-lived resources such as `Runtime`, `Master`, or `TCPServer`. They map to an asynchronous
 Rust task executing on the Tokio runtime. The `Shutdown` method lets you precisely control when the resource/task will stop.
-
-
 
 ### Asynchronous Methods
 
