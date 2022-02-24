@@ -2,7 +2,7 @@ use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::link::LinkErrorMode;
 use crate::outstation::config::*;
-use crate::outstation::database::{DatabaseHandle, EventBufferConfig};
+use crate::outstation::database::DatabaseHandle;
 use crate::outstation::session::{OutstationSession, RunError};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
@@ -36,7 +36,6 @@ impl OutstationTask {
     pub(crate) fn create(
         link_error_mode: LinkErrorMode,
         config: OutstationConfig,
-        event_config: EventBufferConfig,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
@@ -45,7 +44,7 @@ impl OutstationTask {
         let handle = DatabaseHandle::new(
             config.max_read_request_headers,
             config.class_zero,
-            event_config,
+            config.event_buffer_config,
         );
         let (reader, writer) = crate::transport::create_outstation_transport_layer(
             link_error_mode,

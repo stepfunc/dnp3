@@ -1,6 +1,6 @@
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
-use crate::outstation::database::ClassZeroConfig;
+use crate::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use crate::util::buffer::Buffer;
 
 /// Validated buffer size for use in the outstation
@@ -90,6 +90,8 @@ pub struct OutstationConfig {
     pub outstation_address: EndpointAddress,
     /// address of the master with which the outstation will communicate
     pub master_address: EndpointAddress,
+    /// event buffers configuration
+    pub event_buffer_config: EventBufferConfig,
     /// buffer size for transmitted solicited responses
     pub solicited_buffer_size: BufferSize,
     /// buffer size for transmitted unsolicited responses
@@ -148,10 +150,15 @@ impl OutstationConfig {
 
     /// constructs an `OutstationConfig` with default settings, except for the
     /// master and outstation link addresses which really don't have good defaults
-    pub fn new(outstation_address: EndpointAddress, master_address: EndpointAddress) -> Self {
+    pub fn new(
+        outstation_address: EndpointAddress,
+        master_address: EndpointAddress,
+        event_buffer_config: EventBufferConfig,
+    ) -> Self {
         Self {
             outstation_address,
             master_address,
+            event_buffer_config,
             solicited_buffer_size: BufferSize::default(),
             unsolicited_buffer_size: BufferSize::default(),
             rx_buffer_size: BufferSize::default(),

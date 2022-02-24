@@ -21,14 +21,14 @@ mod adapters;
 mod database;
 mod struct_constructors;
 
-enum TcpServerState {
-    Configuring(dnp3::tcp::TcpServer),
+enum OutstationServerState {
+    Configuring(dnp3::tcp::Server),
     Running(ServerHandle),
 }
 
-pub struct TcpServer {
+pub struct OutstationServer {
     runtime: RuntimeHandle,
-    state: TcpServerState,
+    state: OutstationServerState,
 }
 
 pub struct Outstation {
@@ -36,34 +36,34 @@ pub struct Outstation {
     runtime: RuntimeHandle,
 }
 
-pub unsafe fn tcp_server_create(
+pub unsafe fn outstation_server_create_tcp_server(
     runtime: *mut Runtime,
     link_error_mode: ffi::LinkErrorMode,
     address: &CStr,
-) -> Result<*mut TcpServer, ffi::ParamError> {
+) -> Result<*mut OutstationServer, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let address = address.to_string_lossy().parse()?;
 
-    let server = dnp3::tcp::TcpServer::new(link_error_mode.into(), address);
+    let server = dnp3::tcp::Server::new_tcp_server(link_error_mode.into(), address);
 
-    Ok(Box::into_raw(Box::new(TcpServer {
+    Ok(Box::into_raw(Box::new(OutstationServer {
         runtime: runtime.handle(),
-        state: TcpServerState::Configuring(server),
+        state: OutstationServerState::Configuring(server),
     })))
 }
 
-pub unsafe fn tcp_server_destroy(server: *mut TcpServer) {
+pub unsafe fn outstation_server_destroy(server: *mut OutstationServer) {
     if !server.is_null() {
         Box::from_raw(server);
     }
 }
 
-pub unsafe fn tcp_server_create_tls(
+pub unsafe fn outstation_server_create_tls_server(
     runtime: *mut Runtime,
     link_error_mode: ffi::LinkErrorMode,
     address: &CStr,
     tls_config: ffi::TlsServerConfig,
-) -> Result<*mut TcpServer, ffi::ParamError> {
+) -> Result<*mut OutstationServer, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let address = address.to_string_lossy().parse()?;
 
@@ -87,25 +87,18 @@ pub unsafe fn tcp_server_create_tls(
         err
     })?;
 
-    let server = dnp3::tcp::TcpServer::new_tls_server(link_error_mode.into(), address, tls_config);
+    let server = dnp3::tcp::Server::new_tls_server(link_error_mode.into(), address, tls_config);
 
-    Ok(Box::into_raw(Box::new(TcpServer {
+    Ok(Box::into_raw(Box::new(OutstationServer {
         runtime: runtime.handle(),
-        state: TcpServerState::Configuring(server),
+        state: OutstationServerState::Configuring(server),
     })))
 }
 
-pub unsafe fn tcpserver_destroy(server: *mut TcpServer) {
-    if !server.is_null() {
-        Box::from_raw(server);
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn tcp_server_add_outstation(
-    server: *mut TcpServer,
+pub unsafe fn outstation_server_add_outstation(
+    server: *mut OutstationServer,
     config: ffi::OutstationConfig,
-    event_config: ffi::EventBufferConfig,
     application: ffi::OutstationApplication,
     information: ffi::OutstationInformation,
     control_handler: ffi::ControlHandler,
@@ -115,8 +108,8 @@ pub unsafe fn tcp_server_add_outstation(
     let server = server.as_mut().ok_or(ffi::ParamError::NullParameter)?;
 
     let server_handle = match &mut server.state {
-        TcpServerState::Configuring(server) => server,
-        TcpServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),
+        OutstationServerState::Configuring(server) => server,
+        OutstationServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),
     };
 
     let config = convert_outstation_config(config)?;
@@ -127,7 +120,6 @@ pub unsafe fn tcp_server_add_outstation(
 
     let (outstation, task) = server_handle.add_outstation_no_spawn(
         config,
-        event_config.into(),
         Box::new(application),
         Box::new(information),
         Box::new(control_handler),
@@ -143,21 +135,21 @@ pub unsafe fn tcp_server_add_outstation(
     })))
 }
 
-pub unsafe fn tcp_server_bind(server: *mut TcpServer) -> Result<(), ffi::ParamError> {
+pub unsafe fn outstation_server_bind(server: *mut OutstationServer) -> Result<(), ffi::ParamError> {
     if server.is_null() {
         return Err(ffi::ParamError::NullParameter);
     }
     let mut server = Box::from_raw(server);
 
     let server_handle = match server.state {
-        TcpServerState::Configuring(server) => server,
-        TcpServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),
+        OutstationServerState::Configuring(server) => server,
+        OutstationServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),
     };
 
     let (handle, task) = server.runtime.block_on(server_handle.bind_no_spawn())??;
 
     server.runtime.spawn(task)?;
-    server.state = TcpServerState::Running(handle);
+    server.state = OutstationServerState::Running(handle);
     Box::leak(server);
     Ok(())
 }
@@ -174,7 +166,6 @@ pub unsafe fn outstation_create_serial_session(
     serial_path: &CStr,
     settings: ffi::SerialPortSettings,
     config: ffi::OutstationConfig,
-    event_config: ffi::EventBufferConfig,
     application: ffi::OutstationApplication,
     information: ffi::OutstationInformation,
     control_handler: ffi::ControlHandler,
@@ -191,7 +182,6 @@ pub unsafe fn outstation_create_serial_session(
         &serial_path,
         settings.into(),
         config,
-        event_config.into(),
         Box::new(application),
         Box::new(information),
         Box::new(control_handler),
@@ -229,8 +219,9 @@ pub unsafe fn outstation_set_decode_level(
 fn convert_outstation_config(
     config: ffi::OutstationConfig,
 ) -> Result<OutstationConfig, ffi::ParamError> {
-    let outstation_address = EndpointAddress::from(config.outstation_address())?;
-    let master_address = EndpointAddress::from(config.master_address())?;
+    let outstation_address = EndpointAddress::try_new(config.outstation_address())?;
+    let master_address = EndpointAddress::try_new(config.master_address())?;
+    let event_buffer_config = config.event_buffer_config().into();
     let solicited_buffer_size = BufferSize::new(config.solicited_buffer_size() as usize)?;
     let unsolicited_buffer_size = BufferSize::new(config.unsolicited_buffer_size() as usize)?;
     let rx_buffer_size = BufferSize::new(config.rx_buffer_size() as usize)?;
@@ -244,6 +235,7 @@ fn convert_outstation_config(
     Ok(OutstationConfig {
         outstation_address,
         master_address,
+        event_buffer_config,
         solicited_buffer_size,
         unsolicited_buffer_size,
         rx_buffer_size,
@@ -307,8 +299,8 @@ impl From<ffi::ClassZeroConfig> for ClassZeroConfig {
     }
 }
 
-impl From<ffi::EventBufferConfig> for EventBufferConfig {
-    fn from(from: ffi::EventBufferConfig) -> Self {
+impl From<&ffi::EventBufferConfig> for EventBufferConfig {
+    fn from(from: &ffi::EventBufferConfig) -> Self {
         EventBufferConfig {
             max_binary: from.max_binary(),
             max_double_binary: from.max_double_bit_binary(),

@@ -2,7 +2,7 @@ use std::ffi::CStr;
 use std::path::Path;
 use std::time::Duration;
 
-use dnp3::app::{ConnectStrategy, Listener, RangeError, RetryStrategy, Timeout, Timestamp};
+use dnp3::app::{ConnectStrategy, Listener, RetryStrategy, Timeout, TimeoutRangeError, Timestamp};
 use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::serial::*;
@@ -56,9 +56,9 @@ pub(crate) unsafe fn master_channel_create_tls(
     link_error_mode: ffi::LinkErrorMode,
     config: ffi::MasterChannelConfig,
     endpoints: *const crate::EndpointList,
-    tls_config: ffi::TlsClientConfig,
     connect_strategy: ffi::ConnectStrategy,
     listener: ffi::ClientStateListener,
+    tls_config: ffi::TlsClientConfig,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
     let config = convert_config(config)?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
@@ -93,9 +93,9 @@ pub(crate) unsafe fn master_channel_create_tls(
         link_error_mode.into(),
         config,
         endpoints.clone(),
-        tls_config,
         connect_strategy,
         Box::new(listener),
+        tls_config,
     );
 
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
@@ -167,7 +167,7 @@ pub unsafe fn master_channel_add_association(
     assoc_handler: ffi::AssociationHandler,
 ) -> Result<ffi::AssociationId, ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let address = EndpointAddress::from(address)?;
+    let address = EndpointAddress::try_new(address)?;
 
     let config = AssociationConfig {
         response_timeout: Timeout::from_duration(Duration::from_millis(config.response_timeout))?,
@@ -202,8 +202,8 @@ pub unsafe fn master_channel_add_association(
     })
 }
 
-impl From<RangeError> for ffi::ParamError {
-    fn from(_: RangeError) -> Self {
+impl From<TimeoutRangeError> for ffi::ParamError {
+    fn from(_: TimeoutRangeError) -> Self {
         ffi::ParamError::InvalidTimeout
     }
 }
@@ -213,7 +213,7 @@ pub(crate) unsafe fn master_channel_remove_association(
     id: ffi::AssociationId,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let endpoint = EndpointAddress::from(id.address)?;
+    let endpoint = EndpointAddress::try_new(id.address)?;
 
     channel
         .runtime
@@ -229,7 +229,7 @@ pub(crate) unsafe fn master_channel_add_poll(
     period: std::time::Duration,
 ) -> Result<ffi::PollId, ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let address = EndpointAddress::from(id.address)?;
+    let address = EndpointAddress::try_new(id.address)?;
     let request = request.as_ref().ok_or(ffi::ParamError::NullParameter)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
@@ -248,7 +248,7 @@ pub(crate) unsafe fn master_channel_remove_poll(
     poll: ffi::PollId,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let endpoint = EndpointAddress::from(poll.association_id)?;
+    let endpoint = EndpointAddress::try_new(poll.association_id)?;
 
     let poll = PollHandle::create(
         AssociationHandle::create(endpoint, channel.handle.clone()),
@@ -265,7 +265,7 @@ pub unsafe fn master_channel_demand_poll(
     poll: ffi::PollId,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let endpoint = EndpointAddress::from(poll.association_id)?;
+    let endpoint = EndpointAddress::try_new(poll.association_id)?;
 
     let mut poll = PollHandle::create(
         AssociationHandle::create(endpoint, channel.handle.clone()),
@@ -284,7 +284,7 @@ pub(crate) unsafe fn master_channel_read(
     callback: ffi::ReadTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let address = EndpointAddress::from(association.address)?;
+    let address = EndpointAddress::try_new(association.address)?;
     let request = request
         .as_ref()
         .ok_or(ffi::ParamError::NullParameter)?
@@ -311,7 +311,7 @@ pub unsafe fn master_channel_operate(
     callback: ffi::CommandTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let address = EndpointAddress::from(association.address)?;
+    let address = EndpointAddress::try_new(association.address)?;
     let headers = commands
         .as_ref()
         .ok_or(ffi::ParamError::NullParameter)?
@@ -376,7 +376,7 @@ pub(crate) unsafe fn master_channel_synchronize_time(
     callback: ffi::TimeSyncTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let address = EndpointAddress::from(association.address)?;
+    let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
@@ -397,7 +397,7 @@ pub(crate) unsafe fn master_channel_cold_restart(
     callback: ffi::RestartTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let address = EndpointAddress::from(association.address)?;
+    let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
@@ -418,7 +418,7 @@ pub(crate) unsafe fn master_channel_warm_restart(
     callback: ffi::RestartTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let address = EndpointAddress::from(association.address)?;
+    let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
@@ -439,7 +439,7 @@ pub(crate) unsafe fn master_channel_check_link_status(
     callback: ffi::LinkStatusCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let address = EndpointAddress::from(association.address)?;
+    let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
@@ -567,7 +567,7 @@ pub(crate) unsafe fn endpoint_list_add(list: *mut EndpointList, endpoint: &CStr)
 fn convert_config(
     config: ffi::MasterChannelConfig,
 ) -> Result<MasterChannelConfig, ffi::ParamError> {
-    let address = EndpointAddress::from(config.address())?;
+    let address = EndpointAddress::try_new(config.address())?;
 
     Ok(MasterChannelConfig {
         master_address: address,

@@ -78,7 +78,7 @@ impl std::fmt::Display for SpecialAddressError {
 
 impl EndpointAddress {
     /// try to construct an EndpointAddress from a raw u16
-    pub fn from(value: u16) -> Result<Self, SpecialAddressError> {
+    pub fn try_new(value: u16) -> Result<Self, SpecialAddressError> {
         value.try_into()
     }
 

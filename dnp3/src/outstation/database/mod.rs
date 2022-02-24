@@ -167,6 +167,7 @@ impl EventBufferConfig {
             + self.max_frozen_counter as usize
             + self.max_analog as usize
             + self.max_analog_output_status as usize
+            + self.max_octet_string as usize
     }
 }
 

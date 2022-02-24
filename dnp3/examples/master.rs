@@ -4,6 +4,7 @@ use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
 use dnp3::app::control::*;
+use dnp3::app::measurement::*;
 use dnp3::app::*;
 use dnp3::decode::*;
 use dnp3::link::*;
@@ -16,6 +17,177 @@ use dnp3::tcp::tls::*;
 
 use std::path::Path;
 use std::process::exit;
+
+/// read handler that does nothing
+#[derive(Copy, Clone)]
+pub struct ExampleReadHandler;
+
+impl ExampleReadHandler {
+    /// create a boxed instance of the NullReadHandler
+    pub fn boxed() -> Box<dyn ReadHandler> {
+        Box::new(Self {})
+    }
+}
+
+// ANCHOR: read_handler
+impl ReadHandler for ExampleReadHandler {
+    fn begin_fragment(&mut self, _read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
+        println!(
+            "Beginning fragment (broadcast: {})",
+            header.iin.iin1.get_broadcast()
+        );
+        MaybeAsync::ready(())
+    }
+
+    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
+        println!("End fragment");
+        MaybeAsync::ready(())
+    }
+
+    fn handle_binary_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
+    ) {
+        println!("Binary Inputs:");
+        println!("Qualifier: {}", info.qualifier);
+        println!("Variation: {}", info.variation);
+
+        for (x, idx) in iter {
+            println!(
+                "BI {}: Value={} Flags={:#04X} Time={:?}",
+                idx, x.value, x.flags.value, x.time
+            );
+        }
+    }
+
+    fn handle_double_bit_binary_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
+    ) {
+        println!("Double Bit Binary Inputs:");
+        println!("Qualifier: {}", info.qualifier);
+        println!("Variation: {}", info.variation);
+
+        for (x, idx) in iter {
+            println!(
+                "DBBI {}: Value={} Flags={:#04X} Time={:?}",
+                idx, x.value, x.flags.value, x.time
+            );
+        }
+    }
+
+    fn handle_binary_output_status(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
+    ) {
+        println!("Binary Output Statuses:");
+        println!("Qualifier: {}", info.qualifier);
+        println!("Variation: {}", info.variation);
+
+        for (x, idx) in iter {
+            println!(
+                "BOS {}: Value={} Flags={:#04X} Time={:?}",
+                idx, x.value, x.flags.value, x.time
+            );
+        }
+    }
+
+    fn handle_counter(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Counter, u16)>) {
+        println!("Counters:");
+        println!("Qualifier: {}", info.qualifier);
+        println!("Variation: {}", info.variation);
+
+        for (x, idx) in iter {
+            println!(
+                "Counter {}: Value={} Flags={:#04X} Time={:?}",
+                idx, x.value, x.flags.value, x.time
+            );
+        }
+    }
+
+    fn handle_frozen_counter(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
+    ) {
+        println!("Frozen Counters:");
+        println!("Qualifier: {}", info.qualifier);
+        println!("Variation: {}", info.variation);
+
+        for (x, idx) in iter {
+            println!(
+                "Frozen Counter {}: Value={} Flags={:#04X} Time={:?}",
+                idx, x.value, x.flags.value, x.time
+            );
+        }
+    }
+
+    fn handle_analog_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
+    ) {
+        println!("Analog Inputs:");
+        println!("Qualifier: {}", info.qualifier);
+        println!("Variation: {}", info.variation);
+
+        for (x, idx) in iter {
+            println!(
+                "AI {}: Value={} Flags={:#04X} Time={:?}",
+                idx, x.value, x.flags.value, x.time
+            );
+        }
+    }
+
+    fn handle_analog_output_status(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
+    ) {
+        println!("Analog Output Statuses:");
+        println!("Qualifier: {}", info.qualifier);
+        println!("Variation: {}", info.variation);
+
+        for (x, idx) in iter {
+            println!(
+                "AOS {}: Value={} Flags={:#04X} Time={:?}",
+                idx, x.value, x.flags.value, x.time
+            );
+        }
+    }
+
+    fn handle_octet_string<'a>(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+    ) {
+        println!("Octet Strings:");
+        println!("Qualifier: {}", info.qualifier);
+        println!("Variation: {}", info.variation);
+
+        for (x, idx) in iter {
+            println!("Octet String {}: Value={:X?}", idx, x.value);
+        }
+    }
+}
+// ANCHOR_END: read_handler
+
+// ANCHOR: association_handler
+#[derive(Copy, Clone)]
+pub struct ExampleAssociationHandler;
+
+impl AssociationHandler for ExampleAssociationHandler {}
+
+impl ExampleAssociationHandler {
+    /// create a boxed instance of the DefaultAssociationHandler
+    pub fn boxed() -> Box<dyn AssociationHandler> {
+        Box::new(Self {})
+    }
+}
+// ANCHOR_END: association_handler
 
 /*
   Example program using the master API from within the Tokio runtime.
@@ -44,10 +216,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: association_create
     let mut association = channel
         .add_association(
-            EndpointAddress::from(1024)?,
+            EndpointAddress::try_new(1024)?,
             get_association_config(),
-            NullReadHandler::boxed(),
-            DefaultAssociationHandler::boxed(),
+            ExampleReadHandler::boxed(),
+            ExampleAssociationHandler::boxed(),
         )
         .await?;
     // ANCHOR_END: association_create
@@ -56,7 +228,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: add_poll
     let mut poll = association
         .add_poll(
-            EventClasses::all().to_classes().to_request(),
+            ReadRequest::ClassScan(Classes::class123()),
             Duration::from_secs(5),
         )
         .await?;
@@ -134,13 +306,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "crt" => {
-                if let Err(err) = association.cold_restart().await {
-                    tracing::warn!("error: {}", err);
+                let result = association.cold_restart().await;
+
+                match result {
+                    Ok(delay) => tracing::info!("restart delay: {:?}", delay),
+                    Err(err) => tracing::warn!("error: {}", err),
                 }
             }
             "wrt" => {
-                if let Err(err) = association.warm_restart().await {
-                    tracing::warn!("error: {}", err);
+                let result = association.warm_restart().await;
+
+                match result {
+                    Ok(delay) => tracing::info!("restart delay: {:?}", delay),
+                    Err(err) => tracing::warn!("error: {}", err),
                 }
             }
             "lsr" => {
@@ -181,7 +359,7 @@ fn create_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
 
 // ANCHOR: master_channel_config
 fn get_master_channel_config() -> Result<MasterChannelConfig, Box<dyn std::error::Error>> {
-    let mut config = MasterChannelConfig::new(EndpointAddress::from(1)?);
+    let mut config = MasterChannelConfig::new(EndpointAddress::try_new(1)?);
     config.decode_level = AppDecodeLevel::ObjectValues.into();
     Ok(config)
 }
@@ -265,16 +443,16 @@ fn create_serial_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> 
 
 #[cfg(feature = "tls")]
 fn create_tls_channel(
-    config: TlsClientConfig,
+    tls_config: TlsClientConfig,
 ) -> Result<MasterChannel, Box<dyn std::error::Error>> {
     // ANCHOR: create_master_tls_channel
     let channel = spawn_master_tls_client(
         LinkErrorMode::Close,
         get_master_channel_config()?,
         EndpointList::new("127.0.0.1:20001".to_owned(), &[]),
-        config,
         ConnectStrategy::default(),
         NullListener::create(),
+        tls_config,
     );
     // ANCHOR_END: create_master_tls_channel
     Ok(channel)

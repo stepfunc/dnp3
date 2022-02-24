@@ -88,11 +88,6 @@ impl EventClasses {
         }
     }
 
-    /// construct an `EventClasses` from its fields
-    pub fn to_classes(self) -> Classes {
-        Classes::new(false, self)
-    }
-
     /// test if any of the event classes are enabled
     pub fn any(self) -> bool {
         self.class1 || self.class2 || self.class3
@@ -148,14 +143,19 @@ impl Classes {
         Self { class0, events }
     }
 
-    /// convert a `Classes` struct into a [ReadRequest](crate::master::ReadRequest)
-    pub fn to_request(self) -> ReadRequest {
-        ReadRequest::class_scan(self)
-    }
-
     /// construct a `Classes` with everything enabled
     pub fn all() -> Self {
         Self::new(true, EventClasses::all())
+    }
+
+    /// construct a `Classes` with all events, without class 0.
+    pub fn class123() -> Self {
+        Self::new(false, EventClasses::all())
+    }
+
+    /// construct a `Classes` with class 0 and no events
+    pub fn class0() -> Self {
+        Self::new(true, EventClasses::none())
     }
 
     /// construct a `Classes` with nothing enabled

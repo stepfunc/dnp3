@@ -107,11 +107,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "List of IP endpoints.",
         )?
         .param(
-            "tls_config",
-            tls_client_config,
-            "TLS client configuration",
-        )?
-        .param(
             "connect_strategy",
             connect_strategy,
             "Controls the timing of (re)connection attempts",
@@ -120,6 +115,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "listener",
             tcp_client_state_listener,
             "TCP connection listener used to receive updates on the status of the connection",
+        )?
+        .param(
+            "tls_config",
+            tls_client_config,
+            "TLS client configuration",
         )?
         .returns(
             master_channel_class.clone(),
@@ -323,7 +323,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     lib.define_class(&master_channel_class)?
-
         .destructor(channel_destructor)?
         .static_method(master_channel_create_tcp_fn)?
         .static_method(master_channel_create_tls_fn)?

@@ -107,12 +107,11 @@ class ExampleOutstation
         }
     }
 
-    private static void RunServer(TcpServer server)
+    private static void RunServer(OutstationServer server)
     {
         // ANCHOR: tcp_server_add_outstation
         var outstation = server.AddOutstation(
             GetOutstationConfig(),
-            GetEventBufferConfig(),
             new TestOutstationApplication(),
             new TestOutstationInformation(),
             new TestControlHandler(),
@@ -131,7 +130,7 @@ class ExampleOutstation
     private static void RunTcp(Runtime runtime)
     {
         // ANCHOR: create_tcp_server
-        var server = new TcpServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000");
+        var server = OutstationServer.CreateTcpServer(runtime, LinkErrorMode.Close, "127.0.0.1:20000");
         // ANCHOR_END: create_tcp_server
 
         try
@@ -152,7 +151,6 @@ class ExampleOutstation
             "COM1",
             new SerialPortSettings(),
             GetOutstationConfig(),
-            GetEventBufferConfig(),
             new TestOutstationApplication(),
             new TestOutstationInformation(),
             new TestControlHandler()
@@ -166,7 +164,7 @@ class ExampleOutstation
     private static void RunTls(Runtime runtime, TlsServerConfig config)
     {
         // ANCHOR: create_tls_server
-        var server = TcpServer.CreateTlsServer(runtime, LinkErrorMode.Close, "127.0.0.1:20001", config);
+        var server = OutstationServer.CreateTlsServer(runtime, LinkErrorMode.Close, "127.0.0.1:20001", config);
         // ANCHOR_END: create_tls_server
 
         try
@@ -280,8 +278,10 @@ class ExampleOutstation
             // outstation address
             1024,
             // master address
-            1
-        ).WithDecodeLevel(new DecodeLevel().WithApplication(AppDecodeLevel.ObjectValues));
+            1,
+            // event buffer sizes
+            GetEventBufferConfig()
+        ).WithDecodeLevel(DecodeLevel.Nothing().WithApplication(AppDecodeLevel.ObjectValues));
         // ANCHOR_END: outstation_config
         return config;
     }
@@ -394,6 +394,4 @@ class ExampleOutstation
             }
         }
     }
-
-    
 }

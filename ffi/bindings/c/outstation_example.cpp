@@ -118,21 +118,21 @@ Timestamp now()
     return Timestamp::synchronized_timestamp(std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count());
 }
 
-// ANCHOR: create_outstation_config
-dnp3::OutstationConfig get_outstation_config()
-{
-    dnp3::OutstationConfig config(1024, 1);
-    config.decode_level.application = dnp3::AppDecodeLevel::object_values;
-    return config;
-}
-// ANCHOR_END: create_outstation_config
-
 // ANCHOR: event_buffer_config
 dnp3::EventBufferConfig get_event_buffer_config()
 {
     return EventBufferConfig(10, 10, 10, 10, 10, 10, 10, 10);
 }
 // ANCHOR_END: event_buffer_config
+
+// ANCHOR: create_outstation_config
+dnp3::OutstationConfig get_outstation_config()
+{
+    dnp3::OutstationConfig config(1024, 1, get_event_buffer_config());
+    config.decode_level.application = dnp3::AppDecodeLevel::object_values;
+    return config;
+}
+// ANCHOR_END: create_outstation_config
 
 void run_outstation(dnp3::Outstation &outstation)
 {
@@ -210,12 +210,12 @@ void run_outstation(dnp3::Outstation &outstation)
     }
 }
 
-void run_server(dnp3::TcpServer &server)
+void run_server(dnp3::OutstationServer &server)
 {
     // ANCHOR: tcp_server_add_outstation
     auto filter = AddressFilter::any();
     auto outstation = server.add_outstation(
-        get_outstation_config(), get_event_buffer_config(), std::make_unique<MyOutstationApplication>(), std::make_unique<MyOutstationInformation>(),
+        get_outstation_config(), std::make_unique<MyOutstationApplication>(), std::make_unique<MyOutstationInformation>(),
         std::make_unique<MyControlHandler>(),
         connection_state_listener([](ConnectionState state) { std::cout << "ConnectionState: " << to_string(state) << std::endl; }), filter);
     // ANCHOR_END: tcp_server_add_outstation
@@ -248,7 +248,7 @@ void run_server(dnp3::TcpServer &server)
 void run_tcp_server(dnp3::Runtime &runtime)
 {
     // ANCHOR: create_tcp_server
-    dnp3::TcpServer server(runtime, LinkErrorMode::close, "127.0.0.1:20000");
+    auto server = dnp3::OutstationServer::create_tcp_server(runtime, LinkErrorMode::close, "127.0.0.1:20000");
     // ANCHOR_END: create_tcp_server
 
     run_server(server);
@@ -262,7 +262,6 @@ void run_serial(dnp3::Runtime &runtime)
         "/dev/pts/4",  // change this to a real port
         dnp3::SerialPortSettings(), // default settings
         get_outstation_config(),
-        get_event_buffer_config(),
         std::make_unique<MyOutstationApplication>(),
         std::make_unique<MyOutstationInformation>(),
         std::make_unique<MyControlHandler>()
@@ -275,7 +274,7 @@ void run_serial(dnp3::Runtime &runtime)
 void run_tls_server(dnp3::Runtime &runtime, const dnp3::TlsServerConfig &config)
 {
     // ANCHOR: create_tls_server
-    dnp3::TcpServer server = dnp3::TcpServer::create_tls_server(runtime, LinkErrorMode::close, "127.0.0.1:20001", config);
+    dnp3::OutstationServer server = dnp3::OutstationServer::create_tls_server(runtime, LinkErrorMode::close, "127.0.0.1:20001", config);
     // ANCHOR_END: create_tls_server
 
     run_server(server);

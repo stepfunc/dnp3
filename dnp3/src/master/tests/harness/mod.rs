@@ -10,12 +10,15 @@ use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::handler::{AssociationHandle, HeaderInfo, MasterChannel, ReadHandler};
 use crate::master::session::{MasterSession, RunError};
-use crate::master::{DefaultAssociationHandler, ReadType};
+use crate::master::{AssociationHandler, ReadType};
 use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
 use crate::util::phys::PhysLayer;
 
 pub(crate) mod requests;
+
+struct DefaultAssociationHandler;
+impl AssociationHandler for DefaultAssociationHandler {}
 
 pub(crate) fn create_association(
     mut config: AssociationConfig,
@@ -27,7 +30,7 @@ pub(crate) fn create_association(
 
     let mut io = PhysLayer::Mock(io);
 
-    let outstation_address = EndpointAddress::from(1024).unwrap();
+    let outstation_address = EndpointAddress::try_new(1024).unwrap();
 
     // Create the master session
     let (tx, rx) = crate::util::channel::request_channel();
@@ -41,7 +44,7 @@ pub(crate) fn create_association(
 
     let (mut reader, mut writer) = create_master_transport_layer(
         LinkErrorMode::Close,
-        EndpointAddress::from(1).unwrap(),
+        EndpointAddress::try_new(1).unwrap(),
         MasterSession::MIN_RX_BUFFER_SIZE,
     );
 
@@ -59,7 +62,7 @@ pub(crate) fn create_association(
             outstation_address,
             config,
             Box::new(handler),
-            DefaultAssociationHandler::boxed(),
+            Box::new(DefaultAssociationHandler),
         ));
         assert_pending!(add_task.poll());
         assert_pending!(master_task.poll());

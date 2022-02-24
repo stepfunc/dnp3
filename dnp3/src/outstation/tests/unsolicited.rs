@@ -279,9 +279,9 @@ fn handles_disable_unsolicited_during_unsolicited_confirm_wait() {
 
 #[test]
 fn buffer_overflow_issue() {
-    let config = get_default_unsolicited_config();
-    let mut harness =
-        new_harness_with_custom_event_buffers(config, EventBufferConfig::all_types(1));
+    let mut config = get_default_unsolicited_config();
+    config.event_buffer_config = EventBufferConfig::all_types(1);
+    let mut harness = new_harness_with_custom_event_buffers(config);
     confirm_null_unsolicited(&mut harness);
     enable_unsolicited(&mut harness);
 

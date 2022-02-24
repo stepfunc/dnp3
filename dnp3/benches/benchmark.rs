@@ -150,11 +150,10 @@ impl Pair {
 
     async fn spawn_outstation(port: u16, config: TestConfig) -> (ServerHandle, OutstationHandle) {
         let mut server =
-            TcpServer::new(LinkErrorMode::Close, SocketAddr::new(Self::LOCALHOST, port));
+            Server::new_tcp_server(LinkErrorMode::Close, SocketAddr::new(Self::LOCALHOST, port));
         let outstation = server
             .add_outstation(
                 Self::get_outstation_config(config.outstation_level),
-                EventBufferConfig::all_types(100),
                 DefaultOutstationApplication::create(),
                 DefaultOutstationInformation::create(),
                 DefaultControlHandler::create(),
@@ -231,7 +230,7 @@ impl Pair {
                 Self::outstation_address(),
                 Self::get_association_config(),
                 Box::new(handler),
-                DefaultAssociationHandler::boxed(),
+                Box::new(TestAssociationHandler),
             )
             .await
             .unwrap();
@@ -242,15 +241,15 @@ impl Pair {
     }
 
     fn outstation_address() -> EndpointAddress {
-        EndpointAddress::from(10).unwrap()
+        EndpointAddress::try_new(10).unwrap()
     }
 
     fn master_address() -> EndpointAddress {
-        EndpointAddress::from(1).unwrap()
+        EndpointAddress::try_new(1).unwrap()
     }
 
     fn get_master_config(level: DecodeLevel) -> MasterChannelConfig {
-        let mut config = MasterChannelConfig::new(EndpointAddress::from(1).unwrap());
+        let mut config = MasterChannelConfig::new(EndpointAddress::try_new(1).unwrap());
         config.decode_level = level;
         config
     }
@@ -262,7 +261,11 @@ impl Pair {
     }
 
     fn get_outstation_config(level: DecodeLevel) -> OutstationConfig {
-        let mut config = OutstationConfig::new(Self::outstation_address(), Self::master_address());
+        let mut config = OutstationConfig::new(
+            Self::outstation_address(),
+            Self::master_address(),
+            EventBufferConfig::all_types(100),
+        );
         config.decode_level = level;
         config
     }
@@ -365,7 +368,8 @@ impl ReadHandler for TestHandler {
     }
 }
 
-impl AssociationHandler for TestHandler {}
+struct TestAssociationHandler;
+impl AssociationHandler for TestAssociationHandler {}
 
 // don't need to send every type
 #[derive(Copy, Clone, PartialEq, Debug)]

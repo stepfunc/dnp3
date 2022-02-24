@@ -302,7 +302,7 @@ impl<T> Promise<T> {
 /// callbacks associated with a single master to outstation association
 pub trait AssociationHandler: Send {
     /// Retrieve the system time used for time synchronization
-    fn get_system_time(&self) -> Option<Timestamp> {
+    fn get_current_time(&self) -> Option<Timestamp> {
         Timestamp::try_from_system_time(SystemTime::now())
     }
 }
@@ -421,29 +421,9 @@ pub trait ReadHandler: Send {
     );
 }
 
-/// no-op default association handler type
-#[derive(Copy, Clone)]
-pub struct DefaultAssociationHandler;
-
-impl AssociationHandler for DefaultAssociationHandler {}
-
-impl DefaultAssociationHandler {
-    /// create a boxed instance of the DefaultAssociationHandler
-    pub fn boxed() -> Box<dyn AssociationHandler> {
-        Box::new(Self {})
-    }
-}
-
 /// read handler that does nothing
 #[derive(Copy, Clone)]
-pub struct NullReadHandler;
-
-impl NullReadHandler {
-    /// create a boxed instance of the NullReadHandler
-    pub fn boxed() -> Box<dyn ReadHandler> {
-        Box::new(Self {})
-    }
-}
+pub(crate) struct NullReadHandler;
 
 impl ReadHandler for NullReadHandler {
     fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {

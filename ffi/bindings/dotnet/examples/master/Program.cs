@@ -32,6 +32,7 @@ class MainClass
         }
     }
 
+    // ANCHOR: read_handler
     class TestReadHandler : IReadHandler
     {
         public void BeginFragment(ReadType readType, ResponseHeader header)
@@ -46,7 +47,7 @@ class MainClass
 
         public void HandleBinaryInput(HeaderInfo info, ICollection<BinaryInput> values)
         {
-            Console.WriteLine("Binaries:");
+            Console.WriteLine("Binary Inputs:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
             Console.WriteLine("Variation: " + info.Variation);
 
@@ -58,7 +59,7 @@ class MainClass
 
         public void HandleDoubleBitBinaryInput(HeaderInfo info, ICollection<DoubleBitBinaryInput> values)
         {
-            Console.WriteLine("Double Bit Binaries:");
+            Console.WriteLine("Double Bit Binary Inputs:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
             Console.WriteLine("Variation: " + info.Variation);
 
@@ -106,7 +107,7 @@ class MainClass
 
         public void HandleAnalogInput(HeaderInfo info, ICollection<AnalogInput> values)
         {
-            Console.WriteLine("Analogs:");
+            Console.WriteLine("Analog Inputs:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
             Console.WriteLine("Variation: " + info.Variation);
 
@@ -130,7 +131,7 @@ class MainClass
 
         public void HandleOctetString(HeaderInfo info, ICollection<OctetString> values)
         {
-            Console.WriteLine("Octet String:");
+            Console.WriteLine("Octet Strings:");
             Console.WriteLine("Qualifier: " + info.Qualifier);
             Console.WriteLine("Variation: " + info.Variation);
 
@@ -145,6 +146,7 @@ class MainClass
             }
         }
     }
+    // ANCHOR_END: read_handler
 
     // ANCHOR: association_handler
     class TestAssocationHandler : IAssociationHandler
@@ -161,7 +163,7 @@ class MainClass
     private static MasterChannelConfig GetMasterChannelConfig()
     {
         return new MasterChannelConfig(1)
-            .WithDecodeLevel(new DecodeLevel().WithApplication(AppDecodeLevel.ObjectValues));
+            .WithDecodeLevel(DecodeLevel.Nothing().WithApplication(AppDecodeLevel.ObjectValues));
     }
     // ANCHOR_END: master_channel_config
 
@@ -206,7 +208,7 @@ class MainClass
         }        
     }
 
-    private static void RunTls (Runtime runtime, TlsClientConfig config)
+    private static void RunTls (Runtime runtime, TlsClientConfig tlsConfig)
     {
         // ANCHOR: create_tls_channel
         var channel = MasterChannel.CreateTlsChannel(
@@ -214,9 +216,9 @@ class MainClass
             LinkErrorMode.Close,
             GetMasterChannelConfig(),
             new EndpointList("127.0.0.1:20001"),
-            config,
             new ConnectStrategy(),
-            new TestClientStateListener()
+            new TestClientStateListener(),
+            tlsConfig
         );
         // ANCHOR_END: create_tls_channel
 
@@ -387,12 +389,12 @@ class MainClass
                 }
             case "dln":
                 {
-                    channel.SetDecodeLevel(new DecodeLevel());
+                    channel.SetDecodeLevel(DecodeLevel.Nothing());
                     return true;
                 }
             case "dlv":
                 {
-                    channel.SetDecodeLevel(new DecodeLevel() { Application = AppDecodeLevel.ObjectValues });
+                    channel.SetDecodeLevel(DecodeLevel.Nothing().WithApplication(AppDecodeLevel.ObjectValues));
                     return true;
                 }
             case "rao":

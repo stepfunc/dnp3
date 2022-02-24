@@ -6,7 +6,7 @@ use dnp3::master::{AssociationHandler, HeaderInfo, ReadHandler, ReadType};
 use crate::ffi;
 
 impl AssociationHandler for ffi::AssociationHandler {
-    fn get_system_time(&self) -> Option<Timestamp> {
+    fn get_current_time(&self) -> Option<Timestamp> {
         if let Some(time) = self.get_current_time() {
             time.into()
         } else {

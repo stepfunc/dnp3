@@ -367,7 +367,7 @@ impl Association {
     }
 
     pub(crate) fn get_system_time(&self) -> Option<Timestamp> {
-        self.assoc_handler.get_system_time()
+        self.assoc_handler.get_current_time()
     }
 
     pub(crate) fn complete_poll(&mut self, id: u64) {

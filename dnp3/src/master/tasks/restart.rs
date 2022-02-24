@@ -120,18 +120,21 @@ mod tests {
     use crate::link::EndpointAddress;
     use crate::master::association::{Association, AssociationConfig};
     use crate::master::tasks::RequestWriter;
-    use crate::master::{DefaultAssociationHandler, NullReadHandler};
+    use crate::master::{AssociationHandler, NullReadHandler};
     use crate::util::cursor::WriteCursor;
 
     use super::*;
 
+    struct DefaultAssociationHandler;
+    impl AssociationHandler for DefaultAssociationHandler {}
+
     #[test]
     fn cold_restart() {
         let mut association = Association::new(
-            EndpointAddress::from(1).unwrap(),
+            EndpointAddress::try_new(1).unwrap(),
             AssociationConfig::default(),
-            NullReadHandler::boxed(),
-            DefaultAssociationHandler::boxed(),
+            Box::new(NullReadHandler),
+            Box::new(DefaultAssociationHandler),
         );
         let (tx, mut rx) = crate::tokio::sync::oneshot::channel();
         let task = NonReadTask::Restart(RestartTask::new(
@@ -175,10 +178,10 @@ mod tests {
     #[test]
     fn warm_restart() {
         let mut association = Association::new(
-            EndpointAddress::from(1).unwrap(),
+            EndpointAddress::try_new(1).unwrap(),
             AssociationConfig::default(),
-            NullReadHandler::boxed(),
-            DefaultAssociationHandler::boxed(),
+            Box::new(NullReadHandler),
+            Box::new(DefaultAssociationHandler),
         );
         let (tx, mut rx) = crate::tokio::sync::oneshot::channel();
         let task = NonReadTask::Restart(RestartTask::new(

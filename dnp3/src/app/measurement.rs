@@ -583,14 +583,14 @@ impl OctetString {
     ///
     /// The `value` parameter must have a length of [1, 255],
     /// otherwise it will return an error.
-    pub fn new(value: &[u8]) -> Result<Self, OctetStringError> {
+    pub fn new(value: &[u8]) -> Result<Self, OctetStringLengthError> {
         let len = value.len();
         if len == 0 {
-            return Err(OctetStringError::ZeroLength);
+            return Err(OctetStringLengthError::ZeroLength);
         }
 
         if len > 255 {
-            return Err(OctetStringError::MoreThan255Octets);
+            return Err(OctetStringLengthError::MoreThan255Octets);
         }
 
         let mut result = Self {
@@ -620,7 +620,7 @@ impl OctetString {
 
 /// Errors when creating an octet string
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum OctetStringError {
+pub enum OctetStringLengthError {
     /// Zero-length octet strings are explicitely disallowed
     /// by the standard.
     ZeroLength,
@@ -642,13 +642,16 @@ mod tests {
 
     #[test]
     fn new_octet_string_zero_length() {
-        assert_eq!(Err(OctetStringError::ZeroLength), OctetString::new(&[]));
+        assert_eq!(
+            Err(OctetStringLengthError::ZeroLength),
+            OctetString::new(&[])
+        );
     }
 
     #[test]
     fn new_octet_string_greater_size() {
         assert_eq!(
-            Err(OctetStringError::MoreThan255Octets),
+            Err(OctetStringLengthError::MoreThan255Octets),
             OctetString::new(&[0; 500])
         );
     }

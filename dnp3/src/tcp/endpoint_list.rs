@@ -22,9 +22,9 @@ impl EndpointList {
     }
 
     /// Create a list with a main endpoint followed by fail-overs
-    pub fn new(addr: String, fail_overs: &[String]) -> Self {
+    pub fn new(addr: String, fail_overs_list: &[String]) -> Self {
         let mut endpoints = vec![addr];
-        endpoints.extend_from_slice(fail_overs);
+        endpoints.extend_from_slice(fail_overs_list);
         Self {
             endpoints,
             pending_endpoints: VecDeque::new(),

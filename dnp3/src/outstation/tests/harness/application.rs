@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex};
 use crate::app::Timestamp;
 use crate::outstation::database::Database;
 use crate::outstation::tests::harness::{Event, EventHandle};
-use crate::outstation::traits::{OutstationApplication, RestartDelay};
-use crate::outstation::{FreezeIndices, FreezeResult, FreezeType, WriteTimeResult};
+use crate::outstation::traits::{OutstationApplication, RequestError, RestartDelay};
+use crate::outstation::{FreezeIndices, FreezeType};
 
 pub(crate) struct MockOutstationApplication {
     events: EventHandle,
@@ -35,9 +35,9 @@ impl MockOutstationApplication {
 }
 
 impl OutstationApplication for MockOutstationApplication {
-    fn write_absolute_time(&mut self, time: Timestamp) -> WriteTimeResult {
+    fn write_absolute_time(&mut self, time: Timestamp) -> Result<(), RequestError> {
         self.events.push(Event::WriteAbsoluteTime(time));
-        WriteTimeResult::Ok
+        Ok(())
     }
 
     fn get_processing_delay_ms(&self) -> u16 {
@@ -61,8 +61,8 @@ impl OutstationApplication for MockOutstationApplication {
         indices: FreezeIndices,
         freeze_type: FreezeType,
         _db: &mut Database,
-    ) -> FreezeResult {
+    ) -> Result<(), RequestError> {
         self.events.push(Event::Freeze(indices, freeze_type));
-        FreezeResult::Success
+        Ok(())
     }
 }

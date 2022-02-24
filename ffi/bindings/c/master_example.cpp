@@ -35,9 +35,18 @@ std::ostream& operator<<(std::ostream& os, const dnp3::Flags& flags)
     return write_hex_byte(os, flags.value);
 }
 
+// ANCHOR: read_handler
 class ReadHandler : public dnp3::ReadHandler {
-    void begin_fragment(dnp3::ReadType read_type, const dnp3::ResponseHeader& header) override {}
-    void end_fragment(dnp3::ReadType read_type, const dnp3::ResponseHeader& header) override {}
+    void begin_fragment(dnp3::ReadType read_type, const dnp3::ResponseHeader& header) override
+    {
+        std::cout << "Begin fragment (broadcast: " << header.iin.iin1.broadcast << ")" << std::endl;
+    }
+
+    void end_fragment(dnp3::ReadType read_type, const dnp3::ResponseHeader& header) override
+    {
+        std::cout << "End fragment" << std::endl;
+    }
+
     void handle_binary_input(const dnp3::HeaderInfo &info, dnp3::BinaryInputIterator &it) override
     {
         while (it.next()) {
@@ -100,6 +109,7 @@ class ReadHandler : public dnp3::ReadHandler {
         }
     }
 };
+// ANCHOR_END: read_handler
 
 // ANCHOR: association_handler
 class AssociationHandler : public dnp3::AssociationHandler {
@@ -227,10 +237,10 @@ void run_channel(dnp3::MasterChannel &channel)
             channel.disable();
         }
         else if (cmd == "dln") {
-            channel.set_decode_level(dnp3::DecodeLevel());
+            channel.set_decode_level(dnp3::DecodeLevel::nothing());
         }
         else if (cmd == "dlv") {
-            dnp3::DecodeLevel level;
+            auto level = dnp3::DecodeLevel::nothing();
             level.application = dnp3::AppDecodeLevel::object_values;
             channel.set_decode_level(level);
         }
@@ -314,19 +324,19 @@ void run_serial(dnp3::Runtime &runtime)
     run_channel(channel);
 }
 
-void run_tls_client(dnp3::Runtime &runtime, const dnp3::TlsClientConfig& config)
+void run_tls_client(dnp3::Runtime &runtime, const dnp3::TlsClientConfig& tls_config)
 {
     // ANCHOR: create_master_tls_channel
     dnp3::EndpointList endpoints(std::string("127.0.0.1:20001"));
 
     auto channel = dnp3::MasterChannel::create_tls_channel(
-        runtime, 
+        runtime,
         dnp3::LinkErrorMode::close,
         get_master_channel_config(),
         endpoints,
-        config,
         dnp3::ConnectStrategy(),
-        std::make_unique<ClientStateListener>()
+        std::make_unique<ClientStateListener>(),
+        tls_config
     );
     // ANCHOR_END: create_master_tls_channel
 

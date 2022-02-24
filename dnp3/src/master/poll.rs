@@ -149,12 +149,14 @@ pub struct PollHandle {
 
 impl PollHandle {
     /// FFI only
+    #[doc(hidden)]
     #[cfg(feature = "ffi")]
     pub fn get_id(&self) -> u64 {
         self.id
     }
 
     /// FFI only
+    #[doc(hidden)]
     #[cfg(feature = "ffi")]
     pub fn create(association: AssociationHandle, id: u64) -> Self {
         Self::new(association, id)

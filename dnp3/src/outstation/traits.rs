@@ -29,15 +29,13 @@ pub enum RestartDelay {
     Milliseconds(u16),
 }
 
-/// Enum describing the result of time synchronization request
+/// Enum describing the result of an operation
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum WriteTimeResult {
-    /// outstation does not support time synchronization
+pub enum RequestError {
+    /// outstation supports this operation, but the parameter(s) are nonsensical.
+    ParameterError,
+    /// outstation does not support this operation
     NotSupported,
-    /// outstation supports time synchronization but the supplied time value is invalid
-    InvalidValue,
-    /// success
-    Ok,
 }
 
 /// Outstation connection state for connection-oriented transports, e.g. TCP
@@ -68,8 +66,8 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// Handle a write of the absolute time.
     ///
     /// This is used during time synchronization procedures.
-    fn write_absolute_time(&mut self, _time: Timestamp) -> WriteTimeResult {
-        WriteTimeResult::NotSupported
+    fn write_absolute_time(&mut self, _time: Timestamp) -> Result<(), RequestError> {
+        Err(RequestError::NotSupported)
     }
 
     /// Returns the application-controlled IIN bits
@@ -109,8 +107,8 @@ pub trait OutstationApplication: Sync + Send + 'static {
         _indices: FreezeIndices,
         _freeze_type: FreezeType,
         _database: &mut Database,
-    ) -> FreezeResult {
-        FreezeResult::NotSupported
+    ) -> Result<(), RequestError> {
+        Err(RequestError::NotSupported)
     }
 }
 
@@ -228,17 +226,6 @@ pub enum FreezeType {
     /// Copy the current value of a counter to the associated point and
     /// clear the current value to 0
     FreezeAndClear,
-}
-
-/// Result of a freeze operation
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum FreezeResult {
-    /// Freeze operation was successful
-    Success,
-    /// One of the point is invalid
-    ParameterError,
-    /// The demanded freeze operation is not supported by this device
-    NotSupported,
 }
 
 /// callbacks for handling controls

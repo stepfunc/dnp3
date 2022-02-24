@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn run_tcp() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_tcp_server
-    let server = TcpServer::new(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
+    let server = Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
     // ANCHOR_END: create_tcp_server
 
     run_tcp_server(server).await
@@ -66,8 +66,6 @@ async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
         "/dev/ttySIM1",
         SerialSettings::default(),
         get_outstation_config(),
-        // event buffer space for 100 analog events
-        EventBufferConfig::new(0, 0, 0, 0, 0, 100, 0, 0),
         // customizable trait that controls outstation behavior
         DefaultOutstationApplication::create(),
         // customizable trait to receive events about what the outstation is doing
@@ -83,18 +81,16 @@ async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "tls")]
 async fn run_tls(config: TlsServerConfig) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_tls_server
-    let server =
-        TcpServer::new_tls_server(LinkErrorMode::Close, "127.0.0.1:20001".parse()?, config);
+    let server = Server::new_tls_server(LinkErrorMode::Close, "127.0.0.1:20001".parse()?, config);
     // ANCHOR_END: create_tls_server
 
     run_tcp_server(server).await
 }
 
-async fn run_tcp_server(mut server: TcpServer) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: tcp_server_spawn_outstation
     let outstation = server.add_outstation(
         get_outstation_config(),
-        get_event_buffer_config(),
         DefaultOutstationApplication::create(),
         DefaultOutstationInformation::create(),
         DefaultControlHandler::with_status(CommandStatus::NotSupported),
@@ -181,9 +177,10 @@ fn get_outstation_config() -> OutstationConfig {
     // create an outstation configuration with default values
     let mut config = OutstationConfig::new(
         // outstation address
-        EndpointAddress::from(1024).unwrap(),
+        EndpointAddress::try_new(1024).unwrap(),
         // master address
-        EndpointAddress::from(1).unwrap(),
+        EndpointAddress::try_new(1).unwrap(),
+        get_event_buffer_config(),
     );
     // override the default decoding
     config.decode_level.application = AppDecodeLevel::ObjectValues;

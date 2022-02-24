@@ -48,7 +48,7 @@ dnp3_port_state_listener_t get_port_state_listener()
     };
 }
 
-// ReadHandler
+// ANCHOR: read_handler
 void begin_fragment(dnp3_read_type_t read_type, dnp3_response_header_t header, void *arg)
 {
     printf("Beginning fragment (broadcast: %u)\n", header.iin.iin1.broadcast);
@@ -158,6 +158,7 @@ void handle_octet_strings(dnp3_header_info_t info, dnp3_octet_string_iterator_t 
         printf("\n");
     }
 }
+// ANCHOR_END: read_handler
 
 dnp3_read_handler_t get_read_handler()
 {
@@ -300,10 +301,10 @@ int run_channel(dnp3_master_channel_t *channel)
             dnp3_master_channel_disable(channel);
         }
         else if (strcmp(cbuf, "dln\n") == 0) {
-            dnp3_master_channel_set_decode_level(channel, dnp3_decode_level_init());
+            dnp3_master_channel_set_decode_level(channel, dnp3_decode_level_nothing());
         }
         else if (strcmp(cbuf, "dlv\n") == 0) {
-            dnp3_decode_level_t level = dnp3_decode_level_init();
+            dnp3_decode_level_t level = dnp3_decode_level_nothing();
             level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
             dnp3_master_channel_set_decode_level(channel, level);
         }
@@ -408,6 +409,7 @@ int run_channel(dnp3_master_channel_t *channel)
     }
 
     dnp3_master_channel_destroy(channel);
+    return 0;
 }
 
 int run_tcp_channel(dnp3_runtime_t *runtime)
@@ -458,7 +460,7 @@ int run_serial_channel(dnp3_runtime_t *runtime)
     return run_channel(channel);
 }
 
-int run_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t config)
+int run_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t tls_config)
 {
     // ANCHOR: create_master_tls_channel
     dnp3_master_channel_t *channel = NULL;
@@ -468,9 +470,9 @@ int run_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t config)
         DNP3_LINK_ERROR_MODE_CLOSE,
         get_master_channel_config(),
         endpoints,
-        config,
         dnp3_connect_strategy_init(),
         get_client_state_listener(),
+        tls_config,
         &channel
     );
     dnp3_endpoint_list_destroy(endpoints);

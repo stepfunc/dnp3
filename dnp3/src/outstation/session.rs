@@ -1253,9 +1253,8 @@ impl OutstationSession {
                 HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
                     if let Some(value) = seq.single() {
                         match self.application.write_absolute_time(value.time) {
-                            WriteTimeResult::NotSupported => Iin2::NO_FUNC_CODE_SUPPORT,
-                            WriteTimeResult::InvalidValue => Iin2::PARAMETER_ERROR,
-                            WriteTimeResult::Ok => Iin2::default(),
+                            Err(err) => err.into(),
+                            Ok(()) => Iin2::default(),
                         }
                     } else {
                         tracing::warn!("request lacks a single g50v1");
@@ -1314,9 +1313,9 @@ impl OutstationSession {
 
         self.state.last_recorded_time = None;
         match self.application.write_absolute_time(timestamp) {
-            WriteTimeResult::NotSupported => Iin2::NO_FUNC_CODE_SUPPORT,
-            WriteTimeResult::InvalidValue => Iin2::PARAMETER_ERROR,
-            WriteTimeResult::Ok => Iin2::default(),
+            Err(RequestError::NotSupported) => Iin2::NO_FUNC_CODE_SUPPORT,
+            Err(RequestError::ParameterError) => Iin2::PARAMETER_ERROR,
+            Ok(()) => Iin2::default(),
         }
     }
 
@@ -1662,21 +1661,24 @@ impl OutstationSession {
                     HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => {
                         iin |= self
                             .application
-                            .freeze_counter(FreezeIndices::All, freeze_type, db);
+                            .freeze_counter(FreezeIndices::All, freeze_type, db)
+                            .map_or_else(|err| err.into(), |_| Iin2::default());
                     }
                     HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                        iin |= self.application.freeze_counter(
-                            FreezeIndices::Range(start as u16, stop as u16),
-                            freeze_type,
-                            db,
-                        );
+                        iin |= self
+                            .application
+                            .freeze_counter(
+                                FreezeIndices::Range(start as u16, stop as u16),
+                                freeze_type,
+                                db,
+                            )
+                            .map_or_else(|err| err.into(), |_| Iin2::default());
                     }
                     HeaderDetails::TwoByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                        iin |= self.application.freeze_counter(
-                            FreezeIndices::Range(start, stop),
-                            freeze_type,
-                            db,
-                        );
+                        iin |= self
+                            .application
+                            .freeze_counter(FreezeIndices::Range(start, stop), freeze_type, db)
+                            .map_or_else(|err| err.into(), |_| Iin2::default());
                     }
                     _ => {
                         iin |= Iin2::NO_FUNC_CODE_SUPPORT;

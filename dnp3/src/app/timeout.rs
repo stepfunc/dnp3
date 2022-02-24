@@ -17,7 +17,7 @@ impl Default for Timeout {
 
 /// Error type returned when a Timeout is constructed with an out-of-range value
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum RangeError {
+pub enum TimeoutRangeError {
     /// value smaller than library allowed minimum
     TooSmall(Duration),
     /// value larger than library allowed maximum
@@ -33,27 +33,27 @@ impl Timeout {
     /// try to construct a `Timeout` from a count of seconds
     ///
     /// returns a `RangeError` is < `Timeout::MIN` or > `Timeout::MAX`
-    pub fn from_secs(x: u64) -> Result<Self, RangeError> {
+    pub fn from_secs(x: u64) -> Result<Self, TimeoutRangeError> {
         Self::from_duration(Duration::from_secs(x))
     }
 
     /// try to construct a `Timeout` from a count of milliseconds
     ///
     /// returns a `RangeError` is < `Timeout::MIN` or > `Timeout::MAX`
-    pub fn from_millis(x: u64) -> Result<Self, RangeError> {
+    pub fn from_millis(x: u64) -> Result<Self, TimeoutRangeError> {
         Self::from_duration(Duration::from_millis(x))
     }
 
     /// try to construct a `Timeout` from a `Duration`
     ///
     /// returns a `RangeError` is < `Timeout::MIN` or > `Timeout::MAX`
-    pub fn from_duration(value: Duration) -> Result<Self, RangeError> {
+    pub fn from_duration(value: Duration) -> Result<Self, TimeoutRangeError> {
         if value < Self::MIN {
-            return Err(RangeError::TooSmall(value));
+            return Err(TimeoutRangeError::TooSmall(value));
         }
 
         if value > Self::MAX {
-            return Err(RangeError::TooLarge(value));
+            return Err(TimeoutRangeError::TooLarge(value));
         }
 
         Ok(Self { value })
@@ -72,16 +72,16 @@ impl std::fmt::Display for Timeout {
     }
 }
 
-impl std::fmt::Display for RangeError {
+impl std::fmt::Display for TimeoutRangeError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            RangeError::TooSmall(x) => write!(
+            TimeoutRangeError::TooSmall(x) => write!(
                 f,
                 "specified duration ({} ms) smaller than allowed library minimum ({} ms)",
                 x.as_millis(),
                 Timeout::MIN.as_millis()
             ),
-            RangeError::TooLarge(x) => write!(
+            TimeoutRangeError::TooLarge(x) => write!(
                 f,
                 "specified duration ({} ms) larger than allowed library maximum ({} ms)",
                 x.as_millis(),
@@ -91,4 +91,4 @@ impl std::fmt::Display for RangeError {
     }
 }
 
-impl std::error::Error for RangeError {}
+impl std::error::Error for TimeoutRangeError {}
