@@ -1,3 +1,4 @@
+use crate::app::Timeout;
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
 use crate::outstation::database::{ClassZeroConfig, EventBufferConfig};
@@ -101,9 +102,9 @@ pub struct OutstationConfig {
     /// initial decoding level
     pub decode_level: DecodeLevel,
     /// confirm timeout for solicited and unsolicited responses
-    pub confirm_timeout: std::time::Duration,
+    pub confirm_timeout: Timeout,
     /// timeout after which a matching OPERATE will fail with SELECT_TIMEOUT
-    pub select_timeout: std::time::Duration,
+    pub select_timeout: Timeout,
     /// optional features that can be enabled
     pub features: Features,
     /// number of non-regenerated unsolicited retries to perform
@@ -163,8 +164,8 @@ impl OutstationConfig {
             unsolicited_buffer_size: BufferSize::default(),
             rx_buffer_size: BufferSize::default(),
             decode_level: DecodeLevel::nothing(),
-            confirm_timeout: Self::DEFAULT_CONFIRM_TIMEOUT,
-            select_timeout: Self::DEFAULT_SELECT_TIMEOUT,
+            confirm_timeout: Timeout::default(),
+            select_timeout: Timeout::default(),
             features: Features::default(),
             max_unsolicited_retries: None,
             unsolicited_retry_delay: Self::DEFAULT_UNSOLICITED_RETRY_DELAY,

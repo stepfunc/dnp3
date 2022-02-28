@@ -95,7 +95,7 @@ impl ReadHandler for ffi::ReadHandler {
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
-        iter: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+        iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     ) {
         let info = info.into();
         let mut iterator = OctetStringIterator::new(iter);
@@ -346,13 +346,13 @@ impl ffi::AnalogOutputStatus {
 }
 
 pub struct OctetStringIterator<'a> {
-    inner: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+    inner: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     next: Option<ffi::OctetString<'a>>,
     current_byte_it: Option<ByteIterator<'a>>,
 }
 
 impl<'a> OctetStringIterator<'a> {
-    fn new(inner: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>) -> Self {
+    fn new(inner: &'a mut dyn Iterator<Item = (&'a [u8], u16)>) -> Self {
         Self {
             inner,
             next: None,
@@ -397,9 +397,9 @@ pub struct ByteIterator<'a> {
 }
 
 impl<'a> ByteIterator<'a> {
-    fn new(bytes: Bytes<'a>) -> Self {
+    fn new(bytes: &'a [u8]) -> Self {
         Self {
-            inner: bytes.value.iter(),
+            inner: bytes.iter(),
             next: None,
         }
     }

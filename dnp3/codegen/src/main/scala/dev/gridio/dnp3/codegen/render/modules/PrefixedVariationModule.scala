@@ -13,7 +13,7 @@ object PrefixedVariationModule extends Module {
       "use crate::app::parse::parser::*;".eol ++
       "use crate::app::parse::traits::{FixedSize, Index};".eol ++
       "use crate::app::parse::prefix::Prefix;".eol ++
-      "use crate::app::parse::bytes::PrefixedBytesSequence;".eol ++
+      "use crate::app::parse::bytes::*;".eol ++
       "use crate::app::measurement::Time;".eol ++
       "use crate::master::{ReadHandler, HeaderInfo};".eol ++
       "use crate::app::ObjectParseError;".eol ++
@@ -54,7 +54,7 @@ object PrefixedVariationModule extends Module {
     }
     def fmtMatcher(v: Variation): Iterator[String] = v match {
       case _ : SizedByVariation => {
-        s"PrefixedVariation::${v.parent.name}VarX(_,seq) =>  format_indexed_items(f, seq.iter()),".eol
+        s"PrefixedVariation::${v.parent.name}VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),".eol
       }
       case _ : FixedSize => {
         s"PrefixedVariation::${v.name}(seq) => format_prefixed_items(f, seq.iter()),".eol

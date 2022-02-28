@@ -1,5 +1,4 @@
 pub use app_enums::*;
-pub use bytes::*;
 pub use header::*;
 pub use listener::*;
 pub use maybe_async::MaybeAsync;
@@ -30,8 +29,6 @@ impl EndpointType {
         *self == EndpointType::Master
     }
 }
-
-mod bytes;
 
 mod control_types;
 #[rustfmt::skip]

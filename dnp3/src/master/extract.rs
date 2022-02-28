@@ -211,7 +211,7 @@ mod test {
         fn handle_octet_string<'a>(
             &mut self,
             _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+            _x: &mut dyn Iterator<Item = (&'a [u8], u16)>,
         ) {
             unimplemented!()
         }

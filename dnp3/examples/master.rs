@@ -162,14 +162,14 @@ impl ReadHandler for ExampleReadHandler {
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+        iter: &mut dyn Iterator<Item = (&'a [u8], u16)>,
     ) {
         println!("Octet Strings:");
         println!("Qualifier: {}", info.qualifier);
         println!("Variation: {}", info.variation);
 
         for (x, idx) in iter {
-            println!("Octet String {}: Value={:X?}", idx, x.value);
+            println!("Octet String {}: Value={:X?}", idx, x);
         }
     }
 }

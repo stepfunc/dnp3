@@ -186,7 +186,7 @@ void binary_transaction(dnp3_database_t *db, void *context)
 
     dnp3_binary_input_t value =
         dnp3_binary_input_init(7, ((database_points_t *)context)->binaryValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
-    dnp3_database_update_binary_input(db, value, dnp3_update_options_init());
+    dnp3_database_update_binary_input(db, value, dnp3_update_options_detect_event());
 }
 
 void double_bit_binary_transaction(dnp3_database_t *db, void *context)
@@ -196,7 +196,7 @@ void double_bit_binary_transaction(dnp3_database_t *db, void *context)
 
     dnp3_double_bit_binary_input_t value = dnp3_double_bit_binary_input_init(7, ((database_points_t *)context)->doubleBitBinaryValue,
                                                                              dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
-    dnp3_database_update_double_bit_binary_input(db, value, dnp3_update_options_init());
+    dnp3_database_update_double_bit_binary_input(db, value, dnp3_update_options_detect_event());
 }
 
 void binary_output_status_transaction(dnp3_database_t *db, void *context)
@@ -205,35 +205,35 @@ void binary_output_status_transaction(dnp3_database_t *db, void *context)
 
     dnp3_binary_output_status_t value = dnp3_binary_output_status_init(7, ((database_points_t *)context)->binaryOutputStatusValue,
                                                                        dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
-    dnp3_database_update_binary_output_status(db, value, dnp3_update_options_init());
+    dnp3_database_update_binary_output_status(db, value, dnp3_update_options_detect_event());
 }
 
 void counter_transaction(dnp3_database_t *db, void *context)
 {
     dnp3_counter_t value =
         dnp3_counter_init(7, ++((database_points_t *)context)->counterValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
-    dnp3_database_update_counter(db, value, dnp3_update_options_init());
+    dnp3_database_update_counter(db, value, dnp3_update_options_detect_event());
 }
 
 void frozen_counter_transaction(dnp3_database_t *db, void *context)
 {
     dnp3_frozen_counter_t value =
         dnp3_frozen_counter_init(7, ++((database_points_t *)context)->frozenCounterValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
-    dnp3_database_update_frozen_counter(db, value, dnp3_update_options_init());
+    dnp3_database_update_frozen_counter(db, value, dnp3_update_options_detect_event());
 }
 
 void analog_transaction(dnp3_database_t *db, void *context)
 {
     dnp3_analog_input_t value =
         dnp3_analog_input_init(7, ++((database_points_t *)context)->analogValue, dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
-    dnp3_database_update_analog_input(db, value, dnp3_update_options_init());
+    dnp3_database_update_analog_input(db, value, dnp3_update_options_detect_event());
 }
 
 void analog_output_status_transaction(dnp3_database_t *db, void *context)
 {
     dnp3_analog_output_status_t value = dnp3_analog_output_status_init(7, ++((database_points_t *)context)->analogOutputStatusValue,
                                                                        dnp3_flags_init(DNP3_FLAG_ONLINE), dnp3_timestamp_synchronized_timestamp(0));
-    dnp3_database_update_analog_output_status(db, value, dnp3_update_options_init());
+    dnp3_database_update_analog_output_status(db, value, dnp3_update_options_detect_event());
 }
 
 void octet_string_transaction(dnp3_database_t *db, void *context)
@@ -246,7 +246,7 @@ void octet_string_transaction(dnp3_database_t *db, void *context)
     dnp3_octet_string_value_add(octet_string, 0x6F); // o
     dnp3_octet_string_value_add(octet_string, 0x00); // \0
 
-    dnp3_database_update_octet_string(db, 7, octet_string, dnp3_update_options_init());
+    dnp3_database_update_octet_string(db, 7, octet_string, dnp3_update_options_detect_event());
 
     dnp3_octet_string_value_destroy(octet_string);
 }
@@ -492,8 +492,8 @@ int run_serial(dnp3_runtime_t* runtime)
     dnp3_outstation_t* outstation = NULL;
     dnp3_param_error_t err = dnp3_outstation_create_serial_session(
         runtime,
-        "/dev/pts/4",                     // change to a real port
-        dnp3_serial_port_settings_init(), // default settings
+        "/dev/pts/4",                // change to a real port
+        dnp3_serial_settings_init(), // default settings
         get_outstation_config(),
         get_outstation_application(),
         get_outstation_information(),

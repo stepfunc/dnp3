@@ -40,12 +40,20 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
         )?
         .end_fields()?
         .begin_initializer(
-            "init",
-            InitializerType::Normal,
-            "Initialize to default values",
+            "detect_event",
+            InitializerType::Static,
+            "Default event detection mode. Updates the static value and automatically detects event.",
         )?
         .default(&update_static, true)?
         .default_variant(&event_mode, "detect")?
+        .end_initializer()?
+        .begin_initializer(
+            "no_event",
+            InitializerType::Static,
+            "Only update the static value. Usefull during initialization of the database.",
+        )?
+        .default(&update_static, true)?
+        .default_variant(&event_mode, "suppress")?
         .end_initializer()?
         .build()?;
 

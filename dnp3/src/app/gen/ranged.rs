@@ -15,7 +15,7 @@ use crate::app::QualifierCode;
 use crate::app::parse::range::{RangedSequence, Range};
 use crate::util::cursor::ReadCursor;
 use crate::app::parse::parser::*;
-use crate::app::parse::bytes::RangedBytesSequence;
+use crate::app::parse::bytes::*;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
 use crate::master::{ReadHandler, HeaderInfo};
 use crate::app::ObjectParseError;
@@ -218,7 +218,7 @@ impl<'a> RangedVariation<'a> {
             RangedVariation::Group40Var4(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group80Var1(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group110Var0 => Ok(()),
-            RangedVariation::Group110VarX(_,seq) =>  format_indexed_items(f, seq.iter()),
+            RangedVariation::Group110VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),
         }
     }
     

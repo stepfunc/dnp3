@@ -278,11 +278,9 @@ impl AssociationHandle {
 /// A generic callback type that must be invoked once and only once.
 /// The user can select to implement it using FnOnce or a
 /// one-shot reply channel
-pub enum Promise<T> {
+pub(crate) enum Promise<T> {
     /// nothing happens when the promise is completed
     None,
-    /// Box<FnOnce> is consumed when the promise is completed
-    BoxedFn(Box<dyn FnOnce(T) + Send + Sync>),
     /// one-shot reply channel is consumed when the promise is completed
     OneShot(crate::tokio::sync::oneshot::Sender<T>),
 }
@@ -291,7 +289,6 @@ impl<T> Promise<T> {
     pub(crate) fn complete(self, value: T) {
         match self {
             Promise::None => {}
-            Promise::BoxedFn(func) => func(value),
             Promise::OneShot(s) => {
                 s.send(value).ok();
             }
@@ -417,7 +414,7 @@ pub trait ReadHandler: Send {
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
-        iter: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+        iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     );
 }
 
@@ -486,7 +483,7 @@ impl ReadHandler for NullReadHandler {
     fn handle_octet_string<'a>(
         &mut self,
         _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+        _iter: &mut dyn Iterator<Item = (&'a [u8], u16)>,
     ) {
     }
 }

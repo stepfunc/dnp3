@@ -1,5 +1,5 @@
 use crate::app::control::CommandStatus;
-use crate::app::Sequence;
+use crate::app::{Sequence, Timeout};
 
 /// records when a select occurs
 #[derive(Copy, Clone)]
@@ -36,7 +36,7 @@ impl SelectState {
 
     pub(crate) fn match_operate(
         &self,
-        timeout: std::time::Duration,
+        timeout: Timeout,
         seq: Sequence,
         frame_id: u32,
         object_hash: u64,
@@ -68,7 +68,7 @@ impl SelectState {
                 return Err(CommandStatus::Timeout);
             }
             Some(elapsed) => {
-                if elapsed > timeout {
+                if elapsed > timeout.value {
                     tracing::warn!("received valid OPERATE after SELECT timeout");
                     return Err(CommandStatus::Timeout);
                 }

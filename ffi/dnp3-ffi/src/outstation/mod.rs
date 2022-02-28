@@ -4,7 +4,7 @@ use std::path::Path;
 use std::time::Duration;
 
 pub use database::*;
-use dnp3::app::Listener;
+use dnp3::app::{Listener, Timeout};
 use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::{BufferSize, ConnectionState, Feature, Features, OutstationConfig};
@@ -164,7 +164,7 @@ pub unsafe fn outstation_destroy(outstation: *mut Outstation) {
 pub unsafe fn outstation_create_serial_session(
     runtime: *mut crate::Runtime,
     serial_path: &CStr,
-    settings: ffi::SerialPortSettings,
+    settings: ffi::SerialSettings,
     config: ffi::OutstationConfig,
     application: ffi::OutstationApplication,
     information: ffi::OutstationInformation,
@@ -240,8 +240,8 @@ fn convert_outstation_config(
         unsolicited_buffer_size,
         rx_buffer_size,
         decode_level: config.decode_level().clone().into(),
-        confirm_timeout: config.confirm_timeout(),
-        select_timeout: config.select_timeout(),
+        confirm_timeout: Timeout::from_duration(config.confirm_timeout())?,
+        select_timeout: Timeout::from_duration(config.select_timeout())?,
         features: config.features().into(),
         max_unsolicited_retries: Some(config.max_unsolicited_retries() as usize),
         unsolicited_retry_delay: config.unsolicited_retry_delay(),
@@ -294,7 +294,7 @@ impl From<ffi::ClassZeroConfig> for ClassZeroConfig {
             frozen_counter: from.frozen_counter(),
             analog: from.analog(),
             analog_output_status: from.analog_output_status(),
-            octet_strings: from.octet_strings(),
+            octet_string: from.octet_string(),
         }
     }
 }

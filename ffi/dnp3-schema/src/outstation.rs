@@ -223,7 +223,7 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
     let frozen_counter = Name::create("frozen_counter")?;
     let analog = Name::create("analog")?;
     let analog_output_status = Name::create("analog_output_status")?;
-    let octet_strings = Name::create("octet_strings")?;
+    let octet_strings = Name::create("octet_string")?;
 
     let class_zero_config = lib.declare_function_argument_struct("class_zero_config")?;
     let class_zero_config = lib

@@ -1,16 +1,17 @@
-use std::time::Duration;
-
 use dnp3::app::control::*;
 use dnp3::app::measurement::*;
-use dnp3::app::NullListener;
+use dnp3::app::*;
 use dnp3::decode::*;
 use dnp3::link::*;
 use dnp3::outstation::database::*;
 use dnp3::outstation::*;
-use dnp3::serial::{spawn_outstation_serial, SerialSettings};
+use dnp3::serial::*;
 use dnp3::tcp::*;
 use std::path::Path;
 use std::process::exit;
+use tokio_stream::StreamExt;
+use tokio_util::codec::FramedRead;
+use tokio_util::codec::LinesCodec;
 
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
@@ -51,6 +52,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+struct ExampleOutstationApplication;
+impl OutstationApplication for ExampleOutstationApplication {}
+
+struct ExampleOutstationInformation;
+impl OutstationInformation for ExampleOutstationInformation {}
+
 async fn run_tcp() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_tcp_server
     let server = Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
@@ -67,9 +74,9 @@ async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
         SerialSettings::default(),
         get_outstation_config(),
         // customizable trait that controls outstation behavior
-        DefaultOutstationApplication::create(),
+        Box::new(ExampleOutstationApplication),
         // customizable trait to receive events about what the outstation is doing
-        DefaultOutstationInformation::create(),
+        Box::new(ExampleOutstationInformation),
         // customizable trait to process control requests from the master
         DefaultControlHandler::with_status(CommandStatus::NotSupported),
     )?;
@@ -91,8 +98,8 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
     // ANCHOR: tcp_server_spawn_outstation
     let outstation = server.add_outstation(
         get_outstation_config(),
-        DefaultOutstationApplication::create(),
-        DefaultOutstationInformation::create(),
+        Box::new(ExampleOutstationApplication),
+        Box::new(ExampleOutstationInformation),
         DefaultControlHandler::with_status(CommandStatus::NotSupported),
         NullListener::create(),
         AddressFilter::Any,
@@ -103,12 +110,26 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
     // ANCHOR: database_init
     outstation.transaction(|db| {
         for i in 0..10 {
-            db.add(i, Some(EventClass::Class1), AnalogInputConfig::default());
-            db.update(
+            db.add(i, Some(EventClass::Class1), BinaryInputConfig::default());
+            db.add(
                 i,
-                &AnalogInput::new(10.0, Flags::ONLINE, Time::synchronized(0)),
-                UpdateOptions::initialize(),
+                Some(EventClass::Class1),
+                DoubleBitBinaryInputConfig::default(),
             );
+            db.add(
+                i,
+                Some(EventClass::Class1),
+                BinaryOutputStatusConfig::default(),
+            );
+            db.add(i, Some(EventClass::Class1), CounterConfig::default());
+            db.add(i, Some(EventClass::Class1), FrozenCounterConfig::default());
+            db.add(i, Some(EventClass::Class1), AnalogInputConfig::default());
+            db.add(
+                i,
+                Some(EventClass::Class1),
+                AnalogOutputStatusConfig::default(),
+            );
+            db.add(i, Some(EventClass::Class1), OctetStringConfig);
         }
     });
     // ANCHOR_END: database_init
@@ -123,19 +144,127 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
 
 // run the same logic regardless of the transport type
 async fn run_outstation(outstation: OutstationHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let mut value = 0.0;
+    let mut binary_input_value = false;
+    let mut double_bit_binary_input_value = DoubleBit::DeterminedOff;
+    let mut binary_output_status_value = false;
+    let mut counter_value = 0;
+    let mut frozen_counter_value = 0;
+    let mut analog_input_value = 0.0;
+    let mut analog_output_status_value = 0.0;
+
+    let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
     loop {
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        outstation.transaction(|db| {
-            db.update(
-                7,
-                &AnalogInput::new(value, Flags::new(0x01), Time::synchronized(1)),
-                UpdateOptions::default(),
-            )
-        });
-        value += 1.0;
+        match reader.next().await.unwrap()?.as_str() {
+            "x" => return Ok(()),
+            "bi" => {
+                binary_input_value = !binary_input_value;
+                outstation.transaction(|db| {
+                    db.update(
+                        7,
+                        &BinaryInput::new(binary_input_value, Flags::ONLINE, get_current_time()),
+                        UpdateOptions::detect_event(),
+                    );
+                })
+            }
+            "dbbi" => {
+                double_bit_binary_input_value =
+                    if double_bit_binary_input_value == DoubleBit::DeterminedOff {
+                        DoubleBit::DeterminedOn
+                    } else {
+                        DoubleBit::DeterminedOff
+                    };
+                outstation.transaction(|db| {
+                    db.update(
+                        7,
+                        &DoubleBitBinaryInput::new(
+                            double_bit_binary_input_value,
+                            Flags::ONLINE,
+                            get_current_time(),
+                        ),
+                        UpdateOptions::detect_event(),
+                    );
+                })
+            }
+            "bos" => {
+                binary_output_status_value = !binary_output_status_value;
+                outstation.transaction(|db| {
+                    db.update(
+                        7,
+                        &BinaryOutputStatus::new(
+                            binary_output_status_value,
+                            Flags::ONLINE,
+                            get_current_time(),
+                        ),
+                        UpdateOptions::detect_event(),
+                    );
+                })
+            }
+            "co" => {
+                counter_value += 1;
+                outstation.transaction(|db| {
+                    db.update(
+                        7,
+                        &Counter::new(counter_value, Flags::ONLINE, get_current_time()),
+                        UpdateOptions::detect_event(),
+                    );
+                })
+            }
+            "fco" => {
+                frozen_counter_value += 1;
+                outstation.transaction(|db| {
+                    db.update(
+                        7,
+                        &FrozenCounter::new(
+                            frozen_counter_value,
+                            Flags::ONLINE,
+                            get_current_time(),
+                        ),
+                        UpdateOptions::detect_event(),
+                    );
+                })
+            }
+            "ai" => {
+                analog_input_value += 1.0;
+                outstation.transaction(|db| {
+                    db.update(
+                        7,
+                        &AnalogInput::new(analog_input_value, Flags::ONLINE, get_current_time()),
+                        UpdateOptions::detect_event(),
+                    );
+                })
+            }
+            "aos" => {
+                analog_output_status_value += 1.0;
+                outstation.transaction(|db| {
+                    db.update(
+                        7,
+                        &AnalogOutputStatus::new(
+                            analog_output_status_value,
+                            Flags::ONLINE,
+                            get_current_time(),
+                        ),
+                        UpdateOptions::detect_event(),
+                    );
+                })
+            }
+            "os" => outstation.transaction(|db| {
+                db.update(
+                    7,
+                    &OctetString::new("Hello".as_bytes()).unwrap(),
+                    UpdateOptions::detect_event(),
+                );
+            }),
+            s => println!("unknown command: {}", s),
+        }
     }
+}
+
+fn get_current_time() -> Time {
+    let epoch_time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap();
+    Time::Synchronized(Timestamp::new(epoch_time.as_millis() as u64))
 }
 
 #[cfg(feature = "tls")]

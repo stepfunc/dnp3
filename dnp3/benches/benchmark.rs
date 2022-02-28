@@ -65,6 +65,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 criterion_group!(benches, criterion_benchmark);
 criterion_main!(benches);
 
+struct NullOutstationApplication;
+impl OutstationApplication for NullOutstationApplication {}
+
+struct NullOutstationInformation;
+impl OutstationInformation for NullOutstationInformation {}
+
 #[derive(Copy, Clone)]
 struct TestConfig {
     outstation_level: DecodeLevel,
@@ -154,8 +160,8 @@ impl Pair {
         let outstation = server
             .add_outstation(
                 Self::get_outstation_config(config.outstation_level),
-                DefaultOutstationApplication::create(),
-                DefaultOutstationInformation::create(),
+                Box::new(NullOutstationApplication),
+                Box::new(NullOutstationInformation),
                 DefaultControlHandler::create(),
                 NullListener::create(),
                 AddressFilter::Any,
@@ -362,7 +368,7 @@ impl ReadHandler for TestHandler {
     fn handle_octet_string<'a>(
         &mut self,
         _info: HeaderInfo,
-        _iter: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+        _iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     ) {
         unimplemented!()
     }

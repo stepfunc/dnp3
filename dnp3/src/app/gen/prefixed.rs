@@ -16,7 +16,7 @@ use crate::util::cursor::ReadCursor;
 use crate::app::parse::parser::*;
 use crate::app::parse::traits::{FixedSize, Index};
 use crate::app::parse::prefix::Prefix;
-use crate::app::parse::bytes::PrefixedBytesSequence;
+use crate::app::parse::bytes::*;
 use crate::app::measurement::Time;
 use crate::master::{ReadHandler, HeaderInfo};
 use crate::app::ObjectParseError;
@@ -186,7 +186,7 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
             PrefixedVariation::Group42Var6(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group42Var7(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group42Var8(seq) => format_prefixed_items(f, seq.iter()),
-            PrefixedVariation::Group111VarX(_,seq) =>  format_indexed_items(f, seq.iter()),
+            PrefixedVariation::Group111VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),
         }
     }
     

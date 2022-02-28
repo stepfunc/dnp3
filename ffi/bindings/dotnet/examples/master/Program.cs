@@ -239,7 +239,7 @@ class MainClass
             runtime,
             GetMasterChannelConfig(),
             "COM1",
-            new SerialPortSettings(),
+            new SerialSettings(),
             TimeSpan.FromSeconds(5),
             new TestPortStateListener()
         );

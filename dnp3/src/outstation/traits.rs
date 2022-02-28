@@ -249,32 +249,6 @@ pub trait ControlHandler:
     }
 }
 
-/// Struct with a default implementation [OutstationApplication](crate::outstation::OutstationApplication)
-#[derive(Copy, Clone)]
-pub struct DefaultOutstationApplication;
-
-impl OutstationApplication for DefaultOutstationApplication {}
-
-impl DefaultOutstationApplication {
-    /// create a boxed implementation of [OutstationApplication](crate::outstation::OutstationApplication)
-    pub fn create() -> Box<dyn OutstationApplication> {
-        Box::new(DefaultOutstationApplication)
-    }
-}
-
-/// Struct with a default implementation [OutstationInformation](crate::outstation::OutstationInformation)
-#[derive(Copy, Clone)]
-pub struct DefaultOutstationInformation;
-
-impl OutstationInformation for DefaultOutstationInformation {}
-
-impl DefaultOutstationInformation {
-    /// create a boxed implementation of [OutstationInformation](crate::outstation::OutstationInformation)
-    pub fn create() -> Box<dyn OutstationInformation> {
-        Box::new(DefaultOutstationInformation)
-    }
-}
-
 /// Struct with a default implementation of [ControlHandler](crate::outstation::ControlHandler)
 /// that returns that same `CommandStatus` for every operation.
 #[derive(Copy, Clone)]

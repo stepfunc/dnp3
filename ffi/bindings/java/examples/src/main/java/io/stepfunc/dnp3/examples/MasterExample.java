@@ -344,7 +344,7 @@ public class MasterExample {
                     runtime,
                     getMasterChannelConfig(),
                     "/dev/pts/4", // replace with a real port
-                    new SerialPortSettings(),
+                    new SerialSettings(),
                     Duration.ofSeconds(5),
                     new TestPortStateListener());
     // ANCHOR_END: create_serial_channel

@@ -149,7 +149,7 @@ class ExampleOutstation
         var outstation = Outstation.CreateSerialSession(
             runtime,
             "COM1",
-            new SerialPortSettings(),
+            new SerialSettings(),
             GetOutstationConfig(),
             new TestOutstationApplication(),
             new TestOutstationInformation(),
@@ -326,7 +326,7 @@ class ExampleOutstation
                         outstation.Transaction(db =>
                         {
                             binaryValue = !binaryValue;
-                            db.UpdateBinaryInput(new BinaryInput(7, binaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                            db.UpdateBinaryInput(new BinaryInput(7, binaryValue, new Flags(Flag.Online), Now()), UpdateOptions.DetectEvent());
                         });
                         break;
                     }
@@ -335,7 +335,7 @@ class ExampleOutstation
                         outstation.Transaction(db =>
                         {
                             doubleBitBinaryValue = doubleBitBinaryValue == DoubleBit.DeterminedOff ? DoubleBit.DeterminedOn : DoubleBit.DeterminedOff;
-                            db.UpdateDoubleBitBinaryInput(new DoubleBitBinaryInput(7, doubleBitBinaryValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                            db.UpdateDoubleBitBinaryInput(new DoubleBitBinaryInput(7, doubleBitBinaryValue, new Flags(Flag.Online), Now()), UpdateOptions.DetectEvent());
                         });
                         break;
                     }
@@ -344,7 +344,7 @@ class ExampleOutstation
                         outstation.Transaction(db =>
                         {
                             binaryOutputStatusValue = !binaryOutputStatusValue;
-                            db.UpdateBinaryOutputStatus(new BinaryOutputStatus(7, binaryOutputStatusValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                            db.UpdateBinaryOutputStatus(new BinaryOutputStatus(7, binaryOutputStatusValue, new Flags(Flag.Online), Now()), UpdateOptions.DetectEvent());
                         });
                         break;
                     }
@@ -352,7 +352,7 @@ class ExampleOutstation
                     {
                         outstation.Transaction(db =>
                         {
-                            db.UpdateCounter(new Counter(7, ++counterValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                            db.UpdateCounter(new Counter(7, ++counterValue, new Flags(Flag.Online), Now()), UpdateOptions.DetectEvent());
                         });
                         break;
                     }
@@ -360,7 +360,7 @@ class ExampleOutstation
                     {
                         outstation.Transaction(db =>
                         {
-                            db.UpdateFrozenCounter(new FrozenCounter(7, ++frozenCounterValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                            db.UpdateFrozenCounter(new FrozenCounter(7, ++frozenCounterValue, new Flags(Flag.Online), Now()), UpdateOptions.DetectEvent());
                         });
                         break;
                     }
@@ -368,7 +368,7 @@ class ExampleOutstation
                     {
                         outstation.Transaction(db =>
                         {
-                            db.UpdateAnalogInput(new AnalogInput(7, ++analogValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                            db.UpdateAnalogInput(new AnalogInput(7, ++analogValue, new Flags(Flag.Online), Now()), UpdateOptions.DetectEvent());
                         });
                         break;
                     }
@@ -376,7 +376,7 @@ class ExampleOutstation
                     {
                         outstation.Transaction(db =>
                         {
-                            db.UpdateAnalogOutputStatus(new AnalogOutputStatus(7, ++analogOutputStatusValue, new Flags(Flag.Online), Now()), new UpdateOptions());
+                            db.UpdateAnalogOutputStatus(new AnalogOutputStatus(7, ++analogOutputStatusValue, new Flags(Flag.Online), Now()), UpdateOptions.DetectEvent());
                         });
                         break;
                     }
@@ -384,7 +384,7 @@ class ExampleOutstation
                     {
                         outstation.Transaction(db =>
                         {
-                            db.UpdateOctetString(7, System.Text.Encoding.ASCII.GetBytes("Hello"), new UpdateOptions());
+                            db.UpdateOctetString(7, System.Text.Encoding.ASCII.GetBytes("Hello"), UpdateOptions.DetectEvent());
                         });
                         break;
                     }

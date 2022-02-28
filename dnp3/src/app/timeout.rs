@@ -4,7 +4,7 @@ use std::time::Duration;
 /// that ensures values are in the range `[1ms .. 1hour]`
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Timeout {
-    value: Duration,
+    pub(crate) value: Duration,
 }
 
 impl Default for Timeout {

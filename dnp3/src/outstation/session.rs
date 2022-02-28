@@ -36,7 +36,7 @@ use crate::util::cursor::WriteError;
 use crate::util::phys::PhysLayer;
 
 #[derive(Copy, Clone)]
-enum Timeout {
+enum TimeoutStatus {
     Yes,
     No,
 }
@@ -147,8 +147,8 @@ impl LastValidRequest {
 pub(crate) struct SessionConfig {
     decode_level: DecodeLevel,
     master_address: EndpointAddress,
-    confirm_timeout: std::time::Duration,
-    select_timeout: std::time::Duration,
+    confirm_timeout: Timeout,
+    select_timeout: Timeout,
     broadcast: Feature,
     unsolicited: Feature,
     max_unsolicited_retries: Option<usize>,
@@ -709,7 +709,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
     ) -> Result<UnsolicitedWaitResult, RunError> {
-        if let Timeout::Yes = self.read_until(io, reader, deadline).await? {
+        if let TimeoutStatus::Yes = self.read_until(io, reader, deadline).await? {
             return Ok(UnsolicitedWaitResult::Timeout);
         }
 
@@ -831,17 +831,17 @@ impl OutstationSession {
         io: &mut PhysLayer,
         reader: &mut TransportReader,
         deadline: crate::tokio::time::Instant,
-    ) -> Result<Timeout, RunError> {
+    ) -> Result<TimeoutStatus, RunError> {
         loop {
             let decode_level = self.config.decode_level;
             crate::tokio::select! {
                  res = self.sleep_until(Some(deadline)) => {
                      res?;
-                     return Ok(Timeout::Yes);
+                     return Ok(TimeoutStatus::Yes);
                  }
                  res = reader.read(io, decode_level) => {
                      res?;
-                     return Ok(Timeout::No);
+                     return Ok(TimeoutStatus::No);
                  }
             }
         }
@@ -1823,7 +1823,7 @@ impl OutstationSession {
     }
 
     fn new_confirm_deadline(&self) -> crate::tokio::time::Instant {
-        crate::tokio::time::Instant::now() + self.config.confirm_timeout
+        self.config.confirm_timeout.deadline_from_now()
     }
 
     fn new_unsolicited_retry_deadline(&self) -> crate::tokio::time::Instant {
@@ -1888,12 +1888,12 @@ impl OutstationSession {
         let mut deadline = self.new_confirm_deadline();
         loop {
             match self.read_until(io, reader, deadline).await? {
-                Timeout::Yes => {
+                TimeoutStatus::Yes => {
                     self.info.solicited_confirm_timeout(ecsn);
                     return Ok(Confirm::Timeout);
                 }
                 // process data
-                Timeout::No => {
+                TimeoutStatus::No => {
                     let mut guard = reader.pop_request();
                     match self.expect_sol_confirm(ecsn, &mut guard) {
                         ConfirmAction::ContinueWait => {

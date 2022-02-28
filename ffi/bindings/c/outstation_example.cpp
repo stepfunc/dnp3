@@ -148,7 +148,7 @@ void run_outstation(dnp3::Outstation &outstation)
         else if (cmd == "bi") {
             auto modify = database_transaction([&](Database &db) {
                 state.binary = !state.binary;
-                db.update_binary_input(BinaryInput(7, state.binary, online(), now()), UpdateOptions());
+                db.update_binary_input(BinaryInput(7, state.binary, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
@@ -156,42 +156,42 @@ void run_outstation(dnp3::Outstation &outstation)
             auto modify = database_transaction([&](Database &db) {
                 state.double_bit_binary = !state.double_bit_binary;
                 auto value = state.double_bit_binary ? DoubleBit::determined_on : DoubleBit::determined_off;
-                db.update_double_bit_binary_input(DoubleBitBinaryInput(3, value, online(), now()), UpdateOptions());
+                db.update_double_bit_binary_input(DoubleBitBinaryInput(3, value, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
         else if (cmd == "bos") {
             auto modify = database_transaction([&](Database &db) {
                 state.binary_output_status = !state.binary_output_status;
-                db.update_binary_output_status(BinaryOutputStatus(7, state.binary_output_status, online(), now()), UpdateOptions());
+                db.update_binary_output_status(BinaryOutputStatus(7, state.binary_output_status, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
         else if (cmd == "co") {
             auto modify = database_transaction([&](Database &db) {
                 state.counter += 1;
-                db.update_counter(Counter(7, state.counter, online(), now()), UpdateOptions());
+                db.update_counter(Counter(7, state.counter, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
         else if (cmd == "fco") {
             auto modify = database_transaction([&](Database &db) {
                 state.frozen_counter += 1;
-                db.update_frozen_counter(FrozenCounter(7, state.frozen_counter, online(), now()), UpdateOptions());
+                db.update_frozen_counter(FrozenCounter(7, state.frozen_counter, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
         else if (cmd == "ai") {
             auto modify = database_transaction([&](Database &db) {
                 state.analog += 1;
-                db.update_analog_input(AnalogInput(7, state.analog, online(), now()), UpdateOptions());
+                db.update_analog_input(AnalogInput(7, state.analog, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
         else if (cmd == "aos") {
             auto modify = database_transaction([&](Database &db) {
                 state.analog_output_status += 1;
-                db.update_analog_output_status(AnalogOutputStatus(7, state.analog_output_status, online(), now()), UpdateOptions());
+                db.update_analog_output_status(AnalogOutputStatus(7, state.analog_output_status, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
@@ -201,7 +201,7 @@ void run_outstation(dnp3::Outstation &outstation)
                 values.push_back(x);
             }
 
-            auto modify = database_transaction([&](Database &db) { db.update_octet_string(7, values, UpdateOptions()); });
+            auto modify = database_transaction([&](Database &db) { db.update_octet_string(7, values, UpdateOptions::detect_event()); });
             outstation.transaction(modify);
         }
         else {
@@ -260,7 +260,7 @@ void run_serial(dnp3::Runtime &runtime)
     auto outstation = dnp3::Outstation::create_serial_session(
         runtime,
         "/dev/pts/4",  // change this to a real port
-        dnp3::SerialPortSettings(), // default settings
+        dnp3::SerialSettings(), // default settings
         get_outstation_config(),
         std::make_unique<MyOutstationApplication>(),
         std::make_unique<MyOutstationInformation>(),

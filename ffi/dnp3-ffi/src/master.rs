@@ -112,7 +112,7 @@ pub(crate) unsafe fn master_channel_create_serial(
     runtime: *mut crate::runtime::Runtime,
     config: ffi::MasterChannelConfig,
     path: &CStr,
-    serial_params: ffi::SerialPortSettings,
+    serial_params: ffi::SerialSettings,
     retry_delay: Duration,
     listener: ffi::PortStateListener,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
@@ -583,8 +583,8 @@ impl From<ffi::RetryStrategy> for dnp3::app::RetryStrategy {
     }
 }
 
-impl From<ffi::SerialPortSettings> for dnp3::serial::SerialSettings {
-    fn from(from: ffi::SerialPortSettings) -> Self {
+impl From<ffi::SerialSettings> for dnp3::serial::SerialSettings {
+    fn from(from: ffi::SerialSettings) -> Self {
         Self {
             baud_rate: from.baud_rate(),
             data_bits: match from.data_bits() {

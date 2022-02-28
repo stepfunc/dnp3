@@ -315,7 +315,7 @@ void run_serial(dnp3::Runtime &runtime)
         runtime,
         get_master_channel_config(),
         "/dev/pts/4",
-        dnp3::SerialPortSettings(),
+        dnp3::SerialSettings(),
         std::chrono::seconds(5),
         std::make_unique<PortStateListener>()
     );

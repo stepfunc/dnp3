@@ -31,7 +31,7 @@ fn create_one_analog_with_value_42(database: &mut Database) {
     database.update(
         0,
         &AnalogInput::new(42.0, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
-        UpdateOptions::initialize(),
+        UpdateOptions::no_event(),
     );
 }
 
@@ -45,7 +45,7 @@ fn create_five_binary_inputs_with_odd_indices_true(database: &mut Database) {
                 Flags::ONLINE,
                 Time::Synchronized(Timestamp::new(0)),
             ),
-            UpdateOptions::initialize(),
+            UpdateOptions::no_event(),
         );
     }
 }
@@ -180,7 +180,9 @@ fn confirm_can_time_out() {
 
     harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-    crate::tokio::time::advance(get_default_config().confirm_timeout + Duration::from_millis(1));
+    crate::tokio::time::advance(
+        get_default_config().confirm_timeout.value + Duration::from_millis(1),
+    );
     harness.poll_pending();
     harness.check_events(&[Event::SolicitedConfirmTimeout(0)])
 }

@@ -445,7 +445,7 @@ int run_serial_channel(dnp3_runtime_t *runtime)
         runtime,
         get_master_channel_config(),
         "/dev/pts/4",
-        dnp3_serial_port_settings_init(),
+        dnp3_serial_settings_init(),
         1000,
         get_port_state_listener(),
         &channel

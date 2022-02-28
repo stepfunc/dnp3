@@ -340,7 +340,7 @@ fn define_serial_port_settings(lib: &mut LibraryBuilder) -> BackTraced<FunctionA
     let parity = Name::create("parity")?;
     let stop_bits = Name::create("stop_bits")?;
 
-    let serial_settings = lib.declare_function_argument_struct("serial_port_settings")?;
+    let serial_settings = lib.declare_function_argument_struct("serial_settings")?;
     let serial_settings = lib
         .define_function_argument_struct(serial_settings)?
         .add(
