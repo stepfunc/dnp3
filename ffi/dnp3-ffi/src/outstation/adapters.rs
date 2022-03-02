@@ -326,16 +326,16 @@ impl ControlSupport<Group41Var4> for ffi::ControlHandler {
 impl From<RequestHeader> for ffi::RequestHeader {
     fn from(from: RequestHeader) -> ffi::RequestHeader {
         ffi::RequestHeaderFields {
-            control: from.control.into(),
+            control_field: from.control.into(),
             function: from.function.into(),
         }
         .into()
     }
 }
 
-impl From<ControlField> for ffi::Control {
+impl From<ControlField> for ffi::ControlField {
     fn from(from: ControlField) -> Self {
-        ffi::ControlFields {
+        ffi::ControlFieldFields {
             fir: from.fir,
             fin: from.fin,
             con: from.con,

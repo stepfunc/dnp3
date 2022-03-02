@@ -52,6 +52,38 @@ pub unsafe fn request_new_class(
     Box::into_raw(request)
 }
 
+pub unsafe fn request_new_all_objects(variation: ffi::Variation) -> *mut Request {
+    let mut request = Request::new();
+    request.add(ReadHeader::all_objects(variation.into()));
+
+    let request = Box::new(request);
+    Box::into_raw(request)
+}
+
+pub unsafe fn request_new_one_byte_range(
+    variation: ffi::Variation,
+    start: u8,
+    stop: u8,
+) -> *mut Request {
+    let mut request = Request::new();
+    request.add(ReadHeader::one_byte_range(variation.into(), start, stop));
+
+    let request = Box::new(request);
+    Box::into_raw(request)
+}
+
+pub unsafe fn request_new_two_byte_range(
+    variation: ffi::Variation,
+    start: u16,
+    stop: u16,
+) -> *mut Request {
+    let mut request = Request::new();
+    request.add(ReadHeader::two_byte_range(variation.into(), start, stop));
+
+    let request = Box::new(request);
+    Box::into_raw(request)
+}
+
 pub unsafe fn request_destroy(request: *mut Request) {
     if !request.is_null() {
         Box::from_raw(request);

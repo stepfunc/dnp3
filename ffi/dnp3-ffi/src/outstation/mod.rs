@@ -4,11 +4,10 @@ use std::path::Path;
 use std::time::Duration;
 
 pub use database::*;
-use dnp3::app::{Listener, Timeout};
+use dnp3::app::{BufferSize, BufferSizeError, Listener, Timeout};
 use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
-use dnp3::outstation::{BufferSize, ConnectionState, Feature, Features, OutstationConfig};
-use dnp3::outstation::{BufferSizeError, OutstationHandle};
+use dnp3::outstation::{ConnectionState, Feature, Features, OutstationConfig, OutstationHandle};
 use dnp3::tcp::tls::TlsServerConfig;
 use dnp3::tcp::{FilterError, ServerHandle};
 pub use struct_constructors::*;

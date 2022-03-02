@@ -147,7 +147,7 @@ impl From<Iin2> for ffi::Iin2 {
 impl From<ResponseHeader> for ffi::ResponseHeader {
     fn from(header: ResponseHeader) -> ffi::ResponseHeader {
         ffi::ResponseHeaderFields {
-            control: ffi::Control {
+            control_field: ffi::ControlField {
                 fir: header.control.fir,
                 fin: header.control.fin,
                 con: header.control.con,

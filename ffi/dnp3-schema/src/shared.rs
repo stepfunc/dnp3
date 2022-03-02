@@ -11,7 +11,7 @@ pub struct SharedDefinitions {
     pub serial_port_settings: FunctionArgStructHandle,
     pub link_error_mode: EnumHandle,
     pub retry_strategy: FunctionArgStructHandle,
-    pub control_struct: CallbackArgStructHandle,
+    pub control_field_struct: CallbackArgStructHandle,
     pub g12v1_struct: UniversalStructHandle,
     pub binary_point: UniversalStructHandle,
     pub binary_it: AbstractIteratorHandle,
@@ -92,9 +92,9 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
     let decode_level = crate::logging::define(lib, error_type.clone())?;
     let runtime_class = crate::runtime::define(lib, error_type.clone())?;
 
-    let control_struct = lib.declare_callback_argument_struct("control")?;
-    let control_struct = lib
-        .define_callback_argument_struct(control_struct)?
+    let control_field_struct = lib.declare_callback_argument_struct("control_field")?;
+    let control_field_struct = lib
+        .define_callback_argument_struct(control_field_struct)?
         .add("fir", Primitive::Bool, "First fragment in the message")?
         .add("fin", Primitive::Bool, "Final fragment of the message")?
         .add("con", Primitive::Bool, "Requires confirmation")?
@@ -124,40 +124,61 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         .doc("Operation Type field, used in conjunction with {enum:trip_close_code} to specify a control operation")?
         .build()?;
 
+    let tcc_field = Name::create("tcc")?;
+    let clear_field = Name::create("clear")?;
     let queue_field = Name::create("queue")?;
 
     let control_code = lib.declare_universal_struct("control_code")?;
     let control_code = lib
         .define_universal_struct(control_code)?
-        .add("tcc", trip_close_code, "This field is used in conjunction with the `op_type` field to specify a control operation")?
-        .add("clear", Primitive::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
+        .add(&tcc_field, trip_close_code, "This field is used in conjunction with {struct:control_code.op_type} to specify a control operation")?
+        .add(&clear_field, Primitive::Bool, "Support for this field is optional. When the clear bit is set, the device shall remove pending control commands for that index and stop any control operation that is in progress for that index. The indexed point shall go to the state that it would have if the command were allowed to complete normally.")?
         .add(&queue_field, Primitive::Bool, "This field is obsolete and should always be 0")?
-        .add("op_type", op_type, "This field is used in conjunction with the `tcc` field to specify a control operation")?
+        .add("op_type", op_type, "This field is used in conjunction with the {struct:control_code.tcc} field to specify a control operation")?
         .doc("CROB ({struct:group12_var1}) control code")?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize a {struct:control_code} instance")?
         .default(&queue_field, false)?
         .end_initializer()?
+        .begin_initializer("from_op_type", InitializerType::Static, doc("Initialize a {struct:control_code} instance from a {enum:op_type}").details("{struct:control_code.tcc} will be set to {enum:trip_close_code.nul}, {struct:control_code.clear} will be set to false and {struct:control_code.queue} will be set to false."))?
+        .default_variant(&tcc_field, "nul")?
+        .default(&clear_field, false)?
+        .default(&queue_field, false)?
+        .end_initializer()?
+        .begin_initializer("from_tcc_and_op_type", InitializerType::Static, doc("Initialize a {struct:control_code} instance from a {enum:trip_close_code} and a {enum:op_type}.").details("{struct:control_code.clear} will be set to false and {struct:control_code.queue} will be set to false."))?
+        .default(&clear_field, false)?
+        .default(&queue_field, false)?
+        .end_initializer()?
         .build()?;
+
+    let code_field = Name::create("code")?;
+    let count_field = Name::create("count")?;
+    let on_time_field = Name::create("on_time")?;
+    let off_time_field = Name::create("off_time")?;
 
     let g12v1_struct = lib.declare_universal_struct(gv(12, 1))?;
     let g12v1_struct = lib
         .define_universal_struct(g12v1_struct)?
-        .add("code", control_code, "Control code")?
-        .add("count", Primitive::U8, "Count")?
+        .add(&code_field, control_code, "Control code")?
+        .add(&count_field, Primitive::U8, "Count")?
         .add(
-            "on_time",
+            &on_time_field,
             Primitive::U32,
             "Duration the output drive remains active (in milliseconds)",
         )?
         .add(
-            "off_time",
+            &off_time_field,
             Primitive::U32,
             "Duration the output drive remains non-active (in milliseconds)",
         )?
         .doc("Control Relay Output Block")?
         .end_fields()?
         .add_full_initializer("init")?
+        .begin_initializer("from_code", InitializerType::Static, doc("Construct a {struct:group12_var1} from a {struct:control_code}.").details("{struct:group12_var1.count} = 1, {struct:group12_var1.on_time} = 1000 and {struct:group12_var1.off_time} = 1000."))?
+        .default(&count_field, NumberValue::U8(1))?
+        .default(&on_time_field, NumberValue::U32(1000))?
+        .default(&off_time_field, NumberValue::U32(1000))?
+        .end_initializer()?
         .build()?;
 
     // ======
@@ -239,7 +260,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         link_error_mode: define_link_error_mode(lib)?,
         min_tls_version: define_min_tls_version(lib)?,
         certificate_mode: define_certificate_mode(lib)?,
-        control_struct,
+        control_field_struct,
         g12v1_struct,
         binary_point,
         binary_it,

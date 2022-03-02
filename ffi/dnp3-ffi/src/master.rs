@@ -2,7 +2,9 @@ use std::ffi::CStr;
 use std::path::Path;
 use std::time::Duration;
 
-use dnp3::app::{ConnectStrategy, Listener, RetryStrategy, Timeout, TimeoutRangeError, Timestamp};
+use dnp3::app::{
+    BufferSize, ConnectStrategy, Listener, RetryStrategy, Timeout, TimeoutRangeError, Timestamp,
+};
 use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::serial::*;
@@ -572,8 +574,8 @@ fn convert_config(
     Ok(MasterChannelConfig {
         master_address: address,
         decode_level: config.decode_level().clone().into(),
-        tx_buffer_size: config.tx_buffer_size() as usize,
-        rx_buffer_size: config.rx_buffer_size() as usize,
+        tx_buffer_size: BufferSize::new(config.tx_buffer_size() as usize)?,
+        rx_buffer_size: BufferSize::new(config.rx_buffer_size() as usize)?,
     })
 }
 

@@ -4,15 +4,11 @@ use std::time::Duration;
 use tracing::Instrument;
 
 use crate::app::format::write;
-use crate::app::format::write::start_request;
 use crate::app::parse::parser::Response;
-use crate::app::ControlField;
-use crate::app::Sequence;
-use crate::app::Shutdown;
+use crate::app::{BufferSize, ControlField, Sequence, Shutdown};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
-use crate::link::LinkStatusResult;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
@@ -75,31 +71,18 @@ impl From<Shutdown> for RunError {
 }
 
 impl MasterSession {
-    pub(crate) const DEFAULT_TX_BUFFER_SIZE: usize = 2048;
-    pub(crate) const MIN_TX_BUFFER_SIZE: usize = 249;
-
-    pub(crate) const DEFAULT_RX_BUFFER_SIZE: usize = 2048;
-    pub(crate) const MIN_RX_BUFFER_SIZE: usize = 2048;
-
     pub(crate) fn new(
         enabled: bool,
         decode_level: DecodeLevel,
-        tx_buffer_size: usize,
+        tx_buffer_size: BufferSize<249, 2048>,
         messages: Receiver<Message>,
     ) -> Self {
-        let tx_buffer_size = if tx_buffer_size < Self::MIN_TX_BUFFER_SIZE {
-            tracing::warn!("minimum TX buffer size is {}. Defaulting to this value because the provided value ({}) is too low.", Self::MIN_TX_BUFFER_SIZE, tx_buffer_size);
-            Self::MIN_TX_BUFFER_SIZE
-        } else {
-            tx_buffer_size
-        };
-
         Self {
             enabled,
             decode_level,
             associations: AssociationMap::new(),
             messages,
-            tx_buffer: Buffer::new(tx_buffer_size),
+            tx_buffer: tx_buffer_size.create_buffer(),
         }
     }
 
@@ -729,7 +712,8 @@ impl MasterSession {
         let association = self.associations.get_mut(address)?;
         let seq = association.increment_seq();
         let mut cursor = self.tx_buffer.write_cursor();
-        let mut hw = start_request(ControlField::request(seq), request.function(), &mut cursor)?;
+        let mut hw =
+            write::start_request(ControlField::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
         writer
             .write(io, self.decode_level, address.wrap(), cursor.written())
@@ -746,7 +730,7 @@ impl MasterSession {
         destination: EndpointAddress,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<LinkStatusResult, TaskError> {
+    ) -> Result<(), TaskError> {
         // Send link status request
         tracing::info!("sending link status request (for {})", destination);
         writer
@@ -767,13 +751,13 @@ impl MasterSession {
                         Some(TransportResponse::Response(source, response)) => {
                             self.notify_link_activity(source);
                             self.handle_fragment_while_idle(io, writer, source, response).await?;
-                            return Ok(LinkStatusResult::UnexpectedResponse);
+                            return Err(TaskError::UnexpectedResponseHeaders);
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => {
                             self.notify_link_activity(msg.source);
-                            return Ok(LinkStatusResult::Success);
+                            return Ok(());
                         }
-                        Some(TransportResponse::Error(_)) => return Ok(LinkStatusResult::UnexpectedResponse),
+                        Some(TransportResponse::Error(_)) => return Err(TaskError::UnexpectedResponseHeaders),
                         None => continue,
                     }
                 }

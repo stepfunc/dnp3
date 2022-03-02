@@ -187,6 +187,10 @@ public class OutstationExample {
   }
   // ANCHOR_END: event_buffer_config
 
+  private static Timestamp now() {
+    return Timestamp.synchronizedTimestamp(ulong(System.currentTimeMillis()));
+  }
+
   private static OutstationConfig getOutstationConfig() {
     // ANCHOR: outstation_config
     // create an outstation configuration with default values
@@ -361,7 +365,9 @@ public class OutstationExample {
     long frozenCounterValue = 0;
     double analogValue = 0.0;
     double analogOutputStatusValue = 0.0;
+
     final Flags onlineFlags = new Flags(Flag.ONLINE);
+    final UpdateOptions detectEvent = UpdateOptions.detectEvent();
 
     // Handle user input
     try {
@@ -382,8 +388,8 @@ public class OutstationExample {
                             ushort(7),
                             pointValue,
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateBinaryInput(value, UpdateOptions.detectEvent());
+                            now());
+                    db.updateBinaryInput(value, detectEvent);
                   });
               break;
             }
@@ -401,8 +407,8 @@ public class OutstationExample {
                             ushort(7),
                             pointValue,
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateDoubleBitBinaryInput(value, UpdateOptions.detectEvent());
+                            now());
+                    db.updateDoubleBitBinaryInput(value, detectEvent);
                   });
               break;
             }
@@ -417,8 +423,8 @@ public class OutstationExample {
                             ushort(7),
                             pointValue,
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateBinaryOutputStatus(value, UpdateOptions.detectEvent());
+                            now());
+                    db.updateBinaryOutputStatus(value, detectEvent);
                   });
               break;
             }
@@ -433,8 +439,8 @@ public class OutstationExample {
                             ushort(7),
                             uint(pointValue),
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateCounter(value, UpdateOptions.detectEvent());
+                            now());
+                    db.updateCounter(value, detectEvent);
                   });
               break;
             }
@@ -449,8 +455,8 @@ public class OutstationExample {
                             ushort(7),
                             uint(pointValue),
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateFrozenCounter(value, UpdateOptions.detectEvent());
+                            now());
+                    db.updateFrozenCounter(value, detectEvent);
                   });
               break;
             }
@@ -465,8 +471,8 @@ public class OutstationExample {
                             ushort(7),
                             pointValue,
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateAnalogInput(value, UpdateOptions.detectEvent());
+                            now());
+                    db.updateAnalogInput(value, detectEvent);
                   });
               break;
             }
@@ -481,8 +487,8 @@ public class OutstationExample {
                             ushort(7),
                             pointValue,
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateAnalogOutputStatus(value, UpdateOptions.detectEvent());
+                            now());
+                    db.updateAnalogOutputStatus(value, detectEvent);
                   });
               break;
             }
@@ -495,7 +501,7 @@ public class OutstationExample {
                       octetString.add(ubyte(octet));
                     }
 
-                    db.updateOctetString(ushort(7), octetString, UpdateOptions.detectEvent());
+                    db.updateOctetString(ushort(7), octetString, detectEvent);
                   });
               break;
             }

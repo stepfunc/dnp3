@@ -465,12 +465,7 @@ public class MasterExample {
           {
             // ANCHOR: assoc_control
             CommandSet commands = new CommandSet();
-            Group12Var1 control =
-                    new Group12Var1(
-                            new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
-                            ubyte(1),
-                            uint(1000),
-                            uint(1000));
+            Group12Var1 control = Group12Var1.fromCode(ControlCode.fromOpType(OpType.LATCH_ON));
             commands.addG12V1U16(ushort(3), control);
 
             channel

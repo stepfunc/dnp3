@@ -1,58 +1,7 @@
-use crate::app::Timeout;
+use crate::app::{BufferSize, Timeout};
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
 use crate::outstation::database::{ClassZeroConfig, EventBufferConfig};
-use crate::util::buffer::Buffer;
-
-/// Validated buffer size for use in the outstation
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub struct BufferSize {
-    size: usize,
-}
-
-/// Error type returned for invalid buffer sizes
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum BufferSizeError {
-    /// provided size
-    TooSmall(usize),
-}
-
-impl BufferSize {
-    /// minimum allowed outstation buffer size corresponding to the payload of a link frame
-    pub const MIN: usize = 249;
-    /// default outstation buffer size
-    pub const DEFAULT: usize = 2048;
-
-    pub(crate) fn create_buffer(&self) -> Buffer {
-        Buffer::new(self.size)
-    }
-
-    /// get the underlying value
-    pub fn value(&self) -> usize {
-        self.size
-    }
-
-    /// construct a `BufferSize` with the minimum value
-    pub fn min() -> Self {
-        Self { size: Self::MIN }
-    }
-
-    /// attempt to construct a `BufferSize`
-    pub fn new(size: usize) -> Result<Self, BufferSizeError> {
-        if size < Self::MIN {
-            return Err(BufferSizeError::TooSmall(size));
-        }
-        Ok(Self { size })
-    }
-}
-
-impl Default for BufferSize {
-    fn default() -> Self {
-        Self {
-            size: Self::DEFAULT,
-        }
-    }
-}
 
 /// describes whether an optional feature is enabled or disabled
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -176,18 +125,3 @@ impl OutstationConfig {
         }
     }
 }
-
-impl std::fmt::Display for BufferSizeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::TooSmall(size) => write!(
-                f,
-                "provided size {} is less than the minimum allowed size of {}",
-                size,
-                BufferSize::MIN
-            ),
-        }
-    }
-}
-
-impl std::error::Error for BufferSizeError {}

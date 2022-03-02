@@ -679,8 +679,8 @@ fn define_outstation_information(
     let request_header = lib
         .define_callback_argument_struct(request_header)?
         .add(
-            "control",
-            shared_def.control_struct.clone(),
+            "control_field",
+            shared_def.control_field_struct.clone(),
             "Control field",
         )?
         .add("function", function_code.clone(), "Function code")?

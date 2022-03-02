@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
 
-use crate::app::{MaybeAsync, Timeout};
+use crate::app::{BufferSize, MaybeAsync, Timeout};
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
@@ -37,7 +37,7 @@ pub(crate) fn create_association(
     let mut runner = MasterSession::new(
         true,
         AppDecodeLevel::ObjectValues.into(),
-        MasterSession::MIN_TX_BUFFER_SIZE,
+        BufferSize::min(),
         rx,
     );
     let mut master = MasterChannel::new(tx);
@@ -45,7 +45,7 @@ pub(crate) fn create_association(
     let (mut reader, mut writer) = create_master_transport_layer(
         LinkErrorMode::Close,
         EndpointAddress::try_new(1).unwrap(),
-        MasterSession::MIN_RX_BUFFER_SIZE,
+        BufferSize::min(),
     );
 
     reader

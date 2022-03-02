@@ -18,8 +18,7 @@ use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
 use crate::link::EndpointAddress;
 use crate::master::EventClasses;
-use crate::outstation::config::OutstationConfig;
-use crate::outstation::config::{BufferSize, Feature};
+use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::control::collection::{ControlCollection, ControlTransaction};
 use crate::outstation::control::select::SelectState;
 use crate::outstation::database::{DatabaseHandle, ResponseInfo};
@@ -159,8 +158,8 @@ pub(crate) struct SessionConfig {
 
 pub(crate) struct SessionParameters {
     max_read_headers_per_request: u16,
-    sol_tx_buffer_size: BufferSize,
-    unsol_tx_buffer_size: BufferSize,
+    sol_tx_buffer_size: BufferSize<249, 2048>,
+    unsol_tx_buffer_size: BufferSize<249, 2048>,
 }
 
 impl From<OutstationConfig> for SessionConfig {

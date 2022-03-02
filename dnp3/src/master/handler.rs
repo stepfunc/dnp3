@@ -4,13 +4,12 @@ use crate::app::measurement::*;
 use crate::app::variations::Variation;
 use crate::app::*;
 use crate::decode::DecodeLevel;
-use crate::link::{EndpointAddress, LinkStatusResult};
+use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
-use crate::master::session::MasterSession;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
@@ -45,11 +44,11 @@ pub struct MasterChannelConfig {
     /// TX buffer size
     ///
     /// Must be at least 249.
-    pub tx_buffer_size: usize,
+    pub tx_buffer_size: BufferSize<249, 2048>,
     /// RX buffer size
     ///
     /// Must be at least 2048.
-    pub rx_buffer_size: usize,
+    pub rx_buffer_size: BufferSize<2048, 2048>,
 }
 
 impl MasterChannelConfig {
@@ -58,8 +57,8 @@ impl MasterChannelConfig {
         Self {
             master_address,
             decode_level: DecodeLevel::nothing(),
-            tx_buffer_size: MasterSession::DEFAULT_TX_BUFFER_SIZE,
-            rx_buffer_size: MasterSession::DEFAULT_RX_BUFFER_SIZE,
+            tx_buffer_size: BufferSize::default(),
+            rx_buffer_size: BufferSize::default(),
         }
     }
 }
@@ -124,10 +123,7 @@ impl MasterChannel {
 
     /// Remove an association
     /// * `address` is the DNP3 link-layer address of the outstation
-    pub async fn remove_association(
-        &mut self,
-        address: EndpointAddress,
-    ) -> Result<(), AssociationError> {
+    pub async fn remove_association(&mut self, address: EndpointAddress) -> Result<(), Shutdown> {
         self.send_master_message(MasterMsg::RemoveAssociation(address))
             .await?;
         Ok(())
@@ -254,9 +250,11 @@ impl AssociationHandle {
     ///
     /// This function is provided for testing purposes. Using the configured link status timeout
     /// is the preferred so that the master automatically issues these requests.
-    pub async fn check_link_status(&mut self) -> Result<LinkStatusResult, TaskError> {
-        let (tx, rx) =
-            crate::tokio::sync::oneshot::channel::<Result<LinkStatusResult, TaskError>>();
+    ///
+    /// If a [`TaskError::UnexpectedResponseHeaders`] is returned, the link might be alive
+    /// but it didn't answer with the expected `LINK_STATUS`.
+    pub async fn check_link_status(&mut self) -> Result<(), TaskError> {
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         self.send_task(Task::LinkStatus(Promise::OneShot(tx)))
             .await?;
         rx.await?

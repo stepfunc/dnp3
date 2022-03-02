@@ -2,7 +2,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::FunctionCode;
 use crate::app::ResponseHeader;
-use crate::link::{EndpointAddress, LinkStatusResult};
+use crate::link::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::handler::Promise;
@@ -43,7 +43,7 @@ pub(crate) enum Task {
     /// NonRead tasks always require FIR/FIN == 1, but might require multiple read/response cycles, e.g. SBO
     NonRead(NonReadTask),
     /// Send link status request
-    LinkStatus(Promise<Result<LinkStatusResult, TaskError>>),
+    LinkStatus(Promise<Result<(), TaskError>>),
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
