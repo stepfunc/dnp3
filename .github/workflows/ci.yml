@@ -170,9 +170,17 @@ jobs:
         with:
           name: doc
           path: ~/doc
-  # Build bindings on Windows x64 [64-bit MSVC (Windows 7+) (x86_64-pc-windows-msvc)]
+    # Build bindings on Windows x64 [64-bit MSVC (Windows 7+) (x86_64-pc-windows-msvc)] and x86 [32-bit MSVC (Windows 7+) (i686-pc-windows-msvc)]
   bindings-windows:
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc # 64-bit MSVC (Windows 7+)
+            extra-param: # nothing
+          - target: i686-pc-windows-msvc # 32-bit MSVC (Windows 7+)
+            extra-params: --no-tests
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -182,6 +190,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+          target: ${{ matrix.target }}
       - name: Copy Windows config
         shell: pwsh
         run: Copy-Item -Path .cargo/config-windows.toml -Destination .cargo/config.toml
@@ -196,22 +205,22 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: run
-          args: --release --bin dnp3-bindings -- --c
+          args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --c ${{ matrix.extra-params }}
       - name: .NET bindings
         uses: actions-rs/cargo@v1
         with:
           command: run
-          args: --release --bin dnp3-bindings -- --dotnet
+          args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --dotnet ${{ matrix.extra-params }}
       - name: Java bindings
         uses: actions-rs/cargo@v1
         with:
           command: run
-          args: --release --bin dnp3-bindings -- --java
+          args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --java ${{ matrix.extra-params }}
       - name: Upload compiled FFI modules
         uses: actions/upload-artifact@v2
         with:
           name: ffi-modules
-          path: ffi/bindings/c/generated/x86_64-pc-windows-msvc/lib
+          path: ffi/bindings/c/generated/${{ matrix.target }}/lib
       - name: Upload C bindings
         uses: actions/upload-artifact@v2
         with:
