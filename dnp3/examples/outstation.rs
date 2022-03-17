@@ -319,10 +319,6 @@ fn get_outstation_config() -> OutstationConfig {
 
 // ANCHOR: event_buffer_config
 fn get_event_buffer_config() -> EventBufferConfig {
-    // initialize the config to zero for every type
-    let mut config = EventBufferConfig::no_events();
-    // event buffer space for 100 analog events
-    config.max_analog = 100;
-    config
+    EventBufferConfig::all_types(100)
 }
 // ANCHOR_END: event_buffer_config

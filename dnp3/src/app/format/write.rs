@@ -79,6 +79,20 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         Ok(())
     }
 
+    pub(crate) fn write_limited_count<T>(
+        &mut self,
+        variation: Variation,
+        count: T,
+    ) -> Result<(), WriteError>
+    where
+        T: Index,
+    {
+        variation.write(self.cursor)?;
+        T::LIMITED_COUNT_QUALIFIER.write(self.cursor)?;
+        count.write(self.cursor)?;
+        Ok(())
+    }
+
     pub(crate) fn write_clear_restart(&mut self) -> Result<(), WriteError> {
         self.write_range_only(Variation::Group80Var1, 7u8, 7u8)?;
         self.cursor.write_u8(0)?;
