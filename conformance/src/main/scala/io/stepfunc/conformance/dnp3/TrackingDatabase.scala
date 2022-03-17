@@ -64,8 +64,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
 
   // Initialize the outstation database
   outstation.transaction(db => {
-    val updateOptions = new UpdateOptions()
-    updateOptions.eventMode = EventMode.SUPPRESS
+    val updateOptions = UpdateOptions.noEvent()
 
     if(!testDatabaseConfig.disableBinaryInputs) {
       val binaryConfig = new BinaryInputConfig()
@@ -137,7 +136,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     this.events.append(newEvent)
 
     outstation.transaction(db => {
-      db.updateBinaryInput(newPoint, new UpdateOptions)
+      db.updateBinaryInput(newPoint, UpdateOptions.detectEvent())
     })
 
     newEvent
@@ -153,7 +152,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     this.events.append(newEvent)
 
     outstation.transaction(db => {
-      db.updateDoubleBitBinaryInput(newPoint, new UpdateOptions)
+      db.updateDoubleBitBinaryInput(newPoint, UpdateOptions.detectEvent())
     })
 
     newEvent
@@ -168,7 +167,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     this.events.append(newEvent)
 
     outstation.transaction(db => {
-      db.updateCounter(newPoint, new UpdateOptions)
+      db.updateCounter(newPoint, UpdateOptions.detectEvent())
     })
 
     newEvent
@@ -187,7 +186,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     this.events.append(newEvent)
 
     outstation.transaction(db => {
-      db.updateAnalogInput(newPoint, new UpdateOptions)
+      db.updateAnalogInput(newPoint, UpdateOptions.detectEvent())
     })
 
     newEvent
