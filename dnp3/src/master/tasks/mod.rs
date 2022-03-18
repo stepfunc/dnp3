@@ -5,6 +5,7 @@ use crate::app::ResponseHeader;
 use crate::link::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
+use crate::master::extract::extract_measurements;
 use crate::master::handler::Promise;
 use crate::master::poll::Poll;
 use crate::master::request::{Classes, EventClasses};
@@ -13,6 +14,7 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::RestartTask;
 use crate::master::tasks::time::TimeSyncTask;
+use crate::master::ReadType;
 use crate::util::cursor::WriteError;
 
 pub(crate) mod auto;
@@ -145,7 +147,7 @@ impl ReadTask {
     }
 
     pub(crate) async fn process_response(
-        &self,
+        &mut self,
         association: &mut Association,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
@@ -160,7 +162,13 @@ impl ReadTask {
                     .handle_event_scan_response(header, objects)
                     .await
             }
-            ReadTask::SingleRead(_) => association.handle_read_response(header, objects).await,
+            ReadTask::SingleRead(task) => match &mut task.custom_handler {
+                Some(handler) => {
+                    extract_measurements(ReadType::SinglePoll, header, objects, handler.as_mut())
+                        .await
+                }
+                None => association.handle_read_response(header, objects).await,
+            },
         }
     }
 

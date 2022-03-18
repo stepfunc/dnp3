@@ -3,16 +3,34 @@ use crate::master::error::TaskError;
 use crate::master::handler::Promise;
 use crate::master::request::ReadRequest;
 use crate::master::tasks::ReadTask;
+use crate::master::ReadHandler;
 use crate::util::cursor::WriteError;
 
 pub(crate) struct SingleReadTask {
     request: ReadRequest,
+    pub(crate) custom_handler: Option<Box<dyn ReadHandler + Sync>>,
     promise: Promise<Result<(), TaskError>>,
 }
 
 impl SingleReadTask {
     pub(crate) fn new(request: ReadRequest, promise: Promise<Result<(), TaskError>>) -> Self {
-        Self { request, promise }
+        Self {
+            request,
+            custom_handler: None,
+            promise,
+        }
+    }
+
+    pub(crate) fn new_with_custom_handler(
+        request: ReadRequest,
+        custom_handler: Box<dyn ReadHandler + Sync>,
+        promise: Promise<Result<(), TaskError>>,
+    ) -> Self {
+        Self {
+            request,
+            custom_handler: Some(custom_handler),
+            promise,
+        }
     }
 
     pub(crate) fn wrap(self) -> ReadTask {

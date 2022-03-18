@@ -160,7 +160,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param("config", association_config, "Association configuration")?
         .param(
             "read_handler",
-            read_handler,
+            read_handler.clone(),
             "Interface uses to load measurement data",
         )?
         .param(
@@ -235,13 +235,25 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let read_callback = define_read_callback(lib, nothing.clone())?;
 
     let read_async = lib
-        .define_future_method("read", master_channel_class.clone(), read_callback)?
+        .define_future_method("read", master_channel_class.clone(), read_callback.clone())?
         .param("association",association_id.clone(), "Association on which to perform the read")?
         .param("request",request_class.declaration(), "Request to send")?
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Perform a read on the association.")
                 .details("The callback will be called once the read is completely received, but the actual values will be sent to the {interface:read_handler} of the association.")
+        )?
+        .build()?;
+
+    let read_with_handler_async = lib
+        .define_future_method("read_with_handler", master_channel_class.clone(), read_callback)?
+        .param("association",association_id.clone(), "Association on which to perform the read")?
+        .param("request",request_class.declaration(), "Request to send")?
+        .param("handler",read_handler, "Custom {interface:read_handler} to send the data to")?
+        .fails_with(shared.error_type.clone())?
+        .doc(
+            doc("Perform a read on the association.")
+                .details("The callback will be called once the read is completely received, but the actual values will be sent to the {interface:read_handler} passed as a parameter.")
         )?
         .build()?;
 
@@ -337,6 +349,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .method(remove_poll_method)?
         .method(demand_poll_method)?
         .async_method(read_async)?
+        .async_method(read_with_handler_async)?
         .async_method(operate_async)?
         .async_method(perform_time_sync_async)?
         .async_method(cold_restart_async)?

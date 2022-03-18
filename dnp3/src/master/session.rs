@@ -462,12 +462,12 @@ impl MasterSession {
         &mut self,
         io: &mut PhysLayer,
         destination: EndpointAddress,
-        task: ReadTask,
+        mut task: ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), TaskError> {
         let result = self
-            .execute_read_task(io, destination, &task, writer, reader)
+            .execute_read_task(io, destination, &mut task, writer, reader)
             .await;
 
         let association = self.associations.get_mut(destination).ok();
@@ -490,7 +490,7 @@ impl MasterSession {
         &mut self,
         io: &mut PhysLayer,
         destination: EndpointAddress,
-        task: &ReadTask,
+        task: &mut ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), TaskError> {
@@ -546,7 +546,7 @@ impl MasterSession {
         destination: EndpointAddress,
         is_first: bool,
         seq: Sequence,
-        task: &ReadTask,
+        task: &mut ReadTask,
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
         source: EndpointAddress,

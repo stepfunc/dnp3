@@ -201,6 +201,20 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Perform an asynchronous READ request with a custom read handler
+    ///
+    /// If successful, the custom [ReadHandler](crate::master::ReadHandler) will process the received measurement data
+    pub async fn read_with_handler(
+        &mut self,
+        request: ReadRequest,
+        handler: Box<dyn ReadHandler + Sync>,
+    ) -> Result<(), TaskError> {
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TaskError>>();
+        let task = SingleReadTask::new_with_custom_handler(request, handler, Promise::OneShot(tx));
+        self.send_task(task.wrap().wrap()).await?;
+        rx.await?
+    }
+
     /// Perform an asynchronous operate request
     ///
     /// The actual function code used depends on the value of the [CommandMode](crate::master::CommandMode).

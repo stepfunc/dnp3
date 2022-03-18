@@ -305,6 +305,33 @@ pub(crate) unsafe fn master_channel_read(
     Ok(())
 }
 
+pub(crate) unsafe fn master_channel_read_with_handler(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    request: *mut crate::Request,
+    handler: ffi::ReadHandler,
+    callback: ffi::ReadTaskCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let request = request
+        .as_ref()
+        .ok_or(ffi::ParamError::NullParameter)?
+        .build();
+
+    let mut handle = AssociationHandle::create(address, channel.handle.clone());
+
+    let task = async move {
+        match handle.read_with_handler(request, Box::new(handler)).await {
+            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
+            Err(err) => callback.on_failure(err.into()),
+        };
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
 pub unsafe fn master_channel_operate(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
