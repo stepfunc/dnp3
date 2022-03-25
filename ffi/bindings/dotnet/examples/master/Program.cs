@@ -149,7 +149,7 @@ class MainClass
     // ANCHOR_END: read_handler
 
     // ANCHOR: association_handler
-    class TestAssocationHandler : IAssociationHandler
+    class TestAssociationHandler : IAssociationHandler
     {
         public UtcTimestamp GetCurrentTime()
         {
@@ -157,6 +157,16 @@ class MainClass
         }
     }
     // ANCHOR_END: association_handler
+
+    // ANCHOR: association_information
+    class TestAssociationInformation : IAssociationInformation
+    {
+        public void TaskStart(TaskType taskType, FunctionCode fc, byte seq) {}
+        public void TaskSuccess(TaskType taskType, FunctionCode fc, byte seq) {}
+        public void TaskFail(TaskType taskType, TaskError error) {}
+        public void UnsolicitedResponse(bool isDuplicate, byte seq) {}
+    }
+    // ANCHOR_END: association_information
 
 
     // ANCHOR: master_channel_config
@@ -342,7 +352,8 @@ class MainClass
             1024,
             GetAssociationConfig(),
             new TestReadHandler(),
-            new TestAssocationHandler()
+            new TestAssociationHandler(),
+            new TestAssociationInformation()
         );
         // ANCHOR_END: association_create
 

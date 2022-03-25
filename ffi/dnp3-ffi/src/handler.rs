@@ -1,7 +1,10 @@
 use dnp3::app::measurement::*;
 use dnp3::app::*;
 use dnp3::app::{ResponseFunction, ResponseHeader};
-use dnp3::master::{AssociationHandler, HeaderInfo, ReadHandler, ReadType};
+use dnp3::master::{
+    AssociationHandler, AssociationInformation, HeaderInfo, ReadHandler, ReadType, TaskError,
+    TaskType,
+};
 
 use crate::ffi;
 
@@ -12,6 +15,24 @@ impl AssociationHandler for ffi::AssociationHandler {
         } else {
             None
         }
+    }
+}
+
+impl AssociationInformation for ffi::AssociationInformation {
+    fn task_start(&mut self, task_type: TaskType, fc: FunctionCode, seq: Sequence) {
+        ffi::AssociationInformation::task_start(self, task_type.into(), fc.into(), seq.value());
+    }
+
+    fn task_success(&mut self, task_type: TaskType, fc: FunctionCode, seq: Sequence) {
+        ffi::AssociationInformation::task_success(self, task_type.into(), fc.into(), seq.value());
+    }
+
+    fn task_fail(&mut self, task_type: TaskType, error: TaskError) {
+        ffi::AssociationInformation::task_fail(self, task_type.into(), error.into());
+    }
+
+    fn unsolicited_response(&mut self, is_duplicate: bool, seq: Sequence) {
+        ffi::AssociationInformation::unsolicited_response(self, is_duplicate, seq.value());
     }
 }
 
@@ -185,6 +206,23 @@ impl From<HeaderInfo> for ffi::HeaderInfo {
             has_flags: info.has_flags,
         }
         .into()
+    }
+}
+
+impl From<TaskType> for ffi::TaskType {
+    fn from(from: TaskType) -> Self {
+        match from {
+            TaskType::UserRead => ffi::TaskType::UserRead,
+            TaskType::PeriodicPoll => ffi::TaskType::PeriodicPoll,
+            TaskType::StartupIntegrity => ffi::TaskType::StartupIntegrity,
+            TaskType::AutoEventScan => ffi::TaskType::AutoEventScan,
+            TaskType::Command => ffi::TaskType::Command,
+            TaskType::ClearRestartBit => ffi::TaskType::ClearRestartBit,
+            TaskType::EnableUnsolicited => ffi::TaskType::EnableUnsolicited,
+            TaskType::DisableUnsolicited => ffi::TaskType::DisableUnsolicited,
+            TaskType::TimeSync => ffi::TaskType::TimeSync,
+            TaskType::Restart => ffi::TaskType::Restart,
+        }
     }
 }
 

@@ -14,7 +14,7 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::RestartTask;
 use crate::master::tasks::time::TimeSyncTask;
-use crate::master::ReadType;
+use crate::master::{ReadType, TaskType};
 use crate::util::cursor::WriteError;
 
 pub(crate) mod auto;
@@ -202,6 +202,15 @@ impl ReadTask {
             ReadTask::SingleRead(task) => task.on_task_error(err),
         }
     }
+
+    pub(crate) fn as_task_type(&self) -> TaskType {
+        match self {
+            Self::PeriodicPoll(_) => TaskType::PeriodicPoll,
+            Self::StartupIntegrity(_) => TaskType::StartupIntegrity,
+            Self::EventScan(_) => TaskType::AutoEventScan,
+            Self::SingleRead(_) => TaskType::UserRead,
+        }
+    }
 }
 
 impl NonReadTask {
@@ -249,6 +258,19 @@ impl NonReadTask {
             },
             NonReadTask::TimeSync(task) => task.handle(association, response),
             NonReadTask::Restart(task) => task.handle(response),
+        }
+    }
+
+    pub(crate) fn as_task_type(&self) -> TaskType {
+        match self {
+            Self::Command(_) => TaskType::Command,
+            Self::Auto(x) => match x {
+                AutoTask::ClearRestartBit => TaskType::ClearRestartBit,
+                AutoTask::EnableUnsolicited(_) => TaskType::EnableUnsolicited,
+                AutoTask::DisableUnsolicited(_) => TaskType::DisableUnsolicited,
+            },
+            Self::TimeSync(_) => TaskType::TimeSync,
+            Self::Restart(_) => TaskType::Restart,
         }
     }
 }

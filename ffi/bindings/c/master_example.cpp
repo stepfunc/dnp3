@@ -7,7 +7,7 @@
 
 // ANCHOR: logging_callback
 class Logger : public dnp3::Logger {
-    void on_message(dnp3::LogLevel level, std::string message) override
+    void on_message(dnp3::LogLevel level, const char* message) override
     {
         std::cout << message;
     }
@@ -121,6 +121,30 @@ class AssociationHandler : public dnp3::AssociationHandler {
 };
 // ANCHOR_END: association_handler
 
+// ANCHOR: association_information
+class AssociationInformation : public dnp3::AssociationInformation {
+    void task_start(dnp3::TaskType task_type, dnp3::FunctionCode function_code, uint8_t seq) override
+    {
+
+    }
+
+    void task_success(dnp3::TaskType task_type, dnp3::FunctionCode function_code, uint8_t seq) override
+    {
+
+    }
+
+    void task_fail(dnp3::TaskType task_type, dnp3::TaskError error) override
+    {
+
+    }
+
+    void unsolicited_response(bool is_duplicate, uint8_t seq) override
+    {
+
+    }
+};
+// ANCHOR_END: association_information
+
 // ANCHOR: assoc_control_callback
 class CommandTaskCallback : public dnp3::CommandTaskCallback {
     void on_complete(dnp3::Nothing result) override {
@@ -212,7 +236,8 @@ void run_channel(dnp3::MasterChannel &channel)
         1024,
         get_association_config(),
         std::make_unique<ReadHandler>(),
-        std::make_unique<AssociationHandler>()
+        std::make_unique<AssociationHandler>(),
+        std::make_unique<AssociationInformation>()
     );
     // ANCHOR_END: association_create
 

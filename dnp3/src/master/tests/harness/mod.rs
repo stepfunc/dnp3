@@ -10,7 +10,7 @@ use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::handler::{AssociationHandle, HeaderInfo, MasterChannel, ReadHandler};
 use crate::master::session::{MasterSession, RunError};
-use crate::master::{AssociationHandler, ReadType};
+use crate::master::{AssociationHandler, NullAssociationInformation, ReadType};
 use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
 use crate::util::phys::PhysLayer;
@@ -63,6 +63,7 @@ pub(crate) fn create_association(
             config,
             Box::new(handler),
             Box::new(DefaultAssociationHandler),
+            Box::new(NullAssociationInformation),
         ));
         assert_pending!(add_task.poll());
         assert_pending!(master_task.poll());

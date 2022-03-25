@@ -167,6 +167,7 @@ pub unsafe fn master_channel_add_association(
     config: ffi::AssociationConfig,
     read_handler: ffi::ReadHandler,
     assoc_handler: ffi::AssociationHandler,
+    assoc_info: ffi::AssociationInformation,
 ) -> Result<ffi::AssociationId, ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(address)?;
@@ -198,6 +199,7 @@ pub unsafe fn master_channel_add_association(
         config,
         Box::new(read_handler),
         Box::new(assoc_handler),
+        Box::new(assoc_info),
     ))??;
     Ok(ffi::AssociationId {
         address: address.raw_value(),
@@ -743,3 +745,4 @@ define_task_from_impl!(TimeSyncError);
 define_task_from_impl!(RestartError);
 define_task_from_impl!(ReadError);
 define_task_from_impl!(LinkStatusError);
+define_task_from_impl!(TaskError);

@@ -4,6 +4,8 @@ import static org.joou.Unsigned.*;
 
 import io.stepfunc.dnp3.*;
 import io.stepfunc.dnp3.Runtime;
+import org.joou.UByte;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.Duration;
@@ -236,6 +238,22 @@ class TestAssociationHandler implements AssociationHandler {
 }
 // ANCHOR_END: association_handler
 
+// ANCHOR: association_information
+class TestAssociationInformation implements AssociationInformation {
+  @Override
+  public void taskStart(TaskType taskType, FunctionCode fc, UByte seq) {}
+
+  @Override
+  public void taskSuccess(TaskType taskType, FunctionCode fc, UByte seq) {}
+
+  @Override
+  public void taskFail(TaskType taskType, TaskError error) {}
+
+  @Override
+  public void unsolicitedResponse(boolean isDuplicate, UByte seq) {}
+}
+// ANCHOR_END: association_information
+
 public class MasterExample {
 
   // ANCHOR: master_channel_config
@@ -412,7 +430,8 @@ public class MasterExample {
             ushort(1024),
             getAssociationConfig(),
             new TestReadHandler(),
-            new TestAssociationHandler());
+            new TestAssociationHandler(),
+            new TestAssociationInformation());
     // ANCHOR_END: association_create
 
     // Create a periodic poll

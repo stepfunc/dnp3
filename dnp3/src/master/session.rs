@@ -5,7 +5,7 @@ use tracing::Instrument;
 
 use crate::app::format::write;
 use crate::app::parse::parser::Response;
-use crate::app::{BufferSize, ControlField, Sequence, Shutdown};
+use crate::app::{BufferSize, ControlField, FunctionCode, Sequence, Shutdown};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
@@ -252,12 +252,20 @@ impl MasterSession {
                 }
                 self.enabled = enable;
             }
-            MasterMsg::AddAssociation(address, config, read_handler, assoc_handler, callback) => {
+            MasterMsg::AddAssociation(
+                address,
+                config,
+                read_handler,
+                assoc_handler,
+                assoc_info,
+                callback,
+            ) => {
                 callback.complete(self.associations.register(Association::new(
                     address,
                     config,
                     read_handler,
                     assoc_handler,
+                    assoc_info,
                 )));
             }
             MasterMsg::RemoveAssociation(address) => {
@@ -331,86 +339,119 @@ impl MasterSession {
         &mut self,
         io: &mut PhysLayer,
         destination: EndpointAddress,
-        mut task: NonReadTask,
+        task: NonReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), TaskError> {
-        loop {
-            let seq = match self.send_request(io, destination, &task, writer).await {
-                Ok(seq) => seq,
-                Err(err) => {
-                    task.on_task_error(self.associations.get_mut(destination).ok(), err);
-                    return Err(err);
-                }
-            };
+        let mut next_task = Some(task);
+        while let Some(task) = next_task {
+            let task_type = task.as_task_type();
+            let task_fc = task.function();
 
-            let timeout = self.associations.get_timeout(destination)?;
-            let deadline = timeout.deadline_from_now();
+            // Notify task start
+            if let Ok(association) = self.associations.get_mut(destination) {
+                association.notify_task_start(task_type, task_fc);
+            }
 
-            loop {
-                crate::tokio::select! {
-                    _ = crate::tokio::time::sleep_until(deadline) => {
-                        tracing::warn!("no response within timeout: {}", timeout);
-                        task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
-                        return Err(TaskError::ResponseTimeout);
+            // Execute task
+            let result = self
+                .run_single_non_read_task(io, destination, task, writer, reader)
+                .await;
+
+            // Notify task result
+            if let Ok(association) = self.associations.get_mut(destination) {
+                match result {
+                    Ok(_) => {
+                        association.notify_task_success(task_type, task_fc);
                     }
-                    x = reader.read(io, self.decode_level) => {
-                        if let Err(err) = x {
-                            task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
-                            return Err(err.into());
-                        }
+                    Err(err) => {
+                        association.notify_task_fail(task_type, err);
+                    }
+                }
+            }
 
-                        match reader.pop_response() {
-                            Some(TransportResponse::Response(source, response)) => {
-                                self.notify_link_activity(source);
+            // Continue to next task (if there's one)
+            next_task = result.ok().flatten();
+        }
 
-                                let result = self
-                                    .validate_non_read_response(destination, seq, io, writer, source, response)
-                                    .await;
+        Ok(())
+    }
 
-                                match result {
-                                    // continue reading responses until timeout
-                                    Ok(None) => continue,
-                                    Ok(Some(response)) => {
-                                        match self.associations.get_mut(destination) {
-                                            Err(x) => {
-                                                task.on_task_error(None, x.into());
-                                                return Err(x.into());
-                                            }
-                                            Ok(association) => {
-                                                association.process_iin(response.header.iin);
-                                                match task.handle(association, response) {
-                                                    None => return Ok(()),
-                                                    Some(next) => {
-                                                        task = next;
-                                                        // break from the inner loop and execute the next request
-                                                        break;
-                                                    }
-                                                }
-                                            }
+    async fn run_single_non_read_task(
+        &mut self,
+        io: &mut PhysLayer,
+        destination: EndpointAddress,
+        task: NonReadTask,
+        writer: &mut TransportWriter,
+        reader: &mut TransportReader,
+    ) -> Result<Option<NonReadTask>, TaskError> {
+        let seq = match self.send_request(io, destination, &task, writer).await {
+            Ok(seq) => seq,
+            Err(err) => {
+                task.on_task_error(self.associations.get_mut(destination).ok(), err);
+                return Err(err);
+            }
+        };
+
+        let timeout = self.associations.get_timeout(destination)?;
+        let deadline = timeout.deadline_from_now();
+
+        loop {
+            crate::tokio::select! {
+                _ = crate::tokio::time::sleep_until(deadline) => {
+                    tracing::warn!("no response within timeout: {}", timeout);
+                    task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
+                    return Err(TaskError::ResponseTimeout);
+                }
+                x = reader.read(io, self.decode_level) => {
+                    if let Err(err) = x {
+                        task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
+                        return Err(err.into());
+                    }
+
+                    match reader.pop_response() {
+                        Some(TransportResponse::Response(source, response)) => {
+                            self.notify_link_activity(source);
+
+                            let result = self
+                                .validate_non_read_response(destination, seq, io, writer, source, response)
+                                .await;
+
+                            match result {
+                                // continue reading responses until timeout
+                                Ok(None) => continue,
+                                Ok(Some(response)) => {
+                                    match self.associations.get_mut(destination) {
+                                        Err(x) => {
+                                            task.on_task_error(None, x.into());
+                                            return Err(x.into());
+                                        }
+                                        Ok(association) => {
+                                            association.process_iin(response.header.iin);
+                                            return Ok(task.handle(association, response));
                                         }
                                     }
-                                    Err(err) => {
-                                        task.on_task_error(self.associations.get_mut(destination).ok(), err);
-                                        return Err(err);
-                                    }
+                                }
+                                Err(err) => {
+                                    task.on_task_error(self.associations.get_mut(destination).ok(), err);
+                                    return Err(err);
                                 }
                             }
-                            Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
-                            Some(TransportResponse::Error(err)) => {
-                                task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
-                                return Err(err.into());
-                            },
-                            None => continue,
                         }
+                        Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
+                        Some(TransportResponse::Error(err)) => {
+                            task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
+                            return Err(err.into());
+                        },
+                        None => continue,
                     }
-                    y = self.process_message(true) => {
-                        match y {
-                            Ok(_) => (), // unless shutdown, proceed to next event
-                            Err(err) => {
-                                task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
-                                return Err(err.into());
-                            }
+                }
+                y = self.process_message(true) => {
+                    match y {
+                        Ok(_) => (), // unless shutdown, proceed to next event
+                        Err(err) => {
+                            task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
+                            return Err(err.into());
                         }
                     }
                 }
@@ -466,21 +507,31 @@ impl MasterSession {
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), TaskError> {
+        if let Ok(association) = self.associations.get_mut(destination) {
+            association.notify_task_start(task.as_task_type(), FunctionCode::Read);
+        }
+
         let result = self
             .execute_read_task(io, destination, &mut task, writer, reader)
             .await;
 
-        let association = self.associations.get_mut(destination).ok();
+        let mut association = self.associations.get_mut(destination).ok();
 
         match result {
             Ok(_) => {
                 if let Some(association) = association {
+                    association.notify_task_start(task.as_task_type(), task.function());
                     task.complete(association);
                 } else {
                     task.on_task_error(None, TaskError::NoSuchAssociation(destination));
                 }
             }
-            Err(err) => task.on_task_error(association, err),
+            Err(err) => {
+                if let Some(association) = &mut association {
+                    association.notify_task_fail(task.as_task_type(), err);
+                }
+                task.on_task_error(association, err)
+            }
         }
 
         result

@@ -180,14 +180,14 @@ impl ReadHandler for ExampleReadHandler {
 pub struct ExampleAssociationHandler;
 
 impl AssociationHandler for ExampleAssociationHandler {}
-
-impl ExampleAssociationHandler {
-    /// create a boxed instance of the DefaultAssociationHandler
-    pub fn boxed() -> Box<dyn AssociationHandler> {
-        Box::new(Self {})
-    }
-}
 // ANCHOR_END: association_handler
+
+// ANCHOR: association_information
+#[derive(Copy, Clone)]
+pub struct ExampleAssociationInformation;
+
+impl AssociationInformation for ExampleAssociationInformation {}
+// ANCHOR_END: association_information
 
 /*
   Example program using the master API from within the Tokio runtime.
@@ -219,7 +219,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             EndpointAddress::try_new(1024)?,
             get_association_config(),
             ExampleReadHandler::boxed(),
-            ExampleAssociationHandler::boxed(),
+            Box::new(ExampleAssociationHandler),
+            Box::new(ExampleAssociationInformation),
         )
         .await?;
     // ANCHOR_END: association_create
