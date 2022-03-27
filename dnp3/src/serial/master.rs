@@ -97,12 +97,12 @@ impl MasterTask {
     async fn run(&mut self) {
         let _ = self.run_impl().await;
         self.session.shutdown().await;
-        self.listener.update(PortState::Shutdown);
+        self.listener.update(PortState::Shutdown).get().await;
     }
 
     async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
-            self.listener.update(PortState::Disabled);
+            self.listener.update(PortState::Disabled).get().await;
             self.session.wait_for_enabled().await?;
             if let Err(StateChange::Shutdown) = self.run_enabled().await {
                 return Err(Shutdown);
@@ -119,13 +119,16 @@ impl MasterTask {
                         err,
                         self.retry_delay.as_millis()
                     );
-                    self.listener.update(PortState::Wait(self.retry_delay));
+                    self.listener
+                        .update(PortState::Wait(self.retry_delay))
+                        .get()
+                        .await;
                     self.session.wait_for_retry(self.retry_delay).await?;
                 }
                 Ok(serial) => {
                     let mut io = PhysLayer::Serial(serial);
                     tracing::info!("serial port open");
-                    self.listener.update(PortState::Open);
+                    self.listener.update(PortState::Open).get().await;
                     match self
                         .session
                         .run(&mut io, &mut self.writer, &mut self.reader)
@@ -140,7 +143,10 @@ impl MasterTask {
                                 "waiting {} ms to re-open",
                                 self.retry_delay.as_millis()
                             );
-                            self.listener.update(PortState::Wait(self.retry_delay));
+                            self.listener
+                                .update(PortState::Wait(self.retry_delay))
+                                .get()
+                                .await;
                             self.session.wait_for_retry(self.retry_delay).await?;
                         }
                     }

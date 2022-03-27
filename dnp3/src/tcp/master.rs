@@ -137,12 +137,12 @@ impl MasterTask {
     pub(crate) async fn run(&mut self) {
         let _ = self.run_impl().await;
         self.session.shutdown().await;
-        self.listener.update(ClientState::Shutdown);
+        self.listener.update(ClientState::Shutdown).get().await;
     }
 
     async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
-            self.listener.update(ClientState::Disabled);
+            self.listener.update(ClientState::Disabled).get().await;
             self.session.wait_for_enabled().await?;
             if let Err(StateChange::Shutdown) = self.run_connection().await {
                 return Err(Shutdown);
@@ -158,7 +158,7 @@ impl MasterTask {
 
     async fn run_one_connection(&mut self) -> Result<(), StateChange> {
         if let Some(endpoint) = self.endpoints.next_address().await {
-            self.listener.update(ClientState::Connecting);
+            self.listener.update(ClientState::Connecting).get().await;
             match TcpStream::connect(endpoint).await {
                 Err(err) => {
                     let delay = self.back_off.on_failure();
@@ -169,7 +169,9 @@ impl MasterTask {
                         delay.as_millis()
                     );
                     self.listener
-                        .update(ClientState::WaitAfterFailedConnect(delay));
+                        .update(ClientState::WaitAfterFailedConnect(delay))
+                        .get()
+                        .await;
                     self.session.wait_for_retry(delay).await
                 }
                 Ok(socket) => match self.connection_handler.handle(socket, &endpoint).await {
@@ -182,7 +184,7 @@ impl MasterTask {
                         tracing::info!("connected to {}", endpoint);
                         self.endpoints.reset();
                         self.back_off.on_success();
-                        self.listener.update(ClientState::Connected);
+                        self.listener.update(ClientState::Connected).get().await;
                         self.run_phys(phys).await
                     }
                 },
@@ -220,7 +222,9 @@ impl MasterTask {
 
     async fn on_connection_failure(&mut self, delay: Duration) -> Result<(), StateChange> {
         self.listener
-            .update(ClientState::WaitAfterFailedConnect(delay));
+            .update(ClientState::WaitAfterFailedConnect(delay))
+            .get()
+            .await;
         self.session.wait_for_retry(delay).await
     }
 }
