@@ -2,7 +2,9 @@ use std::ffi::CStr;
 use std::path::Path;
 use std::time::Duration;
 
-use dnp3::app::{ConnectStrategy, Listener, RangeError, RetryStrategy, Timeout, Timestamp};
+use dnp3::app::{
+    ConnectStrategy, Listener, MaybeAsync, RangeError, RetryStrategy, Timeout, Timestamp,
+};
 use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::serial::*;
@@ -521,7 +523,7 @@ impl From<ffi::UtcTimestamp> for Option<Timestamp> {
 }
 
 impl Listener<ClientState> for ffi::ClientStateListener {
-    fn update(&mut self, value: ClientState) {
+    fn update(&mut self, value: ClientState) -> MaybeAsync<()> {
         let value = match value {
             ClientState::Disabled => ffi::ClientState::Disabled,
             ClientState::Connecting => ffi::ClientState::Connecting,
@@ -530,12 +532,13 @@ impl Listener<ClientState> for ffi::ClientStateListener {
             ClientState::WaitAfterDisconnect(_) => ffi::ClientState::WaitAfterDisconnect,
             ClientState::Shutdown => ffi::ClientState::Shutdown,
         };
-        self.on_change(value)
+        self.on_change(value);
+        MaybeAsync::ready(())
     }
 }
 
 impl Listener<PortState> for ffi::PortStateListener {
-    fn update(&mut self, value: PortState) {
+    fn update(&mut self, value: PortState) -> MaybeAsync<()> {
         let value = match value {
             PortState::Disabled => ffi::PortState::Disabled,
             PortState::Wait(_) => ffi::PortState::Wait,
@@ -543,6 +546,7 @@ impl Listener<PortState> for ffi::PortStateListener {
             PortState::Shutdown => ffi::PortState::Shutdown,
         };
         self.on_change(value);
+        MaybeAsync::ready(())
     }
 }
 

@@ -80,12 +80,15 @@ impl OutstationTaskAdapter {
                 Some(mut s) => {
                     let id = s.id;
 
-                    self.listener.update(ConnectionState::Connected);
+                    self.listener.update(ConnectionState::Connected).get().await;
                     let result = self
                         .run_one_session(&mut s.phys)
                         .instrument(tracing::info_span!("session", "id" = id))
                         .await;
-                    self.listener.update(ConnectionState::Disconnected);
+                    self.listener
+                        .update(ConnectionState::Disconnected)
+                        .get()
+                        .await;
 
                     // reset outstation state in between sessions
                     self.task.reset();

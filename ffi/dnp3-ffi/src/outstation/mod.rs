@@ -4,7 +4,7 @@ use std::path::Path;
 use std::time::Duration;
 
 pub use database::*;
-use dnp3::app::Listener;
+use dnp3::app::{Listener, MaybeAsync};
 use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::{BufferSize, ConnectionState, Feature, Features, OutstationConfig};
@@ -261,8 +261,9 @@ fn convert_outstation_config(
 }
 
 impl Listener<ConnectionState> for ffi::ConnectionStateListener {
-    fn update(&mut self, value: ConnectionState) {
-        self.on_change(value.into())
+    fn update(&mut self, value: ConnectionState) -> MaybeAsync<()> {
+        self.on_change(value.into());
+        MaybeAsync::ready(())
     }
 }
 

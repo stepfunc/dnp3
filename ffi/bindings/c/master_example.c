@@ -408,6 +408,7 @@ int run_channel(dnp3_master_channel_t *channel)
     }
 
     dnp3_master_channel_destroy(channel);
+    return 0;
 }
 
 int run_tcp_channel(dnp3_runtime_t *runtime)
