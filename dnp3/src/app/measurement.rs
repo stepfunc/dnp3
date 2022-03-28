@@ -70,6 +70,8 @@ impl Flags {
     pub const CHATTER_FILTER: Flags = Flags::new(bits::BIT_5.value);
     /// Object value exceeds the measurement range of the reported variation
     pub const OVER_RANGE: Flags = Flags::new(bits::BIT_5.value);
+    /// Obsolete flag applicable only to counter object groups
+    pub const ROLL_OVER: Flags = Flags::new(bits::BIT_5.value);
     /// reported counter value cannot be compared against a prior value to obtain the correct count difference
     pub const DISCONTINUITY: Flags = Flags::new(bits::BIT_6.value);
     /// Object value might not have the expected level of accuracy
