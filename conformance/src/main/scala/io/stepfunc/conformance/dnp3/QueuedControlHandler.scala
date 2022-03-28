@@ -249,7 +249,7 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
 
       // Update the associated Analog Output Status
       val flags = new Flags(Flag.ONLINE)
-      database.updateAnalogOutputStatus(new AnalogOutputStatus(index, value, flags, Timestamp.invalidTimestamp()), new UpdateOptions())
+      database.updateAnalogOutputStatus(new AnalogOutputStatus(index, value, flags, Timestamp.invalidTimestamp()), UpdateOptions.detectEvent())
     }
 
     result

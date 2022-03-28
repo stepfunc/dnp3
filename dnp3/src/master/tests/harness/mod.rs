@@ -1,21 +1,24 @@
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::task::Poll;
 
-use crate::app::{MaybeAsync, Timeout};
+use crate::app::{BufferSize, MaybeAsync, Timeout};
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::handler::{AssociationHandle, HeaderInfo, MasterChannel, ReadHandler};
 use crate::master::session::{MasterSession, RunError};
-use crate::master::{DefaultAssociationHandler, ReadType};
+use crate::master::{AssociationHandler, AssociationInformation, ReadType};
 use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
 use crate::util::phys::PhysLayer;
 
 pub(crate) mod requests;
+
+struct DefaultAssociationHandler;
+impl AssociationHandler for DefaultAssociationHandler {}
 
 pub(crate) fn create_association(
     mut config: AssociationConfig,
@@ -27,22 +30,22 @@ pub(crate) fn create_association(
 
     let mut io = PhysLayer::Mock(io);
 
-    let outstation_address = EndpointAddress::from(1024).unwrap();
+    let outstation_address = EndpointAddress::try_new(1024).unwrap();
 
     // Create the master session
     let (tx, rx) = crate::util::channel::request_channel();
     let mut runner = MasterSession::new(
         true,
         AppDecodeLevel::ObjectValues.into(),
-        MasterSession::MIN_TX_BUFFER_SIZE,
+        BufferSize::min(),
         rx,
     );
     let mut master = MasterChannel::new(tx);
 
     let (mut reader, mut writer) = create_master_transport_layer(
         LinkErrorMode::Close,
-        EndpointAddress::from(1).unwrap(),
-        MasterSession::MIN_RX_BUFFER_SIZE,
+        EndpointAddress::try_new(1).unwrap(),
+        BufferSize::min(),
     );
 
     reader
@@ -53,13 +56,15 @@ pub(crate) fn create_association(
 
     // Create the association
     let handler = CountHandler::new();
+    let info = CountAssociationInformation::new();
     let num_requests = handler.num_requests.clone();
     let association = {
         let mut add_task = spawn(master.add_association(
             outstation_address,
             config,
             Box::new(handler),
-            DefaultAssociationHandler::boxed(),
+            Box::new(DefaultAssociationHandler),
+            Box::new(info),
         ));
         assert_pending!(add_task.poll());
         assert_pending!(master_task.poll());
@@ -157,8 +162,76 @@ impl ReadHandler for CountHandler {
     fn handle_octet_string<'a>(
         &mut self,
         _info: HeaderInfo,
-        _iter: &'a mut dyn Iterator<Item = (crate::app::Bytes<'a>, u16)>,
+        _iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     ) {
+    }
+}
+
+struct CountAssociationInformationInner {
+    last_start: Option<crate::app::Sequence>,
+    num_success: u32,
+    num_fail: u32,
+    num_unsol: u32,
+}
+
+struct CountAssociationInformation {
+    inner: Mutex<CountAssociationInformationInner>,
+}
+
+impl CountAssociationInformation {
+    fn new() -> Self {
+        Self {
+            inner: Mutex::new(CountAssociationInformationInner {
+                last_start: None,
+                num_success: 0,
+                num_fail: 0,
+                num_unsol: 0,
+            }),
+        }
+    }
+}
+
+impl AssociationInformation for CountAssociationInformation {
+    fn task_start(
+        &mut self,
+        _task_type: crate::master::TaskType,
+        _fc: crate::app::FunctionCode,
+        seq: crate::app::Sequence,
+    ) {
+        let mut inner = self.inner.lock().unwrap();
+
+        assert!(inner.last_start.is_none());
+
+        inner.last_start = Some(seq);
+    }
+
+    fn task_success(
+        &mut self,
+        _task_type: crate::master::TaskType,
+        _fc: crate::app::FunctionCode,
+        seq: crate::app::Sequence,
+    ) {
+        let mut inner = self.inner.lock().unwrap();
+
+        assert_eq!(inner.last_start, Some(seq));
+
+        inner.num_success += 1;
+        inner.last_start = None;
+    }
+
+    fn task_fail(&mut self, _task_type: crate::master::TaskType, _error: crate::master::TaskError) {
+        let mut inner = self.inner.lock().unwrap();
+
+        assert!(inner.last_start.is_some());
+
+        inner.num_fail += 1;
+        inner.last_start = None;
+    }
+
+    fn unsolicited_response(&mut self, _is_duplicate: bool, _seq: crate::app::Sequence) {
+        let mut inner = self.inner.lock().unwrap();
+
+        inner.num_unsol += 1;
     }
 }
 

@@ -13,9 +13,9 @@ for each association you create and is invoked for both unsolicited responses an
 
 When a response is parsed and determined to carry measurement data, `ReadHandler` callbacks are executed in the following order:
 
-1. `ReadHandler::beginFragment`
-2. `ReadHandler::handle<TYPE>` for each object header in the message
-3. `ReadHandler::endFragment`
+1. `ReadHandler::begin_fragment`
+2. `ReadHandler::handle_<TYPE>` for each object header in the message
+3. `ReadHandler::end_fragment`
 
 The begin/end methods provide useful information, including:
 
@@ -23,8 +23,61 @@ The begin/end methods provide useful information, including:
 * Context regarding what triggered the response, such as unsolicited, startup integrity scan, periodic poll, etc.
 
 :::tip
+To determine if a measurement is a static value or an event, use the `HeaderInfo::is_event` field.
+:::
+
+Each value has a set of associated flags. You can check the presence of a flag by using the `Flags::value` field and comparing
+it with the constants defined in `Flag`.
+
+:::tip
 It's common to maintain a list of measurement values in your `ReadHandler` implementation. You can then use the `endFragment` method as a trigger to publish them.
 Since responses may consist of multiple fragments, you can inspect the `ResponseHeader.Control.Fin` field to determine if the current fragment is the final fragment
 in a response series.
 :::
 
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master.rs:read_handler}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:read_handler}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/master_example.cpp:read_handler}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:read_handler}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:read_handler}}
+```
+
+</TabItem>
+</Tabs>

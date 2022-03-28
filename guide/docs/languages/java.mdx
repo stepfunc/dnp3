@@ -7,9 +7,26 @@ slug: /java
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-The Java bindings are distributed as a JAR targeting Java 8. Native libraries for Windows x64, Linux x64 and Linux AArch64 are embedded in the JAR's `resources` directory. The
+The Java bindings are distributed as a JAR targeting Java 8. Native libraries for multiple platforms are embedded in the JAR's `resources` directory. The
 correct native library will automatically load during static initialization. These native libraries wrap the underlying C API with a thin layer of
 [JNI](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/).
+
+The currently embedded shared libraries are the following:
+
+- Windows x64 (Windows 7+)
+- Linux x64 (kernel 2.6.32+, glibc 2.11+)
+- Linux AArch64 (kernel 4.2, glibc 2.17+)
+- MacOS x64 (MacOS 10.7+, Lion+)
+
+:::warning
+MacOS x64 libraries are included in the package but are not officially supported. They can be useful for developers using MacOS, but
+they should **never be used in production**.
+:::
+
+:::tip
+It is also possible to use an external library by specifying its path in the `DNP3_NATIVE_LIB_LOCATION` environment variable. This feature can be useful if your platform
+is not officially supported and you [built the bindings manually](./build.mdx).
+:::
 
 ## Maven
 
@@ -60,7 +77,6 @@ C API errors are transformed into exceptions containing the error enum. The exce
 Uncaught exceptions thrown in callbacks will terminate the program. Always wrap your callback logic using `try/catch` syntax if there's a possibility the callback will throw.
 :::
 
-
 ### Iterators
 
 Iterators are transformed into `List<T>` by the code generator. This means that the collections returned by callbacks may be
@@ -68,7 +84,8 @@ used outside the callback. For example, you can send them to another thread for 
 
 ### Structs
 
-Native structs are mapped to Java classes. They have public member visibility, and the constructor ensures that all values are initialized.
+Native structs are mapped to Java classes. They have public member visibility, and the constructor ensures that all values without a reasonable default are initialized.
+Each field has a `with<FieldName>` method that sets the field and returns the struct for chaining operations.
 
 ### Classes
 

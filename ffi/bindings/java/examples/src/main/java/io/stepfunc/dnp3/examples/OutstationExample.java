@@ -172,7 +172,26 @@ class TestConnectionStateListener implements ConnectionStateListener {
 
 public class OutstationExample {
 
-  static OutstationConfig getOutstationConfig() {
+  // ANCHOR: event_buffer_config
+  private static EventBufferConfig getEventBufferConfig() {
+    return new EventBufferConfig(
+        ushort(10), // binary
+        ushort(10), // double-bit binary
+        ushort(10), // binary output status
+        ushort(5), // counter
+        ushort(5), // frozen counter
+        ushort(5), // analog
+        ushort(5), // analog output status
+        ushort(3) // octet string
+        );
+  }
+  // ANCHOR_END: event_buffer_config
+
+  private static Timestamp now() {
+    return Timestamp.synchronizedTimestamp(ulong(System.currentTimeMillis()));
+  }
+
+  private static OutstationConfig getOutstationConfig() {
     // ANCHOR: outstation_config
     // create an outstation configuration with default values
     OutstationConfig config =
@@ -180,7 +199,9 @@ public class OutstationExample {
             // outstation address
             ushort(1024),
             // master address
-            ushort(1))
+            ushort(1),
+            // event buffer sizes
+            getEventBufferConfig())
     .withDecodeLevel(new DecodeLevel().withApplication(AppDecodeLevel.OBJECT_VALUES));
     // ANCHOR_END: outstation_config
     return config;
@@ -215,7 +236,7 @@ public class OutstationExample {
 
   private static void runTcp(Runtime runtime) {
     // ANCHOR: create_tcp_server
-    TcpServer server = new TcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
+    OutstationServer server = OutstationServer.createTcpServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20000");
     // ANCHOR_END: create_tcp_server
 
     try {
@@ -227,7 +248,7 @@ public class OutstationExample {
 
   private static void runTls(Runtime runtime, TlsServerConfig config) {
     // ANCHOR: create_tls_server
-    TcpServer server = TcpServer.createTlsServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20001", config);
+    OutstationServer server = OutstationServer.createTlsServer(runtime, LinkErrorMode.CLOSE, "127.0.0.1:20001", config);
     // ANCHOR_END: create_tls_server
 
     try {
@@ -242,9 +263,8 @@ public class OutstationExample {
     Outstation outstation = Outstation.createSerialSession(
             runtime,
             "/dev/pts/4",
-            new SerialPortSettings(),
+            new SerialSettings(),
             getOutstationConfig(),
-            getEventBufferConfig(),
             new TestOutstationApplication(),
             new TestOutstationInformation(),
             new TestControlHandler()
@@ -311,28 +331,12 @@ public class OutstationExample {
   }
   // ANCHOR_END: database_init_function
 
-  // ANCHOR: event_buffer_config
-  private static EventBufferConfig getEventBufferConfig() {
-    return new EventBufferConfig(
-        ushort(10), // binary
-        ushort(10), // double-bit binary
-        ushort(10), // binary output status
-        ushort(5), // counter
-        ushort(5), // frozen counter
-        ushort(5), // analog
-        ushort(5), // analog output status
-        ushort(3) // octet string
-        );
-  }
-  // ANCHOR_END: event_buffer_config
-
-  private static void runServer(TcpServer server) {
+  private static void runServer(OutstationServer server) {
 
     // ANCHOR: tcp_server_add_outstation
     final Outstation outstation =
             server.addOutstation(
                     getOutstationConfig(),
-                    getEventBufferConfig(),
                     new TestOutstationApplication(),
                     new TestOutstationInformation(),
                     new TestControlHandler(),
@@ -361,7 +365,9 @@ public class OutstationExample {
     long frozenCounterValue = 0;
     double analogValue = 0.0;
     double analogOutputStatusValue = 0.0;
+
     final Flags onlineFlags = new Flags(Flag.ONLINE);
+    final UpdateOptions detectEvent = UpdateOptions.detectEvent();
 
     // Handle user input
     try {
@@ -382,8 +388,8 @@ public class OutstationExample {
                             ushort(7),
                             pointValue,
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateBinaryInput(value, new UpdateOptions());
+                            now());
+                    db.updateBinaryInput(value, detectEvent);
                   });
               break;
             }
@@ -401,8 +407,8 @@ public class OutstationExample {
                             ushort(7),
                             pointValue,
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateDoubleBitBinaryInput(value, new UpdateOptions());
+                            now());
+                    db.updateDoubleBitBinaryInput(value, detectEvent);
                   });
               break;
             }
@@ -417,8 +423,8 @@ public class OutstationExample {
                             ushort(7),
                             pointValue,
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateBinaryOutputStatus(value, new UpdateOptions());
+                            now());
+                    db.updateBinaryOutputStatus(value, detectEvent);
                   });
               break;
             }
@@ -433,8 +439,8 @@ public class OutstationExample {
                             ushort(7),
                             uint(pointValue),
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateCounter(value, new UpdateOptions());
+                            now());
+                    db.updateCounter(value, detectEvent);
                   });
               break;
             }
@@ -449,8 +455,8 @@ public class OutstationExample {
                             ushort(7),
                             uint(pointValue),
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateFrozenCounter(value, new UpdateOptions());
+                            now());
+                    db.updateFrozenCounter(value, detectEvent);
                   });
               break;
             }
@@ -465,8 +471,8 @@ public class OutstationExample {
                             ushort(7),
                             pointValue,
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateAnalogInput(value, new UpdateOptions());
+                            now());
+                    db.updateAnalogInput(value, detectEvent);
                   });
               break;
             }
@@ -481,8 +487,8 @@ public class OutstationExample {
                             ushort(7),
                             pointValue,
                             onlineFlags,
-                            Timestamp.synchronizedTimestamp(ulong(0)));
-                    db.updateAnalogOutputStatus(value, new UpdateOptions());
+                            now());
+                    db.updateAnalogOutputStatus(value, detectEvent);
                   });
               break;
             }
@@ -495,7 +501,7 @@ public class OutstationExample {
                       octetString.add(ubyte(octet));
                     }
 
-                    db.updateOctetString(ushort(7), octetString, new UpdateOptions());
+                    db.updateOctetString(ushort(7), octetString, detectEvent);
                   });
               break;
             }

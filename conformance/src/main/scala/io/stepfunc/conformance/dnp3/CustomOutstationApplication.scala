@@ -33,14 +33,14 @@ class CustomOutstationApplication(val isLocalControl: Boolean) extends Outstatio
   override def freezeCountersAll(freezeType: FreezeType, database: Database): FreezeResult = {
     for (i <- 0 to 9) {
       val currentCounter = database.getCounter(ushort(i))
-      database.updateFrozenCounter(new FrozenCounter(currentCounter.index, currentCounter.value, currentCounter.flags, currentCounter.time), new UpdateOptions())
+      database.updateFrozenCounter(new FrozenCounter(currentCounter.index, currentCounter.value, currentCounter.flags, currentCounter.time), UpdateOptions.detectEvent())
       if (freezeType == FreezeType.FREEZE_AND_CLEAR) {
         currentCounter.value = uint(0)
-        database.updateCounter(currentCounter, new UpdateOptions())
+        database.updateCounter(currentCounter, UpdateOptions.detectEvent())
       }
     }
 
-    FreezeResult.SUCCESS
+    FreezeResult.OK
   }
 
   override def freezeCountersRange(start: UShort, stop: UShort, freezeType: FreezeType, database: Database): FreezeResult = {
@@ -50,14 +50,14 @@ class CustomOutstationApplication(val isLocalControl: Boolean) extends Outstatio
 
     for (i <- start.intValue() to stop.intValue()) {
       val currentCounter = database.getCounter(ushort(i))
-      database.updateFrozenCounter(new FrozenCounter(currentCounter.index, currentCounter.value, currentCounter.flags, currentCounter.time), new UpdateOptions())
+      database.updateFrozenCounter(new FrozenCounter(currentCounter.index, currentCounter.value, currentCounter.flags, currentCounter.time), UpdateOptions.detectEvent())
       if (freezeType == FreezeType.FREEZE_AND_CLEAR) {
         currentCounter.value = uint(0)
-        database.updateCounter(currentCounter, new UpdateOptions())
+        database.updateCounter(currentCounter, UpdateOptions.detectEvent())
       }
     }
 
-    FreezeResult.SUCCESS
+    FreezeResult.OK
   }
 
   def now(): Timestamp = {

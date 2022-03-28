@@ -1,4 +1,5 @@
-pub use tokio_serial::{DataBits, FlowControl, Parity, SerialStream, StopBits};
+use tokio_serial::SerialStream;
+pub use tokio_serial::{DataBits, FlowControl, Parity, StopBits};
 
 /// serial port settings
 #[derive(Copy, Clone, Debug, PartialEq)]

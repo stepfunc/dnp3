@@ -795,7 +795,7 @@ impl Updatable for OctetString {
     }
 
     fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
-        config.octet_strings
+        config.octet_string
     }
 }
 

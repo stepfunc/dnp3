@@ -10,10 +10,10 @@ impl OutstationApplication for ffi::OutstationApplication {
         ffi::OutstationApplication::get_processing_delay_ms(self).unwrap_or(0)
     }
 
-    fn write_absolute_time(&mut self, time: Timestamp) -> WriteTimeResult {
+    fn write_absolute_time(&mut self, time: Timestamp) -> Result<(), RequestError> {
         ffi::OutstationApplication::write_absolute_time(self, time.raw_value())
             .map(|res| res.into())
-            .unwrap_or(WriteTimeResult::NotSupported)
+            .unwrap_or(Err(RequestError::NotSupported))
     }
 
     fn get_application_iin(&self) -> ApplicationIin {
@@ -35,7 +35,7 @@ impl OutstationApplication for ffi::OutstationApplication {
         indices: FreezeIndices,
         freeze_type: FreezeType,
         database: &mut Database,
-    ) -> FreezeResult {
+    ) -> Result<(), RequestError> {
         match indices {
             FreezeIndices::All => ffi::OutstationApplication::freeze_counters_all(
                 self,
@@ -43,7 +43,7 @@ impl OutstationApplication for ffi::OutstationApplication {
                 database as *mut _,
             )
             .map(|res| res.into())
-            .unwrap_or(FreezeResult::NotSupported),
+            .unwrap_or(Err(RequestError::NotSupported)),
             FreezeIndices::Range(start, stop) => ffi::OutstationApplication::freeze_counters_range(
                 self,
                 start,
@@ -52,7 +52,7 @@ impl OutstationApplication for ffi::OutstationApplication {
                 database as *mut _,
             )
             .map(|res| res.into())
-            .unwrap_or(FreezeResult::NotSupported),
+            .unwrap_or(Err(RequestError::NotSupported)),
         }
     }
 }
@@ -78,12 +78,22 @@ impl From<ffi::RestartDelay> for Option<RestartDelay> {
     }
 }
 
-impl From<ffi::WriteTimeResult> for WriteTimeResult {
+impl From<ffi::WriteTimeResult> for Result<(), RequestError> {
     fn from(from: ffi::WriteTimeResult) -> Self {
         match from {
-            ffi::WriteTimeResult::NotSupported => WriteTimeResult::NotSupported,
-            ffi::WriteTimeResult::InvalidValue => WriteTimeResult::InvalidValue,
-            ffi::WriteTimeResult::Ok => WriteTimeResult::Ok,
+            ffi::WriteTimeResult::Ok => Ok(()),
+            ffi::WriteTimeResult::ParameterError => Err(RequestError::ParameterError),
+            ffi::WriteTimeResult::NotSupported => Err(RequestError::NotSupported),
+        }
+    }
+}
+
+impl From<ffi::FreezeResult> for Result<(), RequestError> {
+    fn from(from: ffi::FreezeResult) -> Self {
+        match from {
+            ffi::FreezeResult::Ok => Ok(()),
+            ffi::FreezeResult::ParameterError => Err(RequestError::ParameterError),
+            ffi::FreezeResult::NotSupported => Err(RequestError::NotSupported),
         }
     }
 }
@@ -146,16 +156,6 @@ impl ControlHandler for ffi::ControlHandler {
     fn end_fragment(&mut self) -> MaybeAsync<()> {
         ffi::ControlHandler::end_fragment(self);
         MaybeAsync::ready(())
-    }
-}
-
-impl From<ffi::FreezeResult> for FreezeResult {
-    fn from(from: ffi::FreezeResult) -> Self {
-        match from {
-            ffi::FreezeResult::Success => FreezeResult::Success,
-            ffi::FreezeResult::ParameterError => FreezeResult::ParameterError,
-            ffi::FreezeResult::NotSupported => FreezeResult::NotSupported,
-        }
     }
 }
 
@@ -326,16 +326,16 @@ impl ControlSupport<Group41Var4> for ffi::ControlHandler {
 impl From<RequestHeader> for ffi::RequestHeader {
     fn from(from: RequestHeader) -> ffi::RequestHeader {
         ffi::RequestHeaderFields {
-            control: from.control.into(),
+            control_field: from.control.into(),
             function: from.function.into(),
         }
         .into()
     }
 }
 
-impl From<ControlField> for ffi::Control {
+impl From<ControlField> for ffi::ControlField {
     fn from(from: ControlField) -> Self {
-        ffi::ControlFields {
+        ffi::ControlFieldFields {
             fir: from.fir,
             fin: from.fin,
             con: from.con,

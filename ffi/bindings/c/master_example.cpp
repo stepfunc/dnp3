@@ -35,9 +35,18 @@ std::ostream& operator<<(std::ostream& os, const dnp3::Flags& flags)
     return write_hex_byte(os, flags.value);
 }
 
+// ANCHOR: read_handler
 class ReadHandler : public dnp3::ReadHandler {
-    void begin_fragment(dnp3::ReadType read_type, const dnp3::ResponseHeader& header) override {}
-    void end_fragment(dnp3::ReadType read_type, const dnp3::ResponseHeader& header) override {}
+    void begin_fragment(dnp3::ReadType read_type, const dnp3::ResponseHeader& header) override
+    {
+        std::cout << "Begin fragment (broadcast: " << header.iin.iin1.broadcast << ")" << std::endl;
+    }
+
+    void end_fragment(dnp3::ReadType read_type, const dnp3::ResponseHeader& header) override
+    {
+        std::cout << "End fragment" << std::endl;
+    }
+
     void handle_binary_input(const dnp3::HeaderInfo &info, dnp3::BinaryInputIterator &it) override
     {
         while (it.next()) {
@@ -100,6 +109,7 @@ class ReadHandler : public dnp3::ReadHandler {
         }
     }
 };
+// ANCHOR_END: read_handler
 
 // ANCHOR: association_handler
 class AssociationHandler : public dnp3::AssociationHandler {
@@ -110,6 +120,30 @@ class AssociationHandler : public dnp3::AssociationHandler {
     }
 };
 // ANCHOR_END: association_handler
+
+// ANCHOR: association_information
+class AssociationInformation : public dnp3::AssociationInformation {
+    void task_start(dnp3::TaskType task_type, dnp3::FunctionCode function_code, uint8_t seq) override
+    {
+
+    }
+
+    void task_success(dnp3::TaskType task_type, dnp3::FunctionCode function_code, uint8_t seq) override
+    {
+
+    }
+
+    void task_fail(dnp3::TaskType task_type, dnp3::TaskError error) override
+    {
+
+    }
+
+    void unsolicited_response(bool is_duplicate, uint8_t seq) override
+    {
+
+    }
+};
+// ANCHOR_END: association_information
 
 // ANCHOR: assoc_control_callback
 class CommandTaskCallback : public dnp3::CommandTaskCallback {
@@ -199,10 +233,11 @@ void run_channel(dnp3::MasterChannel &channel)
 {
     // ANCHOR: association_create
     auto assoc = channel.add_association(
-        1024, 
+        1024,
         get_association_config(),
-        std::make_unique<ReadHandler>(), 
-        std::make_unique<AssociationHandler>()
+        std::make_unique<ReadHandler>(),
+        std::make_unique<AssociationHandler>(),
+        std::make_unique<AssociationInformation>()
     );
     // ANCHOR_END: association_create
 
@@ -227,10 +262,10 @@ void run_channel(dnp3::MasterChannel &channel)
             channel.disable();
         }
         else if (cmd == "dln") {
-            channel.set_decode_level(dnp3::DecodeLevel());
+            channel.set_decode_level(dnp3::DecodeLevel::nothing());
         }
         else if (cmd == "dlv") {
-            dnp3::DecodeLevel level;
+            auto level = dnp3::DecodeLevel::nothing();
             level.application = dnp3::AppDecodeLevel::object_values;
             channel.set_decode_level(level);
         }
@@ -305,7 +340,7 @@ void run_serial(dnp3::Runtime &runtime)
         runtime,
         get_master_channel_config(),
         "/dev/pts/4",
-        dnp3::SerialPortSettings(),
+        dnp3::SerialSettings(),
         std::chrono::seconds(5),
         std::make_unique<PortStateListener>()
     );
@@ -314,19 +349,19 @@ void run_serial(dnp3::Runtime &runtime)
     run_channel(channel);
 }
 
-void run_tls_client(dnp3::Runtime &runtime, const dnp3::TlsClientConfig& config)
+void run_tls_client(dnp3::Runtime &runtime, const dnp3::TlsClientConfig& tls_config)
 {
     // ANCHOR: create_master_tls_channel
     dnp3::EndpointList endpoints(std::string("127.0.0.1:20001"));
 
     auto channel = dnp3::MasterChannel::create_tls_channel(
-        runtime, 
+        runtime,
         dnp3::LinkErrorMode::close,
         get_master_channel_config(),
         endpoints,
-        config,
         dnp3::ConnectStrategy(),
-        std::make_unique<ClientStateListener>()
+        std::make_unique<ClientStateListener>(),
+        tls_config
     );
     // ANCHOR_END: create_master_tls_channel
 

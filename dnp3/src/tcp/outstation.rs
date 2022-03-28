@@ -3,7 +3,6 @@ use tracing::Instrument;
 use crate::app::{Listener, Shutdown};
 use crate::link::LinkErrorMode;
 use crate::outstation::adapter::{NewSession, OutstationTaskAdapter};
-use crate::outstation::database::EventBufferConfig;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::OutstationHandle;
 use crate::outstation::*;
@@ -20,12 +19,12 @@ struct OutstationInfo {
 
 /// A builder for creating a TCP server with one or more outstation instances
 /// associated with it
-pub struct TcpServer {
+pub struct Server {
     link_error_mode: LinkErrorMode,
     connection_id: u64,
     address: std::net::SocketAddr,
     outstations: Vec<OutstationInfo>,
-    connection_handler: TcpServerConnectionHandler,
+    connection_handler: ServerConnectionHandler,
 }
 
 /// Handle to a running server. Dropping the handle, shuts down the server.
@@ -33,13 +32,13 @@ pub struct ServerHandle {
     _tx: crate::tokio::sync::oneshot::Sender<()>,
 }
 
-enum TcpServerConnectionHandler {
+enum ServerConnectionHandler {
     Tcp,
     #[cfg(feature = "tls")]
     Tls(crate::tcp::tls::TlsServerConfig),
 }
 
-impl TcpServerConnectionHandler {
+impl ServerConnectionHandler {
     async fn handle(&mut self, socket: crate::tokio::net::TcpStream) -> Result<PhysLayer, String> {
         match self {
             Self::Tcp => Ok(PhysLayer::Tcp(socket)),
@@ -49,16 +48,16 @@ impl TcpServerConnectionHandler {
     }
 }
 
-impl TcpServer {
+impl Server {
     /// create a TCP server builder object that will eventually be bound
     /// to the specified address
-    pub fn new(link_error_mode: LinkErrorMode, address: std::net::SocketAddr) -> Self {
+    pub fn new_tcp_server(link_error_mode: LinkErrorMode, address: std::net::SocketAddr) -> Self {
         Self {
             link_error_mode,
             connection_id: 0,
             address,
             outstations: Vec::new(),
-            connection_handler: TcpServerConnectionHandler::Tcp,
+            connection_handler: ServerConnectionHandler::Tcp,
         }
     }
 
@@ -74,7 +73,7 @@ impl TcpServer {
             connection_id: 0,
             address,
             outstations: Vec::new(),
-            connection_handler: TcpServerConnectionHandler::Tls(tls_config),
+            connection_handler: ServerConnectionHandler::Tls(tls_config),
         }
     }
 
@@ -83,7 +82,6 @@ impl TcpServer {
     pub fn add_outstation_no_spawn(
         &mut self,
         config: OutstationConfig,
-        event_config: EventBufferConfig,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
@@ -99,7 +97,6 @@ impl TcpServer {
         let (task, handle) = OutstationTask::create(
             self.link_error_mode,
             config,
-            event_config,
             application,
             information,
             control_handler,
@@ -129,11 +126,9 @@ impl TcpServer {
     /// associate an outstation with the TcpServer and spawn it
     ///
     /// Must be called from within the Tokio runtime
-    #[allow(clippy::too_many_arguments)]
     pub fn add_outstation(
         &mut self,
         config: OutstationConfig,
-        event_config: EventBufferConfig,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
@@ -142,7 +137,6 @@ impl TcpServer {
     ) -> Result<OutstationHandle, FilterError> {
         let (handle, future) = self.add_outstation_no_spawn(
             config,
-            event_config,
             application,
             information,
             control_handler,

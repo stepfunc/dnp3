@@ -33,17 +33,17 @@ pub fn spawn_master_tls_client(
     link_error_mode: LinkErrorMode,
     config: MasterChannelConfig,
     endpoints: EndpointList,
-    tls_config: TlsClientConfig,
     connect_strategy: ConnectStrategy,
     listener: Box<dyn Listener<ClientState>>,
+    tls_config: TlsClientConfig,
 ) -> MasterChannel {
     let (future, handle) = create_master_tls_client(
         link_error_mode,
         config,
         endpoints,
-        tls_config,
         connect_strategy,
         listener,
+        tls_config,
     );
     crate::tokio::spawn(future);
     handle
@@ -61,9 +61,9 @@ pub fn create_master_tls_client(
     link_error_mode: LinkErrorMode,
     config: MasterChannelConfig,
     endpoints: EndpointList,
-    tls_config: TlsClientConfig,
     connect_strategy: ConnectStrategy,
     listener: Box<dyn Listener<ClientState>>,
+    tls_config: TlsClientConfig,
 ) -> (impl Future<Output = ()> + 'static, MasterChannel) {
     let main_addr = endpoints.main_addr().to_string();
     let (mut task, handle) = MasterTask::new(

@@ -1,57 +1,7 @@
+use crate::app::{BufferSize, Timeout};
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
-use crate::outstation::database::ClassZeroConfig;
-use crate::util::buffer::Buffer;
-
-/// Validated buffer size for use in the outstation
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub struct BufferSize {
-    size: usize,
-}
-
-/// Error type returned for invalid buffer sizes
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum BufferSizeError {
-    /// provided size
-    TooSmall(usize),
-}
-
-impl BufferSize {
-    /// minimum allowed outstation buffer size corresponding to the payload of a link frame
-    pub const MIN: usize = 249;
-    /// default outstation buffer size
-    pub const DEFAULT: usize = 2048;
-
-    pub(crate) fn create_buffer(&self) -> Buffer {
-        Buffer::new(self.size)
-    }
-
-    /// get the underlying value
-    pub fn value(&self) -> usize {
-        self.size
-    }
-
-    /// construct a `BufferSize` with the minimum value
-    pub fn min() -> Self {
-        Self { size: Self::MIN }
-    }
-
-    /// attempt to construct a `BufferSize`
-    pub fn new(size: usize) -> Result<Self, BufferSizeError> {
-        if size < Self::MIN {
-            return Err(BufferSizeError::TooSmall(size));
-        }
-        Ok(Self { size })
-    }
-}
-
-impl Default for BufferSize {
-    fn default() -> Self {
-        Self {
-            size: Self::DEFAULT,
-        }
-    }
-}
+use crate::outstation::database::{ClassZeroConfig, EventBufferConfig};
 
 /// describes whether an optional feature is enabled or disabled
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -90,6 +40,8 @@ pub struct OutstationConfig {
     pub outstation_address: EndpointAddress,
     /// address of the master with which the outstation will communicate
     pub master_address: EndpointAddress,
+    /// event buffers configuration
+    pub event_buffer_config: EventBufferConfig,
     /// buffer size for transmitted solicited responses
     pub solicited_buffer_size: BufferSize,
     /// buffer size for transmitted unsolicited responses
@@ -99,9 +51,9 @@ pub struct OutstationConfig {
     /// initial decoding level
     pub decode_level: DecodeLevel,
     /// confirm timeout for solicited and unsolicited responses
-    pub confirm_timeout: std::time::Duration,
+    pub confirm_timeout: Timeout,
     /// timeout after which a matching OPERATE will fail with SELECT_TIMEOUT
-    pub select_timeout: std::time::Duration,
+    pub select_timeout: Timeout,
     /// optional features that can be enabled
     pub features: Features,
     /// number of non-regenerated unsolicited retries to perform
@@ -148,16 +100,21 @@ impl OutstationConfig {
 
     /// constructs an `OutstationConfig` with default settings, except for the
     /// master and outstation link addresses which really don't have good defaults
-    pub fn new(outstation_address: EndpointAddress, master_address: EndpointAddress) -> Self {
+    pub fn new(
+        outstation_address: EndpointAddress,
+        master_address: EndpointAddress,
+        event_buffer_config: EventBufferConfig,
+    ) -> Self {
         Self {
             outstation_address,
             master_address,
+            event_buffer_config,
             solicited_buffer_size: BufferSize::default(),
             unsolicited_buffer_size: BufferSize::default(),
             rx_buffer_size: BufferSize::default(),
             decode_level: DecodeLevel::nothing(),
-            confirm_timeout: Self::DEFAULT_CONFIRM_TIMEOUT,
-            select_timeout: Self::DEFAULT_SELECT_TIMEOUT,
+            confirm_timeout: Timeout::default(),
+            select_timeout: Timeout::default(),
             features: Features::default(),
             max_unsolicited_retries: None,
             unsolicited_retry_delay: Self::DEFAULT_UNSOLICITED_RETRY_DELAY,
@@ -168,18 +125,3 @@ impl OutstationConfig {
         }
     }
 }
-
-impl std::fmt::Display for BufferSizeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::TooSmall(size) => write!(
-                f,
-                "provided size {} is less than the minimum allowed size of {}",
-                size,
-                BufferSize::MIN
-            ),
-        }
-    }
-}
-
-impl std::error::Error for BufferSizeError {}

@@ -52,13 +52,67 @@ pub unsafe fn request_new_class(
     Box::into_raw(request)
 }
 
+pub unsafe fn request_new_all_objects(variation: ffi::Variation) -> *mut Request {
+    let mut request = Request::new();
+    request.add(ReadHeader::all_objects(variation.into()));
+
+    let request = Box::new(request);
+    Box::into_raw(request)
+}
+
+pub unsafe fn request_new_one_byte_range(
+    variation: ffi::Variation,
+    start: u8,
+    stop: u8,
+) -> *mut Request {
+    let mut request = Request::new();
+    request.add(ReadHeader::one_byte_range(variation.into(), start, stop));
+
+    let request = Box::new(request);
+    Box::into_raw(request)
+}
+
+pub unsafe fn request_new_two_byte_range(
+    variation: ffi::Variation,
+    start: u16,
+    stop: u16,
+) -> *mut Request {
+    let mut request = Request::new();
+    request.add(ReadHeader::two_byte_range(variation.into(), start, stop));
+
+    let request = Box::new(request);
+    Box::into_raw(request)
+}
+
+pub unsafe fn request_new_one_byte_limited_count(
+    variation: ffi::Variation,
+    count: u8,
+) -> *mut Request {
+    let mut request = Request::new();
+    request.add(ReadHeader::one_byte_limited_count(variation.into(), count));
+
+    let request = Box::new(request);
+    Box::into_raw(request)
+}
+
+pub unsafe fn request_new_two_byte_limited_count(
+    variation: ffi::Variation,
+    count: u16,
+) -> *mut Request {
+    let mut request = Request::new();
+    request.add(ReadHeader::two_byte_limited_count(variation.into(), count));
+
+    let request = Box::new(request);
+    Box::into_raw(request)
+}
+
 pub unsafe fn request_destroy(request: *mut Request) {
     if !request.is_null() {
         Box::from_raw(request);
     }
 }
 
-pub unsafe fn request_add_one_byte_header(
+pub unsafe fn request_add_one_byte_range_header(
     request: *mut Request,
     variation: ffi::Variation,
     start: u8,
@@ -69,7 +123,7 @@ pub unsafe fn request_add_one_byte_header(
     }
 }
 
-pub unsafe fn request_add_two_byte_header(
+pub unsafe fn request_add_two_byte_range_header(
     request: *mut Request,
     variation: ffi::Variation,
     start: u16,
@@ -83,6 +137,26 @@ pub unsafe fn request_add_two_byte_header(
 pub unsafe fn request_add_all_objects_header(request: *mut Request, variation: ffi::Variation) {
     if let Some(request) = request.as_mut() {
         request.add(ReadHeader::all_objects(variation.into()));
+    }
+}
+
+pub unsafe fn request_add_one_byte_limited_count_header(
+    request: *mut Request,
+    variation: ffi::Variation,
+    count: u8,
+) {
+    if let Some(request) = request.as_mut() {
+        request.add(ReadHeader::one_byte_limited_count(variation.into(), count));
+    }
+}
+
+pub unsafe fn request_add_two_byte_limited_count_header(
+    request: *mut Request,
+    variation: ffi::Variation,
+    count: u16,
+) {
+    if let Some(request) = request.as_mut() {
+        request.add(ReadHeader::two_byte_limited_count(variation.into(), count));
     }
 }
 

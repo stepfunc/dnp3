@@ -1,0 +1,94 @@
+---
+id: cpp_bindings
+title: C++ bindings
+sidebar_label: C++
+slug: /cpp_bindings
+---
+
+import useBaseUrl from '@docusaurus/useBaseUrl';
+import sitedata from '../../sitedata.json'
+
+Each [C package distribution](./c_lang.mdx) also includes C++ wrappers for easier usage. The `dnp3.hpp` file includes the public API
+and a `src/dnp3.cpp` contains the companion code.
+
+## CMake Usage
+
+The CMake includes a `dnp3_cpp` target that automatically links with the C bindings and builds the C++ wrapper code.
+
+Make the find package script discoverable by adding it to the prefix path. Next, call `find_package`:
+
+```cmake
+# Define CMake project with CXX language
+project(my_awesome_project LANGUAGES C CXX)
+
+# Import the dnp3 package
+set(CMAKE_PREFIX_PATH ${DISTRIBUTION_PATH}/cmake)
+find_package(dnp3 REQUIRED)
+
+# Create and link the executable
+add_executable(my_awesome_project main.cpp)
+target_link_libraries(my_awesome_project PRIVATE dnp3_cpp)
+```
+
+:::note
+The `dnp3_cpp` CMake target is made available only if the `CXX` language is enabled. Languages can be enabled in the
+[project()](https://cmake.org/cmake/help/latest/command/project.html) command or with a separate
+[enable_language()](https://cmake.org/cmake/help/latest/command/enable_language.html) command.
+:::
+
+## Mapping
+
+Many of the concepts built into higher-level languages are design patterns or idioms in C. When you see these higher levels patterns discussed in this guide, you can use the idioms to understand how they map to C.
+
+### Errors
+
+All C API errors are transformed into a C++ exception containing the error enum. All exceptions derive from `std::logic_error`.
+
+Other validations (e.g. checking that a moved class isn't used after move) also throws `std::logic_error`.
+
+:::warning
+Uncaught exceptions thrown in callbacks will terminate the program. Always wrap your callback logic using `try/catch` syntax if there's a possibility the callback will throw.
+:::
+
+### Iterators
+
+Iterators are wrapped in a class for easier manipulation. Iterating on them should done like so:
+
+```cpp
+while(iter.next()) {
+    auto value = iter.get();
+}
+```
+
+The `next()` advances the iterator and returns `true` if a value is available. The `get()` returns the current value pointed, or throws
+`std::logic_error` if the end was reached.
+
+:::warning
+The iterator wrapper does **not** copy and accumulate the values like in C# or Java. Therefore, an iterator should **never** be used outside of the callback.
+Frequently, the iterator points to memory on the stack and will result in undefined behavior if it is used after the callback is complete.
+:::
+
+### Collections
+
+Collections are taken through a constant reference to a `std::vector`. The elements will be copied internally.
+
+### Classes
+
+Classes have a opaque pointer inside and therefore cannot be copied. They can be moved around with `std::move`. The moved class will
+then throw a `std::logic_error` on any method called.
+
+The class destructor will take care of calling the appropriate C destructor.
+
+### Interfaces
+
+Interfaces are pure virtual classes where every callback needs to be implemented. The destructor is virtual to allow proper cleanup.
+
+An owned interface will be taken as a `std::unique_ptr`. Use C++14 `std::make_unique` to build such a pointer.
+
+Non-owned interfaces are taken by reference and will execute immediately. There are also functional wrappers that take a lambda
+function as an argument available in the `dnp3::functional` namespace.
+
+### Async methods
+
+Async methods take an extra owned interface parameter (known as a future). The interface has two callbacks: `on_complete`
+is called when succesful, and `on_failure` is called if an error occured.

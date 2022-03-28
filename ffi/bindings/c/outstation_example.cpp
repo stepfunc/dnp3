@@ -118,21 +118,21 @@ Timestamp now()
     return Timestamp::synchronized_timestamp(std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count());
 }
 
-// ANCHOR: create_outstation_config
-dnp3::OutstationConfig get_outstation_config()
-{
-    dnp3::OutstationConfig config(1024, 1);
-    config.decode_level.application = dnp3::AppDecodeLevel::object_values;
-    return config;
-}
-// ANCHOR_END: create_outstation_config
-
 // ANCHOR: event_buffer_config
 dnp3::EventBufferConfig get_event_buffer_config()
 {
     return EventBufferConfig(10, 10, 10, 10, 10, 10, 10, 10);
 }
 // ANCHOR_END: event_buffer_config
+
+// ANCHOR: create_outstation_config
+dnp3::OutstationConfig get_outstation_config()
+{
+    dnp3::OutstationConfig config(1024, 1, get_event_buffer_config());
+    config.decode_level.application = dnp3::AppDecodeLevel::object_values;
+    return config;
+}
+// ANCHOR_END: create_outstation_config
 
 void run_outstation(dnp3::Outstation &outstation)
 {
@@ -148,7 +148,7 @@ void run_outstation(dnp3::Outstation &outstation)
         else if (cmd == "bi") {
             auto modify = database_transaction([&](Database &db) {
                 state.binary = !state.binary;
-                db.update_binary_input(BinaryInput(7, state.binary, online(), now()), UpdateOptions());
+                db.update_binary_input(BinaryInput(7, state.binary, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
@@ -156,42 +156,42 @@ void run_outstation(dnp3::Outstation &outstation)
             auto modify = database_transaction([&](Database &db) {
                 state.double_bit_binary = !state.double_bit_binary;
                 auto value = state.double_bit_binary ? DoubleBit::determined_on : DoubleBit::determined_off;
-                db.update_double_bit_binary_input(DoubleBitBinaryInput(3, value, online(), now()), UpdateOptions());
+                db.update_double_bit_binary_input(DoubleBitBinaryInput(3, value, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
         else if (cmd == "bos") {
             auto modify = database_transaction([&](Database &db) {
                 state.binary_output_status = !state.binary_output_status;
-                db.update_binary_output_status(BinaryOutputStatus(7, state.binary_output_status, online(), now()), UpdateOptions());
+                db.update_binary_output_status(BinaryOutputStatus(7, state.binary_output_status, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
         else if (cmd == "co") {
             auto modify = database_transaction([&](Database &db) {
                 state.counter += 1;
-                db.update_counter(Counter(7, state.counter, online(), now()), UpdateOptions());
+                db.update_counter(Counter(7, state.counter, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
         else if (cmd == "fco") {
             auto modify = database_transaction([&](Database &db) {
                 state.frozen_counter += 1;
-                db.update_frozen_counter(FrozenCounter(7, state.frozen_counter, online(), now()), UpdateOptions());
+                db.update_frozen_counter(FrozenCounter(7, state.frozen_counter, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
         else if (cmd == "ai") {
             auto modify = database_transaction([&](Database &db) {
                 state.analog += 1;
-                db.update_analog_input(AnalogInput(7, state.analog, online(), now()), UpdateOptions());
+                db.update_analog_input(AnalogInput(7, state.analog, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
         else if (cmd == "aos") {
             auto modify = database_transaction([&](Database &db) {
                 state.analog_output_status += 1;
-                db.update_analog_output_status(AnalogOutputStatus(7, state.analog_output_status, online(), now()), UpdateOptions());
+                db.update_analog_output_status(AnalogOutputStatus(7, state.analog_output_status, online(), now()), UpdateOptions::detect_event());
             });
             outstation.transaction(modify);
         }
@@ -201,7 +201,7 @@ void run_outstation(dnp3::Outstation &outstation)
                 values.push_back(x);
             }
 
-            auto modify = database_transaction([&](Database &db) { db.update_octet_string(7, values, UpdateOptions()); });
+            auto modify = database_transaction([&](Database &db) { db.update_octet_string(7, values, UpdateOptions::detect_event()); });
             outstation.transaction(modify);
         }
         else {
@@ -210,12 +210,12 @@ void run_outstation(dnp3::Outstation &outstation)
     }
 }
 
-void run_server(dnp3::TcpServer &server)
+void run_server(dnp3::OutstationServer &server)
 {
     // ANCHOR: tcp_server_add_outstation
     auto filter = AddressFilter::any();
     auto outstation = server.add_outstation(
-        get_outstation_config(), get_event_buffer_config(), std::make_unique<MyOutstationApplication>(), std::make_unique<MyOutstationInformation>(),
+        get_outstation_config(), std::make_unique<MyOutstationApplication>(), std::make_unique<MyOutstationInformation>(),
         std::make_unique<MyControlHandler>(),
         connection_state_listener([](ConnectionState state) { std::cout << "ConnectionState: " << to_string(state) << std::endl; }), filter);
     // ANCHOR_END: tcp_server_add_outstation
@@ -248,7 +248,7 @@ void run_server(dnp3::TcpServer &server)
 void run_tcp_server(dnp3::Runtime &runtime)
 {
     // ANCHOR: create_tcp_server
-    dnp3::TcpServer server(runtime, LinkErrorMode::close, "127.0.0.1:20000");
+    auto server = dnp3::OutstationServer::create_tcp_server(runtime, LinkErrorMode::close, "127.0.0.1:20000");
     // ANCHOR_END: create_tcp_server
 
     run_server(server);
@@ -260,9 +260,8 @@ void run_serial(dnp3::Runtime &runtime)
     auto outstation = dnp3::Outstation::create_serial_session(
         runtime,
         "/dev/pts/4",  // change this to a real port
-        dnp3::SerialPortSettings(), // default settings
+        dnp3::SerialSettings(), // default settings
         get_outstation_config(),
-        get_event_buffer_config(),
         std::make_unique<MyOutstationApplication>(),
         std::make_unique<MyOutstationInformation>(),
         std::make_unique<MyControlHandler>()
@@ -275,7 +274,7 @@ void run_serial(dnp3::Runtime &runtime)
 void run_tls_server(dnp3::Runtime &runtime, const dnp3::TlsServerConfig &config)
 {
     // ANCHOR: create_tls_server
-    dnp3::TcpServer server = dnp3::TcpServer::create_tls_server(runtime, LinkErrorMode::close, "127.0.0.1:20001", config);
+    dnp3::OutstationServer server = dnp3::OutstationServer::create_tls_server(runtime, LinkErrorMode::close, "127.0.0.1:20001", config);
     // ANCHOR_END: create_tls_server
 
     run_server(server);

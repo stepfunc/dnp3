@@ -307,7 +307,7 @@ impl From<std::num::TryFromIntError> for TimeSyncError {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
+    use std::sync::{Arc, Mutex};
     use std::time::SystemTime;
 
     use crate::app::format::write::*;
@@ -326,20 +326,20 @@ mod tests {
     }
 
     struct SingleTimestampTestHandler {
-        time: Cell<Option<Timestamp>>,
+        time: Arc<Mutex<Option<Timestamp>>>,
     }
 
     impl SingleTimestampTestHandler {
         fn new(time: Timestamp) -> Self {
             Self {
-                time: Cell::new(Some(time)),
+                time: Arc::new(Mutex::new(Some(time))),
             }
         }
     }
 
     impl AssociationHandler for SingleTimestampTestHandler {
-        fn get_system_time(&self) -> Option<Timestamp> {
-            self.time.take()
+        fn get_current_time(&self) -> Option<Timestamp> {
+            self.time.lock().unwrap().take()
         }
     }
 
@@ -348,6 +348,7 @@ mod tests {
         use crate::app::QualifierCode;
         use crate::link::EndpointAddress;
         use crate::master::association::AssociationConfig;
+        use crate::master::NullAssociationInformation;
 
         use super::*;
 
@@ -366,7 +367,7 @@ mod tests {
         }
 
         impl AssociationHandler for TestHandler {
-            fn get_system_time(&self) -> Option<Timestamp> {
+            fn get_current_time(&self) -> Option<Timestamp> {
                 Some(self.time)
             }
         }
@@ -575,10 +576,11 @@ mod tests {
         ) {
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
-                EndpointAddress::from(1).unwrap(),
+                EndpointAddress::try_new(1).unwrap(),
                 AssociationConfig::default(),
-                NullReadHandler::boxed(),
+                Box::new(NullReadHandler),
                 Box::new(TestHandler::new(system_time)),
+                Box::new(NullAssociationInformation),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
@@ -599,10 +601,11 @@ mod tests {
         ) {
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
-                EndpointAddress::from(1).unwrap(),
+                EndpointAddress::try_new(1).unwrap(),
                 AssociationConfig::default(),
-                NullReadHandler::boxed(),
+                Box::new(NullReadHandler),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
+                Box::new(NullAssociationInformation),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
@@ -711,6 +714,7 @@ mod tests {
     mod lan {
         use crate::link::EndpointAddress;
         use crate::master::association::AssociationConfig;
+        use crate::master::NullAssociationInformation;
 
         use super::*;
 
@@ -850,10 +854,11 @@ mod tests {
         ) {
             let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
             let association = Association::new(
-                EndpointAddress::from(1).unwrap(),
+                EndpointAddress::try_new(1).unwrap(),
                 AssociationConfig::default(),
-                NullReadHandler::boxed(),
+                Box::new(NullReadHandler),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
+                Box::new(NullAssociationInformation),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(

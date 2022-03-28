@@ -628,7 +628,6 @@ mod test {
     use crate::app::sequence::Sequence;
     use crate::app::types::Timestamp;
     use crate::app::variations::*;
-    use crate::app::Bytes;
 
     use super::*;
 
@@ -973,17 +972,14 @@ mod test {
             .unwrap()
             .iter();
 
-        let bytes: Vec<(Bytes, u16)> = assert_matches!(
+        let bytes: Vec<(&[u8], u16)> = assert_matches!(
             headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(01, 02, RangedVariation::Group110VarX(0x01, seq)) => {
                 seq.iter().collect()
             }
         );
 
-        assert_eq!(
-            bytes,
-            vec![(Bytes { value: &[0xAA] }, 1), (Bytes { value: &[0xBB] }, 2)]
-        );
+        assert_eq!(bytes, vec![([0xAA].as_slice(), 1), ([0xBB].as_slice(), 2)]);
         assert_eq!(headers.next(), None);
     }
 
@@ -996,17 +992,14 @@ mod test {
             .unwrap()
             .iter();
 
-        let bytes: Vec<(Bytes, u16)> = assert_matches!(
+        let bytes: Vec<(&[u8], u16)> = assert_matches!(
             headers.next().unwrap().details,
             HeaderDetails::TwoByteCountAndPrefix(0x02, PrefixedVariation::Group111VarX(0x01, seq)) => {
                 seq.iter().collect()
             }
         );
 
-        assert_eq!(
-            bytes,
-            vec![(Bytes { value: &[0xAA] }, 1), (Bytes { value: &[0xBB] }, 2)]
-        );
+        assert_eq!(bytes, vec![([0xAA].as_slice(), 1), ([0xBB].as_slice(), 2)]);
         assert_eq!(headers.next(), None);
     }
 

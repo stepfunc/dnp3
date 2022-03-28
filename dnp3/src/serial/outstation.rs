@@ -3,7 +3,6 @@ use std::future::Future;
 use tracing::Instrument;
 
 use crate::link::LinkErrorMode;
-use crate::outstation::database::EventBufferConfig;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
@@ -21,7 +20,6 @@ pub fn spawn_outstation_serial(
     path: &str,
     settings: SerialSettings,
     config: OutstationConfig,
-    event_config: EventBufferConfig,
     application: Box<dyn OutstationApplication>,
     information: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
@@ -30,7 +28,6 @@ pub fn spawn_outstation_serial(
         path,
         settings,
         config,
-        event_config,
         application,
         information,
         control_handler,
@@ -51,7 +48,6 @@ pub fn create_outstation_serial(
     path: &str,
     settings: SerialSettings,
     config: OutstationConfig,
-    event_config: EventBufferConfig,
     application: Box<dyn OutstationApplication>,
     information: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
@@ -60,7 +56,6 @@ pub fn create_outstation_serial(
     let (mut task, handle) = OutstationTask::create(
         LinkErrorMode::Discard,
         config,
-        event_config,
         application,
         information,
         control_handler,

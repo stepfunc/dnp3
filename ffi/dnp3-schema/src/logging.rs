@@ -209,6 +209,12 @@ pub fn define(
         .default_variant(&link_field, NOTHING)?
         .default_variant(&physical_field, NOTHING)?
         .end_initializer()?
+        .begin_initializer("nothing", InitializerType::Static, "Initialize log levels to nothing")?
+        .default_variant(&application_field, NOTHING)?
+        .default_variant(&transport_field, NOTHING)?
+        .default_variant(&link_field, NOTHING)?
+        .default_variant(&physical_field, NOTHING)?
+        .end_initializer()?
         .build()?;
 
     Ok(decode_level_struct)

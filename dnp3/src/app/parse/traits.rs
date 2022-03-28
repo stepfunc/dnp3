@@ -33,6 +33,7 @@ pub(crate) trait Index: Copy + Clone + FixedSize + PartialEq + Display {
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode;
     const RANGE_QUALIFIER: QualifierCode;
+    const LIMITED_COUNT_QUALIFIER: QualifierCode;
 }
 
 pub(crate) trait FixedSizeVariation: FixedSize + PartialEq + Display {
@@ -73,6 +74,7 @@ impl Index for u8 {
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode = QualifierCode::CountAndPrefix8;
     const RANGE_QUALIFIER: QualifierCode = QualifierCode::Range8;
+    const LIMITED_COUNT_QUALIFIER: QualifierCode = QualifierCode::Count8;
 }
 
 impl Index for u16 {
@@ -88,4 +90,5 @@ impl Index for u16 {
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode = QualifierCode::CountAndPrefix16;
     const RANGE_QUALIFIER: QualifierCode = QualifierCode::Range16;
+    const LIMITED_COUNT_QUALIFIER: QualifierCode = QualifierCode::Count16;
 }

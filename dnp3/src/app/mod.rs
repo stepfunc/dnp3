@@ -1,5 +1,5 @@
 pub use app_enums::*;
-pub use bytes::*;
+pub use buffer_size::*;
 pub use header::*;
 pub use listener::*;
 pub use maybe_async::MaybeAsync;
@@ -31,11 +31,10 @@ impl EndpointType {
     }
 }
 
-mod bytes;
-
 mod control_types;
 #[rustfmt::skip]
 mod app_enums;
+mod buffer_size;
 mod control_enums;
 mod extensions;
 mod header;
