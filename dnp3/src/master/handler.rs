@@ -107,6 +107,7 @@ impl MasterChannel {
         config: AssociationConfig,
         read_handler: Box<dyn ReadHandler>,
         assoc_handler: Box<dyn AssociationHandler>,
+        assoc_information: Box<dyn AssociationInformation>,
     ) -> Result<AssociationHandle, AssociationError> {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
         self.send_master_message(MasterMsg::AddAssociation(
@@ -114,6 +115,7 @@ impl MasterChannel {
             config,
             read_handler,
             assoc_handler,
+            assoc_information,
             Promise::OneShot(tx),
         ))
         .await?;
@@ -150,6 +152,7 @@ impl MasterChannel {
 
 impl AssociationHandle {
     /// constructor only used in the FFI
+    #[doc(hidden)]
     #[cfg(feature = "ffi")]
     pub fn create(address: EndpointAddress, master: MasterChannel) -> Self {
         Self::new(address, master)
@@ -207,7 +210,7 @@ impl AssociationHandle {
     pub async fn read_with_handler(
         &mut self,
         request: ReadRequest,
-        handler: Box<dyn ReadHandler + Sync>,
+        handler: Box<dyn ReadHandler>,
     ) -> Result<(), TaskError> {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         let task = SingleReadTask::new_with_custom_handler(request, handler, Promise::OneShot(tx));
@@ -308,13 +311,57 @@ impl<T> Promise<T> {
     }
 }
 
+/// Task types used in [`AssociationInformation`]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TaskType {
+    /// User-defined read request
+    UserRead,
+    /// Periodic poll task
+    PeriodicPoll,
+    /// Startup integrity scan
+    StartupIntegrity,
+    /// Automatic event scan caused by `RESTART` IIN bit detection
+    AutoEventScan,
+
+    /// Command request
+    Command,
+    /// Clear `RESTART` IIN bit
+    ClearRestartBit,
+    /// Enable unsolicited startup request
+    EnableUnsolicited,
+    /// Disable unsolicited startup request
+    DisableUnsolicited,
+    /// Time synchronisation task
+    TimeSync,
+    /// Cold or warm restart task
+    Restart,
+}
+
 /// callbacks associated with a single master to outstation association
-pub trait AssociationHandler: Send {
+pub trait AssociationHandler: Send + Sync {
     /// Retrieve the system time used for time synchronization
     fn get_current_time(&self) -> Option<Timestamp> {
         Timestamp::try_from_system_time(SystemTime::now())
     }
 }
+
+/// Informational callbacks that can be used to monitor master communication
+/// to a particular outstation. Useful for assessing communication health.
+pub trait AssociationInformation: Send + Sync {
+    /// Called when a new task is started
+    fn task_start(&mut self, _task_type: TaskType, _fc: FunctionCode, _seq: Sequence) {}
+    /// Called when a task successfully completes
+    fn task_success(&mut self, _task_type: TaskType, _fc: FunctionCode, _seq: Sequence) {}
+    /// Called when a task fails
+    fn task_fail(&mut self, _task_type: TaskType, _error: TaskError) {}
+
+    /// Called when an unsolicited response is received
+    fn unsolicited_response(&mut self, _is_duplicate: bool, _seq: Sequence) {}
+}
+
+pub(crate) struct NullAssociationInformation;
+
+impl AssociationInformation for NullAssociationInformation {}
 
 /// Information about the object header and specific variation
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -359,7 +406,7 @@ pub enum ReadType {
 }
 
 /// Trait used to process measurement data received from an outstation
-pub trait ReadHandler: Send {
+pub trait ReadHandler: Send + Sync {
     /// Called as the first action before any of the type-specific handle methods are invoked
     ///
     /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited

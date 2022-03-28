@@ -120,7 +120,7 @@ mod tests {
     use crate::link::EndpointAddress;
     use crate::master::association::{Association, AssociationConfig};
     use crate::master::tasks::RequestWriter;
-    use crate::master::{AssociationHandler, NullReadHandler};
+    use crate::master::{AssociationHandler, NullAssociationInformation, NullReadHandler};
     use crate::util::cursor::WriteCursor;
 
     use super::*;
@@ -135,6 +135,7 @@ mod tests {
             AssociationConfig::default(),
             Box::new(NullReadHandler),
             Box::new(DefaultAssociationHandler),
+            Box::new(NullAssociationInformation),
         );
         let (tx, mut rx) = crate::tokio::sync::oneshot::channel();
         let task = NonReadTask::Restart(RestartTask::new(
@@ -182,6 +183,7 @@ mod tests {
             AssociationConfig::default(),
             Box::new(NullReadHandler),
             Box::new(DefaultAssociationHandler),
+            Box::new(NullAssociationInformation),
         );
         let (tx, mut rx) = crate::tokio::sync::oneshot::channel();
         let task = NonReadTask::Restart(RestartTask::new(

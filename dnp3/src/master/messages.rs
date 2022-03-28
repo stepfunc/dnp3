@@ -6,7 +6,7 @@ use crate::master::error::{AssociationError, TaskError};
 use crate::master::handler::Promise;
 use crate::master::poll::PollMsg;
 use crate::master::tasks::Task;
-use crate::master::{AssociationConfig, AssociationHandler, ReadHandler};
+use crate::master::{AssociationConfig, AssociationHandler, AssociationInformation, ReadHandler};
 
 /// Messages sent from the handles to the master task via an mpsc.
 pub(crate) enum Message {
@@ -25,6 +25,7 @@ pub(crate) enum MasterMsg {
         AssociationConfig,
         Box<dyn ReadHandler>,
         Box<dyn AssociationHandler>,
+        Box<dyn AssociationInformation>,
         Promise<Result<(), AssociationError>>,
     ),
     /// Remove an association from the master

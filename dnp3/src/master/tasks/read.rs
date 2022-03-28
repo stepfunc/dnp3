@@ -8,7 +8,7 @@ use crate::util::cursor::WriteError;
 
 pub(crate) struct SingleReadTask {
     request: ReadRequest,
-    pub(crate) custom_handler: Option<Box<dyn ReadHandler + Sync>>,
+    pub(crate) custom_handler: Option<Box<dyn ReadHandler>>,
     promise: Promise<Result<(), TaskError>>,
 }
 
@@ -23,7 +23,7 @@ impl SingleReadTask {
 
     pub(crate) fn new_with_custom_handler(
         request: ReadRequest,
-        custom_handler: Box<dyn ReadHandler + Sync>,
+        custom_handler: Box<dyn ReadHandler>,
         promise: Promise<Result<(), TaskError>>,
     ) -> Self {
         Self {

@@ -237,6 +237,7 @@ impl Pair {
                 Self::get_association_config(),
                 Box::new(handler),
                 Box::new(TestAssociationHandler),
+                Box::new(TestAssociationInformation),
             )
             .await
             .unwrap();
@@ -376,6 +377,9 @@ impl ReadHandler for TestHandler {
 
 struct TestAssociationHandler;
 impl AssociationHandler for TestAssociationHandler {}
+
+struct TestAssociationInformation;
+impl AssociationInformation for TestAssociationInformation {}
 
 // don't need to send every type
 #[derive(Copy, Clone, PartialEq, Debug)]

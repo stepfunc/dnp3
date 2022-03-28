@@ -64,6 +64,7 @@ module.exports = {
                                 'api/master/assoc_config',
                                 'api/master/read_handler',
                                 'api/master/association_handler',
+                                'api/master/association_information',
                             ]
                         },
                         'api/master/assoc_polls',

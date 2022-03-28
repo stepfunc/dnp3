@@ -253,13 +253,55 @@ dnp3_association_handler_t get_association_handler()
 }
 // ANCHOR_END: association_handler
 
+// ANCHOR: association_information
+void task_start(dnp3_task_type_t task_type, dnp3_function_code_t fc, uint8_t seq, void *arg)
+{
+
+}
+
+void task_success(dnp3_task_type_t task_type, dnp3_function_code_t fc, uint8_t seq, void *arg)
+{
+    
+}
+
+void task_fail(dnp3_task_type_t task_type, dnp3_task_error_t error, void *arg)
+{
+    
+}
+
+void unsolicited_response(bool is_duplicate, uint8_t seq, void *arg)
+{
+    
+}
+
+dnp3_association_information_t get_association_information()
+{
+    return (dnp3_association_information_t){
+        .task_start = task_start,
+        .task_success = task_success,
+        .task_fail = task_fail,
+        .unsolicited_response = unsolicited_response,
+        .on_destroy = NULL,
+        .ctx = NULL,
+    };
+}
+// ANCHOR_END: association_information
+
 int run_channel(dnp3_master_channel_t *channel)
 {
     // Create the association
     // ANCHOR: association_create
     dnp3_association_id_t association_id;
     dnp3_param_error_t err =
-        dnp3_master_channel_add_association(channel, 1024, get_association_config(), get_read_handler(), get_association_handler(), &association_id);
+        dnp3_master_channel_add_association(
+            channel,
+            1024,
+            get_association_config(),
+            get_read_handler(),
+            get_association_handler(),
+            get_association_information(),
+            &association_id
+        );
     // ANCHOR_END: association_create
     if (err) {
         printf("unable to add association: %s \n", dnp3_param_error_to_string(err));

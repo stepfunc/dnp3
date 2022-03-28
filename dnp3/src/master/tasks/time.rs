@@ -307,7 +307,7 @@ impl From<std::num::TryFromIntError> for TimeSyncError {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
+    use std::sync::{Arc, Mutex};
     use std::time::SystemTime;
 
     use crate::app::format::write::*;
@@ -326,20 +326,20 @@ mod tests {
     }
 
     struct SingleTimestampTestHandler {
-        time: Cell<Option<Timestamp>>,
+        time: Arc<Mutex<Option<Timestamp>>>,
     }
 
     impl SingleTimestampTestHandler {
         fn new(time: Timestamp) -> Self {
             Self {
-                time: Cell::new(Some(time)),
+                time: Arc::new(Mutex::new(Some(time))),
             }
         }
     }
 
     impl AssociationHandler for SingleTimestampTestHandler {
         fn get_current_time(&self) -> Option<Timestamp> {
-            self.time.take()
+            self.time.lock().unwrap().take()
         }
     }
 
@@ -348,6 +348,7 @@ mod tests {
         use crate::app::QualifierCode;
         use crate::link::EndpointAddress;
         use crate::master::association::AssociationConfig;
+        use crate::master::NullAssociationInformation;
 
         use super::*;
 
@@ -579,6 +580,7 @@ mod tests {
                 AssociationConfig::default(),
                 Box::new(NullReadHandler),
                 Box::new(TestHandler::new(system_time)),
+                Box::new(NullAssociationInformation),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
@@ -603,6 +605,7 @@ mod tests {
                 AssociationConfig::default(),
                 Box::new(NullReadHandler),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
+                Box::new(NullAssociationInformation),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
@@ -711,6 +714,7 @@ mod tests {
     mod lan {
         use crate::link::EndpointAddress;
         use crate::master::association::AssociationConfig;
+        use crate::master::NullAssociationInformation;
 
         use super::*;
 
@@ -854,6 +858,7 @@ mod tests {
                 AssociationConfig::default(),
                 Box::new(NullReadHandler),
                 Box::new(SingleTimestampTestHandler::new(system_time)),
+                Box::new(NullAssociationInformation),
             );
             let (tx, rx) = crate::tokio::sync::oneshot::channel();
             let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
