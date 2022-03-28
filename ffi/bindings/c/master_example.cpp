@@ -7,7 +7,7 @@
 
 // ANCHOR: logging_callback
 class Logger : public dnp3::Logger {
-    void on_message(dnp3::LogLevel level, const char* message) override
+    void on_message(dnp3::LogLevel level, const char *message) override
     {
         std::cout << message;
     }
