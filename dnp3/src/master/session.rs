@@ -371,7 +371,7 @@ impl MasterSession {
             }
 
             // Continue to next task (if there's one)
-            next_task = result.ok().flatten();
+            next_task = result?;
         }
 
         Ok(())
@@ -520,7 +520,7 @@ impl MasterSession {
         match result {
             Ok(_) => {
                 if let Some(association) = association {
-                    association.notify_task_start(task.as_task_type(), task.function());
+                    association.notify_task_success(task.as_task_type(), task.function());
                     task.complete(association);
                 } else {
                     task.on_task_error(None, TaskError::NoSuchAssociation(destination));
