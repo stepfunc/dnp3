@@ -1,6 +1,6 @@
 [package]
 name = "dnp3"
-version = "1.0.0-alpha2"
+version = "1.0.0-rc1"
 authors = ["Adam Crain <adam@stepfunc.io>", "Émile Grégoire <emile@stepfunc.io>"]
 edition = "2021"
 

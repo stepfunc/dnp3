@@ -16,7 +16,7 @@
         <dependency>
             <groupId>io.stepfunc</groupId>
             <artifactId>dnp3</artifactId>
-            <version>1.0.0-alpha2</version>
+            <version>1.0.0-rc1</version>
         </dependency>
     </dependencies>
 </project>
