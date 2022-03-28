@@ -57,7 +57,7 @@ pub struct ClassZeroConfig {
     pub analog_output_status: bool,
     /// If true, Octet Strings are reported in Class 0 READ requests
     /// This field defaults to `false` for conformance to the standard
-    pub octet_strings: bool,
+    pub octet_string: bool,
 }
 
 impl ClassZeroConfig {
@@ -71,7 +71,7 @@ impl ClassZeroConfig {
         frozen_counter: bool,
         analog: bool,
         analog_output_status: bool,
-        octet_strings: bool,
+        octet_string: bool,
     ) -> Self {
         ClassZeroConfig {
             binary,
@@ -81,7 +81,7 @@ impl ClassZeroConfig {
             frozen_counter,
             analog,
             analog_output_status,
-            octet_strings,
+            octet_string,
         }
     }
 }
@@ -96,7 +96,7 @@ impl Default for ClassZeroConfig {
             frozen_counter: true,
             analog: true,
             analog_output_status: true,
-            octet_strings: false,
+            octet_string: false,
         }
     }
 }
@@ -167,6 +167,7 @@ impl EventBufferConfig {
             + self.max_frozen_counter as usize
             + self.max_analog as usize
             + self.max_analog_output_status as usize
+            + self.max_octet_string as usize
     }
 }
 
@@ -206,20 +207,25 @@ impl UpdateOptions {
 
     /// options that will only update the static value in the database, but produce no events
     /// useful for setting a first value in the outstation during database initialization
-    pub fn initialize() -> Self {
+    pub fn no_event() -> Self {
         Self {
             update_static: true,
             event_mode: EventMode::Suppress,
+        }
+    }
+
+    /// Update the static value and automatically detect event. This is the default value.
+    pub fn detect_event() -> Self {
+        Self {
+            update_static: true,
+            event_mode: EventMode::Detect,
         }
     }
 }
 
 impl Default for UpdateOptions {
     fn default() -> Self {
-        Self {
-            update_static: true,
-            event_mode: EventMode::Detect,
-        }
+        Self::detect_event()
     }
 }
 

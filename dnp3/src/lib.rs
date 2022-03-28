@@ -1,20 +1,4 @@
-//! [DNP3](http://www.dnp.org/) protocol using [Tokio](https://docs.rs/tokio) and `async/await`.
-//!
-//! # Features
-//!
-//! * Panic-free, zero-copy, zero-allocation parsing
-//! * Fully automated level 2 outstation conformance tests
-//! * Automatic TCP connection management with configurable reconnect strategy
-//! * Scalable performance using Tokio's multi-threaded executor
-//!
-//! # License
-//!
-//! This crate is made available under a non-commercial / non-production license.
-//!
-//! Please inquire about commercial licensing here:
-//!
-//! <https://stepfunc.io/contact/>
-
+#![doc = include_str!("../../README.md")]
 #![deny(
 dead_code,
 arithmetic_overflow,

@@ -1,7 +1,32 @@
 use crate::app::parse::traits::FixedSize;
 use crate::app::parse_error::ObjectParseError;
-use crate::app::Bytes;
 use crate::util::cursor::ReadCursor;
+
+/// Wrapper around an underlying u8 slice
+#[derive(Debug, PartialEq)]
+pub(crate) struct Bytes<'a> {
+    /// underlying slice
+    pub(crate) value: &'a [u8],
+}
+
+impl<'a> Bytes<'a> {
+    pub(crate) fn new(value: &'a [u8]) -> Self {
+        Self { value }
+    }
+}
+
+impl std::fmt::Display for Bytes<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if self.value.len() <= 3 {
+            return write!(f, "{:02X?}", self.value);
+        }
+
+        if let Some(s) = self.value.get(0..3) {
+            return write!(f, "length = {}, {:02X?} ...", self.value.len(), s);
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct RangedBytesSequence<'a> {
@@ -103,14 +128,14 @@ where
 }
 
 impl<'a> Iterator for RangedBytesIterator<'a> {
-    type Item = (Bytes<'a>, u16);
+    type Item = (&'a [u8], u16);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.cursor.read_bytes(self.size).ok().map(|b| {
             let index = self.index;
             self.index = self.index.saturating_add(1);
             self.remaining = self.remaining.saturating_sub(1);
-            (Bytes::new(b), index)
+            (b, index)
         })
     }
 
@@ -123,7 +148,7 @@ impl<'a, T> Iterator for PrefixedBytesIterator<'a, T>
 where
     T: FixedSize,
 {
-    type Item = (Bytes<'a>, T);
+    type Item = (&'a [u8], T);
 
     fn next(&mut self) -> Option<Self::Item> {
         let index = match T::read(&mut self.cursor) {
@@ -137,10 +162,24 @@ where
 
         self.remaining -= 1;
 
-        Some((Bytes::new(bytes), index))
+        Some((bytes, index))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.remaining, Some(self.remaining))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn bytes_formats_as_expected() {
+        let short = Bytes::new(&[0x01, 0x02, 0x03]);
+        let long = Bytes::new(&[0x01, 0x02, 0x03, 0x04]);
+
+        assert_eq!(format!("{}", short), "[01, 02, 03]");
+        assert_eq!(format!("{}", long), "length = 4, [01, 02, 03] ...");
     }
 }

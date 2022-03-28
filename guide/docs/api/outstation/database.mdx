@@ -11,6 +11,10 @@ import TabItem from '@theme/TabItem';
 You can use the `Database` class to manipulate the measurement types and values that the outstation exposes to the master. Note that while it's called a "database", it's really just
 a thread-safe data structure in memory.
 
+All database operations are executed in a transaction. All the operations within a transaction will be applied to the database and the
+event buffers at the same time. If unsolicited responses are enabled, the outstation will automatically decides if an unsolicited response
+should be sent at the end of the transaction.
+
 ## Adding Points
 
 You must initialize the points before the outstation exposes any measurement data. While you should do this when you create the outstation, you can add points to a running outstation as well. Each measurement type has unique configuration including:
@@ -26,7 +30,7 @@ When you add a point, it is assigned the following default value with `RESTART` 
 * Double-bit Binary points set to `Indeterminate`
 * Octet Strings are set to the value of `[0x00]`
 
-Update the value after adding the point if you don't want a connecting master to see `RESTART`.
+Update the value after adding the point if you don't want a connecting master to see the points with a `RESTART` flag set.
 
 <Tabs
 groupId="language"
@@ -87,7 +91,11 @@ values={[
 ## Updating Points
 
 You can update a point value in a new transaction or in the same transaction you used to initialize it. This is useful if the outstation
-has local access to values at startup, such as via a local ADC.
+has local access to values at startup, such as via a local ADC. When initializing point values, it is recommended to use the
+`UpdateOptions::no_event()`.
+
+The `Flags` value can be built by ORing values from the constants available in `Flag`. Note that not all `Flag` values are available
+in every point type.
 
 The `UpdateOptions` struct lets you precisely control how a point update is processed. Use the default constructor to:
 

@@ -4,6 +4,8 @@ import static org.joou.Unsigned.*;
 
 import io.stepfunc.dnp3.*;
 import io.stepfunc.dnp3.Runtime;
+import org.joou.UByte;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.Duration;
@@ -36,194 +38,196 @@ class TestPortStateListener implements PortStateListener {
   }
 }
 
+// ANCHOR: read_handler
 class TestReadHandler implements ReadHandler {
 
-  @Override
-  public void beginFragment(ReadType readType, ResponseHeader header) {
-    System.out.println("Beginning fragment (broadcast: " + header.iin.iin1.broadcast + ")");
-  }
+    @Override
+    public void beginFragment(ReadType readType, ResponseHeader header) {
+      System.out.println("Beginning fragment (broadcast: " + header.iin.iin1.broadcast + ")");
+    }
 
-  @Override
-  public void endFragment(ReadType readType, ResponseHeader header) {
-    System.out.println("End fragment");
-  }
+    @Override
+    public void endFragment(ReadType readType, ResponseHeader header) {
+      System.out.println("End fragment");
+    }
 
-  @Override
-  public void handleBinaryInput(HeaderInfo info, List<BinaryInput> it) {
-    System.out.println("Binaries:");
-    System.out.println("Qualifier: " + info.qualifier);
-    System.out.println("Variation: " + info.variation);
+    @Override
+    public void handleBinaryInput(HeaderInfo info, List<BinaryInput> it) {
+      System.out.println("Binary Inputs:");
+      System.out.println("Qualifier: " + info.qualifier);
+      System.out.println("Variation: " + info.variation);
 
-    it.forEach(
-        val -> {
-          System.out.println(
-              "BI "
-                  + val.index
-                  + ": Value="
-                  + val.value
-                  + " Flags="
-                  + val.flags.value
-                  + " Time="
-                  + val.time.value
-                  + " ("
-                  + val.time.quality
-                  + ")");
-        });
-  }
+      it.forEach(
+          val -> {
+            System.out.println(
+                "BI "
+                    + val.index
+                    + ": Value="
+                    + val.value
+                    + " Flags="
+                    + val.flags.value
+                    + " Time="
+                    + val.time.value
+                    + " ("
+                    + val.time.quality
+                    + ")");
+          });
+    }
 
-  @Override
-  public void handleDoubleBitBinaryInput(HeaderInfo info, List<DoubleBitBinaryInput> it) {
-    System.out.println("Double Bit Binaries:");
-    System.out.println("Qualifier: " + info.qualifier);
-    System.out.println("Variation: " + info.variation);
+    @Override
+    public void handleDoubleBitBinaryInput(HeaderInfo info, List<DoubleBitBinaryInput> it) {
+      System.out.println("Double Bit Binary Inputs:");
+      System.out.println("Qualifier: " + info.qualifier);
+      System.out.println("Variation: " + info.variation);
 
-    it.forEach(
-        val -> {
-          System.out.println(
-              "DBBI "
-                  + val.index
-                  + ": Value="
-                  + val.value
-                  + " Flags="
-                  + val.flags.value
-                  + " Time="
-                  + val.time.value
-                  + " ("
-                  + val.time.quality
-                  + ")");
-        });
-  }
+      it.forEach(
+          val -> {
+            System.out.println(
+                "DBBI "
+                    + val.index
+                    + ": Value="
+                    + val.value
+                    + " Flags="
+                    + val.flags.value
+                    + " Time="
+                    + val.time.value
+                    + " ("
+                    + val.time.quality
+                    + ")");
+          });
+    }
 
-  @Override
-  public void handleBinaryOutputStatus(HeaderInfo info, List<BinaryOutputStatus> it) {
-    System.out.println("Binary Output Statuses:");
-    System.out.println("Qualifier: " + info.qualifier);
-    System.out.println("Variation: " + info.variation);
+    @Override
+    public void handleBinaryOutputStatus(HeaderInfo info, List<BinaryOutputStatus> it) {
+      System.out.println("Binary Output Statuses:");
+      System.out.println("Qualifier: " + info.qualifier);
+      System.out.println("Variation: " + info.variation);
 
-    it.forEach(
-        val -> {
-          System.out.println(
-              "BOS "
-                  + val.index
-                  + ": Value="
-                  + val.value
-                  + " Flags="
-                  + val.flags.value
-                  + " Time="
-                  + val.time.value
-                  + " ("
-                  + val.time.quality
-                  + ")");
-        });
-  }
+      it.forEach(
+          val -> {
+            System.out.println(
+                "BOS "
+                    + val.index
+                    + ": Value="
+                    + val.value
+                    + " Flags="
+                    + val.flags.value
+                    + " Time="
+                    + val.time.value
+                    + " ("
+                    + val.time.quality
+                    + ")");
+          });
+    }
 
-  @Override
-  public void handleCounter(HeaderInfo info, List<Counter> it) {
-    System.out.println("Counters:");
-    System.out.println("Qualifier: " + info.qualifier);
-    System.out.println("Variation: " + info.variation);
+    @Override
+    public void handleCounter(HeaderInfo info, List<Counter> it) {
+      System.out.println("Counters:");
+      System.out.println("Qualifier: " + info.qualifier);
+      System.out.println("Variation: " + info.variation);
 
-    it.forEach(
-        val -> {
-          System.out.println(
-              "Counter "
-                  + val.index
-                  + ": Value="
-                  + val.value
-                  + " Flags="
-                  + val.flags.value
-                  + " Time="
-                  + val.time.value
-                  + " ("
-                  + val.time.quality
-                  + ")");
-        });
-  }
+      it.forEach(
+          val -> {
+            System.out.println(
+                "Counter "
+                    + val.index
+                    + ": Value="
+                    + val.value
+                    + " Flags="
+                    + val.flags.value
+                    + " Time="
+                    + val.time.value
+                    + " ("
+                    + val.time.quality
+                    + ")");
+          });
+    }
 
-  @Override
-  public void handleFrozenCounter(HeaderInfo info, List<FrozenCounter> it) {
-    System.out.println("Frozen Counters:");
-    System.out.println("Qualifier: " + info.qualifier);
-    System.out.println("Variation: " + info.variation);
+    @Override
+    public void handleFrozenCounter(HeaderInfo info, List<FrozenCounter> it) {
+      System.out.println("Frozen Counters:");
+      System.out.println("Qualifier: " + info.qualifier);
+      System.out.println("Variation: " + info.variation);
 
-    it.forEach(
-        val -> {
-          System.out.println(
-              "Frozen Counter "
-                  + val.index
-                  + ": Value="
-                  + val.value
-                  + " Flags="
-                  + val.flags.value
-                  + " Time="
-                  + val.time.value
-                  + " ("
-                  + val.time.quality
-                  + ")");
-        });
-  }
+      it.forEach(
+          val -> {
+            System.out.println(
+                "Frozen Counter "
+                    + val.index
+                    + ": Value="
+                    + val.value
+                    + " Flags="
+                    + val.flags.value
+                    + " Time="
+                    + val.time.value
+                    + " ("
+                    + val.time.quality
+                    + ")");
+          });
+    }
 
-  @Override
-  public void handleAnalogInput(HeaderInfo info, List<AnalogInput> it) {
-    System.out.println("Analogs:");
-    System.out.println("Qualifier: " + info.qualifier);
-    System.out.println("Variation: " + info.variation);
+    @Override
+    public void handleAnalogInput(HeaderInfo info, List<AnalogInput> it) {
+      System.out.println("Analog Inputs:");
+      System.out.println("Qualifier: " + info.qualifier);
+      System.out.println("Variation: " + info.variation);
 
-    it.forEach(
-        val -> {
-          System.out.println(
-              "AI "
-                  + val.index
-                  + ": Value="
-                  + val.value
-                  + " Flags="
-                  + val.flags.value
-                  + " Time="
-                  + val.time.value
-                  + " ("
-                  + val.time.quality
-                  + ")");
-        });
-  }
+      it.forEach(
+          val -> {
+            System.out.println(
+                "AI "
+                    + val.index
+                    + ": Value="
+                    + val.value
+                    + " Flags="
+                    + val.flags.value
+                    + " Time="
+                    + val.time.value
+                    + " ("
+                    + val.time.quality
+                    + ")");
+          });
+    }
 
-  @Override
-  public void handleAnalogOutputStatus(HeaderInfo info, List<AnalogOutputStatus> it) {
-    System.out.println("Analog Output Statuses:");
-    System.out.println("Qualifier: " + info.qualifier);
-    System.out.println("Variation: " + info.variation);
+    @Override
+    public void handleAnalogOutputStatus(HeaderInfo info, List<AnalogOutputStatus> it) {
+      System.out.println("Analog Output Statuses:");
+      System.out.println("Qualifier: " + info.qualifier);
+      System.out.println("Variation: " + info.variation);
 
-    it.forEach(
-        val -> {
-          System.out.println(
-              "AOS "
-                  + val.index
-                  + ": Value="
-                  + val.value
-                  + " Flags="
-                  + val.flags.value
-                  + " Time="
-                  + val.time.value
-                  + " ("
-                  + val.time.quality
-                  + ")");
-        });
-  }
+      it.forEach(
+          val -> {
+            System.out.println(
+                "AOS "
+                    + val.index
+                    + ": Value="
+                    + val.value
+                    + " Flags="
+                    + val.flags.value
+                    + " Time="
+                    + val.time.value
+                    + " ("
+                    + val.time.quality
+                    + ")");
+          });
+    }
 
-  @Override
-  public void handleOctetString(HeaderInfo info, List<OctetString> it) {
-    System.out.println("Octet String:");
-    System.out.println("Qualifier: " + info.qualifier);
-    System.out.println("Variation: " + info.variation);
+    @Override
+    public void handleOctetString(HeaderInfo info, List<OctetString> it) {
+      System.out.println("Octet Strings:");
+      System.out.println("Qualifier: " + info.qualifier);
+      System.out.println("Variation: " + info.variation);
 
-    it.forEach(
-        val -> {
-          System.out.print("Octet String " + val.index + ": Value=");
-          val.value.forEach(
-              b -> System.out.print(String.format("%02X", b.byteValue()) + " "));
-          System.out.println();
-        });
-  }
+      it.forEach(
+          val -> {
+            System.out.print("Octet String " + val.index + ": Value=");
+            val.value.forEach(
+                b -> System.out.print(String.format("%02X", b.byteValue()) + " "));
+            System.out.println();
+          });
+    }
 }
+// ANCHOR_END: read_handler
 
 // ANCHOR: association_handler
 class TestAssociationHandler implements AssociationHandler {
@@ -233,6 +237,22 @@ class TestAssociationHandler implements AssociationHandler {
   }
 }
 // ANCHOR_END: association_handler
+
+// ANCHOR: association_information
+class TestAssociationInformation implements AssociationInformation {
+  @Override
+  public void taskStart(TaskType taskType, FunctionCode fc, UByte seq) {}
+
+  @Override
+  public void taskSuccess(TaskType taskType, FunctionCode fc, UByte seq) {}
+
+  @Override
+  public void taskFail(TaskType taskType, TaskError error) {}
+
+  @Override
+  public void unsolicitedResponse(boolean isDuplicate, UByte seq) {}
+}
+// ANCHOR_END: association_information
 
 public class MasterExample {
 
@@ -314,7 +334,7 @@ public class MasterExample {
     }
   }
 
-  private static void runTls(Runtime runtime, TlsClientConfig config) throws Exception {
+  private static void runTls(Runtime runtime, TlsClientConfig tlsConfig) throws Exception {
     // ANCHOR: create_tls_channel
     MasterChannel channel =
             MasterChannel.createTlsChannel(
@@ -322,9 +342,9 @@ public class MasterExample {
                     LinkErrorMode.CLOSE,
                     getMasterChannelConfig(),
                     new EndpointList("127.0.0.1:20001"),
-                    config,
                     new ConnectStrategy(),
-                    new TestClientStateListener());
+                    new TestClientStateListener(),
+                    tlsConfig);
     // ANCHOR_END: create_tls_channel
 
     try {
@@ -342,7 +362,7 @@ public class MasterExample {
                     runtime,
                     getMasterChannelConfig(),
                     "/dev/pts/4", // replace with a real port
-                    new SerialPortSettings(),
+                    new SerialSettings(),
                     Duration.ofSeconds(5),
                     new TestPortStateListener());
     // ANCHOR_END: create_serial_channel
@@ -410,7 +430,8 @@ public class MasterExample {
             ushort(1024),
             getAssociationConfig(),
             new TestReadHandler(),
-            new TestAssociationHandler());
+            new TestAssociationHandler(),
+            new TestAssociationInformation());
     // ANCHOR_END: association_create
 
     // Create a periodic poll
@@ -437,12 +458,10 @@ public class MasterExample {
             channel.disable();
             break;
           case "dln":
-            channel.setDecodeLevel(new DecodeLevel());
+            channel.setDecodeLevel(DecodeLevel.nothing());
             break;
           case "dlv":
-            DecodeLevel level = new DecodeLevel();
-            level.application = AppDecodeLevel.OBJECT_VALUES;
-            channel.setDecodeLevel(level);
+            channel.setDecodeLevel(DecodeLevel.nothing().withApplication(AppDecodeLevel.OBJECT_VALUES));
             break;
           case "rao":
           {
@@ -465,12 +484,7 @@ public class MasterExample {
           {
             // ANCHOR: assoc_control
             CommandSet commands = new CommandSet();
-            Group12Var1 control =
-                    new Group12Var1(
-                            new ControlCode(TripCloseCode.NUL, false, OpType.LATCH_ON),
-                            ubyte(1),
-                            uint(1000),
-                            uint(1000));
+            Group12Var1 control = Group12Var1.fromCode(ControlCode.fromOpType(OpType.LATCH_ON));
             commands.addG12V1U16(ushort(3), control);
 
             channel

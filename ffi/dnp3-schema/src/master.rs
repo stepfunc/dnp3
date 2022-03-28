@@ -107,11 +107,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "List of IP endpoints.",
         )?
         .param(
-            "tls_config",
-            tls_client_config,
-            "TLS client configuration",
-        )?
-        .param(
             "connect_strategy",
             connect_strategy,
             "Controls the timing of (re)connection attempts",
@@ -120,6 +115,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "listener",
             tcp_client_state_listener,
             "TCP connection listener used to receive updates on the status of the connection",
+        )?
+        .param(
+            "tls_config",
+            tls_client_config,
+            "TLS client configuration",
         )?
         .returns(
             master_channel_class.clone(),
@@ -148,6 +148,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let association_handler_interface = define_association_handler(lib)?;
 
+    let association_information_interface = define_association_information(lib, shared)?;
+
     let request_class = crate::request::define(lib, shared)?;
 
     let add_association_method = lib
@@ -160,13 +162,18 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .param("config", association_config, "Association configuration")?
         .param(
             "read_handler",
-            read_handler,
+            read_handler.clone(),
             "Interface uses to load measurement data",
         )?
         .param(
             "association_handler",
             association_handler_interface,
             "Association specific callbacks such as time synchronization",
+        )?
+        .param(
+            "association_information",
+            association_information_interface,
+            "Association information interface",
         )?
         .returns(association_id.clone(), "Id of the association")?
         .fails_with(shared.error_type.clone())?
@@ -235,13 +242,25 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     let read_callback = define_read_callback(lib, nothing.clone())?;
 
     let read_async = lib
-        .define_future_method("read", master_channel_class.clone(), read_callback)?
+        .define_future_method("read", master_channel_class.clone(), read_callback.clone())?
         .param("association",association_id.clone(), "Association on which to perform the read")?
         .param("request",request_class.declaration(), "Request to send")?
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Perform a read on the association.")
                 .details("The callback will be called once the read is completely received, but the actual values will be sent to the {interface:read_handler} of the association.")
+        )?
+        .build()?;
+
+    let read_with_handler_async = lib
+        .define_future_method("read_with_handler", master_channel_class.clone(), read_callback)?
+        .param("association",association_id.clone(), "Association on which to perform the read")?
+        .param("request",request_class.declaration(), "Request to send")?
+        .param("handler",read_handler, "Custom {interface:read_handler} to send the data to")?
+        .fails_with(shared.error_type.clone())?
+        .doc(
+            doc("Perform a read on the association.")
+                .details("The callback will be called once the read is completely received, but the actual values will be sent to the {interface:read_handler} passed as a parameter.")
         )?
         .build()?;
 
@@ -323,7 +342,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     lib.define_class(&master_channel_class)?
-
         .destructor(channel_destructor)?
         .static_method(master_channel_create_tcp_fn)?
         .static_method(master_channel_create_tls_fn)?
@@ -338,6 +356,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .method(remove_poll_method)?
         .method(demand_poll_method)?
         .async_method(read_async)?
+        .async_method(read_with_handler_async)?
         .async_method(operate_async)?
         .async_method(perform_time_sync_async)?
         .async_method(cold_restart_async)?
@@ -734,6 +753,85 @@ fn define_association_handler(lib: &mut LibraryBuilder) -> BackTraced<Asynchrono
     Ok(timestamp_utc)
 }
 
+fn define_association_information(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> BackTraced<AsynchronousInterface> {
+    let task_type = lib
+        .define_enum("task_type")?
+        .push("user_read", "User-defined read request")?
+        .push("periodic_poll", "Periodic poll task")?
+        .push("startup_integrity", "Startup integrity scan")?
+        .push(
+            "auto_event_scan",
+            "Automatic event scan caused by RESTART IIN bit detection",
+        )?
+        .push("command", "Command request")?
+        .push("clear_restart_bit", "Clear RESTART IIN bit")?
+        .push("enable_unsolicited", "Enable unsolicited startup request")?
+        .push("disable_unsolicited", "Disable unsolicited startup request")?
+        .push("time_sync", "Time synchronisation task")?
+        .push("restart", "Cold or warm restart task")?
+        .doc("Task type used in {interface:association_information}")?
+        .build()?;
+
+    let task_error = lib
+        .define_enum("task_error")?
+        .add_task_errors()?
+        .doc("Task error used in {interface:association_information}")?
+        .build()?;
+
+    let handle = lib
+        .define_interface(
+            "association_information",
+            "Informational callbacks about the current state of an outstation association",
+        )?
+        .begin_callback("task_start", "Called when a new task is started")?
+        .param(
+            "task_type",
+            task_type.clone(),
+            "Type of task that was started",
+        )?
+        .param(
+            "function_code",
+            shared.function_code.clone(),
+            "Function code used by the task",
+        )?
+        .param("seq", Primitive::U8, "Sequence number of the request")?
+        .end_callback()?
+        .begin_callback("task_success", "Called when a task successfully completes")?
+        .param(
+            "task_type",
+            task_type.clone(),
+            "Type of task that was completed",
+        )?
+        .param(
+            "function_code",
+            shared.function_code.clone(),
+            "Function code used by the task",
+        )?
+        .param("seq", Primitive::U8, "Sequence number of the request")?
+        .end_callback()?
+        .begin_callback("task_fail", "Called when a task fails")?
+        .param("task_type", task_type, "Type of task that was completed")?
+        .param("error", task_error, "Error that prevented ")?
+        .end_callback()?
+        .begin_callback(
+            "unsolicited_response",
+            "Called when an unsolicited response is received",
+        )?
+        .param(
+            "is_duplicate",
+            Primitive::Bool,
+            "Is the unsolicited response a duplicate response",
+        )?
+        .param("seq", Primitive::U8, "Sequence number of the response")?
+        .end_callback()?
+        .build_async()?;
+
+    Ok(handle)
+}
+
 fn define_event_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let class1 = Name::create("class1")?;
     let class2 = Name::create("class2")?;
@@ -826,29 +924,46 @@ fn define_command_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     Ok(mode)
 }
 
+const TASK_ERRORS: &[(&str, &str)] = &[
+    ("too_many_requests", "too many user requests queued"),
+    (
+        "bad_response",
+        "response was malformed or contained object headers",
+    ),
+    (
+        "response_timeout",
+        "timeout occurred before receiving a response",
+    ),
+    (
+        "write_error",
+        "insufficient buffer space to serialize the request",
+    ),
+    ("no_connection", "no connection"),
+    ("shutdown", "master was shutdown"),
+    ("association_removed", "association was removed mid-task"),
+];
+
 trait TaskErrors: Sized {
     fn add_task_errors(self) -> BackTraced<Self>;
 }
 
 impl TaskErrors for ErrorTypeBuilder<'_> {
     fn add_task_errors(self) -> BackTraced<Self> {
-        let builder = self
-            .add_error("too_many_requests", "too many user requests queued")?
-            .add_error(
-                "bad_response",
-                "response was malformed or contained object headers",
-            )?
-            .add_error(
-                "response_timeout",
-                "timeout occurred before receiving a response",
-            )?
-            .add_error(
-                "write_error",
-                "insufficient buffer space to serialize the request",
-            )?
-            .add_error("no_connection", "no connection")?
-            .add_error("shutdown", "master was shutdown")?
-            .add_error("association_removed", "association was removed mid-task")?;
+        let mut builder = self;
+        for (name, doc) in TASK_ERRORS {
+            builder = builder.add_error(name, doc)?;
+        }
+
+        Ok(builder)
+    }
+}
+
+impl TaskErrors for EnumBuilder<'_> {
+    fn add_task_errors(self) -> BackTraced<Self> {
+        let mut builder = self;
+        for (name, doc) in TASK_ERRORS {
+            builder = builder.push(name, doc)?;
+        }
 
         Ok(builder)
     }

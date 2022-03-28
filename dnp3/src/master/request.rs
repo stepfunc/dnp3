@@ -78,6 +78,24 @@ pub struct AllObjectsScan {
     pub variation: Variation,
 }
 
+/// struct representing a one-byte limited count scan
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct OneByteLimitedCountScan {
+    /// variation to READ
+    pub variation: Variation,
+    /// maximum number of events
+    pub count: u8,
+}
+
+/// struct representing a two-byte limited count scan
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct TwoByteLimitedCountScan {
+    /// variation to READ
+    pub variation: Variation,
+    /// maximum number of events
+    pub count: u16,
+}
+
 impl EventClasses {
     /// construct an `EventClasses` from its fields
     pub fn new(class1: bool, class2: bool, class3: bool) -> Self {
@@ -86,11 +104,6 @@ impl EventClasses {
             class2,
             class3,
         }
-    }
-
-    /// construct an `EventClasses` from its fields
-    pub fn to_classes(self) -> Classes {
-        Classes::new(false, self)
     }
 
     /// test if any of the event classes are enabled
@@ -148,14 +161,19 @@ impl Classes {
         Self { class0, events }
     }
 
-    /// convert a `Classes` struct into a [ReadRequest](crate::master::ReadRequest)
-    pub fn to_request(self) -> ReadRequest {
-        ReadRequest::class_scan(self)
-    }
-
     /// construct a `Classes` with everything enabled
     pub fn all() -> Self {
         Self::new(true, EventClasses::all())
+    }
+
+    /// construct a `Classes` with all events, without class 0.
+    pub fn class123() -> Self {
+        Self::new(false, EventClasses::all())
+    }
+
+    /// construct a `Classes` with class 0 and no events
+    pub fn class0() -> Self {
+        Self::new(true, EventClasses::none())
     }
 
     /// construct a `Classes` with nothing enabled
@@ -218,6 +236,28 @@ impl AllObjectsScan {
     }
 }
 
+impl OneByteLimitedCountScan {
+    /// construct an [`OneByteLimitedCountScan`] from the variation
+    pub fn new(variation: Variation, count: u8) -> Self {
+        Self { variation, count }
+    }
+
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        writer.write_limited_count(self.variation, self.count)
+    }
+}
+
+impl TwoByteLimitedCountScan {
+    /// construct an [`TwoByteLimitedCountScan`] from the variation
+    pub fn new(variation: Variation, count: u16) -> Self {
+        Self { variation, count }
+    }
+
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        writer.write_limited_count(self.variation, self.count)
+    }
+}
+
 /// Enum representing all of the allowed scan types
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ReadHeader {
@@ -227,22 +267,36 @@ pub enum ReadHeader {
     Range16(TwoByteRangeScan),
     /// variant for all objects scans
     AllObjects(AllObjectsScan),
+    /// variant for one byte limited count
+    LimitedCount8(OneByteLimitedCountScan),
+    /// variant for two byte limited count
+    LimitedCount16(TwoByteLimitedCountScan),
 }
 
 impl ReadHeader {
-    /// construct a one byte range `ReadHeader`
+    /// construct a one byte range [`ReadHeader`]
     pub fn one_byte_range(variation: Variation, start: u8, stop: u8) -> Self {
         ReadHeader::Range8(OneByteRangeScan::new(variation, start, stop))
     }
 
-    /// construct a two range `ReadHeader`
+    /// construct a two range [`ReadHeader`]
     pub fn two_byte_range(variation: Variation, start: u16, stop: u16) -> Self {
         ReadHeader::Range16(TwoByteRangeScan::new(variation, start, stop))
     }
 
-    /// construct an all objects `ReadHeader`
+    /// construct an all objects [`ReadHeader`]
     pub fn all_objects(variation: Variation) -> Self {
         ReadHeader::AllObjects(AllObjectsScan::new(variation))
+    }
+
+    /// construct a one byte limited count scan [`ReadHeader`]
+    pub fn one_byte_limited_count(variation: Variation, count: u8) -> Self {
+        ReadHeader::LimitedCount8(OneByteLimitedCountScan::new(variation, count))
+    }
+
+    /// construct a two byte limited count scan [`ReadHeader`]
+    pub fn two_byte_limited_count(variation: Variation, count: u16) -> Self {
+        ReadHeader::LimitedCount16(TwoByteLimitedCountScan::new(variation, count))
     }
 
     pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
@@ -250,6 +304,8 @@ impl ReadHeader {
             ReadHeader::Range8(scan) => scan.write(writer),
             ReadHeader::Range16(scan) => scan.write(writer),
             ReadHeader::AllObjects(scan) => scan.write(writer),
+            ReadHeader::LimitedCount8(scan) => scan.write(writer),
+            ReadHeader::LimitedCount16(scan) => scan.write(writer),
         }
     }
 }

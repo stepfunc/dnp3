@@ -9,6 +9,7 @@ use crate::app::Sequence;
 use crate::app::{ControlField, Iin, Iin1, Iin2};
 use crate::master::association::AssociationConfig;
 use crate::master::request::{Classes, EventClasses};
+use crate::master::ReadRequest;
 use crate::tokio::test::*;
 use crate::tokio::time;
 use crate::util::cursor::WriteCursor;
@@ -168,7 +169,7 @@ fn detect_restart_in_read_response() {
         let mut read_task = spawn(
             harness
                 .association
-                .read(Classes::new(true, EventClasses::none()).to_request()),
+                .read(ReadRequest::ClassScan(Classes::class0())),
         );
         assert_pending!(read_task.poll());
     }

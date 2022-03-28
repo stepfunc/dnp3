@@ -12,7 +12,7 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::range::{RangedSequence, Range};".eol ++
       "use crate::util::cursor::ReadCursor;".eol ++
       "use crate::app::parse::parser::*;".eol ++
-      "use crate::app::parse::bytes::RangedBytesSequence;".eol ++
+      "use crate::app::parse::bytes::*;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
       "use crate::master::{ReadHandler, HeaderInfo};".eol ++
       "use crate::app::ObjectParseError;".eol ++
@@ -90,7 +90,7 @@ object RangedVariationModule extends Module {
       case _ : AnyVariation => s"RangedVariation::${v.name} => Ok(()),".eol
       case _ : SizedByVariation => {
         s"RangedVariation::${v.parent.name}Var0 => Ok(()),".eol ++
-          s"RangedVariation::${v.parent.name}VarX(_,seq) =>  format_indexed_items(f, seq.iter()),".eol
+          s"RangedVariation::${v.parent.name}VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),".eol
       }
       case _ => s"RangedVariation::${v.name}(seq) => format_indexed_items(f, seq.iter()),".eol
     }

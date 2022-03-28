@@ -18,8 +18,8 @@ pub fn define(
     let response_header = lib
         .define_callback_argument_struct(response_header)?
         .add(
-            "control",
-            shared_def.control_struct.clone(),
+            "control_field",
+            shared_def.control_field_struct.clone(),
             "Application control field",
         )?
         .add("func", response_function, "Response type")?

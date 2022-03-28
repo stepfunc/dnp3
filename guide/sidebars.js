@@ -10,9 +10,11 @@ module.exports = {
     ],
     Languages: [
         'languages/bindings',
+        'languages/build',
         {
             Bindings: [
                 'languages/c_bindings',
+                'languages/cpp_bindings',
                 'languages/java',
                 'languages/c_sharp',
             ]
@@ -62,6 +64,7 @@ module.exports = {
                                 'api/master/assoc_config',
                                 'api/master/read_handler',
                                 'api/master/association_handler',
+                                'api/master/association_information',
                             ]
                         },
                         'api/master/assoc_polls',

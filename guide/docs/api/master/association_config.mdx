@@ -97,3 +97,5 @@ The following algorithm is used to schedule requests within an association:
 :::note
 The standard does not specify how requests should be scheduled for multiple associations on a channel. Our implementation uses a per-association task queue. The channel scheduler round-robins through the associations to ensure fair access.
 :::
+
+The `RESTART` IIN bit is automatically cleared by the master whenever the outstation reports it.

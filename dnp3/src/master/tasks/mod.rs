@@ -2,9 +2,10 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::FunctionCode;
 use crate::app::ResponseHeader;
-use crate::link::{EndpointAddress, LinkStatusResult};
+use crate::link::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
+use crate::master::extract::extract_measurements;
 use crate::master::handler::Promise;
 use crate::master::poll::Poll;
 use crate::master::request::{Classes, EventClasses};
@@ -13,6 +14,7 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::RestartTask;
 use crate::master::tasks::time::TimeSyncTask;
+use crate::master::{ReadType, TaskType};
 use crate::util::cursor::WriteError;
 
 pub(crate) mod auto;
@@ -43,7 +45,7 @@ pub(crate) enum Task {
     /// NonRead tasks always require FIR/FIN == 1, but might require multiple read/response cycles, e.g. SBO
     NonRead(NonReadTask),
     /// Send link status request
-    LinkStatus(Promise<Result<LinkStatusResult, TaskError>>),
+    LinkStatus(Promise<Result<(), TaskError>>),
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -145,7 +147,7 @@ impl ReadTask {
     }
 
     pub(crate) async fn process_response(
-        &self,
+        &mut self,
         association: &mut Association,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
@@ -160,7 +162,13 @@ impl ReadTask {
                     .handle_event_scan_response(header, objects)
                     .await
             }
-            ReadTask::SingleRead(_) => association.handle_read_response(header, objects).await,
+            ReadTask::SingleRead(task) => match &mut task.custom_handler {
+                Some(handler) => {
+                    extract_measurements(ReadType::SinglePoll, header, objects, handler.as_mut())
+                        .await
+                }
+                None => association.handle_read_response(header, objects).await,
+            },
         }
     }
 
@@ -192,6 +200,15 @@ impl ReadTask {
                 }
             }
             ReadTask::SingleRead(task) => task.on_task_error(err),
+        }
+    }
+
+    pub(crate) fn as_task_type(&self) -> TaskType {
+        match self {
+            Self::PeriodicPoll(_) => TaskType::PeriodicPoll,
+            Self::StartupIntegrity(_) => TaskType::StartupIntegrity,
+            Self::EventScan(_) => TaskType::AutoEventScan,
+            Self::SingleRead(_) => TaskType::UserRead,
         }
     }
 }
@@ -241,6 +258,19 @@ impl NonReadTask {
             },
             NonReadTask::TimeSync(task) => task.handle(association, response),
             NonReadTask::Restart(task) => task.handle(response),
+        }
+    }
+
+    pub(crate) fn as_task_type(&self) -> TaskType {
+        match self {
+            Self::Command(_) => TaskType::Command,
+            Self::Auto(x) => match x {
+                AutoTask::ClearRestartBit => TaskType::ClearRestartBit,
+                AutoTask::EnableUnsolicited(_) => TaskType::EnableUnsolicited,
+                AutoTask::DisableUnsolicited(_) => TaskType::DisableUnsolicited,
+            },
+            Self::TimeSync(_) => TaskType::TimeSync,
+            Self::Restart(_) => TaskType::Restart,
         }
     }
 }

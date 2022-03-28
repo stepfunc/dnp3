@@ -4,13 +4,12 @@ use crate::app::measurement::*;
 use crate::app::variations::Variation;
 use crate::app::*;
 use crate::decode::DecodeLevel;
-use crate::link::{EndpointAddress, LinkStatusResult};
+use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
-use crate::master::session::MasterSession;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
@@ -45,11 +44,11 @@ pub struct MasterChannelConfig {
     /// TX buffer size
     ///
     /// Must be at least 249.
-    pub tx_buffer_size: usize,
+    pub tx_buffer_size: BufferSize<249, 2048>,
     /// RX buffer size
     ///
     /// Must be at least 2048.
-    pub rx_buffer_size: usize,
+    pub rx_buffer_size: BufferSize<2048, 2048>,
 }
 
 impl MasterChannelConfig {
@@ -58,8 +57,8 @@ impl MasterChannelConfig {
         Self {
             master_address,
             decode_level: DecodeLevel::nothing(),
-            tx_buffer_size: MasterSession::DEFAULT_TX_BUFFER_SIZE,
-            rx_buffer_size: MasterSession::DEFAULT_RX_BUFFER_SIZE,
+            tx_buffer_size: BufferSize::default(),
+            rx_buffer_size: BufferSize::default(),
         }
     }
 }
@@ -108,6 +107,7 @@ impl MasterChannel {
         config: AssociationConfig,
         read_handler: Box<dyn ReadHandler>,
         assoc_handler: Box<dyn AssociationHandler>,
+        assoc_information: Box<dyn AssociationInformation>,
     ) -> Result<AssociationHandle, AssociationError> {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
         self.send_master_message(MasterMsg::AddAssociation(
@@ -115,6 +115,7 @@ impl MasterChannel {
             config,
             read_handler,
             assoc_handler,
+            assoc_information,
             Promise::OneShot(tx),
         ))
         .await?;
@@ -124,10 +125,7 @@ impl MasterChannel {
 
     /// Remove an association
     /// * `address` is the DNP3 link-layer address of the outstation
-    pub async fn remove_association(
-        &mut self,
-        address: EndpointAddress,
-    ) -> Result<(), AssociationError> {
+    pub async fn remove_association(&mut self, address: EndpointAddress) -> Result<(), Shutdown> {
         self.send_master_message(MasterMsg::RemoveAssociation(address))
             .await?;
         Ok(())
@@ -154,6 +152,7 @@ impl MasterChannel {
 
 impl AssociationHandle {
     /// constructor only used in the FFI
+    #[doc(hidden)]
     #[cfg(feature = "ffi")]
     pub fn create(address: EndpointAddress, master: MasterChannel) -> Self {
         Self::new(address, master)
@@ -201,6 +200,20 @@ impl AssociationHandle {
     pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
         let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         let task = SingleReadTask::new(request, Promise::OneShot(tx));
+        self.send_task(task.wrap().wrap()).await?;
+        rx.await?
+    }
+
+    /// Perform an asynchronous READ request with a custom read handler
+    ///
+    /// If successful, the custom [ReadHandler](crate::master::ReadHandler) will process the received measurement data
+    pub async fn read_with_handler(
+        &mut self,
+        request: ReadRequest,
+        handler: Box<dyn ReadHandler>,
+    ) -> Result<(), TaskError> {
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TaskError>>();
+        let task = SingleReadTask::new_with_custom_handler(request, handler, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
     }
@@ -254,9 +267,11 @@ impl AssociationHandle {
     ///
     /// This function is provided for testing purposes. Using the configured link status timeout
     /// is the preferred so that the master automatically issues these requests.
-    pub async fn check_link_status(&mut self) -> Result<LinkStatusResult, TaskError> {
-        let (tx, rx) =
-            crate::tokio::sync::oneshot::channel::<Result<LinkStatusResult, TaskError>>();
+    ///
+    /// If a [`TaskError::UnexpectedResponseHeaders`] is returned, the link might be alive
+    /// but it didn't answer with the expected `LINK_STATUS`.
+    pub async fn check_link_status(&mut self) -> Result<(), TaskError> {
+        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         self.send_task(Task::LinkStatus(Promise::OneShot(tx)))
             .await?;
         rx.await?
@@ -278,11 +293,9 @@ impl AssociationHandle {
 /// A generic callback type that must be invoked once and only once.
 /// The user can select to implement it using FnOnce or a
 /// one-shot reply channel
-pub enum Promise<T> {
+pub(crate) enum Promise<T> {
     /// nothing happens when the promise is completed
     None,
-    /// Box<FnOnce> is consumed when the promise is completed
-    BoxedFn(Box<dyn FnOnce(T) + Send + Sync>),
     /// one-shot reply channel is consumed when the promise is completed
     OneShot(crate::tokio::sync::oneshot::Sender<T>),
 }
@@ -291,7 +304,6 @@ impl<T> Promise<T> {
     pub(crate) fn complete(self, value: T) {
         match self {
             Promise::None => {}
-            Promise::BoxedFn(func) => func(value),
             Promise::OneShot(s) => {
                 s.send(value).ok();
             }
@@ -299,13 +311,57 @@ impl<T> Promise<T> {
     }
 }
 
+/// Task types used in [`AssociationInformation`]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TaskType {
+    /// User-defined read request
+    UserRead,
+    /// Periodic poll task
+    PeriodicPoll,
+    /// Startup integrity scan
+    StartupIntegrity,
+    /// Automatic event scan caused by `RESTART` IIN bit detection
+    AutoEventScan,
+
+    /// Command request
+    Command,
+    /// Clear `RESTART` IIN bit
+    ClearRestartBit,
+    /// Enable unsolicited startup request
+    EnableUnsolicited,
+    /// Disable unsolicited startup request
+    DisableUnsolicited,
+    /// Time synchronisation task
+    TimeSync,
+    /// Cold or warm restart task
+    Restart,
+}
+
 /// callbacks associated with a single master to outstation association
-pub trait AssociationHandler: Send {
+pub trait AssociationHandler: Send + Sync {
     /// Retrieve the system time used for time synchronization
-    fn get_system_time(&self) -> Option<Timestamp> {
+    fn get_current_time(&self) -> Option<Timestamp> {
         Timestamp::try_from_system_time(SystemTime::now())
     }
 }
+
+/// Informational callbacks that can be used to monitor master communication
+/// to a particular outstation. Useful for assessing communication health.
+pub trait AssociationInformation: Send + Sync {
+    /// Called when a new task is started
+    fn task_start(&mut self, _task_type: TaskType, _fc: FunctionCode, _seq: Sequence) {}
+    /// Called when a task successfully completes
+    fn task_success(&mut self, _task_type: TaskType, _fc: FunctionCode, _seq: Sequence) {}
+    /// Called when a task fails
+    fn task_fail(&mut self, _task_type: TaskType, _error: TaskError) {}
+
+    /// Called when an unsolicited response is received
+    fn unsolicited_response(&mut self, _is_duplicate: bool, _seq: Sequence) {}
+}
+
+pub(crate) struct NullAssociationInformation;
+
+impl AssociationInformation for NullAssociationInformation {}
 
 /// Information about the object header and specific variation
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -350,7 +406,7 @@ pub enum ReadType {
 }
 
 /// Trait used to process measurement data received from an outstation
-pub trait ReadHandler: Send {
+pub trait ReadHandler: Send + Sync {
     /// Called as the first action before any of the type-specific handle methods are invoked
     ///
     /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
@@ -417,33 +473,13 @@ pub trait ReadHandler: Send {
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
-        iter: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+        iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     );
-}
-
-/// no-op default association handler type
-#[derive(Copy, Clone)]
-pub struct DefaultAssociationHandler;
-
-impl AssociationHandler for DefaultAssociationHandler {}
-
-impl DefaultAssociationHandler {
-    /// create a boxed instance of the DefaultAssociationHandler
-    pub fn boxed() -> Box<dyn AssociationHandler> {
-        Box::new(Self {})
-    }
 }
 
 /// read handler that does nothing
 #[derive(Copy, Clone)]
-pub struct NullReadHandler;
-
-impl NullReadHandler {
-    /// create a boxed instance of the NullReadHandler
-    pub fn boxed() -> Box<dyn ReadHandler> {
-        Box::new(Self {})
-    }
-}
+pub(crate) struct NullReadHandler;
 
 impl ReadHandler for NullReadHandler {
     fn begin_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
@@ -506,7 +542,7 @@ impl ReadHandler for NullReadHandler {
     fn handle_octet_string<'a>(
         &mut self,
         _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+        _iter: &mut dyn Iterator<Item = (&'a [u8], u16)>,
     ) {
     }
 }

@@ -18,8 +18,7 @@ use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
 use crate::link::EndpointAddress;
 use crate::master::EventClasses;
-use crate::outstation::config::OutstationConfig;
-use crate::outstation::config::{BufferSize, Feature};
+use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::control::collection::{ControlCollection, ControlTransaction};
 use crate::outstation::control::select::SelectState;
 use crate::outstation::database::{DatabaseHandle, ResponseInfo};
@@ -36,7 +35,7 @@ use crate::util::cursor::WriteError;
 use crate::util::phys::PhysLayer;
 
 #[derive(Copy, Clone)]
-enum Timeout {
+enum TimeoutStatus {
     Yes,
     No,
 }
@@ -147,8 +146,8 @@ impl LastValidRequest {
 pub(crate) struct SessionConfig {
     decode_level: DecodeLevel,
     master_address: EndpointAddress,
-    confirm_timeout: std::time::Duration,
-    select_timeout: std::time::Duration,
+    confirm_timeout: Timeout,
+    select_timeout: Timeout,
     broadcast: Feature,
     unsolicited: Feature,
     max_unsolicited_retries: Option<usize>,
@@ -159,8 +158,8 @@ pub(crate) struct SessionConfig {
 
 pub(crate) struct SessionParameters {
     max_read_headers_per_request: u16,
-    sol_tx_buffer_size: BufferSize,
-    unsol_tx_buffer_size: BufferSize,
+    sol_tx_buffer_size: BufferSize<249, 2048>,
+    unsol_tx_buffer_size: BufferSize<249, 2048>,
 }
 
 impl From<OutstationConfig> for SessionConfig {
@@ -709,7 +708,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
     ) -> Result<UnsolicitedWaitResult, RunError> {
-        if let Timeout::Yes = self.read_until(io, reader, deadline).await? {
+        if let TimeoutStatus::Yes = self.read_until(io, reader, deadline).await? {
             return Ok(UnsolicitedWaitResult::Timeout);
         }
 
@@ -831,17 +830,17 @@ impl OutstationSession {
         io: &mut PhysLayer,
         reader: &mut TransportReader,
         deadline: crate::tokio::time::Instant,
-    ) -> Result<Timeout, RunError> {
+    ) -> Result<TimeoutStatus, RunError> {
         loop {
             let decode_level = self.config.decode_level;
             crate::tokio::select! {
                  res = self.sleep_until(Some(deadline)) => {
                      res?;
-                     return Ok(Timeout::Yes);
+                     return Ok(TimeoutStatus::Yes);
                  }
                  res = reader.read(io, decode_level) => {
                      res?;
-                     return Ok(Timeout::No);
+                     return Ok(TimeoutStatus::No);
                  }
             }
         }
@@ -1253,9 +1252,8 @@ impl OutstationSession {
                 HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
                     if let Some(value) = seq.single() {
                         match self.application.write_absolute_time(value.time) {
-                            WriteTimeResult::NotSupported => Iin2::NO_FUNC_CODE_SUPPORT,
-                            WriteTimeResult::InvalidValue => Iin2::PARAMETER_ERROR,
-                            WriteTimeResult::Ok => Iin2::default(),
+                            Err(err) => err.into(),
+                            Ok(()) => Iin2::default(),
                         }
                     } else {
                         tracing::warn!("request lacks a single g50v1");
@@ -1314,9 +1312,9 @@ impl OutstationSession {
 
         self.state.last_recorded_time = None;
         match self.application.write_absolute_time(timestamp) {
-            WriteTimeResult::NotSupported => Iin2::NO_FUNC_CODE_SUPPORT,
-            WriteTimeResult::InvalidValue => Iin2::PARAMETER_ERROR,
-            WriteTimeResult::Ok => Iin2::default(),
+            Err(RequestError::NotSupported) => Iin2::NO_FUNC_CODE_SUPPORT,
+            Err(RequestError::ParameterError) => Iin2::PARAMETER_ERROR,
+            Ok(()) => Iin2::default(),
         }
     }
 
@@ -1662,21 +1660,24 @@ impl OutstationSession {
                     HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => {
                         iin |= self
                             .application
-                            .freeze_counter(FreezeIndices::All, freeze_type, db);
+                            .freeze_counter(FreezeIndices::All, freeze_type, db)
+                            .map_or_else(|err| err.into(), |_| Iin2::default());
                     }
                     HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                        iin |= self.application.freeze_counter(
-                            FreezeIndices::Range(start as u16, stop as u16),
-                            freeze_type,
-                            db,
-                        );
+                        iin |= self
+                            .application
+                            .freeze_counter(
+                                FreezeIndices::Range(start as u16, stop as u16),
+                                freeze_type,
+                                db,
+                            )
+                            .map_or_else(|err| err.into(), |_| Iin2::default());
                     }
                     HeaderDetails::TwoByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                        iin |= self.application.freeze_counter(
-                            FreezeIndices::Range(start, stop),
-                            freeze_type,
-                            db,
-                        );
+                        iin |= self
+                            .application
+                            .freeze_counter(FreezeIndices::Range(start, stop), freeze_type, db)
+                            .map_or_else(|err| err.into(), |_| Iin2::default());
                     }
                     _ => {
                         iin |= Iin2::NO_FUNC_CODE_SUPPORT;
@@ -1821,7 +1822,7 @@ impl OutstationSession {
     }
 
     fn new_confirm_deadline(&self) -> crate::tokio::time::Instant {
-        crate::tokio::time::Instant::now() + self.config.confirm_timeout
+        self.config.confirm_timeout.deadline_from_now()
     }
 
     fn new_unsolicited_retry_deadline(&self) -> crate::tokio::time::Instant {
@@ -1886,12 +1887,12 @@ impl OutstationSession {
         let mut deadline = self.new_confirm_deadline();
         loop {
             match self.read_until(io, reader, deadline).await? {
-                Timeout::Yes => {
+                TimeoutStatus::Yes => {
                     self.info.solicited_confirm_timeout(ecsn);
                     return Ok(Confirm::Timeout);
                 }
                 // process data
-                Timeout::No => {
+                TimeoutStatus::No => {
                     let mut guard = reader.pop_request();
                     match self.expect_sol_confirm(ecsn, &mut guard) {
                         ConfirmAction::ContinueWait => {

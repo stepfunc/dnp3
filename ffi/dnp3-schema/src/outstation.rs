@@ -5,7 +5,6 @@ use std::time::Duration;
 struct OutstationTypes {
     database: ClassHandle,
     outstation_config: FunctionArgStructHandle,
-    event_buffer_config: FunctionArgStructHandle,
     outstation_application: AsynchronousInterface,
     outstation_information: AsynchronousInterface,
     control_handler: AsynchronousInterface,
@@ -19,7 +18,6 @@ impl OutstationTypes {
         Ok(Self {
             database: database.clone(),
             outstation_config: define_outstation_config(lib, shared_def)?,
-            event_buffer_config: define_event_buffer_config(lib)?,
             outstation_application: define_outstation_application(lib, &database)?,
             outstation_information: define_outstation_information(lib, shared_def)?,
             control_handler: define_control_handler(lib, &database, shared_def)?,
@@ -37,10 +35,10 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     let tls_server_config = define_tls_server_config(lib, shared_def)?;
 
     // Define the TCP server
-    let tcp_server = lib.declare_class("tcp_server")?;
+    let outstation_server = lib.declare_class("outstation_server")?;
 
-    let constructor = lib
-        .define_constructor(tcp_server.clone())?
+    let outstation_server_tcp_create = lib
+        .define_function("outstation_server_create_tcp_server")?
         .param(
             "runtime",
             shared_def.runtime_class.clone(),
@@ -56,17 +54,16 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
             StringType,
             "Address to bind the server to e.g. 127.0.0.1:20000",
         )?
+        .returns(outstation_server.clone(), "New TCP server instance")?
         .fails_with(shared_def.error_type.clone())?
         .doc(
-            doc("Create a new TCP server.").details("To start it, use {class:tcp_server.bind()}."),
+            doc("Create a new TCP server.")
+                .details("To start it, use {class:outstation_server.bind()}."),
         )?
-        .build()?;
+        .build_static("create_tcp_server")?;
 
-    let destructor = lib
-        .define_destructor(tcp_server.clone(), "Gracefully shutdown all the outstations associated to this server, stops the server and release resources.")?;
-
-    let tcp_server_tls_create = lib
-        .define_function("tcp_server_create_tls")?
+    let outstation_server_tls_create = lib
+        .define_function("outstation_server_create_tls_server")?
         .param(
             "runtime",
             shared_def.runtime_class.clone(),
@@ -75,7 +72,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .param(
             "link_error_mode",
             shared_def.link_error_mode.clone(),
-            "Controls how link errors are handled with respect to the TCP session",
+            "Controls how link errors are handled with respect to the session",
         )?
         .param(
             "address",
@@ -83,17 +80,16 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
             "Address to bind the server to e.g. 127.0.0.1:20000",
         )?
         .param("tls_config", tls_server_config, "TLS server configuration")?
-        .returns(tcp_server.clone(), "New TCP TLS server instance")?
+        .returns(outstation_server.clone(), "New TLS server instance")?
         .fails_with(shared_def.error_type.clone())?
         .doc(
-            doc("Create a new TCP server with TLS configuration.")
-                .details("To start it, use {class:tcp_server.bind()}."),
+            doc("Create a new TLS server.")
+                .details("To start it, use {class:outstation_server.bind()}."),
         )?
         .build_static("create_tls_server")?;
 
-    let add_outstation = lib.define_method("add_outstation", tcp_server.clone())?
+    let add_outstation = lib.define_method("add_outstation", outstation_server.clone())?
         .param("config",types.outstation_config, "Outstation configuration")?
-        .param("event_config", types.event_buffer_config, "Event buffer configuration")?
         .param("application", types.outstation_application, "Outstation application callbacks")?
         .param("information", types.outstation_information, "Outstation information callbacks")?
         .param("control_handler", types.control_handler, "Outstation control handler")?
@@ -103,25 +99,27 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .fails_with(shared_def.error_type.clone())?
         .doc(doc("Add an outstation to the server.")
             .details("The returned {class:outstation} can be used to modify points of the outstation.")
-            .details("In order for the outstation to run, the TCP server must be running. Use {class:tcp_server.bind()} to run it."))?
+            .details("In order for the outstation to run, the TCP server must be running. Use {class:outstation_server.bind()} to run it."))?
         .build()?;
 
-    let bind = lib.define_method("bind", tcp_server.clone())?
-
+    let bind = lib.define_method("bind", outstation_server.clone())?
         .fails_with(shared_def.error_type.clone())?
         .doc("Bind the server to the port and starts listening. Also starts all the outstations associated to it.")?
         .build()?;
 
-    lib.define_class(&tcp_server)?
-        .constructor(constructor)?
+    let destructor = lib
+        .define_destructor(outstation_server.clone(), "Gracefully shutdown all the outstations associated to this server, stops the server and release resources.")?;
+
+    lib.define_class(&outstation_server)?
+        .static_method(outstation_server_tcp_create)?
+        .static_method(outstation_server_tls_create)?
         .destructor(destructor)?
         .method(add_outstation)?
         .method(bind)?
         .custom_destroy("shutdown")?
-        .static_method(tcp_server_tls_create)?
         .doc(doc("TCP server that listens for connections and routes the messages to outstations.")
-        .details("To add outstations to it, use {class:tcp_server.add_outstation()}. Once all the outstations are added, the server can be started with {class:tcp_server.bind()}.")
-        .details("{class:tcp_server.[destructor]} is used to gracefully shutdown all the outstations and the server."))?
+        .details("To add outstations to it, use {class:outstation_server.add_outstation()}. Once all the outstations are added, the server can be started with {class:outstation_server.bind()}.")
+        .details("{class:outstation_server.[destructor]} is used to gracefully shutdown all the outstations and the server."))?
         .build()?;
 
     Ok(())
@@ -161,11 +159,6 @@ fn define_outstation(
             "outstation configuration",
         )?
         .param(
-            "event_config",
-            types.event_buffer_config.clone(),
-            "event buffer configuration",
-        )?
-        .param(
             "application",
             types.outstation_application.clone(),
             "application interface",
@@ -190,7 +183,7 @@ fn define_outstation(
 
     let destructor = lib.define_destructor(
         outstation.clone(),
-        doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:tcp_server.[destructor]} will properly shutdown the outstation.")
+        doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:outstation_server.[destructor]} will properly shutdown the outstation.")
     )?;
 
     let execute_transaction = lib
@@ -230,7 +223,7 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
     let frozen_counter = Name::create("frozen_counter")?;
     let analog = Name::create("analog")?;
     let analog_output_status = Name::create("analog_output_status")?;
-    let octet_strings = Name::create("octet_strings")?;
+    let octet_strings = Name::create("octet_string")?;
 
     let class_zero_config = lib.declare_function_argument_struct("class_zero_config")?;
     let class_zero_config = lib
@@ -340,6 +333,7 @@ fn define_outstation_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> BackTraced<FunctionArgStructHandle> {
+    let event_buffer_config = define_event_buffer_config(lib)?;
     let class_zero_config = define_class_zero_config(lib)?;
     let outstation_features = define_outstation_features(lib)?;
 
@@ -367,6 +361,7 @@ fn define_outstation_config(
             "Link-layer outstation address",
         )?
         .add("master_address", Primitive::U16, "Link-layer master address")?
+        .add("event_buffer_config", event_buffer_config, "Event buffer sizes configuration")?
         .add(
             &solicited_buffer_size,
             Primitive::U16,
@@ -439,46 +434,55 @@ fn define_outstation_config(
 }
 
 fn define_event_buffer_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
+    let max_binary = Name::create("max_binary")?;
+    let max_double_bit_binary = Name::create("max_double_bit_binary")?;
+    let max_binary_output_status = Name::create("max_binary_output_status")?;
+    let max_counter = Name::create("max_counter")?;
+    let max_frozen_counter = Name::create("max_frozen_counter")?;
+    let max_analog = Name::create("max_analog")?;
+    let max_analog_output_status = Name::create("max_analog_output_status")?;
+    let max_octet_string = Name::create("max_octet_string")?;
+
     let event_buffer_config = lib.declare_function_argument_struct("event_buffer_config")?;
     let event_buffer_config = lib
         .define_function_argument_struct(event_buffer_config)?
         .add(
-            "max_binary",
+            &max_binary,
             Primitive::U16,
             "Maximum number of Binary Input events (g2)",
         )?
         .add(
-            "max_double_bit_binary",
+            &max_double_bit_binary,
             Primitive::U16,
             "Maximum number of Double-Bit Binary Input events (g4)",
         )?
         .add(
-            "max_binary_output_status",
+            &max_binary_output_status,
             Primitive::U16,
             "Maximum number of Binary Output Status events (g11)",
         )?
         .add(
-            "max_counter",
+            &max_counter,
             Primitive::U16,
             "Maximum number of Counter events (g22)",
         )?
         .add(
-            "max_frozen_counter",
+            &max_frozen_counter,
             Primitive::U16,
             "Maximum number of Frozen Counter events (g23)",
         )?
         .add(
-            "max_analog",
+            &max_analog,
             Primitive::U16,
             "Maximum number of Analog Input events (g32)",
         )?
         .add(
-            "max_analog_output_status",
+            &max_analog_output_status,
             Primitive::U16,
             "Maximum number of Analog Output Status events (g42)",
         )?
         .add(
-            "max_octet_string",
+            &max_octet_string,
             Primitive::U16,
             doc("Maximum number of Octet String events (g111)"),
         )?
@@ -488,6 +492,20 @@ fn define_event_buffer_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionAr
         )?
         .end_fields()?
         .add_full_initializer("init")?
+        .begin_initializer(
+            "no_events",
+            InitializerType::Static,
+            "Create a configuration where no events are buffered.",
+        )?
+        .default(&max_binary, NumberValue::U16(0))?
+        .default(&max_double_bit_binary, NumberValue::U16(0))?
+        .default(&max_binary_output_status, NumberValue::U16(0))?
+        .default(&max_counter, NumberValue::U16(0))?
+        .default(&max_frozen_counter, NumberValue::U16(0))?
+        .default(&max_analog, NumberValue::U16(0))?
+        .default(&max_analog_output_status, NumberValue::U16(0))?
+        .default(&max_octet_string, NumberValue::U16(0))?
+        .end_initializer()?
         .build()?;
 
     Ok(event_buffer_config)
@@ -587,9 +605,9 @@ fn define_outstation_application(
     let restart_delay = define_restart_delay(lib)?;
 
     let write_time_result = lib.define_enum("write_time_result")?
-        .push("not_supported", "Writing time is not supported by this outstation (translated to NO_FUNC_CODE_SUPPORT).")?
-        .push("invalid_value", "The provided value was invalid (translated to PARAM_ERROR)")?
         .push("ok", "The write time operation succeeded.")?
+        .push("parameter_error", "The request parameters are nonsensical.")?
+        .push("not_supported", "Writing time is not supported by this outstation (translated to NO_FUNC_CODE_SUPPORT).")?
         .doc("Write time result used by {interface:outstation_application.write_absolute_time()}")?
         .build()?;
 
@@ -601,11 +619,11 @@ fn define_outstation_application(
 
     let freeze_result = lib
         .define_enum("freeze_result")?
-        .push("success", "Freeze operation was successful")?
-        .push("parameter_error", "One of the point is invalid")?
+        .push("ok", "Freeze operation was successful.")?
+        .push("parameter_error", "The request parameters are nonsensical.")?
         .push(
             "not_supported",
-            "The demanded freeze operation is not supported by this device",
+            "The demanded freeze operation is not supported by this device.",
         )?
         .doc("Result of a freeze operation")?
         .build()?;
@@ -655,17 +673,19 @@ fn define_outstation_information(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
 ) -> BackTraced<AsynchronousInterface> {
-    let function_code = define_function_code(lib)?;
-
     let request_header = lib.declare_callback_argument_struct("request_header")?;
     let request_header = lib
         .define_callback_argument_struct(request_header)?
         .add(
-            "control",
-            shared_def.control_struct.clone(),
+            "control_field",
+            shared_def.control_field_struct.clone(),
             "Control field",
         )?
-        .add("function", function_code.clone(), "Function code")?
+        .add(
+            "function",
+            shared_def.function_code.clone(),
+            "Function code",
+        )?
         .doc("Application-layer header for requests")?
         .end_fields()?
         .build()?;
@@ -684,7 +704,7 @@ fn define_outstation_information(
 
             .end_callback()?
         .begin_callback("broadcast_received", "Called when a broadcast request is received by the outstation")?
-            .param("function_code", function_code, "Function code received")?
+            .param("function_code", shared_def.function_code.clone(), "Function code received")?
             .param("action", broadcast_action, "Broadcast action")?
 
             .end_callback()?
@@ -914,47 +934,6 @@ fn define_address_filter(
         .build()?;
 
     Ok(address_filter)
-}
-
-fn define_function_code(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
-    let function = lib.define_enum("function_code")?
-        .push("confirm", "Master sends this to an outstation to confirm the receipt of an Application Layer fragment (value == 0)")?
-        .push("read", "Outstation shall return the data specified by the objects in the request (value == 1)")?
-        .push("write", "Outstation shall store the data specified by the objects in the request (value == 2)")?
-        .push("select", "Outstation shall select (or arm) the output points specified by the objects in the request in preparation for a subsequent operate command (value == 3)")?
-        .push("operate", "Outstation shall activate the output points selected (or armed) by a previous select function code command (value == 4)")?
-        .push("direct_operate", "Outstation shall immediately actuate the output points specified by the objects in the request (value == 5)")?
-        .push("direct_operate_no_response", "Same as DirectOperate but outstation shall not send a response (value == 6)")?
-        .push("immediate_freeze", "Outstation shall copy the point data values specified by the objects in the request to a separate freeze buffer (value == 7)")?
-        .push("immediate_freeze_no_response", "Same as ImmediateFreeze but outstation shall not send a response (value == 8)")?
-        .push("freeze_clear", "Outstation shall copy the point data values specified by the objects in the request into a separate freeze buffer and then clear the values (value == 9)")?
-        .push("freeze_clear_no_response", "Same as FreezeClear but outstation shall not send a response (value == 10)")?
-        .push("freeze_at_time", "Outstation shall copy the point data values specified by the objects in the request to a separate freeze buffer at the time and/or time intervals specified in a special time data information object (value == 11)")?
-        .push("freeze_at_time_no_response", "Same as FreezeAtTime but outstation shall not send a response (value == 12)")?
-        .push("cold_restart", "Outstation shall perform a complete reset of all hardware and software in the device (value == 13)")?
-        .push("warm_restart", "Outstation shall reset only portions of the device (value == 14)")?
-        .push("initialize_data", "Obsolete-Do not use for new designs (value == 15)")?
-        .push("initialize_application", "Outstation shall place the applications specified by the objects in the request into the ready to run state (value == 16)")?
-        .push("start_application", "Outstation shall start running the applications specified by the objects in the request (value == 17)")?
-        .push("stop_application", "Outstation shall stop running the applications specified by the objects in the request (value == 18)")?
-        .push("save_configuration", "This code is deprecated-Do not use for new designs (value == 19)")?
-        .push("enable_unsolicited", "Enables outstation to initiate unsolicited responses from points specified by the objects in the request (value == 20)")?
-        .push("disable_unsolicited", "Prevents outstation from initiating unsolicited responses from points specified by the objects in the request (value == 21)")?
-        .push("assign_class", "Outstation shall assign the events generated by the points specified by the objects in the request to one of the classes (value == 22)")?
-        .push("delay_measure", "Outstation shall report the time it takes to process and initiate the transmission of its response (value == 23)")?
-        .push("record_current_time", "Outstation shall save the time when the last octet of this message is received (value == 24)")?
-        .push("open_file", "Outstation shall open a file (value == 25)")?
-        .push("close_file", "Outstation shall close a file (value == 26)")?
-        .push("delete_file", "Outstation shall delete a file (value == 27)")?
-        .push("get_file_info", "Outstation shall retrieve information about a file (value == 28)")?
-        .push("authenticate_file", "Outstation shall return a file authentication key (value == 29)")?
-        .push("abort_file", "Outstation shall abort a file transfer operation (value == 30)")?
-        .push("response", "Master shall interpret this fragment as an Application Layer response to an ApplicationLayer request (value == 129)")?
-        .push("unsolicited_response", "Master shall interpret this fragment as an unsolicited response that was not prompted by an explicit request (value == 130)")?
-        .doc("Application layer function code")?
-        .build()?;
-
-    Ok(function)
 }
 
 fn define_tls_server_config(

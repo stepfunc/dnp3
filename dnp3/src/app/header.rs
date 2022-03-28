@@ -3,7 +3,7 @@ use std::ops::{Add, BitOr, BitOrAssign};
 
 use crate::app::sequence::Sequence;
 use crate::app::FunctionCode;
-use crate::outstation::{ApplicationIin, FreezeResult};
+use crate::outstation::{ApplicationIin, RequestError};
 use crate::util::bit::bits::*;
 use crate::util::bit::{format_bitfield, Bitfield};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
@@ -408,21 +408,12 @@ impl BitOrAssign<ApplicationIin> for Iin {
     }
 }
 
-impl BitOr<FreezeResult> for Iin {
-    type Output = Self;
-
-    fn bitor(self, rhs: FreezeResult) -> Self::Output {
-        match rhs {
-            FreezeResult::Success => self,
-            FreezeResult::ParameterError => self | Iin2::PARAMETER_ERROR,
-            FreezeResult::NotSupported => self | Iin2::NO_FUNC_CODE_SUPPORT,
+impl From<RequestError> for Iin2 {
+    fn from(from: RequestError) -> Self {
+        match from {
+            RequestError::ParameterError => Iin2::PARAMETER_ERROR,
+            RequestError::NotSupported => Iin2::NO_FUNC_CODE_SUPPORT,
         }
-    }
-}
-
-impl BitOrAssign<FreezeResult> for Iin {
-    fn bitor_assign(&mut self, rhs: FreezeResult) {
-        *self = *self | rhs;
     }
 }
 

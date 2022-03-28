@@ -1,17 +1,38 @@
 use dnp3::app::measurement::*;
 use dnp3::app::*;
 use dnp3::app::{ResponseFunction, ResponseHeader};
-use dnp3::master::{AssociationHandler, HeaderInfo, ReadHandler, ReadType};
+use dnp3::master::{
+    AssociationHandler, AssociationInformation, HeaderInfo, ReadHandler, ReadType, TaskError,
+    TaskType,
+};
 
 use crate::ffi;
 
 impl AssociationHandler for ffi::AssociationHandler {
-    fn get_system_time(&self) -> Option<Timestamp> {
+    fn get_current_time(&self) -> Option<Timestamp> {
         if let Some(time) = self.get_current_time() {
             time.into()
         } else {
             None
         }
+    }
+}
+
+impl AssociationInformation for ffi::AssociationInformation {
+    fn task_start(&mut self, task_type: TaskType, fc: FunctionCode, seq: Sequence) {
+        ffi::AssociationInformation::task_start(self, task_type.into(), fc.into(), seq.value());
+    }
+
+    fn task_success(&mut self, task_type: TaskType, fc: FunctionCode, seq: Sequence) {
+        ffi::AssociationInformation::task_success(self, task_type.into(), fc.into(), seq.value());
+    }
+
+    fn task_fail(&mut self, task_type: TaskType, error: TaskError) {
+        ffi::AssociationInformation::task_fail(self, task_type.into(), error.into());
+    }
+
+    fn unsolicited_response(&mut self, is_duplicate: bool, seq: Sequence) {
+        ffi::AssociationInformation::unsolicited_response(self, is_duplicate, seq.value());
     }
 }
 
@@ -95,7 +116,7 @@ impl ReadHandler for ffi::ReadHandler {
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
-        iter: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+        iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     ) {
         let info = info.into();
         let mut iterator = OctetStringIterator::new(iter);
@@ -147,7 +168,7 @@ impl From<Iin2> for ffi::Iin2 {
 impl From<ResponseHeader> for ffi::ResponseHeader {
     fn from(header: ResponseHeader) -> ffi::ResponseHeader {
         ffi::ResponseHeaderFields {
-            control: ffi::Control {
+            control_field: ffi::ControlField {
                 fir: header.control.fir,
                 fin: header.control.fin,
                 con: header.control.con,
@@ -185,6 +206,23 @@ impl From<HeaderInfo> for ffi::HeaderInfo {
             has_flags: info.has_flags,
         }
         .into()
+    }
+}
+
+impl From<TaskType> for ffi::TaskType {
+    fn from(from: TaskType) -> Self {
+        match from {
+            TaskType::UserRead => ffi::TaskType::UserRead,
+            TaskType::PeriodicPoll => ffi::TaskType::PeriodicPoll,
+            TaskType::StartupIntegrity => ffi::TaskType::StartupIntegrity,
+            TaskType::AutoEventScan => ffi::TaskType::AutoEventScan,
+            TaskType::Command => ffi::TaskType::Command,
+            TaskType::ClearRestartBit => ffi::TaskType::ClearRestartBit,
+            TaskType::EnableUnsolicited => ffi::TaskType::EnableUnsolicited,
+            TaskType::DisableUnsolicited => ffi::TaskType::DisableUnsolicited,
+            TaskType::TimeSync => ffi::TaskType::TimeSync,
+            TaskType::Restart => ffi::TaskType::Restart,
+        }
     }
 }
 
@@ -346,13 +384,13 @@ impl ffi::AnalogOutputStatus {
 }
 
 pub struct OctetStringIterator<'a> {
-    inner: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>,
+    inner: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     next: Option<ffi::OctetString<'a>>,
     current_byte_it: Option<ByteIterator<'a>>,
 }
 
 impl<'a> OctetStringIterator<'a> {
-    fn new(inner: &'a mut dyn Iterator<Item = (Bytes<'a>, u16)>) -> Self {
+    fn new(inner: &'a mut dyn Iterator<Item = (&'a [u8], u16)>) -> Self {
         Self {
             inner,
             next: None,
@@ -397,9 +435,9 @@ pub struct ByteIterator<'a> {
 }
 
 impl<'a> ByteIterator<'a> {
-    fn new(bytes: Bytes<'a>) -> Self {
+    fn new(bytes: &'a [u8]) -> Self {
         Self {
-            inner: bytes.value.iter(),
+            inner: bytes.iter(),
             next: None,
         }
     }

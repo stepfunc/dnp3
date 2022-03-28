@@ -4,8 +4,8 @@ use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;
 
 use crate::app::parse::parser::{HeaderCollection, Response};
-use crate::app::Timestamp;
 use crate::app::{ExponentialBackOff, RetryStrategy};
+use crate::app::{FunctionCode, Timestamp};
 use crate::app::{Iin, ResponseHeader};
 use crate::app::{Sequence, Timeout};
 use crate::link::EndpointAddress;
@@ -20,7 +20,7 @@ use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::NonReadTask::TimeSync;
 use crate::master::tasks::{AssociationTask, ReadTask, Task};
-use crate::master::{ReadHandler, ReadType};
+use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
 use crate::tokio::time::Instant;
 use crate::util::Smallest;
 
@@ -283,6 +283,7 @@ pub(crate) struct Association {
     auto_tasks: TaskStates,
     read_handler: Box<dyn ReadHandler>,
     assoc_handler: Box<dyn AssociationHandler>,
+    assoc_info: Box<dyn AssociationInformation>,
     config: AssociationConfig,
     polls: PollMap,
     next_link_status: Option<Instant>,
@@ -296,6 +297,7 @@ impl Association {
         config: AssociationConfig,
         read_handler: Box<dyn ReadHandler>,
         assoc_handler: Box<dyn AssociationHandler>,
+        assoc_info: Box<dyn AssociationInformation>,
     ) -> Self {
         Self {
             response_timeout: config.response_timeout,
@@ -307,6 +309,7 @@ impl Association {
             auto_tasks: TaskStates::new(),
             read_handler,
             assoc_handler,
+            assoc_info,
             config,
             polls: PollMap::new(),
             next_link_status: config
@@ -367,7 +370,7 @@ impl Association {
     }
 
     pub(crate) fn get_system_time(&self) -> Option<Timestamp> {
-        self.assoc_handler.get_system_time()
+        self.assoc_handler.get_current_time()
     }
 
     pub(crate) fn complete_poll(&mut self, id: u64) {
@@ -506,6 +509,7 @@ impl Association {
             // Ignore repeat
             if last_frag == Some(new_frag) {
                 tracing::warn!("ignoring duplicate unsolicited response");
+                self.notify_unsolicited_response(true, new_frag.header.control.seq);
                 return true; // still want to send confirmation if requested
             }
 
@@ -519,8 +523,11 @@ impl Association {
                 .await;
             }
 
+            self.notify_unsolicited_response(false, new_frag.header.control.seq);
+
             true
         } else {
+            // TODO: notify this event?
             tracing::warn!(
                 "ignoring unsolicited response received before the end of the startup procedure"
             );
@@ -582,6 +589,23 @@ impl Association {
             self.read_handler.as_mut(),
         )
         .await;
+    }
+
+    pub(crate) fn notify_task_start(&mut self, task_type: TaskType, fc: FunctionCode) {
+        self.assoc_info
+            .task_start(task_type, fc, Sequence::new(self.seq.next()))
+    }
+
+    pub(crate) fn notify_task_success(&mut self, task_type: TaskType, fc: FunctionCode) {
+        self.assoc_info.task_success(task_type, fc, self.seq);
+    }
+
+    pub(crate) fn notify_task_fail(&mut self, task_type: TaskType, err: TaskError) {
+        self.assoc_info.task_fail(task_type, err);
+    }
+
+    fn notify_unsolicited_response(&mut self, is_duplicate: bool, seq: Sequence) {
+        self.assoc_info.unsolicited_response(is_duplicate, seq);
     }
 
     pub(crate) fn priority_task(&mut self) -> Option<Task> {

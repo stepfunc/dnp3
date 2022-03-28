@@ -48,7 +48,7 @@ dnp3_port_state_listener_t get_port_state_listener()
     };
 }
 
-// ReadHandler
+// ANCHOR: read_handler
 void begin_fragment(dnp3_read_type_t read_type, dnp3_response_header_t header, void *arg)
 {
     printf("Beginning fragment (broadcast: %u)\n", header.iin.iin1.broadcast);
@@ -158,6 +158,7 @@ void handle_octet_strings(dnp3_header_info_t info, dnp3_octet_string_iterator_t 
         printf("\n");
     }
 }
+// ANCHOR_END: read_handler
 
 dnp3_read_handler_t get_read_handler()
 {
@@ -252,13 +253,55 @@ dnp3_association_handler_t get_association_handler()
 }
 // ANCHOR_END: association_handler
 
+// ANCHOR: association_information
+void task_start(dnp3_task_type_t task_type, dnp3_function_code_t fc, uint8_t seq, void *arg)
+{
+
+}
+
+void task_success(dnp3_task_type_t task_type, dnp3_function_code_t fc, uint8_t seq, void *arg)
+{
+    
+}
+
+void task_fail(dnp3_task_type_t task_type, dnp3_task_error_t error, void *arg)
+{
+    
+}
+
+void unsolicited_response(bool is_duplicate, uint8_t seq, void *arg)
+{
+    
+}
+
+dnp3_association_information_t get_association_information()
+{
+    return (dnp3_association_information_t){
+        .task_start = task_start,
+        .task_success = task_success,
+        .task_fail = task_fail,
+        .unsolicited_response = unsolicited_response,
+        .on_destroy = NULL,
+        .ctx = NULL,
+    };
+}
+// ANCHOR_END: association_information
+
 int run_channel(dnp3_master_channel_t *channel)
 {
     // Create the association
     // ANCHOR: association_create
     dnp3_association_id_t association_id;
     dnp3_param_error_t err =
-        dnp3_master_channel_add_association(channel, 1024, get_association_config(), get_read_handler(), get_association_handler(), &association_id);
+        dnp3_master_channel_add_association(
+            channel,
+            1024,
+            get_association_config(),
+            get_read_handler(),
+            get_association_handler(),
+            get_association_information(),
+            &association_id
+        );
     // ANCHOR_END: association_create
     if (err) {
         printf("unable to add association: %s \n", dnp3_param_error_to_string(err));
@@ -300,10 +343,10 @@ int run_channel(dnp3_master_channel_t *channel)
             dnp3_master_channel_disable(channel);
         }
         else if (strcmp(cbuf, "dln\n") == 0) {
-            dnp3_master_channel_set_decode_level(channel, dnp3_decode_level_init());
+            dnp3_master_channel_set_decode_level(channel, dnp3_decode_level_nothing());
         }
         else if (strcmp(cbuf, "dlv\n") == 0) {
-            dnp3_decode_level_t level = dnp3_decode_level_init();
+            dnp3_decode_level_t level = dnp3_decode_level_nothing();
             level.application = DNP3_APP_DECODE_LEVEL_OBJECT_VALUES;
             dnp3_master_channel_set_decode_level(channel, level);
         }
@@ -444,7 +487,7 @@ int run_serial_channel(dnp3_runtime_t *runtime)
         runtime,
         get_master_channel_config(),
         "/dev/pts/4",
-        dnp3_serial_port_settings_init(),
+        dnp3_serial_settings_init(),
         1000,
         get_port_state_listener(),
         &channel
@@ -459,7 +502,7 @@ int run_serial_channel(dnp3_runtime_t *runtime)
     return run_channel(channel);
 }
 
-int run_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t config)
+int run_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t tls_config)
 {
     // ANCHOR: create_master_tls_channel
     dnp3_master_channel_t *channel = NULL;
@@ -469,9 +512,9 @@ int run_tls_channel(dnp3_runtime_t *runtime, dnp3_tls_client_config_t config)
         DNP3_LINK_ERROR_MODE_CLOSE,
         get_master_channel_config(),
         endpoints,
-        config,
         dnp3_connect_strategy_init(),
         get_client_state_listener(),
+        tls_config,
         &channel
     );
     dnp3_endpoint_list_destroy(endpoints);
