@@ -185,7 +185,7 @@ checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
 [[package]]
 name = "c-oo-bindgen"
 version = "0.1.4"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#48ad0ca956164235f836080c25014b4cf7952656"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#5eecdc37d8a289afa0f7889f54ed1af4fa731f04"
 dependencies = [
  "oo-bindgen",
 ]
@@ -233,7 +233,7 @@ dependencies = [
 [[package]]
 name = "ci-script"
 version = "0.1.4"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#48ad0ca956164235f836080c25014b4cf7952656"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#5eecdc37d8a289afa0f7889f54ed1af4fa731f04"
 dependencies = [
  "c-oo-bindgen",
  "clap",
@@ -436,7 +436,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3"
-version = "1.0.0-rc1"
+version = "1.0.0-rc2"
 dependencies = [
  "assert_matches",
  "chrono",
@@ -458,7 +458,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-bindings"
-version = "1.0.0-rc1"
+version = "1.0.0-rc2"
 dependencies = [
  "ci-script",
  "dnp3-ffi",
@@ -467,7 +467,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-ffi"
-version = "1.0.0-rc1"
+version = "1.0.0-rc2"
 dependencies = [
  "dnp3",
  "dnp3-schema",
@@ -482,7 +482,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-schema"
-version = "1.0.0-rc1"
+version = "1.0.0-rc2"
 dependencies = [
  "dnp3",
  "oo-bindgen",
@@ -491,7 +491,7 @@ dependencies = [
 [[package]]
 name = "dotnet-oo-bindgen"
 version = "0.1.4"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#48ad0ca956164235f836080c25014b4cf7952656"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#5eecdc37d8a289afa0f7889f54ed1af4fa731f04"
 dependencies = [
  "dunce",
  "oo-bindgen",
@@ -692,7 +692,7 @@ checksum = "1aab8fc367588b89dcee83ab0fd66b72b50b72fa1904d7095045ace2b0c81c35"
 [[package]]
 name = "java-oo-bindgen"
 version = "0.1.4"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#48ad0ca956164235f836080c25014b4cf7952656"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#5eecdc37d8a289afa0f7889f54ed1af4fa731f04"
 dependencies = [
  "dunce",
  "oo-bindgen",
@@ -899,7 +899,7 @@ checksum = "87f3e037eac156d1775da914196f0f37741a274155e34a0b7e427c35d2a2ecb9"
 [[package]]
 name = "oo-bindgen"
 version = "0.1.4"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#48ad0ca956164235f836080c25014b4cf7952656"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#5eecdc37d8a289afa0f7889f54ed1af4fa731f04"
 dependencies = [
  "backtrace",
  "heck",
@@ -1177,7 +1177,7 @@ dependencies = [
 [[package]]
 name = "rust-oo-bindgen"
 version = "0.1.4"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#48ad0ca956164235f836080c25014b4cf7952656"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/c++#5eecdc37d8a289afa0f7889f54ed1af4fa731f04"
 dependencies = [
  "heck",
  "oo-bindgen",

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -13,7 +13,7 @@
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="dnp3" Version="1.0.0-rc1" />
+        <PackageReference Include="dnp3" Version="1.0.0-rc2" />
       </ItemGroup>
     </Otherwise>
   </Choose>
