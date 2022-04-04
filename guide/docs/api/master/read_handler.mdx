@@ -35,6 +35,10 @@ Since responses may consist of multiple fragments, you can inspect the `Response
 in a response series.
 :::
 
+It is possible to send a read request with a specific `ReadHandler` by using the `MasterChannel::read_with_handler()` method.
+All the response data associated with the request will be forwarded to the `ReadHandler` specified as an argument instead of
+going to the handler specified at the creation of the association.
+
 <Tabs
 groupId="language"
 defaultValue="Rust"
