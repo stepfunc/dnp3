@@ -1,4 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 pub use config::*;
 use details::range::static_db::{Deadband, FlagsDetector, OctetStringDetector, PointConfig};
@@ -290,20 +292,42 @@ impl Database {
     }
 }
 
+#[derive(Clone)]
+struct DatabaseWrapper {
+    inner: Arc<parking_lot::ReentrantMutex<RefCell<Database>>>,
+}
+
+impl DatabaseWrapper {
+    fn new(db: Database) -> Self {
+        Self {
+            inner: Arc::new(parking_lot::ReentrantMutex::new(RefCell::new(db))),
+        }
+    }
+
+    pub(crate) fn transaction<F, R>(&self, mut func: F) -> R
+    where
+        F: FnMut(&mut Database) -> R,
+    {
+        let guard = self.inner.lock();
+        let ret = func(guard.deref().borrow_mut().deref_mut());
+        ret
+    }
+}
+
 /// Handle type that can be used to perform transactions on an underlying database
 #[derive(Clone)]
 pub(crate) struct DatabaseHandle {
-    inner: Arc<Mutex<Database>>,
+    wrapper: DatabaseWrapper,
     notify: Arc<crate::tokio::sync::Notify>,
 }
 
 impl DatabaseHandle {
     /// Perform a transaction on the underlying database using a closure
-    pub(crate) fn transaction<F, R>(&self, mut func: F) -> R
+    pub(crate) fn transaction<F, R>(&self, func: F) -> R
     where
         F: FnMut(&mut Database) -> R,
     {
-        let ret = func(&mut self.inner.lock().unwrap());
+        let ret = self.wrapper.transaction(func);
         self.notify.notify_one();
         ret
     }
@@ -318,48 +342,45 @@ impl DatabaseHandle {
         event_config: EventBufferConfig,
     ) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(Database::new(
+            wrapper: DatabaseWrapper::new(Database::new(
                 max_read_selection,
                 class_zero_config,
                 event_config,
-            ))),
+            )),
             notify: Arc::new(crate::tokio::sync::Notify::new()),
         }
     }
 
     pub(crate) fn clear_written_events(&mut self) {
-        self.inner.lock().unwrap().inner.clear_written_events();
+        self.wrapper
+            .transaction(|db| db.inner.clear_written_events());
     }
 
     pub(crate) fn get_events_info(&self) -> EventsInfo {
-        let guard = self.inner.lock().unwrap();
-
-        EventsInfo {
-            unwritten_classes: guard.inner.unwritten_classes(),
-            is_overflown: guard.inner.is_overflown(),
-        }
+        self.wrapper.transaction(|db| EventsInfo {
+            unwritten_classes: db.inner.unwritten_classes(),
+            is_overflown: db.inner.is_overflown(),
+        })
     }
 
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> Iin2 {
         let mut iin2 = Iin2::default();
-        let mut guard = self.inner.lock().unwrap();
-        for header in headers.iter() {
-            match ReadHeader::get(&header) {
-                None => {
-                    iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
+        self.wrapper.transaction(|db| {
+            for header in headers.iter() {
+                match ReadHeader::get(&header) {
+                    None => {
+                        iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
+                    }
+                    Some(x) => iin2 |= db.inner.select_by_header(x),
                 }
-                Some(x) => iin2 |= guard.inner.select_by_header(x),
             }
-        }
-        iin2
+            iin2
+        })
     }
 
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {
-        self.inner
-            .lock()
-            .unwrap()
-            .inner
-            .write_response_headers(cursor)
+        self.wrapper
+            .transaction(|db| db.inner.write_response_headers(cursor))
     }
 
     pub(crate) fn write_unsolicited(
@@ -367,17 +388,18 @@ impl DatabaseHandle {
         classes: EventClasses,
         cursor: &mut WriteCursor,
     ) -> usize {
-        let mut guard = self.inner.lock().unwrap();
-        guard.inner.reset();
-        let count = guard.inner.select_event_classes(classes);
-        if count == 0 {
-            return 0;
-        }
-        guard.inner.write_events_only(cursor)
+        self.wrapper.transaction(|db| {
+            db.inner.reset();
+            let count = db.inner.select_event_classes(classes);
+            if count == 0 {
+                return 0;
+            }
+            db.inner.write_events_only(cursor)
+        })
     }
 
     pub(crate) fn reset(&mut self) {
-        self.inner.lock().unwrap().inner.reset()
+        self.wrapper.transaction(|db| db.inner.reset())
     }
 }
 

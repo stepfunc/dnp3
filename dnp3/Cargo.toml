@@ -10,6 +10,7 @@ chrono = "0.4"
 tokio-mock = { git = "https://github.com/stepfunc/tokio-mock.git", tag = "0.1.0" }
 tokio-serial = "5.4"
 xxhash-rust = { version = "0.8.2", features = ["xxh64"] }
+parking_lot = "0.12.0"
 
 # TLS dependencies
 pem = { version = "1.0", optional = true }
