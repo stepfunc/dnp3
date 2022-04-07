@@ -43,3 +43,9 @@ For example, you might maintain the number of control operations performed in a 
 The OperateType enum lets you identify which of the three operate function codes invoked the method. You can probably ignore this value. The specification requires all three control methodologies be supported and result in the same action.
 :::
 
+:::warning
+The outstation automatically performs a transaction on the database when a control ASDU is received. Always use
+the provided `Database` argument to update values in ControlHandler callbacks. Calling `Outstation.transaction`
+inside of `ControlHandler` callback will result in deadlock.
+:::
+

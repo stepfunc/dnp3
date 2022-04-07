@@ -9,11 +9,24 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 You can use the `Database` class to manipulate the measurement types and values that the outstation exposes to the master. Note that while it's called a "database", it's really just
-a thread-safe data structure in memory.
+a in-memory data structure protected by a mutex.
 
 All database operations are executed in a transaction. All the operations within a transaction will be applied to the database and the
 event buffers at the same time. If unsolicited responses are enabled, the outstation will automatically decides if an unsolicited response
 should be sent at the end of the transaction.
+
+Database transactions can occur in 2 distinct ways:
+
+1. When measurement values need to updated due to some external changes, the user can call `Outstation.transaction` to acquire
+a locked reference to the database and make changes.
+
+2. When a control-carrying ASDU is received (select, operate, etc), the outstation locks the database and passes a reference
+to it into each callback anticipating updates from the user.
+
+:::tip
+Structure any common update code to operate on the `Database` type and not depend on `Outstation`. This will allow you to easily
+share code for the two ways in which a database transaction may occur.
+:::
 
 ## Adding Points
 
