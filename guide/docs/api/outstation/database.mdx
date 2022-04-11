@@ -12,7 +12,7 @@ You can use the `Database` class to manipulate the measurement types and values 
 a in-memory data structure protected by a mutex.
 
 All database operations are executed in a transaction. All the operations within a transaction will be applied to the database and the
-event buffers at the same time. If unsolicited responses are enabled, the outstation will automatically decides if an unsolicited response
+event buffers at the same time. If unsolicited responses are enabled, the outstation will automatically decide if an unsolicited response
 should be sent at the end of the transaction.
 
 Database transactions can occur in 2 distinct ways:
