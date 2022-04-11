@@ -1,6 +1,6 @@
 ---
 id: dependencies
-title: Managing Open Source Dependencies
+title: Dependency Licenses
 sidebar_label: Dependency Licenses
 slug: /dependencies
 ---
@@ -8,18 +8,26 @@ slug: /dependencies
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import sitedata from '../../sitedata.json'
 
-While Rust's package manager `cargo` makes it easy to work with external dependencies, the nature of Rust's open-source ecosystem means that the number of dependencies can quickly proliferate. Our library only depends directly on a few third-party libraries; however, those libraries pull in dozens of sub-dependencies. Here's how we manage our direct and indirect dependencies.
+Rust's package manager `cargo` makes it easy to work with external dependencies. The downside of this excellent tooling
+is that open source Rust libraries tend to be finely-factored. Our library only depends directly on a few third-party
+libraries; however, those libraries pull in dozens of sub-dependencies. Here's how we manage our direct and indirect
+dependencies.
 
 ## Automated License Checking
 
-We developed an automated tool called `complicense` to ensure that our binary distributions meet the legal requirements for third-party open source licenses. This tool performs the following tasks:
+We use an automated tool called `complicense` to whitelist dependency licenses and collect them into a single file.
 
-* Analyzes each dependency's license against an allowed list of licenses. Our CI packaging will fail if add a dependency is added with a license that has not been pre-approved.
-* Uses the Github API to automatically retrieve the license file for each project hosted on Github. Only a few projects don't have the proper metadata; the
-license name and content for those are specified manually in the `complicense` configuration.
+The tool performs the following tasks:
+
+* Analyzes each dependency's license against an allowed list of licenses. Our CI packaging will fail if add a dependency
+is added with a license that has not been pre-approved.
+* Uses the Github API to automatically retrieve the license file for each project hosted on Github. Only a few projects
+don't have the proper metadata; the license name and content for those are specified manually in the `complicense`
+configuration.
 * Ignores projects that are 100% copyrighted by Step Function I/O (e.g., the DNP3 library itself).
-* Produces a license report document called `dependencies.txt` that consolidates all the dependency and license information. We include this document in all of our binary distributions for transparency and to make it
-easy for you to comply with the open source licenses.
+* Produces a license report document called `dependencies.txt` that consolidates all the dependency and license
+information. We include this document in all of our binary distributions for transparency and to make it easy for you
+to comply with the open source licenses.
 
 ## Proprietary Compatible
 
