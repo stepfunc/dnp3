@@ -10,9 +10,10 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 We distribute the C# bindings as a [Nuget package](https://www.nuget.org/packages/dnp3). Internally, the C API is called using [P/Invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke)
 The bindings are .NET standard 2.0 compatible and include platform-specific shared libraries that are automatically loaded by the .NET runtime.
 
-The currently embedded shared libraries are the following:
+Shared libraries for the following platforms are included in the Nuget package:
 
 - Windows x64 (Windows 7+)
+- Windows x86 (Windows 7+)
 - Linux x64 (kernel 2.6.32+, glibc 2.11+)
 - Linux AArch64 (kernel 4.2, glibc 2.17+)
 - MacOS x64 (MacOS 10.7+, Lion+)
@@ -53,4 +54,6 @@ Rust task executing on the Tokio runtime. The `Shutdown` method lets you precise
 
 ### Asynchronous Methods
 
-Abstract asynchronous methods are transformed into methods that return `Task<T>`. You can block on the task or `await` it in an async method.
+Abstract asynchronous methods are transformed into methods that return `Task<T>`. C# Tasks are flexible and can be consumed in different ways:
+
+* Synchronous applications can
