@@ -72,32 +72,98 @@ class ExampleOutstation
         public void ClearRestartIin() { }
     }
 
+    // ANCHOR: control_handler
     class TestControlHandler : IControlHandler
     {
         public void BeginFragment() { }
 
         public void EndFragment() { }
 
-        public CommandStatus SelectG12v1(Group12Var1 control, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG12v1(Group12Var1 control, ushort index, Database database)
+        {
+            if (index < 10 && (control.Code.OpType == OpType.LatchOn || control.Code.OpType == OpType.LatchOff))
+            {
+                return CommandStatus.Success;
+            }
+            else
+            {
+                return CommandStatus.NotSupported;
+            }
+        }
 
-        public CommandStatus OperateG12v1(Group12Var1 control, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG12v1(Group12Var1 control, ushort index, OperateType opType, Database database)
+        {
+            if (index < 10 && (control.Code.OpType == OpType.LatchOn || control.Code.OpType == OpType.LatchOff))
+            {
+                var status = (control.Code.OpType == OpType.LatchOn);
+                database.UpdateBinaryOutputStatus(new BinaryOutputStatus(index, status, new Flags(Flag.Online), Now()), UpdateOptions.DetectEvent());
+                return CommandStatus.Success;
+            }
+            else
+            {
+                return CommandStatus.NotSupported;
+            }
+        }
 
-        public CommandStatus SelectG41v1(int control, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v1(int value, ushort index, Database database)
+        {
+            return SelectAnalogOutput(index);
+        }
 
-        public CommandStatus OperateG41v1(int control, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v1(int value, ushort index, OperateType opType, Database database)
+        {
+            return OperateAnalogOutput(value, index, database);
+        }
 
-        public CommandStatus SelectG41v2(short value, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v2(short value, ushort index, Database database)
+        {
+            return SelectAnalogOutput(index);
+        }
 
-        public CommandStatus OperateG41v2(short value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v2(short value, ushort index, OperateType opType, Database database)
+        {
+            return OperateAnalogOutput(value, index, database);
+        }
 
-        public CommandStatus SelectG41v3(float value, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v3(float value, ushort index, Database database)
+        {
+            return SelectAnalogOutput(index);
+        }
 
-        public CommandStatus OperateG41v3(float value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v3(float value, ushort index, OperateType opType, Database database)
+        {
+            return OperateAnalogOutput(value, index, database);
+        }
 
-        public CommandStatus SelectG41v4(double value, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v4(double value, ushort index, Database database)
+        {
+            return SelectAnalogOutput(index);
+        }
 
-        public CommandStatus OperateG41v4(double value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v4(double value, ushort index, OperateType opType, Database database)
+        {
+            return OperateAnalogOutput(value, index, database);
+        }
+
+        private CommandStatus SelectAnalogOutput(ushort index)
+        {
+            return index < 10 ? CommandStatus.Success : CommandStatus.NotSupported;
+        }
+
+        private CommandStatus OperateAnalogOutput(double value, ushort index, Database database)
+        {
+            if (index < 10)
+            {
+                database.UpdateAnalogOutputStatus(new AnalogOutputStatus(index, value, new Flags(Flag.Online), Now()), UpdateOptions.DetectEvent());
+                return CommandStatus.Success;
+            }
+            else
+            {
+                return CommandStatus.NotSupported;
+            }
+        }
     }
+    // ANCHOR_END: control_handler
 
     class TestConnectionStateListener : IConnectionStateListener
     {

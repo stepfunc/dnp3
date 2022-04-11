@@ -58,6 +58,162 @@ impl OutstationApplication for ExampleOutstationApplication {}
 struct ExampleOutstationInformation;
 impl OutstationInformation for ExampleOutstationInformation {}
 
+// ANCHOR: control_handler
+struct ExampleControlHandler;
+impl ControlHandler for ExampleControlHandler {}
+
+impl ControlSupport<Group12Var1> for ExampleControlHandler {
+    fn select(
+        &mut self,
+        control: Group12Var1,
+        index: u16,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        if index < 10
+            && (control.code.op_type == OpType::LatchOn || control.code.op_type == OpType::LatchOff)
+        {
+            CommandStatus::Success
+        } else {
+            CommandStatus::NotSupported
+        }
+    }
+
+    fn operate(
+        &mut self,
+        control: Group12Var1,
+        index: u16,
+        _op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        if index < 10
+            && (control.code.op_type == OpType::LatchOn || control.code.op_type == OpType::LatchOff)
+        {
+            let status = control.code.op_type == OpType::LatchOn;
+            database.update(
+                index,
+                &BinaryOutputStatus::new(status, Flags::ONLINE, get_current_time()),
+                UpdateOptions::detect_event(),
+            );
+            CommandStatus::Success
+        } else {
+            CommandStatus::NotSupported
+        }
+    }
+}
+
+impl ExampleControlHandler {
+    fn select_analog_output(&self, index: u16) -> CommandStatus {
+        if index < 10 {
+            CommandStatus::Success
+        } else {
+            CommandStatus::NotSupported
+        }
+    }
+
+    fn operate_analog_output(
+        &self,
+        value: f64,
+        index: u16,
+        database: &mut Database,
+    ) -> CommandStatus {
+        if index < 10 {
+            database.update(
+                index,
+                &AnalogOutputStatus::new(value, Flags::ONLINE, get_current_time()),
+                UpdateOptions::detect_event(),
+            );
+            CommandStatus::Success
+        } else {
+            CommandStatus::NotSupported
+        }
+    }
+}
+
+impl ControlSupport<Group41Var1> for ExampleControlHandler {
+    fn select(
+        &mut self,
+        _control: Group41Var1,
+        index: u16,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.select_analog_output(index)
+    }
+
+    fn operate(
+        &mut self,
+        control: Group41Var1,
+        index: u16,
+        _op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.operate_analog_output(control.value as f64, index, database)
+    }
+}
+
+impl ControlSupport<Group41Var2> for ExampleControlHandler {
+    fn select(
+        &mut self,
+        _control: Group41Var2,
+        index: u16,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.select_analog_output(index)
+    }
+
+    fn operate(
+        &mut self,
+        control: Group41Var2,
+        index: u16,
+        _op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.operate_analog_output(control.value as f64, index, database)
+    }
+}
+
+impl ControlSupport<Group41Var3> for ExampleControlHandler {
+    fn select(
+        &mut self,
+        _control: Group41Var3,
+        index: u16,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.select_analog_output(index)
+    }
+
+    fn operate(
+        &mut self,
+        control: Group41Var3,
+        index: u16,
+        _op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.operate_analog_output(control.value as f64, index, database)
+    }
+}
+
+impl ControlSupport<Group41Var4> for ExampleControlHandler {
+    fn select(
+        &mut self,
+        _control: Group41Var4,
+        index: u16,
+        _database: &mut Database,
+    ) -> CommandStatus {
+        self.select_analog_output(index)
+    }
+
+    fn operate(
+        &mut self,
+        control: Group41Var4,
+        index: u16,
+        _op_type: OperateType,
+        database: &mut Database,
+    ) -> CommandStatus {
+        self.operate_analog_output(control.value, index, database)
+    }
+}
+// ANCHOR_END: control_handler
+
 async fn run_tcp() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_tcp_server
     let server = Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
@@ -78,7 +234,7 @@ async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
         // customizable trait to receive events about what the outstation is doing
         Box::new(ExampleOutstationInformation),
         // customizable trait to process control requests from the master
-        DefaultControlHandler::with_status(CommandStatus::NotSupported),
+        Box::new(ExampleControlHandler),
     )?;
     // ANCHOR_END: create_serial_server
 
@@ -100,7 +256,7 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
         get_outstation_config(),
         Box::new(ExampleOutstationApplication),
         Box::new(ExampleOutstationInformation),
-        DefaultControlHandler::with_status(CommandStatus::NotSupported),
+        Box::new(ExampleControlHandler),
         NullListener::create(),
         AddressFilter::Any,
     )?;

@@ -14,7 +14,8 @@ jobs:
       matrix:
         rust:
           - stable
-          - beta
+          # As of 1.61-beta.1, clippy gets stuck in an infinite loop. See https://github.com/rust-lang/rust-clippy/issues/8689
+          #- beta
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

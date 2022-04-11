@@ -618,8 +618,6 @@ impl OutstationSession {
             return None;
         }
 
-        cursor.written().len();
-
         let seq = self.state.unsolicited_seq.increment();
         let header = ResponseHeader::new(
             ControlField::unsolicited_response(seq),
