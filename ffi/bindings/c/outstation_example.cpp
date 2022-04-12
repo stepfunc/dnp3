@@ -19,6 +19,17 @@ std::ostream& operator<<(std::ostream& os, const Flags& flags)
     return write_hex_byte(os, flags.value);
 }
 
+Flags online()
+{
+    return Flags(flag::online);
+}
+
+Timestamp now()
+{
+    const auto time_since_epoch = std::chrono::system_clock::now().time_since_epoch();
+    return Timestamp::synchronized_timestamp(std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count());
+}
+
 class MyOutstationApplication : public OutstationApplication {
     uint16_t get_processing_delay_ms() override {
         return 0;
@@ -58,40 +69,96 @@ class MyOutstationInformation : public OutstationInformation {
     void clear_restart_iin() override {}
 };
 
+// ANCHOR: control_handler
 class MyControlHandler : public ControlHandler {
     void begin_fragment() override {}
     void end_fragment() override {}
+
     CommandStatus select_g12v1(const Group12Var1& control, uint16_t index, Database& database) override {
-        return CommandStatus::not_supported;
+        if (index < 10 && (control.code.op_type == OpType::latch_on || control.code.op_type == OpType::latch_off))
+        {
+            return CommandStatus::success;
+        }
+        else
+        {
+            return CommandStatus::not_supported;
+        }
     }
-    CommandStatus operate_g12v1(const Group12Var1& control, uint16_t index, OperateType op_type, Database& database) override {
-        return CommandStatus::not_supported;
+
+    CommandStatus operate_g12v1(const Group12Var1& control, uint16_t index, OperateType op_type, Database& database) override
+    {
+        if (index < 10 && (control.code.op_type == OpType::latch_on || control.code.op_type == OpType::latch_off))
+        {
+            auto status = (control.code.op_type == OpType::latch_on);
+            database.update_binary_output_status(BinaryOutputStatus(index, status, online(), now()), UpdateOptions::detect_event());
+            return CommandStatus::success;
+        }
+        else
+        {
+            return CommandStatus::not_supported;
+        }
     }
-    CommandStatus select_g41v1(int32_t control, uint16_t index, Database& database) override {
-        return CommandStatus::not_supported;
+
+    CommandStatus select_g41v1(int32_t value, uint16_t index, Database& database) override
+    {
+        return select_analog_output(index);
     }
-    CommandStatus operate_g41v1(int32_t control, uint16_t index, OperateType op_type, Database& database) override {
-        return CommandStatus::not_supported;
+
+    CommandStatus operate_g41v1(int32_t value, uint16_t index, OperateType op_type, Database& database) override
+    {
+        return operate_analog_output(value, index, database);
     }
-    CommandStatus select_g41v2(int16_t value, uint16_t index, Database& database) override {
-        return CommandStatus::not_supported;
+
+    CommandStatus select_g41v2(int16_t value, uint16_t index, Database& database) override
+    {
+        return select_analog_output(index);
     }
-    CommandStatus operate_g41v2(int16_t value, uint16_t index, OperateType op_type, Database& database) override {
-        return CommandStatus::not_supported;
+
+    CommandStatus operate_g41v2(int16_t value, uint16_t index, OperateType op_type, Database& database) override
+    {
+        return operate_analog_output(value, index, database);
     }
-    CommandStatus select_g41v3(float value, uint16_t index, Database& database) override {
-        return CommandStatus::not_supported;
+
+    CommandStatus select_g41v3(float value, uint16_t index, Database& database) override
+    {
+        return select_analog_output(index);
     }
-    CommandStatus operate_g41v3(float value, uint16_t index, OperateType op_type, Database& database) override {
-        return CommandStatus::not_supported;
+
+    CommandStatus operate_g41v3(float value, uint16_t index, OperateType op_type, Database& database) override
+    {
+        return operate_analog_output(value, index, database);
     }
-    CommandStatus select_g41v4(double value, uint16_t index, Database& database) override {
-        return CommandStatus::not_supported;
+
+    CommandStatus select_g41v4(double value, uint16_t index, Database& database) override
+    {
+        return select_analog_output(index);
     }
-    CommandStatus operate_g41v4(double value, uint16_t index, OperateType op_type, Database& database) override {
-        return CommandStatus::not_supported;
+
+    CommandStatus operate_g41v4(double value, uint16_t index, OperateType op_type, Database& database) override
+    {
+        return operate_analog_output(value, index, database);
+    }
+
+private:
+    CommandStatus select_analog_output(uint16_t index)
+    {
+        return index < 10 ? CommandStatus::success : CommandStatus::not_supported;
+    }
+
+    CommandStatus operate_analog_output(double value, uint16_t index, Database& database)
+    {
+        if (index < 10)
+        {
+            database.update_analog_output_status(AnalogOutputStatus(index, value, online(), now()), UpdateOptions::detect_event());
+            return CommandStatus::success;
+        }
+        else
+        {
+            return CommandStatus::not_supported;
+        }
     }
 };
+// ANCHOR_END: control_handler
 
 class State {
 public:
@@ -106,17 +173,6 @@ public:
     double analog_output_status = 0.0;
 
 };
-
-Flags online()
-{
-    return Flags(flag::online);
-}
-
-Timestamp now()
-{
-    const auto time_since_epoch = std::chrono::system_clock::now().time_since_epoch();
-    return Timestamp::synchronized_timestamp(std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count());
-}
 
 // ANCHOR: event_buffer_config
 dnp3::EventBufferConfig get_event_buffer_config()
