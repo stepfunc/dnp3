@@ -292,14 +292,14 @@ impl Database {
 
 /// Handle type that can be used to perform transactions on an underlying database
 #[derive(Clone)]
-pub(crate) struct DatabaseHandle {
+pub struct DatabaseHandle {
     inner: Arc<Mutex<Database>>,
     notify: Arc<crate::tokio::sync::Notify>,
 }
 
 impl DatabaseHandle {
     /// Perform a transaction on the underlying database using a closure
-    pub(crate) fn transaction<F, R>(&self, mut func: F) -> R
+    pub fn transaction<F, R>(&self, mut func: F) -> R
     where
         F: FnMut(&mut Database) -> R,
     {

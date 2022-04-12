@@ -1,6 +1,6 @@
 use dnp3::app::control::*;
 use dnp3::app::*;
-use dnp3::outstation::database::Database;
+use dnp3::outstation::database::DatabaseHandle;
 use dnp3::outstation::*;
 
 use crate::ffi;
@@ -34,7 +34,7 @@ impl OutstationApplication for ffi::OutstationApplication {
         &mut self,
         indices: FreezeIndices,
         freeze_type: FreezeType,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> Result<(), RequestError> {
         match indices {
             FreezeIndices::All => ffi::OutstationApplication::freeze_counters_all(
@@ -173,7 +173,7 @@ impl ControlSupport<Group12Var1> for ffi::ControlHandler {
         &mut self,
         control: Group12Var1,
         index: u16,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         ffi::ControlHandler::select_g12v1(self, control.into(), index, database as *mut _)
             .map(|e| e.into())
@@ -185,7 +185,7 @@ impl ControlSupport<Group12Var1> for ffi::ControlHandler {
         control: Group12Var1,
         index: u16,
         op_type: OperateType,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         ffi::ControlHandler::operate_g12v1(
             self,
@@ -204,7 +204,7 @@ impl ControlSupport<Group41Var1> for ffi::ControlHandler {
         &mut self,
         control: Group41Var1,
         index: u16,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         ffi::ControlHandler::select_g41v1(self, control.value, index, database as *mut _)
             .map(|e| e.into())
@@ -216,7 +216,7 @@ impl ControlSupport<Group41Var1> for ffi::ControlHandler {
         control: Group41Var1,
         index: u16,
         op_type: OperateType,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         ffi::ControlHandler::operate_g41v1(
             self,
@@ -235,7 +235,7 @@ impl ControlSupport<Group41Var2> for ffi::ControlHandler {
         &mut self,
         control: Group41Var2,
         index: u16,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         ffi::ControlHandler::select_g41v2(self, control.value, index, database as *mut _)
             .map(|e| e.into())
@@ -247,7 +247,7 @@ impl ControlSupport<Group41Var2> for ffi::ControlHandler {
         control: Group41Var2,
         index: u16,
         op_type: OperateType,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         ffi::ControlHandler::operate_g41v2(
             self,
@@ -266,7 +266,7 @@ impl ControlSupport<Group41Var3> for ffi::ControlHandler {
         &mut self,
         control: Group41Var3,
         index: u16,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         ffi::ControlHandler::select_g41v3(self, control.value, index, database as *mut _)
             .map(|e| e.into())
@@ -278,7 +278,7 @@ impl ControlSupport<Group41Var3> for ffi::ControlHandler {
         control: Group41Var3,
         index: u16,
         op_type: OperateType,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         ffi::ControlHandler::operate_g41v3(
             self,
@@ -297,7 +297,7 @@ impl ControlSupport<Group41Var4> for ffi::ControlHandler {
         &mut self,
         control: Group41Var4,
         index: u16,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         ffi::ControlHandler::select_g41v4(self, control.value, index, database as *mut _)
             .map(|e| e.into())
@@ -309,7 +309,7 @@ impl ControlSupport<Group41Var4> for ffi::ControlHandler {
         control: Group41Var4,
         index: u16,
         op_type: OperateType,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         ffi::ControlHandler::operate_g41v4(
             self,

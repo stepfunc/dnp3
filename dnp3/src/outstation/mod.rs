@@ -36,6 +36,11 @@ pub struct OutstationHandle {
 }
 
 impl OutstationHandle {
+    /// Get a handle to the associated database
+    pub fn get_database_handle(&self) -> DatabaseHandle {
+        self.database.clone()
+    }
+
     /// Perform a transaction on the underlying database using a closure
     pub fn transaction<F, R>(&self, func: F) -> R
     where

@@ -1386,15 +1386,13 @@ impl OutstationSession {
 
             let max_controls_per_request = self.config.max_controls_per_request;
             let result = ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
-                database.transaction(|database| {
-                    controls.operate_with_response(
-                        &mut cursor,
-                        OperateType::DirectOperate,
-                        tx,
-                        database,
-                        max_controls_per_request,
-                    )
-                })
+                controls.operate_with_response(
+                    &mut cursor,
+                    OperateType::DirectOperate,
+                    tx,
+                    database,
+                    max_controls_per_request,
+                )
             })
             .await;
 
@@ -1460,14 +1458,12 @@ impl OutstationSession {
 
     async fn handle_direct_operate_no_ack(
         &mut self,
-        database: &mut DatabaseHandle,
+        database: &DatabaseHandle,
         controls: ControlCollection<'_>,
     ) {
         let max_controls_per_request = self.config.max_controls_per_request;
         ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
-            database.transaction(|database| {
-                controls.operate_no_ack(tx, database, max_controls_per_request)
-            })
+            controls.operate_no_ack(tx, database, max_controls_per_request)
         })
         .await;
     }
@@ -1522,7 +1518,7 @@ impl OutstationSession {
 
     async fn handle_select(
         &mut self,
-        database: &mut DatabaseHandle,
+        database: &DatabaseHandle,
         seq: Sequence,
         frame_id: u32,
         controls: ControlCollection<'_>,
@@ -1535,14 +1531,12 @@ impl OutstationSession {
             let max_controls_per_request = self.config.max_controls_per_request;
             let result: Result<CommandStatus, WriteError> =
                 ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
-                    database.transaction(|database| {
-                        controls.select_with_response(
-                            &mut cursor,
-                            tx,
-                            database,
-                            max_controls_per_request,
-                        )
-                    })
+                    controls.select_with_response(
+                        &mut cursor,
+                        tx,
+                        database,
+                        max_controls_per_request,
+                    )
                 })
                 .await;
 
@@ -1602,16 +1596,14 @@ impl OutstationSession {
                         Ok(()) => {
                             let max_controls_per_request = self.config.max_controls_per_request;
                             ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
-                                database
-                                    .transaction(|db| {
-                                        controls.operate_with_response(
-                                            &mut cursor,
-                                            OperateType::SelectBeforeOperate,
-                                            tx,
-                                            db,
-                                            max_controls_per_request,
-                                        )
-                                    })
+                                controls
+                                    .operate_with_response(
+                                        &mut cursor,
+                                        OperateType::SelectBeforeOperate,
+                                        tx,
+                                        database,
+                                        max_controls_per_request,
+                                    )
                                     .unwrap()
                             })
                             .await
@@ -1652,37 +1644,36 @@ impl OutstationSession {
         respond: bool,
     ) -> Option<Response> {
         let mut iin = Iin::default();
-        database.transaction(|db| {
-            for header in object_headers.iter() {
-                match header.details {
-                    HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => {
-                        iin |= self
-                            .application
-                            .freeze_counter(FreezeIndices::All, freeze_type, db)
-                            .map_or_else(|err| err.into(), |_| Iin2::default());
-                    }
-                    HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                        iin |= self
-                            .application
-                            .freeze_counter(
-                                FreezeIndices::Range(start as u16, stop as u16),
-                                freeze_type,
-                                db,
-                            )
-                            .map_or_else(|err| err.into(), |_| Iin2::default());
-                    }
-                    HeaderDetails::TwoByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                        iin |= self
-                            .application
-                            .freeze_counter(FreezeIndices::Range(start, stop), freeze_type, db)
-                            .map_or_else(|err| err.into(), |_| Iin2::default());
-                    }
-                    _ => {
-                        iin |= Iin2::NO_FUNC_CODE_SUPPORT;
-                    }
+
+        for header in object_headers.iter() {
+            match header.details {
+                HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => {
+                    iin |= self
+                        .application
+                        .freeze_counter(FreezeIndices::All, freeze_type, database)
+                        .map_or_else(|err| err.into(), |_| Iin2::default());
+                }
+                HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => {
+                    iin |= self
+                        .application
+                        .freeze_counter(
+                            FreezeIndices::Range(start as u16, stop as u16),
+                            freeze_type,
+                            database,
+                        )
+                        .map_or_else(|err| err.into(), |_| Iin2::default());
+                }
+                HeaderDetails::TwoByteStartStop(start, stop, RangedVariation::Group20Var0) => {
+                    iin |= self
+                        .application
+                        .freeze_counter(FreezeIndices::Range(start, stop), freeze_type, database)
+                        .map_or_else(|err| err.into(), |_| Iin2::default());
+                }
+                _ => {
+                    iin |= Iin2::NO_FUNC_CODE_SUPPORT;
                 }
             }
-        });
+        }
 
         if respond {
             Some(Response::empty_solicited(seq, iin))

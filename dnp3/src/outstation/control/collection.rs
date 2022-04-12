@@ -7,7 +7,7 @@ use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::{QualifierCode, Variation};
 use crate::outstation::control::control_type::ControlType;
 use crate::outstation::control::prefix::PrefixWriter;
-use crate::outstation::database::Database;
+use crate::outstation::database::DatabaseHandle;
 use crate::outstation::traits::{ControlHandler, ControlSupport, OperateType};
 use crate::util::cursor::{WriteCursor, WriteError};
 
@@ -48,7 +48,7 @@ impl<'a> ControlSupport<Group12Var1> for ControlTransaction<'a> {
         &mut self,
         control: Group12Var1,
         index: u16,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         self.start();
         self.handler.select(control, index, database)
@@ -59,7 +59,7 @@ impl<'a> ControlSupport<Group12Var1> for ControlTransaction<'a> {
         control: Group12Var1,
         index: u16,
         op_type: OperateType,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         self.start();
         self.handler.operate(control, index, op_type, database)
@@ -71,7 +71,7 @@ impl<'a> ControlSupport<Group41Var1> for ControlTransaction<'a> {
         &mut self,
         control: Group41Var1,
         index: u16,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         self.start();
         self.handler.select(control, index, database)
@@ -82,7 +82,7 @@ impl<'a> ControlSupport<Group41Var1> for ControlTransaction<'a> {
         control: Group41Var1,
         index: u16,
         op_type: OperateType,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         self.start();
         self.handler.operate(control, index, op_type, database)
@@ -94,7 +94,7 @@ impl<'a> ControlSupport<Group41Var2> for ControlTransaction<'a> {
         &mut self,
         control: Group41Var2,
         index: u16,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         self.start();
         self.handler.select(control, index, database)
@@ -105,7 +105,7 @@ impl<'a> ControlSupport<Group41Var2> for ControlTransaction<'a> {
         control: Group41Var2,
         index: u16,
         op_type: OperateType,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         self.start();
         self.handler.operate(control, index, op_type, database)
@@ -117,7 +117,7 @@ impl<'a> ControlSupport<Group41Var3> for ControlTransaction<'a> {
         &mut self,
         control: Group41Var3,
         index: u16,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         self.start();
         self.handler.select(control, index, database)
@@ -128,7 +128,7 @@ impl<'a> ControlSupport<Group41Var3> for ControlTransaction<'a> {
         control: Group41Var3,
         index: u16,
         op_type: OperateType,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         self.start();
         self.handler.operate(control, index, op_type, database)
@@ -140,7 +140,7 @@ impl<'a> ControlSupport<Group41Var4> for ControlTransaction<'a> {
         &mut self,
         control: Group41Var4,
         index: u16,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         self.start();
         self.handler.select(control, index, database)
@@ -151,7 +151,7 @@ impl<'a> ControlSupport<Group41Var4> for ControlTransaction<'a> {
         control: Group41Var4,
         index: u16,
         op_type: OperateType,
-        database: &mut Database,
+        database: &DatabaseHandle,
     ) -> CommandStatus {
         self.start();
         self.handler.operate(control, index, op_type, database)
@@ -277,7 +277,7 @@ impl<'a> ControlCollection<'a> {
         &self,
         cursor: &mut WriteCursor,
         transaction: &mut ControlTransaction,
-        database: &mut Database,
+        database: &DatabaseHandle,
         max_controls_per_request: Option<u16>,
     ) -> Result<CommandStatus, WriteError> {
         let mut num_controls = 0;
@@ -300,7 +300,7 @@ impl<'a> ControlCollection<'a> {
         cursor: &mut WriteCursor,
         operate_type: OperateType,
         transaction: &mut ControlTransaction,
-        database: &mut Database,
+        database: &DatabaseHandle,
         max_controls_per_request: Option<u16>,
     ) -> Result<CommandStatus, WriteError> {
         let mut num_controls = 0;
@@ -322,7 +322,7 @@ impl<'a> ControlCollection<'a> {
     pub(crate) fn operate_no_ack(
         &self,
         transaction: &mut ControlTransaction,
-        database: &mut Database,
+        database: &DatabaseHandle,
         max_controls_per_request: Option<u16>,
     ) {
         let mut num_controls = 0;
@@ -378,7 +378,7 @@ impl<'a> ControlHeader<'a> {
         &self,
         cursor: &mut WriteCursor,
         transaction: &mut ControlTransaction,
-        database: &mut Database,
+        database: &DatabaseHandle,
         max_controls_per_request: Option<u16>,
         num_controls: &mut u16,
     ) -> Result<CommandStatus, WriteError> {
@@ -471,7 +471,7 @@ impl<'a> ControlHeader<'a> {
         operate_type: OperateType,
         cursor: &mut WriteCursor,
         transaction: &mut ControlTransaction,
-        database: &mut Database,
+        database: &DatabaseHandle,
         max_controls_per_request: Option<u16>,
         num_controls: &mut u16,
     ) -> Result<CommandStatus, WriteError> {
@@ -572,7 +572,7 @@ impl<'a> ControlHeader<'a> {
     fn operate_no_ack(
         &self,
         transaction: &mut ControlTransaction,
-        database: &mut Database,
+        database: &DatabaseHandle,
         max_controls_per_request: Option<u16>,
         num_controls: &mut u16,
     ) {
@@ -670,7 +670,7 @@ where
 fn select_header_with_response<I, V>(
     cursor: &mut WriteCursor,
     seq: &CountSequence<Prefix<I, V>>,
-    database: &mut Database,
+    database: &DatabaseHandle,
     transaction: &mut ControlTransaction,
     max_controls_per_request: Option<u16>,
     num_controls: &mut u16,
@@ -698,7 +698,7 @@ where
 fn operate_header_with_response<I, V>(
     cursor: &mut WriteCursor,
     seq: &CountSequence<Prefix<I, V>>,
-    database: &mut Database,
+    database: &DatabaseHandle,
     operate_type: OperateType,
     transaction: &mut ControlTransaction,
     max_controls_per_request: Option<u16>,
@@ -730,7 +730,7 @@ where
 
 fn operate_header_no_ack<I, V>(
     seq: &CountSequence<Prefix<I, V>>,
-    database: &mut Database,
+    database: &DatabaseHandle,
     transaction: &mut ControlTransaction,
     max_controls_per_request: Option<u16>,
     num_controls: &mut u16,
