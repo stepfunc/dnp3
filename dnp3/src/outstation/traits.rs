@@ -5,7 +5,7 @@ use crate::app::RequestHeader;
 use crate::app::Sequence;
 use crate::app::{control::*, Timestamp};
 use crate::app::{FunctionCode, MaybeAsync};
-use crate::outstation::database::{Database, DatabaseHandle};
+use crate::outstation::database::DatabaseHandle;
 
 /// Application-controlled IIN bits
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
@@ -106,7 +106,7 @@ pub trait OutstationApplication: Sync + Send + 'static {
         &mut self,
         _indices: FreezeIndices,
         _freeze_type: FreezeType,
-        _database: &DatabaseHandle,
+        _database: &mut DatabaseHandle,
     ) -> Result<(), RequestError> {
         Err(RequestError::NotSupported)
     }
@@ -185,7 +185,7 @@ pub trait ControlSupport<T> {
     ///
     /// `CommandStatus` enumeration returning either `CommandStatus::Success` if the operation is
     /// supported, or an error variant otherwise.
-    fn select(&mut self, control: T, index: u16, database: &DatabaseHandle) -> CommandStatus;
+    fn select(&mut self, control: T, index: u16, database: &mut DatabaseHandle) -> CommandStatus;
 
     /// Operate a control point
     ///
@@ -205,7 +205,7 @@ pub trait ControlSupport<T> {
         control: T,
         index: u16,
         op_type: OperateType,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus;
 }
 
@@ -277,7 +277,7 @@ impl ControlSupport<Group12Var1> for DefaultControlHandler {
         &mut self,
         _control: Group12Var1,
         _index: u16,
-        _database: &DatabaseHandle,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.status
     }
@@ -287,7 +287,7 @@ impl ControlSupport<Group12Var1> for DefaultControlHandler {
         _control: Group12Var1,
         _index: u16,
         _op_type: OperateType,
-        _database: &DatabaseHandle,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.status
     }
@@ -298,7 +298,7 @@ impl ControlSupport<Group41Var1> for DefaultControlHandler {
         &mut self,
         _control: Group41Var1,
         _index: u16,
-        _database: &DatabaseHandle,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.status
     }
@@ -308,7 +308,7 @@ impl ControlSupport<Group41Var1> for DefaultControlHandler {
         _control: Group41Var1,
         _index: u16,
         _op_type: OperateType,
-        _database: &DatabaseHandle,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.status
     }
@@ -319,7 +319,7 @@ impl ControlSupport<Group41Var2> for DefaultControlHandler {
         &mut self,
         _control: Group41Var2,
         _index: u16,
-        _database: &DatabaseHandle,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.status
     }
@@ -329,7 +329,7 @@ impl ControlSupport<Group41Var2> for DefaultControlHandler {
         _control: Group41Var2,
         _index: u16,
         _op_type: OperateType,
-        _database: &DatabaseHandle,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.status
     }
@@ -340,7 +340,7 @@ impl ControlSupport<Group41Var3> for DefaultControlHandler {
         &mut self,
         _control: Group41Var3,
         _index: u16,
-        _database: &DatabaseHandle,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.status
     }
@@ -350,7 +350,7 @@ impl ControlSupport<Group41Var3> for DefaultControlHandler {
         _control: Group41Var3,
         _index: u16,
         _op_type: OperateType,
-        _database: &DatabaseHandle,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.status
     }
@@ -361,7 +361,7 @@ impl ControlSupport<Group41Var4> for DefaultControlHandler {
         &mut self,
         _control: Group41Var4,
         _index: u16,
-        _database: &DatabaseHandle,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.status
     }
@@ -371,7 +371,7 @@ impl ControlSupport<Group41Var4> for DefaultControlHandler {
         _control: Group41Var4,
         _index: u16,
         _op_type: OperateType,
-        _database: &DatabaseHandle,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.status
     }
@@ -390,7 +390,7 @@ where
         &mut self,
         seq: CountSequence<Prefix<I, T>>,
         op_type: OperateType,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
         mut func: F,
     ) where
         F: FnMut(T, I),
@@ -417,7 +417,7 @@ where
     fn select<I, F>(
         &mut self,
         seq: CountSequence<Prefix<I, T>>,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
         mut func: F,
     ) where
         F: FnMut(T, I),

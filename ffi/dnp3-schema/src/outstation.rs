@@ -1,3 +1,4 @@
+use crate::database::DatabaseTypes;
 use crate::shared::SharedDefinitions;
 use oo_bindgen::model::*;
 use std::time::Duration;
@@ -13,14 +14,17 @@ struct OutstationTypes {
 
 impl OutstationTypes {
     fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackTraced<Self> {
-        let database = crate::database::define(lib, shared_def)?;
+        let DatabaseTypes {
+            database,
+            database_handle,
+        } = crate::database::define(lib, shared_def)?;
 
         Ok(Self {
-            database: database.clone(),
+            database,
             outstation_config: define_outstation_config(lib, shared_def)?,
-            outstation_application: define_outstation_application(lib, &database)?,
+            outstation_application: define_outstation_application(lib, &database_handle)?,
             outstation_information: define_outstation_information(lib, shared_def)?,
-            control_handler: define_control_handler(lib, &database, shared_def)?,
+            control_handler: define_control_handler(lib, &database_handle, shared_def)?,
             connection_state_listener: define_connection_state_listener(lib)?,
         })
     }
@@ -600,7 +604,7 @@ fn define_restart_delay(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
 
 fn define_outstation_application(
     lib: &mut LibraryBuilder,
-    database: &ClassHandle,
+    database_handle: &ClassHandle,
 ) -> BackTraced<AsynchronousInterface> {
     let restart_delay = define_restart_delay(lib)?;
 
@@ -654,14 +658,14 @@ fn define_outstation_application(
             .end_callback()?
         .begin_callback("freeze_counters_all", "Freeze all the counters")?
             .param("freeze_type", freeze_type.clone(), "Type of freeze operation")?
-            .param("database",database.declaration(), "Database")?
+            .param("database_handle",database_handle.declaration(), "Database handle")?
             .returns(freeze_result.clone(), "Result of the freeze operation")?
             .end_callback()?
         .begin_callback("freeze_counters_range", "Freeze a range of counters")?
             .param("start", Primitive::U16, "Start index to freeze (inclusive)")?
             .param("stop", Primitive::U16, "Stop index to freeze (inclusive)")?
             .param("freeze_type", freeze_type, "Type of freeze operation")?
-            .param("database",database.declaration(), "Database")?
+            .param("database_handle",database_handle.declaration(), "Database handle")?
             .returns(freeze_result, "Result of the freeze operation")?
             .end_callback()?
         .build_async()?;
@@ -756,7 +760,7 @@ fn define_outstation_information(
 
 fn define_control_handler(
     lib: &mut LibraryBuilder,
-    database: &ClassHandle,
+    database_handle: &ClassHandle,
     shared_def: &SharedDefinitions,
 ) -> BackTraced<AsynchronousInterface> {
     let command_status = define_command_status(lib)?;
@@ -798,7 +802,11 @@ fn define_control_handler(
         .begin_callback("select_g12v1", select_g12_doc)?
         .param("value", shared_def.g12v1_struct.clone(), "Received CROB")?
         .param("index", Primitive::U16, "Index of the point")?
-        .param("database", database.declaration(), "Database")?
+        .param(
+            "database_handle",
+            database_handle.declaration(),
+            "Database handle",
+        )?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
@@ -806,14 +814,22 @@ fn define_control_handler(
         .param("value", shared_def.g12v1_struct.clone(), "Received CROB")?
         .param("index", Primitive::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
-        .param("database", database.declaration(), "Database")?
+        .param(
+            "database_handle",
+            database_handle.declaration(),
+            "Database handle",
+        )?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v1", select_g40_doc.clone())?
         .param("value", Primitive::S32, "Received analog output value")?
         .param("index", Primitive::U16, "Index of the point")?
-        .param("database", database.declaration(), "Database")?
+        .param(
+            "database_handle",
+            database_handle.declaration(),
+            "Database handle",
+        )?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
@@ -821,14 +837,22 @@ fn define_control_handler(
         .param("value", Primitive::S32, "Received analog output value")?
         .param("index", Primitive::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
-        .param("database", database.declaration(), "Database")?
+        .param(
+            "database_handle",
+            database_handle.declaration(),
+            "Database handle",
+        )?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v2", select_g40_doc.clone())?
         .param("value", Primitive::S16, "Received analog output value")?
         .param("index", Primitive::U16, "Index of the point")?
-        .param("database", database.declaration(), "Database")?
+        .param(
+            "database_handle",
+            database_handle.declaration(),
+            "Database handle",
+        )?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
@@ -836,14 +860,22 @@ fn define_control_handler(
         .param("value", Primitive::S16, "Received analog output value")?
         .param("index", Primitive::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
-        .param("database", database.declaration(), "Database")?
+        .param(
+            "database_handle",
+            database_handle.declaration(),
+            "Database handle",
+        )?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v3", select_g40_doc.clone())?
         .param("value", Primitive::Float, "Received analog output value")?
         .param("index", Primitive::U16, "Index of the point")?
-        .param("database", database.declaration(), "Database")?
+        .param(
+            "database_handle",
+            database_handle.declaration(),
+            "Database handle",
+        )?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
@@ -851,14 +883,22 @@ fn define_control_handler(
         .param("value", Primitive::Float, "Received analog output value")?
         .param("index", Primitive::U16, "Index of the point")?
         .param("op_type", operate_type.clone(), "Operate type")?
-        .param("database", database.declaration(), "Database")?
+        .param(
+            "database_handle",
+            database_handle.declaration(),
+            "Database handle",
+        )?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v4", select_g40_doc)?
         .param("value", Primitive::Double, "Received analog output value")?
         .param("index", Primitive::U16, "Index of the point")?
-        .param("database", database.declaration(), "Database")?
+        .param(
+            "database_handle",
+            database_handle.declaration(),
+            "Database handle",
+        )?
         .returns(command_status.clone(), "Command status")?
         .end_callback()?
         //------
@@ -866,7 +906,11 @@ fn define_control_handler(
         .param("value", Primitive::Double, "Received analog output value")?
         .param("index", Primitive::U16, "Index of the point")?
         .param("op_type", operate_type, "Operate type")?
-        .param("database", database.declaration(), "Database")?
+        .param(
+            "database_handle",
+            database_handle.declaration(),
+            "Database handle",
+        )?
         .returns(command_status, "Command status")?
         .end_callback()?
         //------

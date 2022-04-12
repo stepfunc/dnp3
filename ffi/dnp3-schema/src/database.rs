@@ -450,7 +450,34 @@ fn define_analog_output_status_config(
     Ok(config)
 }
 
-pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackTraced<ClassHandle> {
+pub(crate) struct DatabaseTypes {
+    pub(crate) database: ClassHandle,
+    pub(crate) database_handle: ClassHandle,
+}
+
+pub(crate) fn define(
+    lib: &mut LibraryBuilder,
+    shared_def: &SharedDefinitions,
+) -> BackTraced<DatabaseTypes> {
+    let database = define_database(lib, shared_def)?;
+
+    let database_handle = lib.declare_class("database_handle")?;
+
+    let database_handle = lib
+        .define_class(&database_handle)?
+        .doc("handle used to perform transactions on the database")?
+        .build()?;
+
+    Ok(DatabaseTypes {
+        database,
+        database_handle,
+    })
+}
+
+pub(crate) fn define_database(
+    lib: &mut LibraryBuilder,
+    shared_def: &SharedDefinitions,
+) -> BackTraced<ClassHandle> {
     let database = lib.declare_class("database")?;
 
     let event_class = lib

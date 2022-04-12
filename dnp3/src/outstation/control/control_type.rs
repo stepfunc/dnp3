@@ -18,7 +18,7 @@ pub(crate) trait ControlType: Debug {
         self,
         transaction: &mut ControlTransaction,
         index: u16,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus;
     /// operate a control on a handler
     fn operate(
@@ -26,7 +26,7 @@ pub(crate) trait ControlType: Debug {
         transaction: &mut ControlTransaction,
         index: u16,
         op_type: OperateType,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus;
 }
 
@@ -43,7 +43,7 @@ impl ControlType for Group12Var1 {
         self,
         transaction: &mut ControlTransaction,
         index: u16,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         transaction.select(self, index, database)
     }
@@ -53,7 +53,7 @@ impl ControlType for Group12Var1 {
         transaction: &mut ControlTransaction,
         index: u16,
         op_type: OperateType,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         transaction.operate(self, index, op_type, database)
     }
@@ -72,7 +72,7 @@ impl ControlType for Group41Var1 {
         self,
         transaction: &mut ControlTransaction,
         index: u16,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         transaction.select(self, index, database)
     }
@@ -82,7 +82,7 @@ impl ControlType for Group41Var1 {
         transaction: &mut ControlTransaction,
         index: u16,
         op_type: OperateType,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         transaction.operate(self, index, op_type, database)
     }
@@ -101,7 +101,7 @@ impl ControlType for Group41Var2 {
         self,
         transaction: &mut ControlTransaction,
         index: u16,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         transaction.select(self, index, database)
     }
@@ -111,7 +111,7 @@ impl ControlType for Group41Var2 {
         transaction: &mut ControlTransaction,
         index: u16,
         op_type: OperateType,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         transaction.operate(self, index, op_type, database)
     }
@@ -130,7 +130,7 @@ impl ControlType for Group41Var3 {
         self,
         transaction: &mut ControlTransaction,
         index: u16,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         transaction.select(self, index, database)
     }
@@ -140,7 +140,7 @@ impl ControlType for Group41Var3 {
         transaction: &mut ControlTransaction,
         index: u16,
         op_type: OperateType,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         transaction.operate(self, index, op_type, database)
     }
@@ -159,7 +159,7 @@ impl ControlType for Group41Var4 {
         self,
         transaction: &mut ControlTransaction,
         index: u16,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         transaction.select(self, index, database)
     }
@@ -169,7 +169,7 @@ impl ControlType for Group41Var4 {
         transaction: &mut ControlTransaction,
         index: u16,
         op_type: OperateType,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         transaction.operate(self, index, op_type, database)
     }

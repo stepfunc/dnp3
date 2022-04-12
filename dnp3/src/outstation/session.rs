@@ -1458,7 +1458,7 @@ impl OutstationSession {
 
     async fn handle_direct_operate_no_ack(
         &mut self,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
         controls: ControlCollection<'_>,
     ) {
         let max_controls_per_request = self.config.max_controls_per_request;
@@ -1518,7 +1518,7 @@ impl OutstationSession {
 
     async fn handle_select(
         &mut self,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
         seq: Sequence,
         frame_id: u32,
         controls: ControlCollection<'_>,

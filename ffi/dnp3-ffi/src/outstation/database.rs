@@ -1,6 +1,7 @@
 use dnp3::app::measurement::*;
 use dnp3::app::Timestamp;
 pub use dnp3::outstation::database::Database;
+pub use dnp3::outstation::database::DatabaseHandle;
 use dnp3::outstation::database::*;
 
 use crate::ffi;
