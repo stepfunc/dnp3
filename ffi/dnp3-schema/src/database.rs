@@ -451,7 +451,7 @@ fn define_analog_output_status_config(
 }
 
 pub(crate) struct DatabaseTypes {
-    pub(crate) database: ClassHandle,
+    pub(crate) database_transaction: SynchronousInterface,
     pub(crate) database_handle: ClassHandle,
 }
 
@@ -461,15 +461,34 @@ pub(crate) fn define(
 ) -> BackTraced<DatabaseTypes> {
     let database = define_database(lib, shared_def)?;
 
+    let database_transaction = lib
+        .define_interface("database_transaction", "Database transaction interface")?
+        .begin_callback("execute", "Execute a transaction on the provided database")?
+        .param("database", database.declaration.clone(), "Database")?
+        .enable_functional_transform()
+        .end_callback()?
+        .build_sync()?;
+
     let database_handle = lib.declare_class("database_handle")?;
+
+    let transaction_method = lib
+        .define_method("transaction", database_handle.clone())?
+        .param(
+            "callback",
+            database_transaction.clone(),
+            "callback interface",
+        )?
+        .doc("Execute a transaction on the underlying database")?
+        .build()?;
 
     let database_handle = lib
         .define_class(&database_handle)?
+        .method(transaction_method)?
         .doc("handle used to perform transactions on the database")?
         .build()?;
 
     Ok(DatabaseTypes {
-        database,
+        database_transaction,
         database_handle,
     })
 }

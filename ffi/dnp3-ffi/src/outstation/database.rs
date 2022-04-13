@@ -563,3 +563,12 @@ impl From<ffi::AnalogOutputStatus> for AnalogOutputStatus {
         }
     }
 }
+
+pub(crate) unsafe fn database_handle_transaction(
+    instance: *mut crate::DatabaseHandle,
+    callback: crate::ffi::DatabaseTransaction,
+) {
+    if let Some(db) = instance.as_mut() {
+        db.transaction(|db| callback.execute(db))
+    }
+}
