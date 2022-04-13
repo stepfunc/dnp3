@@ -16,43 +16,43 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
 
   override def endFragment(): Unit = {}
 
-  override def selectG12v1(control: Group12Var1, index: UShort, database: Database): CommandStatus = {
+  override def selectG12v1(control: Group12Var1, index: UShort, database: DatabaseHandle): CommandStatus = {
     checkBinaryOutputCommand(control, index, operate = false)
   }
 
-  override def selectG41v1(control: Int, index: UShort, database: Database): CommandStatus = {
+  override def selectG41v1(control: Int, index: UShort, database: DatabaseHandle): CommandStatus = {
     checkAnalogOutputCommand(control.toDouble, index, operate = false, database)
   }
 
-  override def selectG41v2(control: Short, index: UShort, database: Database): CommandStatus = {
+  override def selectG41v2(control: Short, index: UShort, database: DatabaseHandle): CommandStatus = {
     checkAnalogOutputCommand(control.toDouble, index, operate = false, database)
   }
 
-  override def selectG41v3(control: Float, index: UShort, database: Database): CommandStatus = {
+  override def selectG41v3(control: Float, index: UShort, database: DatabaseHandle): CommandStatus = {
     checkAnalogOutputCommand(control.toDouble, index, operate = false, database)
   }
 
-  override def selectG41v4(control: Double, index: UShort, database: Database): CommandStatus = {
+  override def selectG41v4(control: Double, index: UShort, database: DatabaseHandle): CommandStatus = {
     checkAnalogOutputCommand(control, index, operate = false, database)
   }
 
-  override def operateG12v1(control: Group12Var1, index: UShort, opType: OperateType, database: Database): CommandStatus = {
+  override def operateG12v1(control: Group12Var1, index: UShort, opType: OperateType, database: DatabaseHandle): CommandStatus = {
     checkBinaryOutputCommand(control, index, operate = true)
   }
 
-  override def operateG41v1(control: Int, index: UShort, opType: OperateType, database: Database): CommandStatus = {
+  override def operateG41v1(control: Int, index: UShort, opType: OperateType, database: DatabaseHandle): CommandStatus = {
     checkAnalogOutputCommand(control.toDouble, index, operate = true, database)
   }
 
-  override def operateG41v2(control: Short, index: UShort, opType: OperateType, database: Database): CommandStatus = {
+  override def operateG41v2(control: Short, index: UShort, opType: OperateType, database: DatabaseHandle): CommandStatus = {
     checkAnalogOutputCommand(control.toDouble, index, operate = true, database)
   }
 
-  override def operateG41v3(control: Float, index: UShort, opType: OperateType, database: Database): CommandStatus = {
+  override def operateG41v3(control: Float, index: UShort, opType: OperateType, database: DatabaseHandle): CommandStatus = {
     checkAnalogOutputCommand(control.toDouble, index, operate = true, database)
   }
 
-  override def operateG41v4(control: Double, index: UShort, opType: OperateType, database: Database): CommandStatus = {
+  override def operateG41v4(control: Double, index: UShort, opType: OperateType, database: DatabaseHandle): CommandStatus = {
     checkAnalogOutputCommand(control, index, operate = true, database)
   }
 
@@ -233,7 +233,7 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
     result
   }
 
-  private def checkAnalogOutputCommand(value: Double, index: UShort, operate: Boolean, database: Database) : CommandStatus = {
+  private def checkAnalogOutputCommand(value: Double, index: UShort, operate: Boolean, database: DatabaseHandle) : CommandStatus = {
     if (analogOutputsDisabled) return CommandStatus.NOT_SUPPORTED
 
     val result = index.intValue() match {
@@ -249,7 +249,7 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
 
       // Update the associated Analog Output Status
       val flags = new Flags(Flag.ONLINE)
-      database.updateAnalogOutputStatus(new AnalogOutputStatus(index, value, flags, Timestamp.invalidTimestamp()), UpdateOptions.detectEvent())
+      database.transaction(db => db.updateAnalogOutputStatus(new AnalogOutputStatus(index, value, flags, Timestamp.invalidTimestamp()), UpdateOptions.detectEvent()))
     }
 
     result
