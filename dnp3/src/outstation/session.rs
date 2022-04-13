@@ -1385,15 +1385,19 @@ impl OutstationSession {
             let _ = cursor.skip(ResponseHeader::LENGTH);
 
             let max_controls_per_request = self.config.max_controls_per_request;
-            let result = ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
-                controls.operate_with_response(
-                    &mut cursor,
-                    OperateType::DirectOperate,
-                    tx,
-                    database,
-                    max_controls_per_request,
-                )
-            })
+            let result = ControlTransaction::execute(
+                self.control_handler.borrow_mut(),
+                database,
+                |tx, db| {
+                    controls.operate_with_response(
+                        &mut cursor,
+                        OperateType::DirectOperate,
+                        tx,
+                        db,
+                        max_controls_per_request,
+                    )
+                },
+            )
             .await;
 
             (result, cursor.written().len())
@@ -1462,8 +1466,8 @@ impl OutstationSession {
         controls: ControlCollection<'_>,
     ) {
         let max_controls_per_request = self.config.max_controls_per_request;
-        ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
-            controls.operate_no_ack(tx, database, max_controls_per_request)
+        ControlTransaction::execute(self.control_handler.borrow_mut(), database, |tx, db| {
+            controls.operate_no_ack(tx, db, max_controls_per_request)
         })
         .await;
     }
@@ -1529,16 +1533,14 @@ impl OutstationSession {
             let _ = cursor.skip(ResponseHeader::LENGTH);
 
             let max_controls_per_request = self.config.max_controls_per_request;
-            let result: Result<CommandStatus, WriteError> =
-                ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
-                    controls.select_with_response(
-                        &mut cursor,
-                        tx,
-                        database,
-                        max_controls_per_request,
-                    )
-                })
-                .await;
+            let result: Result<CommandStatus, WriteError> = ControlTransaction::execute(
+                self.control_handler.borrow_mut(),
+                database,
+                |tx, db| {
+                    controls.select_with_response(&mut cursor, tx, db, max_controls_per_request)
+                },
+            )
+            .await;
 
             (result, cursor.written().len())
         };
@@ -1595,17 +1597,21 @@ impl OutstationSession {
                         }
                         Ok(()) => {
                             let max_controls_per_request = self.config.max_controls_per_request;
-                            ControlTransaction::execute(self.control_handler.borrow_mut(), |tx| {
-                                controls
-                                    .operate_with_response(
-                                        &mut cursor,
-                                        OperateType::SelectBeforeOperate,
-                                        tx,
-                                        database,
-                                        max_controls_per_request,
-                                    )
-                                    .unwrap()
-                            })
+                            ControlTransaction::execute(
+                                self.control_handler.borrow_mut(),
+                                database,
+                                |tx, db| {
+                                    controls
+                                        .operate_with_response(
+                                            &mut cursor,
+                                            OperateType::SelectBeforeOperate,
+                                            tx,
+                                            db,
+                                            max_controls_per_request,
+                                        )
+                                        .unwrap()
+                                },
+                            )
                             .await
                         }
                     }

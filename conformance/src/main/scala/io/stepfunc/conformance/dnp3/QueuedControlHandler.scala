@@ -14,7 +14,7 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
 
   override def beginFragment(): Unit = {}
 
-  override def endFragment(): Unit = {}
+  override def endFragment(database: DatabaseHandle): Unit = {}
 
   override def selectG12v1(control: Group12Var1, index: UShort, database: DatabaseHandle): CommandStatus = {
     checkBinaryOutputCommand(control, index, operate = false)

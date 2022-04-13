@@ -241,10 +241,14 @@ pub trait ControlHandler:
 {
     /// called before any controls are processed
     fn begin_fragment(&mut self) {}
+
     /// called after all controls have been processed
     ///
+    /// The database handle may be used to process any changes accumulated in response
+    /// to controls using a single lock/unlock cycle as opposed to doing it in every callback.
+    ///
     /// note: This operation may be asynchronous if required
-    fn end_fragment(&mut self) -> MaybeAsync<()> {
+    fn end_fragment(&mut self, _database: &mut DatabaseHandle) -> MaybeAsync<()> {
         MaybeAsync::ready(())
     }
 }

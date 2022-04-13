@@ -789,6 +789,7 @@ fn define_control_handler(
         .begin_callback("begin_fragment", "Notifies the start of a command fragment")?
         .end_callback()?
         .begin_callback("end_fragment", "Notifies the end of a command fragment")?
+        .param("database", database_handle.declaration(), "Database handle")?
         .end_callback()?
         //------
         .begin_callback("select_g12v1", select_g12_doc)?

@@ -145,7 +145,7 @@ impl ControlHandler for MockControlHandler {
         self.events.push(Event::BeginControls);
     }
 
-    fn end_fragment(&mut self) -> MaybeAsync<()> {
+    fn end_fragment(&mut self, _: &mut DatabaseHandle) -> MaybeAsync<()> {
         self.events.push(Event::EndControls);
         MaybeAsync::ready(())
     }

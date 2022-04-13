@@ -72,7 +72,7 @@ class MyOutstationInformation : public OutstationInformation {
 // ANCHOR: control_handler
 class MyControlHandler : public ControlHandler {
     void begin_fragment() override {}
-    void end_fragment() override {}
+    void end_fragment(DatabaseHandle& database) override {}
 
     CommandStatus select_g12v1(const Group12Var1& control, uint16_t index, DatabaseHandle& database) override {
         if (index < 10 && (control.code.op_type == OpType::latch_on || control.code.op_type == OpType::latch_off))

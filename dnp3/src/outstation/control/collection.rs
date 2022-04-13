@@ -17,19 +17,23 @@ pub(crate) struct ControlTransaction<'a> {
 }
 
 impl<'a> ControlTransaction<'a> {
-    pub(crate) async fn execute<F, R>(handler: &'a mut dyn ControlHandler, mut func: F) -> R
+    pub(crate) async fn execute<F, R>(
+        handler: &'a mut dyn ControlHandler,
+        database: &mut DatabaseHandle,
+        mut func: F,
+    ) -> R
     where
-        F: FnMut(&mut Self) -> R,
+        F: FnMut(&mut Self, &mut DatabaseHandle) -> R,
     {
         let mut tx = ControlTransaction {
             started: false,
             handler,
         };
 
-        let ret = func(&mut tx);
+        let ret = func(&mut tx, database);
 
         if tx.started {
-            tx.handler.end_fragment().get().await
+            tx.handler.end_fragment(database).get().await
         }
 
         ret

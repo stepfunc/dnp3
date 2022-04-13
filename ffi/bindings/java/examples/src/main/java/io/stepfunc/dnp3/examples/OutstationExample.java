@@ -106,7 +106,7 @@ class TestControlHandler implements ControlHandler {
   public void beginFragment() {}
 
   @Override
-  public void endFragment() {}
+  public void endFragment(DatabaseHandle database) {}
 
   @Override
   public CommandStatus selectG12v1(Group12Var1 control, UShort index, DatabaseHandle database) {

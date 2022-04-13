@@ -77,7 +77,7 @@ class ExampleOutstation
     {
         public void BeginFragment() { }
 
-        public void EndFragment() { }
+        public void EndFragment(DatabaseHandle database) { }
 
         public CommandStatus SelectG12v1(Group12Var1 control, ushort index, DatabaseHandle database)
         {

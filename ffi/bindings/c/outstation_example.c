@@ -142,7 +142,7 @@ void update_analog_output_status_from_control(dnp3_database_t *database, void *c
 // ANCHOR: control_handler
 void begin_fragment(void *context) {}
 
-void end_fragment(void *context) {}
+void end_fragment(dnp3_database_handle_t *database, void *context) {}
 
 dnp3_command_status_t select_g12v1(dnp3_group12_var1_t control, uint16_t index, dnp3_database_handle_t *database, void *context)
 {
