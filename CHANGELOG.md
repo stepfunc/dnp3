@@ -1,5 +1,6 @@
 ### 1.0.0 ###
 * Public API changes (affects both Rust and bindings):
+  * User-controlled DB locking in callbacks. See [#189](https://github.com/stepfunc/dnp3/pull/189).
   * Multiple renamings to more closely follow the spec. See [#164](https://github.com/stepfunc/dnp3/pull/164) and others.
     Notably the following:
     * Binary -> BinaryInput

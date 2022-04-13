@@ -33,9 +33,9 @@ dnp3_restart_delay_t cold_restart(void *context) { return dnp3_restart_delay_sec
 
 dnp3_restart_delay_t warm_restart(void *context) { return dnp3_restart_delay_not_supported(); }
 
-dnp3_freeze_result_t freeze_counters_all(dnp3_freeze_type_t freeze_type, dnp3_database_t *database, void *context) { return DNP3_FREEZE_RESULT_NOT_SUPPORTED; }
+dnp3_freeze_result_t freeze_counters_all(dnp3_freeze_type_t freeze_type, dnp3_database_handle_t *database, void *context) { return DNP3_FREEZE_RESULT_NOT_SUPPORTED; }
 
-dnp3_freeze_result_t freeze_counters_range(uint16_t start, uint16_t stop, dnp3_freeze_type_t freeze_type, dnp3_database_t *database, void *context)
+dnp3_freeze_result_t freeze_counters_range(uint16_t start, uint16_t stop, dnp3_freeze_type_t freeze_type, dnp3_database_handle_t *database, void *context)
 {
     return DNP3_FREEZE_RESULT_NOT_SUPPORTED;
 }
@@ -126,13 +126,25 @@ void update_analog_output_status(dnp3_database_t* db, void* context)
     dnp3_database_update_analog_output_status(db, status, dnp3_update_options_detect_event());
 }
 
+void update_binary_output_status_from_control(dnp3_database_t *database, void *ctx)
+{
+    dnp3_binary_output_status_t value = *(dnp3_binary_output_status_t *)ctx;
+    dnp3_database_update_binary_output_status(database, value, dnp3_update_options_detect_event());
+}
+
+void update_analog_output_status_from_control(dnp3_database_t *database, void *ctx)
+{
+    dnp3_analog_output_status_t value = *(dnp3_analog_output_status_t *)ctx;
+    dnp3_database_update_analog_output_status(database, value, dnp3_update_options_detect_event());
+}
+
 // ControlHandler interface
 // ANCHOR: control_handler
 void begin_fragment(void *context) {}
 
-void end_fragment(void *context) {}
+void end_fragment(dnp3_database_handle_t *database, void *context) {}
 
-dnp3_command_status_t select_g12v1(dnp3_group12_var1_t control, uint16_t index, dnp3_database_t *database, void *context)
+dnp3_command_status_t select_g12v1(dnp3_group12_var1_t control, uint16_t index, dnp3_database_handle_t *database, void *context)
 {
     if (index < 10 && (control.code.op_type == DNP3_OP_TYPE_LATCH_ON || control.code.op_type == DNP3_OP_TYPE_LATCH_OFF))
     {
@@ -144,13 +156,18 @@ dnp3_command_status_t select_g12v1(dnp3_group12_var1_t control, uint16_t index, 
     }
 }
 
-dnp3_command_status_t operate_g12v1(dnp3_group12_var1_t control, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
+dnp3_command_status_t operate_g12v1(dnp3_group12_var1_t control, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_handle_t *database, void *context)
 {
     if (index < 10 && (control.code.op_type == DNP3_OP_TYPE_LATCH_ON || control.code.op_type == DNP3_OP_TYPE_LATCH_OFF))
     {
         bool status = (control.code.op_type == DNP3_OP_TYPE_LATCH_ON);
         dnp3_binary_output_status_t bo = dnp3_binary_output_status_init(index, status, dnp3_flags_init(DNP3_FLAG_ONLINE), now());
-        dnp3_database_update_binary_output_status(database, bo, dnp3_update_options_detect_event());
+        dnp3_database_transaction_t transaction = {
+            .execute = &update_binary_output_status_from_control,
+            .on_destroy = NULL,
+            .ctx = &bo,
+        };
+        dnp3_database_handle_transaction(database, transaction);
         return DNP3_COMMAND_STATUS_SUCCESS;
     }
     else
@@ -164,12 +181,17 @@ dnp3_command_status_t select_analog_output(uint16_t index)
     return (index < 10) ? DNP3_COMMAND_STATUS_SUCCESS : DNP3_COMMAND_STATUS_NOT_SUPPORTED;
 }
 
-dnp3_command_status_t operate_analog_output(double value, uint16_t index, dnp3_database_t *database)
+dnp3_command_status_t operate_analog_output(double value, uint16_t index, dnp3_database_handle_t *database)
 {
     if (index < 10)
     {
         dnp3_analog_output_status_t ao = dnp3_analog_output_status_init(index, value, dnp3_flags_init(DNP3_FLAG_ONLINE), now());
-        dnp3_database_update_analog_output_status(database, ao, dnp3_update_options_detect_event());
+        dnp3_database_transaction_t transaction = {
+            .execute = &update_analog_output_status_from_control,
+            .on_destroy = NULL,
+            .ctx = &ao,
+        };
+        dnp3_database_handle_transaction(database, transaction);
         return DNP3_COMMAND_STATUS_SUCCESS;
     }
     else
@@ -178,42 +200,39 @@ dnp3_command_status_t operate_analog_output(double value, uint16_t index, dnp3_d
     }
 }
 
-dnp3_command_status_t select_g41v1(int32_t value, uint16_t index, dnp3_database_t *database, void *context)
+dnp3_command_status_t select_g41v1(int32_t value, uint16_t index, dnp3_database_handle_t *database, void *context)
 {
     return select_analog_output(index);
 }
 
-dnp3_command_status_t operate_g41v1(int32_t value, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
+dnp3_command_status_t operate_g41v1(int32_t value, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_handle_t *database, void *context)
 {
     return operate_analog_output((double)value, index, database);
 }
 
-dnp3_command_status_t select_g41v2(int16_t value, uint16_t index, dnp3_database_t *database, void *context)
-{
+dnp3_command_status_t select_g41v2(int16_t value, uint16_t index, dnp3_database_handle_t *database, void *context) {
     return select_analog_output(index);
 }
 
-dnp3_command_status_t operate_g41v2(int16_t value, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
+dnp3_command_status_t operate_g41v2(int16_t value, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_handle_t *database, void *context)
 {
     return operate_analog_output((double)value, index, database);
 }
 
-dnp3_command_status_t select_g41v3(float value, uint16_t index, dnp3_database_t *database, void *context)
-{
+dnp3_command_status_t select_g41v3(float value, uint16_t index, dnp3_database_handle_t *database, void *context) {
     return select_analog_output(index);
 }
 
-dnp3_command_status_t operate_g41v3(float value, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
+dnp3_command_status_t operate_g41v3(float value, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_handle_t *database, void *context)
 {
     return operate_analog_output((double)value, index, database);
 }
 
-dnp3_command_status_t select_g41v4(double value, uint16_t index, dnp3_database_t *database, void *context)
-{
+dnp3_command_status_t select_g41v4(double value, uint16_t index, dnp3_database_handle_t *database, void *context) {
     return select_analog_output(index);
 }
 
-dnp3_command_status_t operate_g41v4(double value, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_t *database, void *context)
+dnp3_command_status_t operate_g41v4(double value, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_handle_t *database, void *context)
 {
     return operate_analog_output(value, index, database);
 }
