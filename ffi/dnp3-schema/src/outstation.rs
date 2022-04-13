@@ -189,7 +189,7 @@ fn define_outstation(
             types.database_transaction.clone(),
             "Interface on which to execute the transaction",
         )?
-        .doc("Execute transaction to modify the internal database of the outstation")?
+        .doc("Acquire a mutex on the underlying database and apply a set of changes as a transaction")?
         .build()?;
 
     let set_decode_level = lib

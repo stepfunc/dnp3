@@ -478,7 +478,7 @@ pub(crate) fn define(
             database_transaction.clone(),
             "callback interface",
         )?
-        .doc("Execute a transaction on the underlying database")?
+        .doc("Acquire a mutex on the underlying database and apply a set of changes as a transaction")?
         .build()?;
 
     let database_handle = lib
