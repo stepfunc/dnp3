@@ -67,7 +67,7 @@ impl ControlSupport<Group12Var1> for ExampleControlHandler {
         &mut self,
         control: Group12Var1,
         index: u16,
-        _database: &mut Database,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         if index < 10
             && (control.code.op_type == OpType::LatchOn || control.code.op_type == OpType::LatchOff)
@@ -83,17 +83,19 @@ impl ControlSupport<Group12Var1> for ExampleControlHandler {
         control: Group12Var1,
         index: u16,
         _op_type: OperateType,
-        database: &mut Database,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         if index < 10
             && (control.code.op_type == OpType::LatchOn || control.code.op_type == OpType::LatchOff)
         {
             let status = control.code.op_type == OpType::LatchOn;
-            database.update(
-                index,
-                &BinaryOutputStatus::new(status, Flags::ONLINE, get_current_time()),
-                UpdateOptions::detect_event(),
-            );
+            database.transaction(|db| {
+                db.update(
+                    index,
+                    &BinaryOutputStatus::new(status, Flags::ONLINE, get_current_time()),
+                    UpdateOptions::detect_event(),
+                );
+            });
             CommandStatus::Success
         } else {
             CommandStatus::NotSupported
@@ -114,14 +116,16 @@ impl ExampleControlHandler {
         &self,
         value: f64,
         index: u16,
-        database: &mut Database,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         if index < 10 {
-            database.update(
-                index,
-                &AnalogOutputStatus::new(value, Flags::ONLINE, get_current_time()),
-                UpdateOptions::detect_event(),
-            );
+            database.transaction(|db| {
+                db.update(
+                    index,
+                    &AnalogOutputStatus::new(value, Flags::ONLINE, get_current_time()),
+                    UpdateOptions::detect_event(),
+                );
+            });
             CommandStatus::Success
         } else {
             CommandStatus::NotSupported
@@ -134,7 +138,7 @@ impl ControlSupport<Group41Var1> for ExampleControlHandler {
         &mut self,
         _control: Group41Var1,
         index: u16,
-        _database: &mut Database,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.select_analog_output(index)
     }
@@ -144,7 +148,7 @@ impl ControlSupport<Group41Var1> for ExampleControlHandler {
         control: Group41Var1,
         index: u16,
         _op_type: OperateType,
-        database: &mut Database,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.operate_analog_output(control.value as f64, index, database)
     }
@@ -155,7 +159,7 @@ impl ControlSupport<Group41Var2> for ExampleControlHandler {
         &mut self,
         _control: Group41Var2,
         index: u16,
-        _database: &mut Database,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.select_analog_output(index)
     }
@@ -165,7 +169,7 @@ impl ControlSupport<Group41Var2> for ExampleControlHandler {
         control: Group41Var2,
         index: u16,
         _op_type: OperateType,
-        database: &mut Database,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.operate_analog_output(control.value as f64, index, database)
     }
@@ -176,7 +180,7 @@ impl ControlSupport<Group41Var3> for ExampleControlHandler {
         &mut self,
         _control: Group41Var3,
         index: u16,
-        _database: &mut Database,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.select_analog_output(index)
     }
@@ -186,7 +190,7 @@ impl ControlSupport<Group41Var3> for ExampleControlHandler {
         control: Group41Var3,
         index: u16,
         _op_type: OperateType,
-        database: &mut Database,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.operate_analog_output(control.value as f64, index, database)
     }
@@ -197,7 +201,7 @@ impl ControlSupport<Group41Var4> for ExampleControlHandler {
         &mut self,
         _control: Group41Var4,
         index: u16,
-        _database: &mut Database,
+        _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.select_analog_output(index)
     }
@@ -207,7 +211,7 @@ impl ControlSupport<Group41Var4> for ExampleControlHandler {
         control: Group41Var4,
         index: u16,
         _op_type: OperateType,
-        database: &mut Database,
+        database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.operate_analog_output(control.value, index, database)
     }

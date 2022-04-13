@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::app::Timestamp;
-use crate::outstation::database::Database;
+use crate::outstation::database::DatabaseHandle;
 use crate::outstation::tests::harness::{Event, EventHandle};
 use crate::outstation::traits::{OutstationApplication, RequestError, RestartDelay};
 use crate::outstation::{FreezeIndices, FreezeType};
@@ -60,7 +60,7 @@ impl OutstationApplication for MockOutstationApplication {
         &mut self,
         indices: FreezeIndices,
         freeze_type: FreezeType,
-        _db: &mut Database,
+        _db: &mut DatabaseHandle,
     ) -> Result<(), RequestError> {
         self.events.push(Event::Freeze(indices, freeze_type));
         Ok(())
