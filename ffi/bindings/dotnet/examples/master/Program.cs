@@ -161,10 +161,10 @@ class MainClass
     // ANCHOR: association_information
     class TestAssociationInformation : IAssociationInformation
     {
-        public void TaskStart(TaskType taskType, FunctionCode fc, byte seq) {}
-        public void TaskSuccess(TaskType taskType, FunctionCode fc, byte seq) {}
-        public void TaskFail(TaskType taskType, TaskError error) {}
-        public void UnsolicitedResponse(bool isDuplicate, byte seq) {}
+        public void TaskStart(TaskType taskType, FunctionCode fc, byte seq) { }
+        public void TaskSuccess(TaskType taskType, FunctionCode fc, byte seq) { }
+        public void TaskFail(TaskType taskType, TaskError error) { }
+        public void UnsolicitedResponse(bool isDuplicate, byte seq) { }
     }
     // ANCHOR_END: association_information
 
@@ -215,10 +215,10 @@ class MainClass
         finally
         {
             channel.Shutdown();
-        }        
+        }
     }
 
-    private static void RunTls (Runtime runtime, TlsClientConfig tlsConfig)
+    private static void RunTls(Runtime runtime, TlsClientConfig tlsConfig)
     {
         // ANCHOR: create_tls_channel
         var channel = MasterChannel.CreateTlsChannel(
@@ -346,7 +346,7 @@ class MainClass
     }
 
     private static void RunChannel(MasterChannel channel)
-    {        
+    {
         // ANCHOR: association_create
         var association = channel.AddAssociation(
             1024,

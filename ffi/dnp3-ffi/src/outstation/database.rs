@@ -1,6 +1,7 @@
 use dnp3::app::measurement::*;
 use dnp3::app::Timestamp;
 pub use dnp3::outstation::database::Database;
+pub use dnp3::outstation::database::DatabaseHandle;
 use dnp3::outstation::database::*;
 
 use crate::ffi;
@@ -560,5 +561,14 @@ impl From<ffi::AnalogOutputStatus> for AnalogOutputStatus {
             flags: from.flags().into(),
             time: from.time().into(),
         }
+    }
+}
+
+pub(crate) unsafe fn database_handle_transaction(
+    instance: *mut crate::DatabaseHandle,
+    callback: crate::ffi::DatabaseTransaction,
+) {
+    if let Some(db) = instance.as_mut() {
+        db.transaction(|db| callback.execute(db))
     }
 }

@@ -28,7 +28,7 @@ mod traits;
 #[cfg(test)]
 mod tests;
 
-/// Handel used to control a running outstation task
+/// Handle used to control a running outstation task
 #[derive(Clone)]
 pub struct OutstationHandle {
     database: DatabaseHandle,
@@ -36,7 +36,12 @@ pub struct OutstationHandle {
 }
 
 impl OutstationHandle {
-    /// Perform a transaction on the underlying database using a closure
+    /// Get a handle to the associated database
+    pub fn get_database_handle(&self) -> DatabaseHandle {
+        self.database.clone()
+    }
+
+    /// Acquire a mutex on the underlying database and apply a set of changes as a transaction
     pub fn transaction<F, R>(&self, func: F) -> R
     where
         F: FnMut(&mut Database) -> R,

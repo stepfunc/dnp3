@@ -450,7 +450,53 @@ fn define_analog_output_status_config(
     Ok(config)
 }
 
-pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackTraced<ClassHandle> {
+pub(crate) struct DatabaseTypes {
+    pub(crate) database_transaction: SynchronousInterface,
+    pub(crate) database_handle: ClassHandle,
+}
+
+pub(crate) fn define(
+    lib: &mut LibraryBuilder,
+    shared_def: &SharedDefinitions,
+) -> BackTraced<DatabaseTypes> {
+    let database = define_database(lib, shared_def)?;
+
+    let database_transaction = lib
+        .define_interface("database_transaction", "Database transaction interface")?
+        .begin_callback("execute", "Execute a transaction on the provided database")?
+        .param("database", database.declaration.clone(), "Database")?
+        .enable_functional_transform()
+        .end_callback()?
+        .build_sync()?;
+
+    let database_handle = lib.declare_class("database_handle")?;
+
+    let transaction_method = lib
+        .define_method("transaction", database_handle.clone())?
+        .param(
+            "callback",
+            database_transaction.clone(),
+            "callback interface",
+        )?
+        .doc("Acquire a mutex on the underlying database and apply a set of changes as a transaction")?
+        .build()?;
+
+    let database_handle = lib
+        .define_class(&database_handle)?
+        .method(transaction_method)?
+        .doc("handle used to perform transactions on the database")?
+        .build()?;
+
+    Ok(DatabaseTypes {
+        database_transaction,
+        database_handle,
+    })
+}
+
+pub(crate) fn define_database(
+    lib: &mut LibraryBuilder,
+    shared_def: &SharedDefinitions,
+) -> BackTraced<ClassHandle> {
     let database = lib.declare_class("database")?;
 
     let event_class = lib

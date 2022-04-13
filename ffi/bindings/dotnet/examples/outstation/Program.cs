@@ -40,9 +40,9 @@ class ExampleOutstation
             return RestartDelay.NotSupported();
         }
 
-        public FreezeResult FreezeCountersAll(FreezeType freezeType, Database database) { return FreezeResult.NotSupported; }
+        public FreezeResult FreezeCountersAll(FreezeType freezeType, DatabaseHandle database) { return FreezeResult.NotSupported; }
 
-        public FreezeResult FreezeCountersRange(ushort start, ushort stop, FreezeType freezeType, Database database) { return FreezeResult.NotSupported; }
+        public FreezeResult FreezeCountersRange(ushort start, ushort stop, FreezeType freezeType, DatabaseHandle database) { return FreezeResult.NotSupported; }
     }
 
     class TestOutstationInformation : IOutstationInformation
@@ -72,32 +72,102 @@ class ExampleOutstation
         public void ClearRestartIin() { }
     }
 
+    // ANCHOR: control_handler
     class TestControlHandler : IControlHandler
     {
         public void BeginFragment() { }
 
-        public void EndFragment() { }
+        public void EndFragment(DatabaseHandle database) { }
 
-        public CommandStatus SelectG12v1(Group12Var1 control, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG12v1(Group12Var1 control, ushort index, DatabaseHandle database)
+        {
+            if (index < 10 && (control.Code.OpType == OpType.LatchOn || control.Code.OpType == OpType.LatchOff))
+            {
+                return CommandStatus.Success;
+            }
+            else
+            {
+                return CommandStatus.NotSupported;
+            }
+        }
 
-        public CommandStatus OperateG12v1(Group12Var1 control, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG12v1(Group12Var1 control, ushort index, OperateType opType, DatabaseHandle database)
+        {
+            if (index < 10 && (control.Code.OpType == OpType.LatchOn || control.Code.OpType == OpType.LatchOff))
+            {
+                var status = (control.Code.OpType == OpType.LatchOn);
+                database.Transaction(db =>
+                    db.UpdateBinaryOutputStatus(new BinaryOutputStatus(index, status, new Flags(Flag.Online), Now()), UpdateOptions.DetectEvent())
+                );
+                return CommandStatus.Success;
+            }
+            else
+            {
+                return CommandStatus.NotSupported;
+            }
+        }
 
-        public CommandStatus SelectG41v1(int control, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v1(int value, ushort index, DatabaseHandle database)
+        {
+            return SelectAnalogOutput(index);
+        }
 
-        public CommandStatus OperateG41v1(int control, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v1(int value, ushort index, OperateType opType, DatabaseHandle database)
+        {
+            return OperateAnalogOutput(value, index, database);
+        }
 
-        public CommandStatus SelectG41v2(short value, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v2(short value, ushort index, DatabaseHandle database)
+        {
+            return SelectAnalogOutput(index);
+        }
 
-        public CommandStatus OperateG41v2(short value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v2(short value, ushort index, OperateType opType, DatabaseHandle database)
+        {
+            return OperateAnalogOutput(value, index, database);
+        }
 
-        public CommandStatus SelectG41v3(float value, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v3(float value, ushort index, DatabaseHandle database)
+        {
+            return SelectAnalogOutput(index);
+        }
 
-        public CommandStatus OperateG41v3(float value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v3(float value, ushort index, OperateType opType, DatabaseHandle database)
+        {
+            return OperateAnalogOutput(value, index, database);
+        }
 
-        public CommandStatus SelectG41v4(double value, ushort index, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus SelectG41v4(double value, ushort index, DatabaseHandle database)
+        {
+            return SelectAnalogOutput(index);
+        }
 
-        public CommandStatus OperateG41v4(double value, ushort index, OperateType opType, Database database) { return CommandStatus.NotSupported; }
+        public CommandStatus OperateG41v4(double value, ushort index, OperateType opType, DatabaseHandle database)
+        {
+            return OperateAnalogOutput(value, index, database);
+        }
+
+        private CommandStatus SelectAnalogOutput(ushort index)
+        {
+            return index < 10 ? CommandStatus.Success : CommandStatus.NotSupported;
+        }
+
+        private CommandStatus OperateAnalogOutput(double value, ushort index, DatabaseHandle database)
+        {
+            if (index < 10)
+            {
+                database.Transaction(db =>
+                    db.UpdateAnalogOutputStatus(new AnalogOutputStatus(index, value, new Flags(Flag.Online), Now()), UpdateOptions.DetectEvent())
+                );
+                return CommandStatus.Success;
+            }
+            else
+            {
+                return CommandStatus.NotSupported;
+            }
+        }
     }
+    // ANCHOR_END: control_handler
 
     class TestConnectionStateListener : IConnectionStateListener
     {
@@ -157,7 +227,7 @@ class ExampleOutstation
         );
         // ANCHOR_END: create_serial_server
 
-        
+
         RunOutstation(outstation);
     }
 
@@ -186,7 +256,7 @@ class ExampleOutstation
            "./certs/ca_chain/entity2_cert.pem",
            "./certs/ca_chain/entity2_key.pem",
            "" // no password
-       );        
+       );
         // ANCHOR_END: tls_ca_chain_config
         return config;
     }
@@ -204,7 +274,7 @@ class ExampleOutstation
         // ANCHOR_END: tls_self_signed_config
         return config;
     }
-         
+
     public static void Main(string[] args)
     {
         // Initialize logging with the default configuration
@@ -212,10 +282,10 @@ class ExampleOutstation
             new LoggingConfig(),
             new TestLogger()
         );
-        
+
         var runtime = new Runtime(new RuntimeConfig { NumCoreThreads = 4 });
-       
-        if(args.Length != 1)
+
+        if (args.Length != 1)
         {
             System.Console.WriteLine("You must specify the transport type");
             System.Console.WriteLine("Usage: outstation-example <transport> (tcp, serial, tls-ca, tls-self-signed)");
@@ -225,7 +295,8 @@ class ExampleOutstation
         try
         {
             var type = args[0];
-            switch(type) {
+            switch (type)
+            {
                 case "tcp":
                     RunTcp(runtime);
                     break;

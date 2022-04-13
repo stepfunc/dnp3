@@ -49,13 +49,13 @@ class TestOutstationApplication implements OutstationApplication {
   }
 
   @Override
-  public FreezeResult freezeCountersAll(FreezeType freezeType, Database database) {
+  public FreezeResult freezeCountersAll(FreezeType freezeType, DatabaseHandle database) {
     return FreezeResult.NOT_SUPPORTED;
   }
 
   @Override
   public FreezeResult freezeCountersRange(
-      UShort start, UShort stop, FreezeType freezeType, Database database) {
+      UShort start, UShort stop, FreezeType freezeType, DatabaseHandle database) {
     return FreezeResult.NOT_SUPPORTED;
   }
 }
@@ -99,69 +99,96 @@ class TestOutstationInformation implements OutstationInformation {
   public void clearRestartIin() {}
 }
 
+// ANCHOR: control_handler
 class TestControlHandler implements ControlHandler {
 
   @Override
   public void beginFragment() {}
 
   @Override
-  public void endFragment() {}
+  public void endFragment(DatabaseHandle database) {}
 
   @Override
-  public CommandStatus selectG12v1(Group12Var1 control, UShort index, Database database) {
-    return CommandStatus.NOT_SUPPORTED;
+  public CommandStatus selectG12v1(Group12Var1 control, UShort index, DatabaseHandle database) {
+    if (index.compareTo(ushort(10)) < 0 && (control.code.opType == OpType.LATCH_ON || control.code.opType == OpType.LATCH_OFF)) {
+      return CommandStatus.SUCCESS;
+    } else {
+      return CommandStatus.NOT_SUPPORTED;
+    }
   }
 
   @Override
-  public CommandStatus operateG12v1(
-      Group12Var1 control, UShort index, OperateType opType, Database database) {
-    return CommandStatus.NOT_SUPPORTED;
+  public CommandStatus operateG12v1(Group12Var1 control, UShort index, OperateType opType, DatabaseHandle database) {
+    if (index.compareTo(ushort(10)) < 0 && (control.code.opType == OpType.LATCH_ON || control.code.opType == OpType.LATCH_OFF)) {
+      boolean status = control.code.opType == OpType.LATCH_ON;
+      database.transaction(db -> db.updateBinaryOutputStatus(new BinaryOutputStatus(index, status, new Flags(Flag.ONLINE), OutstationExample.now()), UpdateOptions.detectEvent()));
+      return CommandStatus.SUCCESS;
+    } else {
+      return CommandStatus.NOT_SUPPORTED;
+    }
   }
 
   @Override
-  public CommandStatus selectG41v1(int control, UShort index, Database database) {
-    return CommandStatus.NOT_SUPPORTED;
+  public CommandStatus selectG41v1(int value, UShort index, DatabaseHandle database) {
+    return selectAnalogOutput(index);
   }
 
   @Override
   public CommandStatus operateG41v1(
-      int control, UShort index, OperateType opType, Database database) {
-    return CommandStatus.NOT_SUPPORTED;
+      int value, UShort index, OperateType opType, DatabaseHandle database) {
+    return operateAnalogOutput(value, index, database);
   }
 
   @Override
-  public CommandStatus selectG41v2(short value, UShort index, Database database) {
-    return CommandStatus.NOT_SUPPORTED;
+  public CommandStatus selectG41v2(short value, UShort index, DatabaseHandle database) {
+    return selectAnalogOutput(index);
   }
 
   @Override
   public CommandStatus operateG41v2(
-      short value, UShort index, OperateType opType, Database database) {
-    return CommandStatus.NOT_SUPPORTED;
+      short value, UShort index, OperateType opType, DatabaseHandle database) {
+    return operateAnalogOutput(value, index, database);
   }
 
   @Override
-  public CommandStatus selectG41v3(float value, UShort index, Database database) {
-    return CommandStatus.NOT_SUPPORTED;
+  public CommandStatus selectG41v3(float value, UShort index, DatabaseHandle database) {
+    return selectAnalogOutput(index);
   }
 
   @Override
   public CommandStatus operateG41v3(
-      float value, UShort index, OperateType opType, Database database) {
-    return CommandStatus.NOT_SUPPORTED;
+      float value, UShort index, OperateType opType, DatabaseHandle database) {
+    return operateAnalogOutput(value, index, database);
   }
 
   @Override
-  public CommandStatus selectG41v4(double value, UShort index, Database database) {
-    return CommandStatus.NOT_SUPPORTED;
+  public CommandStatus selectG41v4(double value, UShort index, DatabaseHandle database) {
+    return selectAnalogOutput(index);
   }
 
   @Override
   public CommandStatus operateG41v4(
-      double value, UShort index, OperateType opType, Database database) {
-    return CommandStatus.NOT_SUPPORTED;
+      double value, UShort index, OperateType opType, DatabaseHandle database) {
+    return operateAnalogOutput(value, index, database);
+  }
+
+  private CommandStatus selectAnalogOutput(UShort index) {
+    return index.compareTo(ushort(10)) < 0 ? CommandStatus.SUCCESS : CommandStatus.NOT_SUPPORTED;
+  }
+
+  private CommandStatus operateAnalogOutput(double value, UShort index, DatabaseHandle database) {
+    if (index.compareTo(ushort(10)) < 0) {
+      database.transaction(db -> db.updateAnalogOutputStatus(new AnalogOutputStatus(index, value, new Flags(Flag.ONLINE), OutstationExample.now()), UpdateOptions.detectEvent()));
+
+      return CommandStatus.SUCCESS;
+    }
+    else
+    {
+      return CommandStatus.NOT_SUPPORTED;
+    }
   }
 }
+// ANCHOR_END: control_handler
 
 class TestConnectionStateListener implements ConnectionStateListener {
   @Override
@@ -187,7 +214,7 @@ public class OutstationExample {
   }
   // ANCHOR_END: event_buffer_config
 
-  private static Timestamp now() {
+  static Timestamp now() {
     return Timestamp.synchronizedTimestamp(ulong(System.currentTimeMillis()));
   }
 
