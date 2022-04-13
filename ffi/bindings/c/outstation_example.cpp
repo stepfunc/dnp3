@@ -46,10 +46,10 @@ class MyOutstationApplication : public OutstationApplication {
     RestartDelay warm_restart() override {
         return RestartDelay::not_supported();
     }
-    FreezeResult freeze_counters_all(FreezeType freeze_type, Database& database) override {        
+    FreezeResult freeze_counters_all(FreezeType freeze_type, DatabaseHandle& database) override {
         return FreezeResult::not_supported;
     }
-    FreezeResult freeze_counters_range(uint16_t start, uint16_t stop, FreezeType freeze_type, Database& database) override {    
+    FreezeResult freeze_counters_range(uint16_t start, uint16_t stop, FreezeType freeze_type, DatabaseHandle &database) override {
         return FreezeResult::not_supported;
     }
 };
@@ -74,7 +74,7 @@ class MyControlHandler : public ControlHandler {
     void begin_fragment() override {}
     void end_fragment() override {}
 
-    CommandStatus select_g12v1(const Group12Var1& control, uint16_t index, Database& database) override {
+    CommandStatus select_g12v1(const Group12Var1& control, uint16_t index, DatabaseHandle& database) override {
         if (index < 10 && (control.code.op_type == OpType::latch_on || control.code.op_type == OpType::latch_off))
         {
             return CommandStatus::success;
@@ -85,12 +85,15 @@ class MyControlHandler : public ControlHandler {
         }
     }
 
-    CommandStatus operate_g12v1(const Group12Var1& control, uint16_t index, OperateType op_type, Database& database) override
+    CommandStatus operate_g12v1(const Group12Var1 &control, uint16_t index, OperateType op_type, DatabaseHandle &database) override
     {
         if (index < 10 && (control.code.op_type == OpType::latch_on || control.code.op_type == OpType::latch_off))
         {
             auto status = (control.code.op_type == OpType::latch_on);
-            database.update_binary_output_status(BinaryOutputStatus(index, status, online(), now()), UpdateOptions::detect_event());
+            auto transaction = functional::database_transaction([=](Database &db) {
+                db.update_binary_output_status(BinaryOutputStatus(index, status, online(), now()), UpdateOptions::detect_event());
+            });
+            database.transaction(transaction);
             return CommandStatus::success;
         }
         else
@@ -99,42 +102,42 @@ class MyControlHandler : public ControlHandler {
         }
     }
 
-    CommandStatus select_g41v1(int32_t value, uint16_t index, Database& database) override
+    CommandStatus select_g41v1(int32_t value, uint16_t index, DatabaseHandle& database) override
     {
         return select_analog_output(index);
     }
 
-    CommandStatus operate_g41v1(int32_t value, uint16_t index, OperateType op_type, Database& database) override
+    CommandStatus operate_g41v1(int32_t value, uint16_t index, OperateType op_type, DatabaseHandle& database) override
     {
         return operate_analog_output(value, index, database);
     }
 
-    CommandStatus select_g41v2(int16_t value, uint16_t index, Database& database) override
+    CommandStatus select_g41v2(int16_t value, uint16_t index, DatabaseHandle& database) override
     {
         return select_analog_output(index);
     }
 
-    CommandStatus operate_g41v2(int16_t value, uint16_t index, OperateType op_type, Database& database) override
+    CommandStatus operate_g41v2(int16_t value, uint16_t index, OperateType op_type, DatabaseHandle& database) override
     {
         return operate_analog_output(value, index, database);
     }
 
-    CommandStatus select_g41v3(float value, uint16_t index, Database& database) override
+    CommandStatus select_g41v3(float value, uint16_t index, DatabaseHandle& database) override
     {
         return select_analog_output(index);
     }
 
-    CommandStatus operate_g41v3(float value, uint16_t index, OperateType op_type, Database& database) override
+    CommandStatus operate_g41v3(float value, uint16_t index, OperateType op_type, DatabaseHandle &database) override
     {
         return operate_analog_output(value, index, database);
     }
 
-    CommandStatus select_g41v4(double value, uint16_t index, Database& database) override
+    CommandStatus select_g41v4(double value, uint16_t index, DatabaseHandle &database) override
     {
         return select_analog_output(index);
     }
 
-    CommandStatus operate_g41v4(double value, uint16_t index, OperateType op_type, Database& database) override
+    CommandStatus operate_g41v4(double value, uint16_t index, OperateType op_type, DatabaseHandle &database) override
     {
         return operate_analog_output(value, index, database);
     }
@@ -145,11 +148,14 @@ private:
         return index < 10 ? CommandStatus::success : CommandStatus::not_supported;
     }
 
-    CommandStatus operate_analog_output(double value, uint16_t index, Database& database)
+    CommandStatus operate_analog_output(double value, uint16_t index, DatabaseHandle& database)
     {
         if (index < 10)
         {
-            database.update_analog_output_status(AnalogOutputStatus(index, value, online(), now()), UpdateOptions::detect_event());
+            auto transaction = functional::database_transaction(
+                [=](Database &db) { db.update_analog_output_status(AnalogOutputStatus(index, value, online(), now()), UpdateOptions::detect_event());
+            });
+            database.transaction(transaction);
             return CommandStatus::success;
         }
         else
