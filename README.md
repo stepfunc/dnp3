@@ -16,9 +16,9 @@ Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET
 - Automatic mapping between DNP3 and higher-level measurement types
 - Built-in logging and protocol decoding
 - Share runtime resources with other libraries to implement extremely efficient gateways and translators
-- Runs on all platforms and operating systems supported by the tokio runtime:
+- Runs on all platforms and operating systems supported by the [Tokio](https://tokio.rs/) runtime:
   - Official support for: Windows x64 and Linux x64, AArch64, ARMv7 and ARMv6
-  - Non-official support: MacOS, PowerPC, MIPS, FreeBSD, and others
+  - Unofficial support: MacOS, PowerPC, MIPS, FreeBSD, and others
 
 # License
 
@@ -28,6 +28,6 @@ Refer to [`LICENSE.txt`](./LICENSE.txt) for the terms of the non-commercial lice
 This software is publicly available, but is not "open source".
 __You must purchase a commercial license to use this software for profit.__
 
-Please inquire about commercial licensing here:
+Please inquire about commercial licensing on our website:
 
 [https://stepfunc.io/contact/](https://stepfunc.io/contact/)
