@@ -126,6 +126,11 @@ void update_analog_output_status(dnp3_database_t* db, void* context)
     dnp3_database_update_analog_output_status(db, status, dnp3_update_options_detect_event());
 }
 
+
+
+// ControlHandler interface
+// ANCHOR: control_handler
+
 void update_binary_output_status_from_control(dnp3_database_t *database, void *ctx)
 {
     dnp3_binary_output_status_t value = *(dnp3_binary_output_status_t *)ctx;
@@ -138,8 +143,6 @@ void update_analog_output_status_from_control(dnp3_database_t *database, void *c
     dnp3_database_update_analog_output_status(database, value, dnp3_update_options_detect_event());
 }
 
-// ControlHandler interface
-// ANCHOR: control_handler
 void begin_fragment(void *context) {}
 
 void end_fragment(dnp3_database_handle_t *database, void *context) {}
