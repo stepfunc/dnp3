@@ -9,13 +9,14 @@ Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET
 # Features
 
 - Subset Level 3 master and outstation components in a single library
-- Supports TCP and serial communication channels
-- Support TLS through [rustls](https://github.com/rustls/rustls).
+
 - Written in safe Rust with idiomatic bindings for C, C++ .NET Core, and Java.
-- Blazing fast (and secure) zero-copy / zero-allocation parsing of application data
+- Supports TCP, TLS,  and serial communication channels
+- TLS is implemented using [rustls](https://github.com/rustls/rustls) not openssl.
 - Automatic mapping between DNP3 and higher-level measurement types
 - Built-in logging and protocol decoding
-- Share runtime resources with other libraries to implement extremely efficient gateways and translators
+- Blazing fast (and secure) zero-copy / zero-allocation parsing of application data
+- Fully asynchronous implementation scales to the OS limit.
 - Runs on all platforms and operating systems supported by the [Tokio](https://tokio.rs/) runtime:
   - Official support for: Windows x64 and Linux x64, AArch64, ARMv7 and ARMv6
   - Unofficial support: MacOS, PowerPC, MIPS, FreeBSD, and others
