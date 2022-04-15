@@ -11,6 +11,8 @@ import TabItem from '@theme/TabItem';
 The `ControlHandler` interface lets application code receive control requests. Each request begins with a call to `beginFragment` and ends
 with a call to `endFragment`. These callbacks are helpful if you want the application to handle operations atomically or in batches of some sort. 
 
+Each `select` or `operate` callback returns a `CommandStatus` enum. The outstation response to a control message echoes the request data and this
+status code is returned  for every control in the message. The library actually builds the response message while making these callbacks.
 
 ## Handling SELECT
 

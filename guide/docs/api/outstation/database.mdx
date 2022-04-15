@@ -15,7 +15,7 @@ All database operations are executed inside a transaction protected by a mutex. 
 event buffers atomically. If unsolicited responses are enabled, the outstation will automatically decide if an unsolicited response
 should be sent at the end of the transaction.
 
-Two types have an identical `transaction` method for manipulating the database:
+The database may be accessed in a transaction in two different ways:
 
 1. When measurement values need to updated due to some external changes, the user can call `Outstation.transaction` to acquire
 a locked reference to the database and make changes.

@@ -53,7 +53,7 @@ If you must implement this functionality to pass conformance tests or due to cus
 * `freezeCountersAll`: This is called when a counter freeze operation is received using the All Points (0x06) qualifier.
 * `freezeCountersRange`: This is  called when a counter freeze operation is received using 8-bit (0x00) or 16-bit (0x01) range qualifiers.
 
-A provided reference to the `Database` lets you perform requested freeze operations. The `FreezeType` parameter lets you choose between two types of supported freeze operations:
+A provided reference to a `DatabaseHandle` may be used to copy counters to frozen counters. The `FreezeType` parameter lets you choose between two types of supported freeze operations:
 
 * `IMMEDIATE_FREEZE`: Copy the current value of a counter to the associated frozen counter point.
 * `FREEZE_AND_CLEAR`: Copy the current value of a counter to the associated frozen counter point and clear the current value to 0.
