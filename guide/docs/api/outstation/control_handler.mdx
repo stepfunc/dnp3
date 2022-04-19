@@ -11,6 +11,8 @@ import TabItem from '@theme/TabItem';
 The `ControlHandler` interface lets application code receive control requests. Each request begins with a call to `beginFragment` and ends
 with a call to `endFragment`. These callbacks are helpful if you want the application to handle operations atomically or in batches of some sort. 
 
+Each `select` or `operate` callback returns a `CommandStatus` enum. The outstation response to a control message echoes the request data and this
+status code is returned  for every control in the message. The library actually builds the response message while making these callbacks.
 
 ## Handling SELECT
 
@@ -36,11 +38,18 @@ The `operate*` methods of `ControlHandler` are called when the outstation receiv
 * `DIRECT_OPERATE` function code (single-pass control with response).
 * `DIRECT_OPERATE_NO_RESPONSE` function code (single-pass control without a response).
 
-A reference to the `Database` also lets you update point values in response to a control request. While you would typically use it to update `BinaryOutputStatus` and `AnalogOutputStatus` values, you can also use it to update other types if required by the application.
-For example, you might maintain the number of control operations performed in a DNP3 counter value.
+A reference to a `DatabaseHandle` also lets you update point values in response to a control request. While you would typically use it to update
+`BinaryOutputStatus` and `AnalogOutputStatus` values, you can also use it to update other types if required by the application. For example, you might
+maintain the number of control operations performed in a DNP3 counter value.
+
+:::tip
+Every call to `DatabaseHandle.transaction` locks and unlocks a mutex. Since DNP3 can carry multiple controls in a single message, the most
+efficient way to update feedback points is to do a single transaction in the `ControlHandler.end_fragment` method.
+:::
 
 :::note
-The OperateType enum lets you identify which of the three operate function codes invoked the method. You can probably ignore this value. The specification requires all three control methodologies be supported and result in the same action.
+The OperateType enum lets you identify which of the three operate function codes invoked the method. You can probably ignore this value. The specification
+requires all three control methodologies be supported and result in the same action.
 :::
 
 <Tabs
@@ -91,3 +100,4 @@ values={[
 
 </TabItem>
 </Tabs>
+

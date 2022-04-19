@@ -13,7 +13,7 @@ and a `src/dnp3.cpp` contains the companion code.
 
 ## CMake Usage
 
-The CMake includes a `dnp3_cpp` target that automatically links with the C bindings and builds the C++ wrapper code.
+The CMake package script includes a `dnp3_cpp` target that automatically links with the C bindings and builds the C++ wrapper code.
 
 Make the find package script discoverable by adding it to the prefix path. Next, call `find_package`:
 
@@ -38,13 +38,13 @@ The `dnp3_cpp` CMake target is made available only if the `CXX` language is enab
 
 ## Mapping
 
-Many of the concepts built into higher-level languages are design patterns or idioms in C. When you see these higher levels patterns discussed in this guide, you can use the idioms to understand how they map to C.
+Most of the abstract concepts in the binding generator map directly to C++.
 
 ### Errors
 
-All C API errors are transformed into a C++ exception containing the error enum. All exceptions derive from `std::logic_error`.
+All C API errors are transformed into a C++ exceptions containing the error enum. All exceptions derive from `std::logic_error`.
 
-Other validations (e.g. checking that a moved class isn't used after move) also throws `std::logic_error`.
+Other validations (e.g. checking that a moved class isn't used after the move) also throw `std::logic_error`.
 
 :::warning
 Uncaught exceptions thrown in callbacks will terminate the program. Always wrap your callback logic using `try/catch` syntax if there's a possibility the callback will throw.
@@ -74,21 +74,28 @@ Collections are taken through a constant reference to a `std::vector`. The eleme
 
 ### Classes
 
-Classes have a opaque pointer inside and therefore cannot be copied. They can be moved around with `std::move`. The moved class will
-then throw a `std::logic_error` on any method called.
+Classes have a opaque pointer inside and therefore cannot be copied. They can be moved around with `std::move`. If a method
+is called on a moved class it throw a `std::logic_error`.
 
-The class destructor will take care of calling the appropriate C destructor.
+The class destructor will call the underlying C destructor automatically.
 
 ### Interfaces
 
-Interfaces are pure virtual classes where every callback needs to be implemented. The destructor is virtual to allow proper cleanup.
+Interfaces are abstract classes containing only pure virtual functions where every callback must be implemented. The destructor is virtual to allow proper cleanup.
 
-An owned interface will be taken as a `std::unique_ptr`. Use C++14 `std::make_unique` to build such a pointer.
+Owned interfaces that are invoked asynchronously by the library are passed into the API as a `std::unique_ptr<T>`. Use `std::make_unique` to create these smart pointers.
 
-Non-owned interfaces are taken by reference and will execute immediately. There are also functional wrappers that take a lambda
+Non-owned (synchronous) interfaces are passed by reference. There are also functional wrappers that take a lambda
 function as an argument available in the `dnp3::functional` namespace.
 
 ### Async methods
 
-Async methods take an extra owned interface parameter (known as a future). The interface has two callbacks: `on_complete`
-is called when succesful, and `on_failure` is called if an error occured.
+C++ doesn't have a robust model for asynchronous computations in the standard library (yet). You can only extract a value
+from a C++ `std::future` using the blocking `get` method and there is no way to chain asynchronously chain futures.
+
+Asynchronous methods are mapped to callback interfaces with two methods:
+
+* `on_complete` is called when the operation succeeds
+* `on_failure` is called if an error occurs
+
+If you already use an external futures library, it will be easy to use our callbacks to complete your futures.

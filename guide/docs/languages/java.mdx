@@ -11,16 +11,17 @@ The Java bindings are distributed as a JAR targeting Java 8. Native libraries fo
 correct native library will automatically load during static initialization. These native libraries wrap the underlying C API with a thin layer of
 [JNI](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/).
 
-The currently embedded shared libraries are the following:
+Shared libraries for the following platforms are included in the release JAR:
 
 - Windows x64 (Windows 7+)
+- Windows x86 (Windows 7+)
 - Linux x64 (kernel 2.6.32+, glibc 2.11+)
 - Linux AArch64 (kernel 4.2, glibc 2.17+)
 - MacOS x64 (MacOS 10.7+, Lion+)
 
 :::warning
-MacOS x64 libraries are included in the package but are not officially supported. They can be useful for developers using MacOS, but
-they should **never be used in production**.
+MacOS x64 libraries are included in the package but are not officially supported. They are useful for developers using MacOS, but
+are not supported in production.
 :::
 
 :::tip
