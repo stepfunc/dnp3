@@ -430,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3"
-version = "1.0.0-rc3"
+version = "1.0.0"
 dependencies = [
  "assert_matches",
  "chrono",
@@ -452,7 +452,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-bindings"
-version = "1.0.0-rc3"
+version = "1.0.0"
 dependencies = [
  "ci-script",
  "dnp3-ffi",
@@ -461,7 +461,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-ffi"
-version = "1.0.0-rc3"
+version = "1.0.0"
 dependencies = [
  "dnp3",
  "dnp3-schema",
@@ -476,7 +476,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-schema"
-version = "1.0.0-rc3"
+version = "1.0.0"
 dependencies = [
  "dnp3",
  "oo-bindgen",

@@ -11,7 +11,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <scala.version>2.13.4</scala.version>
-        <dnp3.version>1.0.0-rc3</dnp3.version>
+        <dnp3.version>1.0.0</dnp3.version>
         <dnp4s.version>0.1.0-SNAPSHOT</dnp4s.version>
         <scala-maven-plugin.version>4.4.0</scala-maven-plugin.version>
     </properties>
