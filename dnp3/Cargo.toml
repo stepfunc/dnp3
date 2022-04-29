@@ -8,8 +8,10 @@ edition = "2021"
 tracing = "0.1"
 chrono = "0.4"
 tokio-mock = { git = "https://github.com/stepfunc/tokio-mock.git", tag = "0.1.0" }
-tokio-serial = "5.4"
 xxhash-rust = { version = "0.8.2", features = ["xxh64"] }
+
+# Serial dependencies
+tokio-serial = { version = "5.4", optional = true }
 
 # TLS dependencies
 pem = { version = "1.0", optional = true }
@@ -27,8 +29,9 @@ criterion = "0.3"
 rand = "0.8"
 
 [features]
-default = ["tls"]
+default = ["serial", "tls"]
 ffi = [] # this feature flag is only used when building the FFI
+serial = ["tokio-serial"]
 tls = ["pem", "pkcs8", "rasn", "tokio-rustls"]
 
 [[bench]]

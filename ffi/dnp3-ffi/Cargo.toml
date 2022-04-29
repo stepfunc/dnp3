@@ -12,10 +12,15 @@ lazy_static = "1.0"
 tracing = "0.1"
 tracing-core = "0.1"
 tracing-subscriber = "0.2"
-dnp3 = { path = "../../dnp3", features = ["ffi", "tls"] }
+dnp3 = { path = "../../dnp3", features = ["ffi"], default-features = false }
 tokio = { version = "1.0", features = ["rt-multi-thread"] }
 num_cpus = "1"
 
 [build-dependencies]
-dnp3-schema = { path = "../dnp3-schema" }
+dnp3-schema = { path = "../dnp3-schema", default-features = false }
 rust-oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.2.0" }
+
+[features]
+default = ["serial", "tls"]
+serial = ["dnp3/serial", "dnp3-schema/serial"]
+tls = ["dnp3/tls", "dnp3-schema/tls"]

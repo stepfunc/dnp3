@@ -9,8 +9,10 @@ use dnp3::app::*;
 use dnp3::decode::*;
 use dnp3::link::*;
 use dnp3::master::*;
-use dnp3::serial::*;
 use dnp3::tcp::*;
+
+#[cfg(feature = "serial")]
+use dnp3::serial::*;
 
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
@@ -343,6 +345,7 @@ fn create_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
     };
     match transport {
         "tcp" => create_tcp_channel(),
+        #[cfg(feature = "serial")]
         "serial" => create_serial_channel(),
         #[cfg(feature = "tls")]
         "tls-ca" => create_tls_channel(get_tls_authority_config()?),
@@ -429,6 +432,7 @@ fn create_tcp_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
     Ok(channel)
 }
 
+#[cfg(feature = "serial")]
 fn create_serial_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
     // ANCHOR: create_master_serial_channel
     let channel = spawn_master_serial(

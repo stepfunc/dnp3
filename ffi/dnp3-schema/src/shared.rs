@@ -4,11 +4,9 @@ use std::time::Duration;
 
 pub struct SharedDefinitions {
     pub error_type: ErrorType<Unvalidated>,
-    pub port_state_listener: AsynchronousInterface,
     pub variation_enum: EnumHandle,
     pub runtime_class: ClassDeclarationHandle,
     pub decode_level: UniversalStructHandle,
-    pub serial_port_settings: FunctionArgStructHandle,
     pub link_error_mode: EnumHandle,
     pub retry_strategy: FunctionArgStructHandle,
     pub control_field_struct: CallbackArgStructHandle,
@@ -30,7 +28,13 @@ pub struct SharedDefinitions {
     pub analog_output_status_it: AbstractIteratorHandle,
     pub octet_string: FunctionReturnStructHandle,
     pub octet_string_it: AbstractIteratorHandle,
+    #[cfg(feature = "serial")]
+    pub port_state_listener: AsynchronousInterface,
+    #[cfg(feature = "serial")]
+    pub serial_port_settings: FunctionArgStructHandle,
+    #[cfg(feature = "tls")]
     pub min_tls_version: EnumHandle,
+    #[cfg(feature = "tls")]
     pub certificate_mode: EnumHandle,
 }
 
@@ -41,6 +45,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
             "param_exception",
             ExceptionType::UncheckedException,
         )?
+        .doc("Error type used throughout the library")?
         .add_error(
             "invalid_timeout",
             "The supplied timeout value is too small or too large",
@@ -77,17 +82,19 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
             "logging_already_configured",
             "Logging can only be configured once",
         )?
-        .add_error("point_does_not_exist", "Point does not exist")?
-        .add_error("invalid_peer_certificate", "Invalid peer certificate file")?
+        .add_error("point_does_not_exist", "Point does not exist")?;
+
+    #[cfg(feature = "tls")]
+    let error_type = error_type.add_error("invalid_peer_certificate", "Invalid peer certificate file")?
         .add_error(
             "invalid_local_certificate",
             "Invalid local certificate file",
         )?
         .add_error("invalid_private_key", "Invalid private key file")?
         .add_error("invalid_dns_name", "Invalid DNS name")?
-        .add_error("other_tls_error", "Other TLS error")?
-        .doc("Error type used throughout the library")?
-        .build()?;
+        .add_error("other_tls_error", "Other TLS error")?;
+
+    let error_type = error_type.build()?;
 
     crate::constants::define(lib)?;
     let decode_level = crate::logging::define(lib, error_type.clone())?;
@@ -252,15 +259,11 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
 
     Ok(SharedDefinitions {
         error_type,
-        port_state_listener: define_port_state_listener(lib)?,
         variation_enum: crate::variation::define(lib)?,
         runtime_class,
         decode_level,
         retry_strategy: define_retry_strategy(lib)?,
-        serial_port_settings: define_serial_port_settings(lib)?,
         link_error_mode: define_link_error_mode(lib)?,
-        min_tls_version: define_min_tls_version(lib)?,
-        certificate_mode: define_certificate_mode(lib)?,
         control_field_struct,
         g12v1_struct,
         function_code: define_function_code(lib)?,
@@ -280,6 +283,14 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         analog_output_status_it,
         octet_string,
         octet_string_it,
+        #[cfg(feature = "serial")]
+        port_state_listener: define_port_state_listener(lib)?,
+        #[cfg(feature = "serial")]
+        serial_port_settings: define_serial_port_settings(lib)?,
+        #[cfg(feature = "tls")]
+        min_tls_version: define_min_tls_version(lib)?,
+        #[cfg(feature = "tls")]
+        certificate_mode: define_certificate_mode(lib)?,
     })
 }
 
@@ -324,6 +335,31 @@ fn define_link_error_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     Ok(mode)
 }
 
+#[cfg(feature = "serial")]
+fn define_port_state_listener(lib: &mut LibraryBuilder) -> BackTraced<AsynchronousInterface> {
+    let port_state = lib
+        .define_enum("port_state")?
+        .push("disabled", "Disabled until enabled")?
+        .push("wait", "Waiting to perform an open retry")?
+        .push("open", "Port is open")?
+        .push("shutdown", "Task has been shut down")?
+        .doc("State of the serial port")?
+        .build()?;
+
+    let port_state_listener = lib
+        .define_interface(
+            "port_state_listener",
+            "Callback interface for receiving updates about the state of a serial port",
+        )?
+        .begin_callback("on_change", "Invoked when the serial port changes state")?
+        .param("state", port_state, "New state of the port")?
+        .end_callback()?
+        .build_async()?;
+
+    Ok(port_state_listener)
+}
+
+#[cfg(feature = "serial")]
 fn define_serial_port_settings(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let data_bits_enum = lib
         .define_enum("data_bits")?
@@ -409,6 +445,7 @@ fn define_serial_port_settings(lib: &mut LibraryBuilder) -> BackTraced<FunctionA
     Ok(serial_settings)
 }
 
+#[cfg(feature = "tls")]
 fn define_min_tls_version(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let handle = lib
         .define_enum("min_tls_version")?
@@ -420,6 +457,7 @@ fn define_min_tls_version(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     Ok(handle)
 }
 
+#[cfg(feature = "tls")]
 fn define_certificate_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let handle = lib.define_enum("certificate_mode")?
         .push("authority_based",
@@ -455,29 +493,6 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
         .build()?;
 
     Ok(flags_struct)
-}
-
-fn define_port_state_listener(lib: &mut LibraryBuilder) -> BackTraced<AsynchronousInterface> {
-    let port_state = lib
-        .define_enum("port_state")?
-        .push("disabled", "Disabled until enabled")?
-        .push("wait", "Waiting to perform an open retry")?
-        .push("open", "Port is open")?
-        .push("shutdown", "Task has been shut down")?
-        .doc("State of the serial port")?
-        .build()?;
-
-    let port_state_listener = lib
-        .define_interface(
-            "port_state_listener",
-            "Callback interface for receiving updates about the state of a serial port",
-        )?
-        .begin_callback("on_change", "Invoked when the serial port changes state")?
-        .param("state", port_state, "New state of the port")?
-        .end_callback()?
-        .build_async()?;
-
-    Ok(port_state_listener)
 }
 
 fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {

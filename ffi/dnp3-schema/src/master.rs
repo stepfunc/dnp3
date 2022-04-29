@@ -13,8 +13,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let master_channel_class = lib.declare_class("master_channel")?;
 
-    let tls_client_config = define_tls_client_config(lib, shared)?;
-
     let connect_strategy = define_connect_strategy(lib)?;
 
     let nothing = lib
@@ -63,6 +61,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("Create a master channel that connects to the specified TCP endpoint(s)")?
         .build_static("create_tcp_channel")?;
 
+    #[cfg(feature = "serial")]
     let master_channel_create_serial_fn = lib
         .define_function("master_channel_create_serial")?
         .param("runtime",shared.runtime_class.clone(), "Runtime to use to drive asynchronous operations of the master")?
@@ -84,6 +83,10 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         "Shutdown a {class:master_channel} and release all resources",
     )?;
 
+    #[cfg(feature = "tls")]
+    let tls_client_config = define_tls_client_config(lib, shared)?;
+
+    #[cfg(feature = "tls")]
     let master_channel_create_tls_fn = lib
         .define_function("master_channel_create_tls")?
         .param(
@@ -341,11 +344,9 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("Asynchronously perform a link status check")?
         .build()?;
 
-    lib.define_class(&master_channel_class)?
+    let class = lib.define_class(&master_channel_class)?
         .destructor(channel_destructor)?
         .static_method(master_channel_create_tcp_fn)?
-        .static_method(master_channel_create_tls_fn)?
-        .static_method(master_channel_create_serial_fn)?
         .method(enable_method)?
         .method(disable_method)?
         .method(add_association_method)?
@@ -367,8 +368,15 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             doc("Represents a communication channel for a master station")
             .details("To communicate with a particular outstation, you need to add an association with {class:master_channel.add_association()}.")
             .warning("The class methods that return a value (e.g. as {class:master_channel.add_association()}) cannot be called from within a callback.")
-        )?
-        .build()?;
+        )?;
+
+    #[cfg(feature = "tls")]
+    let class = class.static_method(master_channel_create_tls_fn)?;
+
+    #[cfg(feature = "serial")]
+    let class = class.static_method(master_channel_create_serial_fn)?;
+
+    class.build()?;
 
     Ok(())
 }
@@ -412,6 +420,7 @@ fn define_connect_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgSt
     Ok(strategy)
 }
 
+#[cfg(feature = "tls")]
 fn define_tls_client_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,

@@ -7,6 +7,7 @@ pub(crate) enum PhysLayer {
     // TLS type is boxed because its size is huge
     #[cfg(feature = "tls")]
     Tls(Box<tokio_rustls::TlsStream<crate::tokio::net::TcpStream>>),
+    #[cfg(feature = "serial")]
     Serial(tokio_serial::SerialStream),
     #[cfg(test)]
     Mock(tokio_mock::mock::test::io::MockIO),
@@ -18,6 +19,7 @@ impl std::fmt::Debug for PhysLayer {
             PhysLayer::Tcp(_) => f.write_str("Tcp"),
             #[cfg(feature = "tls")]
             PhysLayer::Tls(_) => f.write_str("Tls"),
+            #[cfg(feature = "serial")]
             PhysLayer::Serial(_) => f.write_str("Serial"),
             #[cfg(test)]
             PhysLayer::Mock(_) => f.write_str("Mock"),
@@ -35,6 +37,7 @@ impl PhysLayer {
             Self::Tcp(x) => x.read(buffer).await?,
             #[cfg(feature = "tls")]
             Self::Tls(x) => x.read(buffer).await?,
+            #[cfg(feature = "serial")]
             Self::Serial(x) => x.read(buffer).await?,
             #[cfg(test)]
             Self::Mock(x) => x.read(buffer).await?,
@@ -62,6 +65,7 @@ impl PhysLayer {
             Self::Tcp(x) => x.write_all(data).await,
             #[cfg(feature = "tls")]
             Self::Tls(x) => x.write_all(data).await,
+            #[cfg(feature = "serial")]
             Self::Serial(x) => x.write_all(data).await,
             #[cfg(test)]
             Self::Mock(x) => x.write_all(data).await,

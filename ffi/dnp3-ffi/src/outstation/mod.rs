@@ -1,6 +1,5 @@
 use std::ffi::CStr;
 use std::net::AddrParseError;
-use std::path::Path;
 use std::time::Duration;
 
 pub use database::*;
@@ -8,13 +7,16 @@ use dnp3::app::{BufferSize, BufferSizeError, Listener, MaybeAsync, Timeout};
 use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::{ConnectionState, Feature, Features, OutstationConfig, OutstationHandle};
-use dnp3::tcp::tls::TlsServerConfig;
 use dnp3::tcp::{FilterError, ServerHandle};
 pub use struct_constructors::*;
 
 use crate::{ffi, Runtime, RuntimeHandle};
 
+#[cfg(feature = "serial")]
 use dnp3::serial::create_outstation_serial;
+
+#[cfg(feature = "tls")]
+use dnp3::tcp::tls::TlsServerConfig;
 
 mod adapters;
 mod database;
@@ -57,12 +59,15 @@ pub unsafe fn outstation_server_destroy(server: *mut OutstationServer) {
     }
 }
 
+#[cfg(feature = "tls")]
 pub unsafe fn outstation_server_create_tls_server(
     runtime: *mut Runtime,
     link_error_mode: ffi::LinkErrorMode,
     address: &CStr,
     tls_config: ffi::TlsServerConfig,
 ) -> Result<*mut OutstationServer, ffi::ParamError> {
+    use std::path::Path;
+
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let address = address.to_string_lossy().parse()?;
 
@@ -160,6 +165,7 @@ pub unsafe fn outstation_destroy(outstation: *mut Outstation) {
 }
 
 #[allow(clippy::too_many_arguments)] // TODO
+#[cfg(feature = "serial")]
 pub unsafe fn outstation_create_serial_session(
     runtime: *mut crate::Runtime,
     serial_path: &CStr,

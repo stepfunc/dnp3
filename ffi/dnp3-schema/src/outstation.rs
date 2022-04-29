@@ -32,11 +32,9 @@ impl OutstationTypes {
 
 pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackTraced<()> {
     // Everything required to create an outstation
-
     let types = OutstationTypes::define(lib, shared_def)?;
     let outstation = define_outstation(lib, shared_def, &types)?;
     let address_filter = define_address_filter(lib, shared_def)?;
-    let tls_server_config = define_tls_server_config(lib, shared_def)?;
 
     // Define the TCP server
     let outstation_server = lib.declare_class("outstation_server")?;
@@ -66,6 +64,10 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         )?
         .build_static("create_tcp_server")?;
 
+    #[cfg(feature = "tls")]
+    let tls_server_config = define_tls_server_config(lib, shared_def)?;
+
+    #[cfg(feature = "tls")]
     let outstation_server_tls_create = lib
         .define_function("outstation_server_create_tls_server")?
         .param(
@@ -114,17 +116,20 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
     let destructor = lib
         .define_destructor(outstation_server.clone(), "Gracefully shutdown all the outstations associated to this server, stops the server and release resources.")?;
 
-    lib.define_class(&outstation_server)?
+    let class = lib.define_class(&outstation_server)?
         .static_method(outstation_server_tcp_create)?
-        .static_method(outstation_server_tls_create)?
         .destructor(destructor)?
         .method(add_outstation)?
         .method(bind)?
         .custom_destroy("shutdown")?
         .doc(doc("TCP server that listens for connections and routes the messages to outstations.")
         .details("To add outstations to it, use {class:outstation_server.add_outstation()}. Once all the outstations are added, the server can be started with {class:outstation_server.bind()}.")
-        .details("{class:outstation_server.[destructor]} is used to gracefully shutdown all the outstations and the server."))?
-        .build()?;
+        .details("{class:outstation_server.[destructor]} is used to gracefully shutdown all the outstations and the server."))?;
+
+    #[cfg(feature = "tls")]
+    let class = class.static_method(outstation_server_tls_create)?;
+
+    class.build()?;
 
     Ok(())
 }
@@ -136,6 +141,7 @@ fn define_outstation(
 ) -> BackTraced<ClassHandle> {
     let outstation = lib.declare_class("outstation")?;
 
+    #[cfg(feature = "serial")]
     let outstation_create_serial_session_fn = lib
         .define_function("outstation_create_serial_session")?
         .param(
@@ -202,11 +208,14 @@ fn define_outstation(
     let outstation = lib
         .define_class(&outstation)?
         .destructor(destructor)?
-        .static_method(outstation_create_serial_session_fn)?
         .method(execute_transaction)?
         .method(set_decode_level)?
-        .doc(doc("Outstation handle").details("Use this handle to modify the internal database."))?
-        .build()?;
+        .doc(doc("Outstation handle").details("Use this handle to modify the internal database."))?;
+
+    #[cfg(feature = "serial")]
+    let outstation = outstation.static_method(outstation_create_serial_session_fn)?;
+
+    let outstation = outstation.build()?;
 
     Ok(outstation)
 }
@@ -973,6 +982,7 @@ fn define_address_filter(
     Ok(address_filter)
 }
 
+#[cfg(feature = "tls")]
 fn define_tls_server_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,

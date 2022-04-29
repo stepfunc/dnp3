@@ -5,5 +5,10 @@ authors = ["Émile Grégoire <emile@stepfunc.io>"]
 edition = "2021"
 
 [dependencies]
-dnp3 = { path = "../../dnp3" }
+dnp3 = { path = "../../dnp3", default-features = false }
 oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.2.0" }
+
+[features]
+default = ["serial", "tls"]
+serial = ["dnp3/serial"]
+tls = ["dnp3/tls"]
