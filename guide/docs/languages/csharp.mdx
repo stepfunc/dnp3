@@ -8,7 +8,7 @@ slug: /c_sharp
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
 We distribute the C# bindings as a [Nuget package](https://www.nuget.org/packages/dnp3). Internally, the C API is called using [P/Invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke)
-The bindings are .NET standard 2.0 compatible and include platform-specific shared libraries that are automatically loaded by the .NET runtime.
+The bindings are .NET Standard 2.0 compatible and include platform-specific shared libraries that are automatically loaded by the .NET runtime.
 
 Shared libraries for the following platforms are included in the Nuget package:
 
@@ -21,6 +21,18 @@ Shared libraries for the following platforms are included in the Nuget package:
 :::warning
 MacOS x64 libraries are included in the package but are not officially supported. They are useful for developers using MacOS, but
 are not supported in production.
+:::
+
+## Supported .NET versions
+
+The library targets .NET Standard 2.0, meaning it supports .NET Core 2.0+, .NET 5+ and .NET Framework 4.6.1+ (although at least 4.7.2 is recommended).
+A complete compatibility table is available on [Microsoft website](https://docs.microsoft.com/en-us/dotnet/standard/net-standard?tabs=net-standard-2-0).
+
+:::info
+On .NET Framework, you need to specify the platform you are targeting. The library currently does not support the `AnyCPU` platform. You need to
+set the platform to either `x64` or `x86` in order for the MSBuild script to properly copy the DLL in the build directory.
+
+For .NET Core and .NET 5, the proper DLL is automatically loaded even with the `AnyCPU` platform.
 :::
 
 ## Mapping
