@@ -300,11 +300,22 @@ jobs:
           use-cross: true
           command: run
           args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --c --no-tests
+      - name: Java bindings
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: run
+          args: --release --target ${{ matrix.target }} --bin foo-bindings -- --java --no-tests
       - name: Upload compiled FFI modules
         uses: actions/upload-artifact@v2
         with:
           name: ffi-modules
           path: ffi/bindings/c/generated/${{ matrix.target }}/lib
+      - name: Upload compiled Java bindings
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffi-modules
+          path: ffi/bindings/java/dnp3/src/main/resources
       - name: Upload C bindings
         uses: actions/upload-artifact@v2
         with:
