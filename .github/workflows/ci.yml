@@ -305,7 +305,7 @@ jobs:
         with:
           use-cross: true
           command: run
-          args: --release --target ${{ matrix.target }} --bin foo-bindings -- --java --no-tests
+          args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --java --no-tests
       - name: Upload compiled FFI modules
         uses: actions/upload-artifact@v2
         with:
