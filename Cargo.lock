@@ -185,7 +185,7 @@ checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
 [[package]]
 name = "c-oo-bindgen"
 version = "0.2.0"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.0#5d0fe23ae1da50cad284cdca31076214778f4277"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/jni-build-rs#9373049b5f3bb9c8dbb751edaee90429a4537c3f"
 dependencies = [
  "oo-bindgen",
 ]
@@ -204,6 +204,12 @@ name = "cc"
 version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fff2a6927b3bb87f9595d67196a70493f627687a71d87a0d692242c33f58c11"
+
+[[package]]
+name = "cesu8"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d43a04d8753f35258c91f8ec639f792891f748a1edbd759cf1dcea3382ad83c"
 
 [[package]]
 name = "cfg-if"
@@ -227,7 +233,7 @@ dependencies = [
 [[package]]
 name = "ci-script"
 version = "0.2.0"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.0#5d0fe23ae1da50cad284cdca31076214778f4277"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/jni-build-rs#9373049b5f3bb9c8dbb751edaee90429a4537c3f"
 dependencies = [
  "c-oo-bindgen",
  "clap",
@@ -259,6 +265,16 @@ dependencies = [
  "textwrap",
  "unicode-width",
  "vec_map",
+]
+
+[[package]]
+name = "combine"
+version = "4.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a604e93b79d1808327a6fca85a6f2d69de66461e7620f5a4cbf5fb4d1d7c948"
+dependencies = [
+ "bytes",
+ "memchr",
 ]
 
 [[package]]
@@ -483,9 +499,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dnp3_ffi_java"
+version = "1.0.0"
+dependencies = [
+ "dnp3-ffi",
+ "dnp3-schema",
+ "java-oo-bindgen",
+ "jni",
+]
+
+[[package]]
 name = "dotnet-oo-bindgen"
 version = "0.2.0"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.0#5d0fe23ae1da50cad284cdca31076214778f4277"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/jni-build-rs#9373049b5f3bb9c8dbb751edaee90429a4537c3f"
 dependencies = [
  "dunce",
  "oo-bindgen",
@@ -686,12 +712,32 @@ checksum = "1aab8fc367588b89dcee83ab0fd66b72b50b72fa1904d7095045ace2b0c81c35"
 [[package]]
 name = "java-oo-bindgen"
 version = "0.2.0"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.0#5d0fe23ae1da50cad284cdca31076214778f4277"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/jni-build-rs#9373049b5f3bb9c8dbb751edaee90429a4537c3f"
 dependencies = [
  "dunce",
  "oo-bindgen",
  "pathdiff",
 ]
+
+[[package]]
+name = "jni"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6df18c2e3db7e453d3c6ac5b3e9d5182664d28788126d39b91f2d1e22b017ec"
+dependencies = [
+ "cesu8",
+ "combine",
+ "jni-sys",
+ "log",
+ "thiserror",
+ "walkdir",
+]
+
+[[package]]
+name = "jni-sys"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eaf4bc02d17cbdd7ff4c7438cafcdf7fb9a4613313ad11b4f8fefe7d3fa0130"
 
 [[package]]
 name = "js-sys"
@@ -879,7 +925,7 @@ checksum = "87f3e037eac156d1775da914196f0f37741a274155e34a0b7e427c35d2a2ecb9"
 [[package]]
 name = "oo-bindgen"
 version = "0.2.0"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.0#5d0fe23ae1da50cad284cdca31076214778f4277"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/jni-build-rs#9373049b5f3bb9c8dbb751edaee90429a4537c3f"
 dependencies = [
  "backtrace",
  "heck",
@@ -1156,7 +1202,7 @@ dependencies = [
 [[package]]
 name = "rust-oo-bindgen"
 version = "0.2.0"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.0#5d0fe23ae1da50cad284cdca31076214778f4277"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/jni-build-rs#9373049b5f3bb9c8dbb751edaee90429a4537c3f"
 dependencies = [
  "heck",
  "oo-bindgen",

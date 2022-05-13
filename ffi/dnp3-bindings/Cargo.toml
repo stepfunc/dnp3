@@ -5,6 +5,6 @@ authors = ["Émile Grégoire <emile@stepfunc.io>"]
 edition = "2021"
 
 [dependencies]
-ci-script = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.2.0" }
+ci-script = { git = "https://github.com/stepfunc/oo_bindgen.git", branch = "feature/jni-build-rs" }
 dnp3-schema = { path = "../dnp3-schema" }
 dnp3-ffi = { path = "../dnp3-ffi" }
