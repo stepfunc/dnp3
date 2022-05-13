@@ -107,8 +107,8 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-  # Build bindings on Linux x64 [64-bit Linux (kernel 2.6.32+, glibc 2.11+) (x86_64-unknown-linux-gnu)]
-  bindings-linux:
+  # Build API documentation packages
+  documentation:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -151,21 +151,6 @@ jobs:
           cp -a ffi/bindings/dotnet/dnp3/doc ~/doc/dotnet
           cp -a ffi/bindings/java/dnp3/target/apidocs ~/doc/java
           rm ffi/bindings/c/generated/logo.png ffi/bindings/c/generated/doxygen-awesome.css
-      - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi/bindings/c/generated/x86_64-unknown-linux-gnu/lib
-      - name: Upload C bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: c-bindings
-          path: ffi/bindings/c/generated
-      - name: Upload compiled Java bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi/bindings/java/dnp3/src/main/resources
       - name: Upload documentation
         uses: actions/upload-artifact@v2
         with:
@@ -281,61 +266,7 @@ jobs:
         with:
           name: ffi-modules
           path: ffi/bindings/java/dnp3/src/main/resources
-  # Build bindings on Linux AArch64
-  bindings-aarch64:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          target: aarch64-unknown-linux-gnu
-          override: true
-      - name: Caching
-        uses: Swatinem/rust-cache@v1
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --target aarch64-unknown-linux-gnu
-      - name: C bindings
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: run
-          args: --release --target aarch64-unknown-linux-gnu --bin dnp3-bindings -- --c --no-tests
-      - name: .NET bindings
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: run
-          args: --release --target aarch64-unknown-linux-gnu --bin dnp3-bindings -- --dotnet --no-tests
-      - name: Java bindings
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: run
-          args: --release --target aarch64-unknown-linux-gnu --bin dnp3-bindings -- --java --no-tests
-      - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi/bindings/c/generated/aarch64-unknown-linux-gnu/lib
-      - name: Upload C bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: c-bindings
-          path: ffi/bindings/c/generated
-      - name: Upload compiled Java bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi/bindings/java/dnp3/src/main/resources
-  # Cross-compilation for ARM devices and produce C bindings
+  # Cross-compilation for Linux to produce portable C and JNI libraries
   cross:
     strategy:
       fail-fast: false
@@ -344,6 +275,8 @@ jobs:
           - arm-unknown-linux-gnueabi # ARMv6 Linux (kernel 3.2, glibc 2.17)
           - arm-unknown-linux-gnueabihf # ARMv6 Linux, hardfloat (kernel 3.2, glibc 2.17)
           - armv7-unknown-linux-gnueabihf # ARMv7 Linux, hardfloat (kernel 3.2, glibc 2.17)
+          - aarch64-unknown-linux-gnu # ARM64 Linux (kernel 4.2, glibc 2.17+)
+          - x86_64-unknown-linux-gnu # 64-bit Linux (kernel 2.6.32+, glibc 2.11+)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -398,7 +331,7 @@ jobs:
           path: ~/doc
   # Package all the generated bindings
   packaging:
-    needs: [dependencies, bindings-linux, bindings-windows, bindings-macos, bindings-aarch64, cross]
+    needs: [dependencies, documentation, bindings-windows, bindings-macos, cross]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
