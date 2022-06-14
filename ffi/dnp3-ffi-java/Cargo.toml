@@ -1,0 +1,16 @@
+[package]
+name = "dnp3_ffi_java"
+version = "1.0.0"
+edition = "2018"
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = "0.19"
+dnp3-ffi = { path = "../dnp3-ffi" }
+
+[build-dependencies]
+dnp3-schema = { path = "../dnp3-schema" }
+java-oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.2.1" }
