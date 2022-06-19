@@ -38,7 +38,7 @@ where
     T: std::future::Future<Output = RunError>,
 {
     pub(crate) handle: OutstationHandle,
-    io: io::Handle,
+    io: io::ScriptHandle,
     task: Spawn<T>,
     events: EventHandle,
     pub(crate) application_data: Arc<Mutex<ApplicationData>>,
@@ -52,37 +52,34 @@ where
         assert_pending!(self.task.poll());
     }
 
+    pub(crate) fn flush_io(&mut self) {
+        self.poll_pending();
+        let len = self.io.len();
+        if len != 0 {
+            panic!("i/o script has {} actions remaining", len)
+        }
+    }
+
     pub(crate) fn test_request_response(&mut self, request: &[u8], response: &[u8]) {
         self.io.read(request);
-        self.poll_pending();
-        assert!(self.io.pending_write());
         self.io.write(response);
-        assert_pending!(self.task.poll());
-        assert!(self.io.all_read());
-        assert!(self.io.all_written());
+        self.flush_io();
     }
 
     pub(crate) fn expect_response(&mut self, response: &[u8]) {
         self.io.write(response);
-        self.poll_pending();
-        assert!(self.io.all_written());
+        self.flush_io();
     }
 
     pub(crate) fn send(&mut self, request: &[u8]) {
         self.io.read(request);
-        self.poll_pending();
+        self.flush_io();
     }
 
     pub(crate) fn test_request_no_response(&mut self, request: &[u8]) {
         self.io.read(request);
         self.poll_pending();
-        assert!(!self.io.pending_write());
-        self.check_all_io_consumed();
-    }
-
-    pub(crate) fn check_all_io_consumed(&mut self) {
-        assert!(self.io.all_read());
-        assert!(self.io.all_written());
+        self.flush_io();
     }
 
     pub(crate) fn check_events(&mut self, events: &[Event]) {

@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 tracing = "0.1"
 chrono = "0.4"
-tokio-mock = { git = "https://github.com/stepfunc/tokio-mock.git", tag = "0.1.0" }
+tokio-mock = { git = "https://github.com/stepfunc/tokio-mock.git", branch = "feature/simplify-io" }
 tokio-serial = "5.4"
 xxhash-rust = { version = "0.8.2", features = ["xxh64"] }
 

@@ -15,20 +15,20 @@ pub(crate) fn startup_procedure<F: Future<Output = RunError>>(
     // Disable unsolicited
     disable_unsol_request(&mut harness.io, *seq);
     empty_response(&mut harness.io, seq.increment());
-    harness.assert_io();
+    harness.flush_io();
 
     // Integrity poll
     integrity_poll_request(&mut harness.io, *seq);
     empty_response(&mut harness.io, seq.increment());
-    harness.assert_io();
+    harness.flush_io();
 
     // Enable unsolicited
     enable_unsol_request(&mut harness.io, *seq);
     empty_response(&mut harness.io, seq.increment());
-    harness.assert_io();
+    harness.flush_io();
 }
 
-pub(crate) fn disable_unsol_request(io: &mut io::Handle, seq: Sequence) {
+pub(crate) fn disable_unsol_request(io: &mut io::ScriptHandle, seq: Sequence) {
     // DISABLE_UNSOLICITED request
     let mut buffer = [0; 20];
     let mut cursor = WriteCursor::new(&mut buffer);
@@ -52,7 +52,7 @@ pub(crate) fn disable_unsol_request(io: &mut io::Handle, seq: Sequence) {
     io.write(cursor.written());
 }
 
-pub(crate) fn integrity_poll_request(io: &mut io::Handle, seq: Sequence) {
+pub(crate) fn integrity_poll_request(io: &mut io::ScriptHandle, seq: Sequence) {
     // Integrity poll
     let mut buffer = [0; 20];
     let mut cursor = WriteCursor::new(&mut buffer);
@@ -64,7 +64,7 @@ pub(crate) fn integrity_poll_request(io: &mut io::Handle, seq: Sequence) {
     io.write(cursor.written());
 }
 
-pub(crate) fn enable_unsol_request(io: &mut io::Handle, seq: Sequence) {
+pub(crate) fn enable_unsol_request(io: &mut io::ScriptHandle, seq: Sequence) {
     // ENABLE_UNSOLICITED request
     let mut buffer = [0; 20];
     let mut cursor = WriteCursor::new(&mut buffer);
@@ -88,7 +88,7 @@ pub(crate) fn enable_unsol_request(io: &mut io::Handle, seq: Sequence) {
     io.write(cursor.written());
 }
 
-pub(crate) fn clear_restart_iin(io: &mut io::Handle, seq: Sequence) {
+pub(crate) fn clear_restart_iin(io: &mut io::ScriptHandle, seq: Sequence) {
     // ENABLE_UNSOLICITED request
     let mut buffer = [0; 20];
     let mut cursor = WriteCursor::new(&mut buffer);
@@ -100,11 +100,11 @@ pub(crate) fn clear_restart_iin(io: &mut io::Handle, seq: Sequence) {
     io.write(cursor.written());
 }
 
-pub(crate) fn empty_response(io: &mut io::Handle, seq: Sequence) {
+pub(crate) fn empty_response(io: &mut io::ScriptHandle, seq: Sequence) {
     empty_response_custom_iin(io, seq, Iin::default());
 }
 
-pub(crate) fn empty_response_custom_iin(io: &mut io::Handle, seq: Sequence, iin: Iin) {
+pub(crate) fn empty_response_custom_iin(io: &mut io::ScriptHandle, seq: Sequence, iin: Iin) {
     let mut buffer = [0; 4];
     let mut cursor = WriteCursor::new(&mut buffer);
     start_response(
@@ -120,7 +120,7 @@ pub(crate) fn empty_response_custom_iin(io: &mut io::Handle, seq: Sequence, iin:
 
 // Unsolicited stuff
 
-pub(crate) fn unsol_null(io: &mut io::Handle, seq: Sequence, restart_iin: bool) {
+pub(crate) fn unsol_null(io: &mut io::ScriptHandle, seq: Sequence, restart_iin: bool) {
     let iin = if restart_iin {
         Iin::new(Iin1::new(0x80), Iin2::new(0x00))
     } else {
@@ -130,7 +130,7 @@ pub(crate) fn unsol_null(io: &mut io::Handle, seq: Sequence, restart_iin: bool) 
     unsol_null_custom_iin(io, seq, iin);
 }
 
-pub(crate) fn unsol_null_custom_iin(io: &mut io::Handle, seq: Sequence, iin: Iin) {
+pub(crate) fn unsol_null_custom_iin(io: &mut io::ScriptHandle, seq: Sequence, iin: Iin) {
     let mut buffer = [0; 4];
     let mut cursor = WriteCursor::new(&mut buffer);
     start_response(
@@ -144,7 +144,7 @@ pub(crate) fn unsol_null_custom_iin(io: &mut io::Handle, seq: Sequence, iin: Iin
     io.read(cursor.written());
 }
 
-pub(crate) fn unsol_confirm(io: &mut io::Handle, seq: Sequence) {
+pub(crate) fn unsol_confirm(io: &mut io::ScriptHandle, seq: Sequence) {
     let mut buffer = [0; 2];
     let mut cursor = WriteCursor::new(&mut buffer);
     start_request(
@@ -157,7 +157,12 @@ pub(crate) fn unsol_confirm(io: &mut io::Handle, seq: Sequence) {
     io.write(cursor.written());
 }
 
-pub(crate) fn unsol_with_data(io: &mut io::Handle, seq: Sequence, data: i16, restart_iin: bool) {
+pub(crate) fn unsol_with_data(
+    io: &mut io::ScriptHandle,
+    seq: Sequence,
+    data: i16,
+    restart_iin: bool,
+) {
     let iin = if restart_iin {
         Iin::new(Iin1::new(0x80), Iin2::new(0x00))
     } else {

@@ -26,12 +26,12 @@ fn auto_integrity_scan_on_buffer_overflow() {
         Iin::new(Iin1::new(0x00), Iin2::new(0x08)),
     );
     unsol_confirm(&mut harness.io, seq);
-    harness.assert_io();
+    harness.flush_io();
 
     // Send integrity poll
     integrity_poll_request(&mut harness.io, seq);
     empty_response(&mut harness.io, seq.increment());
-    harness.assert_io();
+    harness.flush_io();
 }
 
 #[test]
@@ -50,10 +50,7 @@ fn auto_integrity_scan_on_buffer_overflow_disabled() {
         Iin::new(Iin1::new(0x00), Iin2::new(0x08)),
     );
     unsol_confirm(&mut harness.io, seq);
-    harness.assert_io();
-
-    // No integrity poll
-    assert!(!harness.io.pending_write());
+    harness.flush_io();
 }
 
 #[test]
@@ -72,7 +69,7 @@ fn auto_event_class_scan() {
         Iin::new(Iin1::new(0x02), Iin2::new(0x00)), // Class 1 events
     );
     unsol_confirm(&mut harness.io, seq);
-    harness.assert_io();
+    harness.flush_io();
 
     {
         // Read class 1 events
@@ -88,10 +85,7 @@ fn auto_event_class_scan() {
         harness.io.write(cursor.written());
     }
     empty_response(&mut harness.io, seq);
-    harness.assert_io();
-
-    // No integrity poll
-    assert!(!harness.io.pending_write());
+    harness.flush_io();
 }
 
 #[test]
@@ -110,10 +104,7 @@ fn auto_event_class_ignore_one_class_scan() {
         Iin::new(Iin1::new(0x02), Iin2::new(0x00)), // Class 1 events
     );
     unsol_confirm(&mut harness.io, seq);
-    harness.assert_io();
-
-    // No reads
-    assert!(!harness.io.pending_write());
+    harness.flush_io();
 }
 
 #[test]
@@ -132,8 +123,5 @@ fn auto_event_class_scan_disabled() {
         Iin::new(Iin1::new(0x02), Iin2::new(0x00)), // Class 1 events
     );
     unsol_confirm(&mut harness.io, seq);
-    harness.assert_io();
-
-    // No reads
-    assert!(!harness.io.pending_write());
+    harness.flush_io();
 }
