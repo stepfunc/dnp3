@@ -1,7 +1,7 @@
 [package]
 name = "dnp3-bindings"
 version = "1.0.0"
-authors = ["Émile Grégoire <emile@stepfunc.io>"]
+authors = ["Step Function I/O LLC <info@stepfunc.io>"]
 edition = "2021"
 
 [dependencies]
