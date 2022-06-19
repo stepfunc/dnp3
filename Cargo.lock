@@ -1538,8 +1538,8 @@ dependencies = [
 
 [[package]]
 name = "tokio-mock"
-version = "0.1.1"
-source = "git+https://github.com/stepfunc/tokio-mock.git?branch=feature/simplify-io#3ccf4fc36fd1d5a3c26e3f00727478aafc43b1b2"
+version = "0.2.0"
+source = "git+https://github.com/stepfunc/tokio-mock.git?tag=0.2.0#53467dabf52c0e6da41523e4c1ff5c1d81f5d83f"
 dependencies = [
  "tokio",
 ]
