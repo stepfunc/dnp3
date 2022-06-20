@@ -127,9 +127,8 @@ fn unsolicited_can_timeout_and_not_retry() {
 
     // timeout
     crate::tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
-    harness.poll_pending();
+    harness.flush_io();
     harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, false)]);
-    harness.check_all_io_consumed();
 
     // new series
     crate::tokio::time::advance(OutstationConfig::DEFAULT_UNSOLICITED_RETRY_DELAY);
@@ -148,9 +147,8 @@ fn unsolicited_can_timeout_series_wait_and_start_another_series() {
     harness.expect_response(UNSOL_G2V1_SEQ1);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
     crate::tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
-    harness.poll_pending();
+    harness.flush_io();
     harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, false)]);
-    harness.check_all_io_consumed();
 
     // we're now back in IDLE, and need to wait to attempt a new series
     crate::tokio::time::advance(OutstationConfig::DEFAULT_UNSOLICITED_RETRY_DELAY);
@@ -187,7 +185,7 @@ fn defers_read_during_unsol_confirm_wait() {
     harness.send(UNS_CONFIRM_SEQ_1);
     harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
     harness.expect_response(CLASS_0_RESPONSE_SEQ0);
-    harness.check_all_io_consumed();
+    harness.flush_io();
     harness.check_no_events();
 }
 
@@ -208,7 +206,7 @@ fn defers_read_during_unsol_confirm_wait_timeout() {
     harness.poll_pending();
     harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, false)]);
     harness.expect_response(CLASS_0_RESPONSE_SEQ0_WITH_PENDING_EVENTS);
-    harness.check_all_io_consumed();
+    harness.flush_io();
     harness.check_no_events();
 }
 
@@ -231,7 +229,6 @@ fn handles_non_read_during_unsolicited_confirm_wait() {
     // now send the confirm
     harness.send(UNS_CONFIRM_SEQ_1);
     harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
-    harness.check_all_io_consumed();
 }
 
 #[test]
@@ -253,7 +250,6 @@ fn handles_invalid_request_during_unsolicited_confirm_wait() {
     // now send the confirm
     harness.send(UNS_CONFIRM_SEQ_1);
     harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
-    harness.check_all_io_consumed();
 }
 
 #[test]
@@ -274,7 +270,6 @@ fn handles_disable_unsolicited_during_unsolicited_confirm_wait() {
     crate::tokio::time::advance(OutstationConfig::DEFAULT_UNSOLICITED_RETRY_DELAY);
     harness.poll_pending();
     harness.check_no_events();
-    harness.check_all_io_consumed();
 }
 
 #[test]

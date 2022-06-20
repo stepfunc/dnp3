@@ -9,7 +9,7 @@ pub(crate) enum PhysLayer {
     Tls(Box<tokio_rustls::TlsStream<crate::tokio::net::TcpStream>>),
     Serial(tokio_serial::SerialStream),
     #[cfg(test)]
-    Mock(tokio_mock::mock::test::io::MockIO),
+    Mock(tokio_mock::mock::test::io::MockIo),
 }
 
 impl std::fmt::Debug for PhysLayer {

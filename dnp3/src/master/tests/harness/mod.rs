@@ -240,7 +240,7 @@ pub(crate) struct TestHarness<F: Future<Output = RunError>> {
     pub(crate) master: MasterChannel,
     pub(crate) association: AssociationHandle,
     pub(crate) num_requests: Arc<AtomicU64>,
-    pub(crate) io: io::Handle,
+    pub(crate) io: io::ScriptHandle,
 }
 
 impl<F: Future<Output = RunError>> TestHarness<F> {
@@ -248,13 +248,12 @@ impl<F: Future<Output = RunError>> TestHarness<F> {
         self.session.poll()
     }
 
-    pub(crate) fn assert_io(&mut self) {
+    pub(crate) fn flush_io(&mut self) {
         assert_pending!(self.poll());
-        assert!(
-            self.io.all_written(),
-            "Some expected bytes were not written"
-        );
-        assert!(self.io.all_read(), "Some bytess were not read");
+        let len = self.io.len();
+        if len > 0 {
+            panic!("I/O script has {} items remaining", len)
+        }
     }
 
     pub(crate) fn num_requests(&self) -> u64 {
