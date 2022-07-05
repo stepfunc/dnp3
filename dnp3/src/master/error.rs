@@ -7,10 +7,11 @@ use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::NoAssociation;
 use crate::master::session::{RunError, StateChange};
-use crate::tokio::sync::mpsc::error::SendError;
-use crate::tokio::sync::oneshot::error::RecvError;
 use crate::transport::TransportResponseError;
 use crate::util::cursor::WriteError;
+
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::oneshot::error::RecvError;
 
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq)]

@@ -77,7 +77,7 @@ fn null_unsolicited_always_retries() {
     harness.expect_response(NULL_UNSOL_SEQ_0);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
 
-    crate::tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
+    tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
     harness.poll_pending();
     harness.check_events(&[Event::UnsolicitedConfirmTimeout(0, false)]);
 
@@ -98,7 +98,7 @@ fn unsolicited_can_time_out_and_retry() {
 
     // this would go on forever, but let's just test 3 iterations
     for _ in 0..3 {
-        crate::tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
+        tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
         harness.expect_response(UNSOL_G2V1_SEQ1);
         harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, true)]);
     }
@@ -116,22 +116,22 @@ fn unsolicited_can_timeout_and_not_retry() {
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 
     // first retry
-    crate::tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
+    tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
     harness.expect_response(UNSOL_G2V1_SEQ1);
     harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, true)]);
 
     // second retry
-    crate::tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
+    tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
     harness.expect_response(UNSOL_G2V1_SEQ1);
     harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, true)]);
 
     // timeout
-    crate::tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
+    tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
     harness.flush_io();
     harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, false)]);
 
     // new series
-    crate::tokio::time::advance(OutstationConfig::DEFAULT_UNSOLICITED_RETRY_DELAY);
+    tokio::time::advance(OutstationConfig::DEFAULT_UNSOLICITED_RETRY_DELAY);
     harness.expect_response(UNSOL_G2V1_SEQ2);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(2)]);
 }
@@ -146,12 +146,12 @@ fn unsolicited_can_timeout_series_wait_and_start_another_series() {
     // first response series
     harness.expect_response(UNSOL_G2V1_SEQ1);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-    crate::tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
+    tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
     harness.flush_io();
     harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, false)]);
 
     // we're now back in IDLE, and need to wait to attempt a new series
-    crate::tokio::time::advance(OutstationConfig::DEFAULT_UNSOLICITED_RETRY_DELAY);
+    tokio::time::advance(OutstationConfig::DEFAULT_UNSOLICITED_RETRY_DELAY);
     harness.expect_response(UNSOL_G2V1_SEQ2);
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(2)]);
 }
@@ -202,7 +202,7 @@ fn defers_read_during_unsol_confirm_wait_timeout() {
     harness.send(READ_CLASS_0);
     harness.check_no_events();
     // expire the unsolicited response
-    crate::tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
+    tokio::time::advance(OutstationConfig::DEFAULT_CONFIRM_TIMEOUT);
     harness.poll_pending();
     harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, false)]);
     harness.expect_response(CLASS_0_RESPONSE_SEQ0_WITH_PENDING_EVENTS);
@@ -267,7 +267,7 @@ fn handles_disable_unsolicited_during_unsolicited_confirm_wait() {
     harness.check_no_events();
 
     // check that no other unsolicited responses are sent
-    crate::tokio::time::advance(OutstationConfig::DEFAULT_UNSOLICITED_RETRY_DELAY);
+    tokio::time::advance(OutstationConfig::DEFAULT_UNSOLICITED_RETRY_DELAY);
     harness.poll_pending();
     harness.check_no_events();
 }

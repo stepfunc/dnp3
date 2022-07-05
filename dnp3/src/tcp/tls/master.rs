@@ -5,18 +5,18 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 
-use tokio_rustls::{rustls, webpki};
-use tracing::Instrument;
-
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
 use crate::tcp::EndpointList;
 use crate::tcp::{ClientState, MasterTask, MasterTaskConnectionHandler};
-use crate::tokio::net::TcpStream;
 use crate::util::phys::PhysLayer;
+
 use rasn;
+use tokio::net::TcpStream;
+use tokio_rustls::{rustls, webpki};
+use tracing::Instrument;
 
 /// TLS configuration
 pub struct TlsClientConfig {
@@ -45,7 +45,7 @@ pub fn spawn_master_tls_client(
         listener,
         tls_config,
     );
-    crate::tokio::spawn(future);
+    tokio::spawn(future);
     handle
 }
 

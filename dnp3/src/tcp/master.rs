@@ -11,10 +11,11 @@ use crate::master::session::{MasterSession, RunError, StateChange};
 use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::tcp::ClientState;
 use crate::tcp::EndpointList;
-use crate::tokio::net::TcpStream;
 use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
 use crate::util::phys::PhysLayer;
+
+use tokio::net::TcpStream;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.
@@ -35,7 +36,7 @@ pub fn spawn_master_tcp_client(
         connect_strategy,
         listener,
     );
-    crate::tokio::spawn(future);
+    tokio::spawn(future);
     handle
 }
 

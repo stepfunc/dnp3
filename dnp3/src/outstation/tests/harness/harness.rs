@@ -12,7 +12,6 @@ use crate::outstation::tests::harness::{
     MockOutstationInformation,
 };
 use crate::outstation::OutstationHandle;
-use crate::tokio::test::*;
 use crate::util::phys::PhysLayer;
 
 pub(crate) fn get_default_config() -> OutstationConfig {

@@ -5,7 +5,6 @@ use crate::app::variations::{Group32Var2, Variation};
 use crate::app::Sequence;
 use crate::app::{ControlField, FunctionCode, Iin, Iin1, Iin2, ResponseFunction};
 use crate::master::session::RunError;
-use crate::tokio::test::*;
 use crate::util::cursor::WriteCursor;
 
 pub(crate) fn startup_procedure<F: Future<Output = RunError>>(

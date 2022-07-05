@@ -180,7 +180,7 @@ fn confirm_can_time_out() {
 
     harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-    crate::tokio::time::advance(
+    tokio::time::advance(
         get_default_config().confirm_timeout.value + Duration::from_millis(1),
     );
     harness.poll_pending();

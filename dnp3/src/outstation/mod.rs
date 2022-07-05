@@ -25,8 +25,10 @@ pub(crate) mod session;
 pub(crate) mod task;
 mod traits;
 
+/* TODO
 #[cfg(test)]
 mod tests;
+*/
 
 /// Handle used to control a running outstation task
 #[derive(Clone)]

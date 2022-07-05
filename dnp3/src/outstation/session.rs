@@ -195,7 +195,7 @@ impl From<OutstationConfig> for SessionParameters {
 enum UnsolicitedState {
     /// need to perform NULL unsolicited
     NullRequired,
-    Ready(Option<crate::tokio::time::Instant>),
+    Ready(Option<tokio::time::Instant>),
 }
 
 /// state that mutates while the session runs
@@ -207,7 +207,7 @@ struct SessionState {
     unsolicited: UnsolicitedState,
     unsolicited_seq: Sequence,
     deferred_read: DeferredRead,
-    last_recorded_time: Option<crate::tokio::time::Instant>,
+    last_recorded_time: Option<tokio::time::Instant>,
     last_broadcast_type: Option<BroadcastConfirmMode>,
 }
 
@@ -243,7 +243,7 @@ pub(crate) struct OutstationSession {
     application: Box<dyn OutstationApplication>,
     info: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
-    next_link_status: Option<crate::tokio::time::Instant>,
+    next_link_status: Option<tokio::time::Instant>,
 }
 
 enum Confirm {
@@ -314,7 +314,7 @@ impl OutstationSession {
     ) -> Self {
         let next_link_status = config
             .keep_alive_timeout
-            .map(|delay| crate::tokio::time::Instant::now() + delay);
+            .map(|delay| tokio::time::Instant::now() + delay);
 
         Self {
             messages,
@@ -454,16 +454,14 @@ impl OutstationSession {
 
         let deadline = match deadline {
             Some(deadline) => match self.next_link_status {
-                Some(link_deadline) => {
-                    Some(crate::tokio::time::Instant::min(deadline, link_deadline))
-                }
+                Some(link_deadline) => Some(tokio::time::Instant::min(deadline, link_deadline)),
                 None => Some(deadline),
             },
             None => self.next_link_status,
         };
 
         // wait for an event
-        crate::tokio::select! {
+        tokio::select! {
             frame_read = reader.read(io, self.config.decode_level) => {
                 // make sure an I/O error didn't occur, ending the session
                 frame_read?;
@@ -486,7 +484,7 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<crate::tokio::time::Instant>, RunError> {
+    ) -> Result<Option<tokio::time::Instant>, RunError> {
         if self.config.unsolicited.is_disabled() {
             return Ok(None);
         }
@@ -500,7 +498,7 @@ impl OutstationSession {
                 {
                     UnsolicitedResult::Timeout | UnsolicitedResult::ReturnToIdle => {
                         self.state.unsolicited = UnsolicitedState::NullRequired;
-                        Ok(Some(crate::tokio::time::Instant::now()))
+                        Ok(Some(tokio::time::Instant::now()))
                     }
                     UnsolicitedResult::Confirmed => {
                         self.state.unsolicited = UnsolicitedState::Ready(None);
@@ -510,7 +508,7 @@ impl OutstationSession {
             }
             UnsolicitedState::Ready(deadline) => {
                 if let Some(deadline) = deadline {
-                    if crate::tokio::time::Instant::now() < deadline {
+                    if tokio::time::Instant::now() < deadline {
                         return Ok(Some(deadline)); // not ready yet
                     }
                 }
@@ -546,7 +544,7 @@ impl OutstationSession {
     ) -> Result<(), RunError> {
         if let Some(next) = self.next_link_status {
             // Wait until we need to send the link status
-            if next > crate::tokio::time::Instant::now() {
+            if next > tokio::time::Instant::now() {
                 return Ok(());
             }
 
@@ -700,7 +698,7 @@ impl OutstationSession {
     async fn wait_for_unsolicited_confirm(
         &mut self,
         uns_ecsn: Sequence,
-        deadline: crate::tokio::time::Instant,
+        deadline: tokio::time::Instant,
         io: &mut PhysLayer,
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
@@ -827,11 +825,11 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader,
-        deadline: crate::tokio::time::Instant,
+        deadline: tokio::time::Instant,
     ) -> Result<TimeoutStatus, RunError> {
         loop {
             let decode_level = self.config.decode_level;
-            crate::tokio::select! {
+            tokio::select! {
                  res = self.sleep_until(Some(deadline)) => {
                      res?;
                      return Ok(TimeoutStatus::Yes);
@@ -844,13 +842,10 @@ impl OutstationSession {
         }
     }
 
-    async fn sleep_until(
-        &mut self,
-        instant: Option<crate::tokio::time::Instant>,
-    ) -> Result<(), RunError> {
-        async fn sleep_only(instant: Option<crate::tokio::time::Instant>) {
+    async fn sleep_until(&mut self, instant: Option<tokio::time::Instant>) -> Result<(), RunError> {
+        async fn sleep_only(instant: Option<tokio::time::Instant>) {
             match instant {
-                Some(x) => crate::tokio::time::sleep_until(x).await,
+                Some(x) => tokio::time::sleep_until(x).await,
                 None => {
                     // sleep forever
                     crate::util::future::forever().await;
@@ -859,7 +854,7 @@ impl OutstationSession {
         }
 
         loop {
-            crate::tokio::select! {
+            tokio::select! {
                  _ = sleep_only(instant) => {
                         return Ok(());
                  }
@@ -1293,7 +1288,7 @@ impl OutstationSession {
             return Iin2::PARAMETER_ERROR;
         };
 
-        let now = crate::tokio::time::Instant::now();
+        let now = tokio::time::Instant::now();
         let delay = if let Some(delay) = now.checked_duration_since(last_recorded_time) {
             delay
         } else {
@@ -1335,7 +1330,7 @@ impl OutstationSession {
     }
 
     fn handle_record_current_time(&mut self, seq: Sequence) -> Response {
-        self.state.last_recorded_time = Some(crate::tokio::time::Instant::now());
+        self.state.last_recorded_time = Some(tokio::time::Instant::now());
         Response::empty_solicited(seq, Iin::default())
     }
 
@@ -1550,7 +1545,7 @@ impl OutstationSession {
             self.state.select = Some(SelectState::new(
                 seq,
                 frame_id,
-                crate::tokio::time::Instant::now(),
+                tokio::time::Instant::now(),
                 controls.hash(),
             ))
         }
@@ -1816,12 +1811,12 @@ impl OutstationSession {
         }
     }
 
-    fn new_confirm_deadline(&self) -> crate::tokio::time::Instant {
+    fn new_confirm_deadline(&self) -> tokio::time::Instant {
         self.config.confirm_timeout.deadline_from_now()
     }
 
-    fn new_unsolicited_retry_deadline(&self) -> crate::tokio::time::Instant {
-        crate::tokio::time::Instant::now() + self.config.unsolicited_retry_delay
+    fn new_unsolicited_retry_deadline(&self) -> tokio::time::Instant {
+        tokio::time::Instant::now() + self.config.unsolicited_retry_delay
     }
 
     async fn sol_confirm_wait(
@@ -2006,7 +2001,7 @@ impl OutstationSession {
         self.next_link_status = self
             .config
             .keep_alive_timeout
-            .map(|timeout| crate::tokio::time::Instant::now() + timeout);
+            .map(|timeout| tokio::time::Instant::now() + timeout);
     }
 }
 

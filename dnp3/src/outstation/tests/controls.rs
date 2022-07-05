@@ -185,7 +185,7 @@ fn select_can_time_out() {
         Event::EndControls,
     ]);
 
-    crate::tokio::time::advance(
+    tokio::time::advance(
         get_default_config().select_timeout.value + Duration::from_millis(1),
     );
 

@@ -10,7 +10,7 @@ pub(crate) struct SelectState {
     /// without requests in between
     frame_id: u32,
     /// time at which the SELECT occurred
-    time: crate::tokio::time::Instant,
+    time: tokio::time::Instant,
     /// the hash of the object headers
     object_hash: u64,
 }
@@ -19,7 +19,7 @@ impl SelectState {
     pub(crate) fn new(
         seq: Sequence,
         frame_id: u32,
-        time: crate::tokio::time::Instant,
+        time: tokio::time::Instant,
         object_hash: u64,
     ) -> Self {
         Self {
@@ -41,7 +41,7 @@ impl SelectState {
         frame_id: u32,
         object_hash: u64,
     ) -> Result<(), CommandStatus> {
-        let elapsed = crate::tokio::time::Instant::now().checked_duration_since(self.time);
+        let elapsed = tokio::time::Instant::now().checked_duration_since(self.time);
 
         // check the sequence number
         if self.seq.next() != seq.value() {

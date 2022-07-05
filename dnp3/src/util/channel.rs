@@ -1,11 +1,11 @@
 use crate::app::Shutdown;
 
 pub(crate) struct Receiver<T> {
-    inner: crate::tokio::sync::mpsc::Receiver<T>,
+    inner: tokio::sync::mpsc::Receiver<T>,
 }
 
 pub(crate) struct Sender<T> {
-    inner: crate::tokio::sync::mpsc::Sender<T>,
+    inner: tokio::sync::mpsc::Sender<T>,
 }
 
 impl<T> Clone for Sender<T> {
@@ -25,12 +25,12 @@ impl<T> std::fmt::Debug for Sender<T> {
 }
 
 pub(crate) fn request_channel<T>() -> (Sender<T>, Receiver<T>) {
-    let (tx, rx) = crate::tokio::sync::mpsc::channel(16); // default size for all request channels
+    let (tx, rx) = tokio::sync::mpsc::channel(16); // default size for all request channels
     (Sender::new(tx), Receiver::new(rx))
 }
 
 impl<T> Receiver<T> {
-    fn new(inner: crate::tokio::sync::mpsc::Receiver<T>) -> Self {
+    fn new(inner: tokio::sync::mpsc::Receiver<T>) -> Self {
         Receiver { inner }
     }
 
@@ -47,7 +47,7 @@ impl<T> Receiver<T> {
 }
 
 impl<T> Sender<T> {
-    fn new(inner: crate::tokio::sync::mpsc::Sender<T>) -> Self {
+    fn new(inner: tokio::sync::mpsc::Sender<T>) -> Self {
         Sender { inner }
     }
 
@@ -56,8 +56,8 @@ impl<T> Sender<T> {
     }
 }
 
-impl From<crate::tokio::sync::oneshot::error::RecvError> for Shutdown {
-    fn from(_: crate::tokio::sync::oneshot::error::RecvError) -> Self {
+impl From<tokio::sync::oneshot::error::RecvError> for Shutdown {
+    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
         Shutdown
     }
 }

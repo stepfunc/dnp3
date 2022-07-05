@@ -32,7 +32,7 @@ pub fn spawn_outstation_serial(
         information,
         control_handler,
     )?;
-    crate::tokio::spawn(future);
+    tokio::spawn(future);
     Ok(handle)
 }
 

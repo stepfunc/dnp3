@@ -26,7 +26,7 @@ pub fn spawn_master_serial(
 ) -> MasterChannel {
     let (future, handle) =
         create_master_serial(config, path, serial_settings, retry_delay, listener);
-    crate::tokio::spawn(future);
+    tokio::spawn(future);
     handle
 }
 

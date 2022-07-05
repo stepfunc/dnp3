@@ -14,11 +14,12 @@ use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::master::Association;
-use crate::tokio::time::Instant;
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
+
+use tokio::time::Instant;
 
 pub(crate) struct MasterSession {
     enabled: bool,
@@ -91,14 +92,14 @@ impl MasterSession {
         let deadline = Instant::now().add(duration);
 
         loop {
-            crate::tokio::select! {
+            tokio::select! {
                 result = self.process_message(false) => {
                    result?;
                    if !self.enabled {
                        return Err(StateChange::Disable)
                    }
                 }
-                _ = crate::tokio::time::sleep_until(deadline) => {
+                _ = tokio::time::sleep_until(deadline) => {
                    return Ok(());
                 }
             }
@@ -165,7 +166,7 @@ impl MasterSession {
     ) -> Result<(), RunError> {
         loop {
             let decode_level = self.decode_level;
-            crate::tokio::select! {
+            tokio::select! {
                 result = self.process_message(true) => {
                    // we need to recheck the tasks
                    return Ok(result?);
@@ -198,7 +199,7 @@ impl MasterSession {
     ) -> Result<(), RunError> {
         loop {
             let decode_level = self.decode_level;
-            crate::tokio::select! {
+            tokio::select! {
                 result = self.process_message(true) => {
                    // we need to recheck the tasks
                    return Ok(result?);
@@ -215,7 +216,7 @@ impl MasterSession {
                         None => return Ok(()),
                    }
                 }
-                _ = crate::tokio::time::sleep_until(instant) => {
+                _ = tokio::time::sleep_until(instant) => {
                    return Ok(());
                 }
             }
@@ -397,8 +398,8 @@ impl MasterSession {
         let deadline = timeout.deadline_from_now();
 
         loop {
-            crate::tokio::select! {
-                _ = crate::tokio::time::sleep_until(deadline) => {
+            tokio::select! {
+                _ = tokio::time::sleep_until(deadline) => {
                     tracing::warn!("no response within timeout: {}", timeout);
                     task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
                     return Err(TaskError::ResponseTimeout);
@@ -554,8 +555,8 @@ impl MasterSession {
             let deadline = timeout.deadline_from_now();
 
             loop {
-                crate::tokio::select! {
-                    _ = crate::tokio::time::sleep_until(deadline) => {
+                tokio::select! {
+                    _ = tokio::time::sleep_until(deadline) => {
                             tracing::warn!("no response within timeout: {}", timeout);
                             return Err(TaskError::ResponseTimeout);
                     }
@@ -791,8 +792,8 @@ impl MasterSession {
         loop {
             let timeout = self.associations.get_timeout(destination)?;
             // Wait for something on the link
-            crate::tokio::select! {
-                _ = crate::tokio::time::sleep_until(timeout.deadline_from_now()) => {
+            tokio::select! {
+                _ = tokio::time::sleep_until(timeout.deadline_from_now()) => {
                     tracing::warn!("no response within timeout: {}", timeout);
                     return Err(TaskError::ResponseTimeout);
                 }
