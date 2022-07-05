@@ -306,19 +306,18 @@ impl From<std::num::TryFromIntError> for TimeSyncError {
     }
 }
 
-/* TODO
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
     use std::time::SystemTime;
 
     use crate::app::format::write::*;
-    use crate::app::parse::parser::ParsedFragment;
-    use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
     use crate::app::Sequence;
     use crate::app::*;
+    use crate::link::EndpointAddress;
     use crate::master::handler::{AssociationHandler, NullReadHandler};
     use crate::master::tasks::RequestWriter;
+    use crate::master::{AssociationConfig, NullAssociationInformation};
     use crate::util::cursor::WriteCursor;
 
     use super::*;
@@ -339,18 +338,73 @@ mod tests {
         }
     }
 
+    struct TestHandler {
+        time: Timestamp,
+    }
+
+    impl TestHandler {
+        fn new(time: Timestamp) -> Self {
+            Self { time }
+        }
+    }
+
+    impl AssociationHandler for TestHandler {
+        fn get_current_time(&self) -> Option<Timestamp> {
+            Some(self.time)
+        }
+    }
+
     impl AssociationHandler for SingleTimestampTestHandler {
         fn get_current_time(&self) -> Option<Timestamp> {
             self.time.lock().unwrap().take()
         }
     }
 
+    fn time_sync_setup(
+        procedure: TimeSyncProcedure,
+        handler: fn(Timestamp) -> Box<dyn AssociationHandler>,
+    ) -> (
+        NonReadTask,
+        Timestamp,
+        Association,
+        tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
+    ) {
+        let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
+        let association = Association::new(
+            EndpointAddress::try_new(1).unwrap(),
+            AssociationConfig::default(),
+            Box::new(NullReadHandler),
+            handler(system_time),
+            Box::new(NullAssociationInformation),
+        );
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let task =
+            NonReadTask::TimeSync(TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx)));
+
+        (task, system_time, association, rx)
+    }
+
+    fn send_write_response(task: NonReadTask, association: &mut Association) {
+        let mut buffer = [0; 20];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let writer = start_response(
+            ControlField::request(Sequence::default()),
+            ResponseFunction::Response,
+            Iin::default(),
+            &mut cursor,
+        )
+        .unwrap();
+        let response = writer.to_parsed().to_response().unwrap();
+
+        assert!(task.handle(association, response).is_none());
+    }
+
     mod non_lan {
+        use crate::app::parse::parser::ParsedFragment;
+        use crate::app::parse::traits::FixedSize;
+        use crate::app::parse::traits::FixedSizeVariation;
         use crate::app::variations::Group52Var2;
         use crate::app::QualifierCode;
-        use crate::link::EndpointAddress;
-        use crate::master::association::AssociationConfig;
-        use crate::master::NullAssociationInformation;
 
         use super::*;
 
@@ -358,264 +412,211 @@ mod tests {
         const TOTAL_DELAY_MS: u16 = 200;
         const PROPAGATION_DELAY_MS: u16 = (TOTAL_DELAY_MS - OUTSTATION_DELAY_MS) / 2;
 
-        struct TestHandler {
-            time: Timestamp,
+        fn non_lan_time_sync_setup() -> (
+            NonReadTask,
+            Timestamp,
+            Association,
+            tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
+        ) {
+            time_sync_setup(TimeSyncProcedure::NonLan, |time| {
+                Box::new(TestHandler::new(time))
+            })
         }
 
-        impl TestHandler {
-            fn new(time: Timestamp) -> Self {
-                Self { time }
-            }
+        fn non_lan_time_sync_single_time_setup() -> (
+            NonReadTask,
+            Timestamp,
+            Association,
+            tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
+        ) {
+            time_sync_setup(TimeSyncProcedure::NonLan, |time| {
+                Box::new(SingleTimestampTestHandler::new(time))
+            })
         }
 
-        impl AssociationHandler for TestHandler {
-            fn get_current_time(&self) -> Option<Timestamp> {
-                Some(self.time)
-            }
+        #[tokio::test(start_paused = true)]
+        async fn success() {
+            let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
+            let task = check_measure_delay_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            let task = send_measure_delay_response(task, &mut association).unwrap();
+            let task = check_write_request(task, &mut association, system_time);
+            send_write_response(task, &mut association);
+            assert!(rx.try_recv().unwrap().is_ok());
         }
 
-        #[test]
-        fn success() {
-            run_nonlan_timesync_test(|task, system_time, mut association, mut rx| {
-                let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
-                let task = send_measure_delay_response(task, &mut association).unwrap();
-                let task = check_write_request(task, &mut association, system_time);
-                send_write_response(task, &mut association);
-                assert!(rx.try_recv().unwrap().is_ok());
-            });
-        }
+        #[tokio::test(start_paused = true)]
+        async fn with_16bit_count() {
+            let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
 
-        #[test]
-        fn with_16bit_count() {
-            run_nonlan_timesync_test(|task, system_time, mut association, mut rx| {
-                let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
+            let task = check_measure_delay_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
 
-                let task = {
-                    let mut buffer = [0; 20];
-                    let mut cursor = WriteCursor::new(&mut buffer);
-                    let writer = start_response(
-                        response_control_field(Sequence::default()),
-                        ResponseFunction::Response,
-                        Iin::default(),
-                        &mut cursor,
-                    )
-                    .unwrap();
-                    {
-                        let cursor = writer.inner();
-                        Group52Var2::VARIATION.write(cursor).unwrap();
-                        QualifierCode::Count16.write(cursor).unwrap();
-                        cursor.write_u16_le(1).unwrap();
-                        Group52Var2 {
-                            time: OUTSTATION_DELAY_MS,
-                        }
-                        .write(cursor)
-                        .unwrap();
-                    }
-                    let response = ParsedFragment::parse(cursor.written())
-                        .unwrap()
-                        .to_response()
-                        .unwrap();
-
-                    task.handle(&mut association, response)
-                }
+            let task = {
+                let mut buffer = [0; 20];
+                let mut cursor = WriteCursor::new(&mut buffer);
+                let writer = start_response(
+                    response_control_field(Sequence::default()),
+                    ResponseFunction::Response,
+                    Iin::default(),
+                    &mut cursor,
+                )
                 .unwrap();
-                let task = check_write_request(task, &mut association, system_time);
-                send_write_response(task, &mut association);
-                assert!(rx.try_recv().unwrap().is_ok());
-            });
-        }
-
-        #[test]
-        fn delay_reported_by_outstation_greater_than_actual_delay() {
-            run_nonlan_timesync_test(|task, _system_time, mut association, mut rx| {
-                let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(1)); // This delay is less than the reported delay of the outstation
-                assert!(send_measure_delay_response(task, &mut association).is_none());
-                assert_eq!(
-                    Err(TimeSyncError::BadOutstationTimeDelay(OUTSTATION_DELAY_MS)),
-                    rx.try_recv().unwrap()
-                );
-            });
-        }
-
-        #[test]
-        fn empty_measure_delay_response() {
-            run_nonlan_timesync_test(|task, _system_time, mut association, mut rx| {
-                let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
                 {
-                    let mut buffer = [0; 20];
-                    let mut cursor = WriteCursor::new(&mut buffer);
-                    let writer = start_response(
-                        response_control_field(Sequence::default()),
-                        ResponseFunction::Response,
-                        Iin::default(),
-                        &mut cursor,
-                    )
+                    let cursor = writer.inner();
+                    Group52Var2::VARIATION.write(cursor).unwrap();
+                    QualifierCode::Count16.write(cursor).unwrap();
+                    cursor.write_u16_le(1).unwrap();
+                    Group52Var2 {
+                        time: OUTSTATION_DELAY_MS,
+                    }
+                    .write(cursor)
+                    .unwrap();
+                }
+                let response = ParsedFragment::parse(cursor.written())
+                    .unwrap()
+                    .to_response()
                     .unwrap();
 
-                    let response = writer.to_parsed().to_response().unwrap();
-
-                    assert!(task.handle(&mut association, response).is_none());
-                }
-                assert_eq!(
-                    rx.try_recv().unwrap(),
-                    Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
-                );
-            });
+                task.handle(&mut association, response)
+            }
+            .unwrap();
+            let task = check_write_request(task, &mut association, system_time);
+            send_write_response(task, &mut association);
+            assert!(rx.try_recv().unwrap().is_ok());
         }
 
-        #[test]
-        fn non_empty_write_response() {
-            run_nonlan_timesync_test(|task, system_time, mut association, mut rx| {
-                let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
-                let task = send_measure_delay_response(task, &mut association).unwrap();
-                let task = check_write_request(task, &mut association, system_time);
-                {
-                    let mut buffer = [0; 20];
-                    let mut cursor = WriteCursor::new(&mut buffer);
-                    let mut writer = start_response(
-                        response_control_field(Sequence::default()),
-                        ResponseFunction::Response,
-                        Iin::default(),
-                        &mut cursor,
-                    )
-                    .unwrap();
-                    writer.write_class1230().unwrap();
-
-                    let response = writer.to_parsed().to_response().unwrap();
-
-                    assert!(task.handle(&mut association, response).is_none());
-                }
-                assert_matches!(
-                    rx.try_recv().unwrap(),
-                    Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
-                );
-            });
+        #[tokio::test(start_paused = true)]
+        async fn delay_reported_by_outstation_greater_than_actual_delay() {
+            let (task, _system_time, mut association, mut rx) = non_lan_time_sync_setup();
+            let task = check_measure_delay_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(1)).await; // This delay is less than the reported delay of the outstation
+            assert!(send_measure_delay_response(task, &mut association).is_none());
+            assert_eq!(
+                Err(TimeSyncError::BadOutstationTimeDelay(OUTSTATION_DELAY_MS)),
+                rx.try_recv().unwrap()
+            );
         }
 
-        #[test]
-        fn iin_bit_not_reset() {
-            run_nonlan_timesync_test(|task, system_time, mut association, mut rx| {
-                let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
-                let task = send_measure_delay_response(task, &mut association).unwrap();
-                let task = check_write_request(task, &mut association, system_time);
-                {
-                    let mut buffer = [0; 20];
-                    let mut cursor = WriteCursor::new(&mut buffer);
-                    let writer = start_response(
-                        response_control_field(Sequence::default()),
-                        ResponseFunction::Response,
-                        Iin::new(Iin1::new(0x10), Iin2::new(0x00)),
-                        &mut cursor,
-                    )
-                    .unwrap();
+        #[tokio::test(start_paused = true)]
+        async fn empty_measure_delay_response() {
+            let (task, _system_time, mut association, mut rx) = non_lan_time_sync_setup();
+            let task = check_measure_delay_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            {
+                let mut buffer = [0; 20];
+                let mut cursor = WriteCursor::new(&mut buffer);
+                let writer = start_response(
+                    response_control_field(Sequence::default()),
+                    ResponseFunction::Response,
+                    Iin::default(),
+                    &mut cursor,
+                )
+                .unwrap();
 
-                    let response = writer.to_parsed().to_response().unwrap();
+                let response = writer.to_parsed().to_response().unwrap();
 
-                    assert!(task.handle(&mut association, response).is_none());
-                }
-                assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
-            });
+                assert!(task.handle(&mut association, response).is_none());
+            }
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
+            );
         }
 
-        #[test]
-        fn error_response() {
-            run_nonlan_timesync_test(|task, system_time, mut association, mut rx| {
-                let task = check_measure_delay_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
-                let task = send_measure_delay_response(task, &mut association).unwrap();
-                let task = check_write_request(task, &mut association, system_time);
-                task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
-                assert_eq!(
-                    rx.try_recv().unwrap(),
-                    Err(TimeSyncError::Task(TaskError::ResponseTimeout))
-                );
-            });
+        #[tokio::test(start_paused = true)]
+        async fn non_empty_write_response() {
+            let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
+            let task = check_measure_delay_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            let task = send_measure_delay_response(task, &mut association).unwrap();
+            let task = check_write_request(task, &mut association, system_time);
+            {
+                let mut buffer = [0; 20];
+                let mut cursor = WriteCursor::new(&mut buffer);
+                let mut writer = start_response(
+                    response_control_field(Sequence::default()),
+                    ResponseFunction::Response,
+                    Iin::default(),
+                    &mut cursor,
+                )
+                .unwrap();
+                writer.write_class1230().unwrap();
+
+                let response = writer.to_parsed().to_response().unwrap();
+
+                assert!(task.handle(&mut association, response).is_none());
+            }
+            assert_matches!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
+            );
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn iin_bit_not_reset() {
+            let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
+
+            let task = check_measure_delay_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            let task = send_measure_delay_response(task, &mut association).unwrap();
+            let task = check_write_request(task, &mut association, system_time);
+            {
+                let mut buffer = [0; 20];
+                let mut cursor = WriteCursor::new(&mut buffer);
+                let writer = start_response(
+                    response_control_field(Sequence::default()),
+                    ResponseFunction::Response,
+                    Iin::new(Iin1::new(0x10), Iin2::new(0x00)),
+                    &mut cursor,
+                )
+                .unwrap();
+
+                let response = writer.to_parsed().to_response().unwrap();
+
+                assert!(task.handle(&mut association, response).is_none());
+            }
+            assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn error_response() {
+            let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
+            let task = check_measure_delay_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            let task = send_measure_delay_response(task, &mut association).unwrap();
+            let task = check_write_request(task, &mut association, system_time);
+            task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::Task(TaskError::ResponseTimeout))
+            );
         }
 
         #[test]
         fn no_system_time_at_start() {
-            run_nonlan_timesync_single_timestamp_test(
-                |task, _system_time, mut association, mut rx| {
-                    association.get_system_time(); // Empty the time
+            let (task, _system_time, mut association, mut rx) =
+                non_lan_time_sync_single_time_setup();
+            association.get_system_time(); // Empty the time
 
-                    assert!(task.start(&mut association).is_none());
-                    assert_eq!(
-                        rx.try_recv().unwrap(),
-                        Err(TimeSyncError::SystemTimeNotAvailable)
-                    );
-                },
+            assert!(task.start(&mut association).is_none());
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::SystemTimeNotAvailable)
             );
         }
 
-        #[test]
-        fn no_system_time_at_delay() {
-            run_nonlan_timesync_single_timestamp_test(
-                |task, _system_time, mut association, mut rx| {
-                    let task = check_measure_delay_request(task, &mut association);
-                    tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64));
-                    assert!(send_measure_delay_response(task, &mut association).is_none());
-                    assert_eq!(
-                        rx.try_recv().unwrap(),
-                        Err(TimeSyncError::SystemTimeNotAvailable)
-                    );
-                },
+        #[tokio::test(start_paused = true)]
+        async fn no_system_time_at_delay() {
+            let (task, _system_time, mut association, mut rx) =
+                non_lan_time_sync_single_time_setup();
+            let task = check_measure_delay_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            assert!(send_measure_delay_response(task, &mut association).is_none());
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::SystemTimeNotAvailable)
             );
-        }
-
-        fn run_nonlan_timesync_test(
-            test: impl FnOnce(
-                NonReadTask,
-                Timestamp,
-                Association,
-                tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
-            ),
-        ) {
-            let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
-            let association = Association::new(
-                EndpointAddress::try_new(1).unwrap(),
-                AssociationConfig::default(),
-                Box::new(NullReadHandler),
-                Box::new(TestHandler::new(system_time)),
-                Box::new(NullAssociationInformation),
-            );
-            let (tx, rx) = tokio::sync::oneshot::channel();
-            let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
-                TimeSyncProcedure::NonLan,
-                Promise::OneShot(tx),
-            ));
-
-            test(task, system_time, association, rx);
-        }
-
-        fn run_nonlan_timesync_single_timestamp_test(
-            test: impl FnOnce(
-                NonReadTask,
-                Timestamp,
-                Association,
-                tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
-            ),
-        ) {
-            let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
-            let association = Association::new(
-                EndpointAddress::try_new(1).unwrap(),
-                AssociationConfig::default(),
-                Box::new(NullReadHandler),
-                Box::new(SingleTimestampTestHandler::new(system_time)),
-                Box::new(NullAssociationInformation),
-            );
-            let (tx, rx) = tokio::sync::oneshot::channel();
-            let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
-                TimeSyncProcedure::NonLan,
-                Promise::OneShot(tx),
-            ));
-
-            test(task, system_time, association, rx);
         }
 
         fn check_measure_delay_request(
@@ -696,179 +697,141 @@ mod tests {
 
             task
         }
-
-        fn send_write_response(task: NonReadTask, association: &mut Association) {
-            let mut buffer = [0; 20];
-            let mut cursor = WriteCursor::new(&mut buffer);
-            let writer = start_response(
-                ControlField::request(Sequence::default()),
-                ResponseFunction::Response,
-                Iin::default(),
-                &mut cursor,
-            )
-            .unwrap();
-            let response = writer.to_parsed().to_response().unwrap();
-
-            assert!(task.handle(association, response).is_none());
-        }
     }
 
     mod lan {
-        use crate::link::EndpointAddress;
-        use crate::master::association::AssociationConfig;
-        use crate::master::NullAssociationInformation;
 
         use super::*;
 
         const DELAY_MS: u16 = 200;
 
-        #[test]
-        fn success() {
-            run_lan_timesync_test(|task, system_time, mut association, mut rx| {
-                let task = check_record_current_time_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(DELAY_MS as u64));
-                let task = send_record_current_time_response(task, &mut association).unwrap();
-                let task = check_write_request(task, &mut association, system_time);
-                send_write_response(task, &mut association);
-                assert!(rx.try_recv().unwrap().is_ok());
-            });
+        #[tokio::test(start_paused = true)]
+        async fn success() {
+            let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
+            let task = check_record_current_time_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+            let task = send_record_current_time_response(task, &mut association).unwrap();
+            let task = check_write_request(task, &mut association, system_time);
+            send_write_response(task, &mut association);
+            assert!(rx.try_recv().unwrap().is_ok());
         }
 
-        #[test]
-        fn non_empty_record_current_time_response() {
-            run_lan_timesync_test(|task, _system_time, mut association, mut rx| {
-                let task = check_record_current_time_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(DELAY_MS as u64));
-                {
-                    let mut buffer = [0; 20];
-                    let mut cursor = WriteCursor::new(&mut buffer);
-                    let mut writer = start_response(
-                        response_control_field(Sequence::default()),
-                        ResponseFunction::Response,
-                        Iin::default(),
-                        &mut cursor,
-                    )
-                    .unwrap();
-                    writer.write_class1230().unwrap();
+        #[tokio::test(start_paused = true)]
+        async fn non_empty_record_current_time_response() {
+            let (task, _system_time, mut association, mut rx) = lan_time_sync_setup();
+            let task = check_record_current_time_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+            {
+                let mut buffer = [0; 20];
+                let mut cursor = WriteCursor::new(&mut buffer);
+                let mut writer = start_response(
+                    response_control_field(Sequence::default()),
+                    ResponseFunction::Response,
+                    Iin::default(),
+                    &mut cursor,
+                )
+                .unwrap();
+                writer.write_class1230().unwrap();
 
-                    let response = writer.to_parsed().to_response().unwrap();
+                let response = writer.to_parsed().to_response().unwrap();
 
-                    assert!(task.handle(&mut association, response).is_none());
-                }
-                assert_eq!(
-                    rx.try_recv().unwrap(),
-                    Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
-                );
-            });
+                assert!(task.handle(&mut association, response).is_none());
+            }
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
+            );
         }
 
-        #[test]
-        fn non_empty_write_response() {
-            run_lan_timesync_test(|task, system_time, mut association, mut rx| {
-                let task = check_record_current_time_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(DELAY_MS as u64));
-                let task = send_record_current_time_response(task, &mut association).unwrap();
-                let task = check_write_request(task, &mut association, system_time);
-                {
-                    let mut buffer = [0; 20];
-                    let mut cursor = WriteCursor::new(&mut buffer);
-                    let mut writer = start_response(
-                        response_control_field(Sequence::default()),
-                        ResponseFunction::Response,
-                        Iin::default(),
-                        &mut cursor,
-                    )
-                    .unwrap();
-                    writer.write_class1230().unwrap();
+        #[tokio::test(start_paused = true)]
+        async fn non_empty_write_response() {
+            let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
+            let task = check_record_current_time_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+            let task = send_record_current_time_response(task, &mut association).unwrap();
+            let task = check_write_request(task, &mut association, system_time);
+            {
+                let mut buffer = [0; 20];
+                let mut cursor = WriteCursor::new(&mut buffer);
+                let mut writer = start_response(
+                    response_control_field(Sequence::default()),
+                    ResponseFunction::Response,
+                    Iin::default(),
+                    &mut cursor,
+                )
+                .unwrap();
+                writer.write_class1230().unwrap();
 
-                    let response = writer.to_parsed().to_response().unwrap();
+                let response = writer.to_parsed().to_response().unwrap();
 
-                    assert!(task.handle(&mut association, response).is_none());
-                }
-                assert_eq!(
-                    rx.try_recv().unwrap(),
-                    Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
-                );
-            });
+                assert!(task.handle(&mut association, response).is_none());
+            }
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
+            );
         }
 
-        #[test]
-        fn iin_bit_not_reset() {
-            run_lan_timesync_test(|task, system_time, mut association, mut rx| {
-                let task = check_record_current_time_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(DELAY_MS as u64));
-                let task = send_record_current_time_response(task, &mut association).unwrap();
-                let task = check_write_request(task, &mut association, system_time);
-                {
-                    let mut buffer = [0; 20];
-                    let mut cursor = WriteCursor::new(&mut buffer);
-                    let writer = start_response(
-                        response_control_field(Sequence::default()),
-                        ResponseFunction::Response,
-                        Iin::new(Iin1::new(0x10), Iin2::new(0x00)),
-                        &mut cursor,
-                    )
-                    .unwrap();
+        #[tokio::test(start_paused = true)]
+        async fn iin_bit_not_reset() {
+            let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
+            let task = check_record_current_time_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+            let task = send_record_current_time_response(task, &mut association).unwrap();
+            let task = check_write_request(task, &mut association, system_time);
+            {
+                let mut buffer = [0; 20];
+                let mut cursor = WriteCursor::new(&mut buffer);
+                let writer = start_response(
+                    response_control_field(Sequence::default()),
+                    ResponseFunction::Response,
+                    Iin::new(Iin1::new(0x10), Iin2::new(0x00)),
+                    &mut cursor,
+                )
+                .unwrap();
 
-                    let response = writer.to_parsed().to_response().unwrap();
+                let response = writer.to_parsed().to_response().unwrap();
 
-                    assert!(task.handle(&mut association, response).is_none());
-                }
-                assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
-            });
+                assert!(task.handle(&mut association, response).is_none());
+            }
+            assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
         }
 
-        #[test]
-        fn error_response() {
-            run_lan_timesync_test(|task, system_time, mut association, mut rx| {
-                let task = check_record_current_time_request(task, &mut association);
-                tokio::time::advance(Duration::from_millis(DELAY_MS as u64));
-                let task = send_record_current_time_response(task, &mut association).unwrap();
-                let task = check_write_request(task, &mut association, system_time);
-                task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
-                assert_eq!(
-                    rx.try_recv().unwrap(),
-                    Err(TimeSyncError::Task(TaskError::ResponseTimeout))
-                );
-            });
+        #[tokio::test(start_paused = true)]
+        async fn error_response() {
+            let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
+            let task = check_record_current_time_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+            let task = send_record_current_time_response(task, &mut association).unwrap();
+            let task = check_write_request(task, &mut association, system_time);
+            task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::Task(TaskError::ResponseTimeout))
+            );
         }
 
         #[test]
         fn no_system_time_available() {
-            run_lan_timesync_test(|task, _system_time, mut association, mut rx| {
-                association.get_system_time(); // Empty the time
+            let (task, _system_time, mut association, mut rx) = lan_time_sync_setup();
+            association.get_system_time(); // Empty the time
 
-                assert!(task.start(&mut association).is_none());
-                assert_eq!(
-                    rx.try_recv().unwrap(),
-                    Err(TimeSyncError::SystemTimeNotAvailable)
-                );
-            });
+            assert!(task.start(&mut association).is_none());
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::SystemTimeNotAvailable)
+            );
         }
 
-        fn run_lan_timesync_test(
-            test: impl FnOnce(
-                NonReadTask,
-                Timestamp,
-                Association,
-                tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
-            ),
+        fn lan_time_sync_setup() -> (
+            NonReadTask,
+            Timestamp,
+            Association,
+            tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
         ) {
-            let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
-            let association = Association::new(
-                EndpointAddress::try_new(1).unwrap(),
-                AssociationConfig::default(),
-                Box::new(NullReadHandler),
-                Box::new(SingleTimestampTestHandler::new(system_time)),
-                Box::new(NullAssociationInformation),
-            );
-            let (tx, rx) = tokio::sync::oneshot::channel();
-            let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(
-                TimeSyncProcedure::Lan,
-                Promise::OneShot(tx),
-            ));
-
-            test(task, system_time, association, rx);
+            time_sync_setup(TimeSyncProcedure::Lan, |time| {
+                Box::new(SingleTimestampTestHandler::new(time))
+            })
         }
 
         fn check_record_current_time_request(
@@ -939,21 +902,5 @@ mod tests {
 
             task
         }
-
-        fn send_write_response(task: NonReadTask, association: &mut Association) {
-            let mut buffer = [0; 20];
-            let mut cursor = WriteCursor::new(&mut buffer);
-            let writer = start_response(
-                ControlField::request(Sequence::default()),
-                ResponseFunction::Response,
-                Iin::default(),
-                &mut cursor,
-            )
-            .unwrap();
-            let response = writer.to_parsed().to_response().unwrap();
-
-            assert!(task.handle(association, response).is_none());
-        }
     }
 }
-*/
