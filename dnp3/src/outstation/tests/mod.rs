@@ -4,10 +4,8 @@ pub(crate) mod harness;
 mod controls;
 /// freeze counters tests
 mod freeze;
-/*
 /// various IIN bit tests
 mod iin;
-*/
 /// state machine for READ requests
 mod read_states;
 /*
