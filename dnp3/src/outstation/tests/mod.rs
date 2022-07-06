@@ -1,19 +1,23 @@
 pub(crate) mod harness;
 
+/*
 /// control functionality
 mod controls;
 /// freeze counters tests
 mod freeze;
 /// various IIN bit tests
 mod iin;
+*/
 /// state machine for READ requests
 mod read_states;
+/*
 /// clear restart IIN + cold/warm restart
 mod restart;
 /// time synchronization
 mod time;
 /// unsolicited responses
 mod unsolicited;
+ */
 
 /// test data for use in multiple tests
 mod data {

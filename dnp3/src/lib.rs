@@ -49,6 +49,7 @@ clippy::all
 #[cfg(test)]
 #[macro_use]
 extern crate assert_matches;
+extern crate core;
 
 /// Current version of the library
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

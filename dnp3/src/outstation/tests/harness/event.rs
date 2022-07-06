@@ -1,8 +1,6 @@
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
 use crate::outstation::{FreezeIndices, FreezeType};
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
 
 use crate::app::{FunctionCode, Timestamp};
 
@@ -39,26 +37,31 @@ pub(crate) enum Event {
 }
 
 #[derive(Clone)]
-pub(crate) struct EventHandle {
-    events: Arc<Mutex<VecDeque<Event>>>,
+pub(crate) struct EventSender {
+    tx: tokio::sync::mpsc::UnboundedSender<Event>,
 }
 
-impl EventHandle {
-    pub(crate) fn new() -> Self {
-        EventHandle {
-            events: Arc::new(Mutex::new(VecDeque::new())),
-        }
+pub(crate) struct EventReceiver {
+    rx: tokio::sync::mpsc::UnboundedReceiver<Event>,
+}
+
+pub(crate) fn event_handlers() -> (EventSender, EventReceiver) {
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    (EventSender { tx }, EventReceiver { rx })
+}
+
+impl EventReceiver {
+    pub(crate) async fn next(&mut self) -> Event {
+        self.rx.recv().await.unwrap()
     }
 
-    pub(crate) fn push(&self, event: Event) {
-        self.events.lock().unwrap().push_back(event);
+    pub(crate) fn poll(&mut self) -> Option<Event> {
+        self.rx.try_recv().ok()
     }
+}
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.events.lock().unwrap().is_empty()
-    }
-
-    pub(crate) fn pop(&self) -> Option<Event> {
-        self.events.lock().unwrap().pop_front()
+impl EventSender {
+    pub(crate) fn send(&self, event: Event) {
+        self.tx.send(event).unwrap()
     }
 }

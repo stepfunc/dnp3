@@ -2,12 +2,12 @@ use std::sync::{Arc, Mutex};
 
 use crate::app::Timestamp;
 use crate::outstation::database::DatabaseHandle;
-use crate::outstation::tests::harness::{Event, EventHandle};
+use crate::outstation::tests::harness::{Event, EventSender};
 use crate::outstation::traits::{OutstationApplication, RequestError, RestartDelay};
 use crate::outstation::{FreezeIndices, FreezeType};
 
 pub(crate) struct MockOutstationApplication {
-    events: EventHandle,
+    events: EventSender,
     data: Arc<Mutex<ApplicationData>>,
 }
 
@@ -27,7 +27,7 @@ impl ApplicationData {
 
 impl MockOutstationApplication {
     pub(crate) fn new(
-        events: EventHandle,
+        events: EventSender,
     ) -> (Arc<Mutex<ApplicationData>>, Box<dyn OutstationApplication>) {
         let data = Arc::new(Mutex::new(ApplicationData::new()));
         (data.clone(), Box::new(Self { events, data }))
@@ -36,7 +36,7 @@ impl MockOutstationApplication {
 
 impl OutstationApplication for MockOutstationApplication {
     fn write_absolute_time(&mut self, time: Timestamp) -> Result<(), RequestError> {
-        self.events.push(Event::WriteAbsoluteTime(time));
+        self.events.send(Event::WriteAbsoluteTime(time));
         Ok(())
     }
 
@@ -46,13 +46,13 @@ impl OutstationApplication for MockOutstationApplication {
 
     fn cold_restart(&mut self) -> Option<RestartDelay> {
         let delay = self.data.lock().unwrap().restart_delay;
-        self.events.push(Event::ColdRestart(delay));
+        self.events.send(Event::ColdRestart(delay));
         delay
     }
 
     fn warm_restart(&mut self) -> Option<RestartDelay> {
         let delay = self.data.lock().unwrap().restart_delay;
-        self.events.push(Event::WarmRestart(delay));
+        self.events.send(Event::WarmRestart(delay));
         delay
     }
 
@@ -62,7 +62,7 @@ impl OutstationApplication for MockOutstationApplication {
         freeze_type: FreezeType,
         _db: &mut DatabaseHandle,
     ) -> Result<(), RequestError> {
-        self.events.push(Event::Freeze(indices, freeze_type));
+        self.events.send(Event::Freeze(indices, freeze_type));
         Ok(())
     }
 }
