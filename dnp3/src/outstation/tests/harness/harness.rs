@@ -60,15 +60,24 @@ impl OutstationHarness {
         assert_eq!(self.io.next_event().await, tokio_mock_io::Event::Read);
     }
 
-    pub(crate) fn test_request_no_response(&mut self, request: &[u8]) {
-        self.io.read(request);
-    }
-
-    pub(crate) async fn check_events(&mut self, expected: &[Event]) {
+    pub(crate) async fn wait_for_events(&mut self, expected: &[Event]) {
         for event in expected {
             let next = self.events.next().await;
             if next != *event {
                 panic!("Expected {:?} but next event is {:?}", event, next);
+            }
+        }
+    }
+
+    pub(crate) fn check_events(&mut self, expected: &[Event]) {
+        for event in expected {
+            match self.events.poll() {
+                Some(next) => {
+                    if next != *event {
+                        panic!("Expected {:?} but next event is {:?}", event, next)
+                    }
+                }
+                None => panic!("Expected {:?} but no event ready", event),
             }
         }
     }

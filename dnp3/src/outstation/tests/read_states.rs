@@ -152,13 +152,10 @@ async fn can_read_and_confirm_events() {
     harness
         .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
         .await;
-    harness
-        .check_events(&[Event::EnterSolicitedConfirmWait(0)])
-        .await;
+
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
     harness.send_and_process(CONFIRM_SEQ_0).await;
-    harness
-        .check_events(&[Event::SolicitedConfirmReceived(0)])
-        .await;
+    harness.check_events(&[Event::SolicitedConfirmReceived(0)]);
 }
 
 #[tokio::test]
@@ -170,13 +167,10 @@ async fn ignores_confirm_with_wrong_seq() {
     harness
         .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
         .await;
-    harness
-        .check_events(&[Event::EnterSolicitedConfirmWait(0)])
-        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
+
     harness.send_and_process(CONFIRM_SEQ_1).await;
-    harness
-        .check_events(&[Event::WrongSolicitedConfirmSeq(0, 1)])
-        .await;
+    harness.check_events(&[Event::WrongSolicitedConfirmSeq(0, 1)]);
 }
 
 #[tokio::test]
@@ -188,13 +182,9 @@ async fn ignores_unsolicited_confirm_with_correct_seq() {
     harness
         .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
         .await;
-    harness
-        .check_events(&[Event::EnterSolicitedConfirmWait(0)])
-        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
     harness.send_and_process(UNS_CONFIRM_SEQ_0).await;
-    harness
-        .check_events(&[Event::UnexpectedConfirm(true, 0)])
-        .await;
+    harness.check_events(&[Event::UnexpectedConfirm(true, 0)]);
 }
 
 #[tokio::test]
@@ -206,14 +196,12 @@ async fn confirm_can_time_out() {
     harness
         .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
         .await;
-    harness
-        .check_events(&[Event::EnterSolicitedConfirmWait(0)])
-        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
 
     tokio::time::pause(); // auto advance timers
 
     harness
-        .check_events(&[Event::SolicitedConfirmTimeout(0)])
+        .wait_for_events(&[Event::SolicitedConfirmTimeout(0)])
         .await;
 }
 

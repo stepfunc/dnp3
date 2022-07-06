@@ -1,8 +1,8 @@
 pub(crate) mod harness;
 
-/*
 /// control functionality
 mod controls;
+/*
 /// freeze counters tests
 mod freeze;
 /// various IIN bit tests

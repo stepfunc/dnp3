@@ -42,11 +42,13 @@ const RESPONSE_SEQ1_G41V2_SELECT_TIMEOUT: &[u8] = &[
     0xC1, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x01,
 ];
 
-#[test]
-fn performs_direct_operate() {
+#[tokio::test]
+async fn performs_direct_operate() {
     let mut harness = new_harness(get_default_config());
 
-    harness.test_request_response(DIRECT_OPERATE_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
+    harness
+        .test_request_response(DIRECT_OPERATE_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
+        .await;
 
     harness.check_events(&[
         Event::BeginControls,
@@ -58,25 +60,29 @@ fn performs_direct_operate() {
     ]);
 }
 
-#[test]
-fn performs_direct_operate_no_ack() {
+#[tokio::test]
+async fn performs_direct_operate_no_ack() {
     let mut harness = new_harness(get_default_config());
 
-    harness.test_request_no_response(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2);
+    harness
+        .send_and_process(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2)
+        .await;
 
     harness.check_events(&[
         Event::BeginControls,
         Event::Operate(G41V2_INDEX_7, OperateType::DirectOperateNoAck),
         Event::EndControls,
-    ]);
+    ])
 }
 
-#[test]
-fn performs_direct_operate_no_ack_via_broadcast() {
+#[tokio::test]
+async fn performs_direct_operate_no_ack_via_broadcast() {
     let mut harness =
         new_harness_for_broadcast(get_default_config(), BroadcastConfirmMode::Mandatory);
 
-    harness.test_request_no_response(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2);
+    harness
+        .send_and_process(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2)
+        .await;
 
     harness.check_events(&[
         Event::BeginControls,
@@ -89,14 +95,16 @@ fn performs_direct_operate_no_ack_via_broadcast() {
     ]);
 }
 
-#[test]
-fn broadcast_support_can_be_disabled() {
+#[tokio::test]
+async fn broadcast_support_can_be_disabled() {
     let mut config = get_default_config();
     config.features.broadcast = Feature::Disabled;
 
     let mut harness = new_harness_for_broadcast(config, BroadcastConfirmMode::Mandatory);
 
-    harness.test_request_no_response(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2);
+    harness
+        .send_and_process(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2)
+        .await;
 
     harness.check_events(&[Event::BroadcastReceived(
         FunctionCode::DirectOperateNoResponse,
@@ -104,13 +112,15 @@ fn broadcast_support_can_be_disabled() {
     )]);
 }
 
-#[test]
-fn performs_select_before_operate() {
+#[tokio::test]
+async fn performs_select_before_operate() {
     let mut harness = new_harness(get_default_config());
 
     // ------------ select -------------
 
-    harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
+    harness
+        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
+        .await;
 
     harness.check_events(&[
         Event::BeginControls,
@@ -120,7 +130,9 @@ fn performs_select_before_operate() {
 
     // ------------ operate -------------
 
-    harness.test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SUCCESS);
+    harness
+        .test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SUCCESS)
+        .await;
 
     harness.check_events(&[
         Event::BeginControls,
@@ -129,12 +141,14 @@ fn performs_select_before_operate() {
     ]);
 }
 
-#[test]
-fn rejects_operate_with_non_consecutive_sequence() {
+#[tokio::test]
+async fn rejects_operate_with_non_consecutive_sequence() {
     let mut harness = new_harness(get_default_config());
 
     // ------------ select -------------
-    harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
+    harness
+        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
+        .await;
 
     harness.check_events(&[
         Event::BeginControls,
@@ -144,17 +158,21 @@ fn rejects_operate_with_non_consecutive_sequence() {
 
     // ------------ operate -------------
 
-    harness.test_request_response(OPERATE_SEQ2_G41V2, RESPONSE_SEQ2_G41V2_NO_SELECT);
+    harness
+        .test_request_response(OPERATE_SEQ2_G41V2, RESPONSE_SEQ2_G41V2_NO_SELECT)
+        .await;
 
     harness.check_no_events();
 }
 
-#[test]
-fn rejects_operate_with_non_matching_headers() {
+#[tokio::test]
+async fn rejects_operate_with_non_matching_headers() {
     let mut harness = new_harness(get_default_config());
 
     // ------------ select -------------
-    harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
+    harness
+        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
+        .await;
 
     harness.check_events(&[
         Event::BeginControls,
@@ -164,20 +182,24 @@ fn rejects_operate_with_non_matching_headers() {
 
     // ------------ operate -------------
 
-    harness.test_request_response(
-        OPERATE_SEQ1_G41V2_INDEX_8,
-        RESPONSE_SEQ1_G41V2_INDEX8_NO_SELECT,
-    );
+    harness
+        .test_request_response(
+            OPERATE_SEQ1_G41V2_INDEX_8,
+            RESPONSE_SEQ1_G41V2_INDEX8_NO_SELECT,
+        )
+        .await;
 
     harness.check_no_events();
 }
 
-#[test]
-fn select_can_time_out() {
+#[tokio::test]
+async fn select_can_time_out() {
     let mut harness = new_harness(get_default_config());
 
     // ------------ select -------------
-    harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
+    harness
+        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
+        .await;
 
     harness.check_events(&[
         Event::BeginControls,
@@ -185,24 +207,28 @@ fn select_can_time_out() {
         Event::EndControls,
     ]);
 
-    tokio::time::advance(
-        get_default_config().select_timeout.value + Duration::from_millis(1),
-    );
+    tokio::time::pause();
+    tokio::time::advance(get_default_config().select_timeout.value + Duration::from_millis(1))
+        .await;
 
     // ------------ operate -------------
 
-    harness.test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SELECT_TIMEOUT);
+    harness
+        .test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SELECT_TIMEOUT)
+        .await;
 
     harness.check_no_events();
 }
 
-#[test]
-fn accept_two_identical_selects_before_operate() {
+#[tokio::test]
+async fn accept_two_identical_selects_before_operate() {
     let mut harness = new_harness(get_default_config());
 
     // ------------ select -------------
 
-    harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
+    harness
+        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
+        .await;
 
     harness.check_events(&[
         Event::BeginControls,
@@ -211,13 +237,17 @@ fn accept_two_identical_selects_before_operate() {
     ]);
 
     // --------- second select ----------
-    harness.test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS);
+    harness
+        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
+        .await;
 
     harness.check_no_events();
 
     // ------------ operate -------------
 
-    harness.test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SUCCESS);
+    harness
+        .test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SUCCESS)
+        .await;
 
     harness.check_events(&[
         Event::BeginControls,
