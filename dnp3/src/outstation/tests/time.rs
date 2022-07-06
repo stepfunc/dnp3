@@ -16,35 +16,35 @@ const WRITE_LAST_RECORDED_TIME: &[u8] = &[
 const EMPTY_RESPONSE_SEQ0: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
 const EMPTY_RESPONSE_SEQ1: &[u8] = &[0xC1, 0x81, 0x80, 0x00];
 
-#[test]
-fn responds_to_delay_measure() {
+#[tokio::test]
+async fn responds_to_delay_measure() {
     let mut harness = new_harness(get_default_config());
 
     harness.application_data.lock().unwrap().processing_delay = 0xCAFE;
 
-    harness.test_request_response(super::data::DELAY_MEASURE, RESPONSE_TIME_DELAY_FINE_CAFE);
+    harness.test_request_response(super::data::DELAY_MEASURE, RESPONSE_TIME_DELAY_FINE_CAFE).await;
 }
 
-#[test]
-fn non_lan_procedure() {
+#[tokio::test]
+async fn non_lan_procedure() {
     let mut harness = new_harness(get_default_config());
 
     harness.application_data.lock().unwrap().processing_delay = 0xCAFE;
 
-    harness.test_request_response(super::data::DELAY_MEASURE, RESPONSE_TIME_DELAY_FINE_CAFE);
-    harness.test_request_response(WRITE_ABSOLUTE_TIME, EMPTY_RESPONSE_SEQ1);
+    harness.test_request_response(super::data::DELAY_MEASURE, RESPONSE_TIME_DELAY_FINE_CAFE).await;
+    harness.test_request_response(WRITE_ABSOLUTE_TIME, EMPTY_RESPONSE_SEQ1).await;
 
     harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(1614271096000))]);
 }
 
-#[test]
-fn lan_procedure() {
+#[tokio::test]
+async fn lan_procedure() {
     let mut harness = new_harness(get_default_config());
 
     harness.application_data.lock().unwrap().processing_delay = 0xCAFE;
 
-    harness.test_request_response(RECORD_CURRENT_TIME, EMPTY_RESPONSE_SEQ0);
-    harness.test_request_response(WRITE_LAST_RECORDED_TIME, EMPTY_RESPONSE_SEQ1);
+    harness.test_request_response(RECORD_CURRENT_TIME, EMPTY_RESPONSE_SEQ0).await;
+    harness.test_request_response(WRITE_LAST_RECORDED_TIME, EMPTY_RESPONSE_SEQ1).await;
 
     harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(0 + 0xCAFE))]);
 }

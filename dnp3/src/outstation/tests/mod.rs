@@ -10,9 +10,9 @@ mod iin;
 mod read_states;
 /// clear restart IIN + cold/warm restart
 mod restart;
-/*
 /// time synchronization
 mod time;
+/*
 /// unsolicited responses
 mod unsolicited;
  */
