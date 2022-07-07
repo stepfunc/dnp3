@@ -239,8 +239,25 @@ pub(crate) struct TestHarness {
 }
 
 impl TestHarness {
-    pub(crate) async fn process_response(&mut self, data: &[u8]) {
-        self.io.read(data);
+    pub(crate) async fn expect_write(&mut self, expected: Vec<u8>) {
+        assert_eq!(
+            self.io.next_event().await,
+            tokio_mock_io::Event::Write(expected)
+        );
+    }
+
+    pub(crate) async fn expect_write_and_respond(&mut self, expected: Vec<u8>, response: Vec<u8>) {
+        self.expect_write(expected).await;
+        self.process_response(response).await;
+    }
+
+    pub(crate) async fn read_and_expect_write(&mut self, read: Vec<u8>, expected: Vec<u8>) {
+        self.process_response(read).await;
+        self.expect_write(expected).await;
+    }
+
+    pub(crate) async fn process_response(&mut self, data: Vec<u8>) {
+        self.io.read(&data);
         assert_eq!(self.io.next_event().await, tokio_mock_io::Event::Read);
     }
 

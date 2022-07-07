@@ -12,7 +12,7 @@ pub(crate) async fn startup_procedure(harness: &mut super::TestHarness, seq: &mu
         Event::Write(disable_unsol_request(*seq))
     );
     harness
-        .process_response(&empty_response(seq.increment()))
+        .process_response(empty_response(seq.increment()))
         .await;
 
     // Integrity poll
@@ -21,7 +21,7 @@ pub(crate) async fn startup_procedure(harness: &mut super::TestHarness, seq: &mu
         Event::Write(integrity_poll_request(*seq))
     );
     harness
-        .process_response(&empty_response(seq.increment()))
+        .process_response(empty_response(seq.increment()))
         .await;
 
     // Enable unsolicited
@@ -30,7 +30,7 @@ pub(crate) async fn startup_procedure(harness: &mut super::TestHarness, seq: &mu
         Event::Write(enable_unsol_request(*seq))
     );
     harness
-        .process_response(&empty_response(seq.increment()))
+        .process_response(empty_response(seq.increment()))
         .await;
 }
 
@@ -125,17 +125,17 @@ pub(crate) fn empty_response_custom_iin(seq: Sequence, iin: Iin) -> Vec<u8> {
 
 // Unsolicited stuff
 
-pub(crate) fn unsol_null(io: &mut tokio_mock_io::Handle, seq: Sequence, restart_iin: bool) {
+pub(crate) fn unsol_null(seq: Sequence, restart_iin: bool) -> Vec<u8> {
     let iin = if restart_iin {
         Iin::new(Iin1::new(0x80), Iin2::new(0x00))
     } else {
         Iin::default()
     };
 
-    unsol_null_custom_iin(io, seq, iin);
+    unsol_null_custom_iin(seq, iin)
 }
 
-pub(crate) fn unsol_null_custom_iin(io: &mut tokio_mock_io::Handle, seq: Sequence, iin: Iin) {
+pub(crate) fn unsol_null_custom_iin(seq: Sequence, iin: Iin) -> Vec<u8> {
     let mut buffer = [0; 4];
     let mut cursor = WriteCursor::new(&mut buffer);
     start_response(
@@ -146,7 +146,7 @@ pub(crate) fn unsol_null_custom_iin(io: &mut tokio_mock_io::Handle, seq: Sequenc
     )
     .unwrap();
 
-    io.read(cursor.written());
+    cursor.written().to_vec()
 }
 
 pub(crate) fn unsol_confirm(seq: Sequence) -> Vec<u8> {
@@ -161,12 +161,7 @@ pub(crate) fn unsol_confirm(seq: Sequence) -> Vec<u8> {
     cursor.written().to_vec()
 }
 
-pub(crate) fn unsol_with_data(
-    io: &mut tokio_mock_io::Handle,
-    seq: Sequence,
-    data: i16,
-    restart_iin: bool,
-) {
+pub(crate) fn unsol_with_data(seq: Sequence, data: i16, restart_iin: bool) -> Vec<u8> {
     let iin = if restart_iin {
         Iin::new(Iin1::new(0x80), Iin2::new(0x00))
     } else {
@@ -196,5 +191,5 @@ pub(crate) fn unsol_with_data(
         )
         .unwrap();
 
-    io.read(cursor.written());
+    cursor.written().to_vec()
 }

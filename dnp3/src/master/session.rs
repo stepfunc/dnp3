@@ -487,7 +487,7 @@ impl MasterSession {
 
         if response.header.control.seq != seq {
             tracing::warn!(
-                "unexpected sequence number is response: {}",
+                "unexpected sequence number in response: {}",
                 response.header.control.seq.value()
             );
             return Ok(None);
