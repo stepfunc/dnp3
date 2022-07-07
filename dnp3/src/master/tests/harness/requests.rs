@@ -2,6 +2,7 @@ use crate::app::format::write::{start_request, start_response};
 use crate::app::variations::{Group32Var2, Variation};
 use crate::app::Sequence;
 use crate::app::{ControlField, FunctionCode, Iin, Iin1, Iin2, ResponseFunction};
+use crate::master::Classes;
 use crate::util::cursor::WriteCursor;
 use tokio_mock_io::Event;
 
@@ -54,6 +55,40 @@ pub(crate) fn disable_unsol_request(seq: Sequence) -> Vec<u8> {
     request
         .write_all_objects_header(Variation::Group60Var4)
         .unwrap();
+
+    cursor.written().to_vec()
+}
+
+pub(crate) fn class_scan_request(classes: Classes, seq: Sequence) -> Vec<u8> {
+    // Integrity poll
+    let mut buffer = [0; 20];
+    let mut cursor = WriteCursor::new(&mut buffer);
+    let mut request =
+        start_request(ControlField::request(seq), FunctionCode::Read, &mut cursor).unwrap();
+
+    if classes.class0 {
+        request
+            .write_all_objects_header(Variation::Group60Var1)
+            .unwrap();
+    }
+
+    if classes.events.class1 {
+        request
+            .write_all_objects_header(Variation::Group60Var2)
+            .unwrap();
+    }
+
+    if classes.events.class2 {
+        request
+            .write_all_objects_header(Variation::Group60Var3)
+            .unwrap();
+    }
+
+    if classes.events.class3 {
+        request
+            .write_all_objects_header(Variation::Group60Var4)
+            .unwrap();
+    }
 
     cursor.written().to_vec()
 }

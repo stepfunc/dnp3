@@ -1,4 +1,4 @@
 mod harness;
 
-//mod auto_tasks;
+mod auto_tasks;
 mod startup;

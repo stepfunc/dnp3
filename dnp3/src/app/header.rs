@@ -467,7 +467,7 @@ impl std::fmt::Display for Iin2 {
 
 impl Iin {
     /// construct an IIN from `IIN1` and `IIN2`
-    pub fn new(iin1: Iin1, iin2: Iin2) -> Self {
+    pub const fn new(iin1: Iin1, iin2: Iin2) -> Self {
         Self { iin1, iin2 }
     }
 

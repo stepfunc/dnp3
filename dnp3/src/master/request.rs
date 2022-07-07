@@ -112,7 +112,7 @@ impl EventClasses {
     }
 
     /// construct an `EventClasses` with all three classes enabled
-    pub fn all() -> Self {
+    pub const fn all() -> Self {
         Self {
             class1: true,
             class2: true,
@@ -121,7 +121,7 @@ impl EventClasses {
     }
 
     /// construct an `EventClasses` with all three classes disabled
-    pub fn none() -> Self {
+    pub const fn none() -> Self {
         Self {
             class1: false,
             class2: false,
@@ -157,12 +157,12 @@ impl BitAnd for EventClasses {
 
 impl Classes {
     /// construct a `Classes` from its fields
-    pub fn new(class0: bool, events: EventClasses) -> Self {
+    pub const fn new(class0: bool, events: EventClasses) -> Self {
         Self { class0, events }
     }
 
     /// construct a `Classes` with everything enabled
-    pub fn all() -> Self {
+    pub const fn all() -> Self {
         Self::new(true, EventClasses::all())
     }
 
