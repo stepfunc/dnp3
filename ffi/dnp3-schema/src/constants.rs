@@ -13,7 +13,7 @@ mod bits {
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<()> {
     use bits::*;
 
-    let flag = lib.define_constants("flag")?
+    lib.define_constants("flag")?
         .add("online", ConstantValue::U8(BIT_0,Representation::Hex), "Object value is 'good' / 'valid' / 'nominal'")?
         .add("restart", ConstantValue::U8(BIT_1,Representation::Hex), "Object value has not been updated since device restart")?
         .add("comm_lost", ConstantValue::U8(BIT_2,Representation::Hex), "Object value represents the last value available before a communication failure occurred. Should never be set by originating devices")?
@@ -26,5 +26,5 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<()> {
         .doc("Individual flag constants that may be combined using bitwise-OR operator")?
         .build()?;
 
-    Ok(flag)
+    Ok(())
 }
