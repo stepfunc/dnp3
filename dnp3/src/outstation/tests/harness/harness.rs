@@ -43,8 +43,7 @@ pub(crate) struct OutstationHarness {
 
 impl OutstationHarness {
     pub(crate) async fn test_request_response(&mut self, request: &[u8], response: &[u8]) {
-        self.io.read(request);
-        assert_eq!(self.io.next_event().await, tokio_mock_io::Event::Read);
+        self.send_and_process(request).await;
         self.expect_response(response).await;
     }
 

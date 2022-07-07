@@ -22,7 +22,9 @@ async fn responds_to_delay_measure() {
 
     harness.application_data.lock().unwrap().processing_delay = 0xCAFE;
 
-    harness.test_request_response(super::data::DELAY_MEASURE, RESPONSE_TIME_DELAY_FINE_CAFE).await;
+    harness
+        .test_request_response(super::data::DELAY_MEASURE, RESPONSE_TIME_DELAY_FINE_CAFE)
+        .await;
 }
 
 #[tokio::test]
@@ -31,8 +33,12 @@ async fn non_lan_procedure() {
 
     harness.application_data.lock().unwrap().processing_delay = 0xCAFE;
 
-    harness.test_request_response(super::data::DELAY_MEASURE, RESPONSE_TIME_DELAY_FINE_CAFE).await;
-    harness.test_request_response(WRITE_ABSOLUTE_TIME, EMPTY_RESPONSE_SEQ1).await;
+    harness
+        .test_request_response(super::data::DELAY_MEASURE, RESPONSE_TIME_DELAY_FINE_CAFE)
+        .await;
+    harness
+        .test_request_response(WRITE_ABSOLUTE_TIME, EMPTY_RESPONSE_SEQ1)
+        .await;
 
     harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(1614271096000))]);
 }
@@ -43,8 +49,12 @@ async fn lan_procedure() {
 
     harness.application_data.lock().unwrap().processing_delay = 0xCAFE;
 
-    harness.test_request_response(RECORD_CURRENT_TIME, EMPTY_RESPONSE_SEQ0).await;
-    harness.test_request_response(WRITE_LAST_RECORDED_TIME, EMPTY_RESPONSE_SEQ1).await;
+    harness
+        .test_request_response(RECORD_CURRENT_TIME, EMPTY_RESPONSE_SEQ0)
+        .await;
+    harness
+        .test_request_response(WRITE_LAST_RECORDED_TIME, EMPTY_RESPONSE_SEQ1)
+        .await;
 
     harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(0 + 0xCAFE))]);
 }

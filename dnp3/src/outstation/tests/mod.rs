@@ -12,10 +12,8 @@ mod read_states;
 mod restart;
 /// time synchronization
 mod time;
-/*
 /// unsolicited responses
 mod unsolicited;
- */
 
 /// test data for use in multiple tests
 mod data {
