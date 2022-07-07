@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use tokio::task::JoinHandle;
 
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
@@ -8,11 +9,10 @@ use crate::outstation::database::EventBufferConfig;
 use crate::outstation::session::RunError;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::tests::harness::{
-    ApplicationData, Event, EventHandle, MockControlHandler, MockOutstationApplication,
-    MockOutstationInformation,
+    event_handlers, ApplicationData, Event, EventReceiver, MockControlHandler,
+    MockOutstationApplication, MockOutstationInformation,
 };
 use crate::outstation::OutstationHandle;
-use crate::tokio::test::*;
 use crate::util::phys::PhysLayer;
 
 pub(crate) fn get_default_config() -> OutstationConfig {
@@ -33,111 +33,90 @@ pub(crate) fn get_default_unsolicited_config() -> OutstationConfig {
     config
 }
 
-pub(crate) struct OutstationTestHarness<T>
-where
-    T: std::future::Future<Output = RunError>,
-{
+pub(crate) struct OutstationHarness {
     pub(crate) handle: OutstationHandle,
-    io: io::ScriptHandle,
-    task: Spawn<T>,
-    events: EventHandle,
+    pub(crate) io: tokio_mock_io::Handle,
+    task: JoinHandle<RunError>,
+    events: EventReceiver,
     pub(crate) application_data: Arc<Mutex<ApplicationData>>,
 }
 
-impl<T> OutstationTestHarness<T>
-where
-    T: std::future::Future<Output = RunError>,
-{
-    pub(crate) fn poll_pending(&mut self) {
-        assert_pending!(self.task.poll());
+impl OutstationHarness {
+    pub(crate) async fn test_request_response(&mut self, request: &[u8], response: &[u8]) {
+        self.send_and_process(request).await;
+        self.expect_response(response).await;
     }
 
-    pub(crate) fn flush_io(&mut self) {
-        self.poll_pending();
-        let len = self.io.len();
-        if len != 0 {
-            panic!("i/o script has {} actions remaining", len)
-        }
+    pub(crate) async fn expect_response(&mut self, response: &[u8]) {
+        assert_eq!(
+            self.io.next_event().await,
+            tokio_mock_io::Event::Write(response.to_vec())
+        );
     }
 
-    pub(crate) fn test_request_response(&mut self, request: &[u8], response: &[u8]) {
+    pub(crate) async fn send_and_process(&mut self, request: &[u8]) {
         self.io.read(request);
-        self.io.write(response);
-        self.flush_io();
+        assert_eq!(self.io.next_event().await, tokio_mock_io::Event::Read);
     }
 
-    pub(crate) fn expect_response(&mut self, response: &[u8]) {
-        self.io.write(response);
-        self.flush_io();
-    }
-
-    pub(crate) fn send(&mut self, request: &[u8]) {
-        self.io.read(request);
-        self.flush_io();
-    }
-
-    pub(crate) fn test_request_no_response(&mut self, request: &[u8]) {
-        self.io.read(request);
-        self.poll_pending();
-        self.flush_io();
-    }
-
-    pub(crate) fn check_events(&mut self, events: &[Event]) {
-        for event in events {
-            match self.events.pop() {
-                None => {
-                    panic!("Expected {:?} but there are no more events", event);
-                }
-                Some(x) => {
-                    if *event != x {
-                        panic!("Expected {:?} but next event is {:?}", event, x);
-                    }
-                }
+    pub(crate) async fn wait_for_events(&mut self, expected: &[Event]) {
+        for event in expected {
+            let next = self.events.next().await;
+            if next != *event {
+                panic!("Expected {:?} but next event is {:?}", event, next);
             }
         }
-        self.check_no_events();
+    }
+
+    pub(crate) fn check_events(&mut self, expected: &[Event]) {
+        for event in expected {
+            match self.events.poll() {
+                Some(next) => {
+                    if next != *event {
+                        panic!("Expected {:?} but next event is {:?}", event, next)
+                    }
+                }
+                None => panic!("Expected {:?} but no event ready", event),
+            }
+        }
     }
 
     pub(crate) fn check_no_events(&mut self) {
-        if let Some(x) = self.events.pop() {
+        if let Some(x) = self.events.poll() {
             panic!("expected no events, but next event is: {:?}", x)
         }
     }
 }
 
-pub(crate) fn new_harness(
-    config: OutstationConfig,
-) -> OutstationTestHarness<impl std::future::Future<Output = RunError>> {
+pub(crate) fn new_harness(config: OutstationConfig) -> OutstationHarness {
     new_harness_impl(config, None)
 }
 
-pub(crate) fn new_harness_with_custom_event_buffers(
-    config: OutstationConfig,
-) -> OutstationTestHarness<impl std::future::Future<Output = RunError>> {
+pub(crate) fn new_harness_with_custom_event_buffers(config: OutstationConfig) -> OutstationHarness {
     new_harness_impl(config, None)
 }
 
 pub(crate) fn new_harness_for_broadcast(
     config: OutstationConfig,
     broadcast: BroadcastConfirmMode,
-) -> OutstationTestHarness<impl std::future::Future<Output = RunError>> {
+) -> OutstationHarness {
     new_harness_impl(config, Some(broadcast))
 }
 
 fn new_harness_impl(
     config: OutstationConfig,
     broadcast: Option<BroadcastConfirmMode>,
-) -> OutstationTestHarness<impl std::future::Future<Output = RunError>> {
-    let events = EventHandle::new();
+) -> OutstationHarness {
+    let (sender, receiver) = event_handlers();
 
-    let (data, application) = MockOutstationApplication::new(events.clone());
+    let (data, application) = MockOutstationApplication::new(sender.clone());
 
     let (task, handle) = OutstationTask::create(
         LinkErrorMode::Close,
         config,
         application,
-        MockOutstationInformation::new(events.clone()),
-        MockControlHandler::new(events.clone()),
+        MockOutstationInformation::new(sender.clone()),
+        MockControlHandler::new(sender.clone()),
     );
 
     let mut task = Box::new(task);
@@ -150,15 +129,15 @@ fn new_harness_impl(
             FrameType::Data,
         ));
 
-    let (io, io_handle) = io::mock();
+    let (io, io_handle) = tokio_mock_io::mock();
 
     let mut io = PhysLayer::Mock(io);
 
-    OutstationTestHarness {
+    OutstationHarness {
         handle,
         io: io_handle,
-        task: spawn(async move { task.run(&mut io).await }),
-        events,
+        task: tokio::spawn(async move { task.run(&mut io).await }),
+        events: receiver,
         application_data: data,
     }
 }

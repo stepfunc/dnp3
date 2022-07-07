@@ -1,7 +1,6 @@
-use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::task::Poll;
+use tokio::task::JoinHandle;
 
 use crate::app::{BufferSize, MaybeAsync, Timeout};
 use crate::decode::AppDecodeLevel;
@@ -11,7 +10,6 @@ use crate::master::association::AssociationConfig;
 use crate::master::handler::{AssociationHandle, HeaderInfo, MasterChannel, ReadHandler};
 use crate::master::session::{MasterSession, RunError};
 use crate::master::{AssociationHandler, AssociationInformation, ReadType};
-use crate::tokio::test::*;
 use crate::transport::create_master_transport_layer;
 use crate::util::phys::PhysLayer;
 
@@ -20,13 +18,11 @@ pub(crate) mod requests;
 struct DefaultAssociationHandler;
 impl AssociationHandler for DefaultAssociationHandler {}
 
-pub(crate) fn create_association(
-    mut config: AssociationConfig,
-) -> TestHarness<impl Future<Output = RunError>> {
+pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHarness {
     // use a 1 second timeout for all tests
     config.response_timeout = Timeout::from_secs(1).unwrap();
 
-    let (io, io_handle) = io::mock();
+    let (io, io_handle) = tokio_mock_io::mock();
 
     let mut io = PhysLayer::Mock(io);
 
@@ -52,27 +48,26 @@ pub(crate) fn create_association(
         .get_inner()
         .set_rx_frame_info(FrameInfo::new(outstation_address, None, FrameType::Data));
 
-    let mut master_task = spawn(async move { runner.run(&mut io, &mut writer, &mut reader).await });
+    let master_task =
+        tokio::spawn(async move { runner.run(&mut io, &mut writer, &mut reader).await });
 
     // Create the association
     let handler = CountHandler::new();
     let info = CountAssociationInformation::new();
     let num_requests = handler.num_requests.clone();
-    let association = {
-        let mut add_task = spawn(master.add_association(
+    let association = master
+        .add_association(
             outstation_address,
             config,
             Box::new(handler),
             Box::new(DefaultAssociationHandler),
             Box::new(info),
-        ));
-        assert_pending!(add_task.poll());
-        assert_pending!(master_task.poll());
-        assert_ready!(add_task.poll()).unwrap()
-    };
+        )
+        .await
+        .unwrap();
 
     TestHarness {
-        session: master_task,
+        task: master_task,
         master,
         association,
         num_requests,
@@ -235,25 +230,35 @@ impl AssociationInformation for CountAssociationInformation {
     }
 }
 
-pub(crate) struct TestHarness<F: Future<Output = RunError>> {
-    pub(crate) session: Spawn<F>,
+pub(crate) struct TestHarness {
+    pub(crate) task: JoinHandle<RunError>,
     pub(crate) master: MasterChannel,
     pub(crate) association: AssociationHandle,
     pub(crate) num_requests: Arc<AtomicU64>,
-    pub(crate) io: io::ScriptHandle,
+    pub(crate) io: tokio_mock_io::Handle,
 }
 
-impl<F: Future<Output = RunError>> TestHarness<F> {
-    pub(crate) fn poll(&mut self) -> Poll<RunError> {
-        self.session.poll()
+impl TestHarness {
+    pub(crate) async fn expect_write(&mut self, expected: Vec<u8>) {
+        assert_eq!(
+            self.io.next_event().await,
+            tokio_mock_io::Event::Write(expected)
+        );
     }
 
-    pub(crate) fn flush_io(&mut self) {
-        assert_pending!(self.poll());
-        let len = self.io.len();
-        if len > 0 {
-            panic!("I/O script has {} items remaining", len)
-        }
+    pub(crate) async fn expect_write_and_respond(&mut self, expected: Vec<u8>, response: Vec<u8>) {
+        self.expect_write(expected).await;
+        self.process_response(response).await;
+    }
+
+    pub(crate) async fn read_and_expect_write(&mut self, read: Vec<u8>, expected: Vec<u8>) {
+        self.process_response(read).await;
+        self.expect_write(expected).await;
+    }
+
+    pub(crate) async fn process_response(&mut self, data: Vec<u8>) {
+        self.io.read(&data);
+        assert_eq!(self.io.next_event().await, tokio_mock_io::Event::Read);
     }
 
     pub(crate) fn num_requests(&self) -> u64 {

@@ -294,7 +294,7 @@ impl Database {
 #[derive(Clone)]
 pub struct DatabaseHandle {
     inner: Arc<Mutex<Database>>,
-    notify: Arc<crate::tokio::sync::Notify>,
+    notify: Arc<tokio::sync::Notify>,
 }
 
 impl DatabaseHandle {
@@ -323,7 +323,7 @@ impl DatabaseHandle {
                 class_zero_config,
                 event_config,
             ))),
-            notify: Arc::new(crate::tokio::sync::Notify::new()),
+            notify: Arc::new(tokio::sync::Notify::new()),
         }
     }
 

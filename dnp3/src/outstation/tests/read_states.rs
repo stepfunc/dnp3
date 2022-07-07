@@ -1,5 +1,3 @@
-use tokio::time::Duration;
-
 use crate::app::measurement::*;
 use crate::app::*;
 use crate::outstation::database::*;
@@ -50,15 +48,16 @@ fn create_five_binary_inputs_with_odd_indices_true(database: &mut Database) {
     }
 }
 
-#[test]
-fn empty_read_yields_empty_response() {
+#[tokio::test]
+async fn empty_read_yields_empty_response() {
     let mut harness = new_harness(get_default_config());
-    harness.test_request_response(EMPTY_READ, EMPTY_RESPONSE);
-    harness.check_no_events();
+    harness
+        .test_request_response(EMPTY_READ, EMPTY_RESPONSE)
+        .await;
 }
 
-#[test]
-fn can_read_one_byte_range_for_specific_variation() {
+#[tokio::test]
+async fn can_read_one_byte_range_for_specific_variation() {
     let mut harness = new_harness(get_default_config());
 
     harness
@@ -67,18 +66,20 @@ fn can_read_one_byte_range_for_specific_variation() {
         .transaction(create_one_analog_with_value_42);
 
     const READ_G30_V1_0_TO_0: &[u8] = &[0xC0, 0x01, 0x1E, 0x01, 0x00, 0x00, 0x00];
-    harness.test_request_response(
-        READ_G30_V1_0_TO_0,
-        &[
-            0xC0, 0x81, 0x80, 0x00, 0x1E, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x2A, 0x00,
-            0x00, 0x00,
-        ],
-    );
-    harness.check_events(&[]);
+    harness
+        .test_request_response(
+            READ_G30_V1_0_TO_0,
+            &[
+                0xC0, 0x81, 0x80, 0x00, 0x1E, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x2A, 0x00,
+                0x00, 0x00,
+            ],
+        )
+        .await;
+    harness.check_no_events();
 }
 
-#[test]
-fn can_read_one_byte_range_for_default_variation() {
+#[tokio::test]
+async fn can_read_one_byte_range_for_default_variation() {
     let mut harness = new_harness(get_default_config());
 
     harness
@@ -87,18 +88,20 @@ fn can_read_one_byte_range_for_default_variation() {
         .transaction(create_one_analog_with_value_42);
 
     const READ_G30_V0_0_TO_0: &[u8] = &[0xC0, 0x01, 0x1E, 0x00, 0x00, 0x00, 0x00];
-    harness.test_request_response(
-        READ_G30_V0_0_TO_0,
-        &[
-            0xC0, 0x81, 0x80, 0x00, 0x1E, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x2A, 0x00,
-            0x00, 0x00,
-        ],
-    );
-    harness.check_events(&[]);
+    harness
+        .test_request_response(
+            READ_G30_V0_0_TO_0,
+            &[
+                0xC0, 0x81, 0x80, 0x00, 0x1E, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x2A, 0x00,
+                0x00, 0x00,
+            ],
+        )
+        .await;
+    harness.check_no_events();
 }
 
-#[test]
-fn can_read_two_byte_range_for_specific_variation() {
+#[tokio::test]
+async fn can_read_two_byte_range_for_specific_variation() {
     let mut harness = new_harness(get_default_config());
 
     harness
@@ -107,17 +110,19 @@ fn can_read_two_byte_range_for_specific_variation() {
         .transaction(create_five_binary_inputs_with_odd_indices_true);
 
     const READ_G1_V2_1_TO_3: &[u8] = &[0xC0, 0x01, 0x01, 0x02, 0x01, 0x01, 0x00, 0x03, 0x00];
-    harness.test_request_response(
-        READ_G1_V2_1_TO_3,
-        &[
-            0xC0, 0x81, 0x80, 0x00, 0x01, 0x02, 0x01, 0x01, 0x00, 0x03, 0x00, 0x81, 0x01, 0x81,
-        ],
-    );
-    harness.check_events(&[]);
+    harness
+        .test_request_response(
+            READ_G1_V2_1_TO_3,
+            &[
+                0xC0, 0x81, 0x80, 0x00, 0x01, 0x02, 0x01, 0x01, 0x00, 0x03, 0x00, 0x81, 0x01, 0x81,
+            ],
+        )
+        .await;
+    harness.check_no_events();
 }
 
-#[test]
-fn can_read_two_byte_range_for_default_variation() {
+#[tokio::test]
+async fn can_read_two_byte_range_for_default_variation() {
     let mut harness = new_harness(get_default_config());
 
     harness
@@ -126,67 +131,81 @@ fn can_read_two_byte_range_for_default_variation() {
         .transaction(create_five_binary_inputs_with_odd_indices_true);
 
     const READ_G1_V0_1_TO_3: &[u8] = &[0xC0, 0x01, 0x01, 0x00, 0x01, 0x01, 0x00, 0x03, 0x00];
-    harness.test_request_response(
-        READ_G1_V0_1_TO_3,
-        // the response here is g1v1, packed format, the bit pattern is 0b101 == 0x05
-        &[
-            0xC0, 0x81, 0x80, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x03, 0x00, 0x05,
-        ],
-    );
-    harness.check_events(&[]);
+    harness
+        .test_request_response(
+            READ_G1_V0_1_TO_3,
+            // the response here is g1v1, packed format, the bit pattern is 0b101 == 0x05
+            &[
+                0xC0, 0x81, 0x80, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x03, 0x00, 0x05,
+            ],
+        )
+        .await;
+    harness.check_no_events();
 }
 
-#[test]
-fn can_read_and_confirm_events() {
+#[tokio::test]
+async fn can_read_and_confirm_events() {
     let mut harness = new_harness(get_default_config());
 
     harness.handle.database.transaction(create_binary_and_event);
 
-    harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
+    harness
+        .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
+        .await;
+
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-    harness.send(CONFIRM_SEQ_0);
+    harness.send_and_process(CONFIRM_SEQ_0).await;
     harness.check_events(&[Event::SolicitedConfirmReceived(0)]);
 }
 
-#[test]
-fn ignores_confirm_with_wrong_seq() {
+#[tokio::test]
+async fn ignores_confirm_with_wrong_seq() {
     let mut harness = new_harness(get_default_config());
 
     harness.handle.database.transaction(create_binary_and_event);
 
-    harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
+    harness
+        .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
+        .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-    harness.send(CONFIRM_SEQ_1);
+
+    harness.send_and_process(CONFIRM_SEQ_1).await;
     harness.check_events(&[Event::WrongSolicitedConfirmSeq(0, 1)]);
 }
 
-#[test]
-fn ignores_unsolicited_confirm_with_correct_seq() {
+#[tokio::test]
+async fn ignores_unsolicited_confirm_with_correct_seq() {
     let mut harness = new_harness(get_default_config());
 
     harness.handle.database.transaction(create_binary_and_event);
 
-    harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
+    harness
+        .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
+        .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-    harness.send(UNS_CONFIRM_SEQ_0);
+    harness.send_and_process(UNS_CONFIRM_SEQ_0).await;
     harness.check_events(&[Event::UnexpectedConfirm(true, 0)]);
 }
 
-#[test]
-fn confirm_can_time_out() {
+#[tokio::test]
+async fn confirm_can_time_out() {
     let mut harness = new_harness(get_default_config());
 
     harness.handle.database.transaction(create_binary_and_event);
 
-    harness.test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE);
+    harness
+        .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
+        .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-    crate::tokio::time::advance(
-        get_default_config().confirm_timeout.value + Duration::from_millis(1),
-    );
-    harness.poll_pending();
-    harness.check_events(&[Event::SolicitedConfirmTimeout(0)])
+
+    tokio::time::pause(); // auto advance timers
+
+    harness
+        .wait_for_events(&[Event::SolicitedConfirmTimeout(0)])
+        .await;
 }
 
+/*
 #[test]
 fn sol_confirm_wait_goes_back_to_idle_with_new_request() {
     let mut harness = new_harness(get_default_config());
@@ -212,3 +231,4 @@ fn sol_confirm_wait_goes_back_to_idle_with_new_invalid_request() {
     );
     harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
 }
+*/

@@ -26,7 +26,7 @@ pub fn spawn_master_serial(
 ) -> MasterChannel {
     let (future, handle) =
         create_master_serial(config, path, serial_settings, retry_delay, listener);
-    crate::tokio::spawn(future);
+    tokio::spawn(future);
     handle
 }
 
@@ -48,8 +48,7 @@ pub fn create_master_serial(
     let log_path = path.to_owned();
     let (mut task, handle) = MasterTask::new(path, settings, config, retry_delay, listener);
     let future = async move {
-        let _ = task
-            .run()
+        task.run()
             .instrument(tracing::info_span!("dnp3-master-serial", "port" = ?log_path))
             .await;
     };

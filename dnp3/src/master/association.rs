@@ -21,8 +21,9 @@ use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::NonReadTask::TimeSync;
 use crate::master::tasks::{AssociationTask, ReadTask, Task};
 use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
-use crate::tokio::time::Instant;
 use crate::util::Smallest;
+
+use tokio::time::Instant;
 
 /// Configuration for a master association
 #[derive(Debug, Copy, Clone)]

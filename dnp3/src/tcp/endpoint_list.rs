@@ -61,9 +61,7 @@ impl EndpointList {
             self.current_endpoint = (self.current_endpoint + 1) % self.endpoints.len();
 
             // Resolve the name
-            if let Ok(endpoints) =
-                crate::tokio::net::lookup_host(&self.endpoints[endpoint_idx]).await
-            {
+            if let Ok(endpoints) = tokio::net::lookup_host(&self.endpoints[endpoint_idx]).await {
                 self.pending_endpoints = endpoints.collect();
 
                 if let Some(endpoint) = self.pending_endpoints.pop_front() {

@@ -1,15 +1,16 @@
 use crate::decode::PhysDecodeLevel;
-use crate::tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 // encapsulates all possible physical layers as an enum
 pub(crate) enum PhysLayer {
-    Tcp(crate::tokio::net::TcpStream),
+    Tcp(tokio::net::TcpStream),
     // TLS type is boxed because its size is huge
     #[cfg(feature = "tls")]
-    Tls(Box<tokio_rustls::TlsStream<crate::tokio::net::TcpStream>>),
+    Tls(Box<tokio_rustls::TlsStream<tokio::net::TcpStream>>),
     Serial(tokio_serial::SerialStream),
     #[cfg(test)]
-    Mock(tokio_mock::mock::test::io::MockIo),
+    Mock(tokio_mock_io::Mock),
 }
 
 impl std::fmt::Debug for PhysLayer {

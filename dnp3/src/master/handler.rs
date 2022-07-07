@@ -91,7 +91,7 @@ impl MasterChannel {
 
     /// Get the current decoding level used by this master
     pub async fn get_decode_level(&mut self) -> Result<DecodeLevel, Shutdown> {
-        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<DecodeLevel, Shutdown>>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<DecodeLevel, Shutdown>>();
         self.send_master_message(MasterMsg::GetDecodeLevel(Promise::OneShot(tx)))
             .await?;
         rx.await?
@@ -109,7 +109,7 @@ impl MasterChannel {
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_information: Box<dyn AssociationInformation>,
     ) -> Result<AssociationHandle, AssociationError> {
-        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
         self.send_master_message(MasterMsg::AddAssociation(
             address,
             config,
@@ -175,7 +175,7 @@ impl AssociationHandle {
         request: ReadRequest,
         period: Duration,
     ) -> Result<PollHandle, PollError> {
-        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<PollHandle, PollError>>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<PollHandle, PollError>>();
         self.send_poll_message(PollMsg::AddPoll(
             self.clone(),
             request,
@@ -198,7 +198,7 @@ impl AssociationHandle {
     ///
     /// If successful, the [ReadHandler](crate::master::ReadHandler) will process the received measurement data
     pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
-        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TaskError>>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         let task = SingleReadTask::new(request, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
@@ -212,7 +212,7 @@ impl AssociationHandle {
         request: ReadRequest,
         handler: Box<dyn ReadHandler>,
     ) -> Result<(), TaskError> {
-        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TaskError>>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         let task = SingleReadTask::new_with_custom_handler(request, handler, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
@@ -226,7 +226,7 @@ impl AssociationHandle {
         mode: CommandMode,
         headers: CommandHeaders,
     ) -> Result<(), CommandError> {
-        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), CommandError>>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), CommandError>>();
         let task = CommandTask::from_mode(mode, headers, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
@@ -236,7 +236,7 @@ impl AssociationHandle {
     ///
     /// Returns the delay from the outstation's response as a [Duration](std::time::Duration)
     pub async fn warm_restart(&mut self) -> Result<Duration, TaskError> {
-        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
         let task = RestartTask::new(RestartType::WarmRestart, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
@@ -246,7 +246,7 @@ impl AssociationHandle {
     ///
     /// Returns the delay from the outstation's response as a [Duration](std::time::Duration)
     pub async fn cold_restart(&mut self) -> Result<Duration, TaskError> {
-        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
         let task = RestartTask::new(RestartType::ColdRestart, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
@@ -257,7 +257,7 @@ impl AssociationHandle {
         &mut self,
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
-        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
         let task = TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
@@ -271,7 +271,7 @@ impl AssociationHandle {
     /// If a [`TaskError::UnexpectedResponseHeaders`] is returned, the link might be alive
     /// but it didn't answer with the expected `LINK_STATUS`.
     pub async fn check_link_status(&mut self) -> Result<(), TaskError> {
-        let (tx, rx) = crate::tokio::sync::oneshot::channel::<Result<(), TaskError>>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         self.send_task(Task::LinkStatus(Promise::OneShot(tx)))
             .await?;
         rx.await?
@@ -297,7 +297,7 @@ pub(crate) enum Promise<T> {
     /// nothing happens when the promise is completed
     None,
     /// one-shot reply channel is consumed when the promise is completed
-    OneShot(crate::tokio::sync::oneshot::Sender<T>),
+    OneShot(tokio::sync::oneshot::Sender<T>),
 }
 
 impl<T> Promise<T> {

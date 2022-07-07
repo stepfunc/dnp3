@@ -7,9 +7,9 @@ use tokio_rustls::rustls;
 use tokio_rustls::rustls::server::AllowAnyAuthenticatedClient;
 
 use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
-use crate::tokio::net::TcpStream;
 use crate::util::phys::PhysLayer;
 use rasn;
+use tokio::net::TcpStream;
 
 /// TLS configuration
 pub struct TlsServerConfig {

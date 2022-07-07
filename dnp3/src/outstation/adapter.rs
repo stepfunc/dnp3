@@ -47,7 +47,7 @@ impl OutstationTaskAdapter {
 
     async fn wait_for_session(&mut self) -> Result<NewSession, Shutdown> {
         loop {
-            crate::tokio::select! {
+            tokio::select! {
                 session = self.receiver.receive() => {
                     return session;
                 }
@@ -59,7 +59,7 @@ impl OutstationTaskAdapter {
     }
 
     async fn run_one_session(&mut self, io: &mut PhysLayer) -> Result<NewSession, RunError> {
-        crate::tokio::select! {
+        tokio::select! {
             res = self.task.run(io) => {
                 Err(res)
             }

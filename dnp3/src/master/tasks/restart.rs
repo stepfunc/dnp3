@@ -137,7 +137,7 @@ mod tests {
             Box::new(DefaultAssociationHandler),
             Box::new(NullAssociationInformation),
         );
-        let (tx, mut rx) = crate::tokio::sync::oneshot::channel();
+        let (tx, mut rx) = tokio::sync::oneshot::channel();
         let task = NonReadTask::Restart(RestartTask::new(
             RestartType::ColdRestart,
             Promise::OneShot(tx),
@@ -185,7 +185,7 @@ mod tests {
             Box::new(DefaultAssociationHandler),
             Box::new(NullAssociationInformation),
         );
-        let (tx, mut rx) = crate::tokio::sync::oneshot::channel();
+        let (tx, mut rx) = tokio::sync::oneshot::channel();
         let task = NonReadTask::Restart(RestartTask::new(
             RestartType::WarmRestart,
             Promise::OneShot(tx),

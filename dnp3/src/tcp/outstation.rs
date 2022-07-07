@@ -29,7 +29,7 @@ pub struct Server {
 
 /// Handle to a running server. Dropping the handle, shuts down the server.
 pub struct ServerHandle {
-    _tx: crate::tokio::sync::oneshot::Sender<()>,
+    _tx: tokio::sync::oneshot::Sender<()>,
 }
 
 enum ServerConnectionHandler {
@@ -39,7 +39,7 @@ enum ServerConnectionHandler {
 }
 
 impl ServerConnectionHandler {
-    async fn handle(&mut self, socket: crate::tokio::net::TcpStream) -> Result<PhysLayer, String> {
+    async fn handle(&mut self, socket: tokio::net::TcpStream) -> Result<PhysLayer, String> {
         match self {
             Self::Tcp => Ok(PhysLayer::Tcp(socket)),
             #[cfg(feature = "tls")]
@@ -143,7 +143,7 @@ impl Server {
             listener,
             filter,
         )?;
-        crate::tokio::spawn(future);
+        tokio::spawn(future);
         Ok(handle)
     }
 
@@ -153,11 +153,10 @@ impl Server {
     /// This may be called outside the Tokio runtime and allows for manual spawning
     pub async fn bind_no_spawn(
         mut self,
-    ) -> Result<(ServerHandle, impl std::future::Future<Output = Shutdown>), crate::tokio::io::Error>
-    {
-        let listener = crate::tokio::net::TcpListener::bind(self.address).await?;
+    ) -> Result<(ServerHandle, impl std::future::Future<Output = Shutdown>), tokio::io::Error> {
+        let listener = tokio::net::TcpListener::bind(self.address).await?;
 
-        let (tx, rx) = crate::tokio::sync::oneshot::channel();
+        let (tx, rx) = tokio::sync::oneshot::channel();
 
         let task = async move {
             let local = self.address;
@@ -176,20 +175,20 @@ impl Server {
     /// associated outstations when dropped.
     ///
     /// This must be called from within the Tokio runtime
-    pub async fn bind(self) -> Result<ServerHandle, crate::tokio::io::Error> {
+    pub async fn bind(self) -> Result<ServerHandle, tokio::io::Error> {
         let (handle, future) = self.bind_no_spawn().await?;
-        crate::tokio::spawn(future);
+        tokio::spawn(future);
         Ok(handle)
     }
 
     async fn run(
         &mut self,
-        listener: crate::tokio::net::TcpListener,
-        rx: crate::tokio::sync::oneshot::Receiver<()>,
+        listener: tokio::net::TcpListener,
+        rx: tokio::sync::oneshot::Receiver<()>,
     ) -> Shutdown {
         tracing::info!("accepting connections");
 
-        crate::tokio::select! {
+        tokio::select! {
              _ = self.accept_loop(listener) => {
                 // if the accept loop shuts down we exit
              }
@@ -210,19 +209,13 @@ impl Server {
         Shutdown
     }
 
-    async fn accept_loop(
-        &mut self,
-        mut listener: crate::tokio::net::TcpListener,
-    ) -> Result<(), Shutdown> {
+    async fn accept_loop(&mut self, mut listener: tokio::net::TcpListener) -> Result<(), Shutdown> {
         loop {
             self.accept_one(&mut listener).await?;
         }
     }
 
-    async fn accept_one(
-        &mut self,
-        listener: &mut crate::tokio::net::TcpListener,
-    ) -> Result<(), Shutdown> {
+    async fn accept_one(&mut self, listener: &mut tokio::net::TcpListener) -> Result<(), Shutdown> {
         match listener.accept().await {
             Ok((stream, addr)) => {
                 self.process_connection(stream, addr).await;
@@ -237,7 +230,7 @@ impl Server {
 
     async fn process_connection(
         &mut self,
-        stream: crate::tokio::net::TcpStream,
+        stream: tokio::net::TcpStream,
         addr: std::net::SocketAddr,
     ) {
         let id = self.connection_id;
