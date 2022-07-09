@@ -169,9 +169,7 @@ pub unsafe fn outstation_create_serial_session(
     information: ffi::OutstationInformation,
     control_handler: ffi::ControlHandler,
 ) -> Result<*mut crate::Outstation, ffi::ParamError> {
-    let runtime = runtime
-        .as_ref()
-        .ok_or(ffi::ParamError::NullParameter)?;
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
 
     let _enter = runtime.inner.enter();
     let serial_path = serial_path.to_string_lossy();
@@ -187,7 +185,10 @@ pub unsafe fn outstation_create_serial_session(
         Box::new(control_handler),
     )?;
 
-    let handle = Box::new(crate::Outstation { handle, runtime: runtime.handle() });
+    let handle = Box::new(crate::Outstation {
+        handle,
+        runtime: runtime.handle(),
+    });
 
     Ok(Box::into_raw(handle))
 }
