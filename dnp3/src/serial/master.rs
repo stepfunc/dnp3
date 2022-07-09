@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::time::Duration;
 
 use tracing::Instrument;
@@ -16,7 +15,7 @@ use crate::util::phys::PhysLayer;
 /// `AssociationHandle` created from it, are dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
-/// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
+/// Use Runtime::enter() if required.
 pub fn spawn_master_serial(
     config: MasterChannelConfig,
     path: &str,
@@ -24,35 +23,15 @@ pub fn spawn_master_serial(
     retry_delay: Duration,
     listener: Box<dyn Listener<PortState>>,
 ) -> MasterChannel {
-    let (future, handle) =
-        create_master_serial(config, path, serial_settings, retry_delay, listener);
-    tokio::spawn(future);
-    handle
-}
-
-/// Create a master future, which can be spawned onto a runtime, along with a controlling handle.
-///
-/// Once spawned or otherwise executed using the `run` method, the task runs until the handle
-/// and any `AssociationHandle` created from it are dropped.
-///
-/// **Note**: This function is required instead of `spawn` when using a runtime to directly spawn
-/// tasks instead of within the context of a runtime, e.g. in applications that cannot use
-/// `[tokio::main]` such as C language bindings.
-pub fn create_master_serial(
-    config: MasterChannelConfig,
-    path: &str,
-    settings: SerialSettings,
-    retry_delay: Duration,
-    listener: Box<dyn Listener<PortState>>,
-) -> (impl Future<Output = ()> + 'static, MasterChannel) {
     let log_path = path.to_owned();
-    let (mut task, handle) = MasterTask::new(path, settings, config, retry_delay, listener);
+    let (mut task, handle) = MasterTask::new(path, serial_settings, config, retry_delay, listener);
     let future = async move {
         task.run()
             .instrument(tracing::info_span!("dnp3-master-serial", "port" = ?log_path))
             .await;
     };
-    (future, handle)
+    tokio::spawn(future);
+    handle
 }
 
 struct MasterTask {

@@ -460,12 +460,11 @@ impl MasterSession {
         }
     }
 
-    #[allow(clippy::needless_lifetimes)]
     async fn validate_non_read_response<'a>(
         &mut self,
         destination: EndpointAddress,
         seq: Sequence,
-        io: &'a mut PhysLayer,
+        io: &mut PhysLayer,
         writer: &mut TransportWriter,
         source: EndpointAddress,
         response: Response<'a>,
