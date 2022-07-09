@@ -14,7 +14,7 @@ pub use struct_constructors::*;
 
 use crate::{ffi, Runtime, RuntimeHandle};
 
-use dnp3::serial::create_outstation_serial;
+use dnp3::serial::spawn_outstation_serial;
 
 mod adapters;
 mod database;
@@ -171,13 +171,14 @@ pub unsafe fn outstation_create_serial_session(
 ) -> Result<*mut crate::Outstation, ffi::ParamError> {
     let runtime = runtime
         .as_ref()
-        .ok_or(ffi::ParamError::NullParameter)?
-        .handle();
+        .ok_or(ffi::ParamError::NullParameter)?;
+
+    let _enter = runtime.inner.enter();
     let serial_path = serial_path.to_string_lossy();
 
     let config = convert_outstation_config(config)?;
 
-    let (task, handle) = create_outstation_serial(
+    let handle = spawn_outstation_serial(
         &serial_path,
         settings.into(),
         config,
@@ -186,9 +187,7 @@ pub unsafe fn outstation_create_serial_session(
         Box::new(control_handler),
     )?;
 
-    runtime.spawn(task)?;
-
-    let handle = Box::new(crate::Outstation { handle, runtime });
+    let handle = Box::new(crate::Outstation { handle, runtime: runtime.handle() });
 
     Ok(Box::into_raw(handle))
 }

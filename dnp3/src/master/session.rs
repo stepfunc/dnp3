@@ -465,7 +465,7 @@ impl MasterSession {
         &mut self,
         destination: EndpointAddress,
         seq: Sequence,
-        io: &mut PhysLayer,
+        io: &'a mut PhysLayer,
         writer: &mut TransportWriter,
         source: EndpointAddress,
         response: Response<'a>,
