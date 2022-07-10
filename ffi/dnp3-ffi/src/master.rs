@@ -27,6 +27,7 @@ pub(crate) unsafe fn master_channel_create_tcp(
     connect_strategy: ffi::ConnectStrategy,
     listener: ffi::ClientStateListener,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let config = convert_config(config)?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
 
@@ -36,7 +37,10 @@ pub(crate) unsafe fn master_channel_create_tcp(
         connect_strategy.reconnect_delay(),
     );
 
-    let (future, handle) = dnp3::tcp::create_master_tcp_client(
+    // enter the runtime context so that we can spawn
+    let _enter = runtime.inner.enter();
+
+    let channel = dnp3::tcp::spawn_master_tcp_client(
         link_error_mode.into(),
         config,
         endpoints.clone(),
@@ -44,11 +48,9 @@ pub(crate) unsafe fn master_channel_create_tcp(
         Box::new(listener),
     );
 
-    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    runtime.inner.spawn(future);
     let channel = MasterChannel {
         runtime: runtime.handle(),
-        handle,
+        handle: channel,
     };
 
     Ok(Box::into_raw(Box::new(channel)))
@@ -63,6 +65,7 @@ pub(crate) unsafe fn master_channel_create_tls(
     listener: ffi::ClientStateListener,
     tls_config: ffi::TlsClientConfig,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let config = convert_config(config)?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
 
@@ -92,7 +95,10 @@ pub(crate) unsafe fn master_channel_create_tls(
         connect_strategy.reconnect_delay(),
     );
 
-    let (future, handle) = dnp3::tcp::tls::create_master_tls_client(
+    // enter the runtime context so that we can spawn
+    let _enter = runtime.inner.enter();
+
+    let channel = dnp3::tcp::tls::spawn_master_tls_client(
         link_error_mode.into(),
         config,
         endpoints.clone(),
@@ -101,11 +107,9 @@ pub(crate) unsafe fn master_channel_create_tls(
         tls_config,
     );
 
-    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    runtime.inner.spawn(future);
     let channel = MasterChannel {
         runtime: runtime.handle(),
-        handle,
+        handle: channel,
     };
 
     Ok(Box::into_raw(Box::new(channel)))
@@ -119,9 +123,13 @@ pub(crate) unsafe fn master_channel_create_serial(
     retry_delay: Duration,
     listener: ffi::PortStateListener,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let config = convert_config(config)?;
 
-    let (future, handle) = create_master_serial(
+    // enter the runtime context so that we can spawn
+    let _enter = runtime.inner.enter();
+
+    let channel = spawn_master_serial(
         config,
         &path.to_string_lossy().to_string(),
         serial_params.into(),
@@ -129,12 +137,9 @@ pub(crate) unsafe fn master_channel_create_serial(
         Box::new(listener),
     );
 
-    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    runtime.inner.spawn(future);
-
     let channel = MasterChannel {
         runtime: runtime.handle(),
-        handle,
+        handle: channel,
     };
 
     Ok(Box::into_raw(Box::new(channel)))

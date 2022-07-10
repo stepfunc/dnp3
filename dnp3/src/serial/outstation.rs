@@ -13,8 +13,7 @@ use crate::util::phys::PhysLayer;
 /// a serial port error occurs, e.g. a serial port is removed from the OS.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
-///
-/// Use `Runtime::enter` to create a runtime context if needed before calling.
+/// Use Runtime::enter() if required.
 pub fn spawn_outstation_serial(
     path: &str,
     settings: SerialSettings,

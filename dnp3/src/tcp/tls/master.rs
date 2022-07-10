@@ -1,5 +1,4 @@
 use std::convert::TryFrom;
-use std::future::Future;
 use std::io::{self, ErrorKind};
 use std::net::SocketAddr;
 use std::path::Path;
@@ -28,7 +27,7 @@ pub struct TlsClientConfig {
 /// `AssociationHandle` created from it, are dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
-/// It is preferable to use this method instead of `create(..)` when using `[tokio::main]`.
+/// Use Runtime::enter() if required.
 pub fn spawn_master_tls_client(
     link_error_mode: LinkErrorMode,
     config: MasterChannelConfig,
@@ -37,34 +36,6 @@ pub fn spawn_master_tls_client(
     listener: Box<dyn Listener<ClientState>>,
     tls_config: TlsClientConfig,
 ) -> MasterChannel {
-    let (future, handle) = create_master_tls_client(
-        link_error_mode,
-        config,
-        endpoints,
-        connect_strategy,
-        listener,
-        tls_config,
-    );
-    tokio::spawn(future);
-    handle
-}
-
-/// Create a Future, which can be spawned onto a runtime, along with a controlling handle.
-///
-/// Once spawned or otherwise executed using the `run` method, the task runs until the handle
-/// and any `AssociationHandle` created from it are dropped.
-///
-/// **Note**: This function is required instead of `spawn` when using a runtime to directly spawn
-/// tasks instead of within the context of a runtime, e.g. in applications that cannot use
-/// `[tokio::main]` such as C language bindings.
-pub fn create_master_tls_client(
-    link_error_mode: LinkErrorMode,
-    config: MasterChannelConfig,
-    endpoints: EndpointList,
-    connect_strategy: ConnectStrategy,
-    listener: Box<dyn Listener<ClientState>>,
-    tls_config: TlsClientConfig,
-) -> (impl Future<Output = ()> + 'static, MasterChannel) {
     let main_addr = endpoints.main_addr().to_string();
     let (mut task, handle) = MasterTask::new(
         link_error_mode,
@@ -79,7 +50,8 @@ pub fn create_master_tls_client(
             .instrument(tracing::info_span!("dnp3-master-tls", "endpoint" = ?main_addr))
             .await;
     };
-    (future, handle)
+    tokio::spawn(future);
+    handle
 }
 
 impl TlsClientConfig {
