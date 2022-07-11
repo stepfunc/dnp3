@@ -152,10 +152,14 @@ impl AutoTaskState {
         }
     }
 
-    /// Demand an execution of the task
-    fn demand(&mut self) {
+    /// Demand an execution of the task, returns true if the task was
+    /// idle and this call changed the state to 'pending'
+    fn demand(&mut self) -> bool {
         if self.is_idle() {
             *self = Self::Pending;
+            true
+        } else {
+            false
         }
     }
 
@@ -401,8 +405,9 @@ impl Association {
         self.events_available.class1 = iin.iin1.get_class_1_events();
         self.events_available.class2 = iin.iin1.get_class_2_events();
         self.events_available.class3 = iin.iin1.get_class_3_events();
-        if (self.events_available & self.config.event_scan_on_events_available).any() {
-            self.auto_tasks.event_scan.demand();
+        let classes_to_scan = self.events_available & self.config.event_scan_on_events_available;
+        if classes_to_scan.any() && self.auto_tasks.event_scan.demand() {
+            tracing::info!("scheduled auto event scan");
         }
     }
 
@@ -419,8 +424,10 @@ impl Association {
     }
 
     pub(crate) fn on_event_buffer_overflow_observed(&mut self) {
-        if self.config.auto_integrity_scan_on_buffer_overflow {
-            self.auto_tasks.integrity_scan.demand();
+        if self.config.auto_integrity_scan_on_buffer_overflow
+            && self.auto_tasks.integrity_scan.demand()
+        {
+            tracing::info!("event buffer overflow detected, queuing integrity scan");
         }
     }
 
