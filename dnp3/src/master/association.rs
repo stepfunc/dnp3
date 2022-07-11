@@ -405,10 +405,9 @@ impl Association {
         self.events_available.class1 = iin.iin1.get_class_1_events();
         self.events_available.class2 = iin.iin1.get_class_2_events();
         self.events_available.class3 = iin.iin1.get_class_3_events();
-        if (self.events_available & self.config.event_scan_on_events_available).any() {
-            if self.auto_tasks.event_scan.demand() {
-                tracing::info!("queuing auto event scan");
-            }
+        let classes_to_scan = self.events_available & self.config.event_scan_on_events_available;
+        if classes_to_scan.any() && self.auto_tasks.event_scan.demand() {
+            tracing::info!("scheduled auto event scan");
         }
     }
 
@@ -425,10 +424,10 @@ impl Association {
     }
 
     pub(crate) fn on_event_buffer_overflow_observed(&mut self) {
-        if self.config.auto_integrity_scan_on_buffer_overflow {
-            if self.auto_tasks.integrity_scan.demand() {
-                tracing::info!("event buffer overflow detected, queuing integrity scan");
-            }
+        if self.config.auto_integrity_scan_on_buffer_overflow
+            && self.auto_tasks.integrity_scan.demand()
+        {
+            tracing::info!("event buffer overflow detected, queuing integrity scan");
         }
     }
 
