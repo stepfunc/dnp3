@@ -1,7 +1,9 @@
 use std::ffi::CStr;
+use std::net::IpAddr;
 
 use dnp3::outstation::database::EventBufferConfig;
 use dnp3::outstation::RestartDelay;
+use dnp3::tcp::{BadIpv4Wildcard, WildcardIPv4};
 
 use crate::ffi;
 
@@ -27,6 +29,7 @@ pub fn restart_delay_millis(value: u16) -> ffi::RestartDelay {
 
 pub enum AddressFilter {
     Any,
+    WildcardIpv4(WildcardIPv4),
     AnyOf(std::collections::HashSet<std::net::IpAddr>),
 }
 
@@ -34,13 +37,31 @@ pub fn address_filter_any() -> *mut AddressFilter {
     Box::into_raw(Box::new(AddressFilter::Any))
 }
 
+fn parse_address_filter(s: &str) -> Result<AddressFilter, ffi::ParamError> {
+    // first try to parse it as a normal IP
+    match s.parse::<IpAddr>() {
+        Ok(x) => {
+            let mut set = std::collections::HashSet::new();
+            set.insert(x);
+            Ok(AddressFilter::AnyOf(set))
+        }
+        Err(_) => {
+            // now try to parse as a wildcard
+            let wc: WildcardIPv4 = s.parse()?;
+            Ok(AddressFilter::WildcardIpv4(wc))
+        }
+    }
+}
+
+impl From<BadIpv4Wildcard> for ffi::ParamError {
+    fn from(_: BadIpv4Wildcard) -> Self {
+        ffi::ParamError::InvalidSocketAddress
+    }
+}
+
 pub fn address_filter_create(address: &CStr) -> Result<*mut AddressFilter, ffi::ParamError> {
-    let address = address.to_string_lossy().parse()?;
-
-    let mut set = std::collections::HashSet::new();
-    set.insert(address);
-
-    Ok(Box::into_raw(Box::new(AddressFilter::AnyOf(set))))
+    let address = parse_address_filter(address.to_string_lossy().as_ref())?;
+    Ok(Box::into_raw(Box::new(address)))
 }
 
 pub unsafe fn address_filter_add(
@@ -53,9 +74,16 @@ pub unsafe fn address_filter_add(
     let address = address.to_string_lossy().parse()?;
 
     match address_filter {
-        AddressFilter::Any => (),
+        AddressFilter::Any => {
+            // can't add addresses to an "any" specification
+            return Err(ffi::ParamError::AddressFilterConflict);
+        }
         AddressFilter::AnyOf(set) => {
             set.insert(address);
+        }
+        AddressFilter::WildcardIpv4(_) => {
+            // can't add addresses to a wildcard specification
+            return Err(ffi::ParamError::AddressFilterConflict);
         }
     }
     Ok(())
@@ -112,6 +140,7 @@ impl From<&AddressFilter> for dnp3::tcp::AddressFilter {
         match from {
             AddressFilter::Any => dnp3::tcp::AddressFilter::Any,
             AddressFilter::AnyOf(set) => dnp3::tcp::AddressFilter::AnyOf(set.clone()),
+            AddressFilter::WildcardIpv4(wc) => dnp3::tcp::AddressFilter::WildcardIpv4(*wc),
         }
     }
 }

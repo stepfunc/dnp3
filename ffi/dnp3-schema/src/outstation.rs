@@ -949,7 +949,10 @@ fn define_address_filter(
         .define_constructor(address_filter.clone())?
         .param("address", StringType, "IP address to accept")?
         .fails_with(shared_def.error_type.clone())?
-        .doc("Create an address filter that accepts any IP address")?
+        .doc(
+            doc("Create an address filter that matches a specific address or IPv4 address")
+                .details("Examples: 192.168.1.26, 192.168.0.*, *.*.*.*"),
+        )?
         .build()?;
 
     let add = lib
