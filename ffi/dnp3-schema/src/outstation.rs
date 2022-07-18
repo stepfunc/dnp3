@@ -950,8 +950,9 @@ fn define_address_filter(
         .param("address", StringType, "IP address to accept")?
         .fails_with(shared_def.error_type.clone())?
         .doc(
-            doc("Create an address filter that matches a specific address or IPv4 address")
-                .details("Examples: 192.168.1.26, 192.168.0.*, *.*.*.*"),
+            doc("Create an address filter that matches a specific address or wildcards")
+                .details("Examples: 192.168.1.26, 192.168.0.*, *.*.*.*")
+                .details("Wildcards are only supported for IPv4 addresses"),
         )?
         .build()?;
 
