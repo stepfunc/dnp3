@@ -135,7 +135,7 @@ impl std::fmt::Display for FilterError {
 
 #[cfg(test)]
 mod test {
-    use crate::tcp::{BadIpv4Wildcard, WildcardIPv4};
+    use crate::tcp::{AddressFilter, BadIpv4Wildcard, WildcardIPv4};
     use std::net::IpAddr;
 
     #[test]
@@ -187,11 +187,28 @@ mod test {
 
     #[test]
     fn wildcard_matching_works() {
-        let res: WildcardIPv4 = "192.168.0.*".parse().unwrap();
+        let wc: WildcardIPv4 = "192.168.0.*".parse().unwrap();
         let ip1: IpAddr = "192.168.0.1".parse().unwrap();
         let ip2: IpAddr = "192.168.1.1".parse().unwrap();
 
-        assert!(res.matches(ip1));
-        assert!(!res.matches(ip2));
+        assert!(wc.matches(ip1));
+        assert!(!wc.matches(ip2));
+    }
+
+    #[test]
+    fn wildcard_conflicts() {
+        let wc1 = AddressFilter::WildcardIpv4("192.168.27.*".parse().unwrap());
+        let ip1 = AddressFilter::Exact("192.168.27.2".parse().unwrap());
+
+        let wc2 = AddressFilter::WildcardIpv4("192.168.*.23".parse().unwrap());
+        let ip2 = AddressFilter::Exact("192.168.22.23".parse().unwrap());
+
+        // conflicts
+        assert!(wc1.conflicts_with(&ip1));
+        assert!(wc1.conflicts_with(&wc2));
+
+        // disjoint
+        assert!(!wc1.conflicts_with(&ip2));
+        assert!(!wc2.conflicts_with(&ip1));
     }
 }
