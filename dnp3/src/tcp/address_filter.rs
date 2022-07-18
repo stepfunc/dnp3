@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 /// Represents IPv4 addresses which may contain "*" wildcards
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct WildcardIPv4 {
@@ -8,7 +10,7 @@ pub struct WildcardIPv4 {
 }
 
 /// Error returned when an IPv4 wildcard is not in the correct format
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct BadIpv4Wildcard;
 
 fn get_byte(value: &str) -> Result<Option<u8>, BadIpv4Wildcard> {
@@ -21,11 +23,11 @@ fn get_byte(value: &str) -> Result<Option<u8>, BadIpv4Wildcard> {
     }
 }
 
-impl TryFrom<&str> for WildcardIPv4 {
-    type Error = BadIpv4Wildcard;
+impl FromStr for WildcardIPv4 {
+    type Err = BadIpv4Wildcard;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let mut iter = value.split('.');
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut iter = s.split('.');
         let b3 = get_byte(iter.next().ok_or(BadIpv4Wildcard)?)?;
         let b2 = get_byte(iter.next().ok_or(BadIpv4Wildcard)?)?;
         let b1 = get_byte(iter.next().ok_or(BadIpv4Wildcard)?)?;
@@ -128,5 +130,68 @@ impl std::fmt::Display for FilterError {
         match self {
             FilterError::Conflict => f.write_str("filter conflicts with an existing filter"),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::tcp::{BadIpv4Wildcard, WildcardIPv4};
+    use std::net::IpAddr;
+
+    #[test]
+    fn parses_address_with_subnet_wildcard() {
+        let wc: WildcardIPv4 = "172.17.20.*".parse().unwrap();
+        assert_eq!(
+            wc,
+            WildcardIPv4 {
+                b3: Some(172),
+                b2: Some(17),
+                b1: Some(20),
+                b0: None
+            }
+        )
+    }
+
+    #[test]
+    fn parses_all_wildcards() {
+        let wc: WildcardIPv4 = "*.*.*.*".parse().unwrap();
+        assert_eq!(
+            wc,
+            WildcardIPv4 {
+                b3: None,
+                b2: None,
+                b1: None,
+                b0: None
+            }
+        )
+    }
+
+    #[test]
+    fn rejects_bad_input() {
+        let bad_input = [
+            "*.*.*.*.*",
+            "*.*..*.*",
+            "*.256.*.*",
+            ".*.256.*.*",
+            "1.1.1.1ab",
+        ];
+
+        for x in bad_input {
+            let res: Result<WildcardIPv4, BadIpv4Wildcard> = x.parse();
+            assert_eq!(res, Err(BadIpv4Wildcard));
+        }
+
+        let res: Result<WildcardIPv4, BadIpv4Wildcard> = "*.*.*.*.*".parse();
+        assert_eq!(res, Err(BadIpv4Wildcard));
+    }
+
+    #[test]
+    fn wildcard_matching_works() {
+        let res: WildcardIPv4 = "192.168.0.*".parse().unwrap();
+        let ip1: IpAddr = "192.168.0.1".parse().unwrap();
+        let ip2: IpAddr = "192.168.1.1".parse().unwrap();
+
+        assert!(res.matches(ip1));
+        assert!(!res.matches(ip2));
     }
 }
