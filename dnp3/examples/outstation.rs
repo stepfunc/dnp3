@@ -5,14 +5,15 @@ use dnp3::decode::*;
 use dnp3::link::*;
 use dnp3::outstation::database::*;
 use dnp3::outstation::*;
-use dnp3::serial::*;
+
 use dnp3::tcp::*;
-use std::path::Path;
 use std::process::exit;
 use tokio_stream::StreamExt;
 use tokio_util::codec::FramedRead;
 use tokio_util::codec::LinesCodec;
 
+#[cfg(feature = "serial")]
+use dnp3::serial::*;
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
 
@@ -37,6 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     match transport {
         "tcp" => run_tcp().await,
+        #[cfg(feature = "serial")]
         "serial" => run_serial().await,
         #[cfg(feature = "tls")]
         "tls-ca" => run_tls(get_ca_chain_config()?).await,
@@ -226,6 +228,7 @@ async fn run_tcp() -> Result<(), Box<dyn std::error::Error>> {
     run_tcp_server(server).await
 }
 
+#[cfg(feature = "serial")]
 async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_serial_server
     let outstation = spawn_outstation_serial(
@@ -429,6 +432,7 @@ fn get_current_time() -> Time {
 
 #[cfg(feature = "tls")]
 fn get_ca_chain_config() -> Result<TlsServerConfig, Box<dyn std::error::Error>> {
+    use std::path::Path;
     // ANCHOR: tls_ca_chain_config
     let config = TlsServerConfig::new(
         "test.com",
@@ -446,6 +450,7 @@ fn get_ca_chain_config() -> Result<TlsServerConfig, Box<dyn std::error::Error>> 
 
 #[cfg(feature = "tls")]
 fn get_self_signed_config() -> Result<TlsServerConfig, Box<dyn std::error::Error>> {
+    use std::path::Path;
     // ANCHOR: tls_self_signed_config
     let config = TlsServerConfig::new(
         "test.com",

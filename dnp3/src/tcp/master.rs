@@ -56,12 +56,12 @@ impl MasterTaskConnectionHandler {
     async fn handle(
         &mut self,
         socket: TcpStream,
-        endpoint: &SocketAddr,
+        _endpoint: &SocketAddr,
     ) -> Result<PhysLayer, String> {
         match self {
             Self::Tcp => Ok(PhysLayer::Tcp(socket)),
             #[cfg(feature = "tls")]
-            Self::Tls(config) => config.handle_connection(socket, endpoint).await,
+            Self::Tls(config) => config.handle_connection(socket, _endpoint).await,
         }
     }
 }

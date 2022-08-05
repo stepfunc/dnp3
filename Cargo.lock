@@ -500,7 +500,6 @@ dependencies = [
 name = "dnp3-schema"
 version = "1.1.0-alpha1"
 dependencies = [
- "dnp3",
  "oo-bindgen",
 ]
 
