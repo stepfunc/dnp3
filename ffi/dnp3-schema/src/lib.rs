@@ -65,7 +65,11 @@ pub fn build_lib() -> BackTraced<Library> {
         InterfaceSettings::default(),
     )?;
 
-    let mut builder = LibraryBuilder::new(Version::parse(dnp3::VERSION).unwrap(), info, settings);
+    let mut builder = LibraryBuilder::new(
+        Version::parse(env!("CARGO_PKG_VERSION")).unwrap(),
+        info,
+        settings,
+    );
 
     // Shared stuff
     let shared_def = shared::define(&mut builder)?;

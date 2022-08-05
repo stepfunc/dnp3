@@ -65,6 +65,7 @@ pub mod master;
 /// Types and traits specific to outstations
 pub mod outstation;
 /// Entry points and types for serial
+#[cfg(feature = "serial")]
 pub mod serial;
 /// Entry points and types for TCP
 pub mod tcp;

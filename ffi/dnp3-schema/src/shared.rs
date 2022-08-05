@@ -47,6 +47,10 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         )?
         .add_error("null_parameter", "Null parameter")?
         .add_error(
+            "no_support",
+            "Native library was compiled without support for this feature",
+        )?
+        .add_error(
             "association_does_not_exist",
             "The specified association does not exist",
         )?
