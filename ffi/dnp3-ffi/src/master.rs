@@ -1,5 +1,4 @@
 use std::ffi::CStr;
-use std::path::Path;
 use std::time::Duration;
 
 use dnp3::app::{
@@ -8,9 +7,12 @@ use dnp3::app::{
 };
 use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
-use dnp3::serial::*;
-use dnp3::tcp::tls::*;
 use dnp3::tcp::ClientState;
+
+#[cfg(feature = "serial")]
+use dnp3::serial::*;
+#[cfg(feature = "tls")]
+use dnp3::tcp::tls::*;
 
 use crate::ffi;
 
@@ -56,6 +58,20 @@ pub(crate) unsafe fn master_channel_create_tcp(
     Ok(Box::into_raw(Box::new(channel)))
 }
 
+#[cfg(not(feature = "tls"))]
+pub(crate) unsafe fn master_channel_create_tls(
+    _runtime: *mut crate::runtime::Runtime,
+    _link_error_mode: ffi::LinkErrorMode,
+    _config: ffi::MasterChannelConfig,
+    _endpoints: *const crate::EndpointList,
+    _connect_strategy: ffi::ConnectStrategy,
+    _listener: ffi::ClientStateListener,
+    _tls_config: ffi::TlsClientConfig,
+) -> Result<*mut MasterChannel, ffi::ParamError> {
+    Err(ffi::ParamError::NoSupport)
+}
+
+#[cfg(feature = "tls")]
 pub(crate) unsafe fn master_channel_create_tls(
     runtime: *mut crate::runtime::Runtime,
     link_error_mode: ffi::LinkErrorMode,
@@ -65,6 +81,8 @@ pub(crate) unsafe fn master_channel_create_tls(
     listener: ffi::ClientStateListener,
     tls_config: ffi::TlsClientConfig,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
+    use std::path::Path;
+
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let config = convert_config(config)?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
@@ -115,6 +133,19 @@ pub(crate) unsafe fn master_channel_create_tls(
     Ok(Box::into_raw(Box::new(channel)))
 }
 
+#[cfg(not(feature = "serial"))]
+pub(crate) unsafe fn master_channel_create_serial(
+    _runtime: *mut crate::runtime::Runtime,
+    _config: ffi::MasterChannelConfig,
+    _path: &CStr,
+    _serial_params: ffi::SerialSettings,
+    _retry_delay: Duration,
+    _listener: ffi::PortStateListener,
+) -> Result<*mut MasterChannel, ffi::ParamError> {
+    Err(ffi::ParamError::NoSupport)
+}
+
+#[cfg(feature = "serial")]
 pub(crate) unsafe fn master_channel_create_serial(
     runtime: *mut crate::runtime::Runtime,
     config: ffi::MasterChannelConfig,
@@ -572,6 +603,7 @@ impl Listener<ClientState> for ffi::ClientStateListener {
     }
 }
 
+#[cfg(feature = "tls")]
 impl Listener<PortState> for ffi::PortStateListener {
     fn update(&mut self, value: PortState) -> MaybeAsync<()> {
         let value = match value {
@@ -622,6 +654,7 @@ impl From<ffi::RetryStrategy> for dnp3::app::RetryStrategy {
     }
 }
 
+#[cfg(feature = "serial")]
 impl From<ffi::SerialSettings> for dnp3::serial::SerialSettings {
     fn from(from: ffi::SerialSettings) -> Self {
         Self {
@@ -692,6 +725,7 @@ impl From<PollError> for ffi::ParamError {
     }
 }
 
+#[cfg(feature = "tls")]
 impl From<TlsError> for ffi::ParamError {
     fn from(error: TlsError) -> Self {
         match error {
@@ -704,6 +738,7 @@ impl From<TlsError> for ffi::ParamError {
     }
 }
 
+#[cfg(feature = "tls")]
 impl From<ffi::MinTlsVersion> for MinTlsVersion {
     fn from(from: ffi::MinTlsVersion) -> Self {
         match from {
@@ -713,6 +748,7 @@ impl From<ffi::MinTlsVersion> for MinTlsVersion {
     }
 }
 
+#[cfg(feature = "tls")]
 impl From<ffi::CertificateMode> for CertificateMode {
     fn from(from: ffi::CertificateMode) -> Self {
         match from {
