@@ -1,8 +1,12 @@
+### Next (1.1.0) ###
+* :star: TCP/TLS server can now filter IPv4 addresses with wildcards. See [#208](https://github.com/stepfunc/dnp3/pull/208).
+* :star: Rust crate and FFI/JNI libraries can now be compiled without TLS and/or serial support. See [#212](https://github.com/stepfunc/dnp3/pull/212).
+
 ### 1.0.1 ###
-* Fix panic when creating serial outstation [#203](https://github.com/stepfunc/dnp3/pull/203).
-* Log when OVERFLOW or EVENT classes available IIN bits causes a poll to be scheduled. [#25](https://github.com/stepfunc/dnp3/pull/205).
-* Build all Linux FFI/JNI artifacts using rust-cross [#197](https://github.com/stepfunc/dnp3/pull/197).
-* Newer rust-cross version produces more portable Linux libraries (older GLIBC).
+* :bug: Fix panic when creating serial outstation [#203](https://github.com/stepfunc/dnp3/pull/203).
+* :star: Log when OVERFLOW or EVENT classes available IIN bits causes a poll to be scheduled. [#25](https://github.com/stepfunc/dnp3/pull/205).
+* :star: Build all Linux FFI/JNI artifacts using rust-cross [#197](https://github.com/stepfunc/dnp3/pull/197).
+* :star: Newer rust-cross version produces more portable Linux libraries (older GLIBC).
 
 ### 1.0.0 ###
 * Public API changes (affects both Rust and bindings):
