@@ -497,20 +497,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "dnp3-schema"
-version = "1.1.0-alpha1"
-dependencies = [
- "oo-bindgen",
-]
-
-[[package]]
-name = "dnp3_ffi_java"
+name = "dnp3-ffi-java"
 version = "1.1.0-alpha1"
 dependencies = [
  "dnp3-ffi",
  "dnp3-schema",
  "java-oo-bindgen",
  "jni",
+]
+
+[[package]]
+name = "dnp3-schema"
+version = "1.1.0-alpha1"
+dependencies = [
+ "oo-bindgen",
 ]
 
 [[package]]
