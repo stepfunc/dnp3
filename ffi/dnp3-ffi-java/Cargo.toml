@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 jni = "0.19"
-dnp3-ffi = { path = "../dnp3-ffi", default-features = false }git
+dnp3-ffi = { path = "../dnp3-ffi", default-features = false }
 
 [features]
 default = ["tls", "serial"]
