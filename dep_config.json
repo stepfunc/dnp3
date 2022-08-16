@@ -15,7 +15,7 @@
     "pathdiff",
     "pest",
     "platforms",
-    "rodbus-schema",
+    "dnp3-schema",
     "rust-oo-bindgen",
     "rustc-demangle",
     "same-file",
@@ -31,14 +31,14 @@
     "rasn": {
       "url": "https://github.com/stepfunc/rasn"
     },
-    "rodbus": {
-      "url": "https://github.com/stepfunc/rodbus"
+    "dnp3": {
+      "url": "https://github.com/stepfunc/dnp3"
     },
-    "rodbus-ffi": {
-      "url": "https://github.com/stepfunc/rodbus"
+    "dnp3-ffi": {
+      "url": "https://github.com/stepfunc/dnp3"
     },
-    "rodbus-ffi-java": {
-      "url": "https://github.com/stepfunc/rodbus"
+    "dnp3-ffi-java": {
+      "url": "https://github.com/stepfunc/dnp3"
     }
   },
   "third_party": {
@@ -1355,6 +1355,21 @@
         }
       ]
     },
+    "time": {
+      "id": "time",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2022 Jacob Pratt et al."
+              ]
+            }
+          }
+        }
+      ]
+    },
     "tokio-macros": {
       "id": "tokio-macros",
       "source": "crates.io",
@@ -1590,6 +1605,13 @@
             }
           }
         }
+      ]
+    },
+    "xxhash-rust": {
+      "id": "xxhash-rust",
+      "source": "crates.io",
+      "licenses": [
+        "BSLv1"
       ]
     },
     "zeroize": {
