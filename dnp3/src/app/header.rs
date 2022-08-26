@@ -9,7 +9,7 @@ use crate::util::bit::{format_bitfield, Bitfield};
 use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 
 /// Control field in the application-layer header
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ControlField {
     /// FIR bit - set if the first fragment in a multi-fragmented response
     pub fir: bool,
@@ -135,21 +135,21 @@ impl ControlField {
 }
 
 /// Internal Indications Byte #1
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Iin1 {
     /// underlying value for IIN1
     pub value: u8,
 }
 
 /// Internal Indications Byte #2
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Iin2 {
     /// underlying value for IIN2
     pub value: u8,
 }
 
 /// Internal Indications (2 bytes)
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Iin {
     /// IIN byte #1
     pub iin1: Iin1,
@@ -492,7 +492,7 @@ impl Iin {
 }
 
 /// application-layer header for requests
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct RequestHeader {
     /// control field
     pub control: ControlField,
@@ -501,7 +501,7 @@ pub struct RequestHeader {
 }
 
 /// Only 2 function codes allowed in responses
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ResponseFunction {
     /// (solicited) response (0x81)
     Response,
@@ -510,7 +510,7 @@ pub enum ResponseFunction {
 }
 
 /// application-layer header for responses
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ResponseHeader {
     /// control field
     pub control: ControlField,

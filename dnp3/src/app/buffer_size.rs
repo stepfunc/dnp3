@@ -1,13 +1,13 @@
 use crate::util::buffer::Buffer;
 
 /// Validated buffer size for use in configuration structs
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct BufferSize<const MIN_SIZE: usize = 249, const DEFAULT_SIZE: usize = 2048> {
     size: usize,
 }
 
 /// Error type returned for invalid buffer sizes
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum BufferSizeError {
     /// provided size vs minimum size
     TooSmall(usize, usize),

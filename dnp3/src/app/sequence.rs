@@ -1,5 +1,5 @@
 /// Application-layer sequence number
-#[derive(Debug, Copy, Clone, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct Sequence {
     value: u8,
 }

@@ -6,7 +6,7 @@ use crate::util::bit::BitMask;
 use crate::util::bit::Bitfield;
 
 /// Enumeration modeling two stables states and an in-transit state
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DoubleBit {
     /// Transitioning between end conditions
     Intermediate,
@@ -19,7 +19,7 @@ pub enum DoubleBit {
 }
 
 /// A DNP3 time value that may be Synchronized or NotSynchronized
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Time {
     /// The timestamp is UTC synchronized at the remote device
     Synchronized(Timestamp),
@@ -49,7 +49,7 @@ impl Time {
 /// Not every bit is used for every type (Binary, Analog, etc). Users
 /// should refer to the standard to determine what flag values
 /// correspond to each type.
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Flags {
     /// underlying bitmask
     pub value: u8,
@@ -130,7 +130,7 @@ impl Time {
 }
 
 /// Measurement type corresponding to groups 1 and 2
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct BinaryInput {
     /// value of the type
     pub value: bool,
@@ -152,7 +152,7 @@ impl BinaryInput {
 }
 
 /// Measurement type corresponding to groups 3 and 4
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct DoubleBitBinaryInput {
     /// value of the type
     pub value: DoubleBit,
@@ -174,7 +174,7 @@ impl DoubleBitBinaryInput {
 }
 
 /// Measurement type corresponding to groups 10 and 11
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct BinaryOutputStatus {
     /// value of the type
     pub value: bool,
@@ -196,7 +196,7 @@ impl BinaryOutputStatus {
 }
 
 /// Measurement type corresponding to groups 20 and 22
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Counter {
     /// value of the type
     pub value: u32,
@@ -218,7 +218,7 @@ impl Counter {
 }
 
 /// Measurement type corresponding to groups 21 and 23
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct FrozenCounter {
     /// value of the type
     pub value: u32,
@@ -240,7 +240,7 @@ impl FrozenCounter {
 }
 
 /// Measurement type corresponding to groups 30 and 32
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct AnalogInput {
     /// value of the type
     pub value: f64,
@@ -571,7 +571,7 @@ impl AnalogOutputStatus {
 /// The default value is `[0x00]`, corresponding to an empty
 /// C-style string.
 #[allow(missing_copy_implementations)]
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct OctetString {
     value: [u8; Self::MAX_SIZE],
     len: u8,
@@ -621,7 +621,7 @@ impl OctetString {
 }
 
 /// Errors when creating an octet string
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum OctetStringLengthError {
     /// Zero-length octet strings are explicitely disallowed
     /// by the standard.

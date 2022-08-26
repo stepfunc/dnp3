@@ -2,7 +2,7 @@ use std::time::Duration;
 
 /// A wrapper around a std::time::Duration
 /// that ensures values are in the range `[1ms .. 1hour]`
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Timeout {
     pub(crate) value: Duration,
 }
@@ -16,7 +16,7 @@ impl Default for Timeout {
 }
 
 /// Error type returned when a Timeout is constructed with an out-of-range value
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TimeoutRangeError {
     /// value smaller than library allowed minimum
     TooSmall(Duration),
