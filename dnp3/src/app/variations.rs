@@ -17,7 +17,7 @@ use crate::app::Timestamp;
 use crate::app::measurement::*;
 
 /// All variations supported by the library
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Variation {
     /// Binary Input - Any Variation
     Group1Var0,
