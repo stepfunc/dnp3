@@ -38,7 +38,7 @@ impl TripCloseCode {
             _ => TripCloseCode::Unknown(x),
         }
     }
-    
+
     /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
@@ -80,7 +80,7 @@ impl OpType {
             _ => OpType::Unknown(x),
         }
     }
-    
+
     /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
@@ -168,7 +168,7 @@ impl CommandStatus {
             _ => CommandStatus::Unknown(x),
         }
     }
-    
+
     /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
@@ -195,9 +195,8 @@ impl CommandStatus {
             CommandStatus::Unknown(x) => x,
         }
     }
-    
+
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }
-

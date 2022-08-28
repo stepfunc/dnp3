@@ -72,6 +72,14 @@ sealed case class FixedSizeField(name: String, typ: FixedSizeFieldType, attr: Op
     }
   }
 
+  def isFloatingPoint: Boolean = {
+    typ match {
+      case Float32Field  => true
+      case Float64Field => true
+      case _ => false
+    }
+  }
+
   def isFlags : Boolean = {
     attr match {
       case Some(FieldAttribute.Flags) => true

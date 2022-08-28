@@ -78,6 +78,10 @@ class RemainderOnly(g: ObjectGroup, v: Byte, description: String, remainder: Var
 
 class FixedSize(g: ObjectGroup, v: Byte, description: String)(fs: FixedSizeField*) extends BasicGroupVariation(g, v, description) {
 
+  def hasFloatingPoint: Boolean = {
+    fields.exists(f => f.isFloatingPoint)
+  }
+
   def hasRelativeTime : Boolean = {
     fields.exists(f => f.isRelativeTime)
   }
