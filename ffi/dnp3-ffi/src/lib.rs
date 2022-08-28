@@ -1,4 +1,5 @@
 #![allow(clippy::missing_safety_doc, clippy::useless_conversion)]
+#![allow(clippy::derive_partial_eq_without_eq)]
 #![allow(dead_code)]
 
 /// these use statements allow the code in the FFI to not have to known the real locations

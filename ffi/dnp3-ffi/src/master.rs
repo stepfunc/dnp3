@@ -162,7 +162,7 @@ pub(crate) unsafe fn master_channel_create_serial(
 
     let channel = spawn_master_serial(
         config,
-        &path.to_string_lossy().to_string(),
+        &path.to_string_lossy(),
         serial_params.into(),
         retry_delay,
         Box::new(listener),
