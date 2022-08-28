@@ -4,7 +4,7 @@ use crate::link::EndpointAddress;
 use crate::outstation::database::{ClassZeroConfig, EventBufferConfig};
 
 /// describes whether an optional feature is enabled or disabled
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Feature {
     /// feature is enabled
     Enabled,
@@ -13,7 +13,7 @@ pub enum Feature {
 }
 
 /// Optional features that can be enabled or disabled
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Features {
     /// if enabled, the outstation responds to the self address (default == Disabled)
     pub self_address: Feature,
@@ -34,7 +34,7 @@ impl Default for Features {
 }
 
 /// Outstation configuration parameters
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub struct OutstationConfig {
     /// address of the outstation
     pub outstation_address: EndpointAddress,

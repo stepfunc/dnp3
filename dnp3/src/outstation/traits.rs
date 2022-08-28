@@ -8,7 +8,7 @@ use crate::app::{FunctionCode, MaybeAsync};
 use crate::outstation::database::DatabaseHandle;
 
 /// Application-controlled IIN bits
-#[derive(Debug, Copy, Clone, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct ApplicationIin {
     /// IIN1.4: Time synchronization is required
     pub need_time: bool,
@@ -21,7 +21,7 @@ pub struct ApplicationIin {
 }
 
 /// Enumeration returned for cold/warm restart
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum RestartDelay {
     /// corresponds to g51v1
     Seconds(u16),
@@ -30,7 +30,7 @@ pub enum RestartDelay {
 }
 
 /// Enum describing the result of an operation
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum RequestError {
     /// outstation supports this operation, but the parameter(s) are nonsensical.
     ParameterError,
@@ -39,7 +39,7 @@ pub enum RequestError {
 }
 
 /// Outstation connection state for connection-oriented transports, e.g. TCP
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ConnectionState {
     /// Connected to the master
     Connected,
@@ -113,7 +113,7 @@ pub trait OutstationApplication: Sync + Send + 'static {
 }
 
 /// enumeration describing how the outstation processed a broadcast request
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum BroadcastAction {
     /// Outstation processed the broadcast
     Processed,
@@ -156,7 +156,7 @@ pub trait OutstationInformation: Sync + Send + 'static {
 }
 
 /// enumeration describing how the master requested the control operation
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum OperateType {
     /// control point was properly selected before the operate request
     SelectBeforeOperate,
@@ -210,7 +210,7 @@ pub trait ControlSupport<T> {
 }
 
 /// Indices used by freeze operations
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FreezeIndices {
     /// All counters
     All,
@@ -219,7 +219,7 @@ pub enum FreezeIndices {
 }
 
 /// Freeze operation type
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FreezeType {
     /// Copy the current value of a counter to the associated point
     ImmediateFreeze,

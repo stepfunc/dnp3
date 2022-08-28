@@ -13,7 +13,7 @@ mod master;
 mod outstation;
 
 /// state of TCP client connection
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ClientState {
     /// client is disabled
     Disabled,

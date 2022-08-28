@@ -27,7 +27,7 @@ pub(crate) mod constant {
 /// Controls how errors in parsed link-layer frames are handled. This behavior
 /// is configurable for physical layers with built-in error correction like TCP
 /// as the connection might be through a terminal server.
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum LinkErrorMode {
     /// Framing errors are discarded. The link-layer parser is reset on any error, and the
     /// parser begins scanning for 0x0564. This is always the behavior for serial ports.
@@ -46,7 +46,7 @@ pub struct EndpointAddress {
 }
 
 /// The specified address is special and may not be used as an EndpointAddress
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct SpecialAddressError {
     /// reserved special address
     pub address: u16,

@@ -7,7 +7,7 @@ use crate::app::{FunctionCode, QualifierCode};
 use crate::util::cursor::ReadError;
 
 /// errors that occur when parsing an application layer header
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum HeaderParseError {
     /// unknown function code
     UnknownFunction(Sequence, u8),
@@ -16,7 +16,7 @@ pub enum HeaderParseError {
 }
 
 /// errors that occur when parsing object headers
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ObjectParseError {
     /// unknown group and variation
     UnknownGroupVariation(u8, u8),
@@ -35,7 +35,7 @@ pub enum ObjectParseError {
 }
 
 /// errors that occur when interpreting a header as a request header
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum RequestValidationError {
     /// function code not allowed in requests
     UnexpectedFunction(FunctionCode),
@@ -46,7 +46,7 @@ pub enum RequestValidationError {
 }
 
 /// errors that occur when interpreting a header as a response header
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ResponseValidationError {
     /// function code not allowed in responses
     UnexpectedFunction(FunctionCode),

@@ -1,5 +1,5 @@
 /// Enum representing all possible `BinaryInput` event variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventBinaryInputVariation {
     /// Binary Input Event - Without Time
     Group2Var1,
@@ -10,7 +10,7 @@ pub enum EventBinaryInputVariation {
 }
 
 /// Enum representing all possible `BinaryOutputStatus` event variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventBinaryOutputStatusVariation {
     /// Binary Output Event - Output Status Without Time
     Group11Var1,
@@ -19,7 +19,7 @@ pub enum EventBinaryOutputStatusVariation {
 }
 
 /// Enum representing all possible `DoubleBitBinaryInput` event variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventDoubleBitBinaryInputVariation {
     /// Double-bit Binary Input Event - Without Time
     Group4Var1,
@@ -30,7 +30,7 @@ pub enum EventDoubleBitBinaryInputVariation {
 }
 
 /// Enum representing all possible `Counter` event variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventCounterVariation {
     /// Counter Event - 32-bit With Flag
     Group22Var1,
@@ -43,7 +43,7 @@ pub enum EventCounterVariation {
 }
 
 /// Enum representing all possible `FrozenCounter` event variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventFrozenCounterVariation {
     /// Frozen Counter Event - 32-bit With Flag
     Group23Var1,
@@ -56,7 +56,7 @@ pub enum EventFrozenCounterVariation {
 }
 
 /// Enum representing all possible `AnalogInput` event variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventAnalogInputVariation {
     /// Analog Input Event - 32-bit With Flag
     Group32Var1,
@@ -77,7 +77,7 @@ pub enum EventAnalogInputVariation {
 }
 
 /// Enum representing all possible `AnalogOutputStatus` event variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventAnalogOutputStatusVariation {
     /// Analog Output Event - 32-bit With Flag
     Group42Var1,
@@ -98,11 +98,11 @@ pub enum EventAnalogOutputStatusVariation {
 }
 
 // This is always g111vX
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct EventOctetStringVariation;
 
 /// Enum representing all possible `BinaryInput` static variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StaticBinaryInputVariation {
     /// Binary Input - Packed Format
     Group1Var1,
@@ -111,7 +111,7 @@ pub enum StaticBinaryInputVariation {
 }
 
 /// Enum representing all possible `BinaryOutputStatus` static variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StaticBinaryOutputStatusVariation {
     /// Binary Output - Packed Format
     Group10Var1,
@@ -120,7 +120,7 @@ pub enum StaticBinaryOutputStatusVariation {
 }
 
 /// Enum representing all possible `DoubleBitBinaryInput` static variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StaticDoubleBitBinaryInputVariation {
     /// Double-bit Binary Input - Packed Format
     Group3Var1,
@@ -129,7 +129,7 @@ pub enum StaticDoubleBitBinaryInputVariation {
 }
 
 /// Enum representing all possible `Counter` static variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StaticCounterVariation {
     /// Counter - 32-bit With Flag
     Group20Var1,
@@ -142,7 +142,7 @@ pub enum StaticCounterVariation {
 }
 
 /// Enum representing all possible `FrozenCounter` static variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StaticFrozenCounterVariation {
     /// Frozen Counter - 32-bit With Flag
     Group21Var1,
@@ -159,7 +159,7 @@ pub enum StaticFrozenCounterVariation {
 }
 
 /// Enum representing all possible `AnalogInput` static variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StaticAnalogInputVariation {
     /// Analog Input - 32-bit With Flag
     Group30Var1,
@@ -176,7 +176,7 @@ pub enum StaticAnalogInputVariation {
 }
 
 /// Enum representing all possible `AnalogOutputStatus` static variations
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StaticAnalogOutputStatusVariation {
     /// Analog Output Status - 32-bit With Flag
     Group40Var1,
@@ -189,11 +189,11 @@ pub enum StaticAnalogOutputStatusVariation {
 }
 
 // This is always g110vX
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct StaticOctetStringVariation;
 
 /// configuration for a `BinaryInput` point
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct BinaryInputConfig {
     /// default static variation
     pub s_var: StaticBinaryInputVariation,
@@ -202,7 +202,7 @@ pub struct BinaryInputConfig {
 }
 
 /// configuration for a `DoubleBitBinaryInput` point
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct DoubleBitBinaryInputConfig {
     /// default static variation
     pub s_var: StaticDoubleBitBinaryInputVariation,
@@ -211,7 +211,7 @@ pub struct DoubleBitBinaryInputConfig {
 }
 
 /// configuration for a `BinaryOutputStatus` point
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct BinaryOutputStatusConfig {
     /// default static variation
     pub s_var: StaticBinaryOutputStatusVariation,
@@ -220,7 +220,7 @@ pub struct BinaryOutputStatusConfig {
 }
 
 /// configuration for a `Counter` point
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CounterConfig {
     /// default static variation
     pub s_var: StaticCounterVariation,
@@ -231,7 +231,7 @@ pub struct CounterConfig {
 }
 
 /// configuration for a `FrozenCounter` point
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct FrozenCounterConfig {
     /// default static variation
     pub s_var: StaticFrozenCounterVariation,
@@ -264,7 +264,7 @@ pub struct AnalogOutputStatusConfig {
 }
 
 ///  Placeholder object required by a couple of traits
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OctetStringConfig;
 
 impl BinaryInputConfig {

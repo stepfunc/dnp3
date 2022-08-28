@@ -364,7 +364,7 @@ pub(crate) struct NullAssociationInformation;
 impl AssociationInformation for NullAssociationInformation {}
 
 /// Information about the object header and specific variation
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct HeaderInfo {
     /// underlying variation in the response
     pub variation: Variation,
@@ -393,7 +393,7 @@ impl HeaderInfo {
 }
 
 /// Describes the source of a read event
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReadType {
     /// Startup integrity poll
     StartupIntegrity,

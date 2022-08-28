@@ -14,7 +14,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
 /// Errors that can occur when adding an association
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AssociationError {
     /// the master task has shutdown
     Shutdown,
@@ -23,7 +23,7 @@ pub enum AssociationError {
 }
 
 /// Errors that can occur while executing a master task
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TaskError {
     /// There are too many user requests queued
     TooManyRequests,
@@ -58,7 +58,7 @@ pub enum TaskError {
 }
 
 /// Errors that can occur when adding/modifying polls
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PollError {
     /// the master task has shutdown
     Shutdown,
@@ -67,7 +67,7 @@ pub enum PollError {
 }
 
 /// Errors that can occur when verifying the respond to a command request
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CommandResponseError {
     /// Command failed before receiving a response
     Request(TaskError),
@@ -84,7 +84,7 @@ pub enum CommandResponseError {
 }
 
 /// Parent error type for time sync tasks
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TimeSyncError {
     /// Error occurred during task execution
     Task(TaskError),
@@ -117,7 +117,7 @@ impl TimeSyncError {
 }
 
 /// Parent error type for command tasks
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CommandError {
     /// Failed b/c of a generic task execution error
     Task(TaskError),

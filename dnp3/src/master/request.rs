@@ -12,7 +12,7 @@ use crate::master::error::CommandResponseError;
 use crate::util::cursor::WriteError;
 
 /// Controls how a command request is issued
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CommandMode {
     /// Master will use the `DIRECT_OPERATE` function code in a single request/response
     DirectOperate,
@@ -21,7 +21,7 @@ pub enum CommandMode {
 }
 
 /// Controls which time synchronization procedure is used
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TimeSyncProcedure {
     /// Master will use the LAN procedure: RECORD_CURRENT_TIME followed by WRITE g50v3
     Lan,
@@ -30,7 +30,7 @@ pub enum TimeSyncProcedure {
 }
 
 /// struct recording which event classes are enabled
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EventClasses {
     /// enable Class 1
     pub class1: bool,
@@ -41,7 +41,7 @@ pub struct EventClasses {
 }
 
 /// struct recording which event classes and class 0 are enabled
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Classes {
     /// enable class zero
     pub class0: bool,
@@ -50,7 +50,7 @@ pub struct Classes {
 }
 
 /// struct representing a one-byte range scan
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OneByteRangeScan {
     /// variation to READ
     pub variation: Variation,
@@ -61,7 +61,7 @@ pub struct OneByteRangeScan {
 }
 
 /// struct representing a two-byte range scan
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TwoByteRangeScan {
     /// variation to READ
     pub variation: Variation,
@@ -72,14 +72,14 @@ pub struct TwoByteRangeScan {
 }
 
 /// struct representing an "all objects" (QC = 0x06) scan
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AllObjectsScan {
     /// variation to READ
     pub variation: Variation,
 }
 
 /// struct representing a one-byte limited count scan
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OneByteLimitedCountScan {
     /// variation to READ
     pub variation: Variation,
@@ -88,7 +88,7 @@ pub struct OneByteLimitedCountScan {
 }
 
 /// struct representing a two-byte limited count scan
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TwoByteLimitedCountScan {
     /// variation to READ
     pub variation: Variation,
@@ -259,7 +259,7 @@ impl TwoByteLimitedCountScan {
 }
 
 /// Enum representing all of the allowed scan types
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReadHeader {
     /// variant for one byte range scans
     Range8(OneByteRangeScan),
