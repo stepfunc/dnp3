@@ -383,7 +383,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: dotnet-bindings
-          path: ffi/bindings/dotnet/nupkg/*
+          path: ffi/bindings/dotnet/nupkg/dnp3*
       - name: Create JNI third-party-licenses.txt
         run: bom-tools gen-licenses-dir ./ffi-modules build.jni.log ./dep_config.json > third-party-licenses.txt
       - name: Package Java bindings
