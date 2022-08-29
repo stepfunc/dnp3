@@ -348,8 +348,6 @@ jobs:
     needs: [documentation, bindings-windows, bindings-macos, cross]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -358,21 +356,41 @@ jobs:
           override: true
       - name: Caching
         uses: Swatinem/rust-cache@v1
+      - name: Checkout BOM tools repo
+        uses: actions/checkout@v3
+        with:
+          repository: stepfunc/bom-tools
+          ref: 0.1.0
+          path: bom-tools
+      - name: Install BOM tools
+        working-directory: bom-tools
+        run: cargo install --path bom-tools
+      - name: Checkout
+        uses: actions/checkout@v3
       - name: Download compiled FFI
         uses: actions/download-artifact@v2
         with:
           name: ffi-modules
           path: ffi-modules
-      - name: Package all bindings
+      - name: Create FFI third-party-licenses.txt
+        run: bom-tools gen-licenses-dir ./ffi-modules build.ffi.log ./dep_config.json > third-party-licenses.txt
+      - name: Package .NET bindings
         uses: actions-rs/cargo@v1
         with:
           command: run
-          args: --bin dnp3-bindings -- --package ./ffi-modules
+          args: --bin dnp3-bindings -- --dotnet --package ./ffi-modules -f third-party-licenses.txt
       - name: Upload .NET bindings
         uses: actions/upload-artifact@v2
         with:
           name: dotnet-bindings
           path: ffi/bindings/dotnet/nupkg/*
+      - name: Create JNI third-party-licenses.txt
+        run: bom-tools gen-licenses-dir ./ffi-modules build.jni.log ./dep_config.json > third-party-licenses.txt
+      - name: Package Java bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --bin rodbus-bindings -- --java --package ./ffi-modules -f third-party-licenses.txt
       - name: Upload Java bindings
         uses: actions/upload-artifact@v2
         with:
