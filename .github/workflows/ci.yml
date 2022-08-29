@@ -294,7 +294,7 @@ jobs:
       - name: Create Log Dir
         run: mkdir -p logs/${{ matrix.target }}
       - name: Build FFI
-        run: cross build -p dno3-ffi --release --target ${{ matrix.target }} --message-format json > logs/${{ matrix.target }}/build.ffi.log
+        run: cross build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json > logs/${{ matrix.target }}/build.ffi.log
       - name: Build JNI
         run: cross build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json > logs/${{ matrix.target }}/build.jni.log
       - name: C bindings
