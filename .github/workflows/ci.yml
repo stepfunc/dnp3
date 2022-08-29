@@ -89,6 +89,8 @@ jobs:
         with:
           command: build
           args: --release
+      - name: Build Rustdoc
+        run: cargo doc -p dnp3 --no-deps
       - name: C bindings
         uses: actions-rs/cargo@v1
         with:
@@ -107,6 +109,7 @@ jobs:
       - name: Extract documentation
         run: |
           mkdir -p ~/doc
+          cp -a target/doc ~/doc/rust
           cp -a ffi/bindings/c/generated/doc/c ~/doc/c
           cp -a ffi/bindings/c/generated/doc/cpp ~/doc/cpp
           cp -a ffi/bindings/dotnet/dnp3/doc ~/doc/dotnet
