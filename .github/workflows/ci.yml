@@ -171,11 +171,17 @@ jobs:
         run: Copy-Item -Path .cargo/config-windows.toml -Destination .cargo/config.toml
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Build
-        uses: actions-rs/cargo@v1
+      - name: Create log dir
+        run: mkdir logs\${{ matrix.target }}
+      - name: Build FFI
+        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\logs\${{ matrix.target }}\build.ffi.log
+      - name: Build JNI
+        run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\logs\${{ matrix.target }}\build.jni.log
+      - name: Upload Build Logs
+        uses: actions/upload-artifact@v3
         with:
-          command: build
-          args: --release
+          name: ffi-modules
+          path: logs
       - name: C bindings
         uses: actions-rs/cargo@v1
         with:
@@ -220,11 +226,17 @@ jobs:
           override: true
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Build
-        uses: actions-rs/cargo@v1
+      - name: Create Log Dir
+        run: mkdir -p logs/x86_64-apple-darwin
+      - name: Build FFI
+        run: cargo build -p dnp3-ffi --release --message-format json > logs/x86_64-apple-darwin/build.ffi.log
+      - name: Build JNI
+        run: cargo build -p dnp3-ffi-java --release --message-format json > logs/x86_64-apple-darwin/build.jni.log
+      - name: Upload Build Logs
+        uses: actions/upload-artifact@v3
         with:
-          command: build
-          args: --release
+          name: ffi-modules
+          path: logs
       - name: C bindings
         uses: actions-rs/cargo@v1
         with:
@@ -277,12 +289,14 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --target ${{ matrix.target }}
+      - name: Install Rust Cross
+        run: cargo install cross
+      - name: Create Log Dir
+        run: mkdir -p logs/${{ matrix.target }}
+      - name: Build FFI
+        run: cross build -p dno3-ffi --release --target ${{ matrix.target }} --message-format json > logs/${{ matrix.target }}/build.ffi.log
+      - name: Build JNI
+        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json > logs/${{ matrix.target }}/build.jni.log
       - name: C bindings
         uses: actions-rs/cargo@v1
         with:
