@@ -298,6 +298,21 @@
         }
       ]
     },
+    "core-foundation-sys": {
+      "id": "core-foundation-sys",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2012-2013 Mozilla Foundation"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "cpufeatures": {
       "id": "cpufeatures",
       "source": "crates.io",
@@ -587,6 +602,21 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2015 David Cuddeback"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "iana-time-zone": {
+      "id": "iana-time-zone",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2020 Andrew D. Straw"
               ]
             }
           }
@@ -1594,6 +1624,21 @@
     },
     "windows_x86_64_msvc": {
       "id": "windows_x86_64_msvc",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) Microsoft Corporation"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "windows_i686_msvc": {
+      "id": "windows_i686_msvc",
       "source": "crates.io",
       "licenses": [
         {
