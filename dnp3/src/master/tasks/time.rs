@@ -178,7 +178,7 @@ impl TimeSyncTask {
         // IEEE 1815-2012, pg 301:(Time at [D] – Time at [A] – outstation processing delay) / 2.
         let propagation_delay: Duration =
             match interval.checked_sub(Duration::from_millis(delay_ms as u64)) {
-                Some(x) => (x / 2),
+                Some(x) => x / 2,
                 None => {
                     tracing::warn!("outstation time delay is larger than the response delay");
                     self.report_error(association, TimeSyncError::BadOutstationTimeDelay(delay_ms));

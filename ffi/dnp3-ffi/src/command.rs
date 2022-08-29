@@ -40,7 +40,7 @@ pub unsafe fn command_set_create() -> *mut CommandSet {
 
 pub unsafe fn command_set_destroy(commands: *mut CommandSet) {
     if !commands.is_null() {
-        Box::from_raw(commands);
+        drop(Box::from_raw(commands));
     }
 }
 

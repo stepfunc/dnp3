@@ -17,7 +17,7 @@ use crate::app::Timestamp;
 use crate::app::measurement::*;
 
 /// All variations supported by the library
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Variation {
     /// Binary Input - Any Variation
     Group1Var0,
@@ -568,35 +568,35 @@ impl Variation {
 }
 
 /// Time Delay - Fine
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group52Var2 {
     /// time field of the variation
     pub(crate) time: u16,
 }
 
 /// Time Delay - Coarse
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group52Var1 {
     /// time field of the variation
     pub(crate) time: u16,
 }
 
 /// Time and Date CTO - Absolute time, unsynchronized
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group51Var2 {
     /// time field of the variation
     pub(crate) time: Timestamp,
 }
 
 /// Time and Date CTO - Absolute time, synchronized
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group51Var1 {
     /// time field of the variation
     pub(crate) time: Timestamp,
 }
 
 /// Time and Date - Indexed absolute time and long interval
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group50Var4 {
     /// time field of the variation
     pub(crate) time: Timestamp,
@@ -607,14 +607,14 @@ pub(crate) struct Group50Var4 {
 }
 
 /// Time and Date - Absolute Time at last recorded time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group50Var3 {
     /// time field of the variation
     pub(crate) time: Timestamp,
 }
 
 /// Time and Date - Absolute Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group50Var1 {
     /// time field of the variation
     pub(crate) time: Timestamp,
@@ -661,7 +661,7 @@ pub(crate) struct Group42Var5 {
 }
 
 /// Analog Output Event - 16-bit With Flag and Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group42Var4 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -672,7 +672,7 @@ pub(crate) struct Group42Var4 {
 }
 
 /// Analog Output Event - 32-bit With Flag and Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group42Var3 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -683,7 +683,7 @@ pub(crate) struct Group42Var3 {
 }
 
 /// Analog Output Event - 16-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group42Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -692,7 +692,7 @@ pub(crate) struct Group42Var2 {
 }
 
 /// Analog Output Event - 32-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group42Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -719,7 +719,7 @@ pub struct Group41Var3 {
 }
 
 /// Analog Output - 16-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Group41Var2 {
     /// value field of the variation
     pub value: i16,
@@ -728,7 +728,7 @@ pub struct Group41Var2 {
 }
 
 /// Analog Output - 32-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Group41Var1 {
     /// value field of the variation
     pub value: i32,
@@ -755,7 +755,7 @@ pub(crate) struct Group40Var3 {
 }
 
 /// Analog Output Status - 16-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group40Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -764,7 +764,7 @@ pub(crate) struct Group40Var2 {
 }
 
 /// Analog Output Status - 32-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group40Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -813,7 +813,7 @@ pub(crate) struct Group32Var5 {
 }
 
 /// Analog Input Event - 16-bit With Flag and Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group32Var4 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -824,7 +824,7 @@ pub(crate) struct Group32Var4 {
 }
 
 /// Analog Input Event - 32-bit With Flag and Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group32Var3 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -835,7 +835,7 @@ pub(crate) struct Group32Var3 {
 }
 
 /// Analog Input Event - 16-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group32Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -844,7 +844,7 @@ pub(crate) struct Group32Var2 {
 }
 
 /// Analog Input Event - 32-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group32Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -871,21 +871,21 @@ pub(crate) struct Group30Var5 {
 }
 
 /// Analog Input - 16-bit Without Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group30Var4 {
     /// value field of the variation
     pub(crate) value: i16,
 }
 
 /// Analog Input - 32-bit Without Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group30Var3 {
     /// value field of the variation
     pub(crate) value: i32,
 }
 
 /// Analog Input - 16-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group30Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -894,7 +894,7 @@ pub(crate) struct Group30Var2 {
 }
 
 /// Analog Input - 32-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group30Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -903,7 +903,7 @@ pub(crate) struct Group30Var1 {
 }
 
 /// Frozen Counter Event - 16-bit With Flag and Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group23Var6 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -914,7 +914,7 @@ pub(crate) struct Group23Var6 {
 }
 
 /// Frozen Counter Event - 32-bit With Flag and Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group23Var5 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -925,7 +925,7 @@ pub(crate) struct Group23Var5 {
 }
 
 /// Frozen Counter Event - 16-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group23Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -934,7 +934,7 @@ pub(crate) struct Group23Var2 {
 }
 
 /// Frozen Counter Event - 32-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group23Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -943,7 +943,7 @@ pub(crate) struct Group23Var1 {
 }
 
 /// Counter Event - 16-bit With Flag and Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group22Var6 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -954,7 +954,7 @@ pub(crate) struct Group22Var6 {
 }
 
 /// Counter Event - 32-bit With Flag and Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group22Var5 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -965,7 +965,7 @@ pub(crate) struct Group22Var5 {
 }
 
 /// Counter Event - 16-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group22Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -974,7 +974,7 @@ pub(crate) struct Group22Var2 {
 }
 
 /// Counter Event - 32-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group22Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -983,21 +983,21 @@ pub(crate) struct Group22Var1 {
 }
 
 /// Frozen Counter - 16-bit Without Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var10 {
     /// value field of the variation
     pub(crate) value: u16,
 }
 
 /// Frozen Counter - 32-bit Without Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var9 {
     /// value field of the variation
     pub(crate) value: u32,
 }
 
 /// Frozen Counter - 16-bit With Flag and Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var6 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -1008,7 +1008,7 @@ pub(crate) struct Group21Var6 {
 }
 
 /// Frozen Counter - 32-bit With Flag and Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var5 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -1019,7 +1019,7 @@ pub(crate) struct Group21Var5 {
 }
 
 /// Frozen Counter - 16-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -1028,7 +1028,7 @@ pub(crate) struct Group21Var2 {
 }
 
 /// Frozen Counter - 32-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -1037,21 +1037,21 @@ pub(crate) struct Group21Var1 {
 }
 
 /// Counter - 16-bit Without Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group20Var6 {
     /// value field of the variation
     pub(crate) value: u16,
 }
 
 /// Counter - 32-bit Without Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group20Var5 {
     /// value field of the variation
     pub(crate) value: u32,
 }
 
 /// Counter - 16-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group20Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -1060,7 +1060,7 @@ pub(crate) struct Group20Var2 {
 }
 
 /// Counter - 32-bit With Flag
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group20Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -1069,7 +1069,7 @@ pub(crate) struct Group20Var1 {
 }
 
 /// Binary Command - Control Relay Output Block
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Group12Var1 {
     /// code field of the variation
     pub code: ControlCode,
@@ -1084,7 +1084,7 @@ pub struct Group12Var1 {
 }
 
 /// Binary Output Event - Output Status With Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group11Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -1093,21 +1093,21 @@ pub(crate) struct Group11Var2 {
 }
 
 /// Binary Output Event - Output Status Without Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group11Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
 }
 
 /// Binary Output - Output Status With Flags
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group10Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
 }
 
 /// Double-bit Binary Input Event - With Relative Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group4Var3 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -1116,7 +1116,7 @@ pub(crate) struct Group4Var3 {
 }
 
 /// Double-bit Binary Input Event - With Absolute Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group4Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -1125,21 +1125,21 @@ pub(crate) struct Group4Var2 {
 }
 
 /// Double-bit Binary Input Event - Without Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group4Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
 }
 
 /// Double-bit Binary Input - With Flags
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group3Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
 }
 
 /// Binary Input Event - With Relative Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group2Var3 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -1148,7 +1148,7 @@ pub(crate) struct Group2Var3 {
 }
 
 /// Binary Input Event - With Absolute Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group2Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
@@ -1157,14 +1157,14 @@ pub(crate) struct Group2Var2 {
 }
 
 /// Binary Input Event - Without Time
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group2Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
 }
 
 /// Binary Input - With Flags
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group1Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,

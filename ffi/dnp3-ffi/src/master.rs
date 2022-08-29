@@ -162,7 +162,7 @@ pub(crate) unsafe fn master_channel_create_serial(
 
     let channel = spawn_master_serial(
         config,
-        &path.to_string_lossy().to_string(),
+        &path.to_string_lossy(),
         serial_params.into(),
         retry_delay,
         Box::new(listener),
@@ -178,7 +178,7 @@ pub(crate) unsafe fn master_channel_create_serial(
 
 pub unsafe fn master_channel_destroy(channel: *mut MasterChannel) {
     if !channel.is_null() {
-        Box::from_raw(channel);
+        drop(Box::from_raw(channel));
     }
 }
 
@@ -603,7 +603,7 @@ impl Listener<ClientState> for ffi::ClientStateListener {
     }
 }
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "serial")]
 impl Listener<PortState> for ffi::PortStateListener {
     fn update(&mut self, value: PortState) -> MaybeAsync<()> {
         let value = match value {
@@ -626,7 +626,7 @@ pub(crate) unsafe fn endpoint_list_create(main_endpoint: &CStr) -> *mut Endpoint
 }
 
 pub(crate) unsafe fn endpoint_list_destroy(list: *mut EndpointList) {
-    Box::from_raw(list);
+    drop(Box::from_raw(list));
 }
 
 pub(crate) unsafe fn endpoint_list_add(list: *mut EndpointList, endpoint: &CStr) {

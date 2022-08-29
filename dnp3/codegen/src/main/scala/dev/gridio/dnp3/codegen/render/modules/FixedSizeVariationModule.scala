@@ -74,8 +74,13 @@ object FixedSizeVariationModule extends Module {
       Iterator(s"pub${visibility(gv)} ${f.name}: ${getFieldType(f.typ)},")
     }
 
-    commented(gv.fullDesc).eol ++
-    "#[derive(Copy, Clone, Debug, PartialEq)]".eol ++
+    val derives = if(gv.hasFloatingPoint) {
+      "#[derive(Copy, Clone, Debug, PartialEq)]"
+    } else {
+      "#[derive(Copy, Clone, Debug, PartialEq, Eq)]"
+    }
+
+    commented(gv.fullDesc).eol ++ derives.eol ++
     bracket(s"pub${visibility(gv)} struct ${gv.name}") {
       gv.fields.flatMap(f => field(f)).iterator
     }

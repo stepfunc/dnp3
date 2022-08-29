@@ -13,7 +13,7 @@
 use crate::util::cursor::{WriteCursor, WriteError};
 
 /// Field is used in conjunction with the `OpType` field to specify a control operation
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TripCloseCode {
     ///  not specified (value == 0)
     Nul,
@@ -52,7 +52,7 @@ impl TripCloseCode {
 }
 
 /// Field used in conjunction with the `TCC` field to specify a control operation
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpType {
     ///  not specified (value == 0)
     Nul,
@@ -95,7 +95,7 @@ impl OpType {
 }
 
 /// Enumeration received from an outstation in response to command request
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CommandStatus {
     ///  command was accepted, initiated, or queued (value == 0)
     Success,

@@ -14,8 +14,7 @@ jobs:
       matrix:
         rust:
           - stable
-          # As of 1.61-beta.1, clippy gets stuck in an infinite loop. See https://github.com/rust-lang/rust-clippy/issues/8689
-          #- beta
+          - beta
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,20 +36,20 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
-  # Check dependencies
-  dependencies:
+  # Build the workspace with the feature permutations not built by default
+  features:
+    strategy:
+      fail-fast: false
+      matrix:
+        feature-args:
+          - "--no-default-features"
+          - "--no-default-features --features serial"
+          - "--no-default-features --features tls"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-        with:
-          path: dnp3
-      - name: Checkout complicense
-        uses: actions/checkout@v2
-        with:
-          repository: stepfunc/complicense
-          path: complicense
-      - name: Install Rust
+      - name: Install Rust ${{ matrix.rust }}
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -58,24 +57,11 @@ jobs:
           override: true
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Install cargo-license
+      - name: Build the workspace with the features
         uses: actions-rs/cargo@v1
         with:
-          command: install
-          args: cargo-license
-      - name: Generate dependencies.json
-        working-directory: dnp3/dnp3
-        run: cargo-license --avoid-dev-deps --avoid-build-deps -j > ../dependencies.json
-      - name: Generate dependencies.txt
-        working-directory: complicense
-        run: cargo run -- --import ../dnp3/dependencies.json --config ../dnp3/deps-config.json --token ${{ github.token }} > ../dnp3/dependencies.txt
-      - name: Upload dependencies info
-        uses: actions/upload-artifact@v2
-        with:
-          name: dependencies
-          path: |
-            dnp3/dependencies.json
-            dnp3/dependencies.txt
+          command: build
+          args:  --release ${{ matrix.feature-args }}
   # Run the unit tests on Windows and Linux
   test:
     strategy:
@@ -128,6 +114,8 @@ jobs:
         with:
           command: build
           args: --release
+      - name: Build Rustdoc
+        run: cargo doc -p dnp3 --no-deps
       - name: C bindings
         uses: actions-rs/cargo@v1
         with:
@@ -146,6 +134,7 @@ jobs:
       - name: Extract documentation
         run: |
           mkdir -p ~/doc
+          cp -a target/doc ~/doc/rust
           cp -a ffi/bindings/c/generated/doc/c ~/doc/c
           cp -a ffi/bindings/c/generated/doc/cpp ~/doc/cpp
           cp -a ffi/bindings/dotnet/dnp3/doc ~/doc/dotnet
@@ -182,11 +171,17 @@ jobs:
         run: Copy-Item -Path .cargo/config-windows.toml -Destination .cargo/config.toml
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Build
-        uses: actions-rs/cargo@v1
+      - name: Create log dir
+        run: mkdir logs\${{ matrix.target }}
+      - name: Build FFI
+        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\logs\${{ matrix.target }}\build.ffi.log
+      - name: Build JNI
+        run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\logs\${{ matrix.target }}\build.jni.log
+      - name: Upload Build Logs
+        uses: actions/upload-artifact@v3
         with:
-          command: build
-          args: --release
+          name: ffi-modules
+          path: logs
       - name: C bindings
         uses: actions-rs/cargo@v1
         with:
@@ -231,11 +226,17 @@ jobs:
           override: true
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Build
-        uses: actions-rs/cargo@v1
+      - name: Create Log Dir
+        run: mkdir -p logs/x86_64-apple-darwin
+      - name: Build FFI
+        run: cargo build -p dnp3-ffi --release --message-format json > logs/x86_64-apple-darwin/build.ffi.log
+      - name: Build JNI
+        run: cargo build -p dnp3-ffi-java --release --message-format json > logs/x86_64-apple-darwin/build.jni.log
+      - name: Upload Build Logs
+        uses: actions/upload-artifact@v3
         with:
-          command: build
-          args: --release
+          name: ffi-modules
+          path: logs
       - name: C bindings
         uses: actions-rs/cargo@v1
         with:
@@ -288,12 +289,14 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --target ${{ matrix.target }}
+      - name: Install Rust Cross
+        run: cargo install cross
+      - name: Create Log Dir
+        run: mkdir -p logs/${{ matrix.target }}
+      - name: Build FFI
+        run: cross build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json > logs/${{ matrix.target }}/build.ffi.log
+      - name: Build JNI
+        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json > logs/${{ matrix.target }}/build.jni.log
       - name: C bindings
         uses: actions-rs/cargo@v1
         with:
@@ -342,11 +345,9 @@ jobs:
           path: ~/doc
   # Package all the generated bindings
   packaging:
-    needs: [dependencies, documentation, bindings-windows, bindings-macos, cross]
+    needs: [documentation, bindings-windows, bindings-macos, cross]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -355,25 +356,41 @@ jobs:
           override: true
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Download Cargo.lock
-        uses: actions/download-artifact@v2
+      - name: Checkout BOM tools repo
+        uses: actions/checkout@v3
         with:
-          name: dependencies
+          repository: stepfunc/bom-tools
+          ref: 0.1.0
+          path: bom-tools
+      - name: Install BOM tools
+        working-directory: bom-tools
+        run: cargo install --path bom-tools
+      - name: Checkout
+        uses: actions/checkout@v3
       - name: Download compiled FFI
         uses: actions/download-artifact@v2
         with:
           name: ffi-modules
           path: ffi-modules
-      - name: Package all bindings
+      - name: Create FFI third-party-licenses.txt
+        run: bom-tools gen-licenses-dir ./ffi-modules build.ffi.log ./dep_config.json > third-party-licenses.txt
+      - name: Package .NET bindings
         uses: actions-rs/cargo@v1
         with:
           command: run
-          args: --bin dnp3-bindings -- --package ./ffi-modules -f dependencies.txt
+          args: --bin dnp3-bindings -- --dotnet --package ./ffi-modules -f third-party-licenses.txt
       - name: Upload .NET bindings
         uses: actions/upload-artifact@v2
         with:
           name: dotnet-bindings
-          path: ffi/bindings/dotnet/nupkg/*
+          path: ffi/bindings/dotnet/nupkg/dnp3*
+      - name: Create JNI third-party-licenses.txt
+        run: bom-tools gen-licenses-dir ./ffi-modules build.jni.log ./dep_config.json > third-party-licenses.txt
+      - name: Package Java bindings
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --bin dnp3-bindings -- --java --package ./ffi-modules -f third-party-licenses.txt
       - name: Upload Java bindings
         uses: actions/upload-artifact@v2
         with:
@@ -426,7 +443,7 @@ jobs:
           name: conformance-results
           path: conformance/results
   release:
-    needs: [packaging, conformance, guide]
+    needs: [packaging, features, conformance, guide]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -485,7 +502,5 @@ jobs:
             release/*.zip
             artifacts/dotnet-bindings/dnp3*
             artifacts/java-bindings/*.jar
-            artifacts/dependencies/dependencies.txt
-            artifacts/dependencies/dependencies.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

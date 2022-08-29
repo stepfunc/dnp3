@@ -6,4 +6,4 @@ authors = ["Step Function I/O LLC <info@stepfunc.io>"]
 edition = "2021"
 
 [dependencies]
-oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.2.1" }
+oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.3.0" }

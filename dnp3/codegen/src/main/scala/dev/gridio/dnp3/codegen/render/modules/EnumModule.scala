@@ -66,7 +66,7 @@ class EnumModule(enums: List[EnumModel]) extends Module {
 
     def enumDefinition : Iterator[String] = {
       model.comments.map(commented).iterator ++
-        "#[derive(Copy, Clone, Debug, PartialEq)]".eol ++
+        "#[derive(Copy, Clone, Debug, PartialEq, Eq)]".eol ++
         bracket(s"pub enum ${model.name}") {
           if(model.captureUnknownValues) {
             values ++ Iterator(commented("captures any value not defined in the enumeration"), "Unknown(u8),")

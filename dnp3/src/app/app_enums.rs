@@ -13,7 +13,7 @@
 use crate::util::cursor::{WriteCursor, WriteError};
 
 /// Application object header types
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum QualifierCode {
     ///  8-bit start stop (value == 0x00)
     Range8,
@@ -70,7 +70,7 @@ impl QualifierCode {
 }
 
 /// Application layer function code enumeration
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FunctionCode {
     ///  Master sends this to an outstation to confirm the receipt of an Application Layer fragment (value == 0)
     Confirm,

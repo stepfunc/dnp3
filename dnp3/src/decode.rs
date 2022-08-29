@@ -1,5 +1,5 @@
 /// Controls the decoding of transmitted and received data at the application, transport, and link layer
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct DecodeLevel {
     /// Controls application layer decoding
     pub application: AppDecodeLevel,
@@ -12,7 +12,7 @@ pub struct DecodeLevel {
 }
 
 /// Controls how transmitted and received application-layer fragments are decoded at the INFO log level
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AppDecodeLevel {
     /// Decode nothing
     Nothing,
@@ -25,7 +25,7 @@ pub enum AppDecodeLevel {
 }
 
 /// Controls how transmitted and received transport segments are decoded at the INFO log level
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TransportDecodeLevel {
     /// Decode nothing
     Nothing,
@@ -36,7 +36,7 @@ pub enum TransportDecodeLevel {
 }
 
 /// Controls how transmitted and received link frames are decoded at the INFO log level
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LinkDecodeLevel {
     /// Decode nothing
     Nothing,
@@ -47,7 +47,7 @@ pub enum LinkDecodeLevel {
 }
 
 /// Controls how data transmitted at the physical layer (TCP, serial, etc) is logged
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PhysDecodeLevel {
     /// Log nothing
     Nothing,

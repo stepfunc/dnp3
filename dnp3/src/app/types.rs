@@ -9,7 +9,7 @@ use crate::app::QualifierCode;
 use crate::util::cursor::{WriteCursor, WriteError};
 
 /// Wrapper around a u64 count of milliseconds since Unix epoch UTC
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Timestamp {
     value: u64,
 }

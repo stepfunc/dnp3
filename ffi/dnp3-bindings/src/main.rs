@@ -3,6 +3,7 @@ use std::path::Path;
 fn main() {
     let builder_settings = ci_script::BindingBuilderSettings {
         ffi_target_name: "dnp3-ffi",
+        jni_target_name: "dnp3-ffi-java",
         ffi_name: "dnp3_ffi",
         ffi_path: Path::new("ffi/dnp3-ffi").into(),
         java_group_id: "io.stepfunc",

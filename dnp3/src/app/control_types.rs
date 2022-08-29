@@ -1,7 +1,7 @@
 use crate::app::control_enums::{OpType, TripCloseCode};
 
 /// Control code field used within g12v1
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ControlCode {
     /// This field is used in conjunction with the `op_type` field to specify a control operation
     pub tcc: TripCloseCode,

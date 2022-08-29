@@ -2,7 +2,7 @@ use tokio_serial::SerialStream;
 pub use tokio_serial::{DataBits, FlowControl, Parity, StopBits};
 
 /// serial port settings
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct SerialSettings {
     /// baud rate of the port
     pub baud_rate: u32,
@@ -54,7 +54,7 @@ mod master;
 mod outstation;
 
 /// State of the serial port
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PortState {
     /// Disabled and idle until enabled
     Disabled,

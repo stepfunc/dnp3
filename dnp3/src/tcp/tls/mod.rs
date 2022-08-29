@@ -13,7 +13,7 @@ use tokio_rustls::{rustls, webpki};
 ///
 /// This validation always occurs **after** the handshake signature has been
 /// verified.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CertificateMode {
     /// Validates the peer certificate against one or more configured trust anchors
     ///
@@ -66,7 +66,7 @@ impl std::fmt::Display for TlsError {
 impl std::error::Error for TlsError {}
 
 /// Minimum TLS version to allow
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MinTlsVersion {
     /// TLS 1.2
     V12,

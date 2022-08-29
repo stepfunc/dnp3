@@ -1,0 +1,1678 @@
+{
+  "build_only": [
+    "addr2line",
+    "adler",
+    "autocfg",
+    "backtrace",
+    "cc",
+    "dunce",
+    "gimli",
+    "heck",
+    "java-oo-bindgen",
+    "miniz_oxide",
+    "object",
+    "oo-bindgen",
+    "pathdiff",
+    "pest",
+    "platforms",
+    "dnp3-schema",
+    "rust-oo-bindgen",
+    "rustc-demangle",
+    "same-file",
+    "semver",
+    "semver-parser",
+    "ucd-trie",
+    "unicode-segmentation",
+    "version_check",
+    "walkdir",
+    "winapi-util"
+  ],
+  "vendor": {
+    "rasn": {
+      "url": "https://github.com/stepfunc/rasn"
+    },
+    "dnp3": {
+      "url": "https://github.com/stepfunc/dnp3"
+    },
+    "dnp3-ffi": {
+      "url": "https://github.com/stepfunc/dnp3"
+    },
+    "dnp3-ffi-java": {
+      "url": "https://github.com/stepfunc/dnp3"
+    }
+  },
+  "third_party": {
+    "aes": {
+      "id": "aes",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018 Artyom Pavlov"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "aho-corasick": {
+      "id": "aho-corasick",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015 Andrew Gallant"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "ansi_term": {
+      "id": "ansi_term",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 Benjamin Sago"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "base64": {
+      "id": "base64",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015 Alice Maz"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "base64ct": {
+      "id": "base64ct",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 Steve \"Sc00bz\" Thomas (steve at tobtu dot com)",
+                "Copyright (c) 2021 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "bitflags": {
+      "id": "bitflags",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "block-buffer": {
+      "id": "block-buffer",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018-2019 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "block-modes": {
+      "id": "block-modes",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018-2019 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "block-padding": {
+      "id": "block-padding",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018-2019 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "bytes": {
+      "id": "bytes",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018 Carl Lerche"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "cesu8": {
+      "id": "cesu8",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Eric Kidd"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "cfg-if": {
+      "id": "cfg-if",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 Alex Crichton"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "chrono": {
+      "id": "chrono",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014, Kang Seonghoon"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "cipher": {
+      "id": "cipher",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016-2020 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "combine": {
+      "id": "combine",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015 Markus Westerlind"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "const-oid": {
+      "id": "const-oid",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2020-2022 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "CoreFoundation-sys": {
+      "id": "CoreFoundation-sys",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015 David Cuddeback"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "core-foundation-sys": {
+      "id": "core-foundation-sys",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2012-2013 Mozilla Foundation"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "cpufeatures": {
+      "id": "cpufeatures",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2020 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "crc": {
+      "id": "crc",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2017 crc-rs Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "crc-catalog": {
+      "id": "crc-catalog",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Akhil Velagapudi"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "crypto-common": {
+      "id": "crypto-common",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2021 RustCrypto Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "crypto-mac": {
+      "id": "crypto-mac",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2021 RustCrypto Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "der": {
+      "id": "der",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2020-2022 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "digest": {
+      "id": "digest",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2017 Artyom Pavlov"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "futures": {
+      "id": "futures",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Alex Crichton",
+                "Copyright (c) 2017 The Tokio Authors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "futures-channel": {
+      "id": "futures-channel",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Alex Crichton",
+                "Copyright (c) 2017 The Tokio Authors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "futures-core": {
+      "id": "futures-core",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Alex Crichton",
+                "Copyright (c) 2017 The Tokio Authors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "futures-executor": {
+      "id": "futures-executor",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Alex Crichton",
+                "Copyright (c) 2017 The Tokio Authors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "futures-io": {
+      "id": "futures-io",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Alex Crichton",
+                "Copyright (c) 2017 The Tokio Authors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "futures-macro": {
+      "id": "futures-macro",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Alex Crichton",
+                "Copyright (c) 2017 The Tokio Authors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "futures-sink": {
+      "id": "futures-sink",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Alex Crichton",
+                "Copyright (c) 2017 The Tokio Authors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "futures-task": {
+      "id": "futures-task",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Alex Crichton",
+                "Copyright (c) 2017 The Tokio Authors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "futures-util": {
+      "id": "futures-util",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Alex Crichton",
+                "Copyright (c) 2017 The Tokio Authors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "generic-array": {
+      "id": "generic-array",
+      "source": "crates.io",
+      "authors": null,
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015 Bartłomiej Kamiński"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "hmac": {
+      "id": "hmac",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2017 Artyom Pavlov"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "IOKit-sys": {
+      "id": "IOKit-sys",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015 David Cuddeback"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "iana-time-zone": {
+      "id": "iana-time-zone",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2020 Andrew D. Straw"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "itoa": {
+      "id": "itoa",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": "NotPresent"
+          }
+        }
+      ]
+    },
+    "jni": {
+      "id": "jni",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Prevoty, Inc. and jni-rs contributors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "jni-sys": {
+      "id": "jni-sys",
+      "source": "crates.io",
+      "authors": null,
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015 The rust-jni-sys Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "lazy_static": {
+      "id": "lazy_static",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2010 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "libc": {
+      "id": "libc",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014-2020 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "log": {
+      "id": "log",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "mach": {
+      "id": "mach",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Nick Fitzgerald"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "matchers": {
+      "id": "matchers",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Eliza Weisman"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "memchr": {
+      "id": "memchr",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015 Andrew Gallant"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "memoffset": {
+      "id": "memoffset",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2017 Gilad Naaman"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "mio": {
+      "id": "mio",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 Carl Lerche and other MIO contributors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "mio-serial": {
+      "id": "mio-serial",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2017 Zac Berkowitz (zac.berkowitz@gmail.com)"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nix": {
+      "id": "nix",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015 Carl Lerche + nix-rust Authors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "num-integer": {
+      "id": "num-integer",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "num-traits": {
+      "id": "num-traits",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "num_cpus": {
+      "id": "num_cpus",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "once_cell": {
+      "id": "once_cell",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": "NotPresent"
+          }
+        }
+      ]
+    },
+    "opaque-debug": {
+      "id": "opaque-debug",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018-2019 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "pbkdf2": {
+      "id": "pbkdf2",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2017 Artyom Pavlov",
+                "Copyright (c) 2018-2021 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "pem": {
+      "id": "pem",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Jonathan Creekmore"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "pem-rfc7468": {
+      "id": "pem-rfc7468",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2021 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "pin-project-lite": {
+      "id": "pin-project-lite",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": "NotPresent"
+          }
+        }
+      ]
+    },
+    "pin-utils": {
+      "id": "pin-utils",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018 The pin-utils authors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "pkcs5": {
+      "id": "pkcs5",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2021 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "pkcs8": {
+      "id": "pkcs8",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2020 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "proc-macro2": {
+      "id": "proc-macro2",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 Alex Crichton"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "quote": {
+      "id": "quote",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "rand_core": {
+      "id": "rand_core",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright 2018 Developers of the Rand project",
+                "Copyright (c) 2014 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "regex": {
+      "id": "regex",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "regex-automata": {
+      "id": "regex-automata",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015 Andrew Gallant"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "regex-syntax": {
+      "id": "regex-syntax",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "ring": {
+      "id": "ring",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015-2016 the fiat-crypto authors (see https://github.com/mit-plv/fiat-crypto/blob/master/AUTHORS)"
+              ]
+            }
+          }
+        },
+        {
+          "ISC": {
+            "copyright": {
+              "Lines": [
+                "Copyright 2015-2016 Brian Smith"
+              ]
+            }
+          }
+        },
+        "OpenSSL"
+      ]
+    },
+    "rustls": {
+      "id": "rustls",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Joseph Birr-Pixton <jpixton@gmail.com>"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "ryu": {
+      "id": "ryu",
+      "source": "crates.io",
+      "licenses": [
+        "BSLv1"
+      ]
+    },
+    "salsa20": {
+      "id": "salsa20",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Eric McCorkle"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "scrypt": {
+      "id": "scrypt",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2021 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "sct": {
+      "id": "sct",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 Joseph Birr-Pixton <jpixton@gmail.com>"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "serde": {
+      "id": "serde",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": "NotPresent"
+          }
+        }
+      ]
+    },
+    "serde_json": {
+      "id": "serde_json",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": "NotPresent"
+          }
+        }
+      ]
+    },
+    "serialport": {
+      "id": "serialport",
+      "source": "crates.io",
+      "licenses": [
+        "MPLv2"
+      ]
+    },
+    "sha2": {
+      "id": "sha2",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2006-2009 Graydon Hoare",
+                "Copyright (c) 2009-2013 Mozilla Foundation",
+                "Copyright (c) 2016 Artyom Pavlov"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "sharded-slab": {
+      "id": "sharded-slab",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Eliza Weisman"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "slab": {
+      "id": "slab",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Carl Lerche"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "smallvec": {
+      "id": "smallvec",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018 The Servo Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "socket2": {
+      "id": "socket2",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 Alex Crichton"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "spin": {
+      "id": "spin",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 Mathijs van de Nes"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "spki": {
+      "id": "spki",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2021-2022 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "subtle": {
+      "id": "subtle",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "BSD3": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016-2017 Isis Agora Lovecruft, Henry de Valence. All rights reserved."
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "syn": {
+      "id": "syn",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": "NotPresent"
+          }
+        }
+      ]
+    },
+    "thiserror": {
+      "id": "thiserror",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": "NotPresent"
+          }
+        }
+      ]
+    },
+    "thiserror-impl": {
+      "id": "thiserror-impl",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": "NotPresent"
+          }
+        }
+      ]
+    },
+    "thread_local": {
+      "id": "thread_local",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "tokio": {
+      "id": "tokio",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2022 Tokio Contributors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "time": {
+      "id": "time",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2022 Jacob Pratt et al."
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "tokio-macros": {
+      "id": "tokio-macros",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2022 Tokio Contributors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "tokio-rustls": {
+      "id": "tokio-rustls",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Tokio Contributors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "tokio-serial": {
+      "id": "tokio-serial",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2017 Zac Berkowitz and other tokio-serial contributors."
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "tracing": {
+      "id": "tracing",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Tokio Contributors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "tracing-attributes": {
+      "id": "tracing-attributes",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Tokio Contributors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "tracing-core": {
+      "id": "tracing-core",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Tokio Contributors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "tracing-log": {
+      "id": "tracing-log",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Tokio Contributors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "tracing-serde": {
+      "id": "tracing-serde",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Tokio Contributors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "tracing-subscriber": {
+      "id": "tracing-subscriber",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Tokio Contributors"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "typenum": {
+      "id": "typenum",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 Paho Lurie-Gregg"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "unicode-ident": {
+      "id": "unicode-ident",
+      "source": "crates.io",
+      "licenses": [
+        "UnicodeDFS2016",
+        {
+          "MIT": {
+            "copyright": "NotPresent"
+          }
+        }
+      ]
+    },
+    "untrusted": {
+      "id": "untrusted",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "ISC": {
+            "copyright": {
+              "Lines": [
+                "Copyright 2015-2016 Brian Smith."
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "webpki": {
+      "id": "webpki",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "ISC": {
+            "copyright": {
+              "Lines": [
+                "Copyright 2015 Brian Smith."
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "winapi": {
+      "id": "winapi",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015-2018 The winapi-rs Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "windows-sys": {
+      "id": "windows-sys",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) Microsoft Corporation"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "windows_x86_64_msvc": {
+      "id": "windows_x86_64_msvc",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) Microsoft Corporation"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "windows_i686_msvc": {
+      "id": "windows_i686_msvc",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) Microsoft Corporation"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "xxhash-rust": {
+      "id": "xxhash-rust",
+      "source": "crates.io",
+      "licenses": [
+        "BSLv1"
+      ]
+    },
+    "zeroize": {
+      "id": "zeroize",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018-2021 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

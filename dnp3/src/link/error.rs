@@ -4,7 +4,7 @@ use crate::util::cursor::WriteError;
 /// functions that could panic. If they ever were to happen, they indicate
 /// a bug in the library itself
 #[allow(clippy::enum_variant_names)]
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum LogicError {
     BadRead,
     BadWrite,
@@ -14,7 +14,7 @@ pub enum LogicError {
 /// Errors that can occur when parsing a link-layer frame. On session-oriented transports,
 /// such as TCP/TLS, these errors percolate up to the main master/outstation task and kill
 /// the communication session. On serial, they are just discarded.
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum FrameError {
     UnexpectedStart1(u8),
     UnexpectedStart2(u8),
@@ -23,13 +23,13 @@ pub enum FrameError {
     BadBodyCrc,
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum ParseError {
     BadFrame(FrameError),
     BadLogic(LogicError),
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum LinkError {
     Stdio(std::io::ErrorKind),
     BadFrame(FrameError),

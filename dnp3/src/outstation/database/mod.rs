@@ -17,7 +17,7 @@ mod details;
 pub(crate) mod read;
 
 /// Controls how events are processed when updating values in the database
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EventMode {
     /// Detect events in a type dependent fashion. This is the default mode that should be used.
     Detect,
@@ -28,7 +28,7 @@ pub enum EventMode {
 }
 
 /// Event class (1/2/3) assignment
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EventClass {
     /// Class 1 data per the protocol specification
     Class1,
@@ -39,7 +39,7 @@ pub enum EventClass {
 }
 
 /// Controls which types are reported during a class 0 READ
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ClassZeroConfig {
     /// If true, Binary Inputs are reported in Class 0 READ requests
     pub binary: bool,
@@ -104,7 +104,7 @@ impl Default for ClassZeroConfig {
 /// Maximum number of events for each type.
 ///
 /// A value of zero means that events will not be buffered for that type.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct EventBufferConfig {
     /// maximum number of binary input events (g2)
     pub max_binary: u16,
@@ -181,7 +181,7 @@ pub(crate) struct ResponseInfo {
 pub(crate) struct EventsInfo {
     /// which classes have unwritten events
     pub(crate) unwritten_classes: EventClasses,
-    /// True if an overflow occured
+    /// True if an overflow occurred
     pub(crate) is_overflown: bool,
 }
 

@@ -23,4 +23,4 @@ serial = ["dnp3/serial"]
 
 [build-dependencies]
 dnp3-schema = { path = "../dnp3-schema" }
-rust-oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.2.1" }
+rust-oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.3.0" }
