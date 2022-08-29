@@ -200,7 +200,7 @@ pub unsafe fn octet_string_value_create() -> *mut OctetStringValue {
 
 pub unsafe fn octet_string_value_destroy(octet_string: *mut OctetStringValue) {
     if !octet_string.is_null() {
-        Box::from_raw(octet_string);
+        drop(Box::from_raw(octet_string));
     }
 }
 

@@ -108,7 +108,7 @@ pub unsafe fn request_new_two_byte_limited_count(
 
 pub unsafe fn request_destroy(request: *mut Request) {
     if !request.is_null() {
-        Box::from_raw(request);
+        drop(Box::from_raw(request));
     }
 }
 

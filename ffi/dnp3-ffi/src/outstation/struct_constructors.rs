@@ -91,7 +91,7 @@ pub unsafe fn address_filter_add(
 
 pub unsafe fn address_filter_destroy(address_filter: *mut AddressFilter) {
     if !address_filter.is_null() {
-        Box::from_raw(address_filter);
+        drop(Box::from_raw(address_filter));
     }
 }
 

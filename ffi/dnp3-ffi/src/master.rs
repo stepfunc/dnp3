@@ -178,7 +178,7 @@ pub(crate) unsafe fn master_channel_create_serial(
 
 pub unsafe fn master_channel_destroy(channel: *mut MasterChannel) {
     if !channel.is_null() {
-        Box::from_raw(channel);
+        drop(Box::from_raw(channel));
     }
 }
 
@@ -626,7 +626,7 @@ pub(crate) unsafe fn endpoint_list_create(main_endpoint: &CStr) -> *mut Endpoint
 }
 
 pub(crate) unsafe fn endpoint_list_destroy(list: *mut EndpointList) {
-    Box::from_raw(list);
+    drop(Box::from_raw(list));
 }
 
 pub(crate) unsafe fn endpoint_list_add(list: *mut EndpointList, endpoint: &CStr) {

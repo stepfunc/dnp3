@@ -79,7 +79,7 @@ pub(crate) unsafe fn runtime_create(
 
 pub(crate) unsafe fn runtime_destroy(runtime: *mut crate::runtime::Runtime) {
     if !runtime.is_null() {
-        Box::from_raw(runtime);
+        drop(Box::from_raw(runtime));
     };
 }
 

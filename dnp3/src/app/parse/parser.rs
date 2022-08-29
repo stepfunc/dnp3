@@ -440,9 +440,7 @@ impl<'a> ObjectParser<'a> {
     ) -> Result<HeaderCollection<'a>, ObjectParseError> {
         // we first do a single pass to ensure the ASDU is well-formed, returning an error if it occurs
         for result in ObjectParser::one_pass(function, data) {
-            if let Err(err) = result {
-                return Err(err);
-            }
+            result?;
         }
 
         // now we know that we know the headers are well-formed, our 2nd pass

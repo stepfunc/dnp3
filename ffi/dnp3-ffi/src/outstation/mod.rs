@@ -54,7 +54,7 @@ pub unsafe fn outstation_server_create_tcp_server(
 
 pub unsafe fn outstation_server_destroy(server: *mut OutstationServer) {
     if !server.is_null() {
-        Box::from_raw(server);
+        drop(Box::from_raw(server));
     }
 }
 
@@ -169,7 +169,7 @@ pub unsafe fn outstation_server_bind(server: *mut OutstationServer) -> Result<()
 
 pub unsafe fn outstation_destroy(outstation: *mut Outstation) {
     if !outstation.is_null() {
-        Box::from_raw(outstation);
+        drop(Box::from_raw(outstation));
     }
 }
 
