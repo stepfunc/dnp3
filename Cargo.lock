@@ -184,8 +184,8 @@ checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
 
 [[package]]
 name = "c-oo-bindgen"
-version = "0.2.1"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.1#9acd745340b08489e60347d09c8b4d1e36dd42e8"
+version = "0.3.0"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.3.0#23d39d677a7e4d2f1272e9fb979ea02726764168"
 dependencies = [
  "oo-bindgen",
 ]
@@ -238,8 +238,8 @@ dependencies = [
 
 [[package]]
 name = "ci-script"
-version = "0.2.1"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.1#9acd745340b08489e60347d09c8b4d1e36dd42e8"
+version = "0.3.0"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.3.0#23d39d677a7e4d2f1272e9fb979ea02726764168"
 dependencies = [
  "c-oo-bindgen",
  "clap",
@@ -515,8 +515,8 @@ dependencies = [
 
 [[package]]
 name = "dotnet-oo-bindgen"
-version = "0.2.1"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.1#9acd745340b08489e60347d09c8b4d1e36dd42e8"
+version = "0.3.0"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.3.0#23d39d677a7e4d2f1272e9fb979ea02726764168"
 dependencies = [
  "dunce",
  "oo-bindgen",
@@ -716,8 +716,8 @@ checksum = "112c678d4050afce233f4f2852bb2eb519230b3cf12f33585275537d7e41578d"
 
 [[package]]
 name = "java-oo-bindgen"
-version = "0.2.1"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.1#9acd745340b08489e60347d09c8b4d1e36dd42e8"
+version = "0.3.0"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.3.0#23d39d677a7e4d2f1272e9fb979ea02726764168"
 dependencies = [
  "dunce",
  "oo-bindgen",
@@ -920,8 +920,8 @@ checksum = "18a6dbe30758c9f83eb00cbea4ac95966305f5a7772f3f42ebfc7fc7eddbd8e1"
 
 [[package]]
 name = "oo-bindgen"
-version = "0.2.1"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.1#9acd745340b08489e60347d09c8b4d1e36dd42e8"
+version = "0.3.0"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.3.0#23d39d677a7e4d2f1272e9fb979ea02726764168"
 dependencies = [
  "backtrace",
  "heck",
@@ -1197,8 +1197,8 @@ dependencies = [
 
 [[package]]
 name = "rust-oo-bindgen"
-version = "0.2.1"
-source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.2.1#9acd745340b08489e60347d09c8b4d1e36dd42e8"
+version = "0.3.0"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?tag=0.3.0#23d39d677a7e4d2f1272e9fb979ea02726764168"
 dependencies = [
  "heck",
  "oo-bindgen",
