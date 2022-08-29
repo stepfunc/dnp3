@@ -37,45 +37,6 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
-  # Check dependencies
-  dependencies:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          path: dnp3
-      - name: Checkout complicense
-        uses: actions/checkout@v2
-        with:
-          repository: stepfunc/complicense
-          path: complicense
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - name: Caching
-        uses: Swatinem/rust-cache@v1
-      - name: Install cargo-license
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-license
-      - name: Generate dependencies.json
-        working-directory: dnp3/dnp3
-        run: cargo-license --avoid-dev-deps --avoid-build-deps -j > ../dependencies.json
-      - name: Generate dependencies.txt
-        working-directory: complicense
-        run: cargo run -- --import ../dnp3/dependencies.json --config ../dnp3/deps-config.json --token ${{ github.token }} > ../dnp3/dependencies.txt
-      - name: Upload dependencies info
-        uses: actions/upload-artifact@v2
-        with:
-          name: dependencies
-          path: |
-            dnp3/dependencies.json
-            dnp3/dependencies.txt
   # Run the unit tests on Windows and Linux
   test:
     strategy:
@@ -342,7 +303,7 @@ jobs:
           path: ~/doc
   # Package all the generated bindings
   packaging:
-    needs: [dependencies, documentation, bindings-windows, bindings-macos, cross]
+    needs: [documentation, bindings-windows, bindings-macos, cross]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -355,10 +316,6 @@ jobs:
           override: true
       - name: Caching
         uses: Swatinem/rust-cache@v1
-      - name: Download Cargo.lock
-        uses: actions/download-artifact@v2
-        with:
-          name: dependencies
       - name: Download compiled FFI
         uses: actions/download-artifact@v2
         with:
@@ -368,7 +325,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: run
-          args: --bin dnp3-bindings -- --package ./ffi-modules -f dependencies.txt
+          args: --bin dnp3-bindings -- --package ./ffi-modules
       - name: Upload .NET bindings
         uses: actions/upload-artifact@v2
         with:
