@@ -603,7 +603,7 @@ impl Listener<ClientState> for ffi::ClientStateListener {
     }
 }
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "serial")]
 impl Listener<PortState> for ffi::PortStateListener {
     fn update(&mut self, value: PortState) -> MaybeAsync<()> {
         let value = match value {
