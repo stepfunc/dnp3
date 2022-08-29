@@ -477,7 +477,6 @@ name = "dnp3-bindings"
 version = "1.1.0-alpha1"
 dependencies = [
  "ci-script",
- "dnp3-ffi",
  "dnp3-schema",
 ]
 
