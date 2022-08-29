@@ -61,7 +61,8 @@ jobs:
       - name: Build the workspace with the features
         uses: actions-rs/cargo@v1
         with:
-          command: build --release --no-default-features ${{ matrix.features }}
+          command: build
+          args:  --release --no-default-features ${{ matrix.features }}
   # Run the unit tests on Windows and Linux
   test:
     strategy:
