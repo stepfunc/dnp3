@@ -42,10 +42,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        features:
-          - ""
-          - "--features serial"
-          - "--features tls"
+        feature-args:
+          - "--no-default-features"
+          - "--no-default-features --features serial"
+          - "--no-default-features --features tls"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -62,7 +62,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args:  --release --no-default-features ${{ matrix.features }}
+          args:  --release ${{ matrix.feature-args }}
   # Run the unit tests on Windows and Linux
   test:
     strategy:
@@ -471,7 +471,5 @@ jobs:
             release/*.zip
             artifacts/dotnet-bindings/dnp3*
             artifacts/java-bindings/*.jar
-            artifacts/dependencies/dependencies.txt
-            artifacts/dependencies/dependencies.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
