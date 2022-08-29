@@ -390,7 +390,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: run
-          args: --bin rodbus-bindings -- --java --package ./ffi-modules -f third-party-licenses.txt
+          args: --bin dnp3-bindings -- --java --package ./ffi-modules -f third-party-licenses.txt
       - name: Upload Java bindings
         uses: actions/upload-artifact@v2
         with:
