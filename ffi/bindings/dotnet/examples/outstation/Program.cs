@@ -216,10 +216,11 @@ class ExampleOutstation
     private static void RunSerial(Runtime runtime)
     {
         // ANCHOR: create_serial_server
-        var outstation = Outstation.CreateSerialSession(
+        var outstation = Outstation.CreateSerialSessionFaultTolerant(
             runtime,
             "COM1",
             new SerialSettings(),
+            TimeSpan.FromSeconds(5), // try to open the port every 5 seconds
             GetOutstationConfig(),
             new TestOutstationApplication(),
             new TestOutstationInformation(),

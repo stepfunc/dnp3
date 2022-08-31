@@ -12,8 +12,6 @@ pub use struct_constructors::*;
 
 use crate::{ffi, Runtime, RuntimeHandle};
 
-#[cfg(feature = "serial")]
-use dnp3::serial::spawn_outstation_serial;
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::TlsServerConfig;
 
@@ -188,7 +186,6 @@ pub unsafe fn outstation_create_serial_session(
 }
 
 #[cfg(feature = "serial")]
-#[allow(clippy::too_many_arguments)] // TODO
 pub unsafe fn outstation_create_serial_session(
     runtime: *mut crate::Runtime,
     serial_path: &CStr,
@@ -205,7 +202,7 @@ pub unsafe fn outstation_create_serial_session(
 
     let config = convert_outstation_config(config)?;
 
-    let handle = spawn_outstation_serial(
+    let handle = dnp3::serial::spawn_outstation_serial(
         &serial_path,
         settings.into(),
         config,
@@ -213,6 +210,58 @@ pub unsafe fn outstation_create_serial_session(
         Box::new(information),
         Box::new(control_handler),
     )?;
+
+    let handle = Box::new(crate::Outstation {
+        handle,
+        runtime: runtime.handle(),
+    });
+
+    Ok(Box::into_raw(handle))
+}
+
+#[cfg(not(feature = "serial"))]
+#[allow(clippy::too_many_arguments)] // TODO
+pub unsafe fn outstation_create_serial_session_fault_tolerant(
+    _runtime: *mut crate::Runtime,
+    _serial_path: &CStr,
+    _settings: ffi::SerialSettings,
+    _open_retry_delay: std::time::Duration,
+    _config: ffi::OutstationConfig,
+    _application: ffi::OutstationApplication,
+    _information: ffi::OutstationInformation,
+    _control_handler: ffi::ControlHandler,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    Err(ffi::ParamError::NoSupport)
+}
+
+#[cfg(feature = "serial")]
+#[allow(clippy::too_many_arguments)] // TODO
+pub unsafe fn outstation_create_serial_session_fault_tolerant(
+    runtime: *mut crate::Runtime,
+    serial_path: &CStr,
+    settings: ffi::SerialSettings,
+    open_retry_delay: std::time::Duration,
+    config: ffi::OutstationConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+
+    let _enter = runtime.inner.enter();
+    let serial_path = serial_path.to_string_lossy();
+
+    let config = convert_outstation_config(config)?;
+
+    let handle = dnp3::serial::spawn_outstation_serial_fault_tolerant(
+        &serial_path,
+        settings.into(),
+        config,
+        dnp3::app::RetryStrategy::new(open_retry_delay, open_retry_delay),
+        Box::new(application),
+        Box::new(information),
+        Box::new(control_handler),
+    );
 
     let handle = Box::new(crate::Outstation {
         handle,

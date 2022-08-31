@@ -7,6 +7,7 @@ import io.stepfunc.dnp3.Runtime;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.joou.UByte;
@@ -287,10 +288,11 @@ public class OutstationExample {
 
   private static void runSerial(Runtime runtime) {
     // ANCHOR: create_serial_server
-    Outstation outstation = Outstation.createSerialSession(
+    Outstation outstation = Outstation.createSerialSessionFaultTolerant(
             runtime,
             "/dev/pts/4",
             new SerialSettings(),
+            Duration.ofSeconds(5), // try to open the port every 5 seconds
             getOutstationConfig(),
             new TestOutstationApplication(),
             new TestOutstationInformation(),

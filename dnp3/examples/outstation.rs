@@ -8,6 +8,7 @@ use dnp3::outstation::*;
 
 use dnp3::tcp::*;
 use std::process::exit;
+use std::time::Duration;
 use tokio_stream::StreamExt;
 use tokio_util::codec::FramedRead;
 use tokio_util::codec::LinesCodec;
@@ -231,18 +232,19 @@ async fn run_tcp() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "serial")]
 async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_serial_server
-    let outstation = spawn_outstation_serial(
+    let outstation = spawn_outstation_serial_fault_tolerant(
         // change this for a real port
         "/dev/ttySIM1",
         SerialSettings::default(),
         get_outstation_config(),
+        RetryStrategy::new(Duration::from_secs(1), Duration::from_secs(60)),
         // customizable trait that controls outstation behavior
         Box::new(ExampleOutstationApplication),
         // customizable trait to receive events about what the outstation is doing
         Box::new(ExampleOutstationInformation),
         // customizable trait to process control requests from the master
         Box::new(ExampleControlHandler),
-    )?;
+    );
     // ANCHOR_END: create_serial_server
 
     run_outstation(outstation).await
