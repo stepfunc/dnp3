@@ -8,7 +8,7 @@ slug: /api/outstation/serial_outstation
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Use the `Outstation::createSerialSession` method to create an outstation bound to a serial port. In addition to the common components, this method requires
+Use the `Outstation::CreateSerialSessionFaultTolerant` method to create an outstation bound to a serial port. In addition to the common components, this method requires
 the following serial port parameters:
 
 * Path of the serial device (e.g., `COM3` on Windows or `/dev/ttyS3` on Linux)
@@ -18,6 +18,7 @@ the following serial port parameters:
   * Stop bits
   * Parity
   * Flow control
+* Period of time for retrying the serial port if it cannot be opened or is fails because it is removed from the OS.
 
 The method will then either open the port or fail if the port doesn't exist or is already in use. The returned `Outstation` class behaves identically to other transport types.
 
@@ -72,3 +73,11 @@ values={[
 
 </TabItem>
 </Tabs>
+
+:::warning
+There is also `Outstation::CreateSerialSession` method which opens the port on the calling thread and fails if it is not immediately available. The task spawned
+by this thread will also shut down of the serial port is removed from the OS, e.g. if a USB to serial adapter is physically unplugged.
+
+The fault-tolerant variant was added in the `1.1.0` release and is the preferred way of spawning a serial outstation. The non-fault tolerant version will be
+removed in the next MAJOR release.
+:::
