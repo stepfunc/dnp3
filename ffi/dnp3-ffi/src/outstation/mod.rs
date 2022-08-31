@@ -3,7 +3,7 @@ use std::net::AddrParseError;
 use std::time::Duration;
 
 pub use database::*;
-use dnp3::app::{BufferSize, BufferSizeError, Listener, MaybeAsync, RetryStrategy, Timeout};
+use dnp3::app::{BufferSize, BufferSizeError, Listener, MaybeAsync, Timeout};
 use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::{ConnectionState, Feature, Features, OutstationConfig, OutstationHandle};
@@ -12,9 +12,6 @@ pub use struct_constructors::*;
 
 use crate::{ffi, Runtime, RuntimeHandle};
 
-#[cfg(feature = "serial")]
-use dnp3::serial::spawn_outstation_serial;
-use dnp3::serial::spawn_outstation_serial_fault_tolerant;
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::TlsServerConfig;
 
@@ -205,7 +202,7 @@ pub unsafe fn outstation_create_serial_session(
 
     let config = convert_outstation_config(config)?;
 
-    let handle = spawn_outstation_serial(
+    let handle = dnp3::serial::spawn_outstation_serial(
         &serial_path,
         settings.into(),
         config,
@@ -256,11 +253,11 @@ pub unsafe fn outstation_create_serial_session_fault_tolerant(
 
     let config = convert_outstation_config(config)?;
 
-    let handle = spawn_outstation_serial_fault_tolerant(
+    let handle = dnp3::serial::spawn_outstation_serial_fault_tolerant(
         &serial_path,
         settings.into(),
         config,
-        RetryStrategy::new(open_retry_delay, open_retry_delay),
+        dnp3::app::RetryStrategy::new(open_retry_delay, open_retry_delay),
         Box::new(application),
         Box::new(information),
         Box::new(control_handler),
