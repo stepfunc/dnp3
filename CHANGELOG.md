@@ -1,6 +1,8 @@
-### Next (1.1.0) ###
+### 1.1.0 ###
 * :star: TCP/TLS server can now filter IPv4 addresses with wildcards. See [#208](https://github.com/stepfunc/dnp3/pull/208).
 * :star: Rust crate and FFI/JNI libraries can now be compiled without TLS and/or serial support. See [#212](https://github.com/stepfunc/dnp3/pull/212).
+* :star: Add a way to spawn a serial outstation that is tolerant to the port being removed from the OS. See [#215](https://github.com/stepfunc/dnp3/pull/215).
+* :star: Produce enhanced third-party license reports for FFI and JNI bindings.
 
 ### 1.0.1 ###
 * :bug: Fix panic when creating serial outstation [#203](https://github.com/stepfunc/dnp3/pull/203).

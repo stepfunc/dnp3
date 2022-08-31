@@ -153,6 +153,11 @@ end
 
 If you've already connected a master to the outstation and another matching IP address tries to connect, the existing connection will close. The outstation will then begin a communication session with the new master.
 
+:::tip
+The `AddressFilter` constructor accepts IPv4 wildcards (e.g. 192.168.0.*) which are convenient when you want to allow any master IP in a subnet to connect to the outstation.
+:::
+
+
 ## ConnectionStateListener
 
 The `ConnectionStateListener` interface is provided when adding an outstation to the TCP server. It has a single method that informs your code when the outstation accepts a TCP connection.
