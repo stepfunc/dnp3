@@ -319,10 +319,11 @@ void run_tcp_server(dnp3::Runtime &runtime)
 void run_serial(dnp3::Runtime &runtime)
 {
     // ANCHOR: create_serial_server
-    auto outstation = dnp3::Outstation::create_serial_session(
+    auto outstation = dnp3::Outstation::create_serial_session_fault_tolerant(
         runtime,
         "/dev/pts/4",  // change this to a real port
         dnp3::SerialSettings(), // default settings
+        std::chrono::seconds(5), // retry the port every 5 seconds
         get_outstation_config(),
         std::make_unique<MyOutstationApplication>(),
         std::make_unique<MyOutstationInformation>(),

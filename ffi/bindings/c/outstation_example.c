@@ -598,10 +598,11 @@ int run_serial(dnp3_runtime_t* runtime)
 {
     // ANCHOR: create_serial_server
     dnp3_outstation_t* outstation = NULL;
-    dnp3_param_error_t err = dnp3_outstation_create_serial_session(
+    dnp3_param_error_t err = dnp3_outstation_create_serial_session_fault_tolerant(
         runtime,
         "/dev/pts/4",                // change to a real port
         dnp3_serial_settings_init(), // default settings
+        5000,                        // retry the port every 5 seconds
         get_outstation_config(),
         get_outstation_application(),
         get_outstation_information(),
