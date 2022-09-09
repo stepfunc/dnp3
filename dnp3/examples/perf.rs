@@ -49,7 +49,8 @@ pub async fn main() {
     harness.wait_for_startup().await;
 
     let start = Instant::now();
-    for _ in 0..num_iterations {
+    for i in 0..num_iterations {
+        println!("iteration: {}", i);
         harness.run_iteration().await;
     }
     let elapsed = Instant::now() - start;
