@@ -28,11 +28,11 @@ fn config(num_values: usize) -> TestConfig {
 struct Cli {
     #[clap(short, long, value_parser, default_value_t = 20000)]
     port: u16,
-    #[clap(short, long, value_parser, default_value_t = 1)]
+    #[clap(long, value_parser, default_value_t = 1)]
     sessions: u16,
     #[clap(short, long, value_parser, default_value_t = 100)]
     values: usize,
-    #[clap(short, long, value_parser, default_value_t = 10)]
+    #[clap(long, value_parser, default_value_t = 10)]
     seconds: usize,
     #[clap(short, long, value_parser, default_value_t = false)]
     log: bool,
