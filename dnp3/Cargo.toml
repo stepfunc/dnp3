@@ -20,6 +20,7 @@ tokio-rustls = { version = "0.23", features = ["dangerous_configuration", "tls12
 tokio-serial = { version = "5.4", optional = true }
 
 [dev-dependencies]
+clap = { version = "3.2.20", features = ["derive"] }
 tokio-mock-io = { git = "https://github.com/stepfunc/tokio-mock-io.git", tag = "0.2.0" }
 assert_matches = "1.2"
 tracing-subscriber = "0.2"

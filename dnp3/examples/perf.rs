@@ -12,51 +12,76 @@ use dnp3::outstation::database::*;
 use dnp3::outstation::*;
 use dnp3::tcp::*;
 
-fn config() -> TestConfig {
+use clap::Parser;
+
+fn config(num_values: usize) -> TestConfig {
     TestConfig {
         outstation_level: DecodeLevel::nothing(),
         master_level: DecodeLevel::nothing(),
-        num_values: 100,
+        num_values,
         max_index: 10,
     }
 }
 
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Cli {
+    #[clap(short, long, value_parser, default_value_t = 20000)]
+    port: u16,
+    #[clap(short, long, value_parser, default_value_t = 1)]
+    sessions: u16,
+    #[clap(short, long, value_parser, default_value_t = 100)]
+    values: usize,
+    #[clap(short, long, value_parser, default_value_t = 10)]
+    seconds: usize,
+    #[clap(short, long, value_parser, default_value_t = false)]
+    log: bool,
+}
+
 #[tokio::main(flavor = "multi_thread")]
 pub async fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let args: Cli = Cli::parse();
 
-    if args.len() != 5 {
-        eprintln!("usage: perf <start port> <num pairs> <num points> <num iterations>");
-        return;
+    let config = config(args.values);
+
+    if args.log {
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_target(false)
+            .init();
     }
 
-    let mut config = config();
-
-    let start_port: u16 = args[1].parse().expect("start port must be a u16");
-    let num_ports: u16 = args[2].parse().expect("num ports must be a u16");
-    config.num_values = args[3].parse().expect("num ports must be a usize");
-    let num_iterations: usize = args[4].parse().expect("num iterations must be a usize");
-
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .with_target(false)
-        .init();
-
-    let port_range: std::ops::Range<u16> = start_port..start_port + num_ports;
+    let port_range: std::ops::Range<u16> = args.port..args.port + args.sessions;
 
     let mut harness = TestHarness::create(port_range, config).await;
+    println!("settings: {:?}", args);
 
+    println!("starting up...");
     harness.wait_for_startup().await;
+    let duration = std::time::Duration::from_secs(args.seconds as u64);
+    println!("iterating for {:?}...", duration);
 
     let start = Instant::now();
-    for i in 0..num_iterations {
-        println!("iteration: {}", i);
+    let mut iterations = 0;
+    let elapsed = loop {
         harness.run_iteration().await;
-    }
-    let elapsed = Instant::now() - start;
-    let values = config.num_values * num_iterations * (num_ports as usize);
+        iterations += 1;
+        let elapsed = start.elapsed();
+        if elapsed > duration {
+            break elapsed;
+        }
+    };
 
-    println!("meas/sec: {}", (values as f64) / elapsed.as_secs_f64())
+    let requests = iterations * (args.sessions as usize);
+    let values = config.num_values * requests;
+
+    println!("elapsed time: {:?}", elapsed);
+    println!("num requests: {}", requests);
+    println!(
+        "requests/sec: {:.1}",
+        (requests as f64) / elapsed.as_secs_f64()
+    );
+    println!("meas/sec: {:.1}", (values as f64) / elapsed.as_secs_f64());
 }
 
 struct NullOutstationApplication;
