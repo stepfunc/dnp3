@@ -13,6 +13,7 @@ use dnp3::outstation::*;
 use dnp3::tcp::*;
 
 use clap::Parser;
+use dnp3::app::control::{CommandStatus, Group12Var1, OpType};
 
 fn config(num_values: usize) -> TestConfig {
     TestConfig {
@@ -21,6 +22,12 @@ fn config(num_values: usize) -> TestConfig {
         num_values,
         max_index: 10,
     }
+}
+
+#[derive(clap::ValueEnum, Debug, Clone)]
+enum Action {
+    Unsolicited,
+    DirectOperate,
 }
 
 #[derive(Parser, Debug)]
@@ -36,6 +43,8 @@ struct Cli {
     seconds: usize,
     #[clap(short, long, value_parser, default_value_t = false)]
     log: bool,
+    #[clap(short, long, value_parser)]
+    action: Action,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -64,7 +73,11 @@ pub async fn main() {
     let start = Instant::now();
     let mut iterations = 0;
     let elapsed = loop {
-        harness.run_iteration().await;
+        match args.action {
+            Action::Unsolicited => harness.run_unsol().await,
+            Action::DirectOperate => harness.run_commands().await,
+        }
+
         iterations += 1;
         let elapsed = start.elapsed();
         if elapsed > duration {
@@ -117,7 +130,29 @@ impl TestHarness {
         }
     }
 
-    async fn run_iteration(&mut self) {
+    async fn run_commands(&mut self) {
+        let mut operations = Vec::new();
+        for pair in &mut self.pairs {
+            let op = pair.assoc.operate(
+                CommandMode::DirectOperate,
+                CommandBuilder::single_header_u16(Group12Var1::from_op_type(OpType::LatchOn), 3u16),
+            );
+            operations.push(op);
+        }
+
+        let results = futures::future::join_all(operations).await;
+
+        for res in results {
+            assert_eq!(
+                res.unwrap_err(),
+                CommandError::Response(CommandResponseError::BadStatus(
+                    CommandStatus::NotSupported
+                ))
+            );
+        }
+    }
+
+    async fn run_unsol(&mut self) {
         for pair in &mut self.pairs {
             pair.update_values();
         }
@@ -135,6 +170,8 @@ struct Pair {
     _server: ServerHandle,
     // have to hold onto this to keep master alive
     _master: MasterChannel,
+    // used to send commands
+    assoc: AssociationHandle,
     // count of matching measurements received
     rx: tokio::sync::mpsc::Receiver<usize>,
     // used to update the database
@@ -162,7 +199,7 @@ impl Pair {
 
     async fn spawn(port: u16, config: TestConfig) -> Self {
         let (server, outstation) = Self::spawn_outstation(port, config).await;
-        let (master, measurements, rx) = Self::spawn_master(port, config).await;
+        let (master, assoc, measurements, rx) = Self::spawn_master(port, config).await;
 
         Self {
             values: measurements,
@@ -170,6 +207,7 @@ impl Pair {
             rx,
             _master: master,
             outstation,
+            assoc,
         }
     }
 
@@ -229,6 +267,7 @@ impl Pair {
         config: TestConfig,
     ) -> (
         MasterChannel,
+        AssociationHandle,
         Measurements,
         tokio::sync::mpsc::Receiver<usize>,
     ) {
@@ -250,7 +289,7 @@ impl Pair {
         };
 
         // don't care about the handle
-        let _ = master
+        let assoc = master
             .add_association(
                 Self::outstation_address(),
                 Self::get_association_config(),
@@ -263,7 +302,7 @@ impl Pair {
 
         master.enable().await.unwrap();
 
-        (master, measurements, rx)
+        (master, assoc, measurements, rx)
     }
 
     fn outstation_address() -> EndpointAddress {

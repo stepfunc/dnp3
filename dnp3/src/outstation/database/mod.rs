@@ -303,7 +303,10 @@ impl DatabaseHandle {
     where
         F: FnMut(&mut Database) -> R,
     {
-        let ret = func(&mut self.inner.lock().unwrap());
+        let ret = {
+            let mut db = self.inner.lock().unwrap();
+            func(&mut db)
+        };
         self.notify.notify_one();
         ret
     }

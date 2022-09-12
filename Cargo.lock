@@ -505,6 +505,7 @@ dependencies = [
  "chrono",
  "clap 3.2.20",
  "criterion",
+ "futures",
  "pem",
  "pkcs8",
  "rand",
