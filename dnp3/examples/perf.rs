@@ -71,20 +71,11 @@ pub async fn main() {
     println!("iterating for {:?}...", duration);
 
     let start = Instant::now();
-    let mut iterations = 0;
-    let elapsed = loop {
-        match args.action {
-            Action::Unsolicited => harness.run_unsol().await,
-            Action::DirectOperate => harness.run_commands().await,
-        }
-
-        iterations += 1;
-        let elapsed = start.elapsed();
-        if elapsed > duration {
-            break elapsed;
-        }
+    let iterations = match args.action {
+        Action::Unsolicited => harness.run_unsol(duration).await,
+        Action::DirectOperate => harness.run_commands(duration).await,
     };
-
+    let elapsed = start.elapsed();
     let requests = iterations * (args.sessions as usize);
     let values = config.num_values * requests;
 
@@ -130,36 +121,71 @@ impl TestHarness {
         }
     }
 
-    async fn run_commands(&mut self) {
-        let mut operations = Vec::new();
-        for pair in &mut self.pairs {
-            let op = pair.assoc.operate(
-                CommandMode::DirectOperate,
-                CommandBuilder::single_header_u16(Group12Var1::from_op_type(OpType::LatchOn), 3u16),
-            );
-            operations.push(op);
+    async fn run_commands(self, duration: std::time::Duration) -> usize {
+        let start = Instant::now();
+        let mut tasks = Vec::new();
+
+        for mut pair in self.pairs {
+            let task = tokio::spawn(async move {
+                let mut iterations: usize = 0;
+                loop {
+                    let err = pair
+                        .assoc
+                        .operate(
+                            CommandMode::DirectOperate,
+                            CommandBuilder::single_header_u16(
+                                Group12Var1::from_op_type(OpType::LatchOn),
+                                3u16,
+                            ),
+                        )
+                        .await
+                        .unwrap_err();
+                    assert_eq!(
+                        err,
+                        CommandError::Response(CommandResponseError::BadStatus(
+                            CommandStatus::NotSupported
+                        ))
+                    );
+                    iterations += 1;
+                    if start.elapsed() >= duration {
+                        return iterations;
+                    }
+                }
+            });
+            tasks.push(task);
         }
 
-        let results = futures::future::join_all(operations).await;
-
-        for res in results {
-            assert_eq!(
-                res.unwrap_err(),
-                CommandError::Response(CommandResponseError::BadStatus(
-                    CommandStatus::NotSupported
-                ))
-            );
+        let mut iterations = 0;
+        for task in tasks {
+            iterations += task.await.unwrap();
         }
+        iterations
     }
 
-    async fn run_unsol(&mut self) {
-        for pair in &mut self.pairs {
-            pair.update_values();
+    async fn run_unsol(self, duration: std::time::Duration) -> usize {
+        let start = Instant::now();
+        let mut tasks = Vec::new();
+
+        for mut pair in self.pairs {
+            let task = tokio::spawn(async move {
+                let mut iterations: usize = 0;
+                loop {
+                    pair.update_values();
+                    pair.wait_for_update().await;
+                    iterations += 1;
+                    if start.elapsed() >= duration {
+                        return iterations;
+                    }
+                }
+            });
+            tasks.push(task);
         }
 
-        for pair in &mut self.pairs {
-            pair.wait_for_update().await;
+        let mut iterations = 0;
+        for task in tasks {
+            iterations += task.await.unwrap();
         }
+        iterations
     }
 }
 
