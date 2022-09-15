@@ -125,8 +125,9 @@ impl TestHarness {
         let start = Instant::now();
         let mut tasks = Vec::new();
 
-        for mut pair in self.pairs {
+        for pair in self.pairs {
             let task = tokio::spawn(async move {
+                let mut pair = pair;
                 let mut iterations: usize = 0;
                 loop {
                     let err = pair
