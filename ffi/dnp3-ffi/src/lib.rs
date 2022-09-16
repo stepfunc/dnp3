@@ -11,6 +11,7 @@ pub use master::*;
 pub use outstation::*;
 pub use request::*;
 pub use runtime::*;
+pub(crate) use tcp::*;
 
 mod command;
 mod handler;
@@ -19,6 +20,7 @@ mod master;
 mod outstation;
 mod request;
 mod runtime;
+mod tcp;
 
 pub mod ffi;
 
