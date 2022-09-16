@@ -1,6 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::time::Instant;
 
-use criterion::{criterion_group, criterion_main, Criterion};
 use rand::{Rng, SeedableRng};
 
 use dnp3::app::measurement::*;
@@ -12,58 +12,81 @@ use dnp3::outstation::database::*;
 use dnp3::outstation::*;
 use dnp3::tcp::*;
 
-fn config() -> TestConfig {
+use clap::Parser;
+use dnp3::app::control::{CommandStatus, Group12Var1, OpType};
+
+fn config(num_values: usize) -> TestConfig {
     TestConfig {
         outstation_level: DecodeLevel::nothing(),
         master_level: DecodeLevel::nothing(),
-        num_values: 100,
+        num_values,
         max_index: 10,
     }
 }
 
-// the ports used... the number of ports determines the number of parallel entries
-const PORT_RANGE_16: std::ops::Range<u16> = 50000..50016;
-
-struct TestInstance {
-    runtime: tokio::runtime::Runtime,
-    harness: TestHarness,
+#[derive(clap::ValueEnum, Debug, Clone)]
+enum Action {
+    Unsolicited,
+    DirectOperate,
 }
 
-impl TestInstance {
-    fn create(ports: std::ops::Range<u16>) -> Self {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Cli {
+    #[clap(short, long, value_parser, default_value_t = 20000)]
+    port: u16,
+    #[clap(long, value_parser, default_value_t = 1)]
+    sessions: u16,
+    #[clap(short, long, value_parser, default_value_t = 100)]
+    values: usize,
+    #[clap(long, value_parser, default_value_t = 10)]
+    seconds: usize,
+    #[clap(short, long, value_parser, default_value_t = false)]
+    log: bool,
+    #[clap(short, long, value_parser)]
+    action: Action,
+}
 
-        let mut harness = runtime.block_on(TestHarness::create(ports, config()));
+#[tokio::main(flavor = "multi_thread")]
+pub async fn main() {
+    let args: Cli = Cli::parse();
 
-        runtime.block_on(harness.wait_for_startup());
+    let config = config(args.values);
 
-        Self { runtime, harness }
+    if args.log {
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_target(false)
+            .init();
     }
 
-    fn run_iteration(&mut self) {
-        self.runtime.block_on(self.harness.run_iteration());
-    }
+    let port_range: std::ops::Range<u16> = args.port..args.port + args.sessions;
+
+    let mut harness = TestHarness::create(port_range, config).await;
+    println!("settings: {:?}", args);
+
+    println!("starting up...");
+    harness.wait_for_startup().await;
+    let duration = std::time::Duration::from_secs(args.seconds as u64);
+    println!("iterating for {:?}...", duration);
+
+    let start = Instant::now();
+    let iterations = match args.action {
+        Action::Unsolicited => harness.run_unsol(duration).await,
+        Action::DirectOperate => harness.run_commands(duration).await,
+    };
+    let elapsed = start.elapsed();
+    let requests = iterations * (args.sessions as usize);
+    let values = config.num_values * requests;
+
+    println!("elapsed time: {:?}", elapsed);
+    println!("num requests: {}", requests);
+    println!(
+        "requests/sec: {:.1}",
+        (requests as f64) / elapsed.as_secs_f64()
+    );
+    println!("meas/sec: {:.1}", (values as f64) / elapsed.as_secs_f64());
 }
-
-pub fn criterion_benchmark(c: &mut Criterion) {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .with_target(false)
-        .init();
-
-    let mut instance = TestInstance::create(PORT_RANGE_16);
-    c.bench_function("16 sessions", |b| {
-        b.iter(|| {
-            instance.run_iteration();
-        })
-    });
-}
-
-criterion_group!(benches, criterion_benchmark);
-criterion_main!(benches);
 
 struct NullOutstationApplication;
 impl OutstationApplication for NullOutstationApplication {}
@@ -98,14 +121,72 @@ impl TestHarness {
         }
     }
 
-    async fn run_iteration(&mut self) {
-        for pair in &mut self.pairs {
-            pair.update_values();
+    async fn run_commands(self, duration: std::time::Duration) -> usize {
+        let start = Instant::now();
+        let mut tasks = Vec::new();
+
+        for pair in self.pairs {
+            let task = tokio::spawn(async move {
+                let mut pair = pair;
+                let mut iterations: usize = 0;
+                loop {
+                    let err = pair
+                        .assoc
+                        .operate(
+                            CommandMode::DirectOperate,
+                            CommandBuilder::single_header_u16(
+                                Group12Var1::from_op_type(OpType::LatchOn),
+                                3u16,
+                            ),
+                        )
+                        .await
+                        .unwrap_err();
+                    assert_eq!(
+                        err,
+                        CommandError::Response(CommandResponseError::BadStatus(
+                            CommandStatus::NotSupported
+                        ))
+                    );
+                    iterations += 1;
+                    if start.elapsed() >= duration {
+                        return iterations;
+                    }
+                }
+            });
+            tasks.push(task);
         }
 
-        for pair in &mut self.pairs {
-            pair.wait_for_update().await;
+        let mut iterations = 0;
+        for task in tasks {
+            iterations += task.await.unwrap();
         }
+        iterations
+    }
+
+    async fn run_unsol(self, duration: std::time::Duration) -> usize {
+        let start = Instant::now();
+        let mut tasks = Vec::new();
+
+        for mut pair in self.pairs {
+            let task = tokio::spawn(async move {
+                let mut iterations: usize = 0;
+                loop {
+                    pair.update_values();
+                    pair.wait_for_update().await;
+                    iterations += 1;
+                    if start.elapsed() >= duration {
+                        return iterations;
+                    }
+                }
+            });
+            tasks.push(task);
+        }
+
+        let mut iterations = 0;
+        for task in tasks {
+            iterations += task.await.unwrap();
+        }
+        iterations
     }
 }
 
@@ -116,6 +197,8 @@ struct Pair {
     _server: ServerHandle,
     // have to hold onto this to keep master alive
     _master: MasterChannel,
+    // used to send commands
+    assoc: AssociationHandle,
     // count of matching measurements received
     rx: tokio::sync::mpsc::Receiver<usize>,
     // used to update the database
@@ -143,7 +226,7 @@ impl Pair {
 
     async fn spawn(port: u16, config: TestConfig) -> Self {
         let (server, outstation) = Self::spawn_outstation(port, config).await;
-        let (master, measurements, rx) = Self::spawn_master(port, config).await;
+        let (master, assoc, measurements, rx) = Self::spawn_master(port, config).await;
 
         Self {
             values: measurements,
@@ -151,6 +234,7 @@ impl Pair {
             rx,
             _master: master,
             outstation,
+            assoc,
         }
     }
 
@@ -210,6 +294,7 @@ impl Pair {
         config: TestConfig,
     ) -> (
         MasterChannel,
+        AssociationHandle,
         Measurements,
         tokio::sync::mpsc::Receiver<usize>,
     ) {
@@ -231,7 +316,7 @@ impl Pair {
         };
 
         // don't care about the handle
-        let _ = master
+        let assoc = master
             .add_association(
                 Self::outstation_address(),
                 Self::get_association_config(),
@@ -244,7 +329,7 @@ impl Pair {
 
         master.enable().await.unwrap();
 
-        (master, measurements, rx)
+        (master, assoc, measurements, rx)
     }
 
     fn outstation_address() -> EndpointAddress {
