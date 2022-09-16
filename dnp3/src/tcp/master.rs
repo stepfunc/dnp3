@@ -149,20 +149,23 @@ impl MasterTask {
                         .await;
                     self.session.wait_for_retry(delay).await
                 }
-                Ok(socket) => match self.connection_handler.handle(socket, &endpoint).await {
-                    Err(err) => {
-                        let delay = self.back_off.on_failure();
-                        tracing::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
-                        self.on_connection_failure(delay).await
+                Ok(stream) => {
+                    crate::tcp::configure_client(&stream);
+                    match self.connection_handler.handle(stream, &endpoint).await {
+                        Err(err) => {
+                            let delay = self.back_off.on_failure();
+                            tracing::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
+                            self.on_connection_failure(delay).await
+                        }
+                        Ok(phys) => {
+                            tracing::info!("connected to {}", endpoint);
+                            self.endpoints.reset();
+                            self.back_off.on_success();
+                            self.listener.update(ClientState::Connected).get().await;
+                            self.run_phys(phys).await
+                        }
                     }
-                    Ok(phys) => {
-                        tracing::info!("connected to {}", endpoint);
-                        self.endpoints.reset();
-                        self.back_off.on_success();
-                        self.listener.update(ClientState::Connected).get().await;
-                        self.run_phys(phys).await
-                    }
-                },
+                }
             }
         } else {
             let delay = self.back_off.on_failure();

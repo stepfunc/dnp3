@@ -11,6 +11,7 @@ mod outstation;
 mod request;
 mod runtime;
 mod shared;
+mod tcp;
 mod variation;
 
 pub(crate) fn gv(g: u8, v: u8) -> String {
@@ -70,6 +71,9 @@ pub fn build_lib() -> BackTraced<Library> {
         info,
         settings,
     );
+
+    // global settings
+    crate::tcp::define(&mut builder)?;
 
     // Shared stuff
     let shared_def = shared::define(&mut builder)?;

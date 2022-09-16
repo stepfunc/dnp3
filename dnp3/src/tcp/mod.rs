@@ -1,6 +1,7 @@
 pub use address_filter::*;
 pub use endpoint_list::*;
 pub use master::*;
+pub use no_delay::*;
 pub use outstation::*;
 
 /// Entry points and types for TLS
@@ -10,6 +11,7 @@ pub mod tls;
 mod address_filter;
 mod endpoint_list;
 mod master;
+mod no_delay;
 mod outstation;
 
 /// state of TCP client connection
