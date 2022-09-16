@@ -218,6 +218,7 @@ impl Server {
     async fn accept_one(&mut self, listener: &mut tokio::net::TcpListener) -> Result<(), Shutdown> {
         match listener.accept().await {
             Ok((stream, addr)) => {
+                crate::tcp::configure_server(&stream);
                 self.process_connection(stream, addr).await;
                 Ok(())
             }
