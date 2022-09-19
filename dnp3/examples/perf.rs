@@ -45,12 +45,29 @@ struct Cli {
     log: bool,
     #[clap(short, long, value_parser)]
     action: Action,
+    #[clap(long, value_parser)]
+    workers: Option<usize>,
 }
 
-#[tokio::main(flavor = "multi_thread")]
-pub async fn main() {
+fn main() {
     let args: Cli = Cli::parse();
 
+    let runtime = match args.workers {
+        Some(x) => tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .worker_threads(x)
+            .build()
+            .unwrap(),
+        None => tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap(),
+    };
+
+    runtime.block_on(run(args));
+}
+
+async fn run(args: Cli) {
     let config = config(args.values);
 
     if args.log {
