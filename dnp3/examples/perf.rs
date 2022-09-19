@@ -93,14 +93,13 @@ async fn run(args: Cli) {
         Action::DirectOperate => harness.run_commands(duration).await,
     };
     let elapsed = start.elapsed();
-    let requests = iterations * (args.sessions as usize);
-    let values = config.num_values * requests;
+    let values = config.num_values * iterations;
 
     println!("elapsed time: {:?}", elapsed);
-    println!("num requests: {}", requests);
+    println!("num requests: {}", iterations);
     println!(
         "requests/sec: {:.1}",
-        (requests as f64) / elapsed.as_secs_f64()
+        (iterations as f64) / elapsed.as_secs_f64()
     );
     println!("meas/sec: {:.1}", (values as f64) / elapsed.as_secs_f64());
 }
