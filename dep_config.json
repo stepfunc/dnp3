@@ -28,9 +28,6 @@
     "winapi-util"
   ],
   "vendor": {
-    "rasn": {
-      "url": "https://github.com/stepfunc/rasn"
-    },
     "dnp3": {
       "url": "https://github.com/stepfunc/dnp3"
     },
@@ -39,6 +36,12 @@
     },
     "dnp3-ffi-java": {
       "url": "https://github.com/stepfunc/dnp3"
+    },
+    "rasn": {
+      "url": "https://github.com/stepfunc/rasn"
+    },
+    "scursor": {
+      "url": "https://github.com/stepfunc/scursor"
     }
   },
   "third_party": {
