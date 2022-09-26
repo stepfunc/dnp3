@@ -15,11 +15,7 @@ impl BitConverter for bool {
     const NUM_BITS: u8 = 1;
 
     fn to_mask(&self) -> u8 {
-        if *self {
-            1
-        } else {
-            0
-        }
+        u8::from(*self)
     }
 }
 
