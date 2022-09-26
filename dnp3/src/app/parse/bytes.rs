@@ -1,6 +1,7 @@
 use crate::app::parse::traits::FixedSize;
 use crate::app::parse_error::ObjectParseError;
-use crate::util::cursor::ReadCursor;
+
+use scursor::ReadCursor;
 
 /// Wrapper around an underlying u8 slice
 #[derive(Debug, PartialEq)]
@@ -36,7 +37,7 @@ pub(crate) struct RangedBytesSequence<'a> {
     count: usize,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub(crate) struct RangedBytesIterator<'a> {
     cursor: ReadCursor<'a>,
     index: u16,
@@ -44,7 +45,7 @@ pub(crate) struct RangedBytesIterator<'a> {
     remaining: usize,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub(crate) struct PrefixedBytesSequence<'a, T>
 where
     T: FixedSize,

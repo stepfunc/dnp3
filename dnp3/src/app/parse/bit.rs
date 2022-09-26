@@ -1,7 +1,8 @@
 use crate::app::measurement::DoubleBit;
 use crate::app::parse::range::Range;
 use crate::util::bit::Bitfield;
-use crate::util::cursor::{ReadCursor, ReadError};
+
+use scursor::{ReadCursor, ReadError};
 
 fn num_bytes_for_bits(count: usize) -> usize {
     (count + 7) / 8

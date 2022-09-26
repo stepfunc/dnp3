@@ -16,7 +16,9 @@ object Main {
       "use crate::util::cursor::*;".eol ++
       "use crate::app::control::{CommandStatus, ControlCode};".eol ++
       "use crate::app::Timestamp;".eol ++
-      "use crate::app::measurement::*;".eol
+      "use crate::app::measurement::*;".eol ++
+      space ++
+      "use scursor::*;".eol
     }
   }
 

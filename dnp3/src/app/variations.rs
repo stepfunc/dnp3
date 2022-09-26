@@ -16,6 +16,8 @@ use crate::app::control::{CommandStatus, ControlCode};
 use crate::app::Timestamp;
 use crate::app::measurement::*;
 
+use scursor::*;
+
 /// All variations supported by the library
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Variation {

@@ -4,6 +4,8 @@ use crate::app::variations::Variation;
 use crate::app::QualifierCode;
 use crate::util::cursor::*;
 
+use scursor::{ReadCursor, ReadError};
+
 pub(crate) trait FixedSize: Copy + Clone
 where
     Self: Sized,

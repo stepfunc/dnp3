@@ -2,8 +2,9 @@ use crate::link::constant;
 use crate::link::error::*;
 use crate::link::header::{AnyAddress, ControlField, Header};
 use crate::link::LinkErrorMode;
-use crate::util::cursor::{ReadCursor, ReadError};
 use crate::util::slice_ext::*;
+
+use scursor::{ReadCursor, ReadError};
 
 #[derive(Copy, Clone)]
 enum ParseState {
