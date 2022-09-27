@@ -6,6 +6,8 @@ use crate::app::Timestamp;
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::event::traits::EventVariation;
 use crate::outstation::database::details::event::write_fn::Continue;
+
+use crate::util::BadWrite;
 use scursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone)]
@@ -79,7 +81,7 @@ impl EventWriter {
         event: &E,
         index: u16,
         variation: E::EventVariation,
-    ) -> Result<(), WriteError>
+    ) -> Result<(), BadWrite>
     where
         E: Writable,
     {
@@ -97,12 +99,12 @@ impl EventWriter {
         event: &E,
         index: u16,
         variation: E::EventVariation,
-    ) -> Result<(), WriteError>
+    ) -> Result<(), BadWrite>
     where
         E: Writable,
     {
         match self.state {
-            State::Full => Err(WriteError),
+            State::Full => Err(BadWrite),
             State::Start => self.start_new_header(cursor, event, index, variation),
             State::InProgress(state, header_type) => {
                 match event.get_header_variation(&header_type) {
@@ -167,7 +169,8 @@ impl EventWriter {
         cursor.write_u8(v)?;
         cursor.write_u8(QualifierCode::Count8.as_u8())?;
         cursor.write_u8(1)?;
-        cto.write(cursor)
+        cto.write(cursor)?;
+        Ok(())
     }
 
     fn start_new_header<E>(
@@ -176,7 +179,7 @@ impl EventWriter {
         event: &E,
         index: u16,
         variation: E::EventVariation,
-    ) -> Result<(), WriteError>
+    ) -> Result<(), BadWrite>
     where
         E: Writable,
     {

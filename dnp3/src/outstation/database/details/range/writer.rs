@@ -5,6 +5,7 @@ use crate::outstation::database::details::range::traits::{
     FixedWriteFn, ToBit, ToDoubleBit, WriteInfo, WriteType,
 };
 
+use crate::util::BadWrite;
 use scursor::{WriteCursor, WriteError};
 
 trait BitConverter {
@@ -118,7 +119,7 @@ impl<T> RangeWriter<T> {
         index: u16,
         value: &T,
         info: WriteInfo<T>,
-    ) -> Result<(), WriteError> {
+    ) -> Result<(), BadWrite> {
         match self.try_write(cursor, index, value, info) {
             Ok(state) => {
                 self.state = state;
@@ -127,7 +128,7 @@ impl<T> RangeWriter<T> {
             }
             Err(_) => {
                 self.state = State::Full;
-                Err(WriteError)
+                Err(BadWrite)
             }
         }
     }
@@ -138,10 +139,10 @@ impl<T> RangeWriter<T> {
         index: u16,
         value: &T,
         info: WriteInfo<T>,
-    ) -> Result<State<T>, WriteError> {
+    ) -> Result<State<T>, BadWrite> {
         let variation = info.variation;
         let state = match &self.state {
-            State::Full => return Err(WriteError),
+            State::Full => return Err(BadWrite),
             State::Start => Self::start_header(cursor, index, value, info)?,
             State::Header(variation, header) => {
                 if *variation == info.variation && is_consecutive(header.index, index) {
@@ -160,15 +161,16 @@ impl<T> RangeWriter<T> {
         index: u16,
         value: &T,
         info: WriteInfo<T>,
-    ) -> Result<HeaderState<T>, WriteError> {
-        cursor.transaction(|cur| {
+    ) -> Result<HeaderState<T>, BadWrite> {
+        let ret = cursor.transaction(|cur| {
             let stop_pos = write_header(cur, info.variation, index)?;
             Ok(HeaderState::new(
                 index,
                 stop_pos,
                 info.write_type.write_first_value(cur, value)?,
             ))
-        })
+        })?;
+        Ok(ret)
     }
 
     fn write_next_value(
@@ -177,12 +179,13 @@ impl<T> RangeWriter<T> {
         index: u16,
         value: &T,
     ) -> Result<HeaderState<T>, WriteError> {
-        cursor.transaction(|cur| {
+        let ret = cursor.transaction(|cur| {
             let next_state = header.state.write_next_value(cur, value)?;
             // update the stop field
             cur.at_pos(header.stop_pos, |cur| cur.write_u16_le(index))?;
             Ok(HeaderState::new(index, header.stop_pos, next_state))
-        })
+        })?;
+        Ok(ret)
     }
 }
 

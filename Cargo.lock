@@ -1179,7 +1179,7 @@ dependencies = [
 [[package]]
 name = "scursor"
 version = "0.1.0"
-source = "git+https://github.com/stepfunc/scursor.git#b7262423c4c16aa29eba78f250167489b3dd4bc6"
+source = "git+https://github.com/stepfunc/scursor.git#ff0aa6193e3068ef5307cd3f189c710879b778ba"
 
 [[package]]
 name = "semver"

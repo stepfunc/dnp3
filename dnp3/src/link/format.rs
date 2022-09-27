@@ -6,10 +6,12 @@ use crate::link::error::LogicError;
 use crate::link::header::Header;
 use crate::util::slice_ext::SliceExtNoPanic;
 
-use scursor::{WriteCursor, WriteError};
+use scursor::WriteCursor;
 
-impl From<WriteError> for LogicError {
-    fn from(_: WriteError) -> Self {
+use crate::util::BadWrite;
+
+impl From<BadWrite> for LogicError {
+    fn from(_: BadWrite) -> Self {
         LogicError::BadWrite
     }
 }
@@ -71,7 +73,7 @@ pub(crate) fn format_header_fixed_size(
 pub(crate) fn format_header_only<'a>(
     header: Header,
     cursor: &'a mut WriteCursor,
-) -> Result<FrameData<'a>, WriteError> {
+) -> Result<FrameData<'a>, BadWrite> {
     format_frame(header, None, cursor)
 }
 
@@ -79,7 +81,7 @@ pub(crate) fn format_data_frame<'a>(
     header: Header,
     payload: Payload,
     cursor: &'a mut WriteCursor,
-) -> Result<FrameData<'a>, WriteError> {
+) -> Result<FrameData<'a>, BadWrite> {
     format_frame(header, Some(payload), cursor)
 }
 
@@ -88,8 +90,8 @@ fn format_frame<'a>(
     header: Header,
     payload: Option<Payload>,
     cursor: &'a mut WriteCursor,
-) -> Result<FrameData<'a>, WriteError> {
-    fn format_payload(payload: Payload, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+) -> Result<FrameData<'a>, BadWrite> {
+    fn format_payload(payload: Payload, cursor: &mut WriteCursor) -> Result<(), BadWrite> {
         // the first block contains the transport header
         let (first, remainder) = payload
             .app_data
@@ -114,7 +116,7 @@ fn format_frame<'a>(
     let length: u8 = match payload {
         Some(payload) => {
             if payload.app_data.len() > constant::MAX_APP_BYTES_PER_FRAME {
-                return Err(WriteError);
+                return Err(BadWrite);
             }
             payload.app_data.len() as u8 + constant::MIN_HEADER_LENGTH_VALUE + 1
         }

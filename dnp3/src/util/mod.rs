@@ -1,3 +1,5 @@
+use scursor::WriteError;
+
 pub(crate) mod bit;
 pub(crate) mod buffer;
 pub(crate) mod channel;
@@ -36,5 +38,15 @@ where
                 self.value = Some(other);
             }
         }
+    }
+}
+
+/// signals a bad write operation
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct BadWrite;
+
+impl From<WriteError> for BadWrite {
+    fn from(_: WriteError) -> Self {
+        Self
     }
 }
