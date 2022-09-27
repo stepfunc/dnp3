@@ -8,7 +8,8 @@ use crate::link::EndpointAddress;
 use crate::master::association::NoAssociation;
 use crate::master::session::{RunError, StateChange};
 use crate::transport::TransportResponseError;
-use crate::util::cursor::WriteError;
+
+use scursor::WriteError;
 
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;

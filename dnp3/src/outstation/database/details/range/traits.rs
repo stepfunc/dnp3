@@ -3,7 +3,8 @@ use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
 use crate::app::variations::*;
 use crate::outstation::database::config::*;
 use crate::util::bit::bits::{BIT_6, BIT_7};
-use crate::util::cursor::{WriteCursor, WriteError};
+
+use scursor::{WriteCursor, WriteError};
 
 pub(crate) type FixedWriteFn<T> = fn(&mut WriteCursor, &T) -> Result<(), WriteError>;
 pub(crate) type ToBit<T> = fn(&T) -> bool;
@@ -43,7 +44,7 @@ fn double_bit_type<T>(variation: Variation, func: fn(&T) -> DoubleBit) -> WriteI
 
 fn octet_string(value: &OctetString) -> WriteInfo<OctetString> {
     fn write(cursor: &mut WriteCursor, value: &OctetString) -> Result<(), WriteError> {
-        cursor.write(value.value())
+        cursor.write_bytes(value.value())
     }
     WriteInfo {
         variation: Variation::Group110(value.len()),

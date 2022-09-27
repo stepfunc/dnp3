@@ -101,7 +101,8 @@ class EnumModule(enums: List[EnumModel]) extends Module {
   }
 
   override def lines(implicit indentation: Indentation): Iterator[String] = {
-    "use crate::util::cursor::{WriteCursor, WriteError};".eol ++ space ++
+    "use scursor::{WriteCursor, WriteError};".eol ++
+    space ++
     spaced(enums.map(m => lines(m)).iterator)
   }
 }

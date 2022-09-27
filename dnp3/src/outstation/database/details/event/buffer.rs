@@ -7,7 +7,8 @@ use crate::master::EventClasses;
 use crate::outstation::database::config::*;
 use crate::outstation::database::read::EventReadHeader;
 use crate::outstation::database::{EventBufferConfig, EventClass};
-use crate::util::cursor::{WriteCursor, WriteError};
+
+use scursor::{WriteCursor, WriteError};
 
 use super::list::VecList;
 use super::writer::EventWriter;

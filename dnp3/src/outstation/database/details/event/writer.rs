@@ -6,7 +6,7 @@ use crate::app::Timestamp;
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::event::traits::EventVariation;
 use crate::outstation::database::details::event::write_fn::Continue;
-use crate::util::cursor::{WriteCursor, WriteError};
+use scursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone)]
 pub(crate) struct HeaderState {

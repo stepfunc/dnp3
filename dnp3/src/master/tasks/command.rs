@@ -5,7 +5,8 @@ use crate::master::error::{CommandError, CommandResponseError, TaskError};
 use crate::master::handler::Promise;
 use crate::master::request::*;
 use crate::master::tasks::NonReadTask;
-use crate::util::cursor::WriteError;
+
+use scursor::WriteError;
 
 enum State {
     Select,

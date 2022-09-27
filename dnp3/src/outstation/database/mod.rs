@@ -8,7 +8,8 @@ use crate::app::parse::parser::HeaderCollection;
 use crate::app::Iin2;
 use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
-use crate::util::cursor::WriteCursor;
+
+use scursor::WriteCursor;
 
 mod config;
 /// private internal control only needed by the parent module

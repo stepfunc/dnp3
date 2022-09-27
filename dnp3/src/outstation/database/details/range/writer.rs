@@ -4,7 +4,8 @@ use crate::app::QualifierCode;
 use crate::outstation::database::details::range::traits::{
     FixedWriteFn, ToBit, ToDoubleBit, WriteInfo, WriteType,
 };
-use crate::util::cursor::{WriteCursor, WriteError};
+
+use scursor::{WriteCursor, WriteError};
 
 trait BitConverter {
     const NUM_BITS: u8;

@@ -4,7 +4,8 @@ use crate::master::handler::Promise;
 use crate::master::request::ReadRequest;
 use crate::master::tasks::ReadTask;
 use crate::master::ReadHandler;
-use crate::util::cursor::WriteError;
+
+use scursor::WriteError;
 
 pub(crate) struct SingleReadTask {
     request: ReadRequest,

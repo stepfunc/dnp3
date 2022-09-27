@@ -7,7 +7,8 @@ use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
-use crate::util::cursor::{WriteCursor, WriteError};
+
+use scursor::{WriteCursor, WriteError};
 
 pub(crate) struct HeaderWriter<'a, 'b> {
     cursor: &'b mut WriteCursor<'a>,
@@ -167,7 +168,7 @@ impl Variation {
 #[cfg(test)]
 mod test {
     use crate::app::sequence::Sequence;
-    use crate::util::cursor::WriteCursor;
+    use scursor::WriteCursor;
 
     use super::*;
 

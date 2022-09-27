@@ -10,7 +10,7 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::util::cursor::{WriteCursor, WriteError};
+use scursor::{WriteCursor, WriteError};
 
 /// Application object header types
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

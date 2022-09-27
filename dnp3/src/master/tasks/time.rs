@@ -11,7 +11,8 @@ use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::handler::Promise;
 use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::NonReadTask;
-use crate::util::cursor::WriteError;
+
+use scursor::WriteError;
 
 use tokio::time::Instant;
 
@@ -318,7 +319,8 @@ mod tests {
     use crate::master::handler::{AssociationHandler, NullReadHandler};
     use crate::master::tasks::RequestWriter;
     use crate::master::{AssociationConfig, NullAssociationInformation};
-    use crate::util::cursor::WriteCursor;
+
+    use scursor::WriteCursor;
 
     use super::*;
 

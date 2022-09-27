@@ -10,7 +10,7 @@
 // This file is auto-generated. Do not edit manually
 //
 
-use crate::util::cursor::{WriteCursor, WriteError};
+use scursor::{WriteCursor, WriteError};
 
 /// Field is used in conjunction with the `OpType` field to specify a control operation
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

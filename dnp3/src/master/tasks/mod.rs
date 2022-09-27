@@ -15,7 +15,8 @@ use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::RestartTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::{ReadType, TaskType};
-use crate::util::cursor::WriteError;
+
+use scursor::WriteError;
 
 pub(crate) mod auto;
 pub(crate) mod command;

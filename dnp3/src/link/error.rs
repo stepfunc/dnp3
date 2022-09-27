@@ -1,4 +1,4 @@
-use crate::util::cursor::WriteError;
+use scursor::WriteError;
 
 /// these errors should never occur, but they are preferable to using
 /// functions that could panic. If they ever were to happen, they indicate

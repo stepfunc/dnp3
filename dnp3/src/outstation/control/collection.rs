@@ -9,7 +9,8 @@ use crate::outstation::control::control_type::ControlType;
 use crate::outstation::control::prefix::PrefixWriter;
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::traits::{ControlHandler, ControlSupport, OperateType};
-use crate::util::cursor::{WriteCursor, WriteError};
+
+use scursor::{WriteCursor, WriteError};
 
 pub(crate) struct ControlTransaction<'a> {
     started: bool,

@@ -13,7 +13,6 @@ object Main {
   object CommonUseStatements extends Module {
     override def lines(implicit indentation: Indentation): Iterator[String] = {
       "use crate::app::parse::traits::{FixedSize, FixedSizeVariation};".eol ++
-      "use crate::util::cursor::*;".eol ++
       "use crate::app::control::{CommandStatus, ControlCode};".eol ++
       "use crate::app::Timestamp;".eol ++
       "use crate::app::measurement::*;".eol ++

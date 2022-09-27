@@ -145,7 +145,7 @@ impl Assembler {
         cursor
             .skip(acc_length)
             .expect("accumulated length is greater than the buffer size");
-        match cursor.write_slice(data) {
+        match cursor.write_bytes(data) {
             Err(_) => {
                 tracing::warn!(
                     "transport buffer overflow with {} bytes to write",

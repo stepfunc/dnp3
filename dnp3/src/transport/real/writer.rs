@@ -7,8 +7,9 @@ use crate::link::EndpointAddress;
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::real::sequence::Sequence;
-use crate::util::cursor::WriteCursor;
 use crate::util::phys::PhysLayer;
+
+use scursor::WriteCursor;
 
 pub(crate) struct Writer {
     endpoint_type: EndpointType,

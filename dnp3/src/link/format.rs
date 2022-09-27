@@ -4,8 +4,9 @@ use crate::link::crc::{calc_crc, calc_crc_with_0564};
 use crate::link::display::LinkDisplay;
 use crate::link::error::LogicError;
 use crate::link::header::Header;
-use crate::util::cursor::{WriteCursor, WriteError};
 use crate::util::slice_ext::SliceExtNoPanic;
+
+use scursor::{WriteCursor, WriteError};
 
 impl From<WriteError> for LogicError {
     fn from(_: WriteError) -> Self {
@@ -97,13 +98,13 @@ fn format_frame<'a>(
         // write the first block
         let begin_first_block = cursor.position();
         cursor.write_u8(payload.transport)?;
-        cursor.write(first)?;
+        cursor.write_bytes(first)?;
         cursor.write_u16_le(calc_crc(cursor.written_since(begin_first_block)?))?;
 
         // write the remaining blocks
         for block in remainder.chunks(constant::MAX_BLOCK_SIZE) {
             let start_block = cursor.position();
-            cursor.write(block)?;
+            cursor.write_bytes(block)?;
             cursor.write_u16_le(calc_crc(cursor.written_since(start_block)?))?;
         }
 

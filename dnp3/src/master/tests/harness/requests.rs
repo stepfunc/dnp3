@@ -3,7 +3,8 @@ use crate::app::variations::{Group32Var2, Variation};
 use crate::app::Sequence;
 use crate::app::{ControlField, FunctionCode, Iin, Iin1, Iin2, ResponseFunction};
 use crate::master::Classes;
-use crate::util::cursor::WriteCursor;
+
+use scursor::WriteCursor;
 use tokio_mock_io::Event;
 
 pub(crate) async fn startup_procedure(harness: &mut super::TestHarness, seq: &mut Sequence) {

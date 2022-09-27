@@ -1,7 +1,8 @@
 use crate::app::measurement::*;
 use crate::app::parse::traits::FixedSize;
 use crate::app::variations::{Group2Var3, Group4Var3};
-use crate::util::cursor::{WriteCursor, WriteError};
+
+use scursor::{WriteCursor, WriteError};
 
 pub(crate) enum Continue {
     Ok,
@@ -80,7 +81,7 @@ pub(crate) fn write_octet_string(
     index: u16,
 ) -> Result<Continue, WriteError> {
     cursor.write_u16_le(index)?;
-    cursor.write(event)?;
+    cursor.write_bytes(event)?;
     Ok(Continue::Ok)
 }
 

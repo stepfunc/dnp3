@@ -11,7 +11,6 @@
 //
 
 use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
-use crate::util::cursor::*;
 use crate::app::control::{CommandStatus, ControlCode};
 use crate::app::Timestamp;
 use crate::app::measurement::*;

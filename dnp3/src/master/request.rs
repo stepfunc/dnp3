@@ -9,7 +9,8 @@ use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::*;
 use crate::master::error::CommandResponseError;
-use crate::util::cursor::WriteError;
+
+use scursor::WriteError;
 
 /// Controls how a command request is issued
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

@@ -8,7 +8,8 @@ use crate::outstation::database::read::ReadHeader;
 use crate::outstation::database::{
     ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateOptions,
 };
-use crate::util::cursor::WriteCursor;
+
+use scursor::WriteCursor;
 
 pub(crate) struct Database {
     static_db: StaticDatabase,

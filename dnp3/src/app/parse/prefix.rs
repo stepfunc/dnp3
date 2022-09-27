@@ -1,7 +1,6 @@
 use crate::app::parse::traits::{FixedSize, FixedSizeVariation, Index};
-use crate::util::cursor::{WriteCursor, WriteError};
 
-use scursor::{ReadCursor, ReadError};
+use scursor::*;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Prefix<I, V>

@@ -10,7 +10,8 @@ use crate::outstation::database::details::range::traits::StaticVariation;
 use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::outstation::database::read::StaticReadHeader;
 use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
-use crate::util::cursor::{WriteCursor, WriteError};
+
+use scursor::{WriteCursor, WriteError};
 
 pub(crate) trait EventDetector<T>
 where
