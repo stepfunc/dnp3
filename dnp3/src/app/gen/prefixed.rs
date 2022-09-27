@@ -12,7 +12,6 @@
 
 use crate::app::variations::*;
 use crate::app::parse::count::CountSequence;
-use crate::util::cursor::ReadCursor;
 use crate::app::parse::parser::*;
 use crate::app::parse::traits::{FixedSize, Index};
 use crate::app::parse::prefix::Prefix;
@@ -21,7 +20,9 @@ use crate::app::measurement::Time;
 use crate::master::{ReadHandler, HeaderInfo};
 use crate::app::ObjectParseError;
 
-#[derive(Debug, PartialEq)]
+use scursor::ReadCursor;
+
+#[derive(Debug)]
 pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
     /// Binary Input Event - Without Time
     Group2Var1(CountSequence<'a, Prefix<I, Group2Var1>>),

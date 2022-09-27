@@ -14,8 +14,9 @@ use crate::app::variations::*;
 use crate::app::QualifierCode;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::*;
-use crate::util::cursor::ReadCursor;
 use crate::app::ObjectParseError;
+
+use scursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum CountVariation<'a> {

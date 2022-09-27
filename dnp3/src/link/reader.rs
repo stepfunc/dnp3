@@ -6,8 +6,9 @@ use crate::link::error::LinkError;
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
 use crate::link::LinkErrorMode;
-use crate::util::cursor::ReadCursor;
 use crate::util::phys::PhysLayer;
+
+use scursor::ReadCursor;
 
 pub(crate) struct Reader {
     parser: Parser,

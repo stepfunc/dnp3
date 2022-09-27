@@ -9,7 +9,6 @@ object PrefixedVariationModule extends Module {
   override def lines(implicit indent: Indentation) : Iterator[String] = {
       "use crate::app::variations::*;".eol ++
       "use crate::app::parse::count::CountSequence;".eol ++
-      "use crate::util::cursor::ReadCursor;".eol ++
       "use crate::app::parse::parser::*;".eol ++
       "use crate::app::parse::traits::{FixedSize, Index};".eol ++
       "use crate::app::parse::prefix::Prefix;".eol ++
@@ -17,6 +16,8 @@ object PrefixedVariationModule extends Module {
       "use crate::app::measurement::Time;".eol ++
       "use crate::master::{ReadHandler, HeaderInfo};".eol ++
       "use crate::app::ObjectParseError;".eol ++
+      space ++
+      "use scursor::ReadCursor;".eol ++
       space ++
       enumDefinition ++
       space ++
@@ -34,7 +35,7 @@ object PrefixedVariationModule extends Module {
       }
     }
 
-    "#[derive(Debug, PartialEq)]".eol ++
+    "#[derive(Debug)]".eol ++
       bracket("pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display") {
         variations.iterator.flatMap(v =>  commented(v.fullDesc).eol ++ definition(v))
       }

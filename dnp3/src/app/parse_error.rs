@@ -4,7 +4,8 @@ use crate::app::parse::range::InvalidRange;
 use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
-use crate::util::cursor::ReadError;
+
+use scursor::ReadError;
 
 /// errors that occur when parsing an application layer header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

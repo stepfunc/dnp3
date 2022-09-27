@@ -6,7 +6,8 @@ use crate::app::FunctionCode;
 use crate::outstation::{ApplicationIin, RequestError};
 use crate::util::bit::bits::*;
 use crate::util::bit::{format_bitfield, Bitfield};
-use crate::util::cursor::{ReadCursor, ReadError, WriteCursor, WriteError};
+
+use scursor::*;
 
 /// Control field in the application-layer header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

@@ -10,12 +10,13 @@ object RangedVariationModule extends Module {
       "use crate::app::variations::*;".eol ++
       "use crate::app::QualifierCode;".eol ++
       "use crate::app::parse::range::{RangedSequence, Range};".eol ++
-      "use crate::util::cursor::ReadCursor;".eol ++
       "use crate::app::parse::parser::*;".eol ++
       "use crate::app::parse::bytes::*;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
       "use crate::master::{ReadHandler, HeaderInfo};".eol ++
       "use crate::app::ObjectParseError;".eol ++
+      space ++
+      "use scursor::ReadCursor;".eol ++
       space ++
       rangedVariationEnumDefinition ++
       space ++

@@ -10,8 +10,9 @@ object CountVariationModule extends Module {
       "use crate::app::variations::*;".eol ++ "use crate::app::QualifierCode;".eol ++
       "use crate::app::parse::count::CountSequence;".eol ++
       "use crate::app::parse::parser::*;".eol ++
-      "use crate::util::cursor::ReadCursor;".eol ++
       "use crate::app::ObjectParseError;".eol ++
+      space ++
+      "use scursor::ReadCursor;".eol ++
       space ++
       enumDefinition ++
       space ++

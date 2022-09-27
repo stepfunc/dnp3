@@ -9,6 +9,7 @@ tracing = "0.1"
 chrono = "0.4"
 tokio = { version = "1", features = ["net", "sync", "io-util", "io-std", "time", "rt", "rt-multi-thread", "macros"] }
 xxhash-rust = { version = "0.8.2", features = ["xxh64"] }
+scursor = { git = "https://github.com/stepfunc/scursor.git", tag = "0.1.0" }
 
 # TLS dependencies
 pem = { version = "1.0", optional = true }

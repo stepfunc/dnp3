@@ -13,12 +13,13 @@
 use crate::app::variations::*;
 use crate::app::QualifierCode;
 use crate::app::parse::range::{RangedSequence, Range};
-use crate::util::cursor::ReadCursor;
 use crate::app::parse::parser::*;
 use crate::app::parse::bytes::*;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
 use crate::master::{ReadHandler, HeaderInfo};
 use crate::app::ObjectParseError;
+
+use scursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum RangedVariation<'a> {

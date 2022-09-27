@@ -6,7 +6,8 @@ use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::request::EventClasses;
 use crate::master::tasks::{NonReadTask, Task};
-use crate::util::cursor::WriteError;
+
+use scursor::WriteError;
 
 #[derive(Clone)]
 pub(crate) enum AutoTask {

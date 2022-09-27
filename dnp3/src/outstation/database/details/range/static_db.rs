@@ -10,7 +10,9 @@ use crate::outstation::database::details::range::traits::StaticVariation;
 use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::outstation::database::read::StaticReadHeader;
 use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
-use crate::util::cursor::{WriteCursor, WriteError};
+
+use crate::util::BadWrite;
+use scursor::WriteCursor;
 
 pub(crate) trait EventDetector<T>
 where
@@ -360,7 +362,7 @@ impl StaticDatabase {
         }
     }
 
-    pub(crate) fn write(&mut self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub(crate) fn write(&mut self, cursor: &mut WriteCursor) -> Result<(), BadWrite> {
         while let Some(range) = self.selected.peek() {
             match self.write_range(cursor, range) {
                 // done with this header
@@ -371,7 +373,7 @@ impl StaticDatabase {
                 Err(s) => {
                     // possibly wrote some data though, so update the selection
                     self.selected.update_front(s);
-                    return Err(WriteError);
+                    return Err(BadWrite);
                 }
             };
         }

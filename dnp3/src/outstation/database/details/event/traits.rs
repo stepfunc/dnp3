@@ -5,7 +5,8 @@ use crate::outstation::database::details::event::write_fn::{
     write_cto, write_fixed_size, Continue,
 };
 use crate::outstation::database::details::event::writer::HeaderType;
-use crate::util::cursor::{WriteCursor, WriteError};
+
+use scursor::{WriteCursor, WriteError};
 
 use super::write_fn::write_octet_string;
 

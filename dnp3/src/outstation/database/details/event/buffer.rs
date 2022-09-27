@@ -7,10 +7,13 @@ use crate::master::EventClasses;
 use crate::outstation::database::config::*;
 use crate::outstation::database::read::EventReadHeader;
 use crate::outstation::database::{EventBufferConfig, EventClass};
-use crate::util::cursor::{WriteCursor, WriteError};
+
+use crate::util::BadWrite;
 
 use super::list::VecList;
 use super::writer::EventWriter;
+
+use scursor::WriteCursor;
 
 impl From<EventClass> for EventClasses {
     fn from(x: EventClass) -> Self {
@@ -317,7 +320,7 @@ impl Event {
         index: u16,
         cursor: &mut WriteCursor,
         writer: &mut EventWriter,
-    ) -> Result<(), WriteError> {
+    ) -> Result<(), BadWrite> {
         match &self {
             Event::Binary(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
             Event::DoubleBitBinary(evt, v) => writer.write(cursor, evt, index, v.selected.get()),

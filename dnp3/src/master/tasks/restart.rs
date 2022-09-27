@@ -121,7 +121,7 @@ mod tests {
     use crate::master::association::{Association, AssociationConfig};
     use crate::master::tasks::RequestWriter;
     use crate::master::{AssociationHandler, NullAssociationInformation, NullReadHandler};
-    use crate::util::cursor::WriteCursor;
+    use scursor::WriteCursor;
 
     use super::*;
 

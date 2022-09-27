@@ -7,9 +7,9 @@ use crate::master::association::Next;
 use crate::master::error::PollError;
 use crate::master::handler::{AssociationHandle, Promise};
 use crate::master::request::ReadRequest;
-use crate::util::cursor::WriteError;
 use crate::util::Smallest;
 
+use scursor::WriteError;
 use tokio::time::Instant;
 
 /// Periodic poll representation

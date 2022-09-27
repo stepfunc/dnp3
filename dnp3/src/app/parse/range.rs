@@ -1,5 +1,6 @@
 use crate::app::parse::traits::FixedSize;
-use crate::util::cursor::{ReadCursor, ReadError};
+
+use scursor::{ReadCursor, ReadError};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct InvalidRange {

@@ -1,4 +1,5 @@
-use crate::util::cursor::WriteError;
+use crate::util::BadWrite;
+use scursor::WriteError;
 
 /// these errors should never occur, but they are preferable to using
 /// functions that could panic. If they ever were to happen, they indicate
@@ -34,6 +35,12 @@ pub enum LinkError {
     Stdio(std::io::ErrorKind),
     BadFrame(FrameError),
     BadLogic(LogicError),
+}
+
+impl From<BadWrite> for LinkError {
+    fn from(_: BadWrite) -> Self {
+        LinkError::BadLogic(LogicError::BadWrite)
+    }
 }
 
 impl std::fmt::Display for LinkError {

@@ -1,5 +1,6 @@
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::util::cursor::{WriteCursor, WriteError};
+
+use scursor::{WriteCursor, WriteError};
 
 #[derive(Copy, Clone)]
 struct State<I>

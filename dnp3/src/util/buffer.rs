@@ -1,4 +1,4 @@
-use crate::util::cursor::WriteCursor;
+use scursor::WriteCursor;
 
 pub(crate) struct Buffer {
     inner: Box<[u8]>,

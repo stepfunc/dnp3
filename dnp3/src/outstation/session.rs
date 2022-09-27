@@ -31,8 +31,9 @@ use crate::transport::{
 };
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
-use crate::util::cursor::WriteError;
 use crate::util::phys::PhysLayer;
+
+use scursor::WriteError;
 
 #[derive(Copy, Clone)]
 enum TimeoutStatus {

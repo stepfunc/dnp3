@@ -14,7 +14,8 @@ use crate::app::parse_error::*;
 use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
 use crate::decode::AppDecodeLevel;
-use crate::util::cursor::ReadCursor;
+
+use scursor::ReadCursor;
 
 pub(crate) fn format_count_of_items<T, V>(f: &mut Formatter, iter: T) -> std::fmt::Result
 where
@@ -172,7 +173,7 @@ impl<'a> ParsedFragment<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub(crate) struct ObjectHeader<'a> {
     pub(crate) variation: Variation,
     pub(crate) details: HeaderDetails<'a>,
@@ -319,7 +320,7 @@ impl std::fmt::Display for FragmentDisplay<'_> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub(crate) enum HeaderDetails<'a> {
     AllObjects(AllObjectsVariation),
     OneByteStartStop(u8, u8, RangedVariation<'a>),
@@ -789,15 +790,23 @@ mod test {
         .map(|x| x.details)
         .collect();
 
-        assert_eq!(
-            vec,
-            vec![
-                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var2),
-                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var3),
-                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var4),
-                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var1),
-            ]
-        )
+        assert_eq!(vec.len(), 4);
+        assert_matches!(
+            vec[0],
+            HeaderDetails::AllObjects(AllObjectsVariation::Group60Var2)
+        );
+        assert_matches!(
+            vec[1],
+            HeaderDetails::AllObjects(AllObjectsVariation::Group60Var3)
+        );
+        assert_matches!(
+            vec[2],
+            HeaderDetails::AllObjects(AllObjectsVariation::Group60Var4)
+        );
+        assert_matches!(
+            vec[3],
+            HeaderDetails::AllObjects(AllObjectsVariation::Group60Var1)
+        );
     }
 
     #[test]
@@ -822,7 +831,7 @@ mod test {
                 },
             }]
         );
-        assert_eq!(headers.next(), None);
+        assert_matches!(headers.next(), None);
     }
 
     #[test]
@@ -846,7 +855,7 @@ mod test {
                 (DoubleBit::Indeterminate, 4),
             ]
         );
-        assert_eq!(headers.next(), None);
+        assert_matches!(headers.next(), None);
     }
 
     #[test]
@@ -868,7 +877,7 @@ mod test {
             }]
         );
 
-        assert_eq!(headers.next(), None);
+        assert_matches!(headers.next(), None);
     }
 
     #[test]
@@ -891,7 +900,7 @@ mod test {
                 (Group1Var2 { flags: 0xBB }, 3)
             ]
         );
-        assert_eq!(headers.next(), None);
+        assert_matches!(headers.next(), None);
     }
 
     #[test]
@@ -916,7 +925,7 @@ mod test {
             }
         );
 
-        assert_eq!(headers.next(), None);
+        assert_matches!(headers.next(), None);
     }
 
     #[test]
@@ -935,7 +944,7 @@ mod test {
         );
 
         assert_eq!(vec, vec![(false, 7)]);
-        assert_eq!(headers.next(), None);
+        assert_matches!(headers.next(), None);
     }
 
     #[test]
@@ -944,11 +953,11 @@ mod test {
         let mut headers = HeaderCollection::parse(FunctionCode::Read, &input)
             .unwrap()
             .iter();
-        assert_eq!(
+        assert_matches!(
             headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group110Var0)
         );
-        assert_eq!(headers.next(), None);
+        assert_matches!(headers.next(), None);
     }
 
     #[test]
@@ -978,7 +987,7 @@ mod test {
         );
 
         assert_eq!(bytes, vec![([0xAA].as_slice(), 1), ([0xBB].as_slice(), 2)]);
-        assert_eq!(headers.next(), None);
+        assert_matches!(headers.next(), None);
     }
 
     #[test]
@@ -998,7 +1007,7 @@ mod test {
         );
 
         assert_eq!(bytes, vec![([0xAA].as_slice(), 1), ([0xBB].as_slice(), 2)]);
-        assert_eq!(headers.next(), None);
+        assert_matches!(headers.next(), None);
     }
 
     #[test]
