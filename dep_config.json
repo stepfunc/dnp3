@@ -21,6 +21,7 @@
     "same-file",
     "semver",
     "semver-parser",
+    "tracing-ffi-schema",
     "ucd-trie",
     "unicode-segmentation",
     "version_check",

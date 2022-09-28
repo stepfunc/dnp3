@@ -4,8 +4,8 @@ use oo_bindgen::model::*;
 
 mod constants;
 mod database;
+mod decoding;
 mod handler;
-mod logging;
 mod master;
 mod outstation;
 mod request;
@@ -77,6 +77,10 @@ pub fn build_lib() -> BackTraced<Library> {
 
     // Shared stuff
     let shared_def = shared::define(&mut builder)?;
+
+    // common logging interface with other libraries
+    tracing_ffi_schema::define(&mut builder, shared_def.error_type.clone())?;
+
     // master and outstation APIs
     master::define(&mut builder, &shared_def)?;
     outstation::define(&mut builder, &shared_def)?;

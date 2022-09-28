@@ -94,7 +94,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         .build()?;
 
     crate::constants::define(lib)?;
-    let decode_level = crate::logging::define(lib, error_type.clone())?;
+    let decode_level = crate::decoding::define(lib)?;
     let runtime_class = crate::runtime::define(lib, error_type.clone())?;
 
     let control_field_struct = lib.declare_callback_argument_struct("control_field")?;
