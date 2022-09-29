@@ -420,6 +420,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-core",
+ "tracing-ffi-schema",
  "tracing-subscriber",
 ]
 
@@ -1522,7 +1523,7 @@ dependencies = [
 [[package]]
 name = "tracing-ffi-schema"
 version = "0.1.0"
-source = "git+https://github.com/stepfunc/tracing-ffi.git#510d11098a10f51cfa070448dfe58e25b4c6f481"
+source = "git+https://github.com/stepfunc/tracing-ffi.git#b1bcd1c4ad82c7adcdaf7e9a6ffed21d1e45008c"
 dependencies = [
  "oo-bindgen",
 ]
