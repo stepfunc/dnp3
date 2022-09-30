@@ -7,3 +7,6 @@ members = [
     "ffi/dnp3-bindings",
     "ffi/dnp3-ffi-java",
 ]
+
+[profile.release]
+lto=true
