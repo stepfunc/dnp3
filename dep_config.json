@@ -40,6 +40,9 @@
     "rasn": {
       "url": "https://github.com/stepfunc/rasn"
     },
+    "scursor": {
+      "url": "https://github.com/stepfunc/scursor"
+    },
     "tokio-ffi-schema": {
       "url": "https://github.com/stepfunc/tokio-ffi"
     },
