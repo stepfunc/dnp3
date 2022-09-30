@@ -1424,7 +1424,7 @@ dependencies = [
 [[package]]
 name = "tokio-ffi-schema"
 version = "0.1.0"
-source = "git+https://github.com/stepfunc/tokio-ffi.git#d25867ac956adf265d2f5f8830834ac5f78edbe5"
+source = "git+https://github.com/stepfunc/tokio-ffi.git?tag=0.1.0#d25867ac956adf265d2f5f8830834ac5f78edbe5"
 dependencies = [
  "oo-bindgen",
 ]
