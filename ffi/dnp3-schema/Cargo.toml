@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", tag = "0.3.0" }
 tracing-ffi-schema = { git = "https://github.com/stepfunc/tracing-ffi.git", tag = "0.1.0" }
+tokio-ffi-schema = { git = "https://github.com/stepfunc/tokio-ffi.git" }
