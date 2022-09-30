@@ -9,7 +9,6 @@ mod handler;
 mod master;
 mod outstation;
 mod request;
-mod runtime;
 mod shared;
 mod tcp;
 mod variation;
