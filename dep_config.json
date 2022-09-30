@@ -21,7 +21,6 @@
     "same-file",
     "semver",
     "semver-parser",
-    "tracing-ffi-schema",
     "ucd-trie",
     "unicode-segmentation",
     "version_check",
@@ -41,8 +40,11 @@
     "rasn": {
       "url": "https://github.com/stepfunc/rasn"
     },
-    "scursor": {
-      "url": "https://github.com/stepfunc/scursor"
+    "tokio-ffi-schema": {
+      "url": "https://github.com/stepfunc/tokio-ffi"
+    },
+    "tracing-ffi-schema": {
+      "url": "https://github.com/stepfunc/tracing-ffi"
     }
   },
   "third_party": {

@@ -418,6 +418,7 @@ dependencies = [
  "num_cpus",
  "rust-oo-bindgen",
  "tokio",
+ "tokio-ffi-schema",
  "tracing",
  "tracing-core",
  "tracing-ffi-schema",

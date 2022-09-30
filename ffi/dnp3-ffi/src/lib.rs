@@ -7,6 +7,7 @@ pub(crate) use crate::tracing::*;
 /// but instead just use crate::<name> when invoking an implementation
 pub use command::*;
 pub use decoding::*;
+use dnp3::app::Shutdown;
 pub use handler::*;
 pub use master::*;
 pub use outstation::*;
@@ -26,16 +27,45 @@ mod tracing;
 
 pub mod ffi;
 
-impl From<crate::TracingInitError> for std::os::raw::c_int {
-    fn from(_: crate::TracingInitError) -> Self {
-        crate::ffi::ParamError::LoggingAlreadyConfigured.into()
-    }
-}
-
 lazy_static::lazy_static! {
     static ref VERSION: std::ffi::CString = std::ffi::CString::new(dnp3::VERSION).unwrap();
 }
 
 fn version() -> &'static std::ffi::CStr {
     &VERSION
+}
+
+impl From<crate::TracingInitError> for std::os::raw::c_int {
+    fn from(_: crate::TracingInitError) -> Self {
+        crate::ffi::ParamError::LoggingAlreadyConfigured.into()
+    }
+}
+
+impl From<crate::runtime::RuntimeError> for std::os::raw::c_int {
+    fn from(err: crate::runtime::RuntimeError) -> Self {
+        let err: crate::ffi::ParamError = err.into();
+        err.into()
+    }
+}
+
+impl From<dnp3::app::Shutdown> for crate::ffi::ParamError {
+    fn from(_: Shutdown) -> Self {
+        crate::ffi::ParamError::MasterAlreadyShutdown
+    }
+}
+
+impl From<crate::runtime::RuntimeError> for crate::ffi::ParamError {
+    fn from(err: crate::runtime::RuntimeError) -> Self {
+        match err {
+            crate::runtime::RuntimeError::RuntimeDestroyed => {
+                crate::ffi::ParamError::RuntimeDestroyed
+            }
+            crate::runtime::RuntimeError::CannotBlockWithinAsync => {
+                crate::ffi::ParamError::RuntimeCannotBlockWithinAsync
+            }
+            crate::runtime::RuntimeError::FailedToCreateRuntime => {
+                crate::ffi::ParamError::RuntimeCreationFailure
+            }
+        }
+    }
 }
