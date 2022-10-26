@@ -14,7 +14,7 @@ scursor = { git = "https://github.com/stepfunc/scursor.git", tag = "0.1.0" }
 # TLS dependencies
 pem = { version = "1.0", optional = true }
 pkcs8 = { version = "0.7", features = ["encryption", "pem", "std"], optional = true }
-rasn = { git = "https://github.com/stepfunc/rasn", tag = "0.1.2", optional = true }
+rx509 = { version = "0.2", optional = true }
 tokio-rustls = { version = "0.23", features = ["dangerous_configuration", "tls12"], default-features = false, optional = true }
 
 # serial dependencies
@@ -34,5 +34,5 @@ tokio = { version = "1", features = ["test-util"] }
 [features]
 default = ["tls", "serial"]
 ffi = [] # this feature flag is only used when building the FFI
-tls = ["pem", "pkcs8", "rasn", "tokio-rustls"]
+tls = ["pem", "pkcs8", "rx509", "tokio-rustls"]
 serial = ["tokio-serial"]

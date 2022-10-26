@@ -37,7 +37,7 @@
     "dnp3-ffi-java": {
       "url": "https://github.com/stepfunc/dnp3"
     },
-    "rasn": {
+    "rx509": {
       "url": "https://github.com/stepfunc/rasn"
     },
     "scursor": {

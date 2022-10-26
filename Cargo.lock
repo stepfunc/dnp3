@@ -387,7 +387,7 @@ dependencies = [
  "pem",
  "pkcs8",
  "rand",
- "rasn",
+ "rx509",
  "scursor",
  "tokio",
  "tokio-mock-io",
@@ -1063,11 +1063,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rasn"
-version = "0.1.2"
-source = "git+https://github.com/stepfunc/rasn?tag=0.1.2#bced2fd6bad873104b3d39966f42731315dd705e"
-
-[[package]]
 name = "regex"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1133,6 +1128,12 @@ dependencies = [
  "sct",
  "webpki",
 ]
+
+[[package]]
+name = "rx509"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c177a3ff729f263173df3a7a58442fde7c0eb93d79ee8aaa66e67503c5c42fb"
 
 [[package]]
 name = "ryu"
