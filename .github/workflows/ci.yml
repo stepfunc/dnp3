@@ -174,7 +174,7 @@ jobs:
       - name: Create log dir
         run: mkdir logs\${{ matrix.target }}
       - name: Build FFI
-        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\logs\${{ matrix.target }}\build.ffi.log
+        run:
       - name: Build JNI
         run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\logs\${{ matrix.target }}\build.jni.log
       - name: Upload Build Logs
