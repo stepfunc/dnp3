@@ -389,8 +389,8 @@ dependencies = [
  "rand",
  "rx509",
  "scursor",
+ "sfio-tokio-mock-io",
  "tokio",
- "tokio-mock-io",
  "tokio-rustls",
  "tokio-serial",
  "tokio-stream",
@@ -1184,7 +1184,8 @@ dependencies = [
 [[package]]
 name = "scursor"
 version = "0.1.0"
-source = "git+https://github.com/stepfunc/scursor.git?tag=0.1.0#4d876ce9d08cb42a22b039c847b04728ddc88fd5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d22f5a1672640fcdfc63720cdda822d784d62d89070e8d05b39a5319006f7f7"
 
 [[package]]
 name = "semver"
@@ -1235,6 +1236,15 @@ dependencies = [
  "nix 0.24.2",
  "regex",
  "winapi",
+]
+
+[[package]]
+name = "sfio-tokio-mock-io"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "258bfa6a7160e6e19effd9dcd3601c10432eda4b36daa45b58030605ad332586"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]
@@ -1439,14 +1449,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "tokio-mock-io"
-version = "0.2.0"
-source = "git+https://github.com/stepfunc/tokio-mock-io.git?tag=0.2.0#8bac8f7be852fba655becc8b1d4157a55bb2b9fc"
-dependencies = [
- "tokio",
 ]
 
 [[package]]

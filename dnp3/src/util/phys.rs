@@ -11,7 +11,7 @@ pub(crate) enum PhysLayer {
     #[cfg(feature = "serial")]
     Serial(tokio_serial::SerialStream),
     #[cfg(test)]
-    Mock(tokio_mock_io::Mock),
+    Mock(sfio_tokio_mock_io::Mock),
 }
 
 impl std::fmt::Debug for PhysLayer {
