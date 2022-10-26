@@ -95,7 +95,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
 
     crate::constants::define(lib)?;
     let decode_level = crate::decoding::define(lib)?;
-    let runtime_class = tokio_ffi_schema::define(lib, error_type.clone())?;
+    let runtime_class = sfio_tokio_ffi::define(lib, error_type.clone())?;
 
     let control_field_struct = lib.declare_callback_argument_struct("control_field")?;
     let control_field_struct = lib

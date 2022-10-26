@@ -1,7 +1,12 @@
 use std::path::Path;
 
 fn main() {
-    let builder_settings = ci_script::BindingBuilderSettings {
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_target(false)
+        .init();
+
+    let builder_settings = oo_bindgen::cli::BindingBuilderSettings {
         ffi_target_name: "dnp3-ffi",
         jni_target_name: "dnp3-ffi-java",
         ffi_name: "dnp3_ffi",
@@ -11,5 +16,5 @@ fn main() {
         library: std::rc::Rc::new(dnp3_schema::build_lib().unwrap()),
     };
 
-    ci_script::run(builder_settings);
+    oo_bindgen::cli::run(builder_settings);
 }
