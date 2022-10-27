@@ -9,7 +9,6 @@ Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET
 # Features
 
 - Subset Level 3 master and outstation components in a single library
-
 - Written in safe Rust with idiomatic bindings for C, C++ .NET Core, and Java.
 - Supports TCP, TLS,  and serial communication channels
 - TLS is implemented using [rustls](https://github.com/rustls/rustls) not openssl.
