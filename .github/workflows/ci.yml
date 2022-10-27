@@ -347,7 +347,7 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: Swatinem/rust-cache@v1
       - name: Build JNI
-        run: cargo run --release -p dnp3-ffi-java
+        run: cargo build --release -p dnp3-ffi-java
       - name: Build Java bindings
         run: cargo run --release --bin dnp3-bindings -- --java
       - name: Install Java bindings
