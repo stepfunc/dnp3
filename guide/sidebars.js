@@ -10,7 +10,6 @@ module.exports = {
     ],
     Languages: [
         'languages/bindings',
-        'languages/build',
         {
             Bindings: [
                 'languages/c_bindings',
