@@ -172,7 +172,6 @@ impl rustls::server::ClientCertVerifier for SelfSignedCertificateClientCertVerif
         Some(true)
     }
 
-
     fn client_auth_root_subjects(&self) -> Option<rustls::DistinguishedNames> {
         // Let rustls extract the subjects
         let mut store = rustls::RootCertStore::empty();
