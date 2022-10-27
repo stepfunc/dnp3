@@ -1020,7 +1020,10 @@ fn define_address_filter(
         .destructor(destructor)?
         .static_method(address_filter_any_fn)?
         .method(add)?
-        .doc("Outstation address filter")?
+        .doc(
+            doc("Filters connecting client by their IP address to associate a connecting master with an outstation on the server")
+                .details("Address filters must be DISJOINT, i.e. two filters cannot accept the same IP address. The {class:outstation_server.add_outstation()} method will fail if the filter conflicts with a previously added filter.")
+        )?
         .build()?;
 
     Ok(address_filter)
