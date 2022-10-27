@@ -8,45 +8,76 @@ slug: /c_bindings
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import sitedata from '../../sitedata.json'
 
-We distribute C and C++ bindings as a ZIP file for each supported platform with the following directory layout:
+The C bindings consist of a single header and a shared library which makes application integration straightforward:
 
-- Single C header file in `/include/dnp3.h`
-- Single C++ header file in `/include/dnp3.hpp`
-- CMake find package script in `/cmake/`
-- Platform-specific shared libraries in `/lib/<platform>`
-- License information in `/LICENSE.txt`
+```mermaid
+graph TD
+A[C Application]
+B[dnp3.h]
+C[libdnp3_ffi.so]
+A -- #include --> B
+A -- links --> C
+```
 
-A companion <a href={`${sitedata.github_url}/releases/download/${sitedata.version}/dependencies.txt`}>dependencies.txt</a> containing
-3rd party license information is also available on our download page. See the [Dependency Licenses](../about/dependencies.mdx) for more information.
+The distribution contains:
 
-The pre-built packages are available here:
+* Single header file in `/include/dnp3.h`
+* Platform-specific shared libraries in `/lib/<platform>`
+* 3rd party license information in `third-party-licenses.txt`
+* CMake find package script in `/cmake/`
 
-- <a href={`${sitedata.github_url}/releases/download/${sitedata.version}/dnp3-${sitedata.version}-x86_64-pc-windows-msvc.zip`}>Windows x64 (Windows 7+)</a>
-- <a href={`${sitedata.github_url}/releases/download/${sitedata.version}/dnp3-${sitedata.version}-i686-pc-windows-msvc.zip`}>Windows x86 (Windows 7+)</a>
-- <a href={`${sitedata.github_url}/releases/download/${sitedata.version}/dnp3-${sitedata.version}-x86_64-unknown-linux-gnu.zip`}>Linux x64 (kernel 2.6.32+, glibc 2.11+)</a>
-- <a href={`${sitedata.github_url}/releases/download/${sitedata.version}/dnp3-${sitedata.version}-aarch64-unknown-linux-gnu.zip`}>Linux AArch64 (kernel 4.2, glibc 2.17+)</a>
-- <a href={`${sitedata.github_url}/releases/download/${sitedata.version}/dnp3-${sitedata.version}-armv7-unknown-linux-gnueabihf.zip`}>ARMv7 Linux (kernel 3.2, glibc 2.17)</a>
-- <a href={`${sitedata.github_url}/releases/download/${sitedata.version}/dnp3-${sitedata.version}-arm-unknown-linux-gnueabihf.zip`}>ARMv6 Linux, hardfloat (kernel 3.2, glibc 2.17)</a>
-- <a href={`${sitedata.github_url}/releases/download/${sitedata.version}/dnp3-${sitedata.version}-arm-unknown-linux-gnueabi.zip`}>ARMv6 Linux (kernel 3.2, glibc 2.17)</a>
-- <a href={`${sitedata.github_url}/releases/download/${sitedata.version}/dnp3-${sitedata.version}-x86_64-apple-darwin.zip`}>MacOS x64 (MacOS 10.7+, Lion+)</a>
+:::tip
+The CMake script is just a recipe for how you might integrate the library. You don't have to use it. Our distribution contains a single header file
+and a shared library that can be easily linked. Assuming that you've installed the shared library in /usr/lib, linking a program could be as simple
+as:
 
-:::warning
-MacOS x64 libraries are included in the package but are not officially supported. They are useful for developers using MacOS, but
-are not supported in production.
+```
+> gcc main.c -I./c-bindings/include -ldnp3_ffi
+> ldd a.out
+        linux-vdso.so.1 (0x00007ffec093e000)
+        libdnp3_ffi.so => /lib/libdnp3_ffi.so (0x00007f0054630000)
+        libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f005443e000)
+        libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f0054423000)
+        librt.so.1 => /lib/x86_64-linux-gnu/librt.so.1 (0x00007f0054419000)
+        libpthread.so.0 => /lib/x86_64-linux-gnu/libpthread.so.0 (0x00007f00543f6000)
+        libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f00542a7000)
+        libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007f005429f000)
+        /lib64/ld-linux-x86-64.so.2 (0x00007f0054c7c000)
+```
 :::
 
-## CMake Usage
+The example above shows how dependencies might look for an executable linked on a GLIBC based distribution such as Ubuntu. Libraries are also available for MUSL
+distributions such as Alpine Linux.
 
-Make the find package script discoverable by adding it to the prefix path. Next, call `find_package`:
+```
+> ldd a.out
+        /lib/ld-musl-x86_64.so.1 (0x7fbb1edeb000)
+        libdnp3_ffi.so => /usr/lib/libdnp3_ffi.so (0x7fbb1e894000)
+        libc.musl-x86_64.so.1 => /lib/ld-musl-x86_64.so.1 (0x7fbb1edeb000)
+        libgcc_s.so.1 => /usr/lib/libgcc_s.so.1 (0x7fbb1e87b000)
+```
+
+
+To use the provided CMake find package script, make it discoverable by adding it to the prefix path. Next, call `find_package`:
 
 ```cmake
 set(CMAKE_PREFIX_PATH ${DISTRIBUTION_PATH}/cmake)
-find_package(dnp3 REQUIRED)
+set(DNP3_RUST_TARGET x86_64-unknown-linux-gnu)
+find_package(rodbus REQUIRED)
 ```
 
-This call will expose three targets:
+:::tip
+The DNP3_RUST_TARGET variable can also be set via the command line when configuring cmake. It just tells the script which library to link.
 
-- `dnp3` which is a shared library. When using this target, you must make the DLL or .so file available to your executable. You can automatically copy it to the executable target directory using the following CMake
+```
+> mkdir build; cd build
+> cmake .. -DDNP3_RUST_TARGET=x86_64-unknown-linux-gnu
+```
+:::
+
+This call will expose the library target:
+
+- `dnp3` which is the library. When using this target, you must make the DLL or .so file available to your executable. You can automatically copy it to the executable target directory using the following CMake
   statement:
 
 ```cmake
@@ -54,12 +85,6 @@ add_custom_command(TARGET my_awesome_project POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:dnp3> $<TARGET_FILE_DIR:my_awesome_project>
 )
 ```
-
-- `dnp3_static` which is a static library. The library target includes information to link all the required system dependencies.
-
-:::note
-To use the static library on Windows, you must link with the static release C runtime using the `/MT` flag.
-:::
 
 Finally, declare a dependency on the library for your executable:
 
