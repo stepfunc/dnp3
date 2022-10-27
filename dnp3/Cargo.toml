@@ -8,6 +8,7 @@ description = "Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings f
 homepage = "https://stepfunc.io/products/libraries/dnp3/"
 repository = "https://github.com/stepfunc/dnp3"
 readme = "../README.md"
+exclude = ["./codegen"]
 
 [dependencies]
 tracing = "0.1"
