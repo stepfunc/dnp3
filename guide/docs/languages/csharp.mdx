@@ -14,8 +14,9 @@ Shared libraries for the following platforms are included in the Nuget package:
 
 - Windows x64 (Windows 7+)
 - Windows x86 (Windows 7+)
-- Linux x64 (kernel 2.6.32+, glibc 2.11+)
-- Linux AArch64 (kernel 4.2, glibc 2.17+)
+- Linux x64 (GLIBC and MUSL variants)
+- Linux AArch64 (GLIBC and MUSL variants)
+- Linux ARMv6hf (GLIBC and MUSL variants)
 - MacOS x64 (MacOS 10.7+, Lion+)
 
 :::warning
@@ -68,4 +69,6 @@ Rust task executing on the Tokio runtime. The `Shutdown` method lets you precise
 
 Abstract asynchronous methods are transformed into methods that return `Task<T>`. C# Tasks are flexible and can be consumed in different ways:
 
-* Synchronous applications can
+* Synchronous applications can just call `Task.Result` to block for the value. An exception will be thrown if the task errors.
+* Asynchronous methods can `await` the completion of the task.
+* Synchronous methods may also use the various combinators like `Task.ContinueWith` to process the result asynchronously.
