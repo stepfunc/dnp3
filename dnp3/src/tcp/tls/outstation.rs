@@ -176,6 +176,7 @@ impl rustls::server::ClientCertVerifier for SelfSignedCertificateClientCertVerif
         // Let rustls extract the subjects
         let mut store = rustls::RootCertStore::empty();
         let _ = store.add(&self.cert);
+        #[allow(deprecated)]
         Some(store.subjects())
     }
 
