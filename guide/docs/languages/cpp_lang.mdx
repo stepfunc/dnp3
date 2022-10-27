@@ -8,8 +8,25 @@ slug: /cpp_bindings
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import sitedata from '../../sitedata.json'
 
-Each [C package distribution](./c_lang.mdx) also includes C++ wrappers for easier usage. The `dnp3.hpp` file includes the public API
-and a `src/dnp3.cpp` contains the companion code.
+Each [C package distribution](./c_lang.mdx) also includes a C++ API that fully wraps the C API. The `dnp3.hpp` defines the public API
+and a `src/dnp3.cpp` maps this API to the underlying C API.
+
+```mermaid
+graph TD
+A[C++ Application]
+B[dnp3.hpp]
+C[dnp3.cpp]
+F[dnp3.o]
+D[dnp3.h]
+E[librodbus_ffi.so]
+A -- #include --> B
+C -- #include --> B
+C -- #include --> D
+A -- link --> E
+A -- link --> F
+C -- compile --> F
+```
+
 
 ## CMake Usage
 
@@ -23,6 +40,8 @@ project(my_awesome_project LANGUAGES C CXX)
 
 # Import the dnp3 package
 set(CMAKE_PREFIX_PATH ${DISTRIBUTION_PATH}/cmake)
+# Tell cmake which library we're linking
+set(DNP3_RUST_TARGET x86_64-unknown-linux-gnu)
 find_package(dnp3 REQUIRED)
 
 # Create and link the executable
