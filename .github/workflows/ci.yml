@@ -85,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -256,7 +256,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install dependencies
         working-directory: guide
         run: yarn install
@@ -336,7 +336,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -354,7 +354,7 @@ jobs:
         shell: bash
         run: (cd ffi/bindings/java/dnp3 && sudo mvn install)
       - name: Checkout dnp4s
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: stepfunc/dnp4s
           ssh-key: ${{ secrets.DNP4S_SSH_KEY }}
@@ -382,7 +382,7 @@ jobs:
         with:
           path: artifacts
       - name: Checkout stepfunc/docs
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: stepfunc/docs
           ssh-key: ${{ secrets.SFIO_DOCS_SSH_KEY }}
