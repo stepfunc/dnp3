@@ -464,7 +464,7 @@ pub(crate) fn define(
     let database_transaction = lib
         .define_interface("database_transaction", "Database transaction interface")?
         .begin_callback("execute", "Execute a transaction on the provided database")?
-        .param("database", database.declaration.clone(), "Database")?
+        .param("database", database.declaration(), "Database")?
         .enable_functional_transform()
         .end_callback()?
         .build_sync()?;

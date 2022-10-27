@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust ${{ matrix.rust }}
         uses: actions-rs/toolchain@v1
         with:
@@ -27,15 +27,9 @@ jobs:
           override: true
           components: rustfmt, clippy
       - name: Format
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+        run: cargo fmt --all -- --check
       - name: Clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+        run: cargo clippy -- -D warnings
   # Build the workspace with the feature permutations not built by default
   features:
     strategy:
@@ -48,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust ${{ matrix.rust }}
         uses: actions-rs/toolchain@v1
         with:
@@ -56,12 +50,10 @@ jobs:
           toolchain: stable
           override: true
       - name: Caching
-        uses: Swatinem/rust-cache@v1
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: Swatinem/rust-cache@v2
       - name: Build the workspace with the features
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args:  --release ${{ matrix.feature-args }}
+        run: cargo build --release ${{ matrix.feature-args }}
   # Run the unit tests on Windows and Linux
   test:
     strategy:
@@ -76,29 +68,24 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust ${{ matrix.rust }}
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: ${{ matrix.rust }}
           override: true
-      - name: Copy Windows config
-        if: ${{ runner.os == 'Windows' }}
-        shell: pwsh
-        run: Copy-Item -Path .cargo/config-windows.toml -Destination .cargo/config.toml
       - name: Caching
-        uses: Swatinem/rust-cache@v1
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: Swatinem/rust-cache@v2
       - name: Run Rust unit tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test
   # Build API documentation packages
   documentation:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -108,29 +95,18 @@ jobs:
       - name: Install doxygen 1.9.3
         run: wget -q https://www.doxygen.nl/files/doxygen-1.9.3.linux.bin.tar.gz -O- | sudo tar --strip-components=1 -C /usr -xz doxygen-1.9.3
       - name: Caching
-        uses: Swatinem/rust-cache@v1
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: Swatinem/rust-cache@v2
+      - name: Build FFI and JNI
+        run: cargo build --release -p dnp3-ffi -p dnp3-ffi-java
       - name: Build Rustdoc
         run: cargo doc -p dnp3 --no-deps
       - name: C bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --bin dnp3-bindings -- --c --doxygen
+        run: cargo run --bin dnp3-bindings -- --c --doxygen --no-tests
       - name: .NET bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --bin dnp3-bindings -- --dotnet --doxygen
+        run: cargo run --bin dnp3-bindings -- --dotnet --doxygen --no-tests
       - name: Java bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --bin dnp3-bindings -- --java
+        run: cargo run --bin dnp3-bindings -- --java
       - name: Extract documentation
         run: |
           mkdir -p ~/doc
@@ -141,7 +117,7 @@ jobs:
           cp -a ffi/bindings/java/dnp3/target/apidocs ~/doc/java
           rm ffi/bindings/c/generated/logo.png ffi/bindings/c/generated/doxygen-awesome.css
       - name: Upload documentation
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: doc
           path: ~/doc
@@ -153,12 +129,12 @@ jobs:
       matrix:
         include:
           - target: x86_64-pc-windows-msvc # 64-bit MSVC (Windows 7+)
-            extra-param: # nothing
+            test: true
           - target: i686-pc-windows-msvc # 32-bit MSVC (Windows 7+)
-            extra-params: --no-tests
+            test: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -166,58 +142,46 @@ jobs:
           toolchain: stable
           override: true
           target: ${{ matrix.target }}
-      - name: Copy Windows config
-        shell: pwsh
-        run: Copy-Item -Path .cargo/config-windows.toml -Destination .cargo/config.toml
       - name: Caching
-        uses: Swatinem/rust-cache@v1
-      - name: Create log dir
-        run: mkdir logs\${{ matrix.target }}
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: Swatinem/rust-cache@v2
+      - name: Create FFI modules DIR
+        run: mkdir ffi-modules\${{ matrix.target }}
       - name: Build FFI
-        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\logs\${{ matrix.target }}\build.ffi.log
+        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\ffi-modules\${{ matrix.target }}\build.jni.log
       - name: Build JNI
-        run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\logs\${{ matrix.target }}\build.jni.log
-      - name: Upload Build Logs
+        run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\ffi-modules\${{ matrix.target }}\build.jni.log
+      - name: Copy the FFI and JNI libs
+        shell: pwsh
+        run: |
+          Copy-Item -Path ./target/${{ matrix.target }}/release/dnp3_ffi.dll -Destination ffi-modules/${{ matrix.target }}
+          Copy-Item -Path ./target/${{ matrix.target }}/release/dnp3_ffi.dll.lib -Destination ffi-modules/${{ matrix.target }}
+          Copy-Item -Path ./target/${{ matrix.target }}/release/dnp3_ffi_java.dll -Destination ffi-modules/${{ matrix.target }}
+      - name: Upload compiled FFI modules
         uses: actions/upload-artifact@v3
         with:
           name: ffi-modules
-          path: logs
-      - name: C bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --c ${{ matrix.extra-params }}
-      - name: .NET bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --dotnet ${{ matrix.extra-params }}
-      - name: Java bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --java ${{ matrix.extra-params }}
-      - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi/bindings/c/generated/${{ matrix.target }}/lib
-      - name: Upload C bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: c-bindings
-          path: ffi/bindings/c/generated
-      - name: Upload compiled Java bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi/bindings/java/dnp3/src/main/resources
+          path: ffi-modules
+      - name: Test C Bindings
+        if: ${{ matrix.test }}
+        run: cargo run --bin dnp3-bindings -- --c -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
+      - name: Test .NET Bindings
+        if: ${{ matrix.test }}
+        run: cargo run --bin dnp3-bindings -- --dotnet -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
+      - name: Test Java
+        if: ${{ matrix.test }}
+        run: cargo run --bin dnp3-bindings -- --java -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
   # Build bindings on MacOS [64-bit macOS (10.7+, Lion+) (x86_64-apple-darwin)]
   bindings-macos:
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-apple-darwin # 64-bit macOS (10.7+, Lion+)
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -225,50 +189,29 @@ jobs:
           toolchain: stable
           override: true
       - name: Caching
-        uses: Swatinem/rust-cache@v1
-      - name: Create Log Dir
-        run: mkdir -p logs/x86_64-apple-darwin
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: Swatinem/rust-cache@v2
+      - name: Create FFI modules dir
+        run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cargo build -p dnp3-ffi --release --message-format json > logs/x86_64-apple-darwin/build.ffi.log
+        run: cargo build -p dnp3-ffi --release --message-format json > ffi-modules/${{ matrix.target }}/build.ffi.log
       - name: Build JNI
-        run: cargo build -p dnp3-ffi-java --release --message-format json > logs/x86_64-apple-darwin/build.jni.log
-      - name: Upload Build Logs
+        run: cargo build -p dnp3-ffi-java --release --message-format json > ffi-modules/${{ matrix.target }}/build.jni.log
+      - name: Copy the FFI and JNI libs
+        run: |
+          cp ./target/release/libdnp3_ffi.dylib ./ffi-modules/${{ matrix.target }}
+          cp ./target/release/libdnp3_ffi_java.dylib ./ffi-modules/${{ matrix.target }}
+      - name: Upload compiled FFI modules
         uses: actions/upload-artifact@v3
         with:
           name: ffi-modules
-          path: logs
-      - name: C bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --bin dnp3-bindings -- --c
-      - name: .NET bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --bin dnp3-bindings -- --dotnet
-      - name: Java bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --bin dnp3-bindings -- --java
-      - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi/bindings/c/generated/x86_64-apple-darwin/lib
-      - name: Upload C bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: c-bindings
-          path: ffi/bindings/c/generated
-      - name: Upload compiled Java bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi/bindings/java/dnp3/src/main/resources
+          path: ffi-modules
+      - name: Test .NET bindings
+        run: cargo run --bin dnp3-bindings -- --dotnet
+      - name: Test Java bindings
+        run: cargo run --bin dnp3-bindings -- --java
   # Cross-compilation for Linux to produce portable C and JNI libraries
-  cross:
+  bindings-linux:
     strategy:
       fail-fast: false
       matrix:
@@ -281,7 +224,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -289,46 +232,31 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
+      - name: Caching
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: Swatinem/rust-cache@v2
       - name: Install Rust Cross
         run: cargo install cross
-      - name: Create Log Dir
-        run: mkdir -p logs/${{ matrix.target }}
+      - name: Create FFI modules dir
+        run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cross build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json > logs/${{ matrix.target }}/build.ffi.log
+        run: cross build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json > ffi-modules/${{ matrix.target }}/build.ffi.log
       - name: Build JNI
-        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json > logs/${{ matrix.target }}/build.jni.log
-      - name: C bindings
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: run
-          args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --c --no-tests
-      - name: Java bindings
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: run
-          args: --release --target ${{ matrix.target }} --bin dnp3-bindings -- --java --no-tests
+        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json > ffi-modules/${{ matrix.target }}/build.jni.log
+      - name: Copy the FFI and JNI libs
+        run: |
+          cp ./target/${{ matrix.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.target }}
+          cp ./target/${{ matrix.target }}/release/libdnp3_ffi_java.so ./ffi-modules/${{ matrix.target }}
       - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ffi-modules
-          path: ffi/bindings/c/generated/${{ matrix.target }}/lib
-      - name: Upload compiled Java bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: ffi-modules
-          path: ffi/bindings/java/dnp3/src/main/resources
-      - name: Upload C bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: c-bindings
-          path: ffi/bindings/c/generated
+          path: ffi-modules
   guide:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install dependencies
         working-directory: guide
         run: yarn install
@@ -339,13 +267,13 @@ jobs:
          mkdir -p ~/doc/guide
          mv build/* ~/doc/guide
       - name: Upload guide
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: doc
           path: ~/doc
   # Package all the generated bindings
   packaging:
-    needs: [documentation, bindings-windows, bindings-macos, cross]
+    needs: [documentation, bindings-windows, bindings-macos, bindings-linux]
     runs-on: ubuntu-latest
     steps:
       - name: Install Rust
@@ -355,7 +283,8 @@ jobs:
           toolchain: stable
           override: true
       - name: Caching
-        uses: Swatinem/rust-cache@v1
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: Swatinem/rust-cache@v2
       - name: Checkout BOM tools repo
         uses: actions/checkout@v3
         with:
@@ -368,36 +297,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Download compiled FFI
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: ffi-modules
           path: ffi-modules
       - name: Create FFI third-party-licenses.txt
         run: bom-tools gen-licenses-dir ./ffi-modules build.ffi.log ./dep_config.json > third-party-licenses.txt
+      - name: Package C/C++ bindings
+        run: cargo run --bin dnp3-bindings -- --c --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
       - name: Package .NET bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --bin dnp3-bindings -- --dotnet --package ./ffi-modules -f third-party-licenses.txt
-      - name: Upload .NET bindings
-        uses: actions/upload-artifact@v2
-        with:
-          name: dotnet-bindings
-          path: ffi/bindings/dotnet/nupkg/dnp3*
+        run: cargo run --bin dnp3-bindings -- --dotnet --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
       - name: Create JNI third-party-licenses.txt
         run: bom-tools gen-licenses-dir ./ffi-modules build.jni.log ./dep_config.json > third-party-licenses.txt
       - name: Package Java bindings
-        uses: actions-rs/cargo@v1
+        run: cargo run --bin dnp3-bindings -- --java --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
+      - name: Upload C/C++ bindings
+        uses: actions/upload-artifact@v3
         with:
-          command: run
-          args: --bin dnp3-bindings -- --java --package ./ffi-modules -f third-party-licenses.txt
+          name: c-bindings
+          path: ffi/bindings/c/generated/*
+      - name: Upload .NET bindings
+        uses: actions/upload-artifact@v3
+        with:
+          name: dotnet-bindings
+          path: ffi/bindings/dotnet/nupkg/dnp3*
       - name: Upload Java bindings
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: java-bindings
           path: ffi/bindings/java/dnp3/target/*.jar
       - name: Upload Java pom.xml
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: java-bindings
           path: ffi/bindings/java/dnp3/pom.xml
@@ -406,7 +336,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -414,17 +344,17 @@ jobs:
           toolchain: stable
           override: true
       - name: Caching
-        uses: Swatinem/rust-cache@v1
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: Swatinem/rust-cache@v2
+      - name: Build JNI
+        run: cargo build --release -p dnp3-ffi-java
       - name: Build Java bindings
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --bin dnp3-bindings -- --java
+        run: cargo run --release --bin dnp3-bindings -- --java
       - name: Install Java bindings
         shell: bash
         run: (cd ffi/bindings/java/dnp3 && sudo mvn install)
       - name: Checkout dnp4s
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: stepfunc/dnp4s
           ssh-key: ${{ secrets.DNP4S_SSH_KEY }}
@@ -438,7 +368,7 @@ jobs:
         run: sudo mvn --batch-mode scala:run
       - name: Upload conformance test results
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: conformance-results
           path: conformance/results
@@ -452,7 +382,7 @@ jobs:
         with:
           path: artifacts
       - name: Checkout stepfunc/docs
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: stepfunc/docs
           ssh-key: ${{ secrets.SFIO_DOCS_SSH_KEY }}

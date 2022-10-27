@@ -9,12 +9,12 @@ tracing = "0.1"
 chrono = "0.4"
 tokio = { version = "1", features = ["net", "sync", "io-util", "io-std", "time", "rt", "rt-multi-thread", "macros"] }
 xxhash-rust = { version = "0.8.2", features = ["xxh64"] }
-scursor = { git = "https://github.com/stepfunc/scursor.git", tag = "0.1.0" }
+scursor = "0.1.0"
 
 # TLS dependencies
 pem = { version = "1.0", optional = true }
 pkcs8 = { version = "0.7", features = ["encryption", "pem", "std"], optional = true }
-rasn = { git = "https://github.com/stepfunc/rasn", tag = "0.1.2", optional = true }
+rx509 = { version = "0.2", optional = true }
 tokio-rustls = { version = "0.23", features = ["dangerous_configuration", "tls12"], default-features = false, optional = true }
 
 # serial dependencies
@@ -23,7 +23,7 @@ tokio-serial = { version = "5.4", optional = true }
 [dev-dependencies]
 futures = { version = "0.3.24" }
 clap = { version = "3.2.20", features = ["derive"] }
-tokio-mock-io = { git = "https://github.com/stepfunc/tokio-mock-io.git", tag = "0.2.0" }
+sfio-tokio-mock-io = "0.2.0"
 assert_matches = "1.2"
 tracing-subscriber = "0.2"
 tokio-util = { version = "0.6", features = ["codec"] }
@@ -34,5 +34,5 @@ tokio = { version = "1", features = ["test-util"] }
 [features]
 default = ["tls", "serial"]
 ffi = [] # this feature flag is only used when building the FFI
-tls = ["pem", "pkcs8", "rasn", "tokio-rustls"]
+tls = ["pem", "pkcs8", "rx509", "tokio-rustls"]
 serial = ["tokio-serial"]

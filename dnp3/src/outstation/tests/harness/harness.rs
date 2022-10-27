@@ -35,7 +35,7 @@ pub(crate) fn get_default_unsolicited_config() -> OutstationConfig {
 
 pub(crate) struct OutstationHarness {
     pub(crate) handle: OutstationHandle,
-    pub(crate) io: tokio_mock_io::Handle,
+    pub(crate) io: sfio_tokio_mock_io::Handle,
     task: JoinHandle<RunError>,
     events: EventReceiver,
     pub(crate) application_data: Arc<Mutex<ApplicationData>>,
@@ -50,13 +50,13 @@ impl OutstationHarness {
     pub(crate) async fn expect_response(&mut self, response: &[u8]) {
         assert_eq!(
             self.io.next_event().await,
-            tokio_mock_io::Event::Write(response.to_vec())
+            sfio_tokio_mock_io::Event::Write(response.to_vec())
         );
     }
 
     pub(crate) async fn send_and_process(&mut self, request: &[u8]) {
         self.io.read(request);
-        assert_eq!(self.io.next_event().await, tokio_mock_io::Event::Read);
+        assert_eq!(self.io.next_event().await, sfio_tokio_mock_io::Event::Read);
     }
 
     pub(crate) async fn wait_for_events(&mut self, expected: &[Event]) {
@@ -129,7 +129,7 @@ fn new_harness_impl(
             FrameType::Data,
         ));
 
-    let (io, io_handle) = tokio_mock_io::mock();
+    let (io, io_handle) = sfio_tokio_mock_io::mock();
 
     let mut io = PhysLayer::Mock(io);
 

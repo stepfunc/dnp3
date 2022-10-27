@@ -22,7 +22,7 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
     // use a 1 second timeout for all tests
     config.response_timeout = Timeout::from_secs(1).unwrap();
 
-    let (io, io_handle) = tokio_mock_io::mock();
+    let (io, io_handle) = sfio_tokio_mock_io::mock();
 
     let mut io = PhysLayer::Mock(io);
 
@@ -235,14 +235,14 @@ pub(crate) struct TestHarness {
     pub(crate) master: MasterChannel,
     pub(crate) association: AssociationHandle,
     pub(crate) num_requests: Arc<AtomicU64>,
-    pub(crate) io: tokio_mock_io::Handle,
+    pub(crate) io: sfio_tokio_mock_io::Handle,
 }
 
 impl TestHarness {
     pub(crate) async fn expect_write(&mut self, expected: Vec<u8>) {
         assert_eq!(
             self.io.next_event().await,
-            tokio_mock_io::Event::Write(expected)
+            sfio_tokio_mock_io::Event::Write(expected)
         );
     }
 
@@ -258,7 +258,7 @@ impl TestHarness {
 
     pub(crate) async fn process_response(&mut self, data: Vec<u8>) {
         self.io.read(&data);
-        assert_eq!(self.io.next_event().await, tokio_mock_io::Event::Read);
+        assert_eq!(self.io.next_event().await, sfio_tokio_mock_io::Event::Read);
     }
 
     pub(crate) fn num_requests(&self) -> u64 {

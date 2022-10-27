@@ -78,7 +78,7 @@ pub fn build_lib() -> BackTraced<Library> {
     let shared_def = shared::define(&mut builder)?;
 
     // common logging interface with other libraries
-    tracing_ffi_schema::define(&mut builder, shared_def.error_type.clone())?;
+    sfio_tracing_ffi::define(&mut builder, shared_def.error_type.clone())?;
 
     // master and outstation APIs
     master::define(&mut builder, &shared_def)?;

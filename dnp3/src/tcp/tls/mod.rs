@@ -102,7 +102,7 @@ fn verify_dns_name(cert: &rustls::Certificate, server_name: &str) -> Result<(), 
         Err(webpki::Error::CertNotValidForName) => {
             // Let's extend our search to the CN
             // Parse the certificate using rasn
-            let parsed_cert = rasn::x509::Certificate::parse(&cert.0).map_err(|err| {
+            let parsed_cert = rx509::x509::Certificate::parse(&cert.0).map_err(|err| {
                 rustls::Error::InvalidCertificateData(format!(
                     "unable to parse cert with rasn: {:?}",
                     err
@@ -123,7 +123,7 @@ fn verify_dns_name(cert: &rustls::Certificate, server_name: &str) -> Result<(), 
                 if extensions.iter().any(|x| {
                     matches!(
                         x.content,
-                        rasn::extensions::SpecificExtension::SubjectAlternativeName(_)
+                        rx509::x509::ext::SpecificExtension::SubjectAlternativeName(_)
                     )
                 }) {
                     return Err(rustls::Error::InvalidCertificateData(

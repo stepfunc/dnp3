@@ -12,7 +12,7 @@ use crate::tcp::EndpointList;
 use crate::tcp::{ClientState, MasterTask, MasterTaskConnectionHandler};
 use crate::util::phys::PhysLayer;
 
-use rasn;
+use rx509;
 use tokio::net::TcpStream;
 use tokio_rustls::{rustls, webpki};
 use tracing::Instrument;
@@ -305,7 +305,7 @@ impl rustls::client::ServerCertVerifier for SelfSignedCertificateServerCertVerif
         }
 
         // Check that the certificate is still valid
-        let parsed_cert = rasn::x509::Certificate::parse(&end_entity.0).map_err(|err| {
+        let parsed_cert = rx509::x509::Certificate::parse(&end_entity.0).map_err(|err| {
             rustls::Error::InvalidCertificateData(format!(
                 "unable to parse cert with rasn: {:?}",
                 err
@@ -315,7 +315,7 @@ impl rustls::client::ServerCertVerifier for SelfSignedCertificateServerCertVerif
         let now = now
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|_| rustls::Error::FailedToGetCurrentTime)?;
-        let now = rasn::types::UtcTime::from_seconds_since_epoch(now.as_secs());
+        let now = rx509::der::UtcTime::from_seconds_since_epoch(now.as_secs());
 
         if !parsed_cert.tbs_certificate.value.validity.is_valid(now) {
             return Err(rustls::Error::InvalidCertificateData(
