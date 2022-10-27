@@ -117,7 +117,7 @@ jobs:
           cp -a ffi/bindings/java/dnp3/target/apidocs ~/doc/java
           rm ffi/bindings/c/generated/logo.png ffi/bindings/c/generated/doxygen-awesome.css
       - name: Upload documentation
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: doc
           path: ~/doc
@@ -267,7 +267,7 @@ jobs:
          mkdir -p ~/doc/guide
          mv build/* ~/doc/guide
       - name: Upload guide
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: doc
           path: ~/doc
@@ -368,7 +368,7 @@ jobs:
         run: sudo mvn --batch-mode scala:run
       - name: Upload conformance test results
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: conformance-results
           path: conformance/results
