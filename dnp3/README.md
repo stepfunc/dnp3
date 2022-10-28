@@ -18,11 +18,17 @@ Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET
   - Official support for: Windows x64 and Linux x64, AArch64, ARMv7 and ARMv6
   - Unofficial support: MacOS, PowerPC, MIPS, FreeBSD, and others
 
+# Cargo Features
+
+Default features can be disabled at compile time:
+* `tls` - Build the library with support for TLS (secure Modbus)
+* `serial` - Build the library with support for Modbus RTU and serial ports
+
 # License
 
 This crate is made available under a non-commercial / non-production license.
-Refer to [`LICENSE.txt`](https://github.com/stepfunc/dnp3/LICENSE.txt) for the terms 
-of the non-commercial license.
+Refer to [`LICENSE.txt`](https://raw.githubusercontent.com/stepfunc/dnp3/main/LICENSE.txt) for the terms
+of this non-commercial license.
 
 This software is publicly available, but is not "open source".
 __You must purchase a commercial license to use this software for profit.__
@@ -30,3 +36,8 @@ __You must purchase a commercial license to use this software for profit.__
 Please inquire about commercial licensing on our website:
 
 [https://stepfunc.io/contact/](https://stepfunc.io/contact/)
+
+## Bindings
+
+Bindings in C, C++, java, and .NET Core are available for this library. See the
+[documentation](https://stepfunc.io/products/libraries/dnp3/) for more details.
