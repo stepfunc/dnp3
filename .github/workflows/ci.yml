@@ -389,11 +389,13 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           path: artifacts
-      - name: Package C Bindings & Conformance Results
+      - name: Package C Bindings and Conformance Results
         run: |
           mkdir release
-          zip -r -j release/dnp3-${GITHUB_REF##*/}.zip artifacts/c-bindings
-          zip -r -j release/conformance-results.zip artifacts/conformance-results
+          cd artifacts/c-bindings
+          zip -r ../../release/dnp3-${GITHUB_REF##*/}.zip .
+          cd ../conformance-results
+          zip -r ../../release/conformance-results.zip .
       - name: Checkout stepfunc/docs
         uses: actions/checkout@v3
         with:
