@@ -92,8 +92,8 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - name: Install doxygen 1.9.3
-        run: wget -q https://www.doxygen.nl/files/doxygen-1.9.3.linux.bin.tar.gz -O- | sudo tar --strip-components=1 -C /usr -xz doxygen-1.9.3
+      - name: Install doxygen 1.9.5
+        run: wget -q https://github.com/stepfunc/ci-files/raw/main/doxygen/doxygen-1.9.5.linux.bin.tar.gz -O- | sudo tar --strip-components=1 -C /usr -xz doxygen-1.9.5
       - name: Caching
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: Swatinem/rust-cache@v2
