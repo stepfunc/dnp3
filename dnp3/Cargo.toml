@@ -7,6 +7,8 @@ license-file = "../LICENSE.txt"
 description = "Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET, and Java"
 homepage = "https://stepfunc.io/products/libraries/dnp3/"
 repository = "https://github.com/stepfunc/dnp3"
+keywords = ["dnp3", "ics", "scada", "security", "modbus"]
+categories = ["network-programming"]
 readme = "README.md"
 exclude = ["codegen"] # the scala code used to generate parts of the crate
 
