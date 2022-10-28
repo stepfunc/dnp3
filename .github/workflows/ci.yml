@@ -392,8 +392,8 @@ jobs:
       - name: Package C Bindings & Conformance Results
         run: |
           mkdir release
-          zip -r release/dnp3-${GITHUB_REF##*/}.zip artifacts/c-bindings
-          zip -r release/conformance-results.zip artifacts/conformance-results
+          zip -r -j release/dnp3-${GITHUB_REF##*/}.zip artifacts/c-bindings
+          zip -r -j release/conformance-results.zip artifacts/conformance-results
       - name: Checkout stepfunc/docs
         uses: actions/checkout@v3
         with:
