@@ -714,7 +714,7 @@ fn define_utc_timestamp(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
 
     let timestamp_utc = lib.declare_universal_struct("utc_timestamp")?;
     let timestamp_utc = lib.define_universal_struct(timestamp_utc)?
-        .add(&value, Primitive::U64, doc("Value of the timestamp (in milliseconds from UNIX Epoch).").warning("Only 48 bits are available for timestamps."))?
+        .add(&value, Primitive::U64, doc("Count of milliseconds since UNIX epoch").warning("Only the lower 48-bits are used in DNP3 timestamps and time synchronization"))?
         .add(&is_valid, Primitive::Bool, "True if the timestamp is valid, false otherwise.")?
         .doc(doc("Timestamp value returned by {interface:association_handler.get_current_time()}.").details("{struct:utc_timestamp.value} is only valid if {struct:utc_timestamp.is_valid} is true."))?
         .end_fields()?
