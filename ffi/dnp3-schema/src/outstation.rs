@@ -311,7 +311,7 @@ fn define_class_zero_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
         .add(
             &octet_strings,
             Primitive::Bool,
-            doc("Include Binary Inputs in Class 0 reads")
+            doc("Include Octet Strings in Class 0 reads")
                 .warning("For conformance, this should be false."),
         )?
         .doc("Controls which types are reported during a Class 0 read.")?
