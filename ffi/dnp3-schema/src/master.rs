@@ -714,7 +714,7 @@ fn define_utc_timestamp(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
 
     let timestamp_utc = lib.declare_universal_struct("utc_timestamp")?;
     let timestamp_utc = lib.define_universal_struct(timestamp_utc)?
-        .add(&value, Primitive::U64, doc("Value of the timestamp (in milliseconds from UNIX Epoch).").warning("Only 48 bits are available for timestamps."))?
+        .add(&value, Primitive::U64, doc("Count of milliseconds since UNIX epoch").warning("Only the lower 48-bits are used in DNP3 timestamps and time synchronization"))?
         .add(&is_valid, Primitive::Bool, "True if the timestamp is valid, false otherwise.")?
         .doc(doc("Timestamp value returned by {interface:association_handler.get_current_time()}.").details("{struct:utc_timestamp.value} is only valid if {struct:utc_timestamp.is_valid} is true."))?
         .end_fields()?
@@ -810,7 +810,8 @@ fn define_association_information(
             shared.function_code.clone(),
             "Function code used by the task",
         )?
-        .param("seq", Primitive::U8, "Sequence number of the request")?
+        .param("seq", Primitive::U8, "Sequence number of the response that completed the request. This will typically be the same as the seq number in the request, except for READ requests where the response is multi-fragmented."
+        )?
         .end_callback()?
         .begin_callback("task_fail", "Called when a task fails")?
         .param("task_type", task_type, "Type of task that was completed")?

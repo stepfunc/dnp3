@@ -508,9 +508,9 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStr
     let timestamp_struct = lib.declare_universal_struct("timestamp")?;
     let timestamp_struct = lib
         .define_universal_struct(timestamp_struct)?
-        .add(&value, Primitive::U64, "Timestamp value")?
-        .add(&quality, time_quality_enum, "Timestamp quality")?
-        .doc("Timestamp value")?
+        .add(&value, Primitive::U64, doc("Count of milliseconds since UNIX epoch").warning("Only the lower 48-bits are used in DNP3 timestamps and time synchronization"))?
+        .add(&quality, time_quality_enum, "Enumeration that indicates the timestamp's validity")?
+        .doc("Timestamp associated with particular measurement from the outstation. The validity of the value depends on the quality.")?
         .end_fields()?
         .begin_initializer(
             "invalid_timestamp",

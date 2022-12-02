@@ -484,7 +484,10 @@ pub(crate) fn define(
     let database_handle = lib
         .define_class(&database_handle)?
         .method(transaction_method)?
-        .doc("handle used to perform transactions on the database")?
+        .doc(
+            doc("Handle typed used to perform transactions on the database inside of control and freeze callbacks")
+                .details("This type has the same transaction method as {class:outstation.transaction()} but it is only used in these callbacks.")
+        )?
         .build()?;
 
     Ok(DatabaseTypes {
