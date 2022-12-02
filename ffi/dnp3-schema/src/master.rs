@@ -810,7 +810,8 @@ fn define_association_information(
             shared.function_code.clone(),
             "Function code used by the task",
         )?
-        .param("seq", Primitive::U8, "Sequence number of the request")?
+        .param("seq", Primitive::U8, "Sequence number of the response that completed the request. This will typically be the same as the seq number in the request, except for READ requests where the response is multi-fragmented."
+        )?
         .end_callback()?
         .begin_callback("task_fail", "Called when a task fails")?
         .param("task_type", task_type, "Type of task that was completed")?
