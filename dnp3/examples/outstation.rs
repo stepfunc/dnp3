@@ -486,6 +486,15 @@ fn get_outstation_config() -> OutstationConfig {
 
 // ANCHOR: event_buffer_config
 fn get_event_buffer_config() -> EventBufferConfig {
-    EventBufferConfig::all_types(100)
+    EventBufferConfig::new(
+        10, // binary
+        10, // double-bit binary
+        10, // binary output status
+        5,  // counter
+        5,  // frozen counter
+        5,  // analog
+        5,  // analog output status
+        3,  // octet string
+    )
 }
 // ANCHOR_END: event_buffer_config
