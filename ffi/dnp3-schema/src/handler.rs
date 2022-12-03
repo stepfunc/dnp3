@@ -70,46 +70,37 @@ pub fn define(
 
     let read_type = define_read_type_enum(lib)?;
 
+    let iterator_doc = "{iterator} of values from the response";
+
     let read_handler_interface = lib
         .define_interface(
             "read_handler",
-            "General handler that will receive all values read from the outstation.",
+            doc("Callback interface used to received measurement values received from the outstation.")
+                .details("Methods are always invoked in the following order. {interface:read_handler.begin_fragment()} is called first, followed by one or more of the measurement handlers, and finally {interface:read_handler.end_fragment()} is called."),
         )?
-        .begin_callback("begin_fragment", "Marks the beginning of a fragment")?
+        .begin_callback("begin_fragment", "Called when a valid response fragment is received, but before any measurements are processed")?
         .param(
             "read_type",
             read_type.clone(),
-            "Describes what triggered the read event"
+            "Describes what triggered the callback, e.g. response to a poll vs an unsolicited response",
         )?
-        .param(
-            "header",
-            response_header.clone(),
-            "Header of the fragment",
-        )?
+        .param("header", response_header.clone(), "Header of the fragment")?
         .end_callback()?
-        .begin_callback("end_fragment", "Marks the end of a fragment")?
+        .begin_callback("end_fragment", "Called when all the data from a response fragment has been processed")?
         .param(
             "read_type",
             read_type,
-            "Describes what triggered the read event"
+            "Describes what triggered the read event",
         )?
-        .param(
-            "header",
-           response_header,
-            "Header of the fragment",
-        )?
+        .param("header", response_header, "Header of the fragment")?
         .end_callback()?
         .begin_callback("handle_binary_input", "Handle binary input data")?
         .param(
             "info",
-           header_info.clone(),
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
-        .param(
-            "it",
-           shared_def.binary_it.clone(),
-                "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
-        )?
+        .param("values", shared_def.binary_it.clone(), iterator_doc)?
         .end_callback()?
         .begin_callback(
             "handle_double_bit_binary_input",
@@ -117,15 +108,14 @@ pub fn define(
         )?
         .param(
             "info",
-           header_info.clone(),
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
-            "it",
-           shared_def.double_bit_binary_it.clone(),
-            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
+            "values",
+            shared_def.double_bit_binary_it.clone(),
+            iterator_doc,
         )?
-
         .end_callback()?
         .begin_callback(
             "handle_binary_output_status",
@@ -133,54 +123,38 @@ pub fn define(
         )?
         .param(
             "info",
-           header_info.clone(),
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
-            "it",
-           shared_def.binary_output_status_it.clone(),
-            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
+            "values",
+            shared_def.binary_output_status_it.clone(),
+            iterator_doc,
         )?
-
         .end_callback()?
         .begin_callback("handle_counter", "Handle counter data")?
         .param(
             "info",
-           header_info.clone(),
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
-        .param(
-            "it",
-           shared_def.counter_it.clone(),
-            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
-        )?
-
+        .param("values", shared_def.counter_it.clone(), iterator_doc)?
         .end_callback()?
         .begin_callback("handle_frozen_counter", "Handle frozen counter input data")?
         .param(
             "info",
-           header_info.clone(),
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
-        .param(
-            "it",
-           shared_def.frozen_counter_it.clone(),
-            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
-        )?
-
+        .param("values", shared_def.frozen_counter_it.clone(), iterator_doc)?
         .end_callback()?
         .begin_callback("handle_analog_input", "Handle analog input data")?
         .param(
             "info",
-           header_info.clone(),
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
-        .param(
-            "it",
-           shared_def.analog_it.clone(),
-            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
-        )?
-
+        .param("values", shared_def.analog_it.clone(), iterator_doc)?
         .end_callback()?
         .begin_callback(
             "handle_analog_output_status",
@@ -188,28 +162,22 @@ pub fn define(
         )?
         .param(
             "info",
-           header_info.clone(),
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
-            "it",
-           shared_def.analog_output_status_it.clone(),
-            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
+            "values",
+            shared_def.analog_output_status_it.clone(),
+            iterator_doc,
         )?
-
         .end_callback()?
         .begin_callback("handle_octet_string", "Handle octet string data")?
         .param(
             "info",
-           header_info,
+            header_info,
             "Group/variation and qualifier information",
         )?
-        .param(
-            "it",
-           shared_def.octet_string_it.clone(),
-            "Iterator of point values in the response. This iterator is valid only within this call. Do not copy it."
-        )?
-
+        .param("values", shared_def.octet_string_it.clone(), iterator_doc)?
         .end_callback()?
         .build_async()?;
 
