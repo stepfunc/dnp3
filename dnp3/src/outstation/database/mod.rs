@@ -9,7 +9,7 @@ use crate::app::Iin2;
 use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
 
-use crate::outstation::EventListener;
+use crate::outstation::OptionalEventListener;
 use scursor::WriteCursor;
 
 mod config;
@@ -281,7 +281,7 @@ impl Database {
         max_read_selection: Option<u16>,
         class_zero_config: ClassZeroConfig,
         config: EventBufferConfig,
-        listener: Box<dyn EventListener>,
+        listener: OptionalEventListener,
     ) -> Self {
         Self {
             inner: details::database::Database::new(
@@ -323,7 +323,7 @@ impl DatabaseHandle {
         max_read_selection: Option<u16>,
         class_zero_config: ClassZeroConfig,
         event_config: EventBufferConfig,
-        listener: Box<dyn EventListener>,
+        listener: OptionalEventListener,
     ) -> Self {
         Self {
             inner: Arc::new(Mutex::new(Database::new(

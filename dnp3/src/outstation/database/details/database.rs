@@ -9,7 +9,7 @@ use crate::outstation::database::{
     ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateOptions,
 };
 
-use crate::outstation::EventListener;
+use crate::outstation::OptionalEventListener;
 use scursor::WriteCursor;
 
 pub(crate) struct Database {
@@ -22,7 +22,7 @@ impl Database {
         max_read_selection: Option<u16>,
         class_zero_config: ClassZeroConfig,
         config: EventBufferConfig,
-        listener: Box<dyn EventListener>,
+        listener: OptionalEventListener,
     ) -> Self {
         Self {
             static_db: StaticDatabase::new(max_read_selection, class_zero_config),
