@@ -242,7 +242,7 @@ impl Counters {
 }
 
 #[derive(Debug, PartialEq)]
-struct Variation<T>
+pub(crate) struct Variation<T>
 where
     T: Copy,
 {
@@ -267,7 +267,7 @@ where
 }
 
 #[derive(Debug, PartialEq)]
-enum Event {
+pub(crate) enum Event {
     Binary(
         measurement::BinaryInput,
         Variation<EventBinaryInputVariation>,
@@ -363,12 +363,7 @@ pub(crate) trait Insertable: Sized {
     fn is_type(record: &EventRecord) -> bool;
     fn decrement_type(counter: &mut TypeCounter);
     fn increment_type(counter: &mut TypeCounter);
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: Self::EventVariation,
-    ) -> EventRecord;
+    fn create_event(&self, default_variation: Self::EventVariation) -> Event;
     // set the selected variation if the record is of this type
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool;
 }
@@ -379,6 +374,7 @@ pub(crate) struct EventBuffer {
     total: Counters,
     written: Counters,
     is_overflown: bool,
+    _next_id: u64,
     _listener: Box<dyn EventListener>,
 }
 
@@ -402,6 +398,7 @@ impl EventBuffer {
             total: Counters::new(),
             written: Counters::new(),
             is_overflown: false,
+            _next_id: 0,
             _listener: listener,
         }
     }
@@ -442,8 +439,11 @@ impl EventBuffer {
             Ok(())
         };
 
-        self.events
-            .add(event.create_event_record(index, class, default_variation));
+        self.events.add(EventRecord::new(
+            index,
+            class,
+            event.create_event(default_variation),
+        ));
         self.total.classes.increment(class);
         T::increment_type(&mut self.total.types);
 
@@ -670,17 +670,8 @@ impl Insertable for measurement::BinaryInput {
         counter.num_binary.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventBinaryInputVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::Binary(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventBinaryInputVariation) -> Event {
+        Event::Binary(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -716,17 +707,8 @@ impl Insertable for measurement::DoubleBitBinaryInput {
         counter.num_double_binary.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventDoubleBitBinaryInputVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::DoubleBitBinary(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventDoubleBitBinaryInputVariation) -> Event {
+        Event::DoubleBitBinary(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -762,17 +744,8 @@ impl Insertable for measurement::BinaryOutputStatus {
         counter.num_binary_output_status.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventBinaryOutputStatusVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::BinaryOutputStatus(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventBinaryOutputStatusVariation) -> Event {
+        Event::BinaryOutputStatus(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -808,17 +781,8 @@ impl Insertable for measurement::Counter {
         counter.num_counter.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventCounterVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::Counter(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventCounterVariation) -> Event {
+        Event::Counter(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -854,17 +818,8 @@ impl Insertable for measurement::FrozenCounter {
         counter.num_frozen_counter.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventFrozenCounterVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::FrozenCounter(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventFrozenCounterVariation) -> Event {
+        Event::FrozenCounter(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -900,17 +855,8 @@ impl Insertable for measurement::AnalogInput {
         counter.num_analog.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventAnalogInputVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::Analog(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventAnalogInputVariation) -> Event {
+        Event::Analog(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -946,17 +892,8 @@ impl Insertable for measurement::AnalogOutputStatus {
         counter.num_analog_output_status.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventAnalogOutputStatusVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::AnalogOutputStatus(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventAnalogOutputStatusVariation) -> Event {
+        Event::AnalogOutputStatus(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -992,17 +929,8 @@ impl Insertable for measurement::OctetString {
         counter.num_octet_string.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventOctetStringVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::OctetString(self.as_boxed_slice(), Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventOctetStringVariation) -> Event {
+        Event::OctetString(self.as_boxed_slice(), Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
