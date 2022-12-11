@@ -972,8 +972,74 @@ impl Insertable for measurement::OctetString {
 mod tests {
     use crate::app::measurement::*;
     use crate::outstation::OptionalEventListener;
+    use std::sync::{Arc, Mutex};
 
     use super::*;
+
+    // events corresponding to all the methods on the EventListener trait
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    enum EventInfo {
+        Create(u64),
+        Discard(u64),
+        BeginAck,
+        Clear(u64),
+        EndAck(BufferState),
+    }
+
+    struct EventWriter {
+        inner: Arc<Mutex<Vec<EventInfo>>>,
+    }
+
+    struct EventReader {
+        inner: Arc<Mutex<Vec<EventInfo>>>,
+    }
+
+    impl EventWriter {
+        fn push(&self, info: EventInfo) {
+            self.inner.lock().unwrap().push(info)
+        }
+    }
+
+    impl EventReader {
+        fn flush(&self) -> Vec<EventInfo> {
+            let mut guard = self.inner.lock().unwrap();
+            let mut ret = Vec::new();
+            std::mem::swap(&mut ret, &mut guard);
+            ret
+        }
+    }
+
+    impl EventListener for EventWriter {
+        fn event_created(&mut self, id: u64) {
+            self.push(EventInfo::Create(id));
+        }
+
+        fn event_discarded(&mut self, id: u64) {
+            self.push(EventInfo::Discard(id));
+        }
+
+        fn begin_ack(&mut self) {
+            self.push(EventInfo::BeginAck);
+        }
+
+        fn event_cleared(&mut self, id: u64) {
+            self.push(EventInfo::Clear(id));
+        }
+
+        fn end_ack(&mut self, state: BufferState) {
+            self.push(EventInfo::EndAck(state));
+        }
+    }
+
+    fn pair() -> (EventReader, OptionalEventListener) {
+        let x = Arc::new(Mutex::new(Vec::new()));
+
+        let reader = EventReader { inner: x.clone() };
+
+        let writer = EventWriter { inner: x };
+
+        (reader, OptionalEventListener::new(Some(Box::new(writer))))
+    }
 
     fn insert_events(buffer: &mut EventBuffer) {
         buffer
@@ -1028,10 +1094,9 @@ mod tests {
 
     #[test]
     fn cannot_insert_if_max_for_type_is_zero() {
-        let mut buffer = EventBuffer::new(
-            EventBufferConfig::no_events(),
-            OptionalEventListener::new(None),
-        );
+        let (reader, listener) = pair();
+
+        let mut buffer = EventBuffer::new(EventBufferConfig::no_events(), listener);
 
         assert_matches!(
             buffer.insert(
@@ -1041,15 +1106,16 @@ mod tests {
                 EventBinaryInputVariation::Group2Var1,
             ),
             Err(InsertError::TypeMaxIsZero)
-        )
+        );
+
+        assert!(reader.flush().is_empty());
     }
 
     #[test]
     fn overflows_when_max_for_type_is_exceeded() {
-        let mut buffer = EventBuffer::new(
-            EventBufferConfig::all_types(1),
-            OptionalEventListener::new(None),
-        );
+        let (reader, listener) = pair();
+
+        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(1), listener);
 
         let binary = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0));
 
@@ -1062,6 +1128,8 @@ mod tests {
             )
             .unwrap();
 
+        assert_eq!(&reader.flush(), &[EventInfo::Create(0)]);
+
         assert_matches!(
             buffer.insert(
                 1,
@@ -1070,7 +1138,12 @@ mod tests {
                 EventBinaryInputVariation::Group2Var1
             ),
             Err(InsertError::Overflow)
-        )
+        );
+
+        assert_eq!(
+            &reader.flush(),
+            &[EventInfo::Discard(0), EventInfo::Create(1)]
+        );
     }
 
     #[test]
