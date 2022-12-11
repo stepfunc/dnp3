@@ -12,7 +12,7 @@ use crate::outstation::tests::harness::{
     event_handlers, ApplicationData, Event, EventReceiver, MockControlHandler,
     MockOutstationApplication, MockOutstationInformation,
 };
-use crate::outstation::OutstationHandle;
+use crate::outstation::{NullEventListener, OutstationHandle};
 use crate::util::phys::PhysLayer;
 
 pub(crate) fn get_default_config() -> OutstationConfig {
@@ -117,6 +117,7 @@ fn new_harness_impl(
         application,
         MockOutstationInformation::new(sender.clone()),
         MockControlHandler::new(sender.clone()),
+        NullEventListener::create(),
     );
 
     let mut task = Box::new(task);

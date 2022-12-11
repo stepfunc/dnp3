@@ -155,6 +155,41 @@ pub trait OutstationInformation: Sync + Send + 'static {
     fn clear_restart_iin(&mut self) {}
 }
 
+/// Callbacks to application code regarding the lifetime of events within the EventBuffer.
+///
+/// Events are assigned incrementing unsigned 64-bit identifiers as they are created. There is
+/// no practical risk of overflow of this identifier.
+///
+/// Callbacks are always invoked while the a lock is acquired on underlying buffer.
+pub trait EventListener: Sync + Send + 'static {
+    /// Called when a new event is added to buffer.
+    fn event_created(&mut self, _id: u64) {}
+    /// Called when an event is discarded from the buffer before it could be reported to the master station.
+    fn event_discarded(&mut self, _id: u64) {}
+
+    /// Called when an ACK is received to a response or unsolicited response, but before any
+    /// previously transmitted events are cleared from the buffer
+    fn begin_ack(&mut self) {}
+
+    /// Called when an event is cleared from the buffer due to master acknowledgement
+    fn event_cleared(&mut self, _id: u64) {}
+
+    /// Called when all relevant events have been cleared
+    ///
+    /// * remaining - number of events remaining in the buffer
+    fn end_ack(&mut self, _remaining: usize) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
+}
+
+pub(crate) struct NullEventListener;
+impl NullEventListener {
+    pub(crate) fn create() -> Box<dyn EventListener> {
+        Box::new(Self)
+    }
+}
+impl EventListener for NullEventListener {}
+
 /// enumeration describing how the master requested the control operation
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum OperateType {
