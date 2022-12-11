@@ -5,7 +5,7 @@ use crate::outstation::config::*;
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::session::{OutstationSession, RunError};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
-use crate::outstation::{EventListener, OutstationHandle};
+use crate::outstation::{OptionalEventListener, OutstationHandle};
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::phys::PhysLayer;
 
@@ -39,7 +39,7 @@ impl OutstationTask {
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
-        listener: Box<dyn EventListener>,
+        listener: OptionalEventListener,
     ) -> (Self, OutstationHandle) {
         let (tx, rx) = crate::util::channel::request_channel();
         let handle = DatabaseHandle::new(

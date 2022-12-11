@@ -13,7 +13,7 @@ use crate::util::BadWrite;
 use super::list::VecList;
 use super::writer::EventWriter;
 
-use crate::outstation::EventListener;
+use crate::outstation::{BufferState, EventListener, OptionalEventListener};
 use scursor::WriteCursor;
 
 impl From<EventClass> for EventClasses {
@@ -377,7 +377,7 @@ pub(crate) struct EventBuffer {
     written: Counters,
     is_overflown: bool,
     next_id: u64,
-    listener: Box<dyn EventListener>,
+    listener: OptionalEventListener,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -392,7 +392,7 @@ pub(crate) struct EventWriteError {
 }
 
 impl EventBuffer {
-    pub(crate) fn new(config: EventBufferConfig, listener: Box<dyn EventListener>) -> Self {
+    pub(crate) fn new(config: EventBufferConfig, listener: OptionalEventListener) -> Self {
         let max_size = config.max_events();
         Self {
             config,
@@ -598,11 +598,13 @@ impl EventBuffer {
             self.is_overflown = false;
         }
 
-        self.listener.end_ack(
-            self.total.classes.num_class_1.value,
-            self.total.classes.num_class_2.value,
-            self.total.classes.num_class_3.value,
-        );
+        let state = BufferState {
+            remaining_class_1: self.total.classes.num_class_1.value,
+            remaining_class_2: self.total.classes.num_class_2.value,
+            remaining_class_3: self.total.classes.num_class_3.value,
+        };
+
+        self.listener.end_ack(state);
 
         count
     }
@@ -969,7 +971,7 @@ impl Insertable for measurement::OctetString {
 #[cfg(test)]
 mod tests {
     use crate::app::measurement::*;
-    use crate::outstation::NullEventListener;
+    use crate::outstation::OptionalEventListener;
 
     use super::*;
 
@@ -1026,8 +1028,10 @@ mod tests {
 
     #[test]
     fn cannot_insert_if_max_for_type_is_zero() {
-        let mut buffer =
-            EventBuffer::new(EventBufferConfig::no_events(), NullEventListener::create());
+        let mut buffer = EventBuffer::new(
+            EventBufferConfig::no_events(),
+            OptionalEventListener::none(),
+        );
 
         assert_matches!(
             buffer.insert(
@@ -1042,8 +1046,10 @@ mod tests {
 
     #[test]
     fn overflows_when_max_for_type_is_exceeded() {
-        let mut buffer =
-            EventBuffer::new(EventBufferConfig::all_types(1), NullEventListener::create());
+        let mut buffer = EventBuffer::new(
+            EventBufferConfig::all_types(1),
+            OptionalEventListener::none(),
+        );
 
         let binary = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0));
 
@@ -1069,8 +1075,10 @@ mod tests {
 
     #[test]
     fn can_select_events_by_class_and_write_some() {
-        let mut buffer =
-            EventBuffer::new(EventBufferConfig::all_types(3), NullEventListener::create());
+        let mut buffer = EventBuffer::new(
+            EventBufferConfig::all_types(3),
+            OptionalEventListener::none(),
+        );
 
         insert_events(&mut buffer);
 
@@ -1103,8 +1111,10 @@ mod tests {
 
     #[test]
     fn can_select_events_by_type() {
-        let mut buffer =
-            EventBuffer::new(EventBufferConfig::all_types(3), NullEventListener::create());
+        let mut buffer = EventBuffer::new(
+            EventBufferConfig::all_types(3),
+            OptionalEventListener::none(),
+        );
 
         insert_events(&mut buffer);
 
