@@ -35,7 +35,7 @@ pub fn spawn_outstation_serial(
         application,
         information,
         control_handler,
-        OptionalEventListener::none(),
+        OptionalEventListener::new(None),
     );
 
     let log_path = path.to_owned();
@@ -74,7 +74,7 @@ pub fn spawn_outstation_serial_fault_tolerant(
         application,
         information,
         control_handler,
-        OptionalEventListener::none(),
+        OptionalEventListener::new(None),
     );
 
     let mut serial_task = SerialOutstation {

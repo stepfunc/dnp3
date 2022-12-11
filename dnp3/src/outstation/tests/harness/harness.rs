@@ -117,7 +117,7 @@ fn new_harness_impl(
         application,
         MockOutstationInformation::new(sender.clone()),
         MockControlHandler::new(sender.clone()),
-        OptionalEventListener::none(),
+        OptionalEventListener::new(None),
     );
 
     let mut task = Box::new(task);

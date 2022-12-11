@@ -200,31 +200,19 @@ pub trait EventListener: Sync + Send + 'static {
 
 /// Wrapper around an EventListener trait object
 /// that may be Some or None
-pub struct OptionalEventListener {
+pub(crate) struct OptionalEventListener {
     inner: Option<Box<dyn EventListener>>,
 }
 
 impl OptionalEventListener {
-    /// Create an instance that takes ownership of some type that
-    /// implements the EventListener trait
-    pub fn some<T>(inner: T) -> Self
-    where
-        T: EventListener,
-    {
-        Self {
-            inner: Some(Box::new(inner)),
-        }
-    }
-
-    /// Create an instance that takes contains no underlying implementation
-    pub fn none() -> Self {
-        Self { inner: None }
+    pub(crate) fn new(inner: Option<Box<dyn EventListener>>) -> Self {
+        Self { inner }
     }
 }
 
 impl Default for OptionalEventListener {
     fn default() -> Self {
-        Self::none()
+        Self::new(None)
     }
 }
 
