@@ -1041,6 +1041,14 @@ mod tests {
         (reader, OptionalEventListener::new(Some(Box::new(writer))))
     }
 
+    const INSERT_EVENTS: &[EventInfo] = &[
+        EventInfo::Create(0),
+        EventInfo::Create(1),
+        EventInfo::Create(2),
+        EventInfo::Create(3),
+        EventInfo::Create(4),
+    ];
+
     fn insert_events(buffer: &mut EventBuffer) {
         buffer
             .insert(
@@ -1148,12 +1156,13 @@ mod tests {
 
     #[test]
     fn can_select_events_by_class_and_write_some() {
-        let mut buffer = EventBuffer::new(
-            EventBufferConfig::all_types(3),
-            OptionalEventListener::new(None),
-        );
+        let (reader, listener) = pair();
+
+        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(3), listener);
 
         insert_events(&mut buffer);
+
+        assert_eq!(&reader.flush(), INSERT_EVENTS);
 
         // ignore the class 2 events
         assert_eq!(
@@ -1169,6 +1178,18 @@ mod tests {
             let remaining_classes = EventClasses::all();
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
             assert_eq!(buffer.clear_written(), 1);
+            assert_eq!(
+                &reader.flush(),
+                &[
+                    EventInfo::BeginAck,
+                    EventInfo::Clear(0),
+                    EventInfo::EndAck(BufferState {
+                        remaining_class_1: 1,
+                        remaining_class_2: 2,
+                        remaining_class_3: 1
+                    })
+                ]
+            );
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
         }
 
@@ -1178,18 +1199,30 @@ mod tests {
             let remaining_classes = EventClass::Class1 | EventClass::Class2; //  we just wrote the only class 3 event
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
             assert_eq!(buffer.clear_written(), 1);
+            assert_eq!(
+                &reader.flush(),
+                &[
+                    EventInfo::BeginAck,
+                    EventInfo::Clear(2),
+                    EventInfo::EndAck(BufferState {
+                        remaining_class_1: 1,
+                        remaining_class_2: 2,
+                        remaining_class_3: 0
+                    })
+                ]
+            );
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
         }
     }
 
     #[test]
     fn can_select_events_by_type() {
-        let mut buffer = EventBuffer::new(
-            EventBufferConfig::all_types(3),
-            OptionalEventListener::new(None),
-        );
+        let (reader, listener) = pair();
+
+        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(3), listener);
 
         insert_events(&mut buffer);
+        assert_eq!(&reader.flush(), INSERT_EVENTS);
 
         // ignore the 2nd binary
         assert_eq!(1, buffer.select_default_variation::<BinaryInput>(Some(1)));
@@ -1219,5 +1252,19 @@ mod tests {
         );
 
         assert_eq!(2, buffer.clear_written());
+
+        assert_eq!(
+            &reader.flush(),
+            &[
+                EventInfo::BeginAck,
+                EventInfo::Clear(0),
+                EventInfo::Clear(3),
+                EventInfo::EndAck(BufferState {
+                    remaining_class_1: 1,
+                    remaining_class_2: 1,
+                    remaining_class_3: 1
+                })
+            ]
+        );
     }
 }
