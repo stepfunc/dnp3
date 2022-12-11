@@ -339,15 +339,17 @@ enum EventState {
 #[derive(Debug, PartialEq)]
 pub(crate) struct EventRecord {
     index: u16,
+    id: u64,
     class: EventClass,
     event: Event,
     state: Cell<EventState>,
 }
 
 impl EventRecord {
-    fn new(index: u16, class: EventClass, event: Event) -> Self {
+    fn new(index: u16, id: u64, class: EventClass, event: Event) -> Self {
         Self {
             index,
+            id,
             class,
             event,
             state: Cell::new(EventState::Unselected),
@@ -374,8 +376,8 @@ pub(crate) struct EventBuffer {
     total: Counters,
     written: Counters,
     is_overflown: bool,
-    _next_id: u64,
-    _listener: Box<dyn EventListener>,
+    next_id: u64,
+    listener: Box<dyn EventListener>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -398,8 +400,8 @@ impl EventBuffer {
             total: Counters::new(),
             written: Counters::new(),
             is_overflown: false,
-            _next_id: 0,
-            _listener: listener,
+            next_id: 0,
+            listener,
         }
     }
 
@@ -429,7 +431,13 @@ impl EventBuffer {
         }
 
         let ret = if T::get_type_count(&self.total.types) == max as usize {
-            if let Some(record) = self.events.remove_first(T::is_type) {
+            if let Some(record) = self.events.remove_first(|x| {
+                let ret = T::is_type(x);
+                if ret {
+                    self.listener.event_discarded(x.id);
+                }
+                ret
+            }) {
                 T::decrement_type(&mut self.total.types);
                 self.total.classes.decrement(record.class);
                 self.is_overflown = true;
@@ -439,8 +447,14 @@ impl EventBuffer {
             Ok(())
         };
 
+        let id = self.next_id;
+        self.next_id = self.next_id.overflowing_add(1).0;
+
+        self.listener.event_created(id);
+
         self.events.add(EventRecord::new(
             index,
+            id,
             class,
             event.create_event(default_variation),
         ));
