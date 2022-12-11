@@ -9,6 +9,7 @@ use crate::app::Iin2;
 use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
 
+use crate::outstation::EventListener;
 use scursor::WriteCursor;
 
 mod config;
@@ -271,7 +272,7 @@ pub trait Get<T> {
 /// Core database implementation shared between an outstation task and the user facing API.
 /// This type is always guarded by a `DatabaseHandle` which provides a transactional API.
 pub struct Database {
-    pub(crate) inner: crate::outstation::database::details::database::Database,
+    pub(crate) inner: details::database::Database,
 }
 
 impl Database {
@@ -280,12 +281,14 @@ impl Database {
         max_read_selection: Option<u16>,
         class_zero_config: ClassZeroConfig,
         config: EventBufferConfig,
+        listener: Box<dyn EventListener>,
     ) -> Self {
         Self {
-            inner: crate::outstation::database::details::database::Database::new(
+            inner: details::database::Database::new(
                 max_read_selection,
                 class_zero_config,
                 config,
+                listener,
             ),
         }
     }
@@ -320,12 +323,14 @@ impl DatabaseHandle {
         max_read_selection: Option<u16>,
         class_zero_config: ClassZeroConfig,
         event_config: EventBufferConfig,
+        listener: Box<dyn EventListener>,
     ) -> Self {
         Self {
             inner: Arc::new(Mutex::new(Database::new(
                 max_read_selection,
                 class_zero_config,
                 event_config,
+                listener,
             ))),
             notify: Arc::new(tokio::sync::Notify::new()),
         }

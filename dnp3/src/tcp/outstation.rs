@@ -100,6 +100,7 @@ impl Server {
             application,
             information,
             control_handler,
+            NullEventListener::create(),
         );
 
         let (mut adapter, tx) = OutstationTaskAdapter::create(task, listener);
