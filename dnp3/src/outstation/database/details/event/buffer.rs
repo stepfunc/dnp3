@@ -1030,7 +1030,7 @@ mod tests {
     fn cannot_insert_if_max_for_type_is_zero() {
         let mut buffer = EventBuffer::new(
             EventBufferConfig::no_events(),
-            OptionalEventListener::none(),
+            OptionalEventListener::new(None),
         );
 
         assert_matches!(
@@ -1048,7 +1048,7 @@ mod tests {
     fn overflows_when_max_for_type_is_exceeded() {
         let mut buffer = EventBuffer::new(
             EventBufferConfig::all_types(1),
-            OptionalEventListener::none(),
+            OptionalEventListener::new(None),
         );
 
         let binary = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0));
@@ -1077,7 +1077,7 @@ mod tests {
     fn can_select_events_by_class_and_write_some() {
         let mut buffer = EventBuffer::new(
             EventBufferConfig::all_types(3),
-            OptionalEventListener::none(),
+            OptionalEventListener::new(None),
         );
 
         insert_events(&mut buffer);
@@ -1113,7 +1113,7 @@ mod tests {
     fn can_select_events_by_type() {
         let mut buffer = EventBuffer::new(
             EventBufferConfig::all_types(3),
-            OptionalEventListener::none(),
+            OptionalEventListener::new(None),
         );
 
         insert_events(&mut buffer);
