@@ -581,10 +581,12 @@ impl EventBuffer {
     }
 
     pub(crate) fn clear_written(&mut self) -> usize {
-        let total = &mut self.total;
+        self.listener.begin_ack();
+
         let count = self.events.remove_all(|event| {
             if event.state.get() == EventState::Written {
-                total.decrement(event);
+                self.total.decrement(event);
+                self.listener.event_cleared(event.id);
                 true
             } else {
                 false
@@ -595,6 +597,13 @@ impl EventBuffer {
         if !self.is_any_full() {
             self.is_overflown = false;
         }
+
+        self.listener.end_ack(
+            self.total.classes.num_class_1.value,
+            self.total.classes.num_class_2.value,
+            self.total.classes.num_class_3.value,
+        );
+
         count
     }
 

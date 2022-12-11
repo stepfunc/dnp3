@@ -176,9 +176,13 @@ pub trait EventListener: Sync + Send + 'static {
 
     /// Called when all relevant events have been cleared
     ///
-    /// * remaining - number of events remaining in the buffer
-    fn end_ack(&mut self, _remaining: usize) -> MaybeAsync<()> {
-        MaybeAsync::ready(())
+    /// * remaining - number of events remaining in the buffer for Class 1, 2, and 3
+    fn end_ack(
+        &mut self,
+        _remaining_class_1: usize,
+        _remaining_class_2: usize,
+        _remaining_class_3: usize,
+    ) {
     }
 }
 
