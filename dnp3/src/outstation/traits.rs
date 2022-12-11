@@ -156,7 +156,7 @@ pub trait OutstationInformation: Sync + Send + 'static {
 }
 
 /// Information about the state of buffer after an ACK has been received
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct BufferState {
     /// number of class 1 events remaining in the buffer
     pub remaining_class_1: usize,
