@@ -78,7 +78,6 @@ impl Server {
     }
 
     /// associate an outstation with the TcpServer, but do not spawn it
-    #[allow(clippy::too_many_arguments)]
     pub fn add_outstation_no_spawn(
         &mut self,
         config: OutstationConfig,
