@@ -77,14 +77,42 @@ impl Server {
         }
     }
 
-    /// associate an outstation with the TcpServer, but do not spawn it
+    /// Associate an outstation with the TcpServer, but do not spawn it
     pub fn add_outstation_no_spawn(
         &mut self,
         config: OutstationConfig,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
-        listener: Box<dyn Listener<ConnectionState>>,
+        conn_listener: Box<dyn Listener<ConnectionState>>,
+        filter: AddressFilter,
+    ) -> Result<(OutstationHandle, impl std::future::Future<Output = ()>), FilterError> {
+        self.add_outstation_no_spawn_2(
+            config,
+            application,
+            information,
+            control_handler,
+            conn_listener,
+            None,
+            filter,
+        )
+    }
+
+    /// Associate an outstation with the TcpServer, but do not spawn it
+    ///
+    /// This is just like [`add_outstation_no_spawn`](crate::tcp::Server::add_outstation_no_spawn)
+    /// excepts that also provides the ability to define an [`EventListener`](crate::outstation::EventListener).
+    ///
+    /// Note: This method will likely be the only such method available in the next major release.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_outstation_no_spawn_2(
+        &mut self,
+        config: OutstationConfig,
+        application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
+        control_handler: Box<dyn ControlHandler>,
+        conn_listener: Box<dyn Listener<ConnectionState>>,
+        event_listener: Option<Box<dyn EventListener>>,
         filter: AddressFilter,
     ) -> Result<(OutstationHandle, impl std::future::Future<Output = ()>), FilterError> {
         for item in self.outstations.iter() {
@@ -99,10 +127,10 @@ impl Server {
             application,
             information,
             control_handler,
-            OptionalEventListener::new(None),
+            OptionalEventListener::new(event_listener),
         );
 
-        let (mut adapter, tx) = OutstationTaskAdapter::create(task, listener);
+        let (mut adapter, tx) = OutstationTaskAdapter::create(task, conn_listener);
 
         let outstation = OutstationInfo {
             filter,
@@ -123,24 +151,51 @@ impl Server {
         Ok((handle, future))
     }
 
-    /// associate an outstation with the TcpServer and spawn it
-    ///
-    /// Must be called from within the Tokio runtime
+    /// Associate an outstation with the TcpServer and spawn it. Must be called from within the Tokio runtime
     pub fn add_outstation(
         &mut self,
         config: OutstationConfig,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
-        listener: Box<dyn Listener<ConnectionState>>,
+        conn_listener: Box<dyn Listener<ConnectionState>>,
         filter: AddressFilter,
     ) -> Result<OutstationHandle, FilterError> {
-        let (handle, future) = self.add_outstation_no_spawn(
+        self.add_outstation_2(
             config,
             application,
             information,
             control_handler,
-            listener,
+            conn_listener,
+            None,
+            filter,
+        )
+    }
+
+    /// Associate an outstation with the TcpServer and spawn it. Must be called from within the Tokio runtime.
+    ///
+    /// This is just like [`add_outstation_no_spawn`](crate::tcp::Server::add_outstation)
+    /// except that it also provides the ability to define an [`EventListener`](crate::outstation::EventListener).
+    ///
+    /// Note: This method will likely be the only such method available in the next major release.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_outstation_2(
+        &mut self,
+        config: OutstationConfig,
+        application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
+        control_handler: Box<dyn ControlHandler>,
+        conn_listener: Box<dyn Listener<ConnectionState>>,
+        event_listener: Option<Box<dyn EventListener>>,
+        filter: AddressFilter,
+    ) -> Result<OutstationHandle, FilterError> {
+        let (handle, future) = self.add_outstation_no_spawn_2(
+            config,
+            application,
+            information,
+            control_handler,
+            conn_listener,
+            event_listener,
             filter,
         )?;
         tokio::spawn(future);
