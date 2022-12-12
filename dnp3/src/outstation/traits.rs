@@ -180,9 +180,9 @@ impl BufferState {
 ///
 /// Callbacks are always invoked while the a lock is acquired on underlying buffer.
 pub trait EventListener: Sync + Send + 'static {
-    /// Called when a new event is added to buffer.
+    /// Called when a new event is added to buffer
     fn event_created(&mut self, id: u64);
-    /// Called when an event is discarded from the buffer before it could be reported to the master station.
+    /// Called when an event is discarded from the buffer before it could be reported to the master station
     fn event_discarded(&mut self, id: u64);
 
     /// Called when an ACK is received to a response or unsolicited response, but before any

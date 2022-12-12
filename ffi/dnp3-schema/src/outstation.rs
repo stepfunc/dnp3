@@ -10,6 +10,7 @@ struct OutstationTypes {
     outstation_information: AsynchronousInterface,
     control_handler: AsynchronousInterface,
     connection_state_listener: AsynchronousInterface,
+    event_listener: AsynchronousInterface,
 }
 
 impl OutstationTypes {
@@ -26,6 +27,7 @@ impl OutstationTypes {
             outstation_information: define_outstation_information(lib, shared_def)?,
             control_handler: define_control_handler(lib, &database_handle, shared_def)?,
             connection_state_listener: define_connection_state_listener(lib)?,
+            event_listener: define_event_listener(lib)?,
         })
     }
 }
@@ -93,17 +95,34 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .build_static("create_tls_server")?;
 
     let add_outstation = lib.define_method("add_outstation", outstation_server.clone())?
-        .param("config",types.outstation_config, "Outstation configuration")?
-        .param("application", types.outstation_application, "Outstation application callbacks")?
-        .param("information", types.outstation_information, "Outstation information callbacks")?
-        .param("control_handler", types.control_handler, "Outstation control handler")?
-        .param("listener", types.connection_state_listener, "Listener for the connection state")?
+        .param("config",types.outstation_config.clone(), "Outstation configuration")?
+        .param("application", types.outstation_application.clone(), "Outstation application callbacks")?
+        .param("information", types.outstation_information.clone(), "Outstation information callbacks")?
+        .param("control_handler", types.control_handler.clone(), "Outstation control handler")?
+        .param("listener", types.connection_state_listener.clone(), "Listener for the connection state")?
         .param("filter",address_filter.declaration(), "Address filter")?
         .returns(outstation.declaration(), "Outstation handle")?
         .fails_with(shared_def.error_type.clone())?
         .doc(doc("Add an outstation to the server.")
             .details("The returned {class:outstation} can be used to modify points of the outstation.")
             .details("In order for the outstation to run, the TCP server must be running. Use {class:outstation_server.bind()} to run it."))?
+        .build()?;
+
+    let add_outstation_2 = lib.define_method("add_outstation_2", outstation_server.clone())?
+        .param("config",types.outstation_config, "Outstation configuration")?
+        .param("application", types.outstation_application, "Outstation application callbacks")?
+        .param("information", types.outstation_information, "Outstation information callbacks")?
+        .param("control_handler", types.control_handler, "Outstation control handler")?
+        .param("conn_listener", types.connection_state_listener, "Listener for the connection state")?
+        .param("event_listener", types.event_listener, "Listener")?
+        .param("filter",address_filter.declaration(), "Address filter")?
+        .returns(outstation.declaration(), "Outstation handle")?
+        .fails_with(shared_def.error_type.clone())?
+        .doc(doc("Add an outstation to the server.")
+            .details("The returned {class:outstation} can be used to modify points of the outstation.")
+            .details("In order for the outstation to run, the TCP server must be running. Use {class:outstation_server.bind()} to run it.")
+            .details("This function is just like {class:outstation_server.add_outstation()} except that it also also you to define a {interface:event_listener}")
+        )?
         .build()?;
 
     let bind = lib.define_method("bind", outstation_server.clone())?
@@ -119,6 +138,7 @@ pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackT
         .static_method(outstation_server_tls_create)?
         .destructor(destructor)?
         .method(add_outstation)?
+        .method(add_outstation_2)?
         .method(bind)?
         .custom_destroy("shutdown")?
         .doc(doc("TCP server that listens for connections and routes the messages to outstations.")
@@ -797,6 +817,64 @@ fn define_outstation_information(
         .build_async()?;
 
     Ok(information)
+}
+
+fn define_event_listener(lib: &mut LibraryBuilder) -> BackTraced<AsynchronousInterface> {
+    let buffer_state = lib.declare_callback_argument_struct("buffer_state")?;
+    let buffer_state = lib
+        .define_callback_argument_struct(buffer_state)?
+        .doc("Information about the state of buffer after an ACK has been received")?
+        .add(
+            "remaining_class_1",
+            Primitive::U32,
+            "number of class 1 events remaining in the buffer",
+        )?
+        .add(
+            "remaining_class_2",
+            Primitive::U32,
+            "number of class 2 events remaining in the buffer",
+        )?
+        .add(
+            "remaining_class_3",
+            Primitive::U32,
+            "number of class 3 events remaining in the buffer",
+        )?
+        .end_fields()?
+        .build()?;
+
+    let listener = lib
+        .define_interface("event_listener",
+                          doc("Callbacks to application code regarding the lifetime of events within the event buffer")
+                              .details("Events are assigned incrementing unsigned 64-bit identifiers as they are created. There is no practical risk of overflowing this identifier.")
+                              .details("Callbacks are always invoked while the a lock is acquired on underlying buffer")
+        )?
+        // event created
+        .begin_callback("event_created", doc("Called when a new event is added to buffer"))?
+        .param("id", Primitive::U64, "Unique identifier assigned to the event")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        // event discarded
+        .begin_callback("event_discarded", doc("Called when an ACK is received to a response or unsolicited response, but before any previously transmitted events are cleared from the buffer"))?
+        .param("id", Primitive::U64, "Unique identifier previously assigned to the event in {interface:event_listener.event_created()}")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        // begin ack
+        .begin_callback("begin_ack", doc("Called when an ACK is received to a response or unsolicited response, but before any previously transmitted events are cleared from the buffer"))?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        // event cleared
+        .begin_callback("event_cleared", doc("Called when an event is cleared from the buffer due to master acknowledgement"))?
+        .param("id", Primitive::U64, "Unique identifier previously assigned to the event in {interface:event_listener.event_created()}")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        // end ack
+        .begin_callback("end_ack", doc(" Called when all relevant events have been cleared"))?
+        .param("state", buffer_state, "information about the post-ACK state of the buffer")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .build_async()?;
+
+    Ok(listener)
 }
 
 fn define_control_handler(
