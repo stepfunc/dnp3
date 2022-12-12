@@ -511,3 +511,35 @@ impl From<ffi::CommandStatus> for CommandStatus {
         }
     }
 }
+
+impl EventListener for ffi::EventListener {
+    fn event_created(&mut self, id: u64) {
+        ffi::EventListener::event_created(self, id)
+    }
+
+    fn event_discarded(&mut self, id: u64) {
+        ffi::EventListener::event_discarded(self, id)
+    }
+
+    fn begin_ack(&mut self) {
+        ffi::EventListener::begin_ack(self)
+    }
+
+    fn event_cleared(&mut self, id: u64) {
+        ffi::EventListener::event_cleared(self, id)
+    }
+
+    fn end_ack(&mut self, state: BufferState) {
+        ffi::EventListener::end_ack(self, state.into())
+    }
+}
+
+impl From<BufferState> for ffi::BufferState {
+    fn from(x: BufferState) -> Self {
+        Self {
+            remaining_class_1: x.remaining_class_1 as u32,
+            remaining_class_2: x.remaining_class_2 as u32,
+            remaining_class_3: x.remaining_class_3 as u32,
+        }
+    }
+}
