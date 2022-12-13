@@ -35,6 +35,14 @@ You must initialize the points before the outstation exposes any measurement dat
 * Default static and event variations for the type
 * Type-specific dead-bands that default to zero (Binary points have no deadband)
 
+:::caution
+The default static and event variations for each point type may not do what you expect them to do. For example,
+some DNP3 event variations don't carry a timestamp. This can be confusing to new users who expect to see a timestamp
+value that changes as the outstation receives events.
+
+Refer to the documentation for each variation to understand the data associated with it.
+:::
+
 When you add a point, it is assigned the following default value with `RESTART` flags:
 
 * Binary points are set to `false`
@@ -43,6 +51,12 @@ When you add a point, it is assigned the following default value with `RESTART` 
 * Octet Strings are set to the value of `[0x00]`
 
 Update the value after adding the point if you don't want a connecting master to see the points with a `RESTART` flag set.
+
+:::tip
+The example code below only shows the definition of contiguous ranges of points, however, the library efficiently supports
+using discontiguous ranges as well. In fact, no matter how you define the indices, the library always uses a [BTreeMap](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html)
+to store static values and their configuration.
+:::
 
 <Tabs
 groupId="language"
