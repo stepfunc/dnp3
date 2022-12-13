@@ -274,11 +274,12 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
     // setup the outstation's database before we spawn it
     // ANCHOR: database_init
     outstation.transaction(|db| {
+        // initialize 10 points of each type
         for i in 0..10 {
             db.add(
                 i,
                 Some(EventClass::Class1),
-                // you can specify the default static and event variations explicitly ...
+                // you can explicitly specify the configuration for each point ...
                 BinaryInputConfig {
                     s_var: StaticBinaryInputVariation::Group1Var1,
                     e_var: EventBinaryInputVariation::Group2Var2,
@@ -287,7 +288,7 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
             db.add(
                 i,
                 Some(EventClass::Class1),
-                // ... or you can just use the default values
+                // ... or just use the defaults
                 DoubleBitBinaryInputConfig::default(),
             );
             db.add(
