@@ -65,17 +65,15 @@ impl Connector {
 
     /// Attempt a single connection to the next address in the list
     pub(crate) async fn connect(&mut self) -> Result<PhysLayer, Duration> {
-        match self.endpoints.next_address().await {
+        let addr = match self.endpoints.next_address().await {
+            Some(x) => x,
             None => {
                 let delay = self.back_off.on_failure();
                 tracing::warn!("name resolution failure");
-                Err(delay)
+                return Err(delay);
             }
-            Some(addr) => self.connect_to(addr).await,
-        }
-    }
+        };
 
-    async fn connect_to(&mut self, addr: SocketAddr) -> Result<PhysLayer, Duration> {
         let result = if addr.is_ipv4() {
             TcpSocket::new_v4()
         } else {
