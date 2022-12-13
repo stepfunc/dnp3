@@ -140,14 +140,14 @@ impl TlsClientConfig {
         &mut self,
         socket: TcpStream,
         endpoint: &SocketAddr,
-    ) -> Result<PhysLayer, String> {
+    ) -> Option<PhysLayer> {
         let connector = tokio_rustls::TlsConnector::from(self.config.clone());
         match connector.connect(self.dns_name.clone(), socket).await {
-            Err(err) => Err(format!(
-                "failed to establish TLS session with {}: {}",
-                endpoint, err
-            )),
-            Ok(stream) => Ok(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
+            Err(err) => {
+                tracing::warn!("failed to establish TLS session with {}: {}", endpoint, err);
+                None
+            }
+            Ok(stream) => Some(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
                 stream,
             )))),
         }

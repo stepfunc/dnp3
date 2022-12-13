@@ -53,13 +53,9 @@ pub(crate) enum MasterTaskConnectionHandler {
 }
 
 impl MasterTaskConnectionHandler {
-    async fn handle(
-        &mut self,
-        socket: TcpStream,
-        _endpoint: &SocketAddr,
-    ) -> Result<PhysLayer, String> {
+    async fn handle(&mut self, socket: TcpStream, _endpoint: &SocketAddr) -> Option<PhysLayer> {
         match self {
-            Self::Tcp => Ok(PhysLayer::Tcp(socket)),
+            Self::Tcp => Some(PhysLayer::Tcp(socket)),
             #[cfg(feature = "tls")]
             Self::Tls(config) => config.handle_connection(socket, _endpoint).await,
         }
@@ -152,12 +148,12 @@ impl MasterTask {
                 Ok(stream) => {
                     crate::tcp::configure_client(&stream);
                     match self.connection_handler.handle(stream, &endpoint).await {
-                        Err(err) => {
+                        None => {
                             let delay = self.back_off.on_failure();
-                            tracing::warn!("{} - waiting {} ms to retry", err, delay.as_millis());
+                            tracing::warn!("waiting {} ms to retry", delay.as_millis());
                             self.on_connection_failure(delay).await
                         }
-                        Ok(phys) => {
+                        Some(phys) => {
                             tracing::info!("connected to {}", endpoint);
                             self.endpoints.reset();
                             self.back_off.on_success();
