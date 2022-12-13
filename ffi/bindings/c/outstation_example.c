@@ -267,8 +267,9 @@ void outstation_transaction_startup(dnp3_database_t *db, void *context)
     // initialize 10 values for each type
     for (uint16_t i = 0; i < 10; ++i) {
         // you can explicitly specify the configuration for each point ...
-        dnp3_binary_input_config_t config = { DNP3_STATIC_BINARY_INPUT_VARIATION_GROUP1_VAR1, DNP3_EVENT_BINARY_INPUT_VARIATION_GROUP2_VAR2 };
-        dnp3_database_add_binary_input(db, i, DNP3_EVENT_CLASS_CLASS1, config);
+        dnp3_database_add_binary_input(db, i, DNP3_EVENT_CLASS_CLASS1,
+            dnp3_binary_input_config_create(DNP3_STATIC_BINARY_INPUT_VARIATION_GROUP1_VAR1, DNP3_EVENT_BINARY_INPUT_VARIATION_GROUP2_VAR2)
+        );
         // ... or just use the defaults
         dnp3_database_add_double_bit_binary_input(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_double_bit_binary_input_config_init());
         dnp3_database_add_binary_output_status(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_binary_output_status_config_init());

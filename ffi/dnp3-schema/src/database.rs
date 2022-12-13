@@ -94,6 +94,7 @@ fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
         )?
         .doc("Binary Input configuration")?
         .end_fields()?
+        .add_full_initializer("create")?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(1, 1))?
         .default_variant(&event_variation, gv(2, 1))?
@@ -145,6 +146,7 @@ fn define_double_bit_binary_config(
         )?
         .doc("Double-Bit Binary Input configuration")?
         .end_fields()?
+        .add_full_initializer("create")?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(3, 1))?
         .default_variant(&event_variation, gv(4, 1))?
@@ -189,6 +191,7 @@ fn define_binary_output_status_config(
         )?
         .doc("Binary Output Status configuration")?
         .end_fields()?
+        .add_full_initializer("create")?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(10, 1))?
         .default_variant(&event_variation, gv(11, 2))?
@@ -237,6 +240,7 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
         .add(&deadband, Primitive::U32, "Deadband value")?
         .doc("Counter configuration")?
         .end_fields()?
+        .add_full_initializer("create")?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(20, 1))?
         .default_variant(&event_variation, gv(22, 1))?
@@ -294,6 +298,7 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<Function
         .add(&deadband, Primitive::U32, "Deadband value")?
         .doc("Frozen Counter configuration")?
         .end_fields()?
+        .add_full_initializer("create")?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(21, 1))?
         .default_variant(&event_variation, gv(23, 1))?
@@ -367,6 +372,7 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
         .add(&deadband, Primitive::Double, "Deadband value")?
         .doc("Analog configuration")?
         .end_fields()?
+        .add_full_initializer("create")?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(30, 1))?
         .default_variant(&event_variation, gv(32, 1))?
@@ -440,6 +446,7 @@ fn define_analog_output_status_config(
         .add(&deadband, Primitive::Double, "Deadband value")?
         .doc("Analog Output Status configuration")?
         .end_fields()?
+        .add_full_initializer("create")?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default_variant(&static_variation, gv(40, 1))?
         .default_variant(&event_variation, gv(42, 1))?

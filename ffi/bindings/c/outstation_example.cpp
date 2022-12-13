@@ -285,9 +285,15 @@ void run_server(dnp3::OutstationServer &server)
     // setup the initial state of the outstation
     // ANCHOR: database_init_transaction
     auto setup = database_transaction([](Database &db) {
-        // add 10 of each type
+        // add 10 points of each type
         for (uint16_t i = 0; i < 10; ++i) {
-            db.add_binary_input(i, EventClass::class1, BinaryInputConfig());
+            // you can explicitly specify the configuration for each point ...
+            db.add_binary_input(
+                i,
+                EventClass::class1,
+                BinaryInputConfig(StaticBinaryInputVariation::group1_var1, EventBinaryInputVariation::group2_var2)
+            );
+            // ... or just use the defaults
             db.add_double_bit_binary_input(i, EventClass::class1, DoubleBitBinaryInputConfig());
             db.add_binary_output_status(i, EventClass::class1, BinaryOutputStatusConfig());
             db.add_counter(i, EventClass::class1, CounterConfig());
