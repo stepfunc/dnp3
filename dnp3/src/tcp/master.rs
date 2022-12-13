@@ -138,23 +138,23 @@ impl MasterTask {
             RunError::State(s) => Err(s),
             RunError::Link(err) => {
                 tracing::warn!("connection lost - {}", err);
-                if self.reconnect_delay > Duration::from_secs(0) {
+
+                self.listener
+                    .update(ClientState::WaitAfterDisconnect(self.reconnect_delay))
+                    .get()
+                    .await;
+
+                if !self.reconnect_delay.is_zero() {
                     tracing::warn!(
                         "waiting {} ms to reconnect",
                         self.reconnect_delay.as_millis()
                     );
-                    self.on_connection_failure(self.reconnect_delay).await?;
+
+                    self.session.wait_for_retry(self.reconnect_delay).await?;
                 }
+
                 Ok(())
             }
         }
-    }
-
-    async fn on_connection_failure(&mut self, delay: Duration) -> Result<(), StateChange> {
-        self.listener
-            .update(ClientState::WaitAfterFailedConnect(delay))
-            .get()
-            .await;
-        self.session.wait_for_retry(delay).await
     }
 }
