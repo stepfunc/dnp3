@@ -29,7 +29,7 @@ impl PostConnectionHandler {
 #[derive(Copy, Clone, Debug, Default)]
 pub struct ConnectOptions {
     pub(crate) local_endpoint: Option<SocketAddr>,
-    pub(crate) _timeout: Option<SocketAddr>,
+    pub(crate) timeout: Option<Duration>,
 }
 
 impl ConnectOptions {
@@ -37,6 +37,11 @@ impl ConnectOptions {
     /// ethernet adapter may be used with an OS assigned port.
     pub fn set_local_endpoint(&mut self, address: SocketAddr) {
         self.local_endpoint = Some(address);
+    }
+
+    /// Set a timeout for the TCP connection that might be less than the default for the OS
+    pub fn set_connect_timeout(&mut self, timeout: Duration) {
+        self.timeout = Some(timeout);
     }
 }
 
@@ -97,7 +102,23 @@ impl Connector {
             }
         }
 
-        let stream = match socket.connect(addr).await {
+        let result = match self.options.timeout {
+            None => socket.connect(addr).await,
+            Some(timeout) => match tokio::time::timeout(timeout, socket.connect(addr)).await {
+                Ok(x) => x,
+                Err(_) => {
+                    let delay = self.back_off.on_failure();
+                    tracing::warn!(
+                        "unable to connect to {} within timeout of {:?}",
+                        addr,
+                        timeout
+                    );
+                    return Err(delay);
+                }
+            },
+        };
+
+        let stream = match result {
             Ok(x) => x,
             Err(err) => {
                 let delay = self.back_off.on_failure();
