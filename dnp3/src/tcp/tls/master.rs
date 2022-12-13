@@ -8,8 +8,8 @@ use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
-use crate::tcp::EndpointList;
-use crate::tcp::{ClientState, MasterTask, MasterTaskConnectionHandler};
+use crate::tcp::{ClientState, MasterTask};
+use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 
 use rx509;
@@ -42,7 +42,7 @@ pub fn spawn_master_tls_client(
         endpoints,
         config,
         connect_strategy,
-        MasterTaskConnectionHandler::Tls(tls_config),
+        PostConnectionHandler::Tls(tls_config),
         listener,
     );
     let future = async move {

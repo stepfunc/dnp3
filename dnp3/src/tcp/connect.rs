@@ -1,4 +1,4 @@
-use crate::app::ExponentialBackOff;
+use crate::app::{ExponentialBackOff, RetryStrategy};
 use crate::tcp::EndpointList;
 use crate::util::phys::PhysLayer;
 use std::net::SocketAddr;
@@ -26,11 +26,10 @@ impl PostConnectionHandler {
 }
 
 /// Options that control how TCP connections are established
-#[allow(clippy::missing_copy_implementations)]
-#[derive(Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct ConnectOptions {
     pub(crate) local_endpoint: Option<SocketAddr>,
-    pub(crate) timeout: Option<SocketAddr>,
+    pub(crate) _timeout: Option<SocketAddr>,
 }
 
 impl ConnectOptions {
@@ -50,6 +49,20 @@ pub(crate) struct Connector {
 }
 
 impl Connector {
+    pub(crate) fn new(
+        endpoints: EndpointList,
+        options: ConnectOptions,
+        retry: RetryStrategy,
+        post_connect: PostConnectionHandler,
+    ) -> Self {
+        Self {
+            endpoints,
+            options,
+            back_off: ExponentialBackOff::new(retry),
+            post_connect,
+        }
+    }
+
     /// Attempt a single connection to the next address in the list
     pub(crate) async fn connect(&mut self) -> Result<PhysLayer, Duration> {
         match self.endpoints.next_address().await {
