@@ -34,7 +34,7 @@ pub struct ConnectOptions {
 
 impl ConnectOptions {
     /// Set the local address to which the socket is bound. If not specified, then any available
-    /// ethernet adapter may be used with an OS assigned port.
+    /// adapter may be used with an OS assigned port.
     pub fn set_local_endpoint(&mut self, address: SocketAddr) {
         self.local_endpoint = Some(address);
     }
