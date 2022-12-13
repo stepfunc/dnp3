@@ -5,8 +5,8 @@ use crate::link::LinkErrorMode;
 use crate::outstation::session::RunError;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::{
-    ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
-    OutstationInformation,
+    ControlHandler, OptionalEventListener, OutstationApplication, OutstationConfig,
+    OutstationHandle, OutstationInformation,
 };
 use crate::serial::SerialSettings;
 use crate::util::phys::PhysLayer;
@@ -35,6 +35,7 @@ pub fn spawn_outstation_serial(
         application,
         information,
         control_handler,
+        OptionalEventListener::new(None),
     );
 
     let log_path = path.to_owned();
@@ -73,6 +74,7 @@ pub fn spawn_outstation_serial_fault_tolerant(
         application,
         information,
         control_handler,
+        OptionalEventListener::new(None),
     );
 
     let mut serial_task = SerialOutstation {

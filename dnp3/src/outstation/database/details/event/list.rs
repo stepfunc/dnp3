@@ -192,11 +192,11 @@ impl<T> VecList<T> {
         Some(index)
     }
 
-    pub(crate) fn remove_first<F>(&mut self, predicate: F) -> Option<&T>
+    pub(crate) fn remove_first<F>(&mut self, mut predicate: F) -> Option<&T>
     where
-        F: Fn(&T) -> bool,
+        F: FnMut(&T) -> bool,
     {
-        let index = match self.find_first(&predicate) {
+        let index = match self.find_first(&mut predicate) {
             None => return None,
             Some(x) => x,
         };
@@ -242,17 +242,17 @@ impl<T> VecList<T> {
         }
     }
 
-    fn find_first<F>(&self, predicate: &F) -> Option<Index>
+    fn find_first<F>(&self, predicate: &mut F) -> Option<Index>
     where
-        F: Fn(&T) -> bool,
+        F: FnMut(&T) -> bool,
     {
         self.state
             .and_then(|x| self.find_first_from(x.head, predicate))
     }
 
-    fn find_first_from<F>(&self, start: usize, predicate: &F) -> Option<Index>
+    fn find_first_from<F>(&self, start: usize, predicate: &mut F) -> Option<Index>
     where
-        F: Fn(&T) -> bool,
+        F: FnMut(&T) -> bool,
     {
         let mut current = start;
 

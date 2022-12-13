@@ -6,7 +6,9 @@ pub use database::*;
 use dnp3::app::{BufferSize, BufferSizeError, Listener, MaybeAsync, Timeout};
 use dnp3::link::{EndpointAddress, LinkErrorMode};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
-use dnp3::outstation::{ConnectionState, Feature, Features, OutstationConfig, OutstationHandle};
+use dnp3::outstation::{
+    ConnectionState, EventListener, Feature, Features, OutstationConfig, OutstationHandle,
+};
 use dnp3::tcp::{FilterError, ServerHandle};
 pub use struct_constructors::*;
 
@@ -106,14 +108,59 @@ pub unsafe fn outstation_server_create_tls_server(
     })))
 }
 
-#[allow(clippy::too_many_arguments)]
 pub unsafe fn outstation_server_add_outstation(
     server: *mut OutstationServer,
     config: ffi::OutstationConfig,
     application: ffi::OutstationApplication,
     information: ffi::OutstationInformation,
     control_handler: ffi::ControlHandler,
-    listener: ffi::ConnectionStateListener,
+    conn_listener: ffi::ConnectionStateListener,
+    filter: *mut AddressFilter,
+) -> Result<*mut Outstation, ffi::ParamError> {
+    outstation_server_add_outstation_impl(
+        server,
+        config,
+        application,
+        information,
+        control_handler,
+        conn_listener,
+        None,
+        filter,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn outstation_server_add_outstation_2(
+    server: *mut OutstationServer,
+    config: ffi::OutstationConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+    conn_listener: ffi::ConnectionStateListener,
+    event_listener: ffi::EventListener,
+    filter: *mut AddressFilter,
+) -> Result<*mut Outstation, ffi::ParamError> {
+    outstation_server_add_outstation_impl(
+        server,
+        config,
+        application,
+        information,
+        control_handler,
+        conn_listener,
+        Some(Box::new(event_listener)),
+        filter,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+unsafe fn outstation_server_add_outstation_impl(
+    server: *mut OutstationServer,
+    config: ffi::OutstationConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+    conn_listener: ffi::ConnectionStateListener,
+    event_listener: Option<Box<dyn EventListener>>,
     filter: *mut AddressFilter,
 ) -> Result<*mut Outstation, ffi::ParamError> {
     let server = server.as_mut().ok_or(ffi::ParamError::NullParameter)?;
@@ -129,12 +176,13 @@ pub unsafe fn outstation_server_add_outstation(
         .ok_or(ffi::ParamError::NullParameter)?
         .into();
 
-    let (outstation, task) = server_handle.add_outstation_no_spawn(
+    let (outstation, task) = server_handle.add_outstation_no_spawn_2(
         config,
         Box::new(application),
         Box::new(information),
         Box::new(control_handler),
-        Box::new(listener),
+        Box::new(conn_listener),
+        event_listener,
         filter,
     )?;
 

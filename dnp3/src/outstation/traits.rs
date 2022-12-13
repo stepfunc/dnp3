@@ -155,6 +155,99 @@ pub trait OutstationInformation: Sync + Send + 'static {
     fn clear_restart_iin(&mut self) {}
 }
 
+/// Information about the state of buffer after an ACK has been received
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct BufferState {
+    /// number of class 1 events remaining in the buffer
+    pub remaining_class_1: usize,
+    /// number of class 2 events remaining in the buffer
+    pub remaining_class_2: usize,
+    /// number of class 3 events remaining in the buffer
+    pub remaining_class_3: usize,
+}
+
+impl BufferState {
+    /// true if there are no events remaining in the buffer
+    pub fn is_empty(&self) -> bool {
+        self.remaining_class_1 == 0 && self.remaining_class_2 == 0 && self.remaining_class_3 == 0
+    }
+}
+
+/// Callbacks to application code regarding the lifetime of events within the EventBuffer.
+///
+/// Events are assigned incrementing unsigned 64-bit identifiers as they are created. There is
+/// no practical risk of overflow of this identifier.
+///
+/// Callbacks are always invoked while the a lock is acquired on underlying buffer.
+pub trait EventListener: Sync + Send + 'static {
+    /// Called when a new event is added to buffer
+    fn event_created(&mut self, id: u64);
+    /// Called when an event is discarded from the buffer before it could be reported to the master station
+    fn event_discarded(&mut self, id: u64);
+
+    /// Called when an ACK is received to a response or unsolicited response, but before any
+    /// previously transmitted events are cleared from the buffer
+    fn begin_ack(&mut self);
+
+    /// Called when an event is cleared from the buffer due to master acknowledgement
+    fn event_cleared(&mut self, id: u64);
+
+    /// Called when all relevant events have been cleared
+    ///
+    /// * remaining - number of events remaining in the buffer for Class 1, 2, and 3
+    fn end_ack(&mut self, state: BufferState);
+}
+
+/// Wrapper around an EventListener trait object
+/// that may be Some or None
+pub(crate) struct OptionalEventListener {
+    inner: Option<Box<dyn EventListener>>,
+}
+
+impl OptionalEventListener {
+    pub(crate) fn new(inner: Option<Box<dyn EventListener>>) -> Self {
+        Self { inner }
+    }
+}
+
+impl Default for OptionalEventListener {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+
+impl EventListener for OptionalEventListener {
+    fn event_created(&mut self, id: u64) {
+        if let Some(x) = self.inner.as_mut() {
+            x.event_created(id)
+        }
+    }
+
+    fn event_discarded(&mut self, id: u64) {
+        if let Some(x) = self.inner.as_mut() {
+            x.event_discarded(id)
+        }
+    }
+
+    fn begin_ack(&mut self) {
+        if let Some(x) = self.inner.as_mut() {
+            x.begin_ack()
+        }
+    }
+
+    fn event_cleared(&mut self, id: u64) {
+        if let Some(x) = self.inner.as_mut() {
+            x.event_cleared(id)
+        }
+    }
+
+    fn end_ack(&mut self, state: BufferState) {
+        if let Some(x) = self.inner.as_mut() {
+            x.end_ack(state);
+        }
+    }
+}
+
 /// enumeration describing how the master requested the control operation
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum OperateType {
