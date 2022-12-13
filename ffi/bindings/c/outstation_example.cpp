@@ -285,7 +285,7 @@ void run_server(dnp3::OutstationServer &server)
     // setup the initial state of the outstation
     // ANCHOR: database_init_transaction
     auto setup = database_transaction([](Database &db) {
-        // add 5 of each type
+        // add 10 of each type
         for (uint16_t i = 0; i < 10; ++i) {
             db.add_binary_input(i, EventClass::class1, BinaryInputConfig());
             db.add_double_bit_binary_input(i, EventClass::class1, DoubleBitBinaryInputConfig());
