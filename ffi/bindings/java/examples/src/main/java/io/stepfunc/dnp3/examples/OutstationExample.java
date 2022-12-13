@@ -347,8 +347,11 @@ public class OutstationExample {
 
   // ANCHOR: database_init_function
   private static void initializeDatabase(Database db) {
+    // add 10 points of each type
     for (int i = 0; i < 10; i++) {
-      db.addBinaryInput(ushort(i), EventClass.CLASS1, new BinaryInputConfig());
+      // you can explicitly specify the configuration for each point ...
+      db.addBinaryInput(ushort(i), EventClass.CLASS1, new BinaryInputConfig(StaticBinaryInputVariation.GROUP1_VAR1, EventBinaryInputVariation.GROUP2_VAR2));
+      // ... or just use the defaults
       db.addDoubleBitBinaryInput(ushort(i), EventClass.CLASS1, new DoubleBitBinaryInputConfig());
       db.addBinaryOutputStatus(ushort(i), EventClass.CLASS1, new BinaryOutputStatusConfig());
       db.addCounter(ushort(i), EventClass.CLASS1, new CounterConfig());
