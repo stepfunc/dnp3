@@ -8,7 +8,7 @@ use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
-use crate::tcp::{ClientState, MasterTask};
+use crate::tcp::{ClientState, ConnectOptions, MasterTask};
 use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 
@@ -42,6 +42,7 @@ pub fn spawn_master_tls_client(
         endpoints,
         config,
         connect_strategy,
+        ConnectOptions::default(),
         PostConnectionHandler::Tls(tls_config),
         listener,
     );

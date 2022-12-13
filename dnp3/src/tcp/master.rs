@@ -30,6 +30,7 @@ pub fn spawn_master_tcp_client(
         endpoints,
         config,
         connect_strategy,
+        ConnectOptions::default(),
         PostConnectionHandler::Tcp,
         listener,
     );
@@ -57,6 +58,7 @@ impl MasterTask {
         endpoints: EndpointList,
         config: MasterChannelConfig,
         connect_strategy: ConnectStrategy,
+        connect_options: ConnectOptions,
         connection_handler: PostConnectionHandler,
         listener: Box<dyn Listener<ClientState>>,
     ) -> (Self, MasterChannel) {
@@ -76,7 +78,7 @@ impl MasterTask {
         let task = Self {
             connector: Connector::new(
                 endpoints,
-                ConnectOptions::default(),
+                connect_options,
                 retry_strategy,
                 connection_handler,
             ),
