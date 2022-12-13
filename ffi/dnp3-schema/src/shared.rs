@@ -7,6 +7,7 @@ pub struct SharedDefinitions {
     pub port_state_listener: AsynchronousInterface,
     pub variation_enum: EnumHandle,
     pub runtime_class: ClassDeclarationHandle,
+    pub connect_options: ClassHandle,
     pub decode_level: UniversalStructHandle,
     pub serial_port_settings: FunctionArgStructHandle,
     pub link_error_mode: EnumHandle,
@@ -254,11 +255,14 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
 
     let (octet_string, octet_string_it) = build_octet_string(lib)?;
 
+    let connect_options = define_connect_options(lib, error_type.clone())?;
+
     Ok(SharedDefinitions {
         error_type,
         port_state_listener: define_port_state_listener(lib)?,
         variation_enum: crate::variation::define(lib)?,
         runtime_class,
+        connect_options,
         decode_level,
         retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_port_settings(lib)?,
@@ -285,6 +289,47 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         octet_string,
         octet_string_it,
     })
+}
+
+fn define_connect_options(
+    lib: &mut LibraryBuilder,
+    error_type: ErrorType<Unvalidated>,
+) -> BackTraced<ClassHandle> {
+    let options = lib.declare_class("connect_options")?;
+
+    let constructor = lib
+        .define_constructor(options.clone())?
+        .doc("Initialize to the defaults")?
+        .build()?;
+
+    let destructor = lib.define_destructor(options.clone(), "Destroy an instance")?;
+
+    let set_timeout = lib
+        .define_method("set_timeout", options.clone())?
+        .doc("Set a timeout for the TCP connection that might be less than the default for the OS")?
+        .param("timeout", DurationType::Seconds, "Timeout value")?
+        .build()?;
+
+    let set_local_endpoint = lib
+        .define_method("set_local_endpoint", options.clone())?
+        .doc(
+            doc("Set the local address to which the socket is bound")
+                .details("If not specified, then any available adapter may be used with an OS assigned port.")
+        )?
+        .param("endpoint", StringType, "String in 'address:port' format, where address can be IPv4 or IPv6. Using 0 for the port results in an OS assigned port")?
+        .fails_with(error_type)?
+        .build()?;
+
+    let options = lib
+        .define_class(&options)?
+        .doc("Options that control how TCP connections are established")?
+        .constructor(constructor)?
+        .destructor(destructor)?
+        .method(set_timeout)?
+        .method(set_local_endpoint)?
+        .build()?;
+
+    Ok(options)
 }
 
 fn define_retry_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
