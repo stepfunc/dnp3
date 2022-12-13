@@ -364,10 +364,14 @@ class ExampleOutstation
         // ANCHOR: database_init
         outstation.Transaction(db =>
         {
+            // add 10 points of each type
             for (ushort i = 0; i < 10; i++)
             {
-                // add points with default values
-                db.AddBinaryInput(i, EventClass.Class1, new BinaryInputConfig());
+                // you can explicitly specify the configuration for each point ...
+                db.AddBinaryInput(i, EventClass.Class1,
+                    new BinaryInputConfig(StaticBinaryInputVariation.Group1Var1, EventBinaryInputVariation.Group2Var2)
+                );
+                // ... or just use the defaults
                 db.AddDoubleBitBinaryInput(i, EventClass.Class1, new DoubleBitBinaryInputConfig());
                 db.AddBinaryOutputStatus(i, EventClass.Class1, new BinaryOutputStatusConfig());
                 db.AddCounter(i, EventClass.Class1, new CounterConfig());
