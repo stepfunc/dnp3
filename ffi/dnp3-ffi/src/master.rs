@@ -1,4 +1,5 @@
 use std::ffi::CStr;
+use std::ptr::null_mut;
 use std::time::Duration;
 
 use dnp3::app::{
@@ -29,9 +30,33 @@ pub(crate) unsafe fn master_channel_create_tcp(
     connect_strategy: ffi::ConnectStrategy,
     listener: ffi::ClientStateListener,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
+    master_channel_create_tcp_2(
+        runtime,
+        link_error_mode,
+        config,
+        endpoints,
+        connect_strategy,
+        null_mut(),
+        listener,
+    )
+}
+
+pub(crate) unsafe fn master_channel_create_tcp_2(
+    runtime: *mut crate::runtime::Runtime,
+    link_error_mode: ffi::LinkErrorMode,
+    config: ffi::MasterChannelConfig,
+    endpoints: *const crate::EndpointList,
+    connect_strategy: ffi::ConnectStrategy,
+    options: *mut crate::ConnectOptions,
+    listener: ffi::ClientStateListener,
+) -> Result<*mut MasterChannel, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let config = convert_config(config)?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let connect_options = options
+        .as_ref()
+        .map(|x| x.inner)
+        .unwrap_or_else(Default::default);
 
     let connect_strategy = ConnectStrategy::new(
         connect_strategy.min_connect_delay(),
@@ -42,11 +67,12 @@ pub(crate) unsafe fn master_channel_create_tcp(
     // enter the runtime context so that we can spawn
     let _enter = runtime.inner.enter();
 
-    let channel = dnp3::tcp::spawn_master_tcp_client(
+    let channel = dnp3::tcp::spawn_master_tcp_client_2(
         link_error_mode.into(),
         config,
         endpoints.clone(),
         connect_strategy,
+        connect_options,
         Box::new(listener),
     );
 
