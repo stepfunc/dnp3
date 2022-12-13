@@ -112,6 +112,7 @@ impl MasterTask {
     }
 
     async fn run_one_connection(&mut self) -> Result<(), StateChange> {
+        self.listener.update(ClientState::Connecting).get().await;
         match self.connector.connect().await {
             Ok(phys) => {
                 self.listener.update(ClientState::Connected).get().await;
