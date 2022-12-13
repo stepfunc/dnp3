@@ -36,13 +36,35 @@ pub fn spawn_master_tls_client(
     listener: Box<dyn Listener<ClientState>>,
     tls_config: TlsClientConfig,
 ) -> MasterChannel {
+    spawn_master_tls_client_2(
+        link_error_mode,
+        config,
+        endpoints,
+        connect_strategy,
+        ConnectOptions::default(),
+        listener,
+        tls_config,
+    )
+}
+
+/// Just like [spawn_master_tls_client], but this variant was added later to also accept and
+/// apply [ConnectOptions]
+pub fn spawn_master_tls_client_2(
+    link_error_mode: LinkErrorMode,
+    config: MasterChannelConfig,
+    endpoints: EndpointList,
+    connect_strategy: ConnectStrategy,
+    connect_options: ConnectOptions,
+    listener: Box<dyn Listener<ClientState>>,
+    tls_config: TlsClientConfig,
+) -> MasterChannel {
     let main_addr = endpoints.main_addr().to_string();
     let (mut task, handle) = MasterTask::new(
         link_error_mode,
         endpoints,
         config,
         connect_strategy,
-        ConnectOptions::default(),
+        connect_options,
         PostConnectionHandler::Tls(tls_config),
         listener,
     );
