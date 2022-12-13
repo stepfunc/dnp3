@@ -275,10 +275,19 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
     // ANCHOR: database_init
     outstation.transaction(|db| {
         for i in 0..10 {
-            db.add(i, Some(EventClass::Class1), BinaryInputConfig::default());
             db.add(
                 i,
                 Some(EventClass::Class1),
+                // you can specify the default static and event variations explicitly ...
+                BinaryInputConfig {
+                    s_var: StaticBinaryInputVariation::Group1Var1,
+                    e_var: EventBinaryInputVariation::Group2Var2,
+                },
+            );
+            db.add(
+                i,
+                Some(EventClass::Class1),
+                // ... or you can just use the default values
                 DoubleBitBinaryInputConfig::default(),
             );
             db.add(

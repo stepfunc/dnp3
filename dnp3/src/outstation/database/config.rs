@@ -263,7 +263,8 @@ pub struct AnalogOutputStatusConfig {
     pub deadband: f64,
 }
 
-///  Placeholder object required by a couple of traits
+/// Octet strings don't actually need any configuration b/c the transmitted variation is determined
+/// by the size. This struct is more of a placeholder required by a couple of internal traits.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OctetStringConfig;
 
