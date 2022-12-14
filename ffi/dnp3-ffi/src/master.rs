@@ -1,5 +1,5 @@
 use std::ffi::CStr;
-use std::ptr::null_mut;
+use std::ptr::{null, null_mut};
 use std::time::Duration;
 
 use dnp3::app::{
@@ -84,20 +84,6 @@ pub(crate) unsafe fn master_channel_create_tcp_2(
     Ok(Box::into_raw(Box::new(channel)))
 }
 
-#[cfg(not(feature = "tls"))]
-pub(crate) unsafe fn master_channel_create_tls(
-    _runtime: *mut crate::runtime::Runtime,
-    _link_error_mode: ffi::LinkErrorMode,
-    _config: ffi::MasterChannelConfig,
-    _endpoints: *const crate::EndpointList,
-    _connect_strategy: ffi::ConnectStrategy,
-    _listener: ffi::ClientStateListener,
-    _tls_config: ffi::TlsClientConfig,
-) -> Result<*mut MasterChannel, ffi::ParamError> {
-    Err(ffi::ParamError::NoSupport)
-}
-
-#[cfg(feature = "tls")]
 pub(crate) unsafe fn master_channel_create_tls(
     runtime: *mut crate::runtime::Runtime,
     link_error_mode: ffi::LinkErrorMode,
@@ -107,11 +93,54 @@ pub(crate) unsafe fn master_channel_create_tls(
     listener: ffi::ClientStateListener,
     tls_config: ffi::TlsClientConfig,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
+    master_channel_create_tls_2(
+        runtime,
+        link_error_mode,
+        config,
+        endpoints,
+        connect_strategy,
+        null(),
+        listener,
+        tls_config,
+    )
+}
+
+#[cfg(not(feature = "tls"))]
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn master_channel_create_tls_2(
+    _runtime: *mut crate::runtime::Runtime,
+    _link_error_mode: ffi::LinkErrorMode,
+    _config: ffi::MasterChannelConfig,
+    _endpoints: *const crate::EndpointList,
+    _connect_strategy: ffi::ConnectStrategy,
+    _connect_options: *const crate::ConnectOptions,
+    _listener: ffi::ClientStateListener,
+    _tls_config: ffi::TlsClientConfig,
+) -> Result<*mut MasterChannel, ffi::ParamError> {
+    Err(ffi::ParamError::NoSupport)
+}
+
+#[cfg(feature = "tls")]
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn master_channel_create_tls_2(
+    runtime: *mut crate::runtime::Runtime,
+    link_error_mode: ffi::LinkErrorMode,
+    config: ffi::MasterChannelConfig,
+    endpoints: *const crate::EndpointList,
+    connect_strategy: ffi::ConnectStrategy,
+    connect_options: *const crate::ConnectOptions,
+    listener: ffi::ClientStateListener,
+    tls_config: ffi::TlsClientConfig,
+) -> Result<*mut MasterChannel, ffi::ParamError> {
     use std::path::Path;
 
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let config = convert_config(config)?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let connect_options = connect_options
+        .as_ref()
+        .map(|x| x.inner)
+        .unwrap_or_else(Default::default);
 
     let password = tls_config.password().to_string_lossy();
     let optional_password = match password.as_ref() {
@@ -142,11 +171,12 @@ pub(crate) unsafe fn master_channel_create_tls(
     // enter the runtime context so that we can spawn
     let _enter = runtime.inner.enter();
 
-    let channel = dnp3::tcp::tls::spawn_master_tls_client(
+    let channel = dnp3::tcp::tls::spawn_master_tls_client_2(
         link_error_mode.into(),
         config,
         endpoints.clone(),
         connect_strategy,
+        connect_options,
         Box::new(listener),
         tls_config,
     );
