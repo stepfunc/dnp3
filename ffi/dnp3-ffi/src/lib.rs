@@ -6,6 +6,7 @@ pub(crate) use crate::tracing::*;
 /// these use statements allow the code in the FFI to not have to known the real locations
 /// but instead just use crate::<name> when invoking an implementation
 pub use command::*;
+pub use connect::*;
 pub use decoding::*;
 use dnp3::app::Shutdown;
 pub use handler::*;
@@ -16,6 +17,7 @@ pub use runtime::*;
 pub(crate) use tcp::*;
 
 mod command;
+mod connect;
 mod decoding;
 mod handler;
 mod master;

@@ -63,6 +63,54 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("Create a master channel that connects to the specified TCP endpoint(s)")?
         .build_static("create_tcp_channel")?;
 
+    let master_channel_create_tcp_2_fn = lib
+        .define_function("master_channel_create_tcp_2")?
+        .param(
+            "runtime",
+            shared.runtime_class.clone(),
+            "Runtime to use to drive asynchronous operations of the master",
+        )?
+        .param(
+            "link_error_mode",
+            shared.link_error_mode.clone(),
+            "Controls how link errors are handled with respect to the TCP session",
+        )?
+        .param(
+            "config",
+            master_channel_config.clone(),
+            "Generic configuration for the channel",
+        )?
+        .param(
+            "endpoints",
+            endpoint_list.declaration(),
+            "List of IP endpoints.",
+        )?
+        .param(
+            "connect_strategy",
+            connect_strategy.clone(),
+            "Controls the timing of (re)connection attempts",
+        )?
+        .param(
+            "connect_options",
+            shared.connect_options.declaration(),
+            "Options that control the TCP connection process",
+        )?
+        .param(
+            "listener",
+            tcp_client_state_listener.clone(),
+            "TCP connection listener used to receive updates on the status of the connection",
+        )?
+        .returns(
+            master_channel_class.clone(),
+            "Handle to the master created, {null} if an error occurred",
+        )?
+        .fails_with(shared.error_type.clone())?
+        .doc(
+            doc("Create a master channel that connects to the specified TCP endpoint(s)")
+                .details("This is just like {class:master_channel.create_tcp_channel()} but adds the {class:connect_options} parameter")
+        )?
+        .build_static("create_tcp_channel_2")?;
+
     let master_channel_create_serial_fn = lib
         .define_function("master_channel_create_serial")?
         .param("runtime",shared.runtime_class.clone(), "Runtime to use to drive asynchronous operations of the master")?
@@ -98,6 +146,51 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .param(
             "config",
+            master_channel_config.clone(),
+            "Generic configuration for the channel",
+        )?
+        .param(
+            "endpoints",
+            endpoint_list.declaration(),
+            "List of IP endpoints.",
+        )?
+        .param(
+            "connect_strategy",
+            connect_strategy.clone(),
+            "Controls the timing of (re)connection attempts",
+        )?
+        .param(
+            "listener",
+            tcp_client_state_listener.clone(),
+            "TCP connection listener used to receive updates on the status of the connection",
+        )?
+        .param(
+            "tls_config",
+            tls_client_config.clone(),
+            "TLS client configuration",
+        )?
+        .returns(
+            master_channel_class.clone(),
+            "Handle to the master created, {null} if an error occurred",
+        )?
+        .fails_with(shared.error_type.clone())?
+        .doc("Create a master channel that connects to the specified TCP endpoint(s) and establish a TLS session with the remote.")?
+        .build_static("create_tls_channel")?;
+
+    let master_channel_create_tls_2_fn = lib
+        .define_function("master_channel_create_tls_2")?
+        .param(
+            "runtime",
+            shared.runtime_class.clone(),
+            "Runtime to use to drive asynchronous operations of the master",
+        )?
+        .param(
+            "link_error_mode",
+            shared.link_error_mode.clone(),
+            "Controls how link errors are handled with respect to the TCP session",
+        )?
+        .param(
+            "config",
             master_channel_config,
             "Generic configuration for the channel",
         )?
@@ -110,6 +203,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "connect_strategy",
             connect_strategy,
             "Controls the timing of (re)connection attempts",
+        )?
+        .param(
+            "connect_options",
+            shared.connect_options.declaration(),
+            "Options that control the TCP connection process",
         )?
         .param(
             "listener",
@@ -126,8 +224,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "Handle to the master created, {null} if an error occurred",
         )?
         .fails_with(shared.error_type.clone())?
-        .doc("Create a master channel that connects to the specified TCP endpoint(s) and establish a TLS session with the remote.")?
-        .build_static("create_tls_channel")?;
+        .doc(
+            doc("Create a master channel that connects to the specified TCP endpoint(s) and establish a TLS session with the remote.")
+                .details("This is just like {class:master_channel.create_tls_channel()} but adds the {class:connect_options} parameter")
+        )?
+        .build_static("create_tls_channel_2")?;
 
     let enable_method = lib
         .define_method("enable", master_channel_class.clone())?
@@ -344,7 +445,9 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
     lib.define_class(&master_channel_class)?
         .destructor(channel_destructor)?
         .static_method(master_channel_create_tcp_fn)?
+        .static_method(master_channel_create_tcp_2_fn)?
         .static_method(master_channel_create_tls_fn)?
+        .static_method(master_channel_create_tls_2_fn)?
         .static_method(master_channel_create_serial_fn)?
         .method(enable_method)?
         .method(disable_method)?
