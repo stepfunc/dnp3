@@ -650,12 +650,12 @@ fn build_iterator<T: Into<UniversalStructField>>(
         .add("value", value_type, "Point value")?
         .add("flags", flags_struct.clone(), "Point flags")?
         .add("time", timestamp_struct.clone(), "Point timestamp")?
-        .doc(format!("{} point", name))?
+        .doc(format!("{name} point"))?
         .end_fields()?
         .add_full_initializer("init")?
         .build()?;
 
-    let value_iterator = lib.define_iterator(format!("{}_iterator", name), value_struct.clone())?;
+    let value_iterator = lib.define_iterator(format!("{name}_iterator"), value_struct.clone())?;
 
     Ok((value_struct, value_iterator))
 }
