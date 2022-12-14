@@ -101,26 +101,25 @@ mod test {
         )
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq, Eq)]
     enum Header {
         Binary(Vec<(BinaryInput, u16)>),
     }
 
+    #[derive(Default)]
     struct MockHandler {
-        expected: Vec<Header>,
+        received: Vec<Header>,
     }
 
     impl MockHandler {
         fn new() -> Self {
-            Self { expected: vec![] }
+            Default::default()
         }
 
-        fn is_empty(&self) -> bool {
-            self.expected.is_empty()
-        }
-
-        fn expect(&mut self, header: Header) {
-            self.expected.push(header)
+        fn pop(&mut self) -> Vec<Header> {
+            let mut received = Default::default();
+            std::mem::swap(&mut received, &mut self.received);
+            received
         }
     }
 
@@ -145,19 +144,7 @@ mod test {
             _info: HeaderInfo,
             x: &mut dyn Iterator<Item = (BinaryInput, u16)>,
         ) {
-            let next_header = match self.expected.pop() {
-                Some(y) => y,
-                None => {
-                    panic!("Not expecting any headers!");
-                }
-            };
-
-            match next_header {
-                Header::Binary(expected) => {
-                    let received: Vec<_> = x.collect();
-                    assert_eq!(received, expected);
-                } //x => panic!("Unexpected header: {:?}", x)
-            }
+            self.received.push(Header::Binary(x.collect()));
         }
 
         fn handle_double_bit_binary_input(
@@ -235,9 +222,9 @@ mod test {
             0x07,
         );
 
-        handler.expect(Header::Binary(vec![expected]));
         extract_measurements_inner(objects, &mut handler);
-        assert!(handler.is_empty());
+
+        assert_eq!(handler.pop(), &[Header::Binary(vec![expected])]);
     }
 
     #[test]
@@ -253,7 +240,7 @@ mod test {
         )
         .unwrap();
 
-        let expected: (BinaryInput, u16) = (
+        let expected = (
             BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
@@ -262,9 +249,8 @@ mod test {
             0x07,
         );
 
-        handler.expect(Header::Binary(vec![expected]));
         extract_measurements_inner(objects, &mut handler);
-        assert!(handler.is_empty());
+        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
     }
 
     #[test]
@@ -289,9 +275,8 @@ mod test {
             0x07,
         );
 
-        handler.expect(Header::Binary(vec![expected]));
         extract_measurements_inner(objects, &mut handler);
-        assert!(handler.is_empty());
+        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
     }
 
     #[test]
@@ -316,9 +301,8 @@ mod test {
             0x07,
         );
 
-        handler.expect(Header::Binary(vec![expected]));
         extract_measurements_inner(objects, &mut handler);
-        assert!(handler.is_empty());
+        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
     }
 
     #[test]
@@ -343,8 +327,7 @@ mod test {
             0x07,
         );
 
-        handler.expect(Header::Binary(vec![expected]));
         extract_measurements_inner(objects, &mut handler);
-        assert!(handler.is_empty());
+        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
     }
 }
