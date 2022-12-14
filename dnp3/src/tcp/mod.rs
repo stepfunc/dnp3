@@ -1,4 +1,5 @@
 pub use address_filter::*;
+pub use connect::*;
 pub use endpoint_list::*;
 pub use master::*;
 pub use no_delay::*;
@@ -9,6 +10,7 @@ pub use outstation::*;
 pub mod tls;
 
 mod address_filter;
+mod connect;
 mod endpoint_list;
 mod master;
 mod no_delay;
