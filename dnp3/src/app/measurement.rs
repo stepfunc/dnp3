@@ -399,7 +399,7 @@ impl FlagFormatter {
             f.write_str(", ")?;
         }
         self.prev = true;
-        write!(f, "{} = {:?}", name, item)
+        write!(f, "{name} = {item:?}")
     }
 }
 

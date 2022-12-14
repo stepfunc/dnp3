@@ -95,7 +95,7 @@ impl TlsServerConfig {
     ) -> Result<PhysLayer, String> {
         let connector = tokio_rustls::TlsAcceptor::from(self.config.clone());
         match connector.accept(socket).await {
-            Err(err) => Err(format!("failed to establish TLS session: {}", err)),
+            Err(err) => Err(format!("failed to establish TLS session: {err}")),
             Ok(stream) => Ok(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
                 stream,
             )))),
@@ -204,8 +204,7 @@ impl rustls::server::ClientCertVerifier for SelfSignedCertificateClientCertVerif
         // Check that the certificate is still valid
         let parsed_cert = rx509::x509::Certificate::parse(&end_entity.0).map_err(|err| {
             rustls::Error::InvalidCertificateData(format!(
-                "unable to parse cert with rasn: {:?}",
-                err
+                "unable to parse cert with rasn: {err:?}"
             ))
         })?;
 

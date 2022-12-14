@@ -125,14 +125,14 @@ impl DoubleBit {
 
 impl std::fmt::Display for DoubleBit {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
 impl std::fmt::Display for Variation {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let (g, v) = self.to_group_and_var();
-        write!(f, "g{}v{}", g, v)
+        write!(f, "g{g}v{v}")
     }
 }
 
