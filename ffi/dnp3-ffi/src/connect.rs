@@ -8,7 +8,7 @@ pub struct ConnectOptions {
 }
 
 pub(crate) fn connect_options_create() -> *mut ConnectOptions {
-    Box::into_raw(Box::new(ConnectOptions::default()))
+    Box::into_raw(Box::default())
 }
 
 pub(crate) unsafe fn connect_options_destroy(instance: *mut ConnectOptions) {
