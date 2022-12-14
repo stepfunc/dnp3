@@ -1,99 +1,99 @@
 /// Enum representing all possible `BinaryInput` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventBinaryInputVariation {
-    /// Binary Input Event - Without Time
+    /// Binary Input Event - without time
     Group2Var1,
-    /// Binary Input Event - With Absolute Time
+    /// Binary Input Event - with Absolute time
     Group2Var2,
-    /// Binary Input Event - With Relative Time
+    /// Binary Input Event - with Relative time
     Group2Var3,
 }
 
 /// Enum representing all possible `BinaryOutputStatus` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventBinaryOutputStatusVariation {
-    /// Binary Output Event - Output Status Without Time
+    /// Binary Output Event - Output Status without time
     Group11Var1,
-    /// Binary Output Event - Output Status With Time
+    /// Binary Output Event - Output Status with time
     Group11Var2,
 }
 
 /// Enum representing all possible `DoubleBitBinaryInput` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventDoubleBitBinaryInputVariation {
-    /// Double-bit Binary Input Event - Without Time
+    /// Double-bit Binary Input Event - without time
     Group4Var1,
-    /// Double-bit Binary Input Event - With Absolute Time
+    /// Double-bit Binary Input Event - with Absolute time
     Group4Var2,
-    /// Double-bit Binary Input Event - With Relative Time
+    /// Double-bit Binary Input Event - with Relative time
     Group4Var3,
 }
 
 /// Enum representing all possible `Counter` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventCounterVariation {
-    /// Counter Event - 32-bit With Flag
+    /// Counter Event - 32-bit with flag
     Group22Var1,
-    /// Counter Event - 16-bit With Flag
+    /// Counter Event - 16-bit with flag
     Group22Var2,
-    /// Counter Event - 32-bit With Flag and Time
+    /// Counter Event - 32-bit with flag and time
     Group22Var5,
-    /// Counter Event - 16-bit With Flag and Time
+    /// Counter Event - 16-bit with flag and time
     Group22Var6,
 }
 
 /// Enum representing all possible `FrozenCounter` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventFrozenCounterVariation {
-    /// Frozen Counter Event - 32-bit With Flag
+    /// Frozen Counter Event - 32-bit with flag
     Group23Var1,
-    /// Frozen Counter Event - 16-bit With Flag
+    /// Frozen Counter Event - 16-bit with flag
     Group23Var2,
-    /// Frozen Counter Event - 32-bit With Flag and Time
+    /// Frozen Counter Event - 32-bit with flag and time
     Group23Var5,
-    /// Frozen Counter Event - 16-bit With Flag and Time
+    /// Frozen Counter Event - 16-bit with flag and time
     Group23Var6,
 }
 
 /// Enum representing all possible `AnalogInput` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventAnalogInputVariation {
-    /// Analog Input Event - 32-bit With Flag
+    /// Analog Input Event - 32-bit with flag
     Group32Var1,
-    /// Analog Input Event - 16-bit With Flag
+    /// Analog Input Event - 16-bit with flag
     Group32Var2,
-    /// Analog Input Event - 32-bit With Flag and Time
+    /// Analog Input Event - 32-bit with flag and time
     Group32Var3,
-    /// Analog Input Event - 16-bit With Flag and Time
+    /// Analog Input Event - 16-bit with flag and time
     Group32Var4,
-    /// Analog Input Event - Single-precision With Flag
+    /// Analog Input Event - Single-precision with flag
     Group32Var5,
-    /// Analog Input Event - Double-precision With Flag
+    /// Analog Input Event - Double-precision with flag
     Group32Var6,
-    /// Analog Input Event - Single-precision With Flag and Time
+    /// Analog Input Event - Single-precision with flag and time
     Group32Var7,
-    /// Analog Input Event - Double-precision With Flag and Time
+    /// Analog Input Event - Double-precision with flag and time
     Group32Var8,
 }
 
 /// Enum representing all possible `AnalogOutputStatus` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventAnalogOutputStatusVariation {
-    /// Analog Output Event - 32-bit With Flag
+    /// Analog Output Event - 32-bit with flag
     Group42Var1,
-    /// Analog Output Event - 16-bit With Flag
+    /// Analog Output Event - 16-bit with flag
     Group42Var2,
-    /// Analog Output Event - 32-bit With Flag and Time
+    /// Analog Output Event - 32-bit with flag and time
     Group42Var3,
-    /// Analog Output Event - 16-bit With Flag and Time
+    /// Analog Output Event - 16-bit with flag and time
     Group42Var4,
-    /// Analog Output Event - Single-precision With Flag
+    /// Analog Output Event - Single-precision with flag
     Group42Var5,
-    /// Analog Output Event - Double-precision With Flag
+    /// Analog Output Event - Double-precision with flag
     Group42Var6,
-    /// Analog Output Event - Single-precision With Flag and Time
+    /// Analog Output Event - Single-precision with flag and time
     Group42Var7,
-    /// Analog Output Event - Double-precision With Flag and Time
+    /// Analog Output Event - Double-precision with flag and time
     Group42Var8,
 }
 
@@ -106,7 +106,7 @@ pub(crate) struct EventOctetStringVariation;
 pub enum StaticBinaryInputVariation {
     /// Binary Input - Packed Format
     Group1Var1,
-    /// Binary Input - With Flags
+    /// Binary Input - with flags
     Group1Var2,
 }
 
@@ -115,7 +115,7 @@ pub enum StaticBinaryInputVariation {
 pub enum StaticBinaryOutputStatusVariation {
     /// Binary Output - Packed Format
     Group10Var1,
-    /// Binary Output - Output Status With Flags
+    /// Binary Output - Output Status with flags
     Group10Var2,
 }
 
@@ -124,67 +124,88 @@ pub enum StaticBinaryOutputStatusVariation {
 pub enum StaticDoubleBitBinaryInputVariation {
     /// Double-bit Binary Input - Packed Format
     Group3Var1,
-    /// Double-bit Binary Input - With Flags
+    /// Double-bit Binary Input - with flags
     Group3Var2,
 }
 
 /// Enum representing all possible `Counter` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StaticCounterVariation {
-    /// Counter - 32-bit With Flag
+    /// Counter - 32-bit with flag
     Group20Var1,
-    /// Counter - 16-bit With Flag
+    /// Counter - 16-bit with flag
     Group20Var2,
-    /// Counter - 32-bit Without Flag
+    /// Counter - 32-bit without flag
     Group20Var5,
-    /// Counter - 16-bit Without Flag
+    /// Counter - 16-bit without flag
     Group20Var6,
 }
 
 /// Enum representing all possible `FrozenCounter` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StaticFrozenCounterVariation {
-    /// Frozen Counter - 32-bit With Flag
+    /// Frozen Counter - 32-bit with flag
     Group21Var1,
-    /// Frozen Counter - 16-bit With Flag
+    /// Frozen Counter - 16-bit with flag
     Group21Var2,
-    /// Frozen Counter - 32-bit With Flag and Time
+    /// Frozen Counter - 32-bit with flag and time
     Group21Var5,
-    /// Frozen Counter - 16-bit With Flag and Time
+    /// Frozen Counter - 16-bit with flag and time
     Group21Var6,
-    /// Frozen Counter - 32-bit Without Flag
+    /// Frozen Counter - 32-bit without flag
     Group21Var9,
-    /// Frozen Counter - 16-bit Without Flag
+    /// Frozen Counter - 16-bit without flag
     Group21Var10,
 }
 
 /// Enum representing all possible `AnalogInput` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StaticAnalogInputVariation {
-    /// Analog Input - 32-bit With Flag
+    /// Analog Input - 32-bit with flag
     Group30Var1,
-    /// Analog Input - 16-bit With Flag
+    /// Analog Input - 16-bit with flag
     Group30Var2,
-    /// Analog Input - 32-bit Without Flag
+    /// Analog Input - 32-bit without flag
     Group30Var3,
-    /// Analog Input - 16-bit Without Flag
+    /// Analog Input - 16-bit without flag
     Group30Var4,
-    /// Analog Input - Single-precision With Flag
+    /// Analog Input - Single-precision with flag
     Group30Var5,
-    /// Analog Input - Double-precision With Flag
+    /// Analog Input - Double-precision with flag
     Group30Var6,
+}
+
+/// Enum representing all possible `FrozenAnalogInput` static variations
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum StaticFrozenAnalogInputVariation {
+    /// Frozen Analog Input - 32-bit with flag
+    Group31Var1,
+    /// Frozen Analog Input - 16-bit with flag
+    Group31Var2,
+    /// Frozen Analog Input - 32-bit with flag and time-of-freeze
+    Group31Var3,
+    /// Frozen Analog Input - 32-bit with flag and time-of-freeze
+    Group31Var4,
+    /// Frozen Analog Input - 32-bit without flag
+    Group31Var5,
+    /// Frozen Analog Input - 16-bit without flag
+    Group31Var6,
+    /// Frozen Analog Input - Single-precision with flag
+    Group31Var7,
+    /// Frozen Analog Input - Double-precision with flag
+    Group31Var8,
 }
 
 /// Enum representing all possible `AnalogOutputStatus` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StaticAnalogOutputStatusVariation {
-    /// Analog Output Status - 32-bit With Flag
+    /// Analog Output Status - 32-bit with flag
     Group40Var1,
-    /// Analog Output Status - 16-bit With Flag
+    /// Analog Output Status - 16-bit with flag
     Group40Var2,
-    /// Analog Output Status - Single-precision With Flag
+    /// Analog Output Status - Single-precision with flag
     Group40Var3,
-    /// Analog Output Status - Double-precision With Flag
+    /// Analog Output Status - Double-precision with flag
     Group40Var4,
 }
 

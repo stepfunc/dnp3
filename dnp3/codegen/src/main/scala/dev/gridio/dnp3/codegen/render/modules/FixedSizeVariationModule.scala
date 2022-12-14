@@ -115,6 +115,7 @@ object FixedSizeVariationModule extends Module {
           case GroupType.StaticAnalogOutputStatus => analog
           case GroupType.AnalogEvent => analog
           case GroupType.StaticAnalog => analog
+          case GroupType.StaticFrozenAnalog => analog
           case GroupType.StaticCounter => counter
           case GroupType.CounterEvent => counter
           case GroupType.StaticFrozenCounter => counter
