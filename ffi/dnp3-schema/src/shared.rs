@@ -26,6 +26,8 @@ pub struct SharedDefinitions {
     pub frozen_counter_it: AbstractIteratorHandle,
     pub analog_point: UniversalStructHandle,
     pub analog_it: AbstractIteratorHandle,
+    pub frozen_analog_point: UniversalStructHandle,
+    pub frozen_analog_it: AbstractIteratorHandle,
     pub analog_output_status_point: UniversalStructHandle,
     pub analog_output_status_it: AbstractIteratorHandle,
     pub octet_string: FunctionReturnStructHandle,
@@ -244,6 +246,13 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         &flags_struct,
         &timestamp_struct,
     )?;
+    let (frozen_analog_point, frozen_analog_it) = build_iterator(
+        "frozen_analog_input",
+        Primitive::Double,
+        lib,
+        &flags_struct,
+        &timestamp_struct,
+    )?;
     let (analog_output_status_point, analog_output_status_it) = build_iterator(
         "analog_output_status",
         Primitive::Double,
@@ -280,6 +289,8 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         frozen_counter_it,
         analog_point,
         analog_it,
+        frozen_analog_point,
+        frozen_analog_it,
         analog_output_status_point,
         analog_output_status_it,
         octet_string,

@@ -294,6 +294,12 @@ implement_iterator!(
     ffi::AnalogInput
 );
 implement_iterator!(
+    FrozenAnalogInputIterator,
+    frozen_analog_input_iterator_next,
+    FrozenAnalogInput,
+    ffi::FrozenAnalogInput
+);
+implement_iterator!(
     AnalogOutputStatusIterator,
     analog_output_status_iterator_next,
     AnalogOutputStatus,
@@ -363,6 +369,17 @@ impl ffi::FrozenCounter {
 
 impl ffi::AnalogInput {
     pub(crate) fn new(idx: u16, value: AnalogInput) -> Self {
+        Self {
+            index: idx,
+            value: value.value,
+            flags: value.flags.into(),
+            time: value.time.into(),
+        }
+    }
+}
+
+impl ffi::FrozenAnalogInput {
+    pub(crate) fn new(idx: u16, value: FrozenAnalogInput) -> Self {
         Self {
             index: idx,
             value: value.value,
