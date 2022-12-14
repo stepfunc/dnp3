@@ -106,7 +106,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .fails_with(shared.error_type.clone())?
         .doc("Create a master channel that connects to the specified TCP endpoint(s)")?
-        .build_static("create_tcp_channel")?;
+        .build_static("create_tcp_channel_2")?;
 
     let master_channel_create_serial_fn = lib
         .define_function("master_channel_create_serial")?
