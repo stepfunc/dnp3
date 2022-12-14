@@ -19,7 +19,7 @@ object Group31Var0 extends AnyVariation(Group31, 0)
 object Group31Var1 extends FixedSize(Group31, 1, bit32WithFlag)(flags, value32)
 object Group31Var2 extends FixedSize(Group31, 2, bit16WithFlag)(flags, value16)
 object Group31Var3 extends FixedSize(Group31, 3, bit32WithFlagAndTimeOfFreeze)(flags, value32, time48)
-object Group31Var4 extends FixedSize(Group31, 4, bit32WithFlagAndTimeOfFreeze)(flags, value16, time48)
+object Group31Var4 extends FixedSize(Group31, 4, bit16WithFlagAndTimeOfFreeze)(flags, value16, time48)
 
 object Group31Var5 extends FixedSize(Group31, 5, bit32WithoutFlag)(value32)
 object Group31Var6 extends FixedSize(Group31, 6, bit16WithoutFlag)(value16)

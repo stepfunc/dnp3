@@ -493,6 +493,10 @@ impl EventBuffer {
             EventReadHeader::OctetString(limit) => {
                 self.select_by_type::<measurement::OctetString>(None, limit)
             }
+            EventReadHeader::FrozenAnalog(_, _) => {
+                // not currently supported
+                0
+            }
         }
     }
 

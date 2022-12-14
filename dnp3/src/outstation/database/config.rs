@@ -76,6 +76,27 @@ pub enum EventAnalogInputVariation {
     Group32Var8,
 }
 
+/// Enum representing all possible `FrozenAnalogInput` event variations
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum EventFrozenAnalogInputVariation {
+    /// Frozen Analog Input Event - 32-bit with flag
+    Group33Var1,
+    /// Frozen Analog Input Event - 16-bit with flag
+    Group33Var2,
+    /// Frozen Analog Input Event - 32-bit with flag and time
+    Group33Var3,
+    /// Frozen Analog Input Event - 16-bit with flag and time
+    Group33Var4,
+    /// Frozen Analog Input Event - Single-precision with flag
+    Group33Var5,
+    /// Frozen Analog Input Event - Double-precision with flag
+    Group33Var6,
+    /// Frozen Analog Input Event - Single-precision with flag and time
+    Group33Var7,
+    /// Frozen Analog Input Event - Double-precision with flag and time
+    Group33Var8,
+}
+
 /// Enum representing all possible `AnalogOutputStatus` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum EventAnalogOutputStatusVariation {

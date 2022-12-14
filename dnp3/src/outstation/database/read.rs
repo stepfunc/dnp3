@@ -41,6 +41,7 @@ pub(crate) enum EventReadHeader {
     Counter(Option<EventCounterVariation>, Option<usize>),
     FrozenCounter(Option<EventFrozenCounterVariation>, Option<usize>),
     Analog(Option<EventAnalogInputVariation>, Option<usize>),
+    FrozenAnalog(Option<EventFrozenAnalogInputVariation>, Option<usize>),
     AnalogOutputStatus(Option<EventAnalogOutputStatusVariation>, Option<usize>),
     OctetString(Option<usize>),
 }
@@ -413,6 +414,66 @@ impl ReadHeader {
             AllObjectsVariation::Group32Var8 => Some(
                 EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var8), None).into(),
             ),
+            // group 33
+            AllObjectsVariation::Group33Var0 => {
+                Some(EventReadHeader::FrozenAnalog(None, None).into())
+            }
+            AllObjectsVariation::Group33Var1 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var1),
+                    None,
+                )
+                .into(),
+            ),
+            AllObjectsVariation::Group33Var2 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var2),
+                    None,
+                )
+                .into(),
+            ),
+            AllObjectsVariation::Group33Var3 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var3),
+                    None,
+                )
+                .into(),
+            ),
+            AllObjectsVariation::Group33Var4 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var4),
+                    None,
+                )
+                .into(),
+            ),
+            AllObjectsVariation::Group33Var5 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var5),
+                    None,
+                )
+                .into(),
+            ),
+            AllObjectsVariation::Group33Var6 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var6),
+                    None,
+                )
+                .into(),
+            ),
+            AllObjectsVariation::Group33Var7 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var7),
+                    None,
+                )
+                .into(),
+            ),
+            AllObjectsVariation::Group33Var8 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var8),
+                    None,
+                )
+                .into(),
+            ),
             // group 40
             AllObjectsVariation::Group40Var0 => {
                 Some(StaticReadHeader::AnalogOutputStatus(None, None).into())
@@ -655,6 +716,65 @@ impl ReadHeader {
             CountVariation::Group32Var8 => Some(
                 EventReadHeader::Analog(Some(EventAnalogInputVariation::Group32Var8), Some(count))
                     .into(),
+            ),
+            CountVariation::Group33Var0 => {
+                Some(EventReadHeader::FrozenAnalog(None, Some(count)).into())
+            }
+            CountVariation::Group33Var1 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var1),
+                    Some(count),
+                )
+                .into(),
+            ),
+            CountVariation::Group33Var2 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var2),
+                    Some(count),
+                )
+                .into(),
+            ),
+            CountVariation::Group33Var3 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var3),
+                    Some(count),
+                )
+                .into(),
+            ),
+            CountVariation::Group33Var4 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var4),
+                    Some(count),
+                )
+                .into(),
+            ),
+            CountVariation::Group33Var5 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var5),
+                    Some(count),
+                )
+                .into(),
+            ),
+            CountVariation::Group33Var6 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var6),
+                    Some(count),
+                )
+                .into(),
+            ),
+            CountVariation::Group33Var7 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var7),
+                    Some(count),
+                )
+                .into(),
+            ),
+            CountVariation::Group33Var8 => Some(
+                EventReadHeader::FrozenAnalog(
+                    Some(EventFrozenAnalogInputVariation::Group33Var8),
+                    Some(count),
+                )
+                .into(),
             ),
             CountVariation::Group42Var0 => {
                 Some(EventReadHeader::AnalogOutputStatus(None, Some(count)).into())

@@ -74,6 +74,22 @@ pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt:
     Group32Var7(CountSequence<'a, Prefix<I, Group32Var7>>),
     /// Analog Input Event - Double-precision With Flag and Time
     Group32Var8(CountSequence<'a, Prefix<I, Group32Var8>>),
+    /// Frozen Analog Input Event - 32-bit With Flag
+    Group33Var1(CountSequence<'a, Prefix<I, Group33Var1>>),
+    /// Frozen Analog Input Event - 16-bit With Flag
+    Group33Var2(CountSequence<'a, Prefix<I, Group33Var2>>),
+    /// Frozen Analog Input Event - 32-bit with Flag and Time-of-Freeze
+    Group33Var3(CountSequence<'a, Prefix<I, Group33Var3>>),
+    /// Frozen Analog Input Event - 16-bit with Flag and Time-of-Freeze
+    Group33Var4(CountSequence<'a, Prefix<I, Group33Var4>>),
+    /// Frozen Analog Input Event - Single-precision With Flag
+    Group33Var5(CountSequence<'a, Prefix<I, Group33Var5>>),
+    /// Frozen Analog Input Event - Double-precision With Flag
+    Group33Var6(CountSequence<'a, Prefix<I, Group33Var6>>),
+    /// Frozen Analog Input Event - Single-precision With Flag and Time
+    Group33Var7(CountSequence<'a, Prefix<I, Group33Var7>>),
+    /// Frozen Analog Input Event - Double-precision With Flag and Time
+    Group33Var8(CountSequence<'a, Prefix<I, Group33Var8>>),
     /// Analog Output - 32-bit With Flag
     Group41Var1(CountSequence<'a, Prefix<I, Group41Var1>>),
     /// Analog Output - 16-bit With Flag
@@ -130,6 +146,14 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
             Variation::Group32Var6 => Ok(PrefixedVariation::Group32Var6(CountSequence::parse(count, cursor)?)),
             Variation::Group32Var7 => Ok(PrefixedVariation::Group32Var7(CountSequence::parse(count, cursor)?)),
             Variation::Group32Var8 => Ok(PrefixedVariation::Group32Var8(CountSequence::parse(count, cursor)?)),
+            Variation::Group33Var1 => Ok(PrefixedVariation::Group33Var1(CountSequence::parse(count, cursor)?)),
+            Variation::Group33Var2 => Ok(PrefixedVariation::Group33Var2(CountSequence::parse(count, cursor)?)),
+            Variation::Group33Var3 => Ok(PrefixedVariation::Group33Var3(CountSequence::parse(count, cursor)?)),
+            Variation::Group33Var4 => Ok(PrefixedVariation::Group33Var4(CountSequence::parse(count, cursor)?)),
+            Variation::Group33Var5 => Ok(PrefixedVariation::Group33Var5(CountSequence::parse(count, cursor)?)),
+            Variation::Group33Var6 => Ok(PrefixedVariation::Group33Var6(CountSequence::parse(count, cursor)?)),
+            Variation::Group33Var7 => Ok(PrefixedVariation::Group33Var7(CountSequence::parse(count, cursor)?)),
+            Variation::Group33Var8 => Ok(PrefixedVariation::Group33Var8(CountSequence::parse(count, cursor)?)),
             Variation::Group41Var1 => Ok(PrefixedVariation::Group41Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group41Var2 => Ok(PrefixedVariation::Group41Var2(CountSequence::parse(count, cursor)?)),
             Variation::Group41Var3 => Ok(PrefixedVariation::Group41Var3(CountSequence::parse(count, cursor)?)),
@@ -175,6 +199,14 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
             PrefixedVariation::Group32Var6(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group32Var7(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group32Var8(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group33Var1(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group33Var2(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group33Var3(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group33Var4(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group33Var5(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group33Var6(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group33Var7(seq) => format_prefixed_items(f, seq.iter()),
+            PrefixedVariation::Group33Var8(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group41Var1(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group41Var2(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group41Var3(seq) => format_prefixed_items(f, seq.iter()),
@@ -364,6 +396,62 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
                 );
                 true
             }
+            PrefixedVariation::Group33Var1(seq) => {
+                handler.handle_frozen_analog_input(
+                    self.get_header_info(),
+                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
+                );
+                true
+            }
+            PrefixedVariation::Group33Var2(seq) => {
+                handler.handle_frozen_analog_input(
+                    self.get_header_info(),
+                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
+                );
+                true
+            }
+            PrefixedVariation::Group33Var3(seq) => {
+                handler.handle_frozen_analog_input(
+                    self.get_header_info(),
+                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
+                );
+                true
+            }
+            PrefixedVariation::Group33Var4(seq) => {
+                handler.handle_frozen_analog_input(
+                    self.get_header_info(),
+                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
+                );
+                true
+            }
+            PrefixedVariation::Group33Var5(seq) => {
+                handler.handle_frozen_analog_input(
+                    self.get_header_info(),
+                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
+                );
+                true
+            }
+            PrefixedVariation::Group33Var6(seq) => {
+                handler.handle_frozen_analog_input(
+                    self.get_header_info(),
+                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
+                );
+                true
+            }
+            PrefixedVariation::Group33Var7(seq) => {
+                handler.handle_frozen_analog_input(
+                    self.get_header_info(),
+                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
+                );
+                true
+            }
+            PrefixedVariation::Group33Var8(seq) => {
+                handler.handle_frozen_analog_input(
+                    self.get_header_info(),
+                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
+                );
+                true
+            }
             PrefixedVariation::Group41Var1(_) => {
                 false // command
             }
@@ -469,6 +557,14 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
             PrefixedVariation::Group32Var6(_) => HeaderInfo::new(Variation::Group32Var6, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
             PrefixedVariation::Group32Var7(_) => HeaderInfo::new(Variation::Group32Var7, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
             PrefixedVariation::Group32Var8(_) => HeaderInfo::new(Variation::Group32Var8, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
+            PrefixedVariation::Group33Var1(_) => HeaderInfo::new(Variation::Group33Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
+            PrefixedVariation::Group33Var2(_) => HeaderInfo::new(Variation::Group33Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
+            PrefixedVariation::Group33Var3(_) => HeaderInfo::new(Variation::Group33Var3, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
+            PrefixedVariation::Group33Var4(_) => HeaderInfo::new(Variation::Group33Var4, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
+            PrefixedVariation::Group33Var5(_) => HeaderInfo::new(Variation::Group33Var5, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
+            PrefixedVariation::Group33Var6(_) => HeaderInfo::new(Variation::Group33Var6, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
+            PrefixedVariation::Group33Var7(_) => HeaderInfo::new(Variation::Group33Var7, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
+            PrefixedVariation::Group33Var8(_) => HeaderInfo::new(Variation::Group33Var8, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
             PrefixedVariation::Group41Var1(_) => HeaderInfo::new(Variation::Group41Var1, I::COUNT_AND_PREFIX_QUALIFIER, false, false),
             PrefixedVariation::Group41Var2(_) => HeaderInfo::new(Variation::Group41Var2, I::COUNT_AND_PREFIX_QUALIFIER, false, false),
             PrefixedVariation::Group41Var3(_) => HeaderInfo::new(Variation::Group41Var3, I::COUNT_AND_PREFIX_QUALIFIER, false, false),

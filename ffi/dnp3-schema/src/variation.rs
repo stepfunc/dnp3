@@ -125,6 +125,27 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
             gv(32, 8),
             "Analog Input Event - Double-precision floating point with time",
         )?
+        .push(gv(33, 0), "Frozen Analog Input Event - Default variation")?
+        .push(gv(33, 1), "Frozen Analog Input Event - 32-bit without time")?
+        .push(gv(33, 2), "Frozen Analog Input Event - 16-bit without time")?
+        .push(gv(33, 3), "Frozen Analog Input Event - 32-bit with time")?
+        .push(gv(33, 4), "Frozen Analog Input Event - 16-bit with time")?
+        .push(
+            gv(33, 5),
+            "Frozen Analog Input Event - Single-precision floating point without time",
+        )?
+        .push(
+            gv(33, 6),
+            "Frozen Analog Input Event - Double-precision floating point without time",
+        )?
+        .push(
+            gv(33, 7),
+            "Frozen Analog Input Event - Single-precision floating point with time",
+        )?
+        .push(
+            gv(33, 8),
+            "Frozen Analog Input Event - Double-precision floating point with time",
+        )?
         .push(gv(40, 0), "Analog Output Status - Default variation")?
         .push(gv(40, 1), "Analog Output Status - 32-bit with flags")?
         .push(gv(40, 2), "Analog Output Status - 16-bit with flags")?

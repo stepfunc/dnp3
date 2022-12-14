@@ -87,7 +87,7 @@ pub(crate) enum RangedVariation<'a> {
     Group31Var2(RangedSequence<'a, Group31Var2>),
     /// Frozen Analog Input - 32-bit with Flag and Time-of-Freeze
     Group31Var3(RangedSequence<'a, Group31Var3>),
-    /// Frozen Analog Input - 32-bit with Flag and Time-of-Freeze
+    /// Frozen Analog Input - 16-bit with Flag and Time-of-Freeze
     Group31Var4(RangedSequence<'a, Group31Var4>),
     /// Frozen Analog Input - 32-bit Without Flag
     Group31Var5(RangedSequence<'a, Group31Var5>),

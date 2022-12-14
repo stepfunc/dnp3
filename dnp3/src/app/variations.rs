@@ -130,7 +130,7 @@ pub enum Variation {
     Group31Var2,
     /// Frozen Analog Input - 32-bit with Flag and Time-of-Freeze
     Group31Var3,
-    /// Frozen Analog Input - 32-bit with Flag and Time-of-Freeze
+    /// Frozen Analog Input - 16-bit with Flag and Time-of-Freeze
     Group31Var4,
     /// Frozen Analog Input - 32-bit Without Flag
     Group31Var5,
@@ -158,6 +158,24 @@ pub enum Variation {
     Group32Var7,
     /// Analog Input Event - Double-precision With Flag and Time
     Group32Var8,
+    /// Frozen Analog Input Event - Any Variation
+    Group33Var0,
+    /// Frozen Analog Input Event - 32-bit With Flag
+    Group33Var1,
+    /// Frozen Analog Input Event - 16-bit With Flag
+    Group33Var2,
+    /// Frozen Analog Input Event - 32-bit with Flag and Time-of-Freeze
+    Group33Var3,
+    /// Frozen Analog Input Event - 16-bit with Flag and Time-of-Freeze
+    Group33Var4,
+    /// Frozen Analog Input Event - Single-precision With Flag
+    Group33Var5,
+    /// Frozen Analog Input Event - Double-precision With Flag
+    Group33Var6,
+    /// Frozen Analog Input Event - Single-precision With Flag and Time
+    Group33Var7,
+    /// Frozen Analog Input Event - Double-precision With Flag and Time
+    Group33Var8,
     /// Analog Output Status - Any Variation
     Group40Var0,
     /// Analog Output Status - 32-bit With Flag
@@ -340,6 +358,18 @@ impl Variation {
                 8 => Some(Variation::Group32Var8),
                 _ => None,
             },
+            33 => match var {
+                0 => Some(Variation::Group33Var0),
+                1 => Some(Variation::Group33Var1),
+                2 => Some(Variation::Group33Var2),
+                3 => Some(Variation::Group33Var3),
+                4 => Some(Variation::Group33Var4),
+                5 => Some(Variation::Group33Var5),
+                6 => Some(Variation::Group33Var6),
+                7 => Some(Variation::Group33Var7),
+                8 => Some(Variation::Group33Var8),
+                _ => None,
+            },
             40 => match var {
                 0 => Some(Variation::Group40Var0),
                 1 => Some(Variation::Group40Var1),
@@ -472,6 +502,15 @@ impl Variation {
             Variation::Group32Var6 => (32, 6),
             Variation::Group32Var7 => (32, 7),
             Variation::Group32Var8 => (32, 8),
+            Variation::Group33Var0 => (33, 0),
+            Variation::Group33Var1 => (33, 1),
+            Variation::Group33Var2 => (33, 2),
+            Variation::Group33Var3 => (33, 3),
+            Variation::Group33Var4 => (33, 4),
+            Variation::Group33Var5 => (33, 5),
+            Variation::Group33Var6 => (33, 6),
+            Variation::Group33Var7 => (33, 7),
+            Variation::Group33Var8 => (33, 8),
             Variation::Group40Var0 => (40, 0),
             Variation::Group40Var1 => (40, 1),
             Variation::Group40Var2 => (40, 2),
@@ -565,7 +604,7 @@ impl Variation {
             Variation::Group31Var1 => "Frozen Analog Input - 32-bit With Flag",
             Variation::Group31Var2 => "Frozen Analog Input - 16-bit With Flag",
             Variation::Group31Var3 => "Frozen Analog Input - 32-bit with Flag and Time-of-Freeze",
-            Variation::Group31Var4 => "Frozen Analog Input - 32-bit with Flag and Time-of-Freeze",
+            Variation::Group31Var4 => "Frozen Analog Input - 16-bit with Flag and Time-of-Freeze",
             Variation::Group31Var5 => "Frozen Analog Input - 32-bit Without Flag",
             Variation::Group31Var6 => "Frozen Analog Input - 16-bit Without Flag",
             Variation::Group31Var7 => "Frozen Analog Input - Single-precision With Flag",
@@ -579,6 +618,15 @@ impl Variation {
             Variation::Group32Var6 => "Analog Input Event - Double-precision With Flag",
             Variation::Group32Var7 => "Analog Input Event - Single-precision With Flag and Time",
             Variation::Group32Var8 => "Analog Input Event - Double-precision With Flag and Time",
+            Variation::Group33Var0 => "Frozen Analog Input Event - Any Variation",
+            Variation::Group33Var1 => "Frozen Analog Input Event - 32-bit With Flag",
+            Variation::Group33Var2 => "Frozen Analog Input Event - 16-bit With Flag",
+            Variation::Group33Var3 => "Frozen Analog Input Event - 32-bit with Flag and Time-of-Freeze",
+            Variation::Group33Var4 => "Frozen Analog Input Event - 16-bit with Flag and Time-of-Freeze",
+            Variation::Group33Var5 => "Frozen Analog Input Event - Single-precision With Flag",
+            Variation::Group33Var6 => "Frozen Analog Input Event - Double-precision With Flag",
+            Variation::Group33Var7 => "Frozen Analog Input Event - Single-precision With Flag and Time",
+            Variation::Group33Var8 => "Frozen Analog Input Event - Double-precision With Flag and Time",
             Variation::Group40Var0 => "Analog Output Status - Any Variation",
             Variation::Group40Var1 => "Analog Output Status - 32-bit With Flag",
             Variation::Group40Var2 => "Analog Output Status - 16-bit With Flag",
@@ -821,6 +869,86 @@ pub(crate) struct Group40Var1 {
     pub(crate) value: i32,
 }
 
+/// Frozen Analog Input Event - Double-precision With Flag and Time
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct Group33Var8 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
+    /// value field of the variation
+    pub(crate) value: f64,
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+}
+
+/// Frozen Analog Input Event - Single-precision With Flag and Time
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct Group33Var7 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
+    /// value field of the variation
+    pub(crate) value: f32,
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+}
+
+/// Frozen Analog Input Event - Double-precision With Flag
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct Group33Var6 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
+    /// value field of the variation
+    pub(crate) value: f64,
+}
+
+/// Frozen Analog Input Event - Single-precision With Flag
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct Group33Var5 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
+    /// value field of the variation
+    pub(crate) value: f32,
+}
+
+/// Frozen Analog Input Event - 16-bit with Flag and Time-of-Freeze
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group33Var4 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
+    /// value field of the variation
+    pub(crate) value: i16,
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+}
+
+/// Frozen Analog Input Event - 32-bit with Flag and Time-of-Freeze
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group33Var3 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
+    /// value field of the variation
+    pub(crate) value: i32,
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+}
+
+/// Frozen Analog Input Event - 16-bit With Flag
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group33Var2 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
+    /// value field of the variation
+    pub(crate) value: i16,
+}
+
+/// Frozen Analog Input Event - 32-bit With Flag
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group33Var1 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
+    /// value field of the variation
+    pub(crate) value: i32,
+}
+
 /// Analog Input Event - Double-precision With Flag and Time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group32Var8 {
@@ -933,7 +1061,7 @@ pub(crate) struct Group31Var5 {
     pub(crate) value: i32,
 }
 
-/// Frozen Analog Input - 32-bit with Flag and Time-of-Freeze
+/// Frozen Analog Input - 16-bit with Flag and Time-of-Freeze
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group31Var4 {
     /// flags field of the variation
@@ -1669,6 +1797,150 @@ impl FixedSize for Group40Var1 {
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
         Ok(
             Group40Var1 {
+                flags: cursor.read_u8()?,
+                value: cursor.read_i32_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i32_le(self.value)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group33Var8 {
+    const SIZE: u8 = 15;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group33Var8 {
+                flags: cursor.read_u8()?,
+                value: cursor.read_f64_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f64_le(self.value)?;
+        self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group33Var7 {
+    const SIZE: u8 = 11;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group33Var7 {
+                flags: cursor.read_u8()?,
+                value: cursor.read_f32_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f32_le(self.value)?;
+        self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group33Var6 {
+    const SIZE: u8 = 9;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group33Var6 {
+                flags: cursor.read_u8()?,
+                value: cursor.read_f64_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f64_le(self.value)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group33Var5 {
+    const SIZE: u8 = 5;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group33Var5 {
+                flags: cursor.read_u8()?,
+                value: cursor.read_f32_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_f32_le(self.value)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group33Var4 {
+    const SIZE: u8 = 9;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group33Var4 {
+                flags: cursor.read_u8()?,
+                value: cursor.read_i16_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i16_le(self.value)?;
+        self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group33Var3 {
+    const SIZE: u8 = 11;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group33Var3 {
+                flags: cursor.read_u8()?,
+                value: cursor.read_i32_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i32_le(self.value)?;
+        self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group33Var2 {
+    const SIZE: u8 = 3;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group33Var2 {
+                flags: cursor.read_u8()?,
+                value: cursor.read_i16_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        cursor.write_i16_le(self.value)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group33Var1 {
+    const SIZE: u8 = 5;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group33Var1 {
                 flags: cursor.read_u8()?,
                 value: cursor.read_i32_le()?,
             }
@@ -2706,6 +2978,54 @@ impl std::fmt::Display for Group40Var1 {
     }
 }
 
+impl std::fmt::Display for Group33Var8 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
+    }
+}
+
+impl std::fmt::Display for Group33Var7 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
+    }
+}
+
+impl std::fmt::Display for Group33Var6 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
+    }
+}
+
+impl std::fmt::Display for Group33Var5 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
+    }
+}
+
+impl std::fmt::Display for Group33Var4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
+    }
+}
+
+impl std::fmt::Display for Group33Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
+    }
+}
+
+impl std::fmt::Display for Group33Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
+    }
+}
+
+impl std::fmt::Display for Group33Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
+    }
+}
+
 impl std::fmt::Display for Group32Var8 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "flags: {} value: {} time: {}", AnalogFlagFormatter::new(self.flags), self.value, self.time)
@@ -3109,6 +3429,38 @@ impl FixedSizeVariation for Group40Var2 {
 
 impl FixedSizeVariation for Group40Var1 {
     const VARIATION : Variation = Variation::Group40Var1;
+}
+
+impl FixedSizeVariation for Group33Var8 {
+    const VARIATION : Variation = Variation::Group33Var8;
+}
+
+impl FixedSizeVariation for Group33Var7 {
+    const VARIATION : Variation = Variation::Group33Var7;
+}
+
+impl FixedSizeVariation for Group33Var6 {
+    const VARIATION : Variation = Variation::Group33Var6;
+}
+
+impl FixedSizeVariation for Group33Var5 {
+    const VARIATION : Variation = Variation::Group33Var5;
+}
+
+impl FixedSizeVariation for Group33Var4 {
+    const VARIATION : Variation = Variation::Group33Var4;
+}
+
+impl FixedSizeVariation for Group33Var3 {
+    const VARIATION : Variation = Variation::Group33Var3;
+}
+
+impl FixedSizeVariation for Group33Var2 {
+    const VARIATION : Variation = Variation::Group33Var2;
+}
+
+impl FixedSizeVariation for Group33Var1 {
+    const VARIATION : Variation = Variation::Group33Var1;
 }
 
 impl FixedSizeVariation for Group32Var8 {
