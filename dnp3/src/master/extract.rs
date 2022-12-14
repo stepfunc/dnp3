@@ -101,9 +101,10 @@ mod test {
         )
     }
 
-    #[derive(Debug, PartialEq, Eq)]
+    #[derive(Debug, PartialEq)]
     enum Header {
         Binary(Vec<(BinaryInput, u16)>),
+        FrozenAnalog(Vec<(FrozenAnalogInput, u16)>),
     }
 
     #[derive(Default)]
@@ -185,6 +186,14 @@ mod test {
             _x: &mut dyn Iterator<Item = (AnalogInput, u16)>,
         ) {
             unimplemented!()
+        }
+
+        fn handle_frozen_analog_input(
+            &mut self,
+            _info: HeaderInfo,
+            x: &mut dyn Iterator<Item = (FrozenAnalogInput, u16)>,
+        ) {
+            self.received.push(Header::FrozenAnalog(x.collect()))
         }
 
         fn handle_analog_output_status(
@@ -329,5 +338,52 @@ mod test {
 
         extract_measurements_inner(objects, &mut handler);
         assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
+    }
+
+    #[test]
+    fn handles_frozen_analog_event() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            FunctionCode::Response,
+            &[
+                33, 3, 0x17, 0x01, 0x07, 0x01, 0xDE, 0xAD, 0xCA, 0xFE, 0x01, 0x02, 0x03, 0x04,
+                0x05, 0x06,
+            ],
+        )
+        .unwrap();
+
+        let expected: (FrozenAnalogInput, u16) = (
+            FrozenAnalogInput {
+                value: i32::from_le_bytes([0xDE, 0xAD, 0xCA, 0xFE]) as f64,
+                flags: Flags::ONLINE,
+                time: Some(Time::Synchronized(Timestamp::new(0x060504030201))),
+            },
+            0x07,
+        );
+
+        extract_measurements_inner(objects, &mut handler);
+        assert_eq!(&handler.pop(), &[Header::FrozenAnalog(vec![expected])]);
+    }
+
+    #[test]
+    fn handles_static_frozen_analog() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            FunctionCode::Response,
+            &[31, 2, 0x00, 0x07, 0x07, 0x01, 0xCA, 0xFE],
+        )
+        .unwrap();
+
+        let expected: (FrozenAnalogInput, u16) = (
+            FrozenAnalogInput {
+                value: i16::from_le_bytes([0xCA, 0xFE]) as f64,
+                flags: Flags::ONLINE,
+                time: None,
+            },
+            0x07,
+        );
+
+        extract_measurements_inner(objects, &mut handler);
+        assert_eq!(&handler.pop(), &[Header::FrozenAnalog(vec![expected])]);
     }
 }
