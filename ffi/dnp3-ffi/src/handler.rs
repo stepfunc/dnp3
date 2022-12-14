@@ -103,6 +103,16 @@ impl ReadHandler for ffi::ReadHandler {
         ffi::ReadHandler::handle_analog_input(self, info, &mut iterator);
     }
 
+    fn handle_frozen_analog_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (FrozenAnalogInput, u16)>,
+    ) {
+        let info = info.into();
+        let mut iterator = FrozenAnalogInputIterator::new(iter);
+        ffi::ReadHandler::handle_frozen_analog_input(self, info, &mut iterator);
+    }
+
     fn handle_analog_output_status(
         &mut self,
         info: HeaderInfo,
