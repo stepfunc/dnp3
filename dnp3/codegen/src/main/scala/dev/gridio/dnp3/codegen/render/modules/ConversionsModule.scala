@@ -224,6 +224,14 @@ object ConversionsModule extends Module {
       fixedSize(isType)
     }
 
+    def frozenAnalogVariations: List[FixedSize] = {
+      def isType(fs: FixedSize): Boolean = {
+        fs.parent.groupType == GroupType.StaticFrozenAnalog || fs.parent.groupType == GroupType.FrozenAnalogEvent
+      }
+
+      fixedSize(isType)
+    }
+
     def single(name: String)(fs: FixedSize) : Iterator[String] = {
       def variationToMeas : Iterator[String] = {
         def cast : String = {
@@ -312,7 +320,9 @@ object ConversionsModule extends Module {
 
     spaced(analogVariations.map(single("AnalogInput")).iterator) ++
     space ++
-    spaced(analogOutputStatusVariations.map(single("AnalogOutputStatus")).iterator)
+    spaced(analogOutputStatusVariations.map(single("AnalogOutputStatus")).iterator) ++
+    space ++
+    spaced(frozenAnalogVariations.map(single("FrozenAnalogInput")).iterator)
   }
 
   override def lines(implicit indentation: Indentation): Iterator[String] = {

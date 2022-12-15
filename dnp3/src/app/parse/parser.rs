@@ -23,7 +23,7 @@ where
     V: std::fmt::Display,
 {
     for x in iter {
-        write!(f, "\n{}", x)?;
+        write!(f, "\n{x}")?;
     }
     Ok(())
 }
@@ -35,7 +35,7 @@ where
     I: std::fmt::Display,
 {
     for (v, i) in iter {
-        write!(f, "\nindex: {} {}", i, v)?;
+        write!(f, "\nindex: {i} {v}")?;
     }
     Ok(())
 }

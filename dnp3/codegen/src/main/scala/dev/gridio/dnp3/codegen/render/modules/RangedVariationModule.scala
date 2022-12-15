@@ -102,6 +102,7 @@ object RangedVariationModule extends Module {
         case GroupType.StaticDoubleBinary => "double_bit_binary_input"
         case GroupType.StaticBinaryOutputStatus => "binary_output_status"
         case GroupType.StaticAnalog => "analog_input"
+        case GroupType.StaticFrozenAnalog => "frozen_analog_input"
         case GroupType.StaticAnalogOutputStatus => "analog_output_status"
         case GroupType.StaticCounter => "counter"
         case GroupType.StaticFrozenCounter => "frozen_counter"

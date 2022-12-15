@@ -2,14 +2,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
-use crate::app::{BufferSize, MaybeAsync, Timeout};
+use crate::app::{BufferSize, Timeout};
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
-use crate::master::handler::{AssociationHandle, HeaderInfo, MasterChannel, ReadHandler};
+use crate::master::handler::{AssociationHandle, MasterChannel, ReadHandler};
 use crate::master::session::{MasterSession, RunError};
-use crate::master::{AssociationHandler, AssociationInformation, ReadType};
+use crate::master::{AssociationHandler, AssociationInformation, HeaderInfo};
 use crate::transport::create_master_transport_layer;
 use crate::util::phys::PhysLayer;
 
@@ -88,77 +88,12 @@ impl CountHandler {
 }
 
 impl ReadHandler for CountHandler {
-    fn begin_fragment(
-        &mut self,
-        _read_type: ReadType,
-        _header: crate::app::ResponseHeader,
-    ) -> MaybeAsync<()> {
-        MaybeAsync::ready(())
-    }
-
-    fn end_fragment(
-        &mut self,
-        _read_type: ReadType,
-        _header: crate::app::ResponseHeader,
-    ) -> MaybeAsync<()> {
-        MaybeAsync::ready(())
-    }
-
-    fn handle_binary_input(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::BinaryInput, u16)>,
-    ) {
-    }
-
-    fn handle_double_bit_binary_input(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::DoubleBitBinaryInput, u16)>,
-    ) {
-    }
-
-    fn handle_binary_output_status(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::BinaryOutputStatus, u16)>,
-    ) {
-    }
-
-    fn handle_counter(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::Counter, u16)>,
-    ) {
-    }
-
-    fn handle_frozen_counter(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::FrozenCounter, u16)>,
-    ) {
-    }
-
     fn handle_analog_input(
         &mut self,
         _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (crate::app::measurement::AnalogInput, u16)>,
     ) {
         self.num_requests.fetch_add(1, Ordering::SeqCst);
-    }
-
-    fn handle_analog_output_status(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &mut dyn Iterator<Item = (crate::app::measurement::AnalogOutputStatus, u16)>,
-    ) {
-    }
-
-    fn handle_octet_string<'a>(
-        &mut self,
-        _info: HeaderInfo,
-        _iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
-    ) {
     }
 }
 

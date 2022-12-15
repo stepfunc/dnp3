@@ -62,7 +62,7 @@ pub enum ResponseValidationError {
 impl std::fmt::Display for HeaderParseError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            HeaderParseError::UnknownFunction(_seq, x) => write!(f, "unknown function: {:?}", x),
+            HeaderParseError::UnknownFunction(_seq, x) => write!(f, "unknown function: {x:?}"),
             HeaderParseError::InsufficientBytes => {
                 write!(f, "insufficient bytes for application layer header")
             }
@@ -74,14 +74,14 @@ impl std::fmt::Display for ObjectParseError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             ObjectParseError::UnknownGroupVariation(g, v) => {
-                write!(f, "unknown group/variation: g{}v{}", g, v)
+                write!(f, "unknown group/variation: g{g}v{v}")
             }
-            ObjectParseError::UnknownQualifier(q) => write!(f, "unknown qualifier: 0x{:02X}", q),
+            ObjectParseError::UnknownQualifier(q) => write!(f, "unknown qualifier: 0x{q:02X}"),
             ObjectParseError::InsufficientBytes => {
                 f.write_str("insufficient bytes for object header")
             }
             ObjectParseError::InvalidRange(start, stop) => {
-                write!(f, "invalid range - start: {} stop: {}", start, stop)
+                write!(f, "invalid range - start: {start} stop: {stop}")
             }
             ObjectParseError::InvalidQualifierForVariation(v, q) => write!(
                 f,
@@ -107,13 +107,13 @@ impl std::fmt::Display for RequestValidationError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             RequestValidationError::UnexpectedUnsBit(x) => {
-                write!(f, "UNS bit not allowed for function: {:?}", x)
+                write!(f, "UNS bit not allowed for function: {x:?}")
             }
             RequestValidationError::NonFirFin => {
                 f.write_str("tasks must must have both FIR and FIN set to 1")
             }
             RequestValidationError::UnexpectedFunction(x) => {
-                write!(f, "Function {:?} not allowed in tasks", x)
+                write!(f, "Function {x:?} not allowed in tasks")
             }
         }
     }
@@ -123,7 +123,7 @@ impl std::fmt::Display for ResponseValidationError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             ResponseValidationError::UnexpectedFunction(x) => {
-                write!(f, "function {:?} not allowed in responses", x)
+                write!(f, "function {x:?} not allowed in responses")
             }
             ResponseValidationError::UnsolicitedResponseWithoutUnsBit => {
                 f.write_str("unsolicited responses must have the UNS bit set")

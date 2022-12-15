@@ -143,6 +143,16 @@ impl AnalogConversions for AnalogInput {
     }
 }
 
+impl AnalogConversions for FrozenAnalogInput {
+    fn get_value(&self) -> f64 {
+        self.value
+    }
+
+    fn get_flags(&self) -> Flags {
+        self.flags
+    }
+}
+
 impl AnalogConversions for AnalogOutputStatus {
     fn get_value(&self) -> f64 {
         self.value

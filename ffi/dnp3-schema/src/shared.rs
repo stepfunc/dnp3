@@ -27,6 +27,8 @@ pub struct SharedDefinitions {
     pub frozen_counter_it: AbstractIteratorHandle,
     pub analog_point: UniversalStructHandle,
     pub analog_it: AbstractIteratorHandle,
+    pub frozen_analog_point: UniversalStructHandle,
+    pub frozen_analog_it: AbstractIteratorHandle,
     pub analog_output_status_point: UniversalStructHandle,
     pub analog_output_status_it: AbstractIteratorHandle,
     pub octet_string: FunctionReturnStructHandle,
@@ -245,6 +247,13 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         &flags_struct,
         &timestamp_struct,
     )?;
+    let (frozen_analog_point, frozen_analog_it) = build_iterator(
+        "frozen_analog_input",
+        Primitive::Double,
+        lib,
+        &flags_struct,
+        &timestamp_struct,
+    )?;
     let (analog_output_status_point, analog_output_status_it) = build_iterator(
         "analog_output_status",
         Primitive::Double,
@@ -284,6 +293,8 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         frozen_counter_it,
         analog_point,
         analog_it,
+        frozen_analog_point,
+        frozen_analog_it,
         analog_output_status_point,
         analog_output_status_it,
         octet_string,
@@ -639,12 +650,12 @@ fn build_iterator<T: Into<UniversalStructField>>(
         .add("value", value_type, "Point value")?
         .add("flags", flags_struct.clone(), "Point flags")?
         .add("time", timestamp_struct.clone(), "Point timestamp")?
-        .doc(format!("{} point", name))?
+        .doc(format!("{name} point"))?
         .end_fields()?
         .add_full_initializer("init")?
         .build()?;
 
-    let value_iterator = lib.define_iterator(format!("{}_iterator", name), value_struct.clone())?;
+    let value_iterator = lib.define_iterator(format!("{name}_iterator"), value_struct.clone())?;
 
     Ok((value_struct, value_iterator))
 }

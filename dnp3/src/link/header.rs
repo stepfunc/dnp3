@@ -74,8 +74,8 @@ impl AnyAddress {
 impl std::fmt::Display for AnyAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            AnyAddress::Reserved(x) => write!(f, "reserved address ({})", x),
-            AnyAddress::Endpoint(x) => write!(f, "normal address ({})", x),
+            AnyAddress::Reserved(x) => write!(f, "reserved address ({x})"),
+            AnyAddress::Endpoint(x) => write!(f, "normal address ({x})"),
             AnyAddress::SelfAddress => write!(f, "self address ({})", constants::SELF_ADDRESS),
             AnyAddress::Broadcast(details) => {
                 write!(f, "broadcast address ({})", details.address())

@@ -33,4 +33,6 @@ object VariationNames {
   val doublePrecisionWithFlag = "Double-precision With Flag"
   val singlePrecisionWithFlagTime = "Single-precision With Flag and Time"
   val doublePrecisionWithFlagTime = "Double-precision With Flag and Time"
+  val bit32WithFlagAndTimeOfFreeze = "32-bit with Flag and Time-of-Freeze"
+  val bit16WithFlagAndTimeOfFreeze = "16-bit with Flag and Time-of-Freeze"
 }

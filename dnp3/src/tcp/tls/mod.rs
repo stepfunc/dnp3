@@ -51,14 +51,14 @@ impl std::fmt::Display for TlsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidPeerCertificate(err) => {
-                write!(f, "invalid peer certificate file: {}", err)
+                write!(f, "invalid peer certificate file: {err}")
             }
             Self::InvalidLocalCertificate(err) => {
-                write!(f, "invalid local certificate file: {}", err)
+                write!(f, "invalid local certificate file: {err}")
             }
-            Self::InvalidPrivateKey(err) => write!(f, "invalid private key file: {}", err),
+            Self::InvalidPrivateKey(err) => write!(f, "invalid private key file: {err}"),
             Self::InvalidDnsName => write!(f, "invalid DNS name"),
-            Self::Other(err) => write!(f, "miscellaneous TLS error: {}", err),
+            Self::Other(err) => write!(f, "miscellaneous TLS error: {err}"),
         }
     }
 }
@@ -104,8 +104,7 @@ fn verify_dns_name(cert: &rustls::Certificate, server_name: &str) -> Result<(), 
             // Parse the certificate using rasn
             let parsed_cert = rx509::x509::Certificate::parse(&cert.0).map_err(|err| {
                 rustls::Error::InvalidCertificateData(format!(
-                    "unable to parse cert with rasn: {:?}",
-                    err
+                    "unable to parse cert with rasn: {err:?}"
                 ))
             })?;
 
@@ -114,8 +113,7 @@ fn verify_dns_name(cert: &rustls::Certificate, server_name: &str) -> Result<(), 
                 // Parse the extensions
                 let extensions = extensions.parse().map_err(|err| {
                     rustls::Error::InvalidCertificateData(format!(
-                        "unable to parse certificate extensions with rasn: {:?}",
-                        err
+                        "unable to parse certificate extensions with rasn: {err:?}"
                     ))
                 })?;
 
@@ -140,8 +138,7 @@ fn verify_dns_name(cert: &rustls::Certificate, server_name: &str) -> Result<(), 
                 .parse()
                 .map_err(|err| {
                     rustls::Error::InvalidCertificateData(format!(
-                        "unable to parse certificate subject: {:?}",
-                        err
+                        "unable to parse certificate subject: {err:?}"
                     ))
                 })?;
 
@@ -170,7 +167,7 @@ fn pki_error(error: webpki::Error) -> rustls::Error {
         UnsupportedSignatureAlgorithm | UnsupportedSignatureAlgorithmForPublicKey => {
             rustls::Error::InvalidCertificateSignatureType
         }
-        e => rustls::Error::InvalidCertificateData(format!("invalid peer certificate: {}", e)),
+        e => rustls::Error::InvalidCertificateData(format!("invalid peer certificate: {e}")),
     }
 }
 

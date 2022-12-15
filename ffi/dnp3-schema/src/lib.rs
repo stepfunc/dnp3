@@ -14,7 +14,7 @@ mod tcp;
 mod variation;
 
 pub(crate) fn gv(g: u8, v: u8) -> String {
-    format!("group{}_var{}", g, v)
+    format!("group{g}_var{v}")
 }
 
 pub fn build_lib() -> BackTraced<Library> {
