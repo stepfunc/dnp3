@@ -283,6 +283,24 @@ impl StaticDatabase {
         }
     }
 
+    pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> bool {
+        fn zero_or_positive(value: f64) -> bool {
+            value == 0.0 || (value.is_normal() && value.is_sign_positive())
+        }
+
+        if !zero_or_positive(deadband) {
+            return false;
+        }
+
+        match self.analog.get_mut(index) {
+            None => false,
+            Some(x) => {
+                x.config.detector.deadband = deadband;
+                true
+            }
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn selection_capacity(&self) -> usize {
         self.selected.queue.capacity()

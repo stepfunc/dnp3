@@ -10,7 +10,9 @@ use crate::app::gen::count::CountVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader, Request};
-use crate::app::variations::{Group50Var1, Group50Var3, Group52Var1, Group52Var2};
+use crate::app::variations::{
+    Group34Var1, Group34Var2, Group34Var3, Group50Var1, Group50Var3, Group52Var1, Group52Var2,
+};
 use crate::app::*;
 use crate::app::{ControlField, Iin, Iin1, Iin2, ResponseFunction, ResponseHeader};
 use crate::decode::DecodeLevel;
@@ -33,7 +35,10 @@ use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
+use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::bit::BitSequence;
+use crate::app::parse::prefix::Prefix;
+use crate::app::parse::traits::{FixedSizeVariation, Index};
 use scursor::WriteError;
 
 #[derive(Copy, Clone)]
@@ -1106,7 +1111,7 @@ impl OutstationSession {
         object_headers: HeaderCollection<'_>,
     ) -> Option<Response> {
         let mut result = match function {
-            FunctionCode::Write => Some(self.handle_write(seq, object_headers)),
+            FunctionCode::Write => Some(self.handle_write(seq, object_headers, database)),
             // these function don't process objects
             FunctionCode::DelayMeasure => Some(self.handle_delay_measure(seq)),
             FunctionCode::RecordCurrentTime => Some(self.handle_record_current_time(seq)),
@@ -1217,13 +1222,18 @@ impl OutstationSession {
         }
     }
 
-    fn handle_write(&mut self, seq: Sequence, object_headers: HeaderCollection) -> Response {
+    fn handle_write(
+        &mut self,
+        seq: Sequence,
+        object_headers: HeaderCollection,
+        database: &mut DatabaseHandle,
+    ) -> Response {
         let mut iin2 = Iin2::default();
         let mut empty = true;
 
         for header in object_headers.iter() {
             empty = false;
-            iin2 = self.handle_single_write_header(header);
+            iin2 = self.handle_single_write_header(header, database);
         }
 
         if empty {
@@ -1254,7 +1264,7 @@ impl OutstationSession {
         iin2
     }
 
-    fn handle_write_g50v1(&mut self, seq: CountSequence<Group50Var1>) -> Iin2 {
+    fn handle_write_abs_time(&mut self, seq: CountSequence<Group50Var1>) -> Iin2 {
         if let Some(value) = seq.single() {
             match self.application.write_absolute_time(value.time) {
                 Err(err) => err.into(),
@@ -1266,16 +1276,72 @@ impl OutstationSession {
         }
     }
 
-    fn handle_single_write_header(&mut self, header: ObjectHeader) -> Iin2 {
+    fn handle_write_analog_deadbands<I, V>(
+        &mut self,
+        items: CountSequence<Prefix<I, V>>,
+        db: &mut DatabaseHandle,
+    ) -> Iin2
+    where
+        I: Index,
+        V: FixedSizeVariation + Into<f64>,
+    {
+        if !self.application.begin_write_analog_deadband_header() {
+            return Iin2::NO_FUNC_CODE_SUPPORT;
+        }
+
+        let iin = db.transaction(|db| {
+            let mut iin2 = Iin2::default();
+            for (index, deadband) in items
+                .iter()
+                .map(|x| (x.index.widen_to_u16(), x.value.into()))
+            {
+                if db.inner.set_analog_deadband(index, deadband) {
+                    self.application.write_analog_deadband(index, deadband);
+                } else {
+                    iin2 |= Iin2::PARAMETER_ERROR
+                }
+            }
+            iin2
+        });
+
+        self.application.end_write_analog_deadband_header();
+
+        iin
+    }
+
+    fn handle_single_write_header(
+        &mut self,
+        header: ObjectHeader,
+        db: &mut DatabaseHandle,
+    ) -> Iin2 {
         match header.details {
             HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(bits)) => {
                 self.handle_write_iin(bits)
             }
             HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
-                self.handle_write_g50v1(seq)
+                self.handle_write_abs_time(seq)
             }
             HeaderDetails::OneByteCount(_, CountVariation::Group50Var3(seq)) => {
-                self.handle_write_g50v3(seq)
+                self.handle_write_at_last_recorded_time(seq)
+            }
+            // analog deadbands
+            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var1(seq)) => {
+                self.handle_write_analog_deadbands(seq, db)
+            }
+            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var2(seq)) => {
+                self.handle_write_analog_deadbands(seq, db)
+            }
+            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var3(seq)) => {
+                self.handle_write_analog_deadbands(seq, db)
+            }
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var1(seq)) => {
+                self.handle_write_analog_deadbands(seq, db)
+            }
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var2(seq)) => {
+                self.handle_write_analog_deadbands(seq, db)
+            }
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var3(seq)) => {
+                self.handle_write_analog_deadbands(seq, db)
             }
             _ => {
                 tracing::warn!(
@@ -1288,7 +1354,7 @@ impl OutstationSession {
         }
     }
 
-    fn handle_write_g50v3(&mut self, seq: CountSequence<Group50Var3>) -> Iin2 {
+    fn handle_write_at_last_recorded_time(&mut self, seq: CountSequence<Group50Var3>) -> Iin2 {
         let value = if let Some(value) = seq.single() {
             value
         } else {
@@ -1782,7 +1848,7 @@ impl OutstationSession {
 
         match request.header.function {
             FunctionCode::Write => {
-                self.handle_write(seq, objects);
+                self.handle_write(seq, objects, database);
                 BroadcastAction::Processed
             }
             FunctionCode::DirectOperateNoResponse => {
@@ -2032,5 +2098,23 @@ impl From<ObjectParseError> for Iin2 {
             ObjectParseError::UnknownQualifier(_) => Iin2::PARAMETER_ERROR,
             ObjectParseError::ZeroLengthOctetData => Iin2::PARAMETER_ERROR,
         }
+    }
+}
+
+impl From<Group34Var1> for f64 {
+    fn from(x: Group34Var1) -> Self {
+        x.value as f64
+    }
+}
+
+impl From<Group34Var2> for f64 {
+    fn from(x: Group34Var2) -> Self {
+        x.value as f64
+    }
+}
+
+impl From<Group34Var3> for f64 {
+    fn from(x: Group34Var3) -> Self {
+        x.value as f64
     }
 }

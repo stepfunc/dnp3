@@ -66,7 +66,8 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// Handle a write of the absolute time.
     ///
     /// This is used during time synchronization procedures.
-    fn write_absolute_time(&mut self, _time: Timestamp) -> Result<(), RequestError> {
+    #[allow(unused_variables)]
+    fn write_absolute_time(&mut self, time: Timestamp) -> Result<(), RequestError> {
         Err(RequestError::NotSupported)
     }
 
@@ -102,14 +103,36 @@ pub trait OutstationApplication: Sync + Send + 'static {
     }
 
     /// Perform a counter freeze operation
+    #[allow(unused_variables)]
     fn freeze_counter(
         &mut self,
-        _indices: FreezeIndices,
-        _freeze_type: FreezeType,
-        _database: &mut DatabaseHandle,
+        indices: FreezeIndices,
+        freeze_type: FreezeType,
+        database: &mut DatabaseHandle,
     ) -> Result<(), RequestError> {
         Err(RequestError::NotSupported)
     }
+
+    /// Called when the outstation begins processing a header to write analog deadbands (group 31)
+    ///
+    /// Returning false, indicates that the request should not be processed and the requested write
+    /// operation is rejected with IIN2.NO_FUNC_CODE_SUPPORT
+    ///
+    /// Return true will allow the request to process the actual values below
+    fn begin_write_analog_deadband_header(&mut self) -> bool {
+        // by default, this isn't supported
+        false
+    }
+
+    /// Called for each analog deadband  in the write request
+    ///
+    /// The change takes place automatically in memory. This callback is merely so that the new
+    /// deadbands can be saved to non-volatile memory.
+    #[allow(unused_variables)]
+    fn write_analog_deadband(&mut self, index: u16, deadband: f64) {}
+
+    /// Called when the outstation completes processing a header to write analog deadbands
+    fn end_write_analog_deadband_header(&mut self) {}
 }
 
 /// enumeration describing how the outstation processed a broadcast request
