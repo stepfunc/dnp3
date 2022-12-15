@@ -9,7 +9,7 @@ use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
+use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader, Request};
 use crate::app::variations::{Group50Var3, Group52Var1, Group52Var2};
 use crate::app::*;
 use crate::app::{ControlField, Iin, Iin1, Iin2, ResponseFunction, ResponseHeader};
@@ -1217,61 +1217,66 @@ impl OutstationSession {
     }
 
     fn handle_write(&mut self, seq: Sequence, object_headers: HeaderCollection) -> Response {
-        let iin2 = if let Some(header) = object_headers.get_only_header() {
-            match header.details {
-                HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(seq)) => {
-                    let mut iin2 = Iin2::default();
-                    for (value, index) in seq.iter() {
-                        if index == 7 {
-                            // restart IIN
-                            if value {
-                                tracing::warn!("ignoring request to write IIN 1.7 to TRUE");
-                                iin2 |= Iin2::PARAMETER_ERROR;
-                            } else {
-                                // clear the restart bit
-                                self.state.restart_iin_asserted = false;
-                                self.info.clear_restart_iin();
-                            }
-                        } else {
-                            tracing::warn!(
-                                "ignoring write of IIN index {} to value {}",
-                                index,
-                                value
-                            );
-                            iin2 |= Iin2::PARAMETER_ERROR;
-                        }
-                    }
-                    iin2
-                }
-                HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
-                    if let Some(value) = seq.single() {
-                        match self.application.write_absolute_time(value.time) {
-                            Err(err) => err.into(),
-                            Ok(()) => Iin2::default(),
-                        }
-                    } else {
-                        tracing::warn!("request lacks a single g50v1");
-                        Iin2::PARAMETER_ERROR
-                    }
-                }
-                HeaderDetails::OneByteCount(_, CountVariation::Group50Var3(seq)) => {
-                    self.handle_g50v3(seq)
-                }
-                _ => {
-                    tracing::warn!(
-                        "WRITE not supported with qualifier: {} and variation: {}",
-                        header.details.qualifier(),
-                        header.variation
-                    );
-                    Iin2::NO_FUNC_CODE_SUPPORT
-                }
-            }
-        } else {
+        let mut iin2 = Iin2::default();
+        let mut empty = true;
+
+        for header in object_headers.iter() {
+            empty = false;
+            iin2 = self.handle_single_write_header(header);
+        }
+
+        if empty {
             tracing::warn!("empty WRITE request");
-            Iin2::default()
-        };
+        }
 
         Response::empty_solicited(seq, Iin::default() | iin2)
+    }
+
+    fn handle_single_write_header(&mut self, header: ObjectHeader) -> Iin2 {
+        match header.details {
+            HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(seq)) => {
+                let mut iin2 = Iin2::default();
+                for (value, index) in seq.iter() {
+                    if index == 7 {
+                        // restart IIN
+                        if value {
+                            tracing::warn!("ignoring request to write IIN 1.7 to TRUE");
+                            iin2 |= Iin2::PARAMETER_ERROR;
+                        } else {
+                            // clear the restart bit
+                            self.state.restart_iin_asserted = false;
+                            self.info.clear_restart_iin();
+                        }
+                    } else {
+                        tracing::warn!("ignoring write of IIN index {} to value {}", index, value);
+                        iin2 |= Iin2::PARAMETER_ERROR;
+                    }
+                }
+                iin2
+            }
+            HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
+                if let Some(value) = seq.single() {
+                    match self.application.write_absolute_time(value.time) {
+                        Err(err) => err.into(),
+                        Ok(()) => Iin2::default(),
+                    }
+                } else {
+                    tracing::warn!("request lacks a single g50v1");
+                    Iin2::PARAMETER_ERROR
+                }
+            }
+            HeaderDetails::OneByteCount(_, CountVariation::Group50Var3(seq)) => {
+                self.handle_g50v3(seq)
+            }
+            _ => {
+                tracing::warn!(
+                    "WRITE not supported with qualifier: {} and variation: {}",
+                    header.details.qualifier(),
+                    header.variation
+                );
+                Iin2::NO_FUNC_CODE_SUPPORT
+            }
+        }
     }
 
     fn handle_g50v3(&mut self, seq: CountSequence<Group50Var3>) -> Iin2 {
