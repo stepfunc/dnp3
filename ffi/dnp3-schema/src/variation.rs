@@ -146,6 +146,16 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
             gv(33, 8),
             "Frozen Analog Input Event - Double-precision floating point with time",
         )?
+        .push(
+            gv(34, 0),
+            "Analog Input Reporting Deadband - Default variation",
+        )?
+        .push(gv(34, 1), "Analog Input Reporting Deadband - 16-bit")?
+        .push(gv(34, 2), "Analog Input Reporting Deadband - 32-bit")?
+        .push(
+            gv(34, 3),
+            "Analog Input Reporting Deadband - Single-precision floating point",
+        )?
         .push(gv(40, 0), "Analog Output Status - Default variation")?
         .push(gv(40, 1), "Analog Output Status - 32-bit with flags")?
         .push(gv(40, 2), "Analog Output Status - 16-bit with flags")?

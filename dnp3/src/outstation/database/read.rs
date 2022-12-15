@@ -474,6 +474,8 @@ impl ReadHeader {
                 )
                 .into(),
             ),
+            // Group 34
+            AllObjectsVariation::Group34Var0 => None, // TODO - need to support reading these
             // group 40
             AllObjectsVariation::Group40Var0 => {
                 Some(StaticReadHeader::AnalogOutputStatus(None, None).into())
