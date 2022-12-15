@@ -1111,7 +1111,7 @@ impl OutstationSession {
         object_headers: HeaderCollection<'_>,
     ) -> Option<Response> {
         let mut result = match function {
-            FunctionCode::Write => Some(self.handle_write(seq, object_headers, database)),
+            FunctionCode::Write => Some(self.handle_write(seq, object_headers, database).await),
             // these function don't process objects
             FunctionCode::DelayMeasure => Some(self.handle_delay_measure(seq)),
             FunctionCode::RecordCurrentTime => Some(self.handle_record_current_time(seq)),
@@ -1222,10 +1222,10 @@ impl OutstationSession {
         }
     }
 
-    fn handle_write(
+    async fn handle_write(
         &mut self,
         seq: Sequence,
-        object_headers: HeaderCollection,
+        object_headers: HeaderCollection<'_>,
         database: &mut DatabaseHandle,
     ) -> Response {
         let mut iin2 = Iin2::default();
@@ -1233,7 +1233,7 @@ impl OutstationSession {
 
         for header in object_headers.iter() {
             empty = false;
-            iin2 = self.handle_single_write_header(header, database);
+            iin2 = self.handle_single_write_header(header, database).await;
         }
 
         if empty {
@@ -1276,9 +1276,9 @@ impl OutstationSession {
         }
     }
 
-    fn handle_write_analog_deadbands<I, V>(
+    async fn handle_write_analog_deadbands<I, V>(
         &mut self,
-        items: CountSequence<Prefix<I, V>>,
+        items: CountSequence<'_, Prefix<I, V>>,
         db: &mut DatabaseHandle,
     ) -> Iin2
     where
@@ -1304,14 +1304,17 @@ impl OutstationSession {
             iin2
         });
 
-        self.application.end_write_analog_deadband_header();
+        self.application
+            .end_write_analog_deadband_header()
+            .get()
+            .await;
 
         iin
     }
 
-    fn handle_single_write_header(
+    async fn handle_single_write_header(
         &mut self,
-        header: ObjectHeader,
+        header: ObjectHeader<'_>,
         db: &mut DatabaseHandle,
     ) -> Iin2 {
         match header.details {
@@ -1326,22 +1329,22 @@ impl OutstationSession {
             }
             // analog deadbands
             HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var1(seq)) => {
-                self.handle_write_analog_deadbands(seq, db)
+                self.handle_write_analog_deadbands(seq, db).await
             }
             HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var2(seq)) => {
-                self.handle_write_analog_deadbands(seq, db)
+                self.handle_write_analog_deadbands(seq, db).await
             }
             HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var3(seq)) => {
-                self.handle_write_analog_deadbands(seq, db)
+                self.handle_write_analog_deadbands(seq, db).await
             }
             HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var1(seq)) => {
-                self.handle_write_analog_deadbands(seq, db)
+                self.handle_write_analog_deadbands(seq, db).await
             }
             HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var2(seq)) => {
-                self.handle_write_analog_deadbands(seq, db)
+                self.handle_write_analog_deadbands(seq, db).await
             }
             HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var3(seq)) => {
-                self.handle_write_analog_deadbands(seq, db)
+                self.handle_write_analog_deadbands(seq, db).await
             }
             _ => {
                 tracing::warn!(
@@ -1848,7 +1851,7 @@ impl OutstationSession {
 
         match request.header.function {
             FunctionCode::Write => {
-                self.handle_write(seq, objects, database);
+                self.handle_write(seq, objects, database).await;
                 BroadcastAction::Processed
             }
             FunctionCode::DirectOperateNoResponse => {

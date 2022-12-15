@@ -132,7 +132,9 @@ pub trait OutstationApplication: Sync + Send + 'static {
     fn write_analog_deadband(&mut self, index: u16, deadband: f64) {}
 
     /// Called when the outstation completes processing a header to write analog deadbands
-    fn end_write_analog_deadband_header(&mut self) {}
+    fn end_write_analog_deadband_header(&mut self) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
 }
 
 /// enumeration describing how the outstation processed a broadcast request
