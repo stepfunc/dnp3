@@ -11,7 +11,7 @@ pub(crate) fn format_bytes(f: &mut std::fmt::Formatter, bytes: &[u8]) -> std::fm
                 f.write_char(' ')?;
             }
             first = false;
-            write!(f, "{:02X?}", byte)?;
+            write!(f, "{byte:02X?}")?;
         }
     }
     Ok(())

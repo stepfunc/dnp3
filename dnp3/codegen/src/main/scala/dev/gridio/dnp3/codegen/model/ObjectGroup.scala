@@ -20,7 +20,9 @@ object ObjectGroup {
     Group22,
     Group23,
     Group30,
+    Group31,
     Group32,
+    Group33,
     Group40,
     Group41,
     Group42,
@@ -63,6 +65,7 @@ object GroupType {
   object StaticCounter extends Static
   object StaticFrozenCounter extends Static
   object StaticAnalog extends Static
+  object StaticFrozenAnalog extends Static
   object StaticAnalogOutputStatus extends Static
   object StaticOctetString extends Static
 
@@ -73,6 +76,7 @@ object GroupType {
   object CounterEvent extends Event
   object FrozenCounterEvent extends Event
   object AnalogEvent extends Event
+  object FrozenAnalogEvent extends Event
   object AnalogOutputEvent extends Event
   object AnalogOutputCommandEvent extends Event
   object OctetStringEvent extends Event

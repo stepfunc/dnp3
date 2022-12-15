@@ -134,8 +134,7 @@ impl std::fmt::Display for AssociationError {
             }
             AssociationError::DuplicateAddress(address) => write!(
                 f,
-                "master already contains association with outstation address: {}",
-                address
+                "master already contains association with outstation address: {address}"
             ),
         }
     }
@@ -146,7 +145,7 @@ impl std::fmt::Display for PollError {
         match self {
             PollError::Shutdown => f.write_str("operation failed b/c the master has been shutdown"),
             PollError::NoSuchAssociation(address) => {
-                write!(f, "no association with address: {}", address)
+                write!(f, "no association with address: {address}")
             }
         }
     }
@@ -155,11 +154,10 @@ impl std::fmt::Display for PollError {
 impl std::fmt::Display for CommandResponseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            CommandResponseError::Request(err) => write!(f, "{}", err),
+            CommandResponseError::Request(err) => write!(f, "{err}"),
             CommandResponseError::BadStatus(status) => write!(
                 f,
-                "command status value other than Success was returned: {:?}",
-                status
+                "command status value other than Success was returned: {status:?}"
             ),
             CommandResponseError::HeaderCountMismatch => f.write_str(
                 "response did not contain the same number of object headers as the request",
@@ -194,7 +192,7 @@ impl std::fmt::Display for TaskError {
             }
             TaskError::Link(_) => f.write_str("link-layer or I/O error"),
             TaskError::Transport => f.write_str("malformed response"),
-            TaskError::MalformedResponse(err) => write!(f, "malformed response: {}", err),
+            TaskError::MalformedResponse(err) => write!(f, "malformed response: {err}"),
             TaskError::UnexpectedResponseHeaders => {
                 f.write_str("response contains headers that don't match the request")
             }
@@ -217,7 +215,7 @@ impl std::fmt::Display for TaskError {
             TaskError::Shutdown => f.write_str("the master was shutdown while executing the task"),
             TaskError::Disabled => f.write_str("the master was disabled while executing the task"),
             TaskError::NoConnection => f.write_str("no connection"),
-            TaskError::NoSuchAssociation(x) => write!(f, "no association with address: {}", x),
+            TaskError::NoSuchAssociation(x) => write!(f, "no association with address: {x}"),
         }
     }
 }
@@ -225,20 +223,18 @@ impl std::fmt::Display for TaskError {
 impl std::fmt::Display for TimeSyncError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            TimeSyncError::Task(err) => write!(f, "{}", err),
+            TimeSyncError::Task(err) => write!(f, "{err}"),
             TimeSyncError::SystemTimeNotUnix => {
                 f.write_str("the system time cannot be converted to unix time")
             }
-            TimeSyncError::BadOutstationTimeDelay(x) => write!(
-                f,
-                "outstation time delay ({}) exceeded the response delay",
-                x
-            ),
+            TimeSyncError::BadOutstationTimeDelay(x) => {
+                write!(f, "outstation time delay ({x}) exceeded the response delay")
+            }
             TimeSyncError::Overflow => f.write_str("overflow in calculation"),
             TimeSyncError::ClockRollback => f.write_str("detected a clock rollback"),
             TimeSyncError::StillNeedsTime => f.write_str("outstation did not clear NEED_TIME bit"),
             TimeSyncError::SystemTimeNotAvailable => f.write_str("system time not available"),
-            TimeSyncError::IinError(iin2) => write!(f, "outstation indicated an error: {}", iin2),
+            TimeSyncError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
         }
     }
 }

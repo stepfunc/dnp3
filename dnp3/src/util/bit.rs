@@ -87,7 +87,7 @@ pub(crate) fn format_bitfield(
     }
 
     let mut prev = false;
-    write!(f, "{}: [", name)?;
+    write!(f, "{name}: [")?;
     if value.bit_0() {
         push(f, prev, names[0])?;
         prev = true;

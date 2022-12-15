@@ -465,6 +465,10 @@ impl StaticDatabase {
                 self.select_by_type::<AnalogOutputStatus>(variation, range)
             }
             StaticReadHeader::OctetString(range) => self.select_by_type::<OctetString>(None, range),
+            StaticReadHeader::FrozenAnalog(_, _) => {
+                // we don't support this, but we know what it is
+                Iin2::default()
+            }
         }
     }
 

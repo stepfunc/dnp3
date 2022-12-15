@@ -83,6 +83,27 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
             gv(30, 6),
             "Analog Input - Double-precision floating point with flags",
         )?
+        .push(gv(31, 0), "Frozen Analog Input - Default variation")?
+        .push(gv(31, 1), "Frozen Analog Input - 32-bit with flags")?
+        .push(gv(31, 2), "Frozen Analog Input - 16-bit with flags")?
+        .push(
+            gv(31, 3),
+            "Frozen Analog Input - 32-bit with flags and time-of-freeze",
+        )?
+        .push(
+            gv(31, 4),
+            "Frozen Analog Input - 16-bit with flags and time-of-freeze",
+        )?
+        .push(gv(31, 5), "Frozen Analog Input - 32-bit without flags")?
+        .push(gv(31, 6), "Frozen Analog Input - 16-bit without flags")?
+        .push(
+            gv(31, 7),
+            "Frozen Analog Input - Single-precision floating point with flags",
+        )?
+        .push(
+            gv(31, 8),
+            "Frozen Analog Input - Double-precision floating point with flags",
+        )?
         .push(gv(32, 0), "Analog Input Event - Default variation")?
         .push(gv(32, 1), "Analog Input Event - 32-bit without time")?
         .push(gv(32, 2), "Analog Input Event - 16-bit without time")?
@@ -103,6 +124,27 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .push(
             gv(32, 8),
             "Analog Input Event - Double-precision floating point with time",
+        )?
+        .push(gv(33, 0), "Frozen Analog Input Event - Default variation")?
+        .push(gv(33, 1), "Frozen Analog Input Event - 32-bit without time")?
+        .push(gv(33, 2), "Frozen Analog Input Event - 16-bit without time")?
+        .push(gv(33, 3), "Frozen Analog Input Event - 32-bit with time")?
+        .push(gv(33, 4), "Frozen Analog Input Event - 16-bit with time")?
+        .push(
+            gv(33, 5),
+            "Frozen Analog Input Event - Single-precision floating point without time",
+        )?
+        .push(
+            gv(33, 6),
+            "Frozen Analog Input Event - Double-precision floating point without time",
+        )?
+        .push(
+            gv(33, 7),
+            "Frozen Analog Input Event - Single-precision floating point with time",
+        )?
+        .push(
+            gv(33, 8),
+            "Frozen Analog Input Event - Double-precision floating point with time",
         )?
         .push(gv(40, 0), "Analog Output Status - Default variation")?
         .push(gv(40, 1), "Analog Output Status - 32-bit with flags")?

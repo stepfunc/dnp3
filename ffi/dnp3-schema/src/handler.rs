@@ -85,6 +85,7 @@ pub fn define(
             "Describes what triggered the callback, e.g. response to a poll vs an unsolicited response",
         )?
         .param("header", response_header.clone(), "Header of the fragment")?
+        .returns_nothing_by_default()?
         .end_callback()?
         .begin_callback("end_fragment", "Called when all the data from a response fragment has been processed")?
         .param(
@@ -93,6 +94,7 @@ pub fn define(
             "Describes what triggered the read event",
         )?
         .param("header", response_header, "Header of the fragment")?
+        .returns_nothing_by_default()?
         .end_callback()?
         .begin_callback("handle_binary_input", "Handle binary input data")?
         .param(
@@ -101,6 +103,7 @@ pub fn define(
             "Group/variation and qualifier information",
         )?
         .param("values", shared_def.binary_it.clone(), iterator_doc)?
+        .returns_nothing_by_default()?
         .end_callback()?
         .begin_callback(
             "handle_double_bit_binary_input",
@@ -116,6 +119,7 @@ pub fn define(
             shared_def.double_bit_binary_it.clone(),
             iterator_doc,
         )?
+        .returns_nothing_by_default()?
         .end_callback()?
         .begin_callback(
             "handle_binary_output_status",
@@ -131,6 +135,7 @@ pub fn define(
             shared_def.binary_output_status_it.clone(),
             iterator_doc,
         )?
+        .returns_nothing_by_default()?
         .end_callback()?
         .begin_callback("handle_counter", "Handle counter data")?
         .param(
@@ -139,6 +144,7 @@ pub fn define(
             "Group/variation and qualifier information",
         )?
         .param("values", shared_def.counter_it.clone(), iterator_doc)?
+        .returns_nothing_by_default()?
         .end_callback()?
         .begin_callback("handle_frozen_counter", "Handle frozen counter input data")?
         .param(
@@ -147,6 +153,7 @@ pub fn define(
             "Group/variation and qualifier information",
         )?
         .param("values", shared_def.frozen_counter_it.clone(), iterator_doc)?
+        .returns_nothing_by_default()?
         .end_callback()?
         .begin_callback("handle_analog_input", "Handle analog input data")?
         .param(
@@ -155,6 +162,16 @@ pub fn define(
             "Group/variation and qualifier information",
         )?
         .param("values", shared_def.analog_it.clone(), iterator_doc)?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_frozen_analog_input", "Handle frozen analog input data")?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param("values", shared_def.frozen_analog_it.clone(), iterator_doc)?
+        .returns_nothing_by_default()?
         .end_callback()?
         .begin_callback(
             "handle_analog_output_status",
@@ -170,6 +187,7 @@ pub fn define(
             shared_def.analog_output_status_it.clone(),
             iterator_doc,
         )?
+        .returns_nothing_by_default()?
         .end_callback()?
         .begin_callback("handle_octet_string", "Handle octet string data")?
         .param(
@@ -178,6 +196,7 @@ pub fn define(
             "Group/variation and qualifier information",
         )?
         .param("values", shared_def.octet_string_it.clone(), iterator_doc)?
+        .returns_nothing_by_default()?
         .end_callback()?
         .build_async()?;
 

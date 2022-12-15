@@ -30,7 +30,7 @@ fn main() {
             oo_bindgen::backend::rust::generate_ffi(&lib).unwrap();
         }
         Err(err) => {
-            eprintln!("DNP3 model error: {}", err);
+            eprintln!("DNP3 model error: {err}");
             exit(-1);
         }
     };

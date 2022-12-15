@@ -80,6 +80,24 @@ pub(crate) enum CountVariation<'a> {
     Group32Var7,
     /// Analog Input Event - Double-precision With Flag and Time
     Group32Var8,
+    /// Frozen Analog Input Event - Any Variation
+    Group33Var0,
+    /// Frozen Analog Input Event - 32-bit With Flag
+    Group33Var1,
+    /// Frozen Analog Input Event - 16-bit With Flag
+    Group33Var2,
+    /// Frozen Analog Input Event - 32-bit with Flag and Time-of-Freeze
+    Group33Var3,
+    /// Frozen Analog Input Event - 16-bit with Flag and Time-of-Freeze
+    Group33Var4,
+    /// Frozen Analog Input Event - Single-precision With Flag
+    Group33Var5,
+    /// Frozen Analog Input Event - Double-precision With Flag
+    Group33Var6,
+    /// Frozen Analog Input Event - Single-precision With Flag and Time
+    Group33Var7,
+    /// Frozen Analog Input Event - Double-precision With Flag and Time
+    Group33Var8,
     /// Analog Output Event - Any Variation
     Group42Var0,
     /// Analog Output Event - 32-bit With Flag
@@ -156,6 +174,15 @@ impl<'a> CountVariation<'a> {
             Variation::Group32Var6 => Ok(CountVariation::Group32Var6),
             Variation::Group32Var7 => Ok(CountVariation::Group32Var7),
             Variation::Group32Var8 => Ok(CountVariation::Group32Var8),
+            Variation::Group33Var0 => Ok(CountVariation::Group33Var0),
+            Variation::Group33Var1 => Ok(CountVariation::Group33Var1),
+            Variation::Group33Var2 => Ok(CountVariation::Group33Var2),
+            Variation::Group33Var3 => Ok(CountVariation::Group33Var3),
+            Variation::Group33Var4 => Ok(CountVariation::Group33Var4),
+            Variation::Group33Var5 => Ok(CountVariation::Group33Var5),
+            Variation::Group33Var6 => Ok(CountVariation::Group33Var6),
+            Variation::Group33Var7 => Ok(CountVariation::Group33Var7),
+            Variation::Group33Var8 => Ok(CountVariation::Group33Var8),
             Variation::Group42Var0 => Ok(CountVariation::Group42Var0),
             Variation::Group42Var1 => Ok(CountVariation::Group42Var1),
             Variation::Group42Var2 => Ok(CountVariation::Group42Var2),
@@ -213,6 +240,15 @@ impl<'a> CountVariation<'a> {
             CountVariation::Group32Var6 => Ok(()),
             CountVariation::Group32Var7 => Ok(()),
             CountVariation::Group32Var8 => Ok(()),
+            CountVariation::Group33Var0 => Ok(()),
+            CountVariation::Group33Var1 => Ok(()),
+            CountVariation::Group33Var2 => Ok(()),
+            CountVariation::Group33Var3 => Ok(()),
+            CountVariation::Group33Var4 => Ok(()),
+            CountVariation::Group33Var5 => Ok(()),
+            CountVariation::Group33Var6 => Ok(()),
+            CountVariation::Group33Var7 => Ok(()),
+            CountVariation::Group33Var8 => Ok(()),
             CountVariation::Group42Var0 => Ok(()),
             CountVariation::Group42Var1 => Ok(()),
             CountVariation::Group42Var2 => Ok(()),

@@ -8,8 +8,8 @@ use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
-use crate::tcp::EndpointList;
-use crate::tcp::{ClientState, MasterTask, MasterTaskConnectionHandler};
+use crate::tcp::{ClientState, ConnectOptions, MasterTask};
+use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 
 use rx509;
@@ -36,13 +36,36 @@ pub fn spawn_master_tls_client(
     listener: Box<dyn Listener<ClientState>>,
     tls_config: TlsClientConfig,
 ) -> MasterChannel {
+    spawn_master_tls_client_2(
+        link_error_mode,
+        config,
+        endpoints,
+        connect_strategy,
+        ConnectOptions::default(),
+        listener,
+        tls_config,
+    )
+}
+
+/// Just like [spawn_master_tls_client], but this variant was added later to also accept and
+/// apply [ConnectOptions]
+pub fn spawn_master_tls_client_2(
+    link_error_mode: LinkErrorMode,
+    config: MasterChannelConfig,
+    endpoints: EndpointList,
+    connect_strategy: ConnectStrategy,
+    connect_options: ConnectOptions,
+    listener: Box<dyn Listener<ClientState>>,
+    tls_config: TlsClientConfig,
+) -> MasterChannel {
     let main_addr = endpoints.main_addr().to_string();
     let (mut task, handle) = MasterTask::new(
         link_error_mode,
         endpoints,
         config,
         connect_strategy,
-        MasterTaskConnectionHandler::Tls(tls_config),
+        connect_options,
+        PostConnectionHandler::Tls(tls_config),
         listener,
     );
     let future = async move {
@@ -140,14 +163,14 @@ impl TlsClientConfig {
         &mut self,
         socket: TcpStream,
         endpoint: &SocketAddr,
-    ) -> Result<PhysLayer, String> {
+    ) -> Option<PhysLayer> {
         let connector = tokio_rustls::TlsConnector::from(self.config.clone());
         match connector.connect(self.dns_name.clone(), socket).await {
-            Err(err) => Err(format!(
-                "failed to establish TLS session with {}: {}",
-                endpoint, err
-            )),
-            Ok(stream) => Ok(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
+            Err(err) => {
+                tracing::warn!("failed to establish TLS session with {endpoint}: {err}");
+                None
+            }
+            Ok(stream) => Some(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
                 stream,
             )))),
         }
@@ -307,8 +330,7 @@ impl rustls::client::ServerCertVerifier for SelfSignedCertificateServerCertVerif
         // Check that the certificate is still valid
         let parsed_cert = rx509::x509::Certificate::parse(&end_entity.0).map_err(|err| {
             rustls::Error::InvalidCertificateData(format!(
-                "unable to parse cert with rasn: {:?}",
-                err
+                "unable to parse cert with rasn: {err:?}"
             ))
         })?;
 

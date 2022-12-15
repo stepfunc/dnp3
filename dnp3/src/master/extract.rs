@@ -101,26 +101,26 @@ mod test {
         )
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     enum Header {
         Binary(Vec<(BinaryInput, u16)>),
+        FrozenAnalog(Vec<(FrozenAnalogInput, u16)>),
     }
 
+    #[derive(Default)]
     struct MockHandler {
-        expected: Vec<Header>,
+        received: Vec<Header>,
     }
 
     impl MockHandler {
         fn new() -> Self {
-            Self { expected: vec![] }
+            Default::default()
         }
 
-        fn is_empty(&self) -> bool {
-            self.expected.is_empty()
-        }
-
-        fn expect(&mut self, header: Header) {
-            self.expected.push(header)
+        fn pop(&mut self) -> Vec<Header> {
+            let mut received = Default::default();
+            std::mem::swap(&mut received, &mut self.received);
+            received
         }
     }
 
@@ -145,19 +145,7 @@ mod test {
             _info: HeaderInfo,
             x: &mut dyn Iterator<Item = (BinaryInput, u16)>,
         ) {
-            let next_header = match self.expected.pop() {
-                Some(y) => y,
-                None => {
-                    panic!("Not expecting any headers!");
-                }
-            };
-
-            match next_header {
-                Header::Binary(expected) => {
-                    let received: Vec<_> = x.collect();
-                    assert_eq!(received, expected);
-                } //x => panic!("Unexpected header: {:?}", x)
-            }
+            self.received.push(Header::Binary(x.collect()));
         }
 
         fn handle_double_bit_binary_input(
@@ -200,6 +188,14 @@ mod test {
             unimplemented!()
         }
 
+        fn handle_frozen_analog_input(
+            &mut self,
+            _info: HeaderInfo,
+            x: &mut dyn Iterator<Item = (FrozenAnalogInput, u16)>,
+        ) {
+            self.received.push(Header::FrozenAnalog(x.collect()))
+        }
+
         fn handle_analog_output_status(
             &mut self,
             _info: HeaderInfo,
@@ -235,9 +231,9 @@ mod test {
             0x07,
         );
 
-        handler.expect(Header::Binary(vec![expected]));
         extract_measurements_inner(objects, &mut handler);
-        assert!(handler.is_empty());
+
+        assert_eq!(handler.pop(), &[Header::Binary(vec![expected])]);
     }
 
     #[test]
@@ -253,7 +249,7 @@ mod test {
         )
         .unwrap();
 
-        let expected: (BinaryInput, u16) = (
+        let expected = (
             BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
@@ -262,9 +258,8 @@ mod test {
             0x07,
         );
 
-        handler.expect(Header::Binary(vec![expected]));
         extract_measurements_inner(objects, &mut handler);
-        assert!(handler.is_empty());
+        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
     }
 
     #[test]
@@ -289,9 +284,8 @@ mod test {
             0x07,
         );
 
-        handler.expect(Header::Binary(vec![expected]));
         extract_measurements_inner(objects, &mut handler);
-        assert!(handler.is_empty());
+        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
     }
 
     #[test]
@@ -316,9 +310,8 @@ mod test {
             0x07,
         );
 
-        handler.expect(Header::Binary(vec![expected]));
         extract_measurements_inner(objects, &mut handler);
-        assert!(handler.is_empty());
+        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
     }
 
     #[test]
@@ -343,8 +336,54 @@ mod test {
             0x07,
         );
 
-        handler.expect(Header::Binary(vec![expected]));
         extract_measurements_inner(objects, &mut handler);
-        assert!(handler.is_empty());
+        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
+    }
+
+    #[test]
+    fn handles_frozen_analog_event() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            FunctionCode::Response,
+            &[
+                33, 3, 0x17, 0x01, 0x07, 0x01, 0xDE, 0xAD, 0xCA, 0xFE, 0x01, 0x02, 0x03, 0x04,
+                0x05, 0x06,
+            ],
+        )
+        .unwrap();
+
+        let expected: (FrozenAnalogInput, u16) = (
+            FrozenAnalogInput {
+                value: i32::from_le_bytes([0xDE, 0xAD, 0xCA, 0xFE]) as f64,
+                flags: Flags::ONLINE,
+                time: Some(Time::Synchronized(Timestamp::new(0x060504030201))),
+            },
+            0x07,
+        );
+
+        extract_measurements_inner(objects, &mut handler);
+        assert_eq!(&handler.pop(), &[Header::FrozenAnalog(vec![expected])]);
+    }
+
+    #[test]
+    fn handles_static_frozen_analog() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            FunctionCode::Response,
+            &[31, 2, 0x00, 0x07, 0x07, 0x01, 0xCA, 0xFE],
+        )
+        .unwrap();
+
+        let expected: (FrozenAnalogInput, u16) = (
+            FrozenAnalogInput {
+                value: i16::from_le_bytes([0xCA, 0xFE]) as f64,
+                flags: Flags::ONLINE,
+                time: None,
+            },
+            0x07,
+        );
+
+        extract_measurements_inner(objects, &mut handler);
+        assert_eq!(&handler.pop(), &[Header::FrozenAnalog(vec![expected])]);
     }
 }

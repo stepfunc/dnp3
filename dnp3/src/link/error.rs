@@ -47,8 +47,8 @@ impl std::fmt::Display for LinkError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             LinkError::Stdio(kind) => write!(f, "{}", std::io::Error::from(*kind)),
-            LinkError::BadFrame(err) => write!(f, "{}", err),
-            LinkError::BadLogic(err) => write!(f, "{}", err),
+            LinkError::BadFrame(err) => write!(f, "{err}"),
+            LinkError::BadLogic(err) => write!(f, "{err}"),
         }
     }
 }
@@ -57,10 +57,10 @@ impl std::fmt::Display for FrameError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             FrameError::BadBodyCrc => f.write_str("bad CRC value in frame payload"),
-            FrameError::BadLength(x) => write!(f, "bad frame length: {}", x),
+            FrameError::BadLength(x) => write!(f, "bad frame length: {x}"),
             FrameError::BadHeaderCrc => f.write_str("bad CRC value in frame header"),
-            FrameError::UnexpectedStart1(x) => write!(f, "bad frame start1: {} != 0x05", x),
-            FrameError::UnexpectedStart2(x) => write!(f, "bad frame start1: {} != 0x64", x),
+            FrameError::UnexpectedStart1(x) => write!(f, "bad frame start1: {x} != 0x05"),
+            FrameError::UnexpectedStart2(x) => write!(f, "bad frame start1: {x} != 0x64"),
         }
     }
 }

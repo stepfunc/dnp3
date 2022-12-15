@@ -261,6 +261,28 @@ impl AnalogInput {
     }
 }
 
+/// Measurement type corresponding to groups 30 and 32
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct FrozenAnalogInput {
+    /// value of the type
+    pub value: f64,
+    /// associated flags
+    pub flags: Flags,
+    /// associated time
+    pub time: Option<Time>,
+}
+
+impl FrozenAnalogInput {
+    /// construct an `AnalogInput` from its fields
+    pub fn new(value: f64, flags: Flags, time: Time) -> Self {
+        Self {
+            value,
+            flags,
+            time: Some(time),
+        }
+    }
+}
+
 impl std::ops::BitOr<Flags> for Flags {
     type Output = Flags;
 
@@ -377,7 +399,7 @@ impl FlagFormatter {
             f.write_str(", ")?;
         }
         self.prev = true;
-        write!(f, "{} = {:?}", name, item)
+        write!(f, "{name} = {item:?}")
     }
 }
 

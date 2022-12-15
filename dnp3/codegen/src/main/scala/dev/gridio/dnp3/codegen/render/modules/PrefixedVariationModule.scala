@@ -83,6 +83,7 @@ object PrefixedVariationModule extends Module {
         case GroupType.CounterEvent => "counter"
         case GroupType.FrozenCounterEvent => "frozen_counter"
         case GroupType.AnalogEvent => "analog_input"
+        case GroupType.FrozenAnalogEvent => "frozen_analog_input"
         case GroupType.AnalogOutputEvent => "analog_output_status"
         case GroupType.AnalogOutputCommandEvent => "analog_output_command"
         case GroupType.BinaryOutputCommandEvent => "binary_output_command"

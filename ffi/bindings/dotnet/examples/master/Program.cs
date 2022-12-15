@@ -117,6 +117,18 @@ class MainClass
             }
         }
 
+        public void HandleFrozenAnalogInput(HeaderInfo info, ICollection<FrozenAnalogInput> values)
+        {
+            Console.WriteLine("Frozen Analog Inputs:");
+            Console.WriteLine("Qualifier: " + info.Qualifier);
+            Console.WriteLine("Variation: " + info.Variation);
+
+            foreach (var val in values)
+            {
+                Console.WriteLine($"AI {val.Index}: Value={val.Value} Flags={val.Flags.Value} Time={val.Time.Value} ({val.Time.Quality})");
+            }
+        }
+
         public void HandleAnalogOutputStatus(HeaderInfo info, ICollection<AnalogOutputStatus> values)
         {
             Console.WriteLine("Analog Output Statuses:");
