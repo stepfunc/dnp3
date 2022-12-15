@@ -14,6 +14,8 @@ mod restart;
 mod time;
 /// unsolicited responses
 mod unsolicited;
+/// writing g34
+mod write_deadband;
 
 /// test data for use in multiple tests
 mod data {
