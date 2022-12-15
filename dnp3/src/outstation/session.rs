@@ -10,7 +10,7 @@ use crate::app::gen::count::CountVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader, Request};
-use crate::app::variations::{Group50Var3, Group52Var1, Group52Var2};
+use crate::app::variations::{Group50Var1, Group50Var3, Group52Var1, Group52Var2};
 use crate::app::*;
 use crate::app::{ControlField, Iin, Iin1, Iin2, ResponseFunction, ResponseHeader};
 use crate::decode::DecodeLevel;
@@ -33,6 +33,7 @@ use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
+use crate::app::parse::bit::BitSequence;
 use scursor::WriteError;
 
 #[derive(Copy, Clone)]
@@ -1232,41 +1233,49 @@ impl OutstationSession {
         Response::empty_solicited(seq, Iin::default() | iin2)
     }
 
+    fn handle_write_iin(&mut self, bits: BitSequence) -> Iin2 {
+        let mut iin2 = Iin2::default();
+        for (value, index) in bits.iter() {
+            if index == 7 {
+                // restart IIN
+                if value {
+                    tracing::warn!("ignoring request to write IIN 1.7 to TRUE");
+                    iin2 |= Iin2::PARAMETER_ERROR;
+                } else {
+                    // clear the restart bit
+                    self.state.restart_iin_asserted = false;
+                    self.info.clear_restart_iin();
+                }
+            } else {
+                tracing::warn!("ignoring write of IIN index {} to value {}", index, value);
+                iin2 |= Iin2::PARAMETER_ERROR;
+            }
+        }
+        iin2
+    }
+
+    fn handle_write_g50v1(&mut self, seq: CountSequence<Group50Var1>) -> Iin2 {
+        if let Some(value) = seq.single() {
+            match self.application.write_absolute_time(value.time) {
+                Err(err) => err.into(),
+                Ok(()) => Iin2::default(),
+            }
+        } else {
+            tracing::warn!("request lacks a single g50v1");
+            Iin2::PARAMETER_ERROR
+        }
+    }
+
     fn handle_single_write_header(&mut self, header: ObjectHeader) -> Iin2 {
         match header.details {
-            HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(seq)) => {
-                let mut iin2 = Iin2::default();
-                for (value, index) in seq.iter() {
-                    if index == 7 {
-                        // restart IIN
-                        if value {
-                            tracing::warn!("ignoring request to write IIN 1.7 to TRUE");
-                            iin2 |= Iin2::PARAMETER_ERROR;
-                        } else {
-                            // clear the restart bit
-                            self.state.restart_iin_asserted = false;
-                            self.info.clear_restart_iin();
-                        }
-                    } else {
-                        tracing::warn!("ignoring write of IIN index {} to value {}", index, value);
-                        iin2 |= Iin2::PARAMETER_ERROR;
-                    }
-                }
-                iin2
+            HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(bits)) => {
+                self.handle_write_iin(bits)
             }
             HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
-                if let Some(value) = seq.single() {
-                    match self.application.write_absolute_time(value.time) {
-                        Err(err) => err.into(),
-                        Ok(()) => Iin2::default(),
-                    }
-                } else {
-                    tracing::warn!("request lacks a single g50v1");
-                    Iin2::PARAMETER_ERROR
-                }
+                self.handle_write_g50v1(seq)
             }
             HeaderDetails::OneByteCount(_, CountVariation::Group50Var3(seq)) => {
-                self.handle_g50v3(seq)
+                self.handle_write_g50v3(seq)
             }
             _ => {
                 tracing::warn!(
@@ -1279,7 +1288,7 @@ impl OutstationSession {
         }
     }
 
-    fn handle_g50v3(&mut self, seq: CountSequence<Group50Var3>) -> Iin2 {
+    fn handle_write_g50v3(&mut self, seq: CountSequence<Group50Var3>) -> Iin2 {
         let value = if let Some(value) = seq.single() {
             value
         } else {
