@@ -42,6 +42,10 @@ object FixedSizeField {
   val float32 = FixedSizeField("value", Float32Field, Some(FieldAttribute.Value))
   val float64 = FixedSizeField("value", Float64Field, Some(FieldAttribute.Value))
 
+  // unsigned values
+  val valueU16 = FixedSizeField("value", UInt16Field, Some(FieldAttribute.Value))
+  val valueU32 = FixedSizeField("value", UInt32Field, Some(FieldAttribute.Value))
+
   //enums
   val commandStatus = FixedSizeField("status", EnumFieldType(CommandStatus))
 
