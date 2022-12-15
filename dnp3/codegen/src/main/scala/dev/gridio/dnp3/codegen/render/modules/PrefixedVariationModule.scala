@@ -96,6 +96,11 @@ object PrefixedVariationModule extends Module {
             "false // command".eol
           }
         }
+        case _ if v.parent.groupType == GroupType.AnalogInputDeadband => {
+          bracket(s"PrefixedVariation::${v.name}(_) =>") {
+            "false // deadband".eol
+          }
+        }
         case Group111AnyVar => {
           bracket(s"PrefixedVariation::Group111VarX(_, seq) =>") {
             parenSemi("handler.handle_octet_string") {
@@ -158,6 +163,7 @@ object PrefixedVariationModule extends Module {
   def variations : Iterator[Variation] = {
     ObjectGroup.allVariations.iterator.collect {
       case v : SizedByVariation if v.parent == Group111 => v
+      case v : FixedSize if v.parent.groupType == GroupType.AnalogInputDeadband => v
       case v : FixedSize if v.parent.groupType.isEvent || v.parent.groupType == GroupType.Command => v
     }
   }
