@@ -487,6 +487,7 @@ impl StaticDatabase {
                 // we don't support this, but we know what it is
                 Iin2::default()
             }
+            StaticReadHeader::AnalogInputDeadBand(_, _) => Iin2::NO_FUNC_CODE_SUPPORT,
         }
     }
 

@@ -489,6 +489,15 @@ pub trait ReadHandler: Send + Sync {
     ) {
     }
 
+    /// Process an object header of `AnalogInputDeadBand` values
+    #[allow(unused_variables)]
+    fn handle_analog_input_dead_band(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogInputDeadBand, u16)>,
+    ) {
+    }
+
     /// Process an object header of `AnalogOutputStatus` values
     #[allow(unused_variables)]
     fn handle_analog_output_status(
