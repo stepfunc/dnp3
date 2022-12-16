@@ -113,6 +113,8 @@ pub trait OutstationApplication: Sync + Send + 'static {
         Err(RequestError::NotSupported)
     }
 
+    /// Controls outstation support for writing group 34, analog input dead-bands
+    ///
     /// Returning false, indicates that the writes to group34 should not be processed and requests to
     /// do so should be rejected with IIN2.NO_FUNC_CODE_SUPPORT
     ///
@@ -125,14 +127,14 @@ pub trait OutstationApplication: Sync + Send + 'static {
         false
     }
 
-    /// Called when the outstation begins processing a header to write analog dead-bands (group 31)
+    /// Called when the outstation begins processing a header to write analog dead-bands
     fn begin_write_analog_dead_bands(&mut self) {}
 
     /// Called for each analog dead-band in the write request where an analog input is defined
     /// at the specified index.
     ///
     /// The dead-band is automatically updated in the database. This callback allows application code
-    /// to persist the modified value to non-volatile memory of this is desired
+    /// to persist the modified value to non-volatile memory if desired
     #[allow(unused_variables)]
     fn write_analog_dead_band(&mut self, index: u16, dead_band: f64) {}
 
