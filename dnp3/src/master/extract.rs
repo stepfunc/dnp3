@@ -105,6 +105,7 @@ mod test {
     enum Header {
         Binary(Vec<(BinaryInput, u16)>),
         FrozenAnalog(Vec<(FrozenAnalogInput, u16)>),
+        AnalogDeadBand(Vec<(AnalogInputDeadBand, u16)>),
     }
 
     #[derive(Default)]
@@ -186,6 +187,14 @@ mod test {
             _x: &mut dyn Iterator<Item = (AnalogInput, u16)>,
         ) {
             unimplemented!()
+        }
+
+        fn handle_analog_input_dead_band(
+            &mut self,
+            _info: HeaderInfo,
+            iter: &mut dyn Iterator<Item = (AnalogInputDeadBand, u16)>,
+        ) {
+            self.received.push(Header::AnalogDeadBand(iter.collect()))
         }
 
         fn handle_frozen_analog_input(
@@ -363,6 +372,24 @@ mod test {
 
         extract_measurements_inner(objects, &mut handler);
         assert_eq!(&handler.pop(), &[Header::FrozenAnalog(vec![expected])]);
+    }
+
+    #[test]
+    fn handles_analog_input_dead_band() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            FunctionCode::Response,
+            &[0x22, 1, 0x00, 0x01, 0x02, 0xCA, 0xFE, 0xDE, 0xAD],
+        )
+        .unwrap();
+
+        let items = vec![
+            (AnalogInputDeadBand::U16(0xFECA), 0x01),
+            (AnalogInputDeadBand::U16(0xADDE), 0x02),
+        ];
+
+        extract_measurements_inner(objects, &mut handler);
+        assert_eq!(&handler.pop(), &[Header::AnalogDeadBand(items)]);
     }
 
     #[test]
