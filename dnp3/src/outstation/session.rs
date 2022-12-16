@@ -1285,9 +1285,11 @@ impl OutstationSession {
         I: Index,
         V: FixedSizeVariation + Into<f64>,
     {
-        if !self.application.begin_write_analog_deadband_header() {
+        if !self.application.support_write_analog_dead_bands() {
             return Iin2::NO_FUNC_CODE_SUPPORT;
         }
+
+        self.application.begin_write_analog_dead_bands();
 
         let iin = db.transaction(|db| {
             let mut iin2 = Iin2::default();
@@ -1296,7 +1298,7 @@ impl OutstationSession {
                 .map(|x| (x.index.widen_to_u16(), x.value.into()))
             {
                 if db.inner.set_analog_deadband(index, deadband) {
-                    self.application.write_analog_deadband(index, deadband);
+                    self.application.write_analog_dead_band(index, deadband);
                 } else {
                     iin2 |= Iin2::PARAMETER_ERROR
                 }
@@ -1304,10 +1306,7 @@ impl OutstationSession {
             iin2
         });
 
-        self.application
-            .end_write_analog_deadband_header()
-            .get()
-            .await;
+        self.application.end_write_analog_dead_bands().get().await;
 
         iin
     }

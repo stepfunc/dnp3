@@ -66,16 +66,19 @@ impl OutstationApplication for MockOutstationApplication {
         Ok(())
     }
 
-    fn begin_write_analog_deadband_header(&mut self) -> bool {
-        self.events.send(Event::BeginWriteDeadBands);
+    fn support_write_analog_dead_bands(&mut self) -> bool {
         true
     }
 
-    fn write_analog_deadband(&mut self, index: u16, deadband: f64) {
-        self.events.send(Event::WriteDeadBand(index, deadband))
+    fn begin_write_analog_dead_bands(&mut self) {
+        self.events.send(Event::BeginWriteDeadBands);
     }
 
-    fn end_write_analog_deadband_header(&mut self) -> MaybeAsync<()> {
+    fn write_analog_dead_band(&mut self, index: u16, dead_band: f64) {
+        self.events.send(Event::WriteDeadBand(index, dead_band))
+    }
+
+    fn end_write_analog_dead_bands(&mut self) -> MaybeAsync<()> {
         self.events.send(Event::EndWriteDeadBands);
         MaybeAsync::ready(())
     }

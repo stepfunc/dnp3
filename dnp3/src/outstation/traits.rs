@@ -113,26 +113,34 @@ pub trait OutstationApplication: Sync + Send + 'static {
         Err(RequestError::NotSupported)
     }
 
-    /// Called when the outstation begins processing a header to write analog deadbands (group 31)
+    /// Returning false, indicates that the writes to group34 should not be processed and requests to
+    /// do so should be rejected with IIN2.NO_FUNC_CODE_SUPPORT
     ///
-    /// Returning false, indicates that the request should not be processed and the requested write
-    /// operation is rejected with IIN2.NO_FUNC_CODE_SUPPORT
+    /// Returning true will allow the request to process the actual values with a sequence of calls:
     ///
-    /// Return true will allow the request to process the actual values below
-    fn begin_write_analog_deadband_header(&mut self) -> bool {
-        // by default, this isn't supported
+    /// 1) A single call to [`Self::begin_write_analog_dead_bands`]
+    /// 2) Zero or more calls to [`Self::write_analog_dead_band`]
+    /// 3) A single call to [`Self::end_write_analog_dead_bands`]
+    fn support_write_analog_dead_bands(&mut self) -> bool {
         false
     }
 
-    /// Called for each analog deadband  in the write request
-    ///
-    /// The change takes place automatically in memory. This callback is merely so that the new
-    /// deadbands can be saved to non-volatile memory.
-    #[allow(unused_variables)]
-    fn write_analog_deadband(&mut self, index: u16, deadband: f64) {}
+    /// Called when the outstation begins processing a header to write analog dead-bands (group 31)
+    fn begin_write_analog_dead_bands(&mut self) {}
 
-    /// Called when the outstation completes processing a header to write analog deadbands
-    fn end_write_analog_deadband_header(&mut self) -> MaybeAsync<()> {
+    /// Called for each analog dead-band in the write request where an analog input is defined
+    /// at the specified index.
+    ///
+    /// The dead-band is automatically updated in the database. This callback allows application code
+    /// to persist the modified value to non-volatile memory of this is desired
+    #[allow(unused_variables)]
+    fn write_analog_dead_band(&mut self, index: u16, dead_band: f64) {}
+
+    /// Called when the outstation completes processing a header to write analog dead-bands
+    ///
+    /// Multiple dead-bands changes can be accumulated in calls to [`Self::write_analog_dead_band`] and
+    /// then be processed as a batch in this method.
+    fn end_write_analog_dead_bands(&mut self) -> MaybeAsync<()> {
         MaybeAsync::ready(())
     }
 }
