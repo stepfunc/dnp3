@@ -6,6 +6,8 @@ mod controls;
 mod freeze;
 /// various IIN bit tests
 mod iin;
+/// reading g34
+mod read_dead_band;
 /// state machine for READ requests
 mod read_states;
 /// clear restart IIN + cold/warm restart
@@ -15,7 +17,7 @@ mod time;
 /// unsolicited responses
 mod unsolicited;
 /// writing g34
-mod write_deadband;
+mod write_dead_band;
 
 /// test data for use in multiple tests
 mod data {
