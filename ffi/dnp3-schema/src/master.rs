@@ -875,6 +875,7 @@ fn define_association_information(
         .push("disable_unsolicited", "Disable unsolicited startup request")?
         .push("time_sync", "Time synchronisation task")?
         .push("restart", "Cold or warm restart task")?
+        .push("write_dead_bands", "Write analog input dead-bands")?
         .doc("Task type used in {interface:association_information}")?
         .build()?;
 

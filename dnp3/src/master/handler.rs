@@ -11,10 +11,12 @@ use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Mes
 use crate::master::poll::{PollHandle, PollMsg};
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
 use crate::master::tasks::command::CommandTask;
+use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
+use crate::master::{DeadBandHeader, IinTaskError};
 use crate::util::channel::Sender;
 
 /// Handle to a master communication channel. This handle controls
@@ -263,6 +265,17 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Perform write one or more headers of analog input dead-bands to the outstation
+    pub async fn write_dead_bands(
+        &mut self,
+        headers: Vec<DeadBandHeader>,
+    ) -> Result<(), IinTaskError> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), IinTaskError>>();
+        let task = WriteDeadBandsTask::new(headers, Promise::OneShot(tx));
+        self.send_task(task.wrap().wrap()).await?;
+        rx.await?
+    }
+
     /// Trigger the master to issue a REQUEST_LINK_STATUS function in advance of the link status timeout
     ///
     /// This function is provided for testing purposes. Using the configured link status timeout
@@ -322,7 +335,6 @@ pub enum TaskType {
     StartupIntegrity,
     /// Automatic event scan caused by `RESTART` IIN bit detection
     AutoEventScan,
-
     /// Command request
     Command,
     /// Clear `RESTART` IIN bit
@@ -335,6 +347,8 @@ pub enum TaskType {
     TimeSync,
     /// Cold or warm restart task
     Restart,
+    /// Write dead-bands
+    WriteDeadBands,
 }
 
 /// callbacks associated with a single master to outstation association

@@ -16,10 +16,12 @@ use crate::master::tasks::restart::RestartTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::{ReadType, TaskType};
 
+use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use scursor::WriteError;
 
 pub(crate) mod auto;
 pub(crate) mod command;
+pub(crate) mod deadbands;
 pub(crate) mod read;
 pub(crate) mod restart;
 pub(crate) mod time;
@@ -110,6 +112,8 @@ pub(crate) enum NonReadTask {
     TimeSync(TimeSyncTask),
     /// restart operation
     Restart(RestartTask),
+    /// write dead-bands
+    DeadBands(WriteDeadBandsTask),
 }
 
 impl RequestWriter for ReadTask {
@@ -138,6 +142,7 @@ impl RequestWriter for NonReadTask {
             NonReadTask::Command(t) => t.write(writer),
             NonReadTask::TimeSync(t) => t.write(writer),
             NonReadTask::Restart(_) => Ok(()),
+            NonReadTask::DeadBands(t) => t.write(writer),
         }
     }
 }
@@ -225,6 +230,7 @@ impl NonReadTask {
             NonReadTask::Auto(_) => Some(self),
             NonReadTask::TimeSync(task) => task.start(association).map(|task| task.wrap()),
             NonReadTask::Restart(_) => Some(self),
+            NonReadTask::DeadBands(_) => Some(self),
         }
     }
 
@@ -234,6 +240,7 @@ impl NonReadTask {
             NonReadTask::Auto(task) => task.function(),
             NonReadTask::TimeSync(task) => task.function(),
             NonReadTask::Restart(task) => task.function(),
+            NonReadTask::DeadBands(task) => task.function(),
         }
     }
 
@@ -243,6 +250,7 @@ impl NonReadTask {
             NonReadTask::TimeSync(task) => task.on_task_error(association, err),
             NonReadTask::Auto(task) => task.on_task_error(association, err),
             NonReadTask::Restart(task) => task.on_task_error(err),
+            NonReadTask::DeadBands(task) => task.on_task_error(err),
         }
     }
 
@@ -259,6 +267,7 @@ impl NonReadTask {
             },
             NonReadTask::TimeSync(task) => task.handle(association, response),
             NonReadTask::Restart(task) => task.handle(response),
+            NonReadTask::DeadBands(task) => task.handle(response),
         }
     }
 
@@ -272,6 +281,7 @@ impl NonReadTask {
             },
             Self::TimeSync(_) => TaskType::TimeSync,
             Self::Restart(_) => TaskType::Restart,
+            NonReadTask::DeadBands(_) => TaskType::WriteDeadBands,
         }
     }
 }

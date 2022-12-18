@@ -84,6 +84,16 @@ pub enum CommandResponseError {
     ObjectValueMismatch,
 }
 
+/// Error type for tasks that don't return anything from the outstation but might
+/// fail b/c IIN2 has a bit set
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum IinTaskError {
+    /// Error occurred during task execution
+    Task(TaskError),
+    /// Outstation returned an IIN.2 error
+    IinError(Iin2),
+}
+
 /// Parent error type for time sync tasks
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TimeSyncError {
@@ -239,6 +249,15 @@ impl std::fmt::Display for TimeSyncError {
     }
 }
 
+impl std::fmt::Display for IinTaskError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            IinTaskError::Task(err) => write!(f, "{err}"),
+            IinTaskError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
+        }
+    }
+}
+
 impl From<WriteError> for TaskError {
     fn from(_: WriteError) -> Self {
         TaskError::WriteError
@@ -315,6 +334,18 @@ impl From<RecvError> for AssociationError {
     }
 }
 
+impl From<RecvError> for IinTaskError {
+    fn from(_: RecvError) -> Self {
+        IinTaskError::Task(TaskError::Shutdown)
+    }
+}
+
+impl From<TaskError> for IinTaskError {
+    fn from(err: TaskError) -> Self {
+        IinTaskError::Task(err)
+    }
+}
+
 impl From<StateChange> for TaskError {
     fn from(x: StateChange) -> Self {
         match x {
@@ -378,9 +409,16 @@ impl From<Shutdown> for PollError {
     }
 }
 
+impl From<Shutdown> for IinTaskError {
+    fn from(_: Shutdown) -> Self {
+        IinTaskError::Task(TaskError::Shutdown)
+    }
+}
+
 impl Error for AssociationError {}
 impl Error for TaskError {}
 impl Error for PollError {}
 impl Error for CommandError {}
 impl Error for CommandResponseError {}
 impl Error for TimeSyncError {}
+impl Error for IinTaskError {}
