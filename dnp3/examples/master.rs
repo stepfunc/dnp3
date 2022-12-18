@@ -306,6 +306,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::warn!("error: {}", err);
                 }
             }
+            "wad" => {
+                // change the dead-band for analog input index 7 to 3.5
+                if let Err(err) = association
+                    .write_dead_bands(vec![DeadBandHeader::group34_var3_u8(vec![(7, 3.5)])])
+                    .await
+                {
+                    tracing::warn!("error: {}", err);
+                }
+            }
             "crt" => {
                 let result = association.cold_restart().await;
 
