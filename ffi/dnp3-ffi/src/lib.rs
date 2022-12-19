@@ -15,6 +15,7 @@ pub use outstation::*;
 pub use request::*;
 pub use runtime::*;
 pub(crate) use tcp::*;
+pub use write_dead_band_request::*;
 
 mod command;
 mod connect;
@@ -26,6 +27,7 @@ mod request;
 mod runtime;
 mod tcp;
 mod tracing;
+mod write_dead_band_request;
 
 pub mod ffi;
 

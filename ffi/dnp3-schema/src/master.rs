@@ -23,6 +23,9 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("A single value enum which is used as a placeholder for futures that don't return a value")?
         .build()?;
 
+    let write_dead_band_request = crate::write_dead_band_request::define(lib)?;
+    let write_dead_band_callback = define_write_dead_bands_callback(lib, nothing.clone())?;
+
     let master_channel_create_tcp_fn = lib
         .define_function("master_channel_create_tcp")?
         .param(
@@ -353,6 +356,28 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .build()?;
 
+    let write_dead_bands_async = lib
+        .define_future_method(
+            "write_dead_bands",
+            master_channel_class.clone(),
+            write_dead_band_callback,
+        )?
+        .param(
+            "association",
+            association_id.clone(),
+            "Association on which to perform the WRITE",
+        )?
+        .param(
+            "request",
+            write_dead_band_request.declaration(),
+            "Request containing headers of analog input dead-bands (group 34)",
+        )?
+        .fails_with(shared.error_type.clone())?
+        .doc(doc(
+            "Perform a WRITE on the association using the supplied collection of dead-band headers",
+        ))?
+        .build()?;
+
     let read_with_handler_async = lib
         .define_future_method("read_with_handler", master_channel_class.clone(), read_callback)?
         .param("association",association_id.clone(), "Association on which to perform the read")?
@@ -464,6 +489,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .async_method(perform_time_sync_async)?
         .async_method(cold_restart_async)?
         .async_method(warm_restart_async)?
+        .async_method(write_dead_bands_async)?
         .async_method(check_link_status_async)?
         .custom_destroy("shutdown")?
         .doc(
@@ -1373,6 +1399,35 @@ fn define_link_status_callback(
         nothing,
         "Result of the link status",
         Some(link_status_error),
+    )?;
+
+    Ok(callback)
+}
+
+fn define_write_dead_bands_callback(
+    lib: &mut LibraryBuilder,
+    nothing: EnumHandle,
+) -> BackTraced<FutureInterface<Unvalidated>> {
+    let error = lib
+        .define_error_type(
+            "write_dead_bands_error",
+            "write_dead_bands_exception",
+            ExceptionType::CheckedException,
+        )?
+        .add_error(
+            "rejected_by_iin2",
+            "IIN2 indicates request was not completely successful",
+        )?
+        .add_task_errors()?
+        .doc("Errors that may occur when writing analog input dead bands")?
+        .build()?;
+
+    let callback = lib.define_future_interface(
+        "write_analog_dead_bands_callback",
+        "Handler writing analog input dead-bands",
+        nothing,
+        "Result of WRITE operation",
+        Some(error),
     )?;
 
     Ok(callback)
