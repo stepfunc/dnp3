@@ -79,12 +79,62 @@ pub(crate) unsafe fn write_dead_band_request_destroy(instance: *mut crate::Write
     }
 }
 
-pub(crate) unsafe fn write_dead_band_request_add_g32v1_u8(
+pub(crate) unsafe fn write_dead_band_request_add_g34v1_u8(
     instance: *mut crate::WriteDeadBandRequest,
     index: u8,
     dead_band: u16,
 ) {
     write_dead_band_request_add_generic(instance, (dead_band, index))
+}
+
+pub(crate) unsafe fn write_dead_band_request_add_g34v1_u16(
+    instance: *mut crate::WriteDeadBandRequest,
+    index: u16,
+    dead_band: u16,
+) {
+    write_dead_band_request_add_generic(instance, (dead_band, index))
+}
+
+pub(crate) unsafe fn write_dead_band_request_add_g34v2_u8(
+    instance: *mut crate::WriteDeadBandRequest,
+    index: u8,
+    dead_band: u32,
+) {
+    write_dead_band_request_add_generic(instance, (dead_band, index))
+}
+
+pub(crate) unsafe fn write_dead_band_request_add_g34v2_u16(
+    instance: *mut crate::WriteDeadBandRequest,
+    index: u16,
+    dead_band: u32,
+) {
+    write_dead_band_request_add_generic(instance, (dead_band, index))
+}
+
+pub(crate) unsafe fn write_dead_band_request_add_g34v3_u8(
+    instance: *mut crate::WriteDeadBandRequest,
+    index: u8,
+    dead_band: f32,
+) {
+    write_dead_band_request_add_generic(instance, (dead_band, index))
+}
+
+pub(crate) unsafe fn write_dead_band_request_add_g34v3_u16(
+    instance: *mut crate::WriteDeadBandRequest,
+    index: u16,
+    dead_band: f32,
+) {
+    write_dead_band_request_add_generic(instance, (dead_band, index))
+}
+
+pub(crate) unsafe fn write_dead_band_request_finish_header(
+    instance: *mut crate::WriteDeadBandRequest,
+) {
+    if let Some(instance) = instance.as_mut() {
+        if let Some(current) = instance.current.take() {
+            instance.headers.push(current);
+        }
+    }
 }
 
 unsafe fn write_dead_band_request_add_generic<T>(
@@ -125,6 +175,86 @@ impl DeadBandVariant for (u16, u8) {
             Header::G34V1U8(mut x) => {
                 x.push(item);
                 Ok(Header::G34V1U8(x))
+            }
+            _ => Err((header, Self::wrap(item))),
+        }
+    }
+}
+
+impl DeadBandVariant for (u16, u16) {
+    fn wrap(item: Self) -> Header {
+        Header::G34V1U16(vec![item])
+    }
+
+    fn extend(header: Header, item: Self) -> Result<Header, (Header, Header)> {
+        match header {
+            Header::G34V1U16(mut x) => {
+                x.push(item);
+                Ok(Header::G34V1U16(x))
+            }
+            _ => Err((header, Self::wrap(item))),
+        }
+    }
+}
+
+impl DeadBandVariant for (u32, u8) {
+    fn wrap(item: Self) -> Header {
+        Header::G34V2U8(vec![item])
+    }
+
+    fn extend(header: Header, item: Self) -> Result<Header, (Header, Header)> {
+        match header {
+            Header::G34V2U8(mut x) => {
+                x.push(item);
+                Ok(Header::G34V2U8(x))
+            }
+            _ => Err((header, Self::wrap(item))),
+        }
+    }
+}
+
+impl DeadBandVariant for (u32, u16) {
+    fn wrap(item: Self) -> Header {
+        Header::G34V2U16(vec![item])
+    }
+
+    fn extend(header: Header, item: Self) -> Result<Header, (Header, Header)> {
+        match header {
+            Header::G34V2U16(mut x) => {
+                x.push(item);
+                Ok(Header::G34V2U16(x))
+            }
+            _ => Err((header, Self::wrap(item))),
+        }
+    }
+}
+
+impl DeadBandVariant for (f32, u8) {
+    fn wrap(item: Self) -> Header {
+        Header::G34V3U8(vec![item])
+    }
+
+    fn extend(header: Header, item: Self) -> Result<Header, (Header, Header)> {
+        match header {
+            Header::G34V3U8(mut x) => {
+                x.push(item);
+                Ok(Header::G34V3U8(x))
+            }
+            _ => Err((header, Self::wrap(item))),
+        }
+    }
+}
+
+impl DeadBandVariant for (f32, u16) {
+    fn wrap(item: Self) -> Header {
+        Header::G34V3U16(vec![item])
+    }
+
+    fn extend(header: Header, item: Self) -> Result<Header, (Header, Header)> {
+        match header {
+            Header::G34V3U16(mut x) => {
+                x.push(item);
+                Ok(Header::G34V3U16(x))
             }
             _ => Err((header, Self::wrap(item))),
         }
