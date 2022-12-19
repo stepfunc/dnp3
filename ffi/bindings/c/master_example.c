@@ -421,15 +421,6 @@ int run_channel(dnp3_master_channel_t *channel)
             };
             dnp3_master_channel_synchronize_time(channel, association_id, DNP3_TIME_SYNC_MODE_NON_LAN, cb);
         }
-        else if (strcmp(cbuf, "crt\n") == 0) {
-            dnp3_restart_task_callback_t cb = {
-                .on_complete = &on_restart_success,
-                .on_failure = &on_restart_failure,
-                .on_destroy = NULL,
-                .ctx = NULL,
-            };
-            dnp3_master_channel_cold_restart(channel, association_id, cb);
-        }
         else if (strcmp(cbuf, "wad\n") == 0) {
             // ANCHOR: write_dead_bands
             dnp3_write_analog_dead_bands_callback_t cb = {
@@ -439,7 +430,7 @@ int run_channel(dnp3_master_channel_t *channel)
                 .ctx = NULL,
             };
 
-            dnp3_write_dead_band_request_t *request = dnp3_write_dead_band_request_create();            
+            dnp3_write_dead_band_request_t *request = dnp3_write_dead_band_request_create();
             dnp3_write_dead_band_request_add_g34v1_u8(request, 3, 5);
             dnp3_write_dead_band_request_add_g34v3_u16(request, 4, 2.5f);
 
@@ -447,7 +438,16 @@ int run_channel(dnp3_master_channel_t *channel)
             dnp3_write_dead_band_request_destroy(request);
             // ANCHOR_END: write_dead_bands
         }
-        if (strcmp(cbuf, "wrt\n") == 0) {
+        else if (strcmp(cbuf, "crt\n") == 0) {
+            dnp3_restart_task_callback_t cb = {
+                .on_complete = &on_restart_success,
+                .on_failure = &on_restart_failure,
+                .on_destroy = NULL,
+                .ctx = NULL,
+            };
+            dnp3_master_channel_cold_restart(channel, association_id, cb);
+        }        
+        else if (strcmp(cbuf, "wrt\n") == 0) {
             dnp3_restart_task_callback_t cb = {
                 .on_complete = &on_restart_success,
                 .on_failure = &on_restart_failure,

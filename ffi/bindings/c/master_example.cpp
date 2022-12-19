@@ -190,8 +190,18 @@ class RestartTaskCallback : public dnp3::RestartTaskCallback {
 
     void on_failure(dnp3::RestartError error) override
     {
-        std::cout << "restart failed failed: " << dnp3::to_string(error) << std::endl;
+        std::cout << "restart request failed: " << dnp3::to_string(error) << std::endl;
     }
+};
+
+class WriteDeadBandsCallback : public dnp3::WriteAnalogDeadBandsCallback { 
+
+    void on_complete(dnp3::Nothing) override
+    {
+        std::cout << "write dead-bands succeeded" << std::endl;
+    }
+
+    void on_failure(dnp3::WriteDeadBandsError error) override { std::cout << "write dead-bands failed: " << dnp3::to_string(error) << std::endl; }
 };
 
 class LinkStatusCallback : public dnp3::LinkStatusCallback {
@@ -288,6 +298,12 @@ void run_channel(dnp3::MasterChannel &channel)
         }
         else if (cmd == "nts") {
             channel.synchronize_time(assoc, dnp3::TimeSyncMode::non_lan, std::make_unique<TimeSyncTaskCallback>());
+        }
+        else if (cmd == "wad") {
+            dnp3::WriteDeadBandRequest request;
+            request.add_g34v1_u8(3, 5);
+            request.add_g34v3_u16(2, 2.5);
+            channel.write_dead_bands(assoc, request, std::make_unique<WriteDeadBandsCallback>());
         }
         else if (cmd == "crt") {
             channel.cold_restart(assoc, std::make_unique<RestartTaskCallback>());
