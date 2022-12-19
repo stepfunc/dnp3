@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Master": {
+      "commandName": "Project",
+      "commandLineArgs": "tcp"
+    }
+  }
+}
