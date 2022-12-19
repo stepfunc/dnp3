@@ -511,6 +511,15 @@ public class MasterExample {
             System.out.println("Time sync success!");
             break;
           }
+          case "wad":
+          {
+            WriteDeadBandRequest request = new WriteDeadBandRequest();
+            request.addG34v1U8(ubyte(3),ushort(5));
+            request.addG34v3U16(ushort(5), 2.5f);
+            channel.writeDeadBands(association, request).toCompletableFuture().get();
+            System.out.println("Write dead-bands success!");
+            break;
+          }
           case "crt":
           {
             Duration delay = channel.coldRestart(association).toCompletableFuture().get();
