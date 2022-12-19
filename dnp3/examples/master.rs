@@ -307,13 +307,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "wad" => {
-                // change the dead-band for analog input index 7 to 3.5
+                // ANCHOR: write_dead_bands
                 if let Err(err) = association
-                    .write_dead_bands(vec![DeadBandHeader::group34_var3_u8(vec![(7, 3.5)])])
+                    .write_dead_bands(vec![
+                        DeadBandHeader::group34_var1_u8(vec![(3, 5)]),
+                        DeadBandHeader::group34_var3_u16(vec![(4, 2.5)]),
+                    ])
                     .await
                 {
                     tracing::warn!("error: {}", err);
                 }
+                // ANCHOR_END: write_dead_bands
             }
             "crt" => {
                 let result = association.cold_restart().await;

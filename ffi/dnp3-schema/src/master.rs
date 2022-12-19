@@ -1424,7 +1424,7 @@ fn define_write_dead_bands_callback(
 
     let callback = lib.define_future_interface(
         "write_analog_dead_bands_callback",
-        "Handler writing analog input dead-bands",
+        "Callback interface for writing analog input dead-bands",
         nothing,
         "Result of WRITE operation",
         Some(error),

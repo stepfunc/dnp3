@@ -198,10 +198,13 @@ void on_command_error(dnp3_command_error_t result, void *arg)
 void on_time_sync_success(dnp3_nothing_t nothing, void* arg) { printf("time sync success! \n"); }
 void on_time_sync_error(dnp3_time_sync_error_t error, void *arg) { printf("Time sync error: %s\n", dnp3_time_sync_error_to_string(error)); }
 
-
 // warm/cold restart callbacks
 void on_restart_success(uint64_t delay, void *arg) { printf("restart success: %" PRIu64 "\n", delay); }
 void on_restart_failure(dnp3_restart_error_t error, void* arg) { printf("Restart failure: %s\n", dnp3_restart_error_to_string(error)); }
+
+// write dead-band callbacks
+void on_write_dead_band_success(dnp3_nothing_t delay, void *arg) { printf("Write dead-bands success! \n"); }
+void on_write_dead_band_failure(dnp3_write_dead_bands_error_t error, void *arg) { printf("Write dead-bands failure: %s\n", dnp3_write_dead_bands_error_to_string(error)); }
 
 // link status callbacks
 void on_link_status_success(dnp3_nothing_t nothing, void *arg) { printf("link status success!\n"); }
@@ -427,7 +430,24 @@ int run_channel(dnp3_master_channel_t *channel)
             };
             dnp3_master_channel_cold_restart(channel, association_id, cb);
         }
-        else if (strcmp(cbuf, "wrt\n") == 0) {
+        else if (strcmp(cbuf, "wad\n") == 0) {
+            // ANCHOR: write_dead_bands
+            dnp3_write_analog_dead_bands_callback_t cb = {
+                .on_complete = &on_write_dead_band_success,
+                .on_failure = &on_write_dead_band_failure,
+                .on_destroy = NULL,
+                .ctx = NULL,
+            };
+
+            dnp3_write_dead_band_request_t *request = dnp3_write_dead_band_request_create();            
+            dnp3_write_dead_band_request_add_g34v1_u8(request, 3, 5);
+            dnp3_write_dead_band_request_add_g34v3_u16(request, 4, 2.5f);
+
+            dnp3_master_channel_write_dead_bands(channel, association_id, request, cb);
+            dnp3_write_dead_band_request_destroy(request);
+            // ANCHOR_END: write_dead_bands
+        }
+        if (strcmp(cbuf, "wrt\n") == 0) {
             dnp3_restart_task_callback_t cb = {
                 .on_complete = &on_restart_success,
                 .on_failure = &on_restart_failure,
