@@ -106,6 +106,7 @@ object RangedVariationModule extends Module {
         case GroupType.StaticAnalogOutputStatus => "analog_output_status"
         case GroupType.StaticCounter => "counter"
         case GroupType.StaticFrozenCounter => "frozen_counter"
+        case GroupType.AnalogInputDeadband => "analog_input_dead_band"
         case _ => throw new Exception("unhandled variation")
       }
     }
@@ -205,6 +206,7 @@ object RangedVariationModule extends Module {
         case v : AnyVariation if v.parent.groupType.isStatic => Some(v)
         case v : FixedSize if v.parent.groupType.isStatic => Some(v)
         case v : SizedByVariation if v.parent.groupType.isStatic => Some(v)
+        case v : FixedSize if v.parent.groupType == GroupType.AnalogInputDeadband => Some(v)
         case _ => None
       }
     }

@@ -33,6 +33,10 @@ impl Database {
         self.event_buffer.reset();
     }
 
+    pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> bool {
+        self.static_db.set_analog_deadband(index, deadband)
+    }
+
     pub(crate) fn clear_written_events(&mut self) {
         self.event_buffer.clear_written();
     }

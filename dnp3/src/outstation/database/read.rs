@@ -26,6 +26,7 @@ pub(crate) enum StaticReadHeader {
         Option<IndexRange>,
     ),
     OctetString(Option<IndexRange>),
+    AnalogInputDeadBand(Option<AnalogInputDeadBandVariation>, Option<IndexRange>),
 }
 
 #[derive(Copy, Clone)]
@@ -470,6 +471,31 @@ impl ReadHeader {
             AllObjectsVariation::Group33Var8 => Some(
                 EventReadHeader::FrozenAnalog(
                     Some(EventFrozenAnalogInputVariation::Group33Var8),
+                    None,
+                )
+                .into(),
+            ),
+            // Group 34
+            AllObjectsVariation::Group34Var0 => {
+                Some(StaticReadHeader::AnalogInputDeadBand(None, None).into())
+            }
+            AllObjectsVariation::Group34Var1 => Some(
+                StaticReadHeader::AnalogInputDeadBand(
+                    Some(AnalogInputDeadBandVariation::Group34Var1),
+                    None,
+                )
+                .into(),
+            ),
+            AllObjectsVariation::Group34Var2 => Some(
+                StaticReadHeader::AnalogInputDeadBand(
+                    Some(AnalogInputDeadBandVariation::Group34Var2),
+                    None,
+                )
+                .into(),
+            ),
+            AllObjectsVariation::Group34Var3 => Some(
+                StaticReadHeader::AnalogInputDeadBand(
+                    Some(AnalogInputDeadBandVariation::Group34Var3),
                     None,
                 )
                 .into(),
@@ -1066,6 +1092,28 @@ impl ReadHeader {
             RangedVariation::Group31Var8(_) => Some(
                 StaticReadHeader::FrozenAnalog(
                     Some(StaticFrozenAnalogInputVariation::Group31Var8),
+                    Some(range),
+                )
+                .into(),
+            ),
+            // group 34
+            RangedVariation::Group34Var1(_) => Some(
+                StaticReadHeader::AnalogInputDeadBand(
+                    Some(AnalogInputDeadBandVariation::Group34Var1),
+                    Some(range),
+                )
+                .into(),
+            ),
+            RangedVariation::Group34Var2(_) => Some(
+                StaticReadHeader::AnalogInputDeadBand(
+                    Some(AnalogInputDeadBandVariation::Group34Var2),
+                    Some(range),
+                )
+                .into(),
+            ),
+            RangedVariation::Group34Var3(_) => Some(
+                StaticReadHeader::AnalogInputDeadBand(
+                    Some(AnalogInputDeadBandVariation::Group34Var3),
                     Some(range),
                 )
                 .into(),

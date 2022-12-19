@@ -43,6 +43,17 @@ class ExampleOutstation
         public FreezeResult FreezeCountersAll(FreezeType freezeType, DatabaseHandle database) { return FreezeResult.NotSupported; }
 
         public FreezeResult FreezeCountersRange(ushort start, ushort stop, FreezeType freezeType, DatabaseHandle database) { return FreezeResult.NotSupported; }
+
+        bool IOutstationApplication.SupportWriteAnalogDeadBands()
+        {
+            return false;
+        }
+
+        void IOutstationApplication.BeginWriteAnalogDeadBands() {}
+
+        void IOutstationApplication.WriteAnalogDeadBand(ushort index, double deadBand) {}
+
+        void IOutstationApplication.EndWriteAnalogDeadBands() {}
     }
 
     class TestOutstationInformation : IOutstationInformation

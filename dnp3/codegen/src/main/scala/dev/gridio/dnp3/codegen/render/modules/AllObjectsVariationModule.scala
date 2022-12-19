@@ -47,6 +47,7 @@ object AllObjectsVariationModule extends Module {
       case v : ClassData => v
       case v : AnyVariation if v.parent.groupType != GroupType.Command => v
       case v : FixedSize if v.parent.groupType.isStatic || v.parent.groupType.isEvent => v
+      case v : FixedSize if v.parent.groupType == GroupType.AnalogInputDeadband => v
       case v if v.parent == Group110 || v.parent == Group111 => v
     }
   }

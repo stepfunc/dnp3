@@ -929,6 +929,25 @@ mod test {
     }
 
     #[test]
+    fn parses_g34_var1_with_count_and_prefix() {
+        let input = [0x22, 0x01, 0x17, 0x01, 0x03, 0xCA, 0xFE];
+
+        let mut headers = HeaderCollection::parse(FunctionCode::Write, &input)
+            .unwrap()
+            .iter();
+
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::OneByteCountAndPrefix(01, PrefixedVariation::Group34Var1(seq)) => {
+                let prefix = seq.single().unwrap();
+                assert_eq!(prefix, Prefix { index: 0x03, value: Group34Var1 { value: 0xFECA }});
+            }
+        );
+
+        assert_matches!(headers.next(), None);
+    }
+
+    #[test]
     fn parses_range_of_g80v1() {
         // this is what is typically sent to clear the restart IIN
         let input = [0x50, 0x01, 0x00, 0x07, 0x07, 0x00];

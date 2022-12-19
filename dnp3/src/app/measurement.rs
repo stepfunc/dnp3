@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use crate::app::types::Timestamp;
+use crate::app::variations::{Group34Var1, Group34Var2, Group34Var3};
 use crate::util::bit::bits;
 use crate::util::bit::BitMask;
 use crate::util::bit::Bitfield;
@@ -280,6 +281,35 @@ impl FrozenAnalogInput {
             flags,
             time: Some(time),
         }
+    }
+}
+
+/// Analog input dead-band received from the outstation
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum AnalogInputDeadBand {
+    /// Value corresponding to g34v1
+    U16(u16),
+    /// Value corresponding to g34v2
+    U32(u32),
+    /// Value corresponding to g34v3
+    F32(f32),
+}
+
+impl From<Group34Var1> for AnalogInputDeadBand {
+    fn from(value: Group34Var1) -> Self {
+        Self::U16(value.value)
+    }
+}
+
+impl From<Group34Var2> for AnalogInputDeadBand {
+    fn from(value: Group34Var2) -> Self {
+        AnalogInputDeadBand::U32(value.value)
+    }
+}
+
+impl From<Group34Var3> for AnalogInputDeadBand {
+    fn from(value: Group34Var3) -> Self {
+        AnalogInputDeadBand::F32(value.value)
     }
 }
 

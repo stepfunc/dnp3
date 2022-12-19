@@ -73,6 +73,7 @@ pub(crate) enum SpecificVariation {
     Analog(Option<StaticAnalogInputVariation>),
     AnalogOutputStatus(Option<StaticAnalogOutputStatusVariation>),
     OctetString,
+    AnalogDeadBand(Option<AnalogInputDeadBandVariation>),
 }
 
 impl SpecificVariation {
@@ -200,6 +201,18 @@ where
         }
     }
 
+    fn full_range(&self) -> Option<IndexRange> {
+        /*
+          TODO - when this feature is stabilized we can use it here
+          TODO - #![feature(map_first_last)]
+          TODO - It'll be more efficient than finding first/last using iterators
+        */
+        let start = self.inner.iter().next().map(|(key, _)| *key)?;
+        let stop = self.inner.iter().next_back().map(|(key, _)| *key)?;
+
+        Some(IndexRange::new(start, stop))
+    }
+
     fn get_mut(&mut self, index: u16) -> Option<&mut Point<T>> {
         self.inner.get_mut(&index)
     }
@@ -229,16 +242,10 @@ where
         &mut self,
         variation: Option<T::StaticVariation>,
     ) -> Option<VariationRange> {
-        /*
-          TODO - when this feature is stabilized we can use it here
-          TODO - #![feature(map_first_last)]
-          TODO - It'll be more efficient than finding first/last using iterators
-        */
-        let start = self.inner.iter().next().map(|(key, _)| *key)?;
-        let stop = self.inner.iter().next_back().map(|(key, _)| *key)?;
+        let range = self.full_range()?;
 
         // as far at the processing goes, we treat this just like a range scan over all the values
-        self.select_range_with_variation(IndexRange::new(start, stop), variation)
+        self.select_range_with_variation(range, variation)
     }
 }
 
@@ -280,6 +287,24 @@ impl StaticDatabase {
             analog: PointMap::empty(),
             analog_output_status: PointMap::empty(),
             octet_strings: PointMap::empty(),
+        }
+    }
+
+    pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> bool {
+        fn zero_or_positive(value: f64) -> bool {
+            value == 0.0 || (value.is_normal() && value.is_sign_positive())
+        }
+
+        if !zero_or_positive(deadband) {
+            return false;
+        }
+
+        match self.analog.get_mut(index) {
+            None => false,
+            Some(x) => {
+                x.config.detector.deadband = deadband;
+                true
+            }
         }
     }
 
@@ -411,6 +436,9 @@ impl StaticDatabase {
             SpecificVariation::OctetString => {
                 self.write_typed_range::<OctetString>(cursor, range.range, None)
             }
+            SpecificVariation::AnalogDeadBand(var) => {
+                self.write_analog_dead_bands(cursor, range.range, var)
+            }
         }
     }
 
@@ -434,6 +462,34 @@ impl StaticDatabase {
             if writer.write(cursor, *index, &item.selected, info).is_err() {
                 // ran out of space, tell calling code to resume at this index
                 return Err(T::wrap(IndexRange::new(*index, range.stop), variation));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn write_analog_dead_bands(
+        &mut self,
+        cursor: &mut WriteCursor,
+        range: IndexRange,
+        variation: Option<AnalogInputDeadBandVariation>,
+    ) -> Result<(), VariationRange> {
+        let mut writer = RangeWriter::new();
+        for (index, item) in self.analog.inner.range(range) {
+            // first determine what variation should be written
+            let var = variation.unwrap_or(AnalogInputDeadBandVariation::Group34Var3);
+
+            let info = var.get_write_info();
+
+            if writer
+                .write(cursor, *index, &item.config.detector.deadband, info)
+                .is_err()
+            {
+                // ran out of space, tell calling code to resume at this index
+                return Err(VariationRange::new(
+                    IndexRange::new(*index, range.stop),
+                    SpecificVariation::AnalogDeadBand(variation),
+                ));
             }
         }
 
@@ -468,6 +524,25 @@ impl StaticDatabase {
             StaticReadHeader::FrozenAnalog(_, _) => {
                 // we don't support this, but we know what it is
                 Iin2::default()
+            }
+            StaticReadHeader::AnalogInputDeadBand(var, range) => {
+                match range {
+                    None => {
+                        if let Some(range) = self.analog.full_range() {
+                            self.push_selection(VariationRange::new(
+                                range,
+                                SpecificVariation::AnalogDeadBand(var),
+                            ))
+                        } else {
+                            // we don't have any of those
+                            Iin2::default()
+                        }
+                    }
+                    Some(range) => self.push_selection(VariationRange::new(
+                        range,
+                        SpecificVariation::AnalogDeadBand(var),
+                    )),
+                }
             }
         }
     }

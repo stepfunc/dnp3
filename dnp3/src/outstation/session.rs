@@ -9,8 +9,10 @@ use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::{HeaderCollection, HeaderDetails, Request};
-use crate::app::variations::{Group50Var3, Group52Var1, Group52Var2};
+use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader, Request};
+use crate::app::variations::{
+    Group34Var1, Group34Var2, Group34Var3, Group50Var1, Group50Var3, Group52Var1, Group52Var2,
+};
 use crate::app::*;
 use crate::app::{ControlField, Iin, Iin1, Iin2, ResponseFunction, ResponseHeader};
 use crate::decode::DecodeLevel;
@@ -33,6 +35,10 @@ use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
+use crate::app::gen::prefixed::PrefixedVariation;
+use crate::app::parse::bit::BitSequence;
+use crate::app::parse::prefix::Prefix;
+use crate::app::parse::traits::{FixedSizeVariation, Index};
 use scursor::WriteError;
 
 #[derive(Copy, Clone)]
@@ -1105,7 +1111,7 @@ impl OutstationSession {
         object_headers: HeaderCollection<'_>,
     ) -> Option<Response> {
         let mut result = match function {
-            FunctionCode::Write => Some(self.handle_write(seq, object_headers)),
+            FunctionCode::Write => Some(self.handle_write(seq, object_headers, database).await),
             // these function don't process objects
             FunctionCode::DelayMeasure => Some(self.handle_delay_measure(seq)),
             FunctionCode::RecordCurrentTime => Some(self.handle_record_current_time(seq)),
@@ -1216,65 +1222,141 @@ impl OutstationSession {
         }
     }
 
-    fn handle_write(&mut self, seq: Sequence, object_headers: HeaderCollection) -> Response {
-        let iin2 = if let Some(header) = object_headers.get_only_header() {
-            match header.details {
-                HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(seq)) => {
-                    let mut iin2 = Iin2::default();
-                    for (value, index) in seq.iter() {
-                        if index == 7 {
-                            // restart IIN
-                            if value {
-                                tracing::warn!("ignoring request to write IIN 1.7 to TRUE");
-                                iin2 |= Iin2::PARAMETER_ERROR;
-                            } else {
-                                // clear the restart bit
-                                self.state.restart_iin_asserted = false;
-                                self.info.clear_restart_iin();
-                            }
-                        } else {
-                            tracing::warn!(
-                                "ignoring write of IIN index {} to value {}",
-                                index,
-                                value
-                            );
-                            iin2 |= Iin2::PARAMETER_ERROR;
-                        }
-                    }
-                    iin2
-                }
-                HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
-                    if let Some(value) = seq.single() {
-                        match self.application.write_absolute_time(value.time) {
-                            Err(err) => err.into(),
-                            Ok(()) => Iin2::default(),
-                        }
-                    } else {
-                        tracing::warn!("request lacks a single g50v1");
-                        Iin2::PARAMETER_ERROR
-                    }
-                }
-                HeaderDetails::OneByteCount(_, CountVariation::Group50Var3(seq)) => {
-                    self.handle_g50v3(seq)
-                }
-                _ => {
-                    tracing::warn!(
-                        "WRITE not supported with qualifier: {} and variation: {}",
-                        header.details.qualifier(),
-                        header.variation
-                    );
-                    Iin2::NO_FUNC_CODE_SUPPORT
-                }
-            }
-        } else {
+    async fn handle_write(
+        &mut self,
+        seq: Sequence,
+        object_headers: HeaderCollection<'_>,
+        database: &mut DatabaseHandle,
+    ) -> Response {
+        let mut iin2 = Iin2::default();
+        let mut empty = true;
+
+        for header in object_headers.iter() {
+            empty = false;
+            iin2 = self.handle_single_write_header(header, database).await;
+        }
+
+        if empty {
             tracing::warn!("empty WRITE request");
-            Iin2::default()
-        };
+        }
 
         Response::empty_solicited(seq, Iin::default() | iin2)
     }
 
-    fn handle_g50v3(&mut self, seq: CountSequence<Group50Var3>) -> Iin2 {
+    fn handle_write_iin(&mut self, bits: BitSequence) -> Iin2 {
+        let mut iin2 = Iin2::default();
+        for (value, index) in bits.iter() {
+            if index == 7 {
+                // restart IIN
+                if value {
+                    tracing::warn!("ignoring request to write IIN 1.7 to TRUE");
+                    iin2 |= Iin2::PARAMETER_ERROR;
+                } else {
+                    // clear the restart bit
+                    self.state.restart_iin_asserted = false;
+                    self.info.clear_restart_iin();
+                }
+            } else {
+                tracing::warn!("ignoring write of IIN index {} to value {}", index, value);
+                iin2 |= Iin2::PARAMETER_ERROR;
+            }
+        }
+        iin2
+    }
+
+    fn handle_write_abs_time(&mut self, seq: CountSequence<Group50Var1>) -> Iin2 {
+        if let Some(value) = seq.single() {
+            match self.application.write_absolute_time(value.time) {
+                Err(err) => err.into(),
+                Ok(()) => Iin2::default(),
+            }
+        } else {
+            tracing::warn!("request lacks a single g50v1");
+            Iin2::PARAMETER_ERROR
+        }
+    }
+
+    async fn handle_write_analog_deadbands<I, V>(
+        &mut self,
+        items: CountSequence<'_, Prefix<I, V>>,
+        db: &mut DatabaseHandle,
+    ) -> Iin2
+    where
+        I: Index,
+        V: FixedSizeVariation + Into<f64>,
+    {
+        if !self.application.support_write_analog_dead_bands() {
+            return Iin2::NO_FUNC_CODE_SUPPORT;
+        }
+
+        self.application.begin_write_analog_dead_bands();
+
+        let iin = db.transaction(|db| {
+            let mut iin2 = Iin2::default();
+            for (index, deadband) in items
+                .iter()
+                .map(|x| (x.index.widen_to_u16(), x.value.into()))
+            {
+                if db.inner.set_analog_deadband(index, deadband) {
+                    self.application.write_analog_dead_band(index, deadband);
+                } else {
+                    iin2 |= Iin2::PARAMETER_ERROR
+                }
+            }
+            iin2
+        });
+
+        self.application.end_write_analog_dead_bands().get().await;
+
+        iin
+    }
+
+    async fn handle_single_write_header(
+        &mut self,
+        header: ObjectHeader<'_>,
+        db: &mut DatabaseHandle,
+    ) -> Iin2 {
+        match header.details {
+            HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(bits)) => {
+                self.handle_write_iin(bits)
+            }
+            HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
+                self.handle_write_abs_time(seq)
+            }
+            HeaderDetails::OneByteCount(_, CountVariation::Group50Var3(seq)) => {
+                self.handle_write_at_last_recorded_time(seq)
+            }
+            // analog deadbands
+            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var1(seq)) => {
+                self.handle_write_analog_deadbands(seq, db).await
+            }
+            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var2(seq)) => {
+                self.handle_write_analog_deadbands(seq, db).await
+            }
+            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var3(seq)) => {
+                self.handle_write_analog_deadbands(seq, db).await
+            }
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var1(seq)) => {
+                self.handle_write_analog_deadbands(seq, db).await
+            }
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var2(seq)) => {
+                self.handle_write_analog_deadbands(seq, db).await
+            }
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var3(seq)) => {
+                self.handle_write_analog_deadbands(seq, db).await
+            }
+            _ => {
+                tracing::warn!(
+                    "WRITE not supported with qualifier: {} and variation: {}",
+                    header.details.qualifier(),
+                    header.variation
+                );
+                Iin2::NO_FUNC_CODE_SUPPORT
+            }
+        }
+    }
+
+    fn handle_write_at_last_recorded_time(&mut self, seq: CountSequence<Group50Var3>) -> Iin2 {
         let value = if let Some(value) = seq.single() {
             value
         } else {
@@ -1768,7 +1850,7 @@ impl OutstationSession {
 
         match request.header.function {
             FunctionCode::Write => {
-                self.handle_write(seq, objects);
+                self.handle_write(seq, objects, database).await;
                 BroadcastAction::Processed
             }
             FunctionCode::DirectOperateNoResponse => {
@@ -2018,5 +2100,23 @@ impl From<ObjectParseError> for Iin2 {
             ObjectParseError::UnknownQualifier(_) => Iin2::PARAMETER_ERROR,
             ObjectParseError::ZeroLengthOctetData => Iin2::PARAMETER_ERROR,
         }
+    }
+}
+
+impl From<Group34Var1> for f64 {
+    fn from(x: Group34Var1) -> Self {
+        x.value as f64
+    }
+}
+
+impl From<Group34Var2> for f64 {
+    fn from(x: Group34Var2) -> Self {
+        x.value as f64
+    }
+}
+
+impl From<Group34Var3> for f64 {
+    fn from(x: Group34Var3) -> Self {
+        x.value as f64
     }
 }

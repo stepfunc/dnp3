@@ -306,6 +306,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::warn!("error: {}", err);
                 }
             }
+            "wad" => {
+                // ANCHOR: write_dead_bands
+                if let Err(err) = association
+                    .write_dead_bands(vec![
+                        DeadBandHeader::group34_var1_u8(vec![(3, 5)]),
+                        DeadBandHeader::group34_var3_u16(vec![(4, 2.5)]),
+                    ])
+                    .await
+                {
+                    tracing::warn!("error: {}", err);
+                }
+                // ANCHOR_END: write_dead_bands
+            }
             "crt" => {
                 let result = association.cold_restart().await;
 

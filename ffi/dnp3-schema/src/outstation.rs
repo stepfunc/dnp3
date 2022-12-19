@@ -709,6 +709,34 @@ fn define_outstation_application(
             .param("database_handle",database_handle.declaration(), "Database handle")?
             .returns(freeze_result, "Result of the freeze operation")?
             .end_callback()?
+        .begin_callback("support_write_analog_dead_bands",
+                        doc("Controls outstation support for writing group 34, analog input dead-bands")
+                            .details("Returning false, indicates that the writes to group34 should not be processed and requests to do so should be rejected with IIN2.NO_FUNC_CODE_SUPPORT")
+                            .details("Returning true will allow the request to process the actual values with a sequence of calls:")
+                            .details("1) A single call to {interface:outstation_application.begin_write_analog_dead_bands()}")
+                            .details("2) Zero or more calls to {interface:outstation_application.write_analog_dead_band()}")
+                            .details("3) A single call to {interface:outstation_application.end_write_analog_dead_bands()}")
+             )?
+            .returns_with_default(PrimitiveValue::Bool(false), "True if the outstation should process the request")?
+            .end_callback()?
+        .begin_callback("begin_write_analog_dead_bands", "Called when the outstation begins processing a header to write analog dead-bands")?
+            .returns_nothing_by_default()?
+            .end_callback()?
+        .begin_callback("write_analog_dead_band",
+                        doc("Called when the outstation begins processing a header to write analog dead-bands")
+                            .details("Called for each analog dead-band in the write request where an analog input is defined at the specified index.")
+                            .details("The dead-band is automatically updated in the database. This callback allows application code to persist the modified value to non-volatile memory if desired")
+            )?
+            .param("index", Primitive::U16, "Index of the analog input")?
+            .param("dead_band", Primitive::Double, "New dead-band value")?
+            .returns_nothing_by_default()?
+            .end_callback()?
+        .begin_callback("end_write_analog_dead_bands",
+                        doc("Called when the outstation completes processing a header to write analog dead-bands")
+                            .details("Multiple dead-bands changes can be accumulated in calls to {interface:outstation_application.write_analog_dead_band()} and then be processed as a batch in this method.")
+             )?
+            .returns_nothing_by_default()?
+            .end_callback()?
         .build_async()?;
 
     Ok(application)

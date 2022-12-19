@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::app::Timestamp;
+use crate::app::{MaybeAsync, Timestamp};
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::tests::harness::{Event, EventSender};
 use crate::outstation::traits::{OutstationApplication, RequestError, RestartDelay};
@@ -35,13 +35,13 @@ impl MockOutstationApplication {
 }
 
 impl OutstationApplication for MockOutstationApplication {
+    fn get_processing_delay_ms(&self) -> u16 {
+        self.data.lock().unwrap().processing_delay
+    }
+
     fn write_absolute_time(&mut self, time: Timestamp) -> Result<(), RequestError> {
         self.events.send(Event::WriteAbsoluteTime(time));
         Ok(())
-    }
-
-    fn get_processing_delay_ms(&self) -> u16 {
-        self.data.lock().unwrap().processing_delay
     }
 
     fn cold_restart(&mut self) -> Option<RestartDelay> {
@@ -64,5 +64,22 @@ impl OutstationApplication for MockOutstationApplication {
     ) -> Result<(), RequestError> {
         self.events.send(Event::Freeze(indices, freeze_type));
         Ok(())
+    }
+
+    fn support_write_analog_dead_bands(&mut self) -> bool {
+        true
+    }
+
+    fn begin_write_analog_dead_bands(&mut self) {
+        self.events.send(Event::BeginWriteDeadBands);
+    }
+
+    fn write_analog_dead_band(&mut self, index: u16, dead_band: f64) {
+        self.events.send(Event::WriteDeadBand(index, dead_band))
+    }
+
+    fn end_write_analog_dead_bands(&mut self) -> MaybeAsync<()> {
+        self.events.send(Event::EndWriteDeadBands);
+        MaybeAsync::ready(())
     }
 }

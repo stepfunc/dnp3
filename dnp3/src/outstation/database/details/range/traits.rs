@@ -150,6 +150,67 @@ impl StaticVariation<Counter> for StaticCounterVariation {
     }
 }
 
+impl AnalogInputDeadBandVariation {
+    pub(crate) fn get_write_info(&self) -> WriteInfo<f64> {
+        match self {
+            AnalogInputDeadBandVariation::Group34Var1 => fixed_type::<f64, Group34Var1>(),
+            AnalogInputDeadBandVariation::Group34Var2 => fixed_type::<f64, Group34Var2>(),
+            AnalogInputDeadBandVariation::Group34Var3 => fixed_type::<f64, Group34Var3>(),
+        }
+    }
+}
+
+impl ToVariation<Group34Var1> for f64 {
+    fn to_variation(&self) -> Group34Var1 {
+        let num = self.round() as i64;
+        let value = {
+            if num > u16::MAX as i64 {
+                u16::MAX
+            } else if num < u16::MIN as i64 {
+                u16::MIN
+            } else {
+                num as u16
+            }
+        };
+
+        Group34Var1 { value }
+    }
+}
+
+impl ToVariation<Group34Var2> for f64 {
+    fn to_variation(&self) -> Group34Var2 {
+        let num = self.round() as i64;
+        let value = {
+            if num > u32::MAX as i64 {
+                u32::MAX
+            } else if num < u32::MIN as i64 {
+                u32::MIN
+            } else {
+                num as u32
+            }
+        };
+
+        Group34Var2 { value }
+    }
+}
+
+impl ToVariation<Group34Var3> for f64 {
+    fn to_variation(&self) -> Group34Var3 {
+        let num = *self;
+        let value = {
+            if num > f32::MAX as f64 {
+                f32::MAX
+            } else if num < f32::MIN as f64 {
+                f32::MIN
+            } else {
+                num as f32
+            }
+        };
+
+        Group34Var3 { value }
+    }
+}
+
 impl StaticVariation<FrozenCounter> for StaticFrozenCounterVariation {
     fn get_write_info(&self, _value: &FrozenCounter) -> WriteInfo<FrozenCounter> {
         match self {

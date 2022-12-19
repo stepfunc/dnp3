@@ -97,6 +97,103 @@ pub struct TwoByteLimitedCountScan {
     pub count: u16,
 }
 
+/// Represents a single header in a WRITE request to modify dead-bands within the outstation
+#[derive(Debug, Clone)]
+pub struct DeadBandHeader {
+    // hidden implementation
+    pub(crate) inner: DeadBandHeaderVariants,
+}
+
+impl DeadBandHeader {
+    /// Group 34 variation 1 with 8-bit index
+    pub fn group34_var1_u8(dead_bands: Vec<(u8, u16)>) -> Self {
+        Self {
+            inner: DeadBandHeaderVariants::G34V1U8(
+                dead_bands
+                    .iter()
+                    .map(|(i, v)| (Group34Var1 { value: *v }, *i))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// Group 34 variation 1 with 16-bit index
+    pub fn group34_var1_u16(dead_bands: Vec<(u16, u16)>) -> Self {
+        Self {
+            inner: DeadBandHeaderVariants::G34V1U16(
+                dead_bands
+                    .iter()
+                    .map(|(i, v)| (Group34Var1 { value: *v }, *i))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// Group 34 variation 2 with 8-bit index
+    pub fn group34_var2_u8(dead_bands: Vec<(u8, u32)>) -> Self {
+        Self {
+            inner: DeadBandHeaderVariants::G34V2U8(
+                dead_bands
+                    .iter()
+                    .map(|(i, v)| (Group34Var2 { value: *v }, *i))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// Group 34 variation 2 with 16-bit index
+    pub fn group34_var2_u16(dead_bands: Vec<(u16, u32)>) -> Self {
+        Self {
+            inner: DeadBandHeaderVariants::G34V2U16(
+                dead_bands
+                    .iter()
+                    .map(|(i, v)| (Group34Var2 { value: *v }, *i))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// Group 34 variation 3 with 8-bit index
+    pub fn group34_var3_u8(dead_bands: Vec<(u8, f32)>) -> Self {
+        Self {
+            inner: DeadBandHeaderVariants::G34V3U8(
+                dead_bands
+                    .iter()
+                    .map(|(i, v)| (Group34Var3 { value: *v }, *i))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// Group 34 variation 3 with 16-bit index
+    pub fn group34_var3_u16(dead_bands: Vec<(u16, f32)>) -> Self {
+        Self {
+            inner: DeadBandHeaderVariants::G34V3U16(
+                dead_bands
+                    .iter()
+                    .map(|(i, v)| (Group34Var3 { value: *v }, *i))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum DeadBandHeaderVariants {
+    /// Group 34 variation 1 with 8-bit index
+    G34V1U8(Vec<(Group34Var1, u8)>),
+    /// Group 34 variation 1 with 16-bit index
+    G34V1U16(Vec<(Group34Var1, u16)>),
+    /// Group 34 variation 2 with 8-bit index
+    G34V2U8(Vec<(Group34Var2, u8)>),
+    /// Group 34 variation 2 with 16-bit index
+    G34V2U16(Vec<(Group34Var2, u16)>),
+    /// Group 34 variation 3 with 8-bit index
+    G34V3U8(Vec<(Group34Var3, u8)>),
+    /// Group 34 variation 3 with 16-bit index
+    G34V3U16(Vec<(Group34Var3, u16)>),
+}
+
 impl EventClasses {
     /// construct an `EventClasses` from its fields
     pub fn new(class1: bool, class2: bool, class3: bool) -> Self {

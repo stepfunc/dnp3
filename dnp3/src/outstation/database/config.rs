@@ -230,6 +230,17 @@ pub enum StaticAnalogOutputStatusVariation {
     Group40Var4,
 }
 
+/// this is not currently public, but it could be a future release
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum AnalogInputDeadBandVariation {
+    /// Analog Input Dead-band - 16-bit
+    Group34Var1,
+    /// Analog Input Dead-band - 32-bit
+    Group34Var2,
+    /// Analog Input Dead-band - Single-precision floating-point
+    Group34Var3,
+}
+
 // This is always g110vX
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct StaticOctetStringVariation;

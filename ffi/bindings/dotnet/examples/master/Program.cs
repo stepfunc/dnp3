@@ -464,6 +464,15 @@ class MainClass
                     Console.WriteLine("Time sync success");
                     return true;
                 }
+            case "wad":
+                {
+                    var request = new WriteDeadBandRequest();
+                    request.AddG34v1U8(3, 5);
+                    request.AddG34v3U16(4, 2.5f);
+                    await channel.WriteDeadBands(association, request);
+                    Console.WriteLine($"Write dead-bands sucess");
+                    return true;
+                }
             case "crt":
                 {
                     var delay = await channel.ColdRestart(association);

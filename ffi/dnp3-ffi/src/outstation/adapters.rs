@@ -55,6 +55,23 @@ impl OutstationApplication for ffi::OutstationApplication {
             .unwrap_or(Err(RequestError::NotSupported)),
         }
     }
+
+    fn support_write_analog_dead_bands(&mut self) -> bool {
+        ffi::OutstationApplication::support_write_analog_dead_bands(self).unwrap_or(false)
+    }
+
+    fn begin_write_analog_dead_bands(&mut self) {
+        ffi::OutstationApplication::begin_write_analog_dead_bands(self)
+    }
+
+    fn write_analog_dead_band(&mut self, index: u16, dead_band: f64) {
+        ffi::OutstationApplication::write_analog_dead_band(self, index, dead_band)
+    }
+
+    fn end_write_analog_dead_bands(&mut self) -> MaybeAsync<()> {
+        ffi::OutstationApplication::end_write_analog_dead_bands(self);
+        MaybeAsync::ready(())
+    }
 }
 
 impl From<ffi::ApplicationIin> for ApplicationIin {

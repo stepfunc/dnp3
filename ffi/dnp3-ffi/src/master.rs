@@ -400,6 +400,30 @@ pub(crate) unsafe fn master_channel_read(
     Ok(())
 }
 
+pub(crate) unsafe fn master_channel_write_dead_bands(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    request: *mut crate::WriteDeadBandRequest,
+    callback: ffi::WriteAnalogDeadBandsCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let request = request.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let headers = request.build();
+
+    let mut handle = AssociationHandle::create(address, channel.handle.clone());
+
+    let task = async move {
+        match handle.write_dead_bands(headers).await {
+            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
+            Err(err) => callback.on_failure(err.into()),
+        }
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
 pub(crate) unsafe fn master_channel_read_with_handler(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
@@ -781,6 +805,15 @@ impl From<PollError> for ffi::ParamError {
     }
 }
 
+impl From<IinTaskError> for ffi::WriteDeadBandsError {
+    fn from(value: IinTaskError) -> Self {
+        match value {
+            IinTaskError::Task(x) => x.into(),
+            IinTaskError::IinError(_) => ffi::WriteDeadBandsError::RejectedByIin2,
+        }
+    }
+}
+
 #[cfg(feature = "tls")]
 impl From<TlsError> for ffi::ParamError {
     fn from(error: TlsError) -> Self {
@@ -846,3 +879,4 @@ define_task_from_impl!(RestartError);
 define_task_from_impl!(ReadError);
 define_task_from_impl!(LinkStatusError);
 define_task_from_impl!(TaskError);
+define_task_from_impl!(WriteDeadBandsError);
