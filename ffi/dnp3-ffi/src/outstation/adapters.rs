@@ -36,6 +36,13 @@ impl OutstationApplication for ffi::OutstationApplication {
         freeze_type: FreezeType,
         database: &mut DatabaseHandle,
     ) -> Result<(), RequestError> {
+        let freeze_type = match freeze_type {
+            FreezeType::ImmediateFreeze => ffi::FreezeType::ImmediateFreeze,
+            FreezeType::FreezeAndClear => ffi::FreezeType::FreezeAndClear,
+            // TODO
+            FreezeType::FreezeAtTime(_) => return Err(RequestError::NotSupported),
+        };
+
         match indices {
             FreezeIndices::All => ffi::OutstationApplication::freeze_counters_all(
                 self,
@@ -173,15 +180,6 @@ impl ControlHandler for ffi::ControlHandler {
     fn end_fragment(&mut self, database: &mut DatabaseHandle) -> MaybeAsync<()> {
         ffi::ControlHandler::end_fragment(self, database as *mut _);
         MaybeAsync::ready(())
-    }
-}
-
-impl From<FreezeType> for ffi::FreezeType {
-    fn from(from: FreezeType) -> Self {
-        match from {
-            FreezeType::ImmediateFreeze => ffi::FreezeType::ImmediateFreeze,
-            FreezeType::FreezeAndClear => ffi::FreezeType::FreezeAndClear,
-        }
     }
 }
 
