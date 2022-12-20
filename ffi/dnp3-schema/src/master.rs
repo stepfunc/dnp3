@@ -17,6 +17,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let connect_strategy = define_connect_strategy(lib)?;
 
+    let write_error = define_write_error(lib)?;
+
     let nothing = lib
         .define_enum("nothing")?
         .push("nothing", "the only value this enum has")?
@@ -24,7 +26,8 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     let write_dead_band_request = crate::write_dead_band_request::define(lib)?;
-    let write_dead_band_callback = define_write_dead_bands_callback(lib, nothing.clone())?;
+    let write_dead_band_callback =
+        define_write_dead_bands_callback(lib, write_error, nothing.clone())?;
 
     let master_channel_create_tcp_fn = lib
         .define_function("master_channel_create_tcp")?
@@ -500,6 +503,24 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     Ok(())
+}
+
+fn define_write_error(lib: &mut LibraryBuilder) -> BackTraced<ErrorType<Unvalidated>> {
+    let error = lib
+        .define_error_type(
+            "write_error",
+            "write_exception",
+            ExceptionType::CheckedException,
+        )?
+        .add_error(
+            "rejected_by_iin2",
+            "IIN2 indicates request was not completely successful",
+        )?
+        .add_task_errors()?
+        .doc("Errors that may occur when performing a WRITE operation")?
+        .build()?;
+
+    Ok(error)
 }
 
 fn define_connect_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
@@ -1406,28 +1427,15 @@ fn define_link_status_callback(
 
 fn define_write_dead_bands_callback(
     lib: &mut LibraryBuilder,
+    error_type: ErrorType<Unvalidated>,
     nothing: EnumHandle,
 ) -> BackTraced<FutureInterface<Unvalidated>> {
-    let error = lib
-        .define_error_type(
-            "write_dead_bands_error",
-            "write_dead_bands_exception",
-            ExceptionType::CheckedException,
-        )?
-        .add_error(
-            "rejected_by_iin2",
-            "IIN2 indicates request was not completely successful",
-        )?
-        .add_task_errors()?
-        .doc("Errors that may occur when writing analog input dead bands")?
-        .build()?;
-
     let callback = lib.define_future_interface(
         "write_analog_dead_bands_callback",
         "Callback interface for writing analog input dead-bands",
         nothing,
         "Result of WRITE operation",
-        Some(error),
+        Some(error_type),
     )?;
 
     Ok(callback)

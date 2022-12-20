@@ -2,16 +2,15 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::master::tasks::NonReadTask;
-use crate::master::{DeadBandHeader, DeadBandHeaderVariants, IinTaskError, Promise, TaskError};
-use scursor::WriteError;
+use crate::master::{DeadBandHeader, DeadBandHeaderVariants, Promise, TaskError, WriteTaskError};
 
 pub(crate) struct WriteDeadBandsTask {
     headers: Vec<DeadBandHeader>,
-    promise: Promise<Result<(), IinTaskError>>,
+    promise: Promise<Result<(), WriteTaskError>>,
 }
 
 impl DeadBandHeaderVariants {
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             Self::G34V1U8(x) => writer.write_prefixed_items(x.iter()),
             Self::G34V1U16(x) => writer.write_prefixed_items(x.iter()),
@@ -26,7 +25,7 @@ impl DeadBandHeaderVariants {
 impl WriteDeadBandsTask {
     pub(crate) fn new(
         headers: Vec<DeadBandHeader>,
-        promise: Promise<Result<(), IinTaskError>>,
+        promise: Promise<Result<(), WriteTaskError>>,
     ) -> Self {
         Self { headers, promise }
     }
@@ -39,7 +38,7 @@ impl WriteDeadBandsTask {
         FunctionCode::Write
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         for header in self.headers.iter() {
             header.inner.write(writer)?;
         }
@@ -53,7 +52,7 @@ impl WriteDeadBandsTask {
 
     pub(crate) fn handle(self, response: Response) -> Option<NonReadTask> {
         if !response.raw_objects.is_empty() {
-            self.promise.complete(Err(IinTaskError::Task(
+            self.promise.complete(Err(WriteTaskError::Task(
                 TaskError::UnexpectedResponseHeaders,
             )));
             return None;
@@ -61,7 +60,7 @@ impl WriteDeadBandsTask {
 
         if response.header.iin.has_request_error() {
             self.promise
-                .complete(Err(IinTaskError::IinError(response.header.iin.iin2)));
+                .complete(Err(WriteTaskError::IinError(response.header.iin.iin2)));
             return None;
         }
 

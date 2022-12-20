@@ -805,11 +805,11 @@ impl From<PollError> for ffi::ParamError {
     }
 }
 
-impl From<IinTaskError> for ffi::WriteDeadBandsError {
-    fn from(value: IinTaskError) -> Self {
+impl From<WriteTaskError> for ffi::WriteError {
+    fn from(value: WriteTaskError) -> Self {
         match value {
-            IinTaskError::Task(x) => x.into(),
-            IinTaskError::IinError(_) => ffi::WriteDeadBandsError::RejectedByIin2,
+            WriteTaskError::Task(x) => x.into(),
+            WriteTaskError::IinError(_) => ffi::WriteError::RejectedByIin2,
         }
     }
 }
@@ -879,4 +879,4 @@ define_task_from_impl!(RestartError);
 define_task_from_impl!(ReadError);
 define_task_from_impl!(LinkStatusError);
 define_task_from_impl!(TaskError);
-define_task_from_impl!(WriteDeadBandsError);
+define_task_from_impl!(WriteError);

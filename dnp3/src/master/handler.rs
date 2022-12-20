@@ -16,7 +16,7 @@ use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
-use crate::master::{DeadBandHeader, IinTaskError};
+use crate::master::{DeadBandHeader, WriteTaskError};
 use crate::util::channel::Sender;
 
 /// Handle to a master communication channel. This handle controls
@@ -269,8 +269,8 @@ impl AssociationHandle {
     pub async fn write_dead_bands(
         &mut self,
         headers: Vec<DeadBandHeader>,
-    ) -> Result<(), IinTaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), IinTaskError>>();
+    ) -> Result<(), WriteTaskError> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WriteTaskError>>();
         let task = WriteDeadBandsTask::new(headers, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
