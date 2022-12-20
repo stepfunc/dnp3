@@ -31,7 +31,8 @@ impl Timestamp {
         Self::zero()
     }
 
-    pub(crate) const fn zero() -> Self {
+    /// Timestamp value of zero corresponding to the epoch
+    pub const fn zero() -> Self {
         Self::new(0)
     }
 
