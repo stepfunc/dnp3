@@ -17,7 +17,6 @@ use crate::master::tasks::time::TimeSyncTask;
 use crate::master::{ReadType, TaskType};
 
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
-use scursor::WriteError;
 
 pub(crate) mod auto;
 pub(crate) mod command;
@@ -89,7 +88,7 @@ impl Task {
 
 pub(crate) trait RequestWriter {
     fn function(&self) -> FunctionCode;
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError>;
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError>;
 }
 
 pub(crate) enum ReadTask {
@@ -121,7 +120,7 @@ impl RequestWriter for ReadTask {
         FunctionCode::Read
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             ReadTask::PeriodicPoll(poll) => poll.format(writer),
             ReadTask::StartupIntegrity(classes) => classes.write(writer),
@@ -136,7 +135,7 @@ impl RequestWriter for NonReadTask {
         self.function()
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             NonReadTask::Auto(t) => t.write(writer),
             NonReadTask::Command(t) => t.write(writer),

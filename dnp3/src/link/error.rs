@@ -1,5 +1,4 @@
 use crate::util::BadWrite;
-use scursor::WriteError;
 
 /// these errors should never occur, but they are preferable to using
 /// functions that could panic. If they ever were to happen, they indicate
@@ -90,8 +89,8 @@ impl From<LogicError> for LinkError {
     }
 }
 
-impl From<WriteError> for LinkError {
-    fn from(_: WriteError) -> Self {
+impl From<scursor::WriteError> for LinkError {
+    fn from(_: scursor::WriteError) -> Self {
         LinkError::BadLogic(LogicError::BadWrite)
     }
 }

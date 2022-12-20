@@ -7,8 +7,6 @@ use crate::master::error::TaskError;
 use crate::master::request::EventClasses;
 use crate::master::tasks::{NonReadTask, Task};
 
-use scursor::WriteError;
-
 #[derive(Clone)]
 pub(crate) enum AutoTask {
     ClearRestartBit,
@@ -21,7 +19,7 @@ impl AutoTask {
         Task::NonRead(NonReadTask::Auto(self))
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             AutoTask::ClearRestartBit => writer.write_clear_restart(),
             AutoTask::EnableUnsolicited(classes) => classes.write(writer),

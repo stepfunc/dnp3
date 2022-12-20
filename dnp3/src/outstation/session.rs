@@ -39,7 +39,6 @@ use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::bit::BitSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use scursor::WriteError;
 
 #[derive(Copy, Clone)]
 enum TimeoutStatus {
@@ -1611,7 +1610,7 @@ impl OutstationSession {
             let _ = cursor.skip(ResponseHeader::LENGTH);
 
             let max_controls_per_request = self.config.max_controls_per_request;
-            let result: Result<CommandStatus, WriteError> = ControlTransaction::execute(
+            let result: Result<CommandStatus, scursor::WriteError> = ControlTransaction::execute(
                 self.control_handler.borrow_mut(),
                 database,
                 |tx, db| {

@@ -9,8 +9,6 @@ use crate::master::association::NoAssociation;
 use crate::master::session::{RunError, StateChange};
 use crate::transport::TransportResponseError;
 
-use scursor::WriteError;
-
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
@@ -258,8 +256,8 @@ impl std::fmt::Display for WriteTaskError {
     }
 }
 
-impl From<WriteError> for TaskError {
-    fn from(_: WriteError) -> Self {
+impl From<scursor::WriteError> for TaskError {
+    fn from(_: scursor::WriteError) -> Self {
         TaskError::WriteError
     }
 }

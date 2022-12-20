@@ -10,8 +10,6 @@ use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::*;
 use crate::master::error::CommandResponseError;
 
-use scursor::WriteError;
-
 /// Controls how a command request is issued
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CommandMode {
@@ -227,7 +225,7 @@ impl EventClasses {
         }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         if self.class1 {
             writer.write_all_objects_header(Variation::Group60Var2)?;
         }
@@ -284,7 +282,7 @@ impl Classes {
         self.class0 || self.events.any()
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         self.events.write(writer)?;
         if self.class0 {
             writer.write_all_objects_header(Variation::Group60Var1)?;
@@ -303,7 +301,7 @@ impl OneByteRangeScan {
         }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         writer.write_range_only(self.variation, self.start, self.stop)
     }
 }
@@ -318,7 +316,7 @@ impl TwoByteRangeScan {
         }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         writer.write_range_only(self.variation, self.start, self.stop)
     }
 }
@@ -329,7 +327,7 @@ impl AllObjectsScan {
         Self { variation }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         writer.write_all_objects_header(self.variation)
     }
 }
@@ -340,7 +338,7 @@ impl OneByteLimitedCountScan {
         Self { variation, count }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         writer.write_limited_count(self.variation, self.count)
     }
 }
@@ -351,7 +349,7 @@ impl TwoByteLimitedCountScan {
         Self { variation, count }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         writer.write_limited_count(self.variation, self.count)
     }
 }
@@ -397,7 +395,7 @@ impl ReadHeader {
         ReadHeader::LimitedCount16(TwoByteLimitedCountScan::new(variation, count))
     }
 
-    pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             ReadHeader::Range8(scan) => scan.write(writer),
             ReadHeader::Range16(scan) => scan.write(writer),
@@ -445,7 +443,7 @@ impl ReadRequest {
         Self::MultipleHeader(headers.to_vec())
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             ReadRequest::SingleHeader(req) => req.format(writer),
             ReadRequest::ClassScan(req) => req.write(writer),
@@ -556,7 +554,7 @@ impl CommandHeaders {
         }
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         for header in self.headers.iter() {
             header.write(writer)?;
         }
@@ -866,7 +864,7 @@ impl Default for CommandBuilder {
 }
 
 impl CommandHeader {
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             CommandHeader::G12V1U8(items) => writer.write_prefixed_items(items.iter()),
             CommandHeader::G41V1U8(items) => writer.write_prefixed_items(items.iter()),
