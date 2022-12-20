@@ -1158,17 +1158,24 @@ impl OutstationSession {
                 .await
             }
             FunctionCode::ImmediateFreeze => {
-                self.handle_freeze(database, seq, object_headers, FreezeType::ImmediateFreeze)
+                Some(self.handle_freeze(database, seq, object_headers, FreezeType::ImmediateFreeze))
             }
             FunctionCode::ImmediateFreezeNoResponse => {
                 self.handle_freeze(database, seq, object_headers, FreezeType::ImmediateFreeze);
                 None
             }
             FunctionCode::FreezeClear => {
-                self.handle_freeze(database, seq, object_headers, FreezeType::FreezeAndClear)
+                Some(self.handle_freeze(database, seq, object_headers, FreezeType::FreezeAndClear))
             }
             FunctionCode::FreezeClearNoResponse => {
                 self.handle_freeze(database, seq, object_headers, FreezeType::FreezeAndClear);
+                None
+            }
+            FunctionCode::FreezeAtTime => {
+                Some(self.handle_freeze_at_time(database, seq, object_headers))
+            }
+            FunctionCode::FreezeAtTimeNoResponse => {
+                self.handle_freeze_at_time(database, seq, object_headers);
                 None
             }
             FunctionCode::EnableUnsolicited => {
@@ -1710,14 +1717,67 @@ impl OutstationSession {
         seq: Sequence,
         object_headers: HeaderCollection,
         freeze_type: FreezeType,
-    ) -> Option<Response> {
+    ) -> Response {
         let mut iin = Iin::default();
 
         for header in object_headers.iter() {
             iin |= self.handle_freeze_header(database, freeze_type, header.details);
         }
 
-        Some(Response::empty_solicited(seq, iin))
+        Response::empty_solicited(seq, iin)
+    }
+
+    fn handle_freeze_at_time(
+        &mut self,
+        database: &mut DatabaseHandle,
+        seq: Sequence,
+        object_headers: HeaderCollection,
+    ) -> Response {
+        let mut iin = Iin::default();
+
+        let mut timing: Option<FreezeTiming> = None;
+
+        for header in object_headers.iter() {
+            match header.details {
+                HeaderDetails::OneByteCount(_, CountVariation::Group50Var2(seq)) => {
+                    match seq.single() {
+                        None => iin |= Iin2::PARAMETER_ERROR,
+                        Some(x) => {
+                            timing = Some(x.into());
+                        }
+                    }
+                }
+                HeaderDetails::TwoByteCount(_, CountVariation::Group50Var2(seq)) => {
+                    match seq.single() {
+                        None => iin |= Iin2::PARAMETER_ERROR,
+                        Some(x) => {
+                            timing = Some(x.into());
+                        }
+                    }
+                }
+                _ => {
+                    // other variations require that there be a preceding g50v2
+                    match timing {
+                        None => {
+                            tracing::warn!(
+                                "freeze-at-time on {} w/o preceding g50v2",
+                                header.variation
+                            );
+                            iin |= Iin2::PARAMETER_ERROR;
+                        }
+                        Some(x) => {
+                            iin |= self.handle_freeze_header(
+                                database,
+                                FreezeType::FreezeAtTime(x),
+                                header.details,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        Response::empty_solicited(seq, iin)
     }
 
     fn handle_freeze_header(
@@ -1851,6 +1911,10 @@ impl OutstationSession {
             }
             FunctionCode::FreezeClearNoResponse => {
                 self.handle_freeze(database, seq, objects, FreezeType::FreezeAndClear);
+                BroadcastAction::Processed
+            }
+            FunctionCode::FreezeAtTimeNoResponse => {
+                self.handle_freeze_at_time(database, seq, objects);
                 BroadcastAction::Processed
             }
             FunctionCode::RecordCurrentTime => {
