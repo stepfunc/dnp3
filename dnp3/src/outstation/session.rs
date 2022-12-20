@@ -1157,34 +1157,20 @@ impl OutstationSession {
                 )
                 .await
             }
-            FunctionCode::ImmediateFreeze => self.handle_freeze(
-                database,
-                seq,
-                object_headers,
-                FreezeType::ImmediateFreeze,
-                true,
-            ),
-            FunctionCode::ImmediateFreezeNoResponse => self.handle_freeze(
-                database,
-                seq,
-                object_headers,
-                FreezeType::ImmediateFreeze,
-                false,
-            ),
-            FunctionCode::FreezeClear => self.handle_freeze(
-                database,
-                seq,
-                object_headers,
-                FreezeType::FreezeAndClear,
-                true,
-            ),
-            FunctionCode::FreezeClearNoResponse => self.handle_freeze(
-                database,
-                seq,
-                object_headers,
-                FreezeType::FreezeAndClear,
-                false,
-            ),
+            FunctionCode::ImmediateFreeze => {
+                self.handle_freeze(database, seq, object_headers, FreezeType::ImmediateFreeze)
+            }
+            FunctionCode::ImmediateFreezeNoResponse => {
+                self.handle_freeze(database, seq, object_headers, FreezeType::ImmediateFreeze);
+                None
+            }
+            FunctionCode::FreezeClear => {
+                self.handle_freeze(database, seq, object_headers, FreezeType::FreezeAndClear)
+            }
+            FunctionCode::FreezeClearNoResponse => {
+                self.handle_freeze(database, seq, object_headers, FreezeType::FreezeAndClear);
+                None
+            }
             FunctionCode::EnableUnsolicited => {
                 Some(self.handle_enable_or_disable_unsolicited(true, seq, object_headers))
             }
@@ -1724,7 +1710,6 @@ impl OutstationSession {
         seq: Sequence,
         object_headers: HeaderCollection,
         freeze_type: FreezeType,
-        respond: bool,
     ) -> Option<Response> {
         let mut iin = Iin::default();
 
@@ -1732,11 +1717,7 @@ impl OutstationSession {
             iin |= self.handle_freeze_header(database, freeze_type, header.details);
         }
 
-        if respond {
-            Some(Response::empty_solicited(seq, iin))
-        } else {
-            None
-        }
+        Some(Response::empty_solicited(seq, iin))
     }
 
     fn handle_freeze_header(
@@ -1865,11 +1846,11 @@ impl OutstationSession {
                 BroadcastAction::Processed
             }
             FunctionCode::ImmediateFreezeNoResponse => {
-                self.handle_freeze(database, seq, objects, FreezeType::ImmediateFreeze, false);
+                self.handle_freeze(database, seq, objects, FreezeType::ImmediateFreeze);
                 BroadcastAction::Processed
             }
             FunctionCode::FreezeClearNoResponse => {
-                self.handle_freeze(database, seq, objects, FreezeType::FreezeAndClear, false);
+                self.handle_freeze(database, seq, objects, FreezeType::FreezeAndClear);
                 BroadcastAction::Processed
             }
             FunctionCode::RecordCurrentTime => {
