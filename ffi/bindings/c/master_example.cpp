@@ -201,7 +201,7 @@ class WriteDeadBandsCallback : public dnp3::WriteAnalogDeadBandsCallback {
         std::cout << "write dead-bands succeeded" << std::endl;
     }
 
-    void on_failure(dnp3::WriteDeadBandsError error) override { std::cout << "write dead-bands failed: " << dnp3::to_string(error) << std::endl; }
+    void on_failure(dnp3::WriteError error) override { std::cout << "write dead-bands failed: " << dnp3::to_string(error) << std::endl; }
 };
 
 class LinkStatusCallback : public dnp3::LinkStatusCallback {

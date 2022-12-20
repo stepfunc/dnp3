@@ -204,7 +204,7 @@ void on_restart_failure(dnp3_restart_error_t error, void* arg) { printf("Restart
 
 // write dead-band callbacks
 void on_write_dead_band_success(dnp3_nothing_t delay, void *arg) { printf("Write dead-bands success! \n"); }
-void on_write_dead_band_failure(dnp3_write_dead_bands_error_t error, void *arg) { printf("Write dead-bands failure: %s\n", dnp3_write_dead_bands_error_to_string(error)); }
+void on_write_dead_band_failure(dnp3_write_error_t error, void *arg) { printf("Write dead-bands failure: %s\n", dnp3_write_error_to_string(error)); }
 
 // link status callbacks
 void on_link_status_success(dnp3_nothing_t nothing, void *arg) { printf("link status success!\n"); }
