@@ -1729,39 +1729,40 @@ impl OutstationSession {
         let mut iin = Iin::default();
 
         for header in object_headers.iter() {
-            match header.details {
-                HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => {
-                    iin |= self
-                        .application
-                        .freeze_counter(FreezeIndices::All, freeze_type, database)
-                        .map_or_else(|err| err.into(), |_| Iin2::default());
-                }
-                HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                    iin |= self
-                        .application
-                        .freeze_counter(
-                            FreezeIndices::Range(start as u16, stop as u16),
-                            freeze_type,
-                            database,
-                        )
-                        .map_or_else(|err| err.into(), |_| Iin2::default());
-                }
-                HeaderDetails::TwoByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                    iin |= self
-                        .application
-                        .freeze_counter(FreezeIndices::Range(start, stop), freeze_type, database)
-                        .map_or_else(|err| err.into(), |_| Iin2::default());
-                }
-                _ => {
-                    iin |= Iin2::NO_FUNC_CODE_SUPPORT;
-                }
-            }
+            iin |= self.handle_freeze_header(database, freeze_type, header.details);
         }
 
         if respond {
             Some(Response::empty_solicited(seq, iin))
         } else {
             None
+        }
+    }
+
+    fn handle_freeze_header(
+        &mut self,
+        database: &mut DatabaseHandle,
+        freeze_type: FreezeType,
+        details: HeaderDetails,
+    ) -> Iin2 {
+        match details {
+            HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => self
+                .application
+                .freeze_counter(FreezeIndices::All, freeze_type, database)
+                .map_or_else(|err| err.into(), |_| Iin2::default()),
+            HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => self
+                .application
+                .freeze_counter(
+                    FreezeIndices::Range(start as u16, stop as u16),
+                    freeze_type,
+                    database,
+                )
+                .map_or_else(|err| err.into(), |_| Iin2::default()),
+            HeaderDetails::TwoByteStartStop(start, stop, RangedVariation::Group20Var0) => self
+                .application
+                .freeze_counter(FreezeIndices::Range(start, stop), freeze_type, database)
+                .map_or_else(|err| err.into(), |_| Iin2::default()),
+            _ => Iin2::NO_FUNC_CODE_SUPPORT,
         }
     }
 
