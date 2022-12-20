@@ -2,11 +2,11 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::master::tasks::NonReadTask;
-use crate::master::{DeadBandHeader, DeadBandHeaderVariants, Promise, TaskError, WriteTaskError};
+use crate::master::{DeadBandHeader, DeadBandHeaderVariants, Promise, TaskError, WriteError};
 
 pub(crate) struct WriteDeadBandsTask {
     headers: Vec<DeadBandHeader>,
-    promise: Promise<Result<(), WriteTaskError>>,
+    promise: Promise<Result<(), WriteError>>,
 }
 
 impl DeadBandHeaderVariants {
@@ -25,7 +25,7 @@ impl DeadBandHeaderVariants {
 impl WriteDeadBandsTask {
     pub(crate) fn new(
         headers: Vec<DeadBandHeader>,
-        promise: Promise<Result<(), WriteTaskError>>,
+        promise: Promise<Result<(), WriteError>>,
     ) -> Self {
         Self { headers, promise }
     }
@@ -52,15 +52,14 @@ impl WriteDeadBandsTask {
 
     pub(crate) fn handle(self, response: Response) -> Option<NonReadTask> {
         if !response.raw_objects.is_empty() {
-            self.promise.complete(Err(WriteTaskError::Task(
-                TaskError::UnexpectedResponseHeaders,
-            )));
+            self.promise
+                .complete(Err(WriteError::Task(TaskError::UnexpectedResponseHeaders)));
             return None;
         }
 
         if response.header.iin.has_request_error() {
             self.promise
-                .complete(Err(WriteTaskError::IinError(response.header.iin.iin2)));
+                .complete(Err(WriteError::IinError(response.header.iin.iin2)));
             return None;
         }
 

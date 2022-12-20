@@ -82,10 +82,10 @@ pub enum CommandResponseError {
     ObjectValueMismatch,
 }
 
-/// Error type for WRITE operations that don't return anything from the outstation but might fail
-/// b/c IIN2 has a bit set
+/// Error type for operations that don't return anything from the outstation but might fail
+/// b/c IIN2 has an error bit set
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum WriteTaskError {
+pub enum WriteError {
     /// Error occurred during task execution
     Task(TaskError),
     /// Outstation returned an IIN.2 error
@@ -247,11 +247,11 @@ impl std::fmt::Display for TimeSyncError {
     }
 }
 
-impl std::fmt::Display for WriteTaskError {
+impl std::fmt::Display for WriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            WriteTaskError::Task(err) => write!(f, "{err}"),
-            WriteTaskError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
+            WriteError::Task(err) => write!(f, "{err}"),
+            WriteError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
         }
     }
 }
@@ -332,15 +332,15 @@ impl From<RecvError> for AssociationError {
     }
 }
 
-impl From<RecvError> for WriteTaskError {
+impl From<RecvError> for WriteError {
     fn from(_: RecvError) -> Self {
-        WriteTaskError::Task(TaskError::Shutdown)
+        WriteError::Task(TaskError::Shutdown)
     }
 }
 
-impl From<TaskError> for WriteTaskError {
+impl From<TaskError> for WriteError {
     fn from(err: TaskError) -> Self {
-        WriteTaskError::Task(err)
+        WriteError::Task(err)
     }
 }
 
@@ -407,9 +407,9 @@ impl From<Shutdown> for PollError {
     }
 }
 
-impl From<Shutdown> for WriteTaskError {
+impl From<Shutdown> for WriteError {
     fn from(_: Shutdown) -> Self {
-        WriteTaskError::Task(TaskError::Shutdown)
+        WriteError::Task(TaskError::Shutdown)
     }
 }
 
@@ -419,4 +419,4 @@ impl Error for PollError {}
 impl Error for CommandError {}
 impl Error for CommandResponseError {}
 impl Error for TimeSyncError {}
-impl Error for WriteTaskError {}
+impl Error for WriteError {}

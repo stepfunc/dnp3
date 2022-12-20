@@ -805,11 +805,11 @@ impl From<PollError> for ffi::ParamError {
     }
 }
 
-impl From<WriteTaskError> for ffi::WriteError {
-    fn from(value: WriteTaskError) -> Self {
+impl From<WriteError> for ffi::WriteError {
+    fn from(value: WriteError) -> Self {
         match value {
-            WriteTaskError::Task(x) => x.into(),
-            WriteTaskError::IinError(_) => ffi::WriteError::RejectedByIin2,
+            WriteError::Task(x) => x.into(),
+            WriteError::IinError(_) => ffi::WriteError::RejectedByIin2,
         }
     }
 }
