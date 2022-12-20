@@ -118,6 +118,8 @@ pub(crate) enum CountVariation<'a> {
     Group42Var8,
     /// Time and Date - Absolute Time
     Group50Var1(CountSequence<'a, Group50Var1>),
+    /// Time and Date - Absolute time and interval
+    Group50Var2(CountSequence<'a, Group50Var2>),
     /// Time and Date - Absolute Time at last recorded time
     Group50Var3(CountSequence<'a, Group50Var3>),
     /// Time and Date - Indexed absolute time and long interval
@@ -193,6 +195,7 @@ impl<'a> CountVariation<'a> {
             Variation::Group42Var7 => Ok(CountVariation::Group42Var7),
             Variation::Group42Var8 => Ok(CountVariation::Group42Var8),
             Variation::Group50Var1 => Ok(CountVariation::Group50Var1(CountSequence::parse(count, cursor)?)),
+            Variation::Group50Var2 => Ok(CountVariation::Group50Var2(CountSequence::parse(count, cursor)?)),
             Variation::Group50Var3 => Ok(CountVariation::Group50Var3(CountSequence::parse(count, cursor)?)),
             Variation::Group50Var4 => Ok(CountVariation::Group50Var4(CountSequence::parse(count, cursor)?)),
             Variation::Group51Var1 => Ok(CountVariation::Group51Var1(CountSequence::parse(count, cursor)?)),
@@ -259,6 +262,7 @@ impl<'a> CountVariation<'a> {
             CountVariation::Group42Var7 => Ok(()),
             CountVariation::Group42Var8 => Ok(()),
             CountVariation::Group50Var1(seq) => format_count_of_items(f, seq.iter()),
+            CountVariation::Group50Var2(seq) => format_count_of_items(f, seq.iter()),
             CountVariation::Group50Var3(seq) => format_count_of_items(f, seq.iter()),
             CountVariation::Group50Var4(seq) => format_count_of_items(f, seq.iter()),
             CountVariation::Group51Var1(seq) => format_count_of_items(f, seq.iter()),

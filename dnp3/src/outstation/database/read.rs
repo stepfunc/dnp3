@@ -862,6 +862,7 @@ impl ReadHeader {
                 .into(),
             ),
             CountVariation::Group50Var1(_) => None,
+            CountVariation::Group50Var2(_) => None,
             CountVariation::Group50Var3(_) => None,
             CountVariation::Group50Var4(_) => None,
             CountVariation::Group51Var1(_) => None,

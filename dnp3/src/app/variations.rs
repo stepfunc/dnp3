@@ -224,6 +224,8 @@ pub enum Variation {
     Group42Var8,
     /// Time and Date - Absolute Time
     Group50Var1,
+    /// Time and Date - Absolute time and interval
+    Group50Var2,
     /// Time and Date - Absolute Time at last recorded time
     Group50Var3,
     /// Time and Date - Indexed absolute time and long interval
@@ -415,6 +417,7 @@ impl Variation {
             },
             50 => match var {
                 1 => Some(Variation::Group50Var1),
+                2 => Some(Variation::Group50Var2),
                 3 => Some(Variation::Group50Var3),
                 4 => Some(Variation::Group50Var4),
                 _ => None,
@@ -550,6 +553,7 @@ impl Variation {
             Variation::Group42Var7 => (42, 7),
             Variation::Group42Var8 => (42, 8),
             Variation::Group50Var1 => (50, 1),
+            Variation::Group50Var2 => (50, 2),
             Variation::Group50Var3 => (50, 3),
             Variation::Group50Var4 => (50, 4),
             Variation::Group51Var1 => (51, 1),
@@ -670,6 +674,7 @@ impl Variation {
             Variation::Group42Var7 => "Analog Output Event - Single-precision With Flag and Time",
             Variation::Group42Var8 => "Analog Output Event - Double-precision With Flag and Time",
             Variation::Group50Var1 => "Time and Date - Absolute Time",
+            Variation::Group50Var2 => "Time and Date - Absolute time and interval",
             Variation::Group50Var3 => "Time and Date - Absolute Time at last recorded time",
             Variation::Group50Var4 => "Time and Date - Indexed absolute time and long interval",
             Variation::Group51Var1 => "Time and Date CTO - Absolute time, synchronized",
@@ -731,6 +736,15 @@ pub(crate) struct Group50Var4 {
 pub(crate) struct Group50Var3 {
     /// time field of the variation
     pub(crate) time: Timestamp,
+}
+
+/// Time and Date - Absolute time and interval
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group50Var2 {
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+    /// interval field of the variation
+    pub(crate) interval: u32,
 }
 
 /// Time and Date - Absolute Time
@@ -1554,6 +1568,23 @@ impl FixedSize for Group50Var3 {
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group50Var2 {
+    const SIZE: u8 = 10;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group50Var2 {
+                time: Timestamp::new(cursor.read_u48_le()?),
+                interval: cursor.read_u32_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.time.write(cursor)?;
+        cursor.write_u32_le(self.interval)?;
         Ok(())
     }
 }
@@ -2965,6 +2996,12 @@ impl std::fmt::Display for Group50Var3 {
     }
 }
 
+impl std::fmt::Display for Group50Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "time: {} interval: {}", self.time, self.interval)
+    }
+}
+
 impl std::fmt::Display for Group50Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "time: {}", self.time)
@@ -3468,6 +3505,10 @@ impl FixedSizeVariation for Group50Var4 {
 
 impl FixedSizeVariation for Group50Var3 {
     const VARIATION : Variation = Variation::Group50Var3;
+}
+
+impl FixedSizeVariation for Group50Var2 {
+    const VARIATION : Variation = Variation::Group50Var2;
 }
 
 impl FixedSizeVariation for Group50Var1 {
