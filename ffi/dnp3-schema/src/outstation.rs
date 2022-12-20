@@ -675,6 +675,8 @@ fn define_outstation_application(
 
     let application_iin = define_application_iin(lib)?;
 
+    let freeze_not_supported = freeze_result.value("not_supported")?;
+
     let application = lib.define_interface("outstation_application", "Dynamic information required by the outstation from the user application")?
         .begin_callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
@@ -700,15 +702,35 @@ fn define_outstation_application(
         .begin_callback("freeze_counters_all", "Freeze all the counters")?
             .param("freeze_type", freeze_type.clone(), "Type of freeze operation")?
             .param("database_handle",database_handle.declaration(), "Database handle")?
-            .returns(freeze_result.clone(), "Result of the freeze operation")?
+            .returns_with_default(freeze_not_supported.clone(), "Result of the freeze operation")?
+            .end_callback()?
+        .begin_callback("freeze_counters_all_at_time",
+                        doc("Freeze all the counters at a requested time and interval")
+                            .details("Refer to the table on page 57 of IEEE 1815-2012 to interpret the time and interval parameters correctly")
+             )?
+            .param("database_handle",database_handle.declaration(), "Database handle")?
+            .param("time", Primitive::U64, "48-bit DNP3 timestamp in milliseconds since epoch UTC")?
+            .param("interval", Primitive::U32, "Count of milliseconds representing the interval between freezes relative to the timestamp")?
+            .returns_with_default(freeze_not_supported.clone(), "Result of the freeze operation")?
             .end_callback()?
         .begin_callback("freeze_counters_range", "Freeze a range of counters")?
             .param("start", Primitive::U16, "Start index to freeze (inclusive)")?
             .param("stop", Primitive::U16, "Stop index to freeze (inclusive)")?
             .param("freeze_type", freeze_type, "Type of freeze operation")?
             .param("database_handle",database_handle.declaration(), "Database handle")?
-            .returns(freeze_result, "Result of the freeze operation")?
+            .returns_with_default(freeze_not_supported.clone(), "Result of the freeze operation")?
             .end_callback()?
+        .begin_callback("freeze_counters_range_at_time",
+                        doc("Freeze a range of counters at a requested time and interval")
+                            .details("Refer to the table on page 57 of IEEE 1815-2012 to interpret the time and interval parameters correctly")
+             )?
+            .param("start", Primitive::U16, "Start index to freeze (inclusive)")?
+            .param("stop", Primitive::U16, "Stop index to freeze (inclusive)")?
+            .param("database_handle",database_handle.declaration(), "Database handle")?
+           .param("time", Primitive::U64, "48-bit DNP3 timestamp in milliseconds since epoch UTC")?
+            .param("interval", Primitive::U32, "Count of milliseconds representing the interval between freezes relative to the timestamp")?
+            .returns_with_default(freeze_not_supported, "Result of the freeze operation")?
+        .end_callback()?
         .begin_callback("support_write_analog_dead_bands",
                         doc("Controls outstation support for writing group 34, analog input dead-bands")
                             .details("Returning false, indicates that the writes to group34 should not be processed and requests to do so should be rejected with IIN2.NO_FUNC_CODE_SUPPORT")

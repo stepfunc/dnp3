@@ -5,6 +5,15 @@ use dnp3::outstation::*;
 
 use crate::ffi;
 
+fn get_values(timing: FreezeTiming) -> (u64, u32) {
+    match timing {
+        FreezeTiming::FreezeOnceImmediately => (0, 0),
+        FreezeTiming::FreezeOnceAtTime(x) => (x.raw_value(), 0),
+        FreezeTiming::PeriodicallyFreeze(x, i) => (x.raw_value(), i),
+        FreezeTiming::PeriodicallyFreezeRelative(i) => (0, i),
+    }
+}
+
 impl OutstationApplication for ffi::OutstationApplication {
     fn get_processing_delay_ms(&self) -> u16 {
         ffi::OutstationApplication::get_processing_delay_ms(self).unwrap_or(0)
@@ -36,31 +45,64 @@ impl OutstationApplication for ffi::OutstationApplication {
         freeze_type: FreezeType,
         database: &mut DatabaseHandle,
     ) -> Result<(), RequestError> {
-        let freeze_type = match freeze_type {
-            FreezeType::ImmediateFreeze => ffi::FreezeType::ImmediateFreeze,
-            FreezeType::FreezeAndClear => ffi::FreezeType::FreezeAndClear,
-            // TODO
-            FreezeType::FreezeAtTime(_) => return Err(RequestError::NotSupported),
+        let result: Option<ffi::FreezeResult> = match (indices, freeze_type) {
+            (FreezeIndices::All, FreezeType::ImmediateFreeze) => {
+                ffi::OutstationApplication::freeze_counters_all(
+                    self,
+                    ffi::FreezeType::ImmediateFreeze,
+                    database as *mut _,
+                )
+            }
+            (FreezeIndices::All, FreezeType::FreezeAndClear) => {
+                ffi::OutstationApplication::freeze_counters_all(
+                    self,
+                    ffi::FreezeType::FreezeAndClear,
+                    database as *mut _,
+                )
+            }
+            (FreezeIndices::Range(start, stop), FreezeType::ImmediateFreeze) => {
+                ffi::OutstationApplication::freeze_counters_range(
+                    self,
+                    start,
+                    stop,
+                    ffi::FreezeType::ImmediateFreeze,
+                    database as *mut _,
+                )
+            }
+            (FreezeIndices::Range(start, stop), FreezeType::FreezeAndClear) => {
+                ffi::OutstationApplication::freeze_counters_range(
+                    self,
+                    start,
+                    stop,
+                    ffi::FreezeType::FreezeAndClear,
+                    database as *mut _,
+                )
+            }
+            (FreezeIndices::All, FreezeType::FreezeAtTime(timing)) => {
+                let (time, interval) = get_values(timing);
+                ffi::OutstationApplication::freeze_counters_all_at_time(
+                    self,
+                    database as *mut _,
+                    time,
+                    interval,
+                )
+            }
+            (FreezeIndices::Range(start, stop), FreezeType::FreezeAtTime(timing)) => {
+                let (time, interval) = get_values(timing);
+                ffi::OutstationApplication::freeze_counters_range_at_time(
+                    self,
+                    start,
+                    stop,
+                    database as *mut _,
+                    time,
+                    interval,
+                )
+            }
         };
 
-        match indices {
-            FreezeIndices::All => ffi::OutstationApplication::freeze_counters_all(
-                self,
-                freeze_type.into(),
-                database as *mut _,
-            )
+        result
             .map(|res| res.into())
-            .unwrap_or(Err(RequestError::NotSupported)),
-            FreezeIndices::Range(start, stop) => ffi::OutstationApplication::freeze_counters_range(
-                self,
-                start,
-                stop,
-                freeze_type.into(),
-                database as *mut _,
-            )
-            .map(|res| res.into())
-            .unwrap_or(Err(RequestError::NotSupported)),
-        }
+            .unwrap_or(Err(RequestError::NotSupported))
     }
 
     fn support_write_analog_dead_bands(&mut self) -> bool {
