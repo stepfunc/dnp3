@@ -967,6 +967,32 @@ mod test {
     }
 
     #[test]
+    fn parses_count_of_g50v2() {
+        let input = [
+            0x32, 0x02, 0x07, 0x01, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0xBB, 0xCC, 0xDD,
+        ];
+        let mut headers = HeaderCollection::parse(FunctionCode::Write, &input)
+            .unwrap()
+            .iter();
+
+        let received = match headers.next().unwrap().details {
+            HeaderDetails::OneByteCount(01, CountVariation::Group50Var2(seq)) => {
+                seq.single().unwrap()
+            }
+            _ => unreachable!(),
+        };
+
+        assert!(headers.next().is_none());
+
+        let expected = Group50Var2 {
+            time: Timestamp::new(0xFF),
+            interval: 0xDDCCBBAA,
+        };
+
+        assert_eq!(received, expected);
+    }
+
+    #[test]
     fn parses_group110var0_as_read() {
         let input = [0x6E, 0x00, 0x00, 0x02, 0x03];
         let mut headers = HeaderCollection::parse(FunctionCode::Read, &input)
