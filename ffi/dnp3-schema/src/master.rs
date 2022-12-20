@@ -923,6 +923,10 @@ fn define_association_information(
         .push("time_sync", "Time synchronisation task")?
         .push("restart", "Cold or warm restart task")?
         .push("write_dead_bands", "Write analog input dead-bands")?
+        .push(
+            "generic_empty_response",
+            "Generic request that expects an empty response",
+        )?
         .doc("Task type used in {interface:association_information}")?
         .build()?;
 

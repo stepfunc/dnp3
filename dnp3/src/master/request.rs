@@ -8,7 +8,9 @@ use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::*;
+use crate::app::Timestamp;
 use crate::master::error::CommandResponseError;
+use crate::outstation::FreezeTiming;
 
 /// Controls how a command request is issued
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -406,6 +408,86 @@ impl ReadHeader {
     }
 }
 
+/// Builder for write requests that hides the underlying type
+#[derive(Clone, Debug, Default)]
+pub struct Headers {
+    headers: Vec<Header>,
+}
+
+impl Headers {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+        for header in self.headers.iter() {
+            header.format(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+enum Header {
+    Read(ReadHeader),
+    TimeAndInterval(FreezeTiming),
+}
+
+impl Header {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+        match self {
+            Header::Read(x) => x.format(writer),
+            Header::TimeAndInterval(x) => {
+                let g50v2: Group50Var2 = <FreezeTiming as Into<Group50Var2>>::into(*x);
+                writer.write_count_of_one(g50v2)
+            }
+        }
+    }
+}
+
+impl Headers {
+    /// Construct an empty set of request headers
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Add an all objects header (0x06) with the specified variation
+    pub fn all_objects(self, variation: Variation) -> Self {
+        self.add(ReadHeader::all_objects(variation).into())
+    }
+
+    /// Add 8-bit start/stop header (0x00) with the specified variation
+    pub fn add_range_8(self, variation: Variation, start: u8, stop: u8) -> Self {
+        self.add(ReadHeader::one_byte_range(variation, start, stop).into())
+    }
+
+    /// Add 16-bit start/stop header (0x01) with the specified variation
+    pub fn add_range_16(self, variation: Variation, start: u16, stop: u16) -> Self {
+        self.add(ReadHeader::two_byte_range(variation, start, stop).into())
+    }
+
+    /// add a one byte limited count header (0x7) with the specified count and variation
+    pub fn add_one_byte_limited_count(self, variation: Variation, count: u8) -> Self {
+        self.add(ReadHeader::one_byte_limited_count(variation, count).into())
+    }
+
+    /// add a two byte limited count (0x08) header with the specified count and variation
+    pub fn add_two_byte_limited_count(self, variation: Variation, count: u16) -> Self {
+        self.add(ReadHeader::two_byte_limited_count(variation, count).into())
+    }
+
+    /// Add a limited count (0x07) with a single g50v2
+    ///
+    /// This is useful when constructing freeze-at-requests
+    pub fn add_time_and_interval(self, time: Timestamp, interval_ms: u32) -> Self {
+        self.add(Header::TimeAndInterval(FreezeTiming::new(
+            time,
+            interval_ms,
+        )))
+    }
+
+    fn add(mut self, header: Header) -> Self {
+        self.headers.push(header);
+        self
+    }
+}
+
 /// Enum representing all of the READ request types available from the master API
 #[derive(Clone, Debug)]
 pub enum ReadRequest {
@@ -454,6 +536,12 @@ impl ReadRequest {
                 Ok(())
             }
         }
+    }
+}
+
+impl From<ReadHeader> for Header {
+    fn from(value: ReadHeader) -> Self {
+        Header::Read(value)
     }
 }
 

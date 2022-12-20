@@ -70,7 +70,7 @@ impl QualifierCode {
 }
 
 /// Application layer function code enumeration
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FunctionCode {
     ///  Master sends this to an outstation to confirm the receipt of an Application Layer fragment (value == 0)
     Confirm,

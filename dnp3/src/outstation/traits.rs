@@ -269,26 +269,37 @@ pub enum FreezeTiming {
     PeriodicallyFreezeRelative(u32),
 }
 
+impl FreezeTiming {
+    /// construct a new FreezeTiming instance from the raw timestamp and interval fields
+    pub fn new(timestamp: Timestamp, interval: u32) -> Self {
+        match (timestamp.raw_value(), interval) {
+            (0, 0) => Self::FreezeOnceImmediately,
+            (_, 0) => Self::FreezeOnceAtTime(timestamp),
+            (0, _) => Self::PeriodicallyFreezeRelative(interval),
+            (_, _) => Self::PeriodicallyFreeze(timestamp, interval),
+        }
+    }
+
+    /// decompose a FreezeTiming instance into the raw timestamp and interval fields
+    pub fn get_time_and_interval(&self) -> (Timestamp, u32) {
+        match self {
+            FreezeTiming::FreezeOnceImmediately => (Timestamp::zero(), 0),
+            FreezeTiming::FreezeOnceAtTime(t) => (*t, 0),
+            FreezeTiming::PeriodicallyFreeze(t, i) => (*t, *i),
+            FreezeTiming::PeriodicallyFreezeRelative(i) => (Timestamp::zero(), *i),
+        }
+    }
+}
+
 impl From<Group50Var2> for FreezeTiming {
     fn from(value: Group50Var2) -> Self {
-        match (value.time.raw_value(), value.interval) {
-            (0, 0) => Self::FreezeOnceImmediately,
-            (_, 0) => Self::FreezeOnceAtTime(value.time),
-            (0, _) => Self::PeriodicallyFreezeRelative(value.interval),
-            (_, _) => Self::PeriodicallyFreeze(value.time, value.interval),
-        }
+        Self::new(value.time, value.interval)
     }
 }
 
 impl From<FreezeTiming> for Group50Var2 {
     fn from(value: FreezeTiming) -> Self {
-        let (time, interval) = match value {
-            FreezeTiming::FreezeOnceImmediately => (Timestamp::zero(), 0),
-            FreezeTiming::FreezeOnceAtTime(t) => (t, 0),
-            FreezeTiming::PeriodicallyFreeze(t, i) => (t, i),
-            FreezeTiming::PeriodicallyFreezeRelative(i) => (Timestamp::zero(), i),
-        };
-
+        let (time, interval) = value.get_time_and_interval();
         Self { time, interval }
     }
 }

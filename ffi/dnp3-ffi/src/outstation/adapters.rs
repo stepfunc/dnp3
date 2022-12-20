@@ -5,15 +5,6 @@ use dnp3::outstation::*;
 
 use crate::ffi;
 
-fn get_values(timing: FreezeTiming) -> (u64, u32) {
-    match timing {
-        FreezeTiming::FreezeOnceImmediately => (0, 0),
-        FreezeTiming::FreezeOnceAtTime(x) => (x.raw_value(), 0),
-        FreezeTiming::PeriodicallyFreeze(x, i) => (x.raw_value(), i),
-        FreezeTiming::PeriodicallyFreezeRelative(i) => (0, i),
-    }
-}
-
 impl OutstationApplication for ffi::OutstationApplication {
     fn get_processing_delay_ms(&self) -> u16 {
         ffi::OutstationApplication::get_processing_delay_ms(self).unwrap_or(0)
@@ -79,22 +70,22 @@ impl OutstationApplication for ffi::OutstationApplication {
                 )
             }
             (FreezeIndices::All, FreezeType::FreezeAtTime(timing)) => {
-                let (time, interval) = get_values(timing);
+                let (time, interval) = timing.get_time_and_interval();
                 ffi::OutstationApplication::freeze_counters_all_at_time(
                     self,
                     database as *mut _,
-                    time,
+                    time.raw_value(),
                     interval,
                 )
             }
             (FreezeIndices::Range(start, stop), FreezeType::FreezeAtTime(timing)) => {
-                let (time, interval) = get_values(timing);
+                let (time, interval) = timing.get_time_and_interval();
                 ffi::OutstationApplication::freeze_counters_range_at_time(
                     self,
                     start,
                     stop,
                     database as *mut _,
-                    time,
+                    time.raw_value(),
                     interval,
                 )
             }
