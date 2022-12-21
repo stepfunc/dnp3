@@ -194,14 +194,19 @@ class RestartTaskCallback : public dnp3::RestartTaskCallback {
     }
 };
 
-class WriteDeadBandsCallback : public dnp3::EmptyResponseCallback { 
+class GenericCallback : public dnp3::EmptyResponseCallback {
+public:
+    GenericCallback(const std::string &task) : task(task) {}
+
+private:
+    const std::string task;
 
     void on_complete(dnp3::Nothing) override
     {
-        std::cout << "write dead-bands succeeded" << std::endl;
+        std::cout << this->task << " succeeded" << std::endl;
     }
 
-    void on_failure(dnp3::EmptyResponseError error) override { std::cout << "write dead-bands failed: " << dnp3::to_string(error) << std::endl; }
+    void on_failure(dnp3::EmptyResponseError error) override { std::cout << this->task << " failed: " << dnp3::to_string(error) << std::endl; }
 };
 
 class LinkStatusCallback : public dnp3::LinkStatusCallback {
@@ -303,7 +308,13 @@ void run_channel(dnp3::MasterChannel &channel)
             dnp3::WriteDeadBandRequest request;
             request.add_g34v1_u8(3, 5);
             request.add_g34v3_u16(2, 2.5);
-            channel.write_dead_bands(assoc, request, std::make_unique<WriteDeadBandsCallback>());
+            channel.write_dead_bands(assoc, request, std::make_unique<GenericCallback>("write dead-bands"));
+        }
+        else if (cmd == "fat") {
+            dnp3::Request request;
+            request.add_time_and_interval(0xFF0000000000, 86400000);
+            request.add_all_objects_header(dnp3::Variation::group20_var0);
+            channel.request_expect_empty_response(assoc, dnp3::FunctionCode::freeze_at_time, request, std::make_unique<GenericCallback>("freeze-at-time"));
         }
         else if (cmd == "crt") {
             channel.cold_restart(assoc, std::make_unique<RestartTaskCallback>());
