@@ -176,6 +176,14 @@ pub enum Variation {
     Group33Var7,
     /// Frozen Analog Input Event - Double-precision With Flag and Time
     Group33Var8,
+    /// Analog Input Reporting Deadband - Any Variation
+    Group34Var0,
+    /// Analog Input Reporting Deadband - 16-bit
+    Group34Var1,
+    /// Analog Input Reporting Deadband - 32-bit
+    Group34Var2,
+    /// Analog Input Reporting Deadband - Single-precision
+    Group34Var3,
     /// Analog Output Status - Any Variation
     Group40Var0,
     /// Analog Output Status - 32-bit With Flag
@@ -216,6 +224,8 @@ pub enum Variation {
     Group42Var8,
     /// Time and Date - Absolute Time
     Group50Var1,
+    /// Time and Date - Absolute time and interval
+    Group50Var2,
     /// Time and Date - Absolute Time at last recorded time
     Group50Var3,
     /// Time and Date - Indexed absolute time and long interval
@@ -370,6 +380,13 @@ impl Variation {
                 8 => Some(Variation::Group33Var8),
                 _ => None,
             },
+            34 => match var {
+                0 => Some(Variation::Group34Var0),
+                1 => Some(Variation::Group34Var1),
+                2 => Some(Variation::Group34Var2),
+                3 => Some(Variation::Group34Var3),
+                _ => None,
+            },
             40 => match var {
                 0 => Some(Variation::Group40Var0),
                 1 => Some(Variation::Group40Var1),
@@ -400,6 +417,7 @@ impl Variation {
             },
             50 => match var {
                 1 => Some(Variation::Group50Var1),
+                2 => Some(Variation::Group50Var2),
                 3 => Some(Variation::Group50Var3),
                 4 => Some(Variation::Group50Var4),
                 _ => None,
@@ -511,6 +529,10 @@ impl Variation {
             Variation::Group33Var6 => (33, 6),
             Variation::Group33Var7 => (33, 7),
             Variation::Group33Var8 => (33, 8),
+            Variation::Group34Var0 => (34, 0),
+            Variation::Group34Var1 => (34, 1),
+            Variation::Group34Var2 => (34, 2),
+            Variation::Group34Var3 => (34, 3),
             Variation::Group40Var0 => (40, 0),
             Variation::Group40Var1 => (40, 1),
             Variation::Group40Var2 => (40, 2),
@@ -531,6 +553,7 @@ impl Variation {
             Variation::Group42Var7 => (42, 7),
             Variation::Group42Var8 => (42, 8),
             Variation::Group50Var1 => (50, 1),
+            Variation::Group50Var2 => (50, 2),
             Variation::Group50Var3 => (50, 3),
             Variation::Group50Var4 => (50, 4),
             Variation::Group51Var1 => (51, 1),
@@ -627,6 +650,10 @@ impl Variation {
             Variation::Group33Var6 => "Frozen Analog Input Event - Double-precision With Flag",
             Variation::Group33Var7 => "Frozen Analog Input Event - Single-precision With Flag and Time",
             Variation::Group33Var8 => "Frozen Analog Input Event - Double-precision With Flag and Time",
+            Variation::Group34Var0 => "Analog Input Reporting Deadband - Any Variation",
+            Variation::Group34Var1 => "Analog Input Reporting Deadband - 16-bit",
+            Variation::Group34Var2 => "Analog Input Reporting Deadband - 32-bit",
+            Variation::Group34Var3 => "Analog Input Reporting Deadband - Single-precision",
             Variation::Group40Var0 => "Analog Output Status - Any Variation",
             Variation::Group40Var1 => "Analog Output Status - 32-bit With Flag",
             Variation::Group40Var2 => "Analog Output Status - 16-bit With Flag",
@@ -647,6 +674,7 @@ impl Variation {
             Variation::Group42Var7 => "Analog Output Event - Single-precision With Flag and Time",
             Variation::Group42Var8 => "Analog Output Event - Double-precision With Flag and Time",
             Variation::Group50Var1 => "Time and Date - Absolute Time",
+            Variation::Group50Var2 => "Time and Date - Absolute time and interval",
             Variation::Group50Var3 => "Time and Date - Absolute Time at last recorded time",
             Variation::Group50Var4 => "Time and Date - Indexed absolute time and long interval",
             Variation::Group51Var1 => "Time and Date CTO - Absolute time, synchronized",
@@ -708,6 +736,15 @@ pub(crate) struct Group50Var4 {
 pub(crate) struct Group50Var3 {
     /// time field of the variation
     pub(crate) time: Timestamp,
+}
+
+/// Time and Date - Absolute time and interval
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group50Var2 {
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+    /// interval field of the variation
+    pub(crate) interval: u32,
 }
 
 /// Time and Date - Absolute Time
@@ -867,6 +904,27 @@ pub(crate) struct Group40Var1 {
     pub(crate) flags: u8,
     /// value field of the variation
     pub(crate) value: i32,
+}
+
+/// Analog Input Reporting Deadband - Single-precision
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct Group34Var3 {
+    /// value field of the variation
+    pub(crate) value: f32,
+}
+
+/// Analog Input Reporting Deadband - 32-bit
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group34Var2 {
+    /// value field of the variation
+    pub(crate) value: u32,
+}
+
+/// Analog Input Reporting Deadband - 16-bit
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group34Var1 {
+    /// value field of the variation
+    pub(crate) value: u16,
 }
 
 /// Frozen Analog Input Event - Double-precision With Flag and Time
@@ -1514,6 +1572,23 @@ impl FixedSize for Group50Var3 {
     }
 }
 
+impl FixedSize for Group50Var2 {
+    const SIZE: u8 = 10;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group50Var2 {
+                time: Timestamp::new(cursor.read_u48_le()?),
+                interval: cursor.read_u32_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.time.write(cursor)?;
+        cursor.write_u32_le(self.interval)?;
+        Ok(())
+    }
+}
+
 impl FixedSize for Group50Var1 {
     const SIZE: u8 = 6;
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
@@ -1805,6 +1880,51 @@ impl FixedSize for Group40Var1 {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.flags)?;
         cursor.write_i32_le(self.value)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group34Var3 {
+    const SIZE: u8 = 4;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group34Var3 {
+                value: cursor.read_f32_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_f32_le(self.value)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group34Var2 {
+    const SIZE: u8 = 4;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group34Var2 {
+                value: cursor.read_u32_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u32_le(self.value)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group34Var1 {
+    const SIZE: u8 = 2;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group34Var1 {
+                value: cursor.read_u16_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u16_le(self.value)?;
         Ok(())
     }
 }
@@ -2876,6 +2996,12 @@ impl std::fmt::Display for Group50Var3 {
     }
 }
 
+impl std::fmt::Display for Group50Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "time: {} interval: {}", self.time, self.interval)
+    }
+}
+
 impl std::fmt::Display for Group50Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "time: {}", self.time)
@@ -2975,6 +3101,24 @@ impl std::fmt::Display for Group40Var2 {
 impl std::fmt::Display for Group40Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "flags: {} value: {}", AnalogFlagFormatter::new(self.flags), self.value)
+    }
+}
+
+impl std::fmt::Display for Group34Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {}", self.value)
+    }
+}
+
+impl std::fmt::Display for Group34Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {}", self.value)
+    }
+}
+
+impl std::fmt::Display for Group34Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {}", self.value)
     }
 }
 
@@ -3363,6 +3507,10 @@ impl FixedSizeVariation for Group50Var3 {
     const VARIATION : Variation = Variation::Group50Var3;
 }
 
+impl FixedSizeVariation for Group50Var2 {
+    const VARIATION : Variation = Variation::Group50Var2;
+}
+
 impl FixedSizeVariation for Group50Var1 {
     const VARIATION : Variation = Variation::Group50Var1;
 }
@@ -3429,6 +3577,18 @@ impl FixedSizeVariation for Group40Var2 {
 
 impl FixedSizeVariation for Group40Var1 {
     const VARIATION : Variation = Variation::Group40Var1;
+}
+
+impl FixedSizeVariation for Group34Var3 {
+    const VARIATION : Variation = Variation::Group34Var3;
+}
+
+impl FixedSizeVariation for Group34Var2 {
+    const VARIATION : Variation = Variation::Group34Var2;
+}
+
+impl FixedSizeVariation for Group34Var1 {
+    const VARIATION : Variation = Variation::Group34Var1;
 }
 
 impl FixedSizeVariation for Group33Var8 {

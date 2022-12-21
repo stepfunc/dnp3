@@ -695,6 +695,8 @@ fn define_outstation_application(
 
     let application_iin = define_application_iin(lib)?;
 
+    let freeze_not_supported = freeze_result.value("not_supported")?;
+
     let application = lib.define_interface("outstation_application", "Dynamic information required by the outstation from the user application")?
         .begin_callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
@@ -720,14 +722,62 @@ fn define_outstation_application(
         .begin_callback("freeze_counters_all", "Freeze all the counters")?
             .param("freeze_type", freeze_type.clone(), "Type of freeze operation")?
             .param("database_handle",database_handle.declaration(), "Database handle")?
-            .returns(freeze_result.clone(), "Result of the freeze operation")?
+            .returns_with_default(freeze_not_supported.clone(), "Result of the freeze operation")?
+            .end_callback()?
+        .begin_callback("freeze_counters_all_at_time",
+                        doc("Freeze all the counters at a requested time and interval")
+                            .details("Refer to the table on page 57 of IEEE 1815-2012 to interpret the time and interval parameters correctly")
+             )?
+            .param("database_handle",database_handle.declaration(), "Database handle")?
+            .param("time", Primitive::U64, "48-bit DNP3 timestamp in milliseconds since epoch UTC")?
+            .param("interval", Primitive::U32, "Count of milliseconds representing the interval between freezes relative to the timestamp")?
+            .returns_with_default(freeze_not_supported.clone(), "Result of the freeze operation")?
             .end_callback()?
         .begin_callback("freeze_counters_range", "Freeze a range of counters")?
             .param("start", Primitive::U16, "Start index to freeze (inclusive)")?
             .param("stop", Primitive::U16, "Stop index to freeze (inclusive)")?
             .param("freeze_type", freeze_type, "Type of freeze operation")?
             .param("database_handle",database_handle.declaration(), "Database handle")?
-            .returns(freeze_result, "Result of the freeze operation")?
+            .returns_with_default(freeze_not_supported.clone(), "Result of the freeze operation")?
+            .end_callback()?
+        .begin_callback("freeze_counters_range_at_time",
+                        doc("Freeze a range of counters at a requested time and interval")
+                            .details("Refer to the table on page 57 of IEEE 1815-2012 to interpret the time and interval parameters correctly")
+             )?
+            .param("start", Primitive::U16, "Start index to freeze (inclusive)")?
+            .param("stop", Primitive::U16, "Stop index to freeze (inclusive)")?
+            .param("database_handle",database_handle.declaration(), "Database handle")?
+           .param("time", Primitive::U64, "48-bit DNP3 timestamp in milliseconds since epoch UTC")?
+            .param("interval", Primitive::U32, "Count of milliseconds representing the interval between freezes relative to the timestamp")?
+            .returns_with_default(freeze_not_supported, "Result of the freeze operation")?
+        .end_callback()?
+        .begin_callback("support_write_analog_dead_bands",
+                        doc("Controls outstation support for writing group 34, analog input dead-bands")
+                            .details("Returning false, indicates that the writes to group34 should not be processed and requests to do so should be rejected with IIN2.NO_FUNC_CODE_SUPPORT")
+                            .details("Returning true will allow the request to process the actual values with a sequence of calls:")
+                            .details("1) A single call to {interface:outstation_application.begin_write_analog_dead_bands()}")
+                            .details("2) Zero or more calls to {interface:outstation_application.write_analog_dead_band()}")
+                            .details("3) A single call to {interface:outstation_application.end_write_analog_dead_bands()}")
+             )?
+            .returns_with_default(PrimitiveValue::Bool(false), "True if the outstation should process the request")?
+            .end_callback()?
+        .begin_callback("begin_write_analog_dead_bands", "Called when the outstation begins processing a header to write analog dead-bands")?
+            .returns_nothing_by_default()?
+            .end_callback()?
+        .begin_callback("write_analog_dead_band",
+                        doc("Called when the outstation begins processing a header to write analog dead-bands")
+                            .details("Called for each analog dead-band in the write request where an analog input is defined at the specified index.")
+                            .details("The dead-band is automatically updated in the database. This callback allows application code to persist the modified value to non-volatile memory if desired")
+            )?
+            .param("index", Primitive::U16, "Index of the analog input")?
+            .param("dead_band", Primitive::Double, "New dead-band value")?
+            .returns_nothing_by_default()?
+            .end_callback()?
+        .begin_callback("end_write_analog_dead_bands",
+                        doc("Called when the outstation completes processing a header to write analog dead-bands")
+                            .details("Multiple dead-bands changes can be accumulated in calls to {interface:outstation_application.write_analog_dead_band()} and then be processed as a batch in this method.")
+             )?
+            .returns_nothing_by_default()?
             .end_callback()?
         .build_async()?;
 

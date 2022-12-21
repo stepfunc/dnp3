@@ -20,14 +20,19 @@ impl Timestamp {
     pub(crate) const OUT_OF_RANGE: &'static str = "<out of range>";
 
     /// Create a timestamp from a count of milliseconds since epoch
-    pub fn new(value: u64) -> Self {
+    pub const fn new(value: u64) -> Self {
         Self {
             value: value & Self::MAX_VALUE,
         }
     }
 
     /// Minimum valid timestamp
-    pub fn min() -> Self {
+    pub const fn min() -> Self {
+        Self::zero()
+    }
+
+    /// Timestamp value of zero corresponding to the epoch
+    pub const fn zero() -> Self {
         Self::new(0)
     }
 
@@ -49,7 +54,7 @@ impl Timestamp {
         ))
     }
 
-    /// Attempt to create a DateTime<Utc> from a Timestamp
+    /// Attempt to create a `DateTime<Utc>` from a Timestamp
     pub fn to_datetime_utc(self) -> Option<DateTime<Utc>> {
         Utc.timestamp_millis_opt(self.value as i64).single()
     }

@@ -1,5 +1,3 @@
-use scursor::WriteError;
-
 pub(crate) mod bit;
 pub(crate) mod buffer;
 pub(crate) mod channel;
@@ -45,8 +43,8 @@ where
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct BadWrite;
 
-impl From<WriteError> for BadWrite {
-    fn from(_: WriteError) -> Self {
+impl From<scursor::WriteError> for BadWrite {
+    fn from(_: scursor::WriteError) -> Self {
         Self
     }
 }

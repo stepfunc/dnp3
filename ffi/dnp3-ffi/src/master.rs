@@ -332,7 +332,7 @@ pub(crate) unsafe fn master_channel_add_poll(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
     let handle = channel
         .runtime
-        .block_on(association.add_poll(request.build(), period))??;
+        .block_on(association.add_poll(request.build_read_request(), period))??;
 
     Ok(ffi::PollId {
         association_id: id.address,
@@ -385,7 +385,7 @@ pub(crate) unsafe fn master_channel_read(
     let request = request
         .as_ref()
         .ok_or(ffi::ParamError::NullParameter)?
-        .build();
+        .build_read_request();
 
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
@@ -394,6 +394,59 @@ pub(crate) unsafe fn master_channel_read(
             Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
             Err(err) => callback.on_failure(err.into()),
         };
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_write_dead_bands(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    request: *mut crate::WriteDeadBandRequest,
+    callback: ffi::EmptyResponseCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let request = request.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let headers = request.build();
+
+    let mut handle = AssociationHandle::create(address, channel.handle.clone());
+
+    let task = async move {
+        match handle.write_dead_bands(headers).await {
+            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
+            Err(err) => callback.on_failure(err.into()),
+        }
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_request_expect_empty_response(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    function: ffi::FunctionCode,
+    headers: *mut crate::Request,
+    callback: ffi::EmptyResponseCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let function: dnp3::app::FunctionCode = function.into();
+    let headers = headers.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let headers = headers.build_headers();
+
+    let mut handle = AssociationHandle::create(address, channel.handle.clone());
+
+    let task = async move {
+        match handle
+            .request_expecting_empty_response(function, headers)
+            .await
+        {
+            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
+            Err(err) => callback.on_failure(err.into()),
+        }
     };
 
     channel.runtime.spawn(task)?;
@@ -412,7 +465,7 @@ pub(crate) unsafe fn master_channel_read_with_handler(
     let request = request
         .as_ref()
         .ok_or(ffi::ParamError::NullParameter)?
-        .build();
+        .build_read_request();
 
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
@@ -781,6 +834,15 @@ impl From<PollError> for ffi::ParamError {
     }
 }
 
+impl From<WriteError> for ffi::EmptyResponseError {
+    fn from(value: WriteError) -> Self {
+        match value {
+            WriteError::Task(x) => x.into(),
+            WriteError::IinError(_) => ffi::EmptyResponseError::RejectedByIin2,
+        }
+    }
+}
+
 #[cfg(feature = "tls")]
 impl From<TlsError> for ffi::ParamError {
     fn from(error: TlsError) -> Self {
@@ -846,3 +908,54 @@ define_task_from_impl!(RestartError);
 define_task_from_impl!(ReadError);
 define_task_from_impl!(LinkStatusError);
 define_task_from_impl!(TaskError);
+define_task_from_impl!(EmptyResponseError);
+
+impl From<ffi::FunctionCode> for dnp3::app::FunctionCode {
+    fn from(value: ffi::FunctionCode) -> Self {
+        match value {
+            ffi::FunctionCode::Confirm => dnp3::app::FunctionCode::Confirm,
+            ffi::FunctionCode::Read => dnp3::app::FunctionCode::Read,
+            ffi::FunctionCode::Write => dnp3::app::FunctionCode::Write,
+            ffi::FunctionCode::Select => dnp3::app::FunctionCode::Select,
+            ffi::FunctionCode::Operate => dnp3::app::FunctionCode::Operate,
+            ffi::FunctionCode::DirectOperate => dnp3::app::FunctionCode::DirectOperate,
+            ffi::FunctionCode::DirectOperateNoResponse => {
+                dnp3::app::FunctionCode::DirectOperateNoResponse
+            }
+            ffi::FunctionCode::ImmediateFreeze => dnp3::app::FunctionCode::ImmediateFreeze,
+            ffi::FunctionCode::ImmediateFreezeNoResponse => {
+                dnp3::app::FunctionCode::ImmediateFreezeNoResponse
+            }
+            ffi::FunctionCode::FreezeClear => dnp3::app::FunctionCode::FreezeClear,
+            ffi::FunctionCode::FreezeClearNoResponse => {
+                dnp3::app::FunctionCode::FreezeClearNoResponse
+            }
+            ffi::FunctionCode::FreezeAtTime => dnp3::app::FunctionCode::FreezeAtTime,
+            ffi::FunctionCode::FreezeAtTimeNoResponse => {
+                dnp3::app::FunctionCode::FreezeAtTimeNoResponse
+            }
+            ffi::FunctionCode::ColdRestart => dnp3::app::FunctionCode::ColdRestart,
+            ffi::FunctionCode::WarmRestart => dnp3::app::FunctionCode::WarmRestart,
+            ffi::FunctionCode::InitializeData => dnp3::app::FunctionCode::InitializeData,
+            ffi::FunctionCode::InitializeApplication => {
+                dnp3::app::FunctionCode::InitializeApplication
+            }
+            ffi::FunctionCode::StartApplication => dnp3::app::FunctionCode::StartApplication,
+            ffi::FunctionCode::StopApplication => dnp3::app::FunctionCode::StopApplication,
+            ffi::FunctionCode::SaveConfiguration => dnp3::app::FunctionCode::SaveConfiguration,
+            ffi::FunctionCode::EnableUnsolicited => dnp3::app::FunctionCode::EnableUnsolicited,
+            ffi::FunctionCode::DisableUnsolicited => dnp3::app::FunctionCode::DisableUnsolicited,
+            ffi::FunctionCode::AssignClass => dnp3::app::FunctionCode::AssignClass,
+            ffi::FunctionCode::DelayMeasure => dnp3::app::FunctionCode::DelayMeasure,
+            ffi::FunctionCode::RecordCurrentTime => dnp3::app::FunctionCode::RecordCurrentTime,
+            ffi::FunctionCode::OpenFile => dnp3::app::FunctionCode::OpenFile,
+            ffi::FunctionCode::CloseFile => dnp3::app::FunctionCode::CloseFile,
+            ffi::FunctionCode::DeleteFile => dnp3::app::FunctionCode::DeleteFile,
+            ffi::FunctionCode::GetFileInfo => dnp3::app::FunctionCode::GetFileInfo,
+            ffi::FunctionCode::AuthenticateFile => dnp3::app::FunctionCode::AuthenticateFile,
+            ffi::FunctionCode::AbortFile => dnp3::app::FunctionCode::AbortFile,
+            ffi::FunctionCode::Response => dnp3::app::FunctionCode::Response,
+            ffi::FunctionCode::UnsolicitedResponse => dnp3::app::FunctionCode::UnsolicitedResponse,
+        }
+    }
+}

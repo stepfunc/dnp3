@@ -11,7 +11,7 @@ pub trait Listener<T>: Send + Sync {
 pub struct NullListener;
 
 impl NullListener {
-    /// create a Box<dyn Listener<T>> that does nothing
+    /// create a `Box<dyn Listener<T>>` that does nothing
     pub fn create<T>() -> Box<dyn Listener<T>> {
         Box::new(NullListener)
     }

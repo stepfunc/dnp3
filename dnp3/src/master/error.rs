@@ -9,8 +9,6 @@ use crate::master::association::NoAssociation;
 use crate::master::session::{RunError, StateChange};
 use crate::transport::TransportResponseError;
 
-use scursor::WriteError;
-
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
@@ -82,6 +80,16 @@ pub enum CommandResponseError {
     ObjectCountMismatch,
     /// Value in one of the objects in the response doesn't match the request
     ObjectValueMismatch,
+}
+
+/// Error type for operations that don't return anything from the outstation but might fail
+/// b/c IIN2 has an error bit set
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum WriteError {
+    /// Error occurred during task execution
+    Task(TaskError),
+    /// Outstation returned an IIN.2 error
+    IinError(Iin2),
 }
 
 /// Parent error type for time sync tasks
@@ -239,8 +247,17 @@ impl std::fmt::Display for TimeSyncError {
     }
 }
 
-impl From<WriteError> for TaskError {
-    fn from(_: WriteError) -> Self {
+impl std::fmt::Display for WriteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            WriteError::Task(err) => write!(f, "{err}"),
+            WriteError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
+        }
+    }
+}
+
+impl From<scursor::WriteError> for TaskError {
+    fn from(_: scursor::WriteError) -> Self {
         TaskError::WriteError
     }
 }
@@ -315,6 +332,18 @@ impl From<RecvError> for AssociationError {
     }
 }
 
+impl From<RecvError> for WriteError {
+    fn from(_: RecvError) -> Self {
+        WriteError::Task(TaskError::Shutdown)
+    }
+}
+
+impl From<TaskError> for WriteError {
+    fn from(err: TaskError) -> Self {
+        WriteError::Task(err)
+    }
+}
+
 impl From<StateChange> for TaskError {
     fn from(x: StateChange) -> Self {
         match x {
@@ -378,9 +407,16 @@ impl From<Shutdown> for PollError {
     }
 }
 
+impl From<Shutdown> for WriteError {
+    fn from(_: Shutdown) -> Self {
+        WriteError::Task(TaskError::Shutdown)
+    }
+}
+
 impl Error for AssociationError {}
 impl Error for TaskError {}
 impl Error for PollError {}
 impl Error for CommandError {}
 impl Error for CommandResponseError {}
 impl Error for TimeSyncError {}
+impl Error for WriteError {}

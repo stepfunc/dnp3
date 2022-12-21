@@ -929,6 +929,25 @@ mod test {
     }
 
     #[test]
+    fn parses_g34_var1_with_count_and_prefix() {
+        let input = [0x22, 0x01, 0x17, 0x01, 0x03, 0xCA, 0xFE];
+
+        let mut headers = HeaderCollection::parse(FunctionCode::Write, &input)
+            .unwrap()
+            .iter();
+
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::OneByteCountAndPrefix(01, PrefixedVariation::Group34Var1(seq)) => {
+                let prefix = seq.single().unwrap();
+                assert_eq!(prefix, Prefix { index: 0x03, value: Group34Var1 { value: 0xFECA }});
+            }
+        );
+
+        assert_matches!(headers.next(), None);
+    }
+
+    #[test]
     fn parses_range_of_g80v1() {
         // this is what is typically sent to clear the restart IIN
         let input = [0x50, 0x01, 0x00, 0x07, 0x07, 0x00];
@@ -945,6 +964,32 @@ mod test {
 
         assert_eq!(vec, vec![(false, 7)]);
         assert_matches!(headers.next(), None);
+    }
+
+    #[test]
+    fn parses_count_of_g50v2() {
+        let input = [
+            0x32, 0x02, 0x07, 0x01, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0xBB, 0xCC, 0xDD,
+        ];
+        let mut headers = HeaderCollection::parse(FunctionCode::Write, &input)
+            .unwrap()
+            .iter();
+
+        let received = match headers.next().unwrap().details {
+            HeaderDetails::OneByteCount(01, CountVariation::Group50Var2(seq)) => {
+                seq.single().unwrap()
+            }
+            _ => unreachable!(),
+        };
+
+        assert!(headers.next().is_none());
+
+        let expected = Group50Var2 {
+            time: Timestamp::new(0xFF),
+            interval: 0xDDCCBBAA,
+        };
+
+        assert_eq!(received, expected);
     }
 
     #[test]

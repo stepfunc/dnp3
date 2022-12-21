@@ -34,6 +34,9 @@ pub(crate) enum Event {
     WarmRestart(Option<RestartDelay>),
     ClearRestartIIN,
     WriteAbsoluteTime(Timestamp),
+    BeginWriteDeadBands,
+    WriteDeadBand(u16, f64),
+    EndWriteDeadBands,
 }
 
 #[derive(Clone)]

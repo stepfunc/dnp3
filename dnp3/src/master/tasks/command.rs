@@ -6,8 +6,6 @@ use crate::master::handler::Promise;
 use crate::master::request::*;
 use crate::master::tasks::NonReadTask;
 
-use scursor::WriteError;
-
 enum State {
     Select,
     Operate,
@@ -70,7 +68,7 @@ impl CommandTask {
         }
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         self.headers.write(writer)
     }
 

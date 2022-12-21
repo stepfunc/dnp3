@@ -232,6 +232,8 @@ impl From<TaskType> for ffi::TaskType {
             TaskType::DisableUnsolicited => ffi::TaskType::DisableUnsolicited,
             TaskType::TimeSync => ffi::TaskType::TimeSync,
             TaskType::Restart => ffi::TaskType::Restart,
+            TaskType::WriteDeadBands => ffi::TaskType::WriteDeadBands,
+            TaskType::GenericEmptyResponse(_) => ffi::TaskType::GenericEmptyResponse,
         }
     }
 }

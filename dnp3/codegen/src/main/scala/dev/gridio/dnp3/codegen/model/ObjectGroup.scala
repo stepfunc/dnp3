@@ -23,6 +23,7 @@ object ObjectGroup {
     Group31,
     Group32,
     Group33,
+    Group34,
     Group40,
     Group41,
     Group42,
@@ -58,6 +59,8 @@ object GroupType {
   trait Event extends GroupType {
     override def isEvent: Boolean = true
   }
+
+  object AnalogInputDeadband extends GroupType
 
   object StaticBinary extends Static
   object StaticDoubleBinary extends Static

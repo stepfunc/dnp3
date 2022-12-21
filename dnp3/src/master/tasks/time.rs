@@ -12,8 +12,6 @@ use crate::master::handler::Promise;
 use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::NonReadTask;
 
-use scursor::WriteError;
-
 use tokio::time::Instant;
 
 enum State {
@@ -95,7 +93,7 @@ impl TimeSyncTask {
         }
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self.state {
             State::MeasureDelay(_) => Ok(()),
             State::WriteAbsoluteTime(x) => writer.write_count_of_one(Group50Var1 { time: x }),

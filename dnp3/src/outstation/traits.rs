@@ -1,6 +1,7 @@
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::variations::Group50Var2;
 use crate::app::RequestHeader;
 use crate::app::Sequence;
 use crate::app::{control::*, Timestamp};
@@ -66,7 +67,8 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// Handle a write of the absolute time.
     ///
     /// This is used during time synchronization procedures.
-    fn write_absolute_time(&mut self, _time: Timestamp) -> Result<(), RequestError> {
+    #[allow(unused_variables)]
+    fn write_absolute_time(&mut self, time: Timestamp) -> Result<(), RequestError> {
         Err(RequestError::NotSupported)
     }
 
@@ -102,13 +104,47 @@ pub trait OutstationApplication: Sync + Send + 'static {
     }
 
     /// Perform a counter freeze operation
+    #[allow(unused_variables)]
     fn freeze_counter(
         &mut self,
-        _indices: FreezeIndices,
-        _freeze_type: FreezeType,
-        _database: &mut DatabaseHandle,
+        indices: FreezeIndices,
+        freeze_type: FreezeType,
+        database: &mut DatabaseHandle,
     ) -> Result<(), RequestError> {
         Err(RequestError::NotSupported)
+    }
+
+    /// Controls outstation support for writing group 34, analog input dead-bands
+    ///
+    /// Returning false, indicates that the writes to group34 should not be processed and requests to
+    /// do so should be rejected with IIN2.NO_FUNC_CODE_SUPPORT
+    ///
+    /// Returning true will allow the request to process the actual values with a sequence of calls:
+    ///
+    /// 1) A single call to [`Self::begin_write_analog_dead_bands`]
+    /// 2) Zero or more calls to [`Self::write_analog_dead_band`]
+    /// 3) A single call to [`Self::end_write_analog_dead_bands`]
+    fn support_write_analog_dead_bands(&mut self) -> bool {
+        false
+    }
+
+    /// Called when the outstation begins processing a header to write analog dead-bands
+    fn begin_write_analog_dead_bands(&mut self) {}
+
+    /// Called for each analog dead-band in the write request where an analog input is defined
+    /// at the specified index.
+    ///
+    /// The dead-band is automatically updated in the database. This callback allows application code
+    /// to persist the modified value to non-volatile memory if desired
+    #[allow(unused_variables)]
+    fn write_analog_dead_band(&mut self, index: u16, dead_band: f64) {}
+
+    /// Called when the outstation completes processing a header to write analog dead-bands
+    ///
+    /// Multiple dead-bands changes can be accumulated in calls to [`Self::write_analog_dead_band`] and
+    /// then be processed as a batch in this method.
+    fn end_write_analog_dead_bands(&mut self) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
     }
 }
 
@@ -311,7 +347,58 @@ pub enum FreezeIndices {
     Range(u16, u16),
 }
 
+/// This object maps to the fields of g50v2
+///
+/// There is a table on page 57 of 1815-2012 that describes these 4 permutations
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum FreezeInterval {
+    /// Freeze once immediately
+    FreezeOnceImmediately,
+    /// Freeze once at the specified time
+    FreezeOnceAtTime(Timestamp),
+    /// Periodically freeze at intervals relative to the timestamp
+    PeriodicallyFreeze(Timestamp, u32),
+    /// Periodically freeze at intervals relative to the beginning of the current hour
+    PeriodicallyFreezeRelative(u32),
+}
+
+impl FreezeInterval {
+    /// construct a new FreezeTiming instance from the raw timestamp and interval fields
+    pub fn new(timestamp: Timestamp, interval: u32) -> Self {
+        match (timestamp.raw_value(), interval) {
+            (0, 0) => Self::FreezeOnceImmediately,
+            (_, 0) => Self::FreezeOnceAtTime(timestamp),
+            (0, _) => Self::PeriodicallyFreezeRelative(interval),
+            (_, _) => Self::PeriodicallyFreeze(timestamp, interval),
+        }
+    }
+
+    /// decompose a FreezeTiming instance into the raw timestamp and interval fields
+    pub fn get_time_and_interval(&self) -> (Timestamp, u32) {
+        match self {
+            FreezeInterval::FreezeOnceImmediately => (Timestamp::zero(), 0),
+            FreezeInterval::FreezeOnceAtTime(t) => (*t, 0),
+            FreezeInterval::PeriodicallyFreeze(t, i) => (*t, *i),
+            FreezeInterval::PeriodicallyFreezeRelative(i) => (Timestamp::zero(), *i),
+        }
+    }
+}
+
+impl From<Group50Var2> for FreezeInterval {
+    fn from(value: Group50Var2) -> Self {
+        Self::new(value.time, value.interval)
+    }
+}
+
+impl From<FreezeInterval> for Group50Var2 {
+    fn from(value: FreezeInterval) -> Self {
+        let (time, interval) = value.get_time_and_interval();
+        Self { time, interval }
+    }
+}
+
 /// Freeze operation type
+#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FreezeType {
     /// Copy the current value of a counter to the associated point
@@ -319,6 +406,8 @@ pub enum FreezeType {
     /// Copy the current value of a counter to the associated point and
     /// clear the current value to 0
     FreezeAndClear,
+    /// Freeze at a particular time
+    FreezeAtTime(FreezeInterval),
 }
 
 /// callbacks for handling controls

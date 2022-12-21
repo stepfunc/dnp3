@@ -12,6 +12,7 @@ mod request;
 mod shared;
 mod tcp;
 mod variation;
+mod write_dead_band_request;
 
 pub(crate) fn gv(g: u8, v: u8) -> String {
     format!("group{g}_var{v}")
