@@ -194,14 +194,14 @@ class RestartTaskCallback : public dnp3::RestartTaskCallback {
     }
 };
 
-class WriteDeadBandsCallback : public dnp3::WriteAnalogDeadBandsCallback { 
+class WriteDeadBandsCallback : public dnp3::EmptyResponseCallback { 
 
     void on_complete(dnp3::Nothing) override
     {
         std::cout << "write dead-bands succeeded" << std::endl;
     }
 
-    void on_failure(dnp3::WriteError error) override { std::cout << "write dead-bands failed: " << dnp3::to_string(error) << std::endl; }
+    void on_failure(dnp3::EmptyResponseError error) override { std::cout << "write dead-bands failed: " << dnp3::to_string(error) << std::endl; }
 };
 
 class LinkStatusCallback : public dnp3::LinkStatusCallback {
