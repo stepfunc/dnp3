@@ -20,6 +20,11 @@
       "dotnet": true,
       "java": true
     },
+    "i686-unknown-linux-gnu": {
+      "cpp": true,
+      "dotnet": false,
+      "java": false
+    },
     "aarch64-unknown-linux-gnu": {
       "cpp": true,
       "dotnet": true,
