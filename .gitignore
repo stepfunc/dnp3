@@ -35,3 +35,7 @@ ffi/bindings/java/dnp3
 ffi/bindings/java/dnp3-jni
 ffi/bindings/java/*/target
 ffi/bindings/java/**/*.iml
+
+# .NET examples properties
+ffi/bindings/dotnet/examples/master/Properties/
+ffi/bindings/dotnet/examples/outstation/Properties/

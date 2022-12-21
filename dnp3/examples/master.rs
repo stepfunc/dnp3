@@ -321,11 +321,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // ANCHOR_END: write_dead_bands
             }
             "fat" => {
+                // ANCHOR: freeze_at_time
                 let headers = Headers::new()
                     // freeze all the counters once per day relative to the beginning of the current hour
                     .add_freeze_interval(FreezeInterval::PeriodicallyFreezeRelative(86_400_000))
                     // apply this schedule to all counters
-                    .all_objects(Variation::Group20Var0);
+                    .add_all_objects(Variation::Group20Var0);
 
                 if let Err(err) = association
                     .request_expecting_empty_response(FunctionCode::FreezeAtTime, headers)
@@ -333,6 +334,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 {
                     tracing::warn!("error: {}", err);
                 }
+                // ANCHOR_END: freeze_at_time
             }
             "crt" => {
                 let result = association.cold_restart().await;

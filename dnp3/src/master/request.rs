@@ -472,7 +472,7 @@ impl Headers {
     }
 
     /// Add an all objects header (0x06) with the specified variation
-    pub fn all_objects(self, variation: Variation) -> Self {
+    pub fn add_all_objects(self, variation: Variation) -> Self {
         self.add(ReadHeader::all_objects(variation).into())
     }
 
