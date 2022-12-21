@@ -10,6 +10,7 @@
     "clap_derive",
     "clap_lex",
     "dunce",
+    "errno",
     "gimli",
     "heck",
     "io-lifetimes",
