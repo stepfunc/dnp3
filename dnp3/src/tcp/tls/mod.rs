@@ -196,6 +196,7 @@ fn load_certs(path: &Path, is_local: bool) -> Result<Vec<rustls::Certificate>, T
 }
 
 fn load_private_key(path: &Path, password: Option<&str>) -> Result<rustls::PrivateKey, TlsError> {
+
     let expected_tag = match &password {
         Some(_) => "ENCRYPTED PRIVATE KEY",
         None => "PRIVATE KEY",
@@ -213,9 +214,9 @@ fn load_private_key(path: &Path, password: Option<&str>) -> Result<rustls::Priva
     let key = match iter.next() {
         Some(key) => match password {
             Some(password) => {
-                let encrypted = pkcs8::EncryptedPrivateKeyDocument::from_der(&key)?;
+                let encrypted = pkcs8::EncryptedPrivateKeyInfo::try_from(key.as_slice())?;
                 let decrypted = encrypted.decrypt(password)?;
-                rustls::PrivateKey(decrypted.as_ref().to_owned())
+                rustls::PrivateKey(decrypted.as_bytes().to_owned())
             }
             None => rustls::PrivateKey(key),
         },
@@ -236,6 +237,12 @@ fn load_private_key(path: &Path, password: Option<&str>) -> Result<rustls::Priva
     }
 
     Ok(key)
+}
+
+impl From<pkcs8::der::Error> for TlsError {
+    fn from(from: pkcs8::der::Error) -> Self {
+        TlsError::InvalidPrivateKey(io::Error::new(ErrorKind::InvalidData, from.to_string()))
+    }
 }
 
 impl From<pkcs8::Error> for TlsError {
