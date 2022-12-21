@@ -1,5 +1,6 @@
-use dnp3::app::Variation;
+use dnp3::app::{Timestamp, Variation};
 use dnp3::master::{Headers, ReadHeader, ReadRequest};
+use dnp3::outstation::FreezeInterval;
 
 use crate::ffi;
 
@@ -14,8 +15,13 @@ impl Request {
         }
     }
 
-    fn add(&mut self, header: ReadHeader) {
-        self.headers.add_read_header(header);
+    fn add_read_header(&mut self, header: ReadHeader) {
+        self.headers.push_read_header(header);
+    }
+
+    fn add_time_and_interval(&mut self, time: Timestamp, interval: u32) {
+        self.headers
+            .push_freeze_interval(FreezeInterval::new(time, interval));
     }
 
     pub(crate) fn build_read_request(&self) -> ReadRequest {
@@ -40,16 +46,16 @@ pub unsafe fn request_new_class(
 ) -> *mut Request {
     let mut request = Request::new();
     if class1 {
-        request.add(ReadHeader::all_objects(Variation::Group60Var2));
+        request.add_read_header(ReadHeader::all_objects(Variation::Group60Var2));
     }
     if class2 {
-        request.add(ReadHeader::all_objects(Variation::Group60Var3));
+        request.add_read_header(ReadHeader::all_objects(Variation::Group60Var3));
     }
     if class3 {
-        request.add(ReadHeader::all_objects(Variation::Group60Var4));
+        request.add_read_header(ReadHeader::all_objects(Variation::Group60Var4));
     }
     if class0 {
-        request.add(ReadHeader::all_objects(Variation::Group60Var1));
+        request.add_read_header(ReadHeader::all_objects(Variation::Group60Var1));
     }
 
     let request = Box::new(request);
@@ -58,7 +64,7 @@ pub unsafe fn request_new_class(
 
 pub unsafe fn request_new_all_objects(variation: ffi::Variation) -> *mut Request {
     let mut request = Request::new();
-    request.add(ReadHeader::all_objects(variation.into()));
+    request.add_read_header(ReadHeader::all_objects(variation.into()));
 
     let request = Box::new(request);
     Box::into_raw(request)
@@ -70,7 +76,7 @@ pub unsafe fn request_new_one_byte_range(
     stop: u8,
 ) -> *mut Request {
     let mut request = Request::new();
-    request.add(ReadHeader::one_byte_range(variation.into(), start, stop));
+    request.add_read_header(ReadHeader::one_byte_range(variation.into(), start, stop));
 
     let request = Box::new(request);
     Box::into_raw(request)
@@ -82,7 +88,7 @@ pub unsafe fn request_new_two_byte_range(
     stop: u16,
 ) -> *mut Request {
     let mut request = Request::new();
-    request.add(ReadHeader::two_byte_range(variation.into(), start, stop));
+    request.add_read_header(ReadHeader::two_byte_range(variation.into(), start, stop));
 
     let request = Box::new(request);
     Box::into_raw(request)
@@ -93,7 +99,7 @@ pub unsafe fn request_new_one_byte_limited_count(
     count: u8,
 ) -> *mut Request {
     let mut request = Request::new();
-    request.add(ReadHeader::one_byte_limited_count(variation.into(), count));
+    request.add_read_header(ReadHeader::one_byte_limited_count(variation.into(), count));
 
     let request = Box::new(request);
     Box::into_raw(request)
@@ -104,7 +110,7 @@ pub unsafe fn request_new_two_byte_limited_count(
     count: u16,
 ) -> *mut Request {
     let mut request = Request::new();
-    request.add(ReadHeader::two_byte_limited_count(variation.into(), count));
+    request.add_read_header(ReadHeader::two_byte_limited_count(variation.into(), count));
 
     let request = Box::new(request);
     Box::into_raw(request)
@@ -123,7 +129,7 @@ pub unsafe fn request_add_one_byte_range_header(
     stop: u8,
 ) {
     if let Some(request) = request.as_mut() {
-        request.add(ReadHeader::one_byte_range(variation.into(), start, stop));
+        request.add_read_header(ReadHeader::one_byte_range(variation.into(), start, stop));
     }
 }
 
@@ -134,13 +140,13 @@ pub unsafe fn request_add_two_byte_range_header(
     stop: u16,
 ) {
     if let Some(request) = request.as_mut() {
-        request.add(ReadHeader::two_byte_range(variation.into(), start, stop));
+        request.add_read_header(ReadHeader::two_byte_range(variation.into(), start, stop));
     }
 }
 
 pub unsafe fn request_add_all_objects_header(request: *mut Request, variation: ffi::Variation) {
     if let Some(request) = request.as_mut() {
-        request.add(ReadHeader::all_objects(variation.into()));
+        request.add_read_header(ReadHeader::all_objects(variation.into()));
     }
 }
 
@@ -150,7 +156,7 @@ pub unsafe fn request_add_one_byte_limited_count_header(
     count: u8,
 ) {
     if let Some(request) = request.as_mut() {
-        request.add(ReadHeader::one_byte_limited_count(variation.into(), count));
+        request.add_read_header(ReadHeader::one_byte_limited_count(variation.into(), count));
     }
 }
 
@@ -160,7 +166,17 @@ pub unsafe fn request_add_two_byte_limited_count_header(
     count: u16,
 ) {
     if let Some(request) = request.as_mut() {
-        request.add(ReadHeader::two_byte_limited_count(variation.into(), count));
+        request.add_read_header(ReadHeader::two_byte_limited_count(variation.into(), count));
+    }
+}
+
+pub(crate) unsafe fn request_add_time_and_interval(
+    request: *mut crate::Request,
+    time: u64,
+    interval_ms: u32,
+) {
+    if let Some(request) = request.as_mut() {
+        request.add_time_and_interval(Timestamp::new(time), interval_ms);
     }
 }
 

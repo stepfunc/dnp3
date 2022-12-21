@@ -461,8 +461,14 @@ impl Headers {
 
     /// Add a header to the collection
     #[cfg(feature = "ffi")]
-    pub fn add_read_header(&mut self, header: ReadHeader) {
+    pub fn push_read_header(&mut self, header: ReadHeader) {
         self.headers.push(header.into());
+    }
+
+    /// Add a header to the collection
+    #[cfg(feature = "ffi")]
+    pub fn push_freeze_interval(&mut self, interval: FreezeInterval) {
+        self.headers.push(Header::TimeAndInterval(interval));
     }
 
     /// Add an all objects header (0x06) with the specified variation
