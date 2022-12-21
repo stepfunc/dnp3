@@ -1,6 +1,6 @@
 use crate::app::Timestamp;
 use crate::outstation::tests::harness::*;
-use crate::outstation::{FreezeIndices, FreezeTiming, FreezeType};
+use crate::outstation::{FreezeIndices, FreezeInterval, FreezeType};
 
 const EMPTY_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
 const EMPTY_RESPONSE_PARAM_ERROR: &[u8] = &[0xC0, 0x81, 0x80, 0x04];
@@ -158,7 +158,7 @@ async fn freeze_at_time() {
 
     harness.check_events(&[Event::Freeze(
         FreezeIndices::All,
-        FreezeType::FreezeAtTime(FreezeTiming::PeriodicallyFreeze(
+        FreezeType::FreezeAtTime(FreezeInterval::PeriodicallyFreeze(
             Timestamp::new(0xFF),
             0xDDCCBBAA,
         )),
@@ -178,7 +178,7 @@ async fn freeze_at_time_no_ack() {
 
     harness.check_events(&[Event::Freeze(
         FreezeIndices::All,
-        FreezeType::FreezeAtTime(FreezeTiming::PeriodicallyFreeze(
+        FreezeType::FreezeAtTime(FreezeInterval::PeriodicallyFreeze(
             Timestamp::new(0xFF),
             0xDDCCBBAA,
         )),

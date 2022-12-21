@@ -10,7 +10,7 @@ use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::*;
 use crate::app::Timestamp;
 use crate::master::error::CommandResponseError;
-use crate::outstation::FreezeTiming;
+use crate::outstation::FreezeInterval;
 
 /// Controls how a command request is issued
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -426,7 +426,7 @@ impl Headers {
 #[derive(Clone, Debug)]
 enum Header {
     Read(ReadHeader),
-    TimeAndInterval(FreezeTiming),
+    TimeAndInterval(FreezeInterval),
 }
 
 impl Header {
@@ -434,7 +434,7 @@ impl Header {
         match self {
             Header::Read(x) => x.format(writer),
             Header::TimeAndInterval(x) => {
-                let g50v2: Group50Var2 = <FreezeTiming as Into<Group50Var2>>::into(*x);
+                let g50v2: Group50Var2 = <FreezeInterval as Into<Group50Var2>>::into(*x);
                 writer.write_count_of_one(g50v2)
             }
         }
@@ -476,10 +476,17 @@ impl Headers {
     ///
     /// This is useful when constructing freeze-at-requests
     pub fn add_time_and_interval(self, time: Timestamp, interval_ms: u32) -> Self {
-        self.add(Header::TimeAndInterval(FreezeTiming::new(
-            time,
-            interval_ms,
-        )))
+        self.add_freeze_interval(FreezeInterval::new(time, interval_ms))
+    }
+
+    /// Add a limited count (0x07) with a single g50v2
+    ///
+    /// This is useful when constructing freeze-at-requests
+    ///
+    /// This can also be accomplished using the `add_time_and_interval` method although
+    /// this method provides cleaner semantics.
+    pub fn add_freeze_interval(self, interval: FreezeInterval) -> Self {
+        self.add(Header::TimeAndInterval(interval))
     }
 
     fn add(mut self, header: Header) -> Self {

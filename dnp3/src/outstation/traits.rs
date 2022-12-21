@@ -258,7 +258,7 @@ pub enum FreezeIndices {
 ///
 /// There is a table on page 57 of 1815-2012 that describes these 4 permutations
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum FreezeTiming {
+pub enum FreezeInterval {
     /// Freeze once immediately
     FreezeOnceImmediately,
     /// Freeze once at the specified time
@@ -269,7 +269,7 @@ pub enum FreezeTiming {
     PeriodicallyFreezeRelative(u32),
 }
 
-impl FreezeTiming {
+impl FreezeInterval {
     /// construct a new FreezeTiming instance from the raw timestamp and interval fields
     pub fn new(timestamp: Timestamp, interval: u32) -> Self {
         match (timestamp.raw_value(), interval) {
@@ -283,22 +283,22 @@ impl FreezeTiming {
     /// decompose a FreezeTiming instance into the raw timestamp and interval fields
     pub fn get_time_and_interval(&self) -> (Timestamp, u32) {
         match self {
-            FreezeTiming::FreezeOnceImmediately => (Timestamp::zero(), 0),
-            FreezeTiming::FreezeOnceAtTime(t) => (*t, 0),
-            FreezeTiming::PeriodicallyFreeze(t, i) => (*t, *i),
-            FreezeTiming::PeriodicallyFreezeRelative(i) => (Timestamp::zero(), *i),
+            FreezeInterval::FreezeOnceImmediately => (Timestamp::zero(), 0),
+            FreezeInterval::FreezeOnceAtTime(t) => (*t, 0),
+            FreezeInterval::PeriodicallyFreeze(t, i) => (*t, *i),
+            FreezeInterval::PeriodicallyFreezeRelative(i) => (Timestamp::zero(), *i),
         }
     }
 }
 
-impl From<Group50Var2> for FreezeTiming {
+impl From<Group50Var2> for FreezeInterval {
     fn from(value: Group50Var2) -> Self {
         Self::new(value.time, value.interval)
     }
 }
 
-impl From<FreezeTiming> for Group50Var2 {
-    fn from(value: FreezeTiming) -> Self {
+impl From<FreezeInterval> for Group50Var2 {
+    fn from(value: FreezeInterval) -> Self {
         let (time, interval) = value.get_time_and_interval();
         Self { time, interval }
     }
@@ -314,7 +314,7 @@ pub enum FreezeType {
     /// clear the current value to 0
     FreezeAndClear,
     /// Freeze at a particular time
-    FreezeAtTime(FreezeTiming),
+    FreezeAtTime(FreezeInterval),
 }
 
 /// callbacks for handling controls

@@ -1735,7 +1735,7 @@ impl OutstationSession {
     ) -> Response {
         let mut iin = Iin::default();
 
-        let mut timing: Option<FreezeTiming> = None;
+        let mut timing: Option<FreezeInterval> = None;
 
         for header in object_headers.iter() {
             match header.details {

@@ -16,6 +16,7 @@ use dnp3::serial::*;
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
 
+use dnp3::outstation::FreezeInterval;
 use std::process::exit;
 
 /// read handler that does nothing
@@ -320,9 +321,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // ANCHOR_END: write_dead_bands
             }
             "fat" => {
-                // freeze all the counters once per day relative to the beginning of the current hour
                 let headers = Headers::new()
-                    .add_time_and_interval(Timestamp::zero(), 86_400_000)
+                    // freeze all the counters once per day relative to the beginning of the current hour
+                    .add_freeze_interval(FreezeInterval::PeriodicallyFreezeRelative(86_400_000))
+                    // apply this schedule to all counters
                     .all_objects(Variation::Group20Var0);
 
                 if let Err(err) = association
