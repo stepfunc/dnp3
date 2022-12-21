@@ -30,7 +30,7 @@ tokio-serial = { version = "=5.4.3", optional = true }
 
 [dev-dependencies]
 futures = { version = "0.3.24" }
-clap = { version = "3.2.20", features = ["derive"] }
+clap = { version = "4.0", features = ["derive"] }
 sfio-tokio-mock-io = "0.2.0"
 assert_matches = "1.2"
 tracing-subscriber = "0.2"
