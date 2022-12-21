@@ -214,6 +214,22 @@
         }
       ]
     },
+    "cbc": {
+      "id": "cbc",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018-2022 RustCrypto Developers",
+                "Copyright (c) 2018 Artyom Pavlov"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "cesu8": {
       "id": "cesu8",
       "source": "crates.io",
@@ -638,6 +654,22 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2020 Andrew D. Straw"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "inout": {
+      "id": "inout",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2022 The RustCrypto Project Developers",
+                "Copyright (c) 2022 Artyom Pavlov"
               ]
             }
           }
