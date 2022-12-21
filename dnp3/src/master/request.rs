@@ -414,14 +414,7 @@ pub struct Headers {
     headers: Vec<Header>,
 }
 
-impl Headers {
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        for header in self.headers.iter() {
-            header.format(writer)?;
-        }
-        Ok(())
-    }
-}
+impl Headers {}
 
 #[derive(Clone, Debug)]
 enum Header {
@@ -439,12 +432,37 @@ impl Header {
             }
         }
     }
+
+    #[cfg(feature = "ffi")]
+    pub(crate) fn to_read_header(&self) -> Option<ReadHeader> {
+        match self {
+            Header::Read(x) => Some(*x),
+            Header::TimeAndInterval(_) => None,
+        }
+    }
 }
 
 impl Headers {
     /// Construct an empty set of request headers
     pub fn new() -> Self {
         Default::default()
+    }
+
+    /// Convert this generic request into a ReadRequest dropping irrelevant headers
+    #[cfg(feature = "ffi")]
+    pub fn to_read_request(&self) -> ReadRequest {
+        ReadRequest::MultipleHeader(
+            self.headers
+                .iter()
+                .filter_map(|x| x.to_read_header())
+                .collect(),
+        )
+    }
+
+    /// Add a header to the collection
+    #[cfg(feature = "ffi")]
+    pub fn add_read_header(&mut self, header: ReadHeader) {
+        self.headers.push(header.into());
     }
 
     /// Add an all objects header (0x06) with the specified variation
@@ -487,6 +505,13 @@ impl Headers {
     /// this method provides cleaner semantics.
     pub fn add_freeze_interval(self, interval: FreezeInterval) -> Self {
         self.add(Header::TimeAndInterval(interval))
+    }
+
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+        for header in self.headers.iter() {
+            header.format(writer)?;
+        }
+        Ok(())
     }
 
     fn add(mut self, header: Header) -> Self {

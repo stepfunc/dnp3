@@ -1,25 +1,29 @@
 use dnp3::app::Variation;
-use dnp3::master::{ReadHeader, ReadRequest};
+use dnp3::master::{Headers, ReadHeader, ReadRequest};
 
 use crate::ffi;
 
 pub struct Request {
-    headers: Vec<ReadHeader>,
+    headers: Headers,
 }
 
 impl Request {
     fn new() -> Self {
         Self {
-            headers: Vec::new(),
+            headers: Default::default(),
         }
     }
 
     fn add(&mut self, header: ReadHeader) {
-        self.headers.push(header);
+        self.headers.add_read_header(header);
     }
 
-    pub(crate) fn build(&self) -> ReadRequest {
-        ReadRequest::MultipleHeader(self.headers.clone())
+    pub(crate) fn build_read_request(&self) -> ReadRequest {
+        self.headers.to_read_request()
+    }
+
+    pub(crate) fn build_headers(&self) -> Headers {
+        self.headers.clone()
     }
 }
 

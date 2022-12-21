@@ -17,8 +17,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let connect_strategy = define_connect_strategy(lib)?;
 
-    let write_error = define_write_error(lib)?;
-
     let nothing = lib
         .define_enum("nothing")?
         .push("nothing", "the only value this enum has")?
@@ -26,8 +24,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     let write_dead_band_request = crate::write_dead_band_request::define(lib)?;
-    let write_dead_band_callback =
-        define_write_dead_bands_callback(lib, write_error, nothing.clone())?;
+    let empty_response_callback = define_empty_response_callback(lib, nothing.clone())?;
 
     let master_channel_create_tcp_fn = lib
         .define_function("master_channel_create_tcp")?
@@ -363,7 +360,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .define_future_method(
             "write_dead_bands",
             master_channel_class.clone(),
-            write_dead_band_callback,
+            empty_response_callback.clone(),
         )?
         .param(
             "association",
@@ -378,6 +375,33 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .fails_with(shared.error_type.clone())?
         .doc(doc(
             "Perform a WRITE on the association using the supplied collection of dead-band headers",
+        ))?
+        .build()?;
+
+    let request_expect_empty_response = lib
+        .define_future_method(
+            "request_expect_empty_response",
+            master_channel_class.clone(),
+            empty_response_callback,
+        )?
+        .param(
+            "association",
+            association_id.clone(),
+            "Association on which to perform the request",
+        )?
+        .param(
+            "function",
+            shared.function_code.clone(),
+            "Function code for the request",
+        )?
+        .param(
+            "headers",
+            request_class.declaration(),
+            "Headers that will be contained in the request",
+        )?
+        .fails_with(shared.error_type.clone())?
+        .doc(doc(
+            "Send the specified request to the association using the supplied function and collection of request headers",
         ))?
         .build()?;
 
@@ -493,6 +517,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .async_method(cold_restart_async)?
         .async_method(warm_restart_async)?
         .async_method(write_dead_bands_async)?
+        .async_method(request_expect_empty_response)?
         .async_method(check_link_status_async)?
         .custom_destroy("shutdown")?
         .doc(
@@ -503,24 +528,6 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     Ok(())
-}
-
-fn define_write_error(lib: &mut LibraryBuilder) -> BackTraced<ErrorType<Unvalidated>> {
-    let error = lib
-        .define_error_type(
-            "write_error",
-            "write_exception",
-            ExceptionType::CheckedException,
-        )?
-        .add_error(
-            "rejected_by_iin2",
-            "IIN2 indicates request was not completely successful",
-        )?
-        .add_task_errors()?
-        .doc("Errors that may occur when performing a WRITE operation")?
-        .build()?;
-
-    Ok(error)
 }
 
 fn define_connect_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
@@ -1429,17 +1436,30 @@ fn define_link_status_callback(
     Ok(callback)
 }
 
-fn define_write_dead_bands_callback(
+fn define_empty_response_callback(
     lib: &mut LibraryBuilder,
-    error_type: ErrorType<Unvalidated>,
     nothing: EnumHandle,
 ) -> BackTraced<FutureInterface<Unvalidated>> {
+    let error = lib
+        .define_error_type(
+            "empty_response_error",
+            "empty_response_exception",
+            ExceptionType::CheckedException,
+        )?
+        .add_error(
+            "rejected_by_iin2",
+            "IIN2 indicates request was not completely successful",
+        )?
+        .add_task_errors()?
+        .doc("Errors that may occur when performing a request that expects a response with zero object headers")?
+        .build()?;
+
     let callback = lib.define_future_interface(
-        "write_analog_dead_bands_callback",
-        "Callback interface for writing analog input dead-bands",
+        "empty_response_callback",
+        "Callback interface for any task that expects an empty response",
         nothing,
-        "Result of WRITE operation",
-        Some(error_type),
+        "Result of operation",
+        Some(error),
     )?;
 
     Ok(callback)
