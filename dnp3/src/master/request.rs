@@ -8,9 +8,9 @@ use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::*;
+use crate::app::Timestamp;
 use crate::master::error::CommandResponseError;
-
-use scursor::WriteError;
+use crate::outstation::FreezeInterval;
 
 /// Controls how a command request is issued
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -227,7 +227,7 @@ impl EventClasses {
         }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         if self.class1 {
             writer.write_all_objects_header(Variation::Group60Var2)?;
         }
@@ -284,7 +284,7 @@ impl Classes {
         self.class0 || self.events.any()
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         self.events.write(writer)?;
         if self.class0 {
             writer.write_all_objects_header(Variation::Group60Var1)?;
@@ -303,7 +303,7 @@ impl OneByteRangeScan {
         }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         writer.write_range_only(self.variation, self.start, self.stop)
     }
 }
@@ -318,7 +318,7 @@ impl TwoByteRangeScan {
         }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         writer.write_range_only(self.variation, self.start, self.stop)
     }
 }
@@ -329,7 +329,7 @@ impl AllObjectsScan {
         Self { variation }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         writer.write_all_objects_header(self.variation)
     }
 }
@@ -340,7 +340,7 @@ impl OneByteLimitedCountScan {
         Self { variation, count }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         writer.write_limited_count(self.variation, self.count)
     }
 }
@@ -351,7 +351,7 @@ impl TwoByteLimitedCountScan {
         Self { variation, count }
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         writer.write_limited_count(self.variation, self.count)
     }
 }
@@ -397,7 +397,7 @@ impl ReadHeader {
         ReadHeader::LimitedCount16(TwoByteLimitedCountScan::new(variation, count))
     }
 
-    pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             ReadHeader::Range8(scan) => scan.write(writer),
             ReadHeader::Range16(scan) => scan.write(writer),
@@ -405,6 +405,124 @@ impl ReadHeader {
             ReadHeader::LimitedCount8(scan) => scan.write(writer),
             ReadHeader::LimitedCount16(scan) => scan.write(writer),
         }
+    }
+}
+
+/// Builder for write requests that hides the underlying type
+#[derive(Clone, Debug, Default)]
+pub struct Headers {
+    headers: Vec<Header>,
+}
+
+impl Headers {}
+
+#[derive(Clone, Debug)]
+enum Header {
+    Read(ReadHeader),
+    TimeAndInterval(FreezeInterval),
+}
+
+impl Header {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+        match self {
+            Header::Read(x) => x.format(writer),
+            Header::TimeAndInterval(x) => {
+                let g50v2: Group50Var2 = <FreezeInterval as Into<Group50Var2>>::into(*x);
+                writer.write_count_of_one(g50v2)
+            }
+        }
+    }
+
+    #[cfg(feature = "ffi")]
+    pub(crate) fn to_read_header(&self) -> Option<ReadHeader> {
+        match self {
+            Header::Read(x) => Some(*x),
+            Header::TimeAndInterval(_) => None,
+        }
+    }
+}
+
+impl Headers {
+    /// Construct an empty set of request headers
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Convert this generic request into a ReadRequest dropping irrelevant headers
+    #[cfg(feature = "ffi")]
+    pub fn to_read_request(&self) -> ReadRequest {
+        ReadRequest::MultipleHeader(
+            self.headers
+                .iter()
+                .filter_map(|x| x.to_read_header())
+                .collect(),
+        )
+    }
+
+    /// Add a header to the collection
+    #[cfg(feature = "ffi")]
+    pub fn push_read_header(&mut self, header: ReadHeader) {
+        self.headers.push(header.into());
+    }
+
+    /// Add a header to the collection
+    #[cfg(feature = "ffi")]
+    pub fn push_freeze_interval(&mut self, interval: FreezeInterval) {
+        self.headers.push(Header::TimeAndInterval(interval));
+    }
+
+    /// Add an all objects header (0x06) with the specified variation
+    pub fn add_all_objects(self, variation: Variation) -> Self {
+        self.add(ReadHeader::all_objects(variation).into())
+    }
+
+    /// Add 8-bit start/stop header (0x00) with the specified variation
+    pub fn add_range_8(self, variation: Variation, start: u8, stop: u8) -> Self {
+        self.add(ReadHeader::one_byte_range(variation, start, stop).into())
+    }
+
+    /// Add 16-bit start/stop header (0x01) with the specified variation
+    pub fn add_range_16(self, variation: Variation, start: u16, stop: u16) -> Self {
+        self.add(ReadHeader::two_byte_range(variation, start, stop).into())
+    }
+
+    /// add a one byte limited count header (0x7) with the specified count and variation
+    pub fn add_one_byte_limited_count(self, variation: Variation, count: u8) -> Self {
+        self.add(ReadHeader::one_byte_limited_count(variation, count).into())
+    }
+
+    /// add a two byte limited count (0x08) header with the specified count and variation
+    pub fn add_two_byte_limited_count(self, variation: Variation, count: u16) -> Self {
+        self.add(ReadHeader::two_byte_limited_count(variation, count).into())
+    }
+
+    /// Add a limited count (0x07) with a single g50v2
+    ///
+    /// This is useful when constructing freeze-at-requests
+    pub fn add_time_and_interval(self, time: Timestamp, interval_ms: u32) -> Self {
+        self.add_freeze_interval(FreezeInterval::new(time, interval_ms))
+    }
+
+    /// Add a limited count (0x07) with a single g50v2
+    ///
+    /// This is useful when constructing freeze-at-requests
+    ///
+    /// This can also be accomplished using the `add_time_and_interval` method although
+    /// this method provides cleaner semantics.
+    pub fn add_freeze_interval(self, interval: FreezeInterval) -> Self {
+        self.add(Header::TimeAndInterval(interval))
+    }
+
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+        for header in self.headers.iter() {
+            header.format(writer)?;
+        }
+        Ok(())
+    }
+
+    fn add(mut self, header: Header) -> Self {
+        self.headers.push(header);
+        self
     }
 }
 
@@ -445,7 +563,7 @@ impl ReadRequest {
         Self::MultipleHeader(headers.to_vec())
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             ReadRequest::SingleHeader(req) => req.format(writer),
             ReadRequest::ClassScan(req) => req.write(writer),
@@ -456,6 +574,12 @@ impl ReadRequest {
                 Ok(())
             }
         }
+    }
+}
+
+impl From<ReadHeader> for Header {
+    fn from(value: ReadHeader) -> Self {
+        Header::Read(value)
     }
 }
 
@@ -556,7 +680,7 @@ impl CommandHeaders {
         }
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         for header in self.headers.iter() {
             header.write(writer)?;
         }
@@ -866,7 +990,7 @@ impl Default for CommandBuilder {
 }
 
 impl CommandHeader {
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             CommandHeader::G12V1U8(items) => writer.write_prefixed_items(items.iter()),
             CommandHeader::G41V1U8(items) => writer.write_prefixed_items(items.iter()),

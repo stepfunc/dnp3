@@ -1,6 +1,7 @@
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::variations::Group50Var2;
 use crate::app::RequestHeader;
 use crate::app::Sequence;
 use crate::app::{control::*, Timestamp};
@@ -253,7 +254,58 @@ pub enum FreezeIndices {
     Range(u16, u16),
 }
 
+/// This object maps to the fields of g50v2
+///
+/// There is a table on page 57 of 1815-2012 that describes these 4 permutations
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum FreezeInterval {
+    /// Freeze once immediately
+    FreezeOnceImmediately,
+    /// Freeze once at the specified time
+    FreezeOnceAtTime(Timestamp),
+    /// Periodically freeze at intervals relative to the timestamp
+    PeriodicallyFreeze(Timestamp, u32),
+    /// Periodically freeze at intervals relative to the beginning of the current hour
+    PeriodicallyFreezeRelative(u32),
+}
+
+impl FreezeInterval {
+    /// construct a new FreezeTiming instance from the raw timestamp and interval fields
+    pub fn new(timestamp: Timestamp, interval: u32) -> Self {
+        match (timestamp.raw_value(), interval) {
+            (0, 0) => Self::FreezeOnceImmediately,
+            (_, 0) => Self::FreezeOnceAtTime(timestamp),
+            (0, _) => Self::PeriodicallyFreezeRelative(interval),
+            (_, _) => Self::PeriodicallyFreeze(timestamp, interval),
+        }
+    }
+
+    /// decompose a FreezeTiming instance into the raw timestamp and interval fields
+    pub fn get_time_and_interval(&self) -> (Timestamp, u32) {
+        match self {
+            FreezeInterval::FreezeOnceImmediately => (Timestamp::zero(), 0),
+            FreezeInterval::FreezeOnceAtTime(t) => (*t, 0),
+            FreezeInterval::PeriodicallyFreeze(t, i) => (*t, *i),
+            FreezeInterval::PeriodicallyFreezeRelative(i) => (Timestamp::zero(), *i),
+        }
+    }
+}
+
+impl From<Group50Var2> for FreezeInterval {
+    fn from(value: Group50Var2) -> Self {
+        Self::new(value.time, value.interval)
+    }
+}
+
+impl From<FreezeInterval> for Group50Var2 {
+    fn from(value: FreezeInterval) -> Self {
+        let (time, interval) = value.get_time_and_interval();
+        Self { time, interval }
+    }
+}
+
 /// Freeze operation type
+#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FreezeType {
     /// Copy the current value of a counter to the associated point
@@ -261,6 +313,8 @@ pub enum FreezeType {
     /// Copy the current value of a counter to the associated point and
     /// clear the current value to 0
     FreezeAndClear,
+    /// Freeze at a particular time
+    FreezeAtTime(FreezeInterval),
 }
 
 /// callbacks for handling controls

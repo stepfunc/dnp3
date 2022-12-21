@@ -179,6 +179,24 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("Add a two-byte limited count variation interrogation")?
         .build()?;
 
+    let add_time_and_interval = lib
+        .define_method("add_time_and_interval", request.clone())?
+        .param(
+            "time",
+            Primitive::U64,
+            "DNP3 48-bit timestamp representing count of milliseconds since epoch UTC",
+        )?
+        .param(
+            "interval_ms",
+            Primitive::U32,
+            "Interval expressed in milliseconds",
+        )?
+        .doc(
+            doc("Add a single g51v1 time-and-interval")
+                .details("This is useful when constructing freeze-at-time requests"),
+        )?
+        .build()?;
+
     let request = lib
         .define_class(&request)?
         .constructor(constructor)?
@@ -194,6 +212,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .method(add_all_objects_header)?
         .method(add_one_byte_limited_count_header)?
         .method(add_two_byte_limited_count_header)?
+        .method(add_time_and_interval)?
         .doc(
             doc("Custom request")
             .details("Whenever a method takes a request as a parameter, the request is internally copied. Therefore, it is possible to reuse the same requests over and over.")

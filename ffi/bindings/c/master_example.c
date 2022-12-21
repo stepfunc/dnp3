@@ -202,13 +202,16 @@ void on_time_sync_error(dnp3_time_sync_error_t error, void *arg) { printf("Time 
 void on_restart_success(uint64_t delay, void *arg) { printf("restart success: %" PRIu64 "\n", delay); }
 void on_restart_failure(dnp3_restart_error_t error, void* arg) { printf("Restart failure: %s\n", dnp3_restart_error_to_string(error)); }
 
-// write dead-band callbacks
-void on_write_dead_band_success(dnp3_nothing_t delay, void *arg) { printf("Write dead-bands success! \n"); }
-void on_write_dead_band_failure(dnp3_write_dead_bands_error_t error, void *arg) { printf("Write dead-bands failure: %s\n", dnp3_write_dead_bands_error_to_string(error)); }
-
 // link status callbacks
 void on_link_status_success(dnp3_nothing_t nothing, void *arg) { printf("link status success!\n"); }
 void on_link_status_failure(dnp3_link_status_error_t error, void* arg) { printf("link status error: %s\n", dnp3_link_status_error_to_string(error)); }
+
+// generic callbacks
+void on_generic_success(dnp3_nothing_t delay, void *arg) { printf("%s success! \n", (const char*) arg); }
+void on_generic_failure(dnp3_empty_response_error_t error, void *arg)
+{
+    printf("%s failure: %s\n", (const char *)arg, dnp3_empty_response_error_to_string(error));
+}
 
 // ANCHOR: master_channel_config
 dnp3_master_channel_config_t get_master_channel_config()
@@ -423,11 +426,11 @@ int run_channel(dnp3_master_channel_t *channel)
         }
         else if (strcmp(cbuf, "wad\n") == 0) {
             // ANCHOR: write_dead_bands
-            dnp3_write_analog_dead_bands_callback_t cb = {
-                .on_complete = &on_write_dead_band_success,
-                .on_failure = &on_write_dead_band_failure,
+            dnp3_empty_response_callback_t cb = {
+                .on_complete = &on_generic_success,
+                .on_failure = &on_generic_failure,
                 .on_destroy = NULL,
-                .ctx = NULL,
+                .ctx = "write dead-bands",
             };
 
             dnp3_write_dead_band_request_t *request = dnp3_write_dead_band_request_create();
@@ -437,6 +440,22 @@ int run_channel(dnp3_master_channel_t *channel)
             dnp3_master_channel_write_dead_bands(channel, association_id, request, cb);
             dnp3_write_dead_band_request_destroy(request);
             // ANCHOR_END: write_dead_bands
+        }
+        else if (strcmp(cbuf, "fat\n") == 0) {            
+            dnp3_empty_response_callback_t cb = {
+                .on_complete = &on_generic_success,
+                .on_failure = &on_generic_failure,
+                .on_destroy = NULL,
+                .ctx = "freeze-at-time",
+            };
+
+            dnp3_request_t *request = dnp3_request_create();
+            dnp3_request_add_time_and_interval(request, 0xFF0000000000, 865000000);
+            dnp3_request_add_all_objects_header(request, DNP3_VARIATION_GROUP20_VAR0);
+                     
+            
+            dnp3_master_channel_request_expect_empty_response(channel, association_id, DNP3_FUNCTION_CODE_FREEZE_AT_TIME, request, cb);
+            dnp3_request_destroy(request);            
         }
         else if (strcmp(cbuf, "crt\n") == 0) {
             dnp3_restart_task_callback_t cb = {

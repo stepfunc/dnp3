@@ -5,8 +5,6 @@ use crate::master::request::ReadRequest;
 use crate::master::tasks::ReadTask;
 use crate::master::ReadHandler;
 
-use scursor::WriteError;
-
 pub(crate) struct SingleReadTask {
     request: ReadRequest,
     pub(crate) custom_handler: Option<Box<dyn ReadHandler>>,
@@ -38,7 +36,7 @@ impl SingleReadTask {
         ReadTask::SingleRead(self)
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         self.request.format(writer)
     }
 

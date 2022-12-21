@@ -9,7 +9,6 @@ use crate::master::handler::{AssociationHandle, Promise};
 use crate::master::request::ReadRequest;
 use crate::util::Smallest;
 
-use scursor::WriteError;
 use tokio::time::Instant;
 
 /// Periodic poll representation
@@ -96,7 +95,7 @@ impl Poll {
         }
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         self.request.format(writer)
     }
 

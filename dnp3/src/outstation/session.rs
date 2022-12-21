@@ -39,7 +39,6 @@ use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::bit::BitSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use scursor::WriteError;
 
 #[derive(Copy, Clone)]
 enum TimeoutStatus {
@@ -1158,34 +1157,27 @@ impl OutstationSession {
                 )
                 .await
             }
-            FunctionCode::ImmediateFreeze => self.handle_freeze(
-                database,
-                seq,
-                object_headers,
-                FreezeType::ImmediateFreeze,
-                true,
-            ),
-            FunctionCode::ImmediateFreezeNoResponse => self.handle_freeze(
-                database,
-                seq,
-                object_headers,
-                FreezeType::ImmediateFreeze,
-                false,
-            ),
-            FunctionCode::FreezeClear => self.handle_freeze(
-                database,
-                seq,
-                object_headers,
-                FreezeType::FreezeAndClear,
-                true,
-            ),
-            FunctionCode::FreezeClearNoResponse => self.handle_freeze(
-                database,
-                seq,
-                object_headers,
-                FreezeType::FreezeAndClear,
-                false,
-            ),
+            FunctionCode::ImmediateFreeze => {
+                Some(self.handle_freeze(database, seq, object_headers, FreezeType::ImmediateFreeze))
+            }
+            FunctionCode::ImmediateFreezeNoResponse => {
+                self.handle_freeze(database, seq, object_headers, FreezeType::ImmediateFreeze);
+                None
+            }
+            FunctionCode::FreezeClear => {
+                Some(self.handle_freeze(database, seq, object_headers, FreezeType::FreezeAndClear))
+            }
+            FunctionCode::FreezeClearNoResponse => {
+                self.handle_freeze(database, seq, object_headers, FreezeType::FreezeAndClear);
+                None
+            }
+            FunctionCode::FreezeAtTime => {
+                Some(self.handle_freeze_at_time(database, seq, object_headers))
+            }
+            FunctionCode::FreezeAtTimeNoResponse => {
+                self.handle_freeze_at_time(database, seq, object_headers);
+                None
+            }
             FunctionCode::EnableUnsolicited => {
                 Some(self.handle_enable_or_disable_unsolicited(true, seq, object_headers))
             }
@@ -1611,7 +1603,7 @@ impl OutstationSession {
             let _ = cursor.skip(ResponseHeader::LENGTH);
 
             let max_controls_per_request = self.config.max_controls_per_request;
-            let result: Result<CommandStatus, WriteError> = ControlTransaction::execute(
+            let result: Result<CommandStatus, scursor::WriteError> = ControlTransaction::execute(
                 self.control_handler.borrow_mut(),
                 database,
                 |tx, db| {
@@ -1725,44 +1717,93 @@ impl OutstationSession {
         seq: Sequence,
         object_headers: HeaderCollection,
         freeze_type: FreezeType,
-        respond: bool,
-    ) -> Option<Response> {
+    ) -> Response {
         let mut iin = Iin::default();
 
         for header in object_headers.iter() {
+            iin |= self.handle_freeze_header(database, freeze_type, header.details);
+        }
+
+        Response::empty_solicited(seq, iin)
+    }
+
+    fn handle_freeze_at_time(
+        &mut self,
+        database: &mut DatabaseHandle,
+        seq: Sequence,
+        object_headers: HeaderCollection,
+    ) -> Response {
+        let mut iin = Iin::default();
+
+        let mut timing: Option<FreezeInterval> = None;
+
+        for header in object_headers.iter() {
             match header.details {
-                HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => {
-                    iin |= self
-                        .application
-                        .freeze_counter(FreezeIndices::All, freeze_type, database)
-                        .map_or_else(|err| err.into(), |_| Iin2::default());
+                HeaderDetails::OneByteCount(_, CountVariation::Group50Var2(seq)) => {
+                    match seq.single() {
+                        None => iin.iin2.set(Iin2::PARAMETER_ERROR),
+                        Some(x) => {
+                            timing = Some(x.into());
+                        }
+                    }
                 }
-                HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                    iin |= self
-                        .application
-                        .freeze_counter(
-                            FreezeIndices::Range(start as u16, stop as u16),
-                            freeze_type,
-                            database,
-                        )
-                        .map_or_else(|err| err.into(), |_| Iin2::default());
-                }
-                HeaderDetails::TwoByteStartStop(start, stop, RangedVariation::Group20Var0) => {
-                    iin |= self
-                        .application
-                        .freeze_counter(FreezeIndices::Range(start, stop), freeze_type, database)
-                        .map_or_else(|err| err.into(), |_| Iin2::default());
+                HeaderDetails::TwoByteCount(_, CountVariation::Group50Var2(seq)) => {
+                    match seq.single() {
+                        None => iin.iin2.set(Iin2::PARAMETER_ERROR),
+                        Some(x) => {
+                            timing = Some(x.into());
+                        }
+                    }
                 }
                 _ => {
-                    iin |= Iin2::NO_FUNC_CODE_SUPPORT;
+                    // other variations require that there be a preceding g50v2
+                    match timing {
+                        None => {
+                            tracing::warn!(
+                                "freeze-at-time on {} w/o preceding g50v2",
+                                header.variation
+                            );
+                            iin.iin2.set(Iin2::PARAMETER_ERROR);
+                        }
+                        Some(x) => {
+                            iin |= self.handle_freeze_header(
+                                database,
+                                FreezeType::FreezeAtTime(x),
+                                header.details,
+                            );
+                        }
+                    }
                 }
             }
         }
 
-        if respond {
-            Some(Response::empty_solicited(seq, iin))
-        } else {
-            None
+        Response::empty_solicited(seq, iin)
+    }
+
+    fn handle_freeze_header(
+        &mut self,
+        database: &mut DatabaseHandle,
+        freeze_type: FreezeType,
+        details: HeaderDetails,
+    ) -> Iin2 {
+        match details {
+            HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => self
+                .application
+                .freeze_counter(FreezeIndices::All, freeze_type, database)
+                .map_or_else(|err| err.into(), |_| Iin2::default()),
+            HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => self
+                .application
+                .freeze_counter(
+                    FreezeIndices::Range(start as u16, stop as u16),
+                    freeze_type,
+                    database,
+                )
+                .map_or_else(|err| err.into(), |_| Iin2::default()),
+            HeaderDetails::TwoByteStartStop(start, stop, RangedVariation::Group20Var0) => self
+                .application
+                .freeze_counter(FreezeIndices::Range(start, stop), freeze_type, database)
+                .map_or_else(|err| err.into(), |_| Iin2::default()),
+            _ => Iin2::NO_FUNC_CODE_SUPPORT,
         }
     }
 
@@ -1865,11 +1906,15 @@ impl OutstationSession {
                 BroadcastAction::Processed
             }
             FunctionCode::ImmediateFreezeNoResponse => {
-                self.handle_freeze(database, seq, objects, FreezeType::ImmediateFreeze, false);
+                self.handle_freeze(database, seq, objects, FreezeType::ImmediateFreeze);
                 BroadcastAction::Processed
             }
             FunctionCode::FreezeClearNoResponse => {
-                self.handle_freeze(database, seq, objects, FreezeType::FreezeAndClear, false);
+                self.handle_freeze(database, seq, objects, FreezeType::FreezeAndClear);
+                BroadcastAction::Processed
+            }
+            FunctionCode::FreezeAtTimeNoResponse => {
+                self.handle_freeze_at_time(database, seq, objects);
                 BroadcastAction::Processed
             }
             FunctionCode::RecordCurrentTime => {

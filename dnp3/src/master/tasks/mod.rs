@@ -17,11 +17,12 @@ use crate::master::tasks::time::TimeSyncTask;
 use crate::master::{ReadType, TaskType};
 
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
-use scursor::WriteError;
+use crate::master::tasks::empty_response::EmptyResponseTask;
 
 pub(crate) mod auto;
 pub(crate) mod command;
 pub(crate) mod deadbands;
+pub(crate) mod empty_response;
 pub(crate) mod read;
 pub(crate) mod restart;
 pub(crate) mod time;
@@ -89,7 +90,7 @@ impl Task {
 
 pub(crate) trait RequestWriter {
     fn function(&self) -> FunctionCode;
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError>;
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError>;
 }
 
 pub(crate) enum ReadTask {
@@ -114,6 +115,8 @@ pub(crate) enum NonReadTask {
     Restart(RestartTask),
     /// write dead-bands
     DeadBands(WriteDeadBandsTask),
+    /// Generic task for anything that doesn't have response object headers
+    EmptyResponseTask(EmptyResponseTask),
 }
 
 impl RequestWriter for ReadTask {
@@ -121,7 +124,7 @@ impl RequestWriter for ReadTask {
         FunctionCode::Read
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             ReadTask::PeriodicPoll(poll) => poll.format(writer),
             ReadTask::StartupIntegrity(classes) => classes.write(writer),
@@ -136,13 +139,14 @@ impl RequestWriter for NonReadTask {
         self.function()
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             NonReadTask::Auto(t) => t.write(writer),
             NonReadTask::Command(t) => t.write(writer),
             NonReadTask::TimeSync(t) => t.write(writer),
             NonReadTask::Restart(_) => Ok(()),
             NonReadTask::DeadBands(t) => t.write(writer),
+            NonReadTask::EmptyResponseTask(t) => t.write(writer),
         }
     }
 }
@@ -231,6 +235,7 @@ impl NonReadTask {
             NonReadTask::TimeSync(task) => task.start(association).map(|task| task.wrap()),
             NonReadTask::Restart(_) => Some(self),
             NonReadTask::DeadBands(_) => Some(self),
+            NonReadTask::EmptyResponseTask(_) => Some(self),
         }
     }
 
@@ -241,6 +246,7 @@ impl NonReadTask {
             NonReadTask::TimeSync(task) => task.function(),
             NonReadTask::Restart(task) => task.function(),
             NonReadTask::DeadBands(task) => task.function(),
+            NonReadTask::EmptyResponseTask(task) => task.function(),
         }
     }
 
@@ -251,6 +257,7 @@ impl NonReadTask {
             NonReadTask::Auto(task) => task.on_task_error(association, err),
             NonReadTask::Restart(task) => task.on_task_error(err),
             NonReadTask::DeadBands(task) => task.on_task_error(err),
+            NonReadTask::EmptyResponseTask(task) => task.on_task_error(err),
         }
     }
 
@@ -268,6 +275,7 @@ impl NonReadTask {
             NonReadTask::TimeSync(task) => task.handle(association, response),
             NonReadTask::Restart(task) => task.handle(response),
             NonReadTask::DeadBands(task) => task.handle(response),
+            NonReadTask::EmptyResponseTask(task) => task.handle(response),
         }
     }
 
@@ -282,6 +290,7 @@ impl NonReadTask {
             Self::TimeSync(_) => TaskType::TimeSync,
             Self::Restart(_) => TaskType::Restart,
             NonReadTask::DeadBands(_) => TaskType::WriteDeadBands,
+            NonReadTask::EmptyResponseTask(_) => TaskType::GenericEmptyResponse(self.function()),
         }
     }
 }

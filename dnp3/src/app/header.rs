@@ -261,6 +261,10 @@ impl Iin2 {
         Self { value }
     }
 
+    pub(crate) fn set(&mut self, iin2: Self) {
+        self.value |= iin2.value;
+    }
+
     /// test IIN.2 to see if the NO_FUNC_CODE_SUPPORT bit is set
     pub fn get_no_func_code_support(self) -> bool {
         self.value.bit_0()

@@ -12,11 +12,12 @@ use crate::master::poll::{PollHandle, PollMsg};
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
+use crate::master::tasks::empty_response::EmptyResponseTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
-use crate::master::{DeadBandHeader, IinTaskError};
+use crate::master::{DeadBandHeader, Headers, WriteError};
 use crate::util::channel::Sender;
 
 /// Handle to a master communication channel. This handle controls
@@ -206,6 +207,22 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Perform an asynchronous request with the specified function code and object headers
+    ///
+    /// This is useful for constructing various types of WRITE and FREEZE operations where
+    /// an empty response is expected from the outstation, and the only indication of success
+    /// are bits in IIN.2
+    pub async fn request_expecting_empty_response(
+        &mut self,
+        function: FunctionCode,
+        headers: Headers,
+    ) -> Result<(), WriteError> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WriteError>>();
+        let task = EmptyResponseTask::new(function, headers, Promise::OneShot(tx));
+        self.send_task(task.wrap().wrap()).await?;
+        rx.await?
+    }
+
     /// Perform an asynchronous READ request with a custom read handler
     ///
     /// If successful, the custom [ReadHandler](crate::master::ReadHandler) will process the received measurement data
@@ -269,8 +286,8 @@ impl AssociationHandle {
     pub async fn write_dead_bands(
         &mut self,
         headers: Vec<DeadBandHeader>,
-    ) -> Result<(), IinTaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), IinTaskError>>();
+    ) -> Result<(), WriteError> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WriteError>>();
         let task = WriteDeadBandsTask::new(headers, Promise::OneShot(tx));
         self.send_task(task.wrap().wrap()).await?;
         rx.await?
@@ -325,6 +342,7 @@ impl<T> Promise<T> {
 }
 
 /// Task types used in [`AssociationInformation`]
+#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TaskType {
     /// User-defined read request
@@ -349,6 +367,8 @@ pub enum TaskType {
     Restart,
     /// Write dead-bands
     WriteDeadBands,
+    /// Generic task which
+    GenericEmptyResponse(FunctionCode),
 }
 
 /// callbacks associated with a single master to outstation association

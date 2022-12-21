@@ -2,48 +2,37 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::master::tasks::NonReadTask;
-use crate::master::{DeadBandHeader, DeadBandHeaderVariants, Promise, TaskError, WriteError};
+use crate::master::{Headers, Promise, TaskError, WriteError};
 
-pub(crate) struct WriteDeadBandsTask {
-    headers: Vec<DeadBandHeader>,
+pub(crate) struct EmptyResponseTask {
+    function: FunctionCode,
+    headers: Headers,
     promise: Promise<Result<(), WriteError>>,
 }
 
-impl DeadBandHeaderVariants {
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        match self {
-            Self::G34V1U8(x) => writer.write_prefixed_items(x.iter()),
-            Self::G34V1U16(x) => writer.write_prefixed_items(x.iter()),
-            Self::G34V2U8(x) => writer.write_prefixed_items(x.iter()),
-            Self::G34V2U16(x) => writer.write_prefixed_items(x.iter()),
-            Self::G34V3U8(x) => writer.write_prefixed_items(x.iter()),
-            Self::G34V3U16(x) => writer.write_prefixed_items(x.iter()),
-        }
-    }
-}
-
-impl WriteDeadBandsTask {
+impl EmptyResponseTask {
     pub(crate) fn new(
-        headers: Vec<DeadBandHeader>,
+        function: FunctionCode,
+        headers: Headers,
         promise: Promise<Result<(), WriteError>>,
     ) -> Self {
-        Self { headers, promise }
+        Self {
+            function,
+            headers,
+            promise,
+        }
     }
 
     pub(crate) fn wrap(self) -> NonReadTask {
-        NonReadTask::DeadBands(self)
+        NonReadTask::EmptyResponseTask(self)
     }
 
     pub(crate) const fn function(&self) -> FunctionCode {
-        FunctionCode::Write
+        self.function
     }
 
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        for header in self.headers.iter() {
-            header.inner.write(writer)?;
-        }
-
-        Ok(())
+        self.headers.write(writer)
     }
 
     pub(crate) fn on_task_error(self, err: TaskError) {

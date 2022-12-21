@@ -24,7 +24,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .build()?;
 
     let write_dead_band_request = crate::write_dead_band_request::define(lib)?;
-    let write_dead_band_callback = define_write_dead_bands_callback(lib, nothing.clone())?;
+    let empty_response_callback = define_empty_response_callback(lib, nothing.clone())?;
 
     let master_channel_create_tcp_fn = lib
         .define_function("master_channel_create_tcp")?
@@ -360,7 +360,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .define_future_method(
             "write_dead_bands",
             master_channel_class.clone(),
-            write_dead_band_callback,
+            empty_response_callback.clone(),
         )?
         .param(
             "association",
@@ -375,6 +375,33 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .fails_with(shared.error_type.clone())?
         .doc(doc(
             "Perform a WRITE on the association using the supplied collection of dead-band headers",
+        ))?
+        .build()?;
+
+    let request_expect_empty_response = lib
+        .define_future_method(
+            "request_expect_empty_response",
+            master_channel_class.clone(),
+            empty_response_callback,
+        )?
+        .param(
+            "association",
+            association_id.clone(),
+            "Association on which to perform the request",
+        )?
+        .param(
+            "function",
+            shared.function_code.clone(),
+            "Function code for the request",
+        )?
+        .param(
+            "headers",
+            request_class.declaration(),
+            "Headers that will be contained in the request",
+        )?
+        .fails_with(shared.error_type.clone())?
+        .doc(doc(
+            "Send the specified request to the association using the supplied function and collection of request headers",
         ))?
         .build()?;
 
@@ -490,6 +517,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .async_method(cold_restart_async)?
         .async_method(warm_restart_async)?
         .async_method(write_dead_bands_async)?
+        .async_method(request_expect_empty_response)?
         .async_method(check_link_status_async)?
         .custom_destroy("shutdown")?
         .doc(
@@ -902,6 +930,10 @@ fn define_association_information(
         .push("time_sync", "Time synchronisation task")?
         .push("restart", "Cold or warm restart task")?
         .push("write_dead_bands", "Write analog input dead-bands")?
+        .push(
+            "generic_empty_response",
+            "Generic request that expects an empty response",
+        )?
         .doc("Task type used in {interface:association_information}")?
         .build()?;
 
@@ -1404,14 +1436,14 @@ fn define_link_status_callback(
     Ok(callback)
 }
 
-fn define_write_dead_bands_callback(
+fn define_empty_response_callback(
     lib: &mut LibraryBuilder,
     nothing: EnumHandle,
 ) -> BackTraced<FutureInterface<Unvalidated>> {
     let error = lib
         .define_error_type(
-            "write_dead_bands_error",
-            "write_dead_bands_exception",
+            "empty_response_error",
+            "empty_response_exception",
             ExceptionType::CheckedException,
         )?
         .add_error(
@@ -1419,14 +1451,14 @@ fn define_write_dead_bands_callback(
             "IIN2 indicates request was not completely successful",
         )?
         .add_task_errors()?
-        .doc("Errors that may occur when writing analog input dead bands")?
+        .doc("Errors that may occur when performing a request that expects a response with zero object headers")?
         .build()?;
 
     let callback = lib.define_future_interface(
-        "write_analog_dead_bands_callback",
-        "Callback interface for writing analog input dead-bands",
+        "empty_response_callback",
+        "Callback interface for any task that expects an empty response",
         nothing,
-        "Result of WRITE operation",
+        "Result of operation",
         Some(error),
     )?;
 

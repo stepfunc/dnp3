@@ -36,24 +36,64 @@ impl OutstationApplication for ffi::OutstationApplication {
         freeze_type: FreezeType,
         database: &mut DatabaseHandle,
     ) -> Result<(), RequestError> {
-        match indices {
-            FreezeIndices::All => ffi::OutstationApplication::freeze_counters_all(
-                self,
-                freeze_type.into(),
-                database as *mut _,
-            )
+        let result: Option<ffi::FreezeResult> = match (indices, freeze_type) {
+            (FreezeIndices::All, FreezeType::ImmediateFreeze) => {
+                ffi::OutstationApplication::freeze_counters_all(
+                    self,
+                    ffi::FreezeType::ImmediateFreeze,
+                    database as *mut _,
+                )
+            }
+            (FreezeIndices::All, FreezeType::FreezeAndClear) => {
+                ffi::OutstationApplication::freeze_counters_all(
+                    self,
+                    ffi::FreezeType::FreezeAndClear,
+                    database as *mut _,
+                )
+            }
+            (FreezeIndices::Range(start, stop), FreezeType::ImmediateFreeze) => {
+                ffi::OutstationApplication::freeze_counters_range(
+                    self,
+                    start,
+                    stop,
+                    ffi::FreezeType::ImmediateFreeze,
+                    database as *mut _,
+                )
+            }
+            (FreezeIndices::Range(start, stop), FreezeType::FreezeAndClear) => {
+                ffi::OutstationApplication::freeze_counters_range(
+                    self,
+                    start,
+                    stop,
+                    ffi::FreezeType::FreezeAndClear,
+                    database as *mut _,
+                )
+            }
+            (FreezeIndices::All, FreezeType::FreezeAtTime(timing)) => {
+                let (time, interval) = timing.get_time_and_interval();
+                ffi::OutstationApplication::freeze_counters_all_at_time(
+                    self,
+                    database as *mut _,
+                    time.raw_value(),
+                    interval,
+                )
+            }
+            (FreezeIndices::Range(start, stop), FreezeType::FreezeAtTime(timing)) => {
+                let (time, interval) = timing.get_time_and_interval();
+                ffi::OutstationApplication::freeze_counters_range_at_time(
+                    self,
+                    start,
+                    stop,
+                    database as *mut _,
+                    time.raw_value(),
+                    interval,
+                )
+            }
+        };
+
+        result
             .map(|res| res.into())
-            .unwrap_or(Err(RequestError::NotSupported)),
-            FreezeIndices::Range(start, stop) => ffi::OutstationApplication::freeze_counters_range(
-                self,
-                start,
-                stop,
-                freeze_type.into(),
-                database as *mut _,
-            )
-            .map(|res| res.into())
-            .unwrap_or(Err(RequestError::NotSupported)),
-        }
+            .unwrap_or(Err(RequestError::NotSupported))
     }
 
     fn support_write_analog_dead_bands(&mut self) -> bool {
@@ -173,15 +213,6 @@ impl ControlHandler for ffi::ControlHandler {
     fn end_fragment(&mut self, database: &mut DatabaseHandle) -> MaybeAsync<()> {
         ffi::ControlHandler::end_fragment(self, database as *mut _);
         MaybeAsync::ready(())
-    }
-}
-
-impl From<FreezeType> for ffi::FreezeType {
-    fn from(from: FreezeType) -> Self {
-        match from {
-            FreezeType::ImmediateFreeze => ffi::FreezeType::ImmediateFreeze,
-            FreezeType::FreezeAndClear => ffi::FreezeType::FreezeAndClear,
-        }
     }
 }
 

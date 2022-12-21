@@ -470,7 +470,16 @@ class MainClass
                     request.AddG34v1U8(3, 5);
                     request.AddG34v3U16(4, 2.5f);
                     await channel.WriteDeadBands(association, request);
-                    Console.WriteLine($"Write dead-bands sucess");
+                    Console.WriteLine($"Write dead-bands success");
+                    return true;
+                }
+            case "fat":
+                {
+                    var request = new Request();                    
+                    request.AddTimeAndInterval(0, 86400000);
+                    request.AddAllObjectsHeader(Variation.Group20Var0);
+                    await channel.RequestExpectEmptyResponse(association, FunctionCode.FreezeAtTime, request);
+                    Console.WriteLine($"Freeze-at-time success");
                     return true;
                 }
             case "crt":

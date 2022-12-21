@@ -9,8 +9,6 @@ use crate::master::association::NoAssociation;
 use crate::master::session::{RunError, StateChange};
 use crate::transport::TransportResponseError;
 
-use scursor::WriteError;
-
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
@@ -84,10 +82,10 @@ pub enum CommandResponseError {
     ObjectValueMismatch,
 }
 
-/// Error type for tasks that don't return anything from the outstation but might
-/// fail b/c IIN2 has a bit set
+/// Error type for operations that don't return anything from the outstation but might fail
+/// b/c IIN2 has an error bit set
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum IinTaskError {
+pub enum WriteError {
     /// Error occurred during task execution
     Task(TaskError),
     /// Outstation returned an IIN.2 error
@@ -249,17 +247,17 @@ impl std::fmt::Display for TimeSyncError {
     }
 }
 
-impl std::fmt::Display for IinTaskError {
+impl std::fmt::Display for WriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            IinTaskError::Task(err) => write!(f, "{err}"),
-            IinTaskError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
+            WriteError::Task(err) => write!(f, "{err}"),
+            WriteError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
         }
     }
 }
 
-impl From<WriteError> for TaskError {
-    fn from(_: WriteError) -> Self {
+impl From<scursor::WriteError> for TaskError {
+    fn from(_: scursor::WriteError) -> Self {
         TaskError::WriteError
     }
 }
@@ -334,15 +332,15 @@ impl From<RecvError> for AssociationError {
     }
 }
 
-impl From<RecvError> for IinTaskError {
+impl From<RecvError> for WriteError {
     fn from(_: RecvError) -> Self {
-        IinTaskError::Task(TaskError::Shutdown)
+        WriteError::Task(TaskError::Shutdown)
     }
 }
 
-impl From<TaskError> for IinTaskError {
+impl From<TaskError> for WriteError {
     fn from(err: TaskError) -> Self {
-        IinTaskError::Task(err)
+        WriteError::Task(err)
     }
 }
 
@@ -409,9 +407,9 @@ impl From<Shutdown> for PollError {
     }
 }
 
-impl From<Shutdown> for IinTaskError {
+impl From<Shutdown> for WriteError {
     fn from(_: Shutdown) -> Self {
-        IinTaskError::Task(TaskError::Shutdown)
+        WriteError::Task(TaskError::Shutdown)
     }
 }
 
@@ -421,4 +419,4 @@ impl Error for PollError {}
 impl Error for CommandError {}
 impl Error for CommandResponseError {}
 impl Error for TimeSyncError {}
-impl Error for IinTaskError {}
+impl Error for WriteError {}
