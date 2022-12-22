@@ -31,6 +31,7 @@ impl EndpointType {
     }
 }
 
+mod attributes;
 mod control_types;
 #[rustfmt::skip]
 mod app_enums;
