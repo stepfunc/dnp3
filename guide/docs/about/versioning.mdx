@@ -5,8 +5,43 @@ sidebar_label: Versioning
 slug: /versioning
 ---
 
-Our library follows the [semantic versioning](https://semver.org/) specification. Refer to the specification for the meaning of the `<major>.<minor>.<patch>`
-fields of the version number.
+The underlying Rust library follows the [semantic versioning](https://semver.org/) specification. Refer to the specification for the meaning of the `<major>.<minor>.<patch>`
+fields of the version number when using the library in Rust.
+
+## Version numbers
+
+The following sections describe the meaning of the fields in the version number.
+
+### Major
+
+Major releases are for substantial breaking changes and should occur infrequently. They provide an opportunity to
+consolidate functionality that may have been added in an adhoc manner in support of backwards compatibility in minor
+releases. Major releases may also add functionality that requires refactoring of the API.
+
+### Minor
+
+Minor releases are for introducing new functionality in a (mostly) backwards compatible manner:
+
+- Rust - API compatible per `semver`
+- C & C++ - API compatible
+- Java - API compatible
+- C# - API compatible with the exception that we may add new methods to interfaces that need to be stubbed out
+
+:::note Why is C# different?
+C++, Java, Rust, and even C (via NULL) support a way of defining default methods on interfaces. This allows us to extend
+interfaces in minor releases without breaking source compatibility in these languages. Default interfaces were added to
+C# 8.0, however to target .NET standard 2.0 (which is both .NET Core and .NET Framework compatible) we can only use C# 7.
+:::
+
+### Patch
+
+Patch releases are only for fixing bugs that cannot wait for a minor release to be resolved. Patch releases,
+e.g. 1.0.0 -> 1.0.1, are API compatible in all languages. The C library (libdnp3_ffi.so) will also be ABI compatible
+between patch versions.
+
+
+
+
 
 import sitedata from '../../sitedata.json'
 
