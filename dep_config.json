@@ -10,10 +10,13 @@
     "clap_derive",
     "clap_lex",
     "dunce",
+    "errno",
     "gimli",
     "heck",
-    "java-oo-bindgen",
+    "io-lifetimes",
+    "is-terminal",
     "miniz_oxide",
+    "linux-raw-sys",
     "object",
     "oo-bindgen",
     "os_str_bytes",
@@ -23,8 +26,8 @@
     "proc-macro-error",
     "proc-macro-error-attr",
     "dnp3-schema",
-    "rust-oo-bindgen",
     "rustc-demangle",
+    "rustix",
     "same-file",
     "semver",
     "semver-parser",
@@ -206,6 +209,22 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2018 Carl Lerche"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "cbc": {
+      "id": "cbc",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018-2022 RustCrypto Developers",
+                "Copyright (c) 2018 Artyom Pavlov"
               ]
             }
           }
@@ -636,6 +655,22 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2020 Andrew D. Straw"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "inout": {
+      "id": "inout",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2022 The RustCrypto Project Developers",
+                "Copyright (c) 2022 Artyom Pavlov"
               ]
             }
           }

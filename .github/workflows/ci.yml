@@ -222,6 +222,7 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-gnu # 64-bit Linux (kernel 2.6.32+, glibc 2.11+)
+          - i686-unknown-linux-gnu # 32-bit Linux (kernel 3.2+, glibc 2.17+)
           - x86_64-unknown-linux-musl # 64-bit Linux with MUSL
           - arm-unknown-linux-gnueabihf # ARMv6 Linux, hardfloat (kernel 3.2, glibc 2.17)
           - arm-unknown-linux-musleabihf # ARMv6 Linux with MUSL, hardfloat
