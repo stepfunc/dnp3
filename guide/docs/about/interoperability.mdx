@@ -22,6 +22,7 @@ Our library is currently `Level 3` compliant for both master and outstation. We 
 |---------------------------|:-----:|
 | Double-bit Binary Inputs  |  4    |
 | Floating-point AI/AO      |  4    |
+| Analog Input Dead-bands   |  4    |
 | BO/AO events              |  4    |
 | LAN time-synchronization  |  4    |
 | Self-address support      |  4    |
@@ -33,9 +34,8 @@ We are planning to add support for several features in future releases, includin
 
 1. Device attributes (group 0)
 2. AO/BO command events (groups 13 & 43)
-3. Analog input deadbands (group 34)
 
-Our library will be level 4 compliant when we complete items 1-3.
+The library will be level 4 compliant when we complete these two remaining features.
 
 ## Conformance Testing
 
@@ -45,5 +45,5 @@ We created an internal implementation of these test procedures that we automatic
 [Github Actions](https://github.com/stepfunc/dnp3/actions) CI.
 
 :::note
-The DNP User Group only certifies outstation devices as conformant, not libraries. Contact Step Function I/O if you would like to engage us to conduct conformance testing for your outstation product.
+The DNP User Group only certifies outstation devices as conforming to the specification, not libraries. Contact Step Function I/O if you would like to engage us to conduct conformance testing for your outstation product.
 :::
