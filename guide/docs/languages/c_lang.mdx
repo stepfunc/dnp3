@@ -122,7 +122,8 @@ int opaque_type_get_special_value(opaque_type_t* instance)
 
 ### Interfaces
 
-C accomplishes function polymorphism using function pointers. Interfaces are simply collections of function pointers along with some optional context. For example, let's look at the following logging interface in the library:
+C accomplishes function polymorphism using function pointers. Interfaces are simply collections of function pointers
+along with some optional context. For example, let's look at the following logging interface in the library:
 
 ```c
 typedef struct dnp3_logger_t
@@ -139,9 +140,14 @@ typedef struct dnp3_logger_t
 
 Keep in mind that this example only contains a single method. Other interfaces will contain several methods.
 
+:::warning
+Always use [C99 struct initialization](https://en.cppreference.com/w/c/language/struct_initialization) when defining interfaces
+as this will guarantee that fields you don't explicitly initialize are set to NULL.
+:::
+
 :::tip
-If your implementation of an interface is stateless, you can initialize `ctx` and `on_destroy` to NULL. C99 struct initialization syntax
-will do this by default if you don't specify a value for these fields.
+The FFI library will interpret NULL function pointers as "not-defined" and will use an intelligent default for this method of
+the interface. The `ctx` value may be NULL as well if your interface is stateless.
 :::
 
 ### Iterators
