@@ -48,6 +48,7 @@ impl AttrDataType {
         }
     }
 
+    /*
     pub(crate) fn to_u8(self) -> u8 {
         match self {
             Self::VisibleString => VISIBLE_STRING,
@@ -60,16 +61,22 @@ impl AttrDataType {
             Self::ExtAttrList => EXT_ATTR_LIST,
         }
     }
+    */
 }
 
+/// A list of attributes returned from the outstation. This type is
+/// the payload of g0v255. It implements an iterator over [`AttrItem`] values.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AttrList<'a> {
     data: &'a [u8],
 }
 
+/// Single entry in the attribute list
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AttrItem {
+    /// Variation of the attributes
     pub variation: u8,
+    /// Property indicating if the attribute can be written by the master
     pub is_writable: bool,
 }
 impl<'a> Iterator for AttrList<'a> {
@@ -92,25 +99,38 @@ impl<'a> Iterator for AttrList<'a> {
     }
 }
 
+/// Floating point attribute can be F32 or F64
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FloatType {
+    /// Single-precision
     F32(f32),
+    /// Double-precision
     F64(f64),
 }
 
+/// Represents an attribute value
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum Attribute<'a> {
+pub enum Attribute<'a> {
+    /// VSTR - Visible character suitable for print and display
     VisibleString(&'a str),
+    /// UINT - Unsigned integer
     UnsignedInt(u32),
+    /// Signed integer
     SignedInt(i32),
+    /// Int - Signed integer
     FloatingPoint(FloatType),
+    /// OSTR - Octet string
     OctetString(&'a [u8]),
+    /// BSTR - Bit string
     BitString(&'a [u8]),
+    /// List of UINT8-BSTR8
     AttrList(AttrList<'a>),
 }
 
+/// Possible errors when parsing device attributes
+#[non_exhaustive]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum AttrParseError {
+pub enum AttrParseError {
     /// End of buffer
     ReadError,
     /// Unknown data type code
@@ -119,7 +139,7 @@ pub(crate) enum AttrParseError {
     BadIntegerLength(u8),
     /// Only 4 and 8 byte floats are supported
     BadFloatLength(u8),
-    /// Attribute lists must be even in length (2*N) where is number of pairs
+    /// Attribute lists must be even in length (2*N) where N is number of pairs
     BadAttrListLength(u16),
     /// Visible string is not UTF-8. The DNP3 standard doesn't really define what "visible" means
     /// but this handles ASCII and is more flexible for non-english users.
@@ -139,7 +159,8 @@ impl From<Utf8Error> for AttrParseError {
 }
 
 impl<'a> Attribute<'a> {
-    pub(crate) fn parse(cursor: &'a mut ReadCursor) -> Result<Self, AttrParseError> {
+    /// Parse a device attribute (code, length, and payload)
+    pub fn parse(cursor: &'a mut ReadCursor) -> Result<Self, AttrParseError> {
         let data_type = {
             let data_type = cursor.read_u8()?;
             match AttrDataType::get(data_type) {
