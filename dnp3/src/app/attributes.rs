@@ -63,16 +63,15 @@ impl AttrDataType {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct AttrList<'a> {
+pub struct AttrList<'a> {
     data: &'a [u8],
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct AttrItem {
-    pub(crate) variation: u8,
-    pub(crate) is_writable: bool,
+pub struct AttrItem {
+    pub variation: u8,
+    pub is_writable: bool,
 }
-
 impl<'a> Iterator for AttrList<'a> {
     type Item = AttrItem;
 
@@ -94,7 +93,7 @@ impl<'a> Iterator for AttrList<'a> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum FloatType {
+pub enum FloatType {
     F32(f32),
     F64(f64),
 }
