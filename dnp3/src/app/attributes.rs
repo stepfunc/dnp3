@@ -88,7 +88,7 @@ impl<'a> Iterator for AttrList<'a> {
 
         Some(AttrItem {
             variation,
-            is_writable
+            is_writable,
         })
     }
 }
@@ -141,10 +141,12 @@ impl From<Utf8Error> for AttrParseError {
 
 impl<'a> Attribute<'a> {
     pub(crate) fn parse(cursor: &'a mut ReadCursor) -> Result<Self, AttrParseError> {
-        let data_type = cursor.read_u8()?;
-        let data_type = match AttrDataType::get(data_type) {
-            Some(x) => x,
-            None => return Err(AttrParseError::UnknownDataType(data_type)),
+        let data_type = {
+            let data_type = cursor.read_u8()?;
+            match AttrDataType::get(data_type) {
+                Some(x) => x,
+                None => return Err(AttrParseError::UnknownDataType(data_type)),
+            }
         };
 
         // the raw length
@@ -308,21 +310,41 @@ mod test {
         let expected = f32::from_le_bytes(bytes);
         let input = &[FLOATING_POINT, 0x04, 0x01, 0x02, 0x03, 0x04];
         let mut cursor = ReadCursor::new(input.as_slice());
-        assert_eq!(Attribute::parse(&mut cursor), Ok(Attribute::FloatingPoint(FloatType::F32(expected))));
+        assert_eq!(
+            Attribute::parse(&mut cursor),
+            Ok(Attribute::FloatingPoint(FloatType::F32(expected)))
+        );
     }
 
     #[test]
     fn parses_f64() {
-        let input = &[FLOATING_POINT, 0x08, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+        let input = &[
+            FLOATING_POINT,
+            0x08,
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            0x05,
+            0x06,
+            0x07,
+            0x08,
+        ];
         let expected = f64::from_le_bytes([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]);
         let mut cursor = ReadCursor::new(input.as_slice());
-        assert_eq!(Attribute::parse(&mut cursor), Ok(Attribute::FloatingPoint(FloatType::F64(expected))));
+        assert_eq!(
+            Attribute::parse(&mut cursor),
+            Ok(Attribute::FloatingPoint(FloatType::F64(expected)))
+        );
     }
 
     #[test]
     fn rejects_bad_float_length() {
         let input = &[FLOATING_POINT, 0x07, 0x01, 0x02];
         let mut cursor = ReadCursor::new(input.as_slice());
-        assert_eq!(Attribute::parse(&mut cursor), Err(AttrParseError::BadFloatLength(7)));
+        assert_eq!(
+            Attribute::parse(&mut cursor),
+            Err(AttrParseError::BadFloatLength(7))
+        );
     }
 }
