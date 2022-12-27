@@ -74,18 +74,55 @@ pub struct AttrList<'a> {
 /// Single entry in the attribute list
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AttrItem {
-    /// Variation of the attributes
+    /// Variation of the attribute
     pub variation: u8,
-    /// Property indicating if the attribute can be written by the master
-    pub is_writable: bool,
+    /// Associated properties
+    pub properties: AttrProp,
 }
+
+/// Attribute properties encoded in an attribute list
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+pub struct AttrProp {
+    /// property indicating if the attribute can be written by the master
+    is_writable: bool,
+}
+
+impl AttrProp {
+    const READ_BIT: u8 = 0x01;
+
+    /// Construct `AttrProp` with the write-able bit set
+    pub fn writable(self) -> Self {
+        Self { is_writable: true }
+    }
+
+    /// Returns true if the attribute is writeable
+    pub fn is_writable(&self) -> bool {
+        self.is_writable
+    }
+
+    pub(crate) fn new(props: u8) -> Self {
+        Self {
+            is_writable: props & Self::READ_BIT != 0,
+        }
+    }
+
+    /*
+    pub(crate) fn value(self) -> u8 {
+        let mut value = 0;
+        if self.is_writable {
+            value |= Self::READ_BIT;
+        }
+        value
+    }
+     */
+}
+
 impl<'a> Iterator for AttrList<'a> {
     type Item = AttrItem;
 
     fn next(&mut self) -> Option<Self::Item> {
         let variation = *self.data.first()?;
         let prop = *self.data.get(1)?;
-        let is_writable = (prop & 0x01) != 0;
 
         self.data = match self.data.get(2..) {
             Some(x) => x,
@@ -94,7 +131,7 @@ impl<'a> Iterator for AttrList<'a> {
 
         Some(AttrItem {
             variation,
-            is_writable,
+            properties: AttrProp::new(prop),
         })
     }
 }
@@ -310,15 +347,15 @@ mod test {
             &[
                 AttrItem {
                     variation: 20,
-                    is_writable: false
+                    properties: AttrProp { is_writable: false },
                 },
                 AttrItem {
                     variation: 21,
-                    is_writable: true
+                    properties: AttrProp { is_writable: true },
                 },
                 AttrItem {
                     variation: 22,
-                    is_writable: false
+                    properties: AttrProp { is_writable: false },
                 },
             ]
         );
