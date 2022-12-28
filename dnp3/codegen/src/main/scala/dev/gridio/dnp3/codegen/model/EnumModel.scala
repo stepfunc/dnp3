@@ -41,6 +41,7 @@ trait EnumModel {
   def values: List[EnumValue]
   def render : IntRender
   def captureUnknownValues: Boolean
+  def implOrd: Boolean = false
 }
 
 

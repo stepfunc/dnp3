@@ -20,6 +20,8 @@ use scursor::*;
 /// All variations supported by the library
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Variation {
+    /// Device Attributes - All Variations
+    Group0(u8),
     /// Binary Input - Any Variation
     Group1Var0,
     /// Binary Input - Packed Format
@@ -257,6 +259,7 @@ pub enum Variation {
 impl Variation {
     pub(crate) fn lookup(group: u8, var: u8) -> Option<Variation> {
         match group {
+            0 => Some(Variation::Group0(var)),
             1 => match var {
                 0 => Some(Variation::Group1Var0),
                 1 => Some(Variation::Group1Var1),
@@ -451,6 +454,7 @@ impl Variation {
     
     pub(crate) fn to_group_and_var(self) -> (u8, u8) {
         match self {
+            Variation::Group0(x) => (0, x),
             Variation::Group1Var0 => (1, 0),
             Variation::Group1Var1 => (1, 1),
             Variation::Group1Var2 => (1, 2),
@@ -572,6 +576,7 @@ impl Variation {
     
     pub(crate) fn description(self) -> &'static str {
         match self {
+            Variation::Group0(_) => "Device Attributes - All Variations",
             Variation::Group1Var0 => "Binary Input - Any Variation",
             Variation::Group1Var1 => "Binary Input - Packed Format",
             Variation::Group1Var2 => "Binary Input - With Flags",

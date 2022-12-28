@@ -4,6 +4,7 @@ import dev.gridio.dnp3.codegen.model._
 
 object FunctionCode extends EnumModel {
 
+  override def implOrd: Boolean = true
   override def captureUnknownValues: Boolean = false
 
   override def render: IntRender = IntRender.Base10
