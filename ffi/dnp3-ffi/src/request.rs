@@ -183,6 +183,9 @@ pub(crate) unsafe fn request_add_time_and_interval(
 impl From<ffi::Variation> for Variation {
     fn from(from: ffi::Variation) -> Variation {
         match from {
+            ffi::Variation::Group0 => Variation::Group0(0),
+            ffi::Variation::Group0Var254 => Variation::Group0Var254,
+            ffi::Variation::Group0Var255 => Variation::Group0Var255,
             ffi::Variation::Group1Var0 => Variation::Group1Var0,
             ffi::Variation::Group1Var1 => Variation::Group1Var1,
             ffi::Variation::Group1Var2 => Variation::Group1Var2,
@@ -325,6 +328,9 @@ impl From<ffi::Variation> for Variation {
 impl From<Variation> for ffi::Variation {
     fn from(from: Variation) -> ffi::Variation {
         match from {
+            Variation::Group0(_) => ffi::Variation::Group0,
+            Variation::Group0Var254 => ffi::Variation::Group0Var254,
+            Variation::Group0Var255 => ffi::Variation::Group0Var255,
             Variation::Group1Var0 => ffi::Variation::Group1Var0,
             Variation::Group1Var1 => ffi::Variation::Group1Var1,
             Variation::Group1Var2 => ffi::Variation::Group1Var2,

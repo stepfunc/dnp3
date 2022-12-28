@@ -1,7 +1,7 @@
 package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
-import dev.gridio.dnp3.codegen.model.groups.{Group110, Group111}
+import dev.gridio.dnp3.codegen.model.groups.{AllAttributesRequest, Group0, Group110, Group111, ListOfAttributes}
 import dev.gridio.dnp3.codegen.render._
 
 object AllObjectsVariationModule extends Module {
@@ -49,6 +49,8 @@ object AllObjectsVariationModule extends Module {
       case v : FixedSize if v.parent.groupType.isStatic || v.parent.groupType.isEvent => v
       case v : FixedSize if v.parent.groupType == GroupType.AnalogInputDeadband => v
       case v if v.parent == Group110 || v.parent == Group111 => v
+      case ListOfAttributes => ListOfAttributes
+      case AllAttributesRequest => AllAttributesRequest
     }
   }
 

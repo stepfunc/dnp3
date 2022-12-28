@@ -14,6 +14,8 @@ use crate::app::variations::Variation;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum AllObjectsVariation {
+    Group0Var255,
+    Group0Var254,
     Group1Var0,
     Group1Var1,
     Group1Var2,
@@ -120,6 +122,8 @@ pub(crate) enum AllObjectsVariation {
 impl AllObjectsVariation {
     pub(crate) fn get(v: Variation) -> Option<AllObjectsVariation> {
         match v {
+            Variation::Group0Var255 => Some(AllObjectsVariation::Group0Var255),
+            Variation::Group0Var254 => Some(AllObjectsVariation::Group0Var254),
             Variation::Group1Var0 => Some(AllObjectsVariation::Group1Var0),
             Variation::Group1Var1 => Some(AllObjectsVariation::Group1Var1),
             Variation::Group1Var2 => Some(AllObjectsVariation::Group1Var2),

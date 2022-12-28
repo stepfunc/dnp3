@@ -48,7 +48,7 @@ trait Variation {
 }
 
 class AnyVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g, Variation.Value(v), "Any Variation")
-class AnyDeviceAttribute(g: ObjectGroup) extends BasicGroupVariation (g,  Variation.Value(253), "All Variations")
+
 class ClassData(g: ObjectGroup, v: Byte, desc: String) extends BasicGroupVariation(g,  Variation.Value(v), desc)
 
 class SizedByVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g,  Variation.Value(v), "Sized by variation")
@@ -57,7 +57,7 @@ class SingleBitField(g: ObjectGroup, v: Byte, description: String) extends Basic
 
 class DoubleBitField(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g,  Variation.Value(v), description)
 
-sealed abstract class BasicGroupVariation(g: ObjectGroup, v: Variation.Value, description: String) extends Variation {
+abstract class BasicGroupVariation(g: ObjectGroup, v: Variation.Value, description: String) extends Variation {
   def variation: Variation.Value = v
 
   def parent: ObjectGroup = g

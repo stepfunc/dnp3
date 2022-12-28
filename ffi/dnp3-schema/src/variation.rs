@@ -4,6 +4,15 @@ use oo_bindgen::model::{BackTraced, EnumHandle, LibraryBuilder};
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let variation = lib
         .define_enum("variation")?
+        .push("group0", "Device Attributes - Variations 0 to 253")?
+        .push(
+            "group0_var254",
+            "Device Attributes - Non-Specific All Attributes Request",
+        )?
+        .push(
+            "group0_var255",
+            "Device Attributes - List of Attribute Variations",
+        )?
         .push(gv(1, 0), "Binary Input - Default variation")?
         .push(gv(1, 1), "Binary Input - Packed format")?
         .push(gv(1, 2), "Binary Input - With flags")?

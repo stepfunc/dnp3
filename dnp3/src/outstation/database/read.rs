@@ -99,6 +99,9 @@ impl ReadHeader {
 
     fn from_all_objects(header: &AllObjectsVariation) -> Option<ReadHeader> {
         match header {
+            // group 0
+            AllObjectsVariation::Group0Var254 => None,
+            AllObjectsVariation::Group0Var255 => None,
             // group 1
             AllObjectsVariation::Group1Var0 => Some(StaticReadHeader::Binary(None, None).into()),
             AllObjectsVariation::Group1Var1 => Some(

@@ -20,7 +20,11 @@ use scursor::*;
 /// All variations supported by the library
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Variation {
-    /// Device Attributes - All Variations
+    /// Device Attributes - List of Attribute Variations
+    Group0Var255,
+    /// Device Attributes - Non-Specific All Attributes Request
+    Group0Var254,
+    /// Device Attributes - Variations 1 to 253
     Group0(u8),
     /// Binary Input - Any Variation
     Group1Var0,
@@ -259,7 +263,12 @@ pub enum Variation {
 impl Variation {
     pub(crate) fn lookup(group: u8, var: u8) -> Option<Variation> {
         match group {
-            0 => Some(Variation::Group0(var)),
+            0 => match var {
+                0 => None,
+                254 => Some(Variation::Group0Var254),
+                255 => Some(Variation::Group0Var255),
+                _ => Some(Variation::Group0(var)),
+            },
             1 => match var {
                 0 => Some(Variation::Group1Var0),
                 1 => Some(Variation::Group1Var1),
@@ -454,6 +463,8 @@ impl Variation {
     
     pub(crate) fn to_group_and_var(self) -> (u8, u8) {
         match self {
+            Variation::Group0Var255 => (0, 255),
+            Variation::Group0Var254 => (0, 254),
             Variation::Group0(x) => (0, x),
             Variation::Group1Var0 => (1, 0),
             Variation::Group1Var1 => (1, 1),
@@ -576,7 +587,9 @@ impl Variation {
     
     pub(crate) fn description(self) -> &'static str {
         match self {
-            Variation::Group0(_) => "Device Attributes - All Variations",
+            Variation::Group0Var255 => "Device Attributes - List of Attribute Variations",
+            Variation::Group0Var254 => "Device Attributes - Non-Specific All Attributes Request",
+            Variation::Group0(_) => "Device Attributes - Variations 1 to 253",
             Variation::Group1Var0 => "Binary Input - Any Variation",
             Variation::Group1Var1 => "Binary Input - Packed Format",
             Variation::Group1Var2 => "Binary Input - With Flags",
