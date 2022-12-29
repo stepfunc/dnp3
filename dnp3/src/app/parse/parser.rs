@@ -1096,6 +1096,25 @@ mod test {
     }
 
     #[test]
+    fn parses_specific_attribute_in_read_request() {
+        let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x07];
+
+        let mut headers = ObjectParser::parse(FunctionCode::Read, &input)
+            .unwrap()
+            .iter();
+
+        let first = headers.next().unwrap();
+        assert!(headers.next().is_none());
+
+        assert_eq!(first.variation, Variation::Group0(0xCA));
+        assert!(std::matches!(first.details, HeaderDetails::OneByteStartStop(
+                0x07,
+                0x07,
+                RangedVariation::Group0(0xCA, None)
+        )));
+    }
+
+    #[test]
     fn range_parsing_fails_for_specific_attribute_with_count_equal_two() {
         let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x08, 0x02, 0x01, 42];
         let err = ObjectParser::parse(FunctionCode::Response, &input).unwrap_err();
