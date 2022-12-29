@@ -23,11 +23,9 @@ use scursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum RangedVariation<'a> {
-    /// Device Attributes - List of Attribute Variations
-    Group0Var255(Option<crate::app::AttrListSet<'a>>),
     /// Device Attributes - Non-Specific All Attributes Request
     Group0Var254,
-    /// Device Attributes - Variations 1 to 253
+    /// Device Attributes - Variations 1 to 253 and 255
     /// variation and optional attribute
     Group0(u8, Option<crate::app::AttributeSet<'a>>),
     /// Binary Input - Any Variation
@@ -130,7 +128,6 @@ pub(crate) enum RangedVariation<'a> {
 impl<'a> RangedVariation<'a> {
     pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
-            Variation::Group0Var255 => Ok(RangedVariation::Group0Var255(Some(crate::app::AttrListSet::parse_from_range(range, cursor)?))),
             Variation::Group0Var254 => Ok(RangedVariation::Group0Var254),
             Variation::Group0(var) => Ok(RangedVariation::Group0(var, Some(crate::app::AttributeSet::parse_from_range(range, cursor)?))),
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
@@ -189,7 +186,6 @@ impl<'a> RangedVariation<'a> {
     
     pub(crate) fn parse_read(v: Variation, qualifier: QualifierCode) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
-            Variation::Group0Var255 => Ok(RangedVariation::Group0Var255(None)),
             Variation::Group0Var254 => Ok(RangedVariation::Group0Var254),
             Variation::Group0(var) => Ok(RangedVariation::Group0(var, None)),
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
@@ -245,7 +241,6 @@ impl<'a> RangedVariation<'a> {
     
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            RangedVariation::Group0Var255(_) => Ok(()), // TODO - this should output something!
             RangedVariation::Group0Var254 => Ok(()),
             RangedVariation::Group0(_,_) => Ok(()), // TODO - this should output something!
             RangedVariation::Group1Var0 => Ok(()),
@@ -301,10 +296,6 @@ impl<'a> RangedVariation<'a> {
     
     pub(crate) fn extract_measurements_to(&self, qualifier: QualifierCode, handler: &mut dyn ReadHandler) -> bool {
         match self {
-            RangedVariation::Group0Var255(_) => {
-                // TODO
-                false // extraction not supported
-            }
             RangedVariation::Group0Var254 => {
                 false // extraction not supported
             }
@@ -613,7 +604,6 @@ impl<'a> RangedVariation<'a> {
     
     pub(crate) fn variation(&self) -> Variation {
         match self {
-            RangedVariation::Group0Var255(_) => Variation::Group0Var255,
             RangedVariation::Group0Var254 => Variation::Group0Var254,
             RangedVariation::Group0(var,_) => Variation::Group0(*var),
             RangedVariation::Group1Var0 => Variation::Group1Var0,

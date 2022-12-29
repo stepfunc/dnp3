@@ -48,7 +48,6 @@ object VariationEnumModule extends Module {
             bracketComma(s"${g.group} => match var") {
               "0 => None,".eol ++
               "254 => Some(Variation::Group0Var254),".eol ++
-              "255 => Some(Variation::Group0Var255),".eol ++
               "_ => Some(Variation::Group0(var)),".eol
             }
           case _ =>

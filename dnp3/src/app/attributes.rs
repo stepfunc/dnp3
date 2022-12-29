@@ -103,29 +103,6 @@ fn try_get_set(range: Range) -> Result<u8, AttrParseError> {
     Ok(set)
 }
 
-impl<'a> AttrListSet<'a> {
-    pub(crate) fn parse_from_range(
-        range: Range,
-        cursor: &mut ReadCursor<'a>,
-    ) -> Result<Self, AttrParseError> {
-        let set = try_get_set(range)?;
-
-        let attr = Attribute::parse(cursor)?;
-
-        let list = match attr {
-            Attribute::AttrList(x) => x,
-            _ => {
-                return Err(AttrParseError::UnexpectedType(
-                    AttrDataType::AttrList,
-                    attr.get_type(),
-                ))
-            }
-        };
-
-        Ok(Self { set, list })
-    }
-}
-
 /// Single entry in the attribute list
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AttrItem {
@@ -340,7 +317,8 @@ impl<'a> Attribute<'a> {
         Ok(attr)
     }
 
-    pub(crate) fn get_type(&self) -> AttrDataType {
+    /// underlying type
+    pub fn get_type(&self) -> AttrDataType {
         match self {
             Attribute::VisibleString(_) => AttrDataType::VisibleString,
             Attribute::UnsignedInt(_) => AttrDataType::UnsignedInt,

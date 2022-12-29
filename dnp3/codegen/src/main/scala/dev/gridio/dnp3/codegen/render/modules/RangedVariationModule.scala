@@ -1,7 +1,7 @@
 package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
-import dev.gridio.dnp3.codegen.model.groups.{AllAttributesRequest, Group10Var1, Group110AnyVar, Group1Var1, Group80Var1, ListOfAttributes, SpecificAttribute}
+import dev.gridio.dnp3.codegen.model.groups.{AllAttributesRequest, Group10Var1, Group110AnyVar, Group1Var1, Group80Var1, SpecificAttribute}
 import dev.gridio.dnp3.codegen.render._
 
 object RangedVariationModule extends Module {
@@ -41,7 +41,6 @@ object RangedVariationModule extends Module {
           "/// variation and optional attribute".eol ++
           s"${v.parent.name}(u8, Option<crate::app::AttributeSet<'a>>),".eol
         }
-        case ListOfAttributes => s"${v.name}(Option<crate::app::AttrListSet<'a>>),".eol
         case AllAttributesRequest => nameOnly
       }
     }
@@ -56,7 +55,6 @@ object RangedVariationModule extends Module {
   private def rangedVariationEnumImpl(implicit indent: Indentation) : Iterator[String] = {
 
     def getNonReadVarDefinition(v: Variation) : String = v match {
-      case ListOfAttributes => "(Some(crate::app::AttrListSet::parse_from_range(range, cursor)?))"
       case AllAttributesRequest => ""
       case SpecificAttribute => "(var, Some(crate::app::AttributeSet::parse_from_range(range, cursor)?))"
       case _ : AnyVariation => ""
@@ -64,7 +62,6 @@ object RangedVariationModule extends Module {
     }
 
     def getReadVarDefinition(v: Variation) : String = v match {
-      case ListOfAttributes => "(None)"
       case AllAttributesRequest => ""
       case SpecificAttribute => "(var, None)"
       case _ : AnyVariation => ""
@@ -113,7 +110,6 @@ object RangedVariationModule extends Module {
       def nothing = s"RangedVariation::${v.name} => Ok(()),".eol
 
       v match {
-        case ListOfAttributes => s"RangedVariation::${v.name}(_) => Ok(()), // TODO - this should output something!".eol
         case AllAttributesRequest => nothing
         case SpecificAttribute => s"RangedVariation::${v.parent.name}(_,_) => Ok(()), // TODO - this should output something!".eol
         case _ : AnyVariation => nothing
@@ -145,7 +141,6 @@ object RangedVariationModule extends Module {
       def simple = s"RangedVariation::${v.name} => Variation::${v.name},".eol
 
       v match {
-        case ListOfAttributes => s"RangedVariation::${v.name}(_) => Variation::${v.name},".eol
         case AllAttributesRequest => simple
         case SpecificAttribute => {
           s"RangedVariation::${v.parent.name}(var,_) => Variation::${v.parent.name}(*var),".eol
@@ -180,10 +175,6 @@ object RangedVariationModule extends Module {
       }
 
       v match {
-        case ListOfAttributes => bracket(s"RangedVariation::${v.name}(_) =>") {
-          "// TODO".eol ++
-            "false // extraction not supported".eol
-        }
         case AllAttributesRequest => notSupported
         case SpecificAttribute => bracket(s"RangedVariation::${v.parent.name}(_,_) =>") {
           "// TODO".eol ++
@@ -251,7 +242,6 @@ object RangedVariationModule extends Module {
         case v : FixedSize if v.parent.groupType.isStatic => Some(v)
         case v : SizedByVariation if v.parent.groupType.isStatic => Some(v)
         case v : FixedSize if v.parent.groupType == GroupType.AnalogInputDeadband => Some(v)
-        case ListOfAttributes => Some(v)
         case AllAttributesRequest => Some(v)
         case SpecificAttribute => Some(v)
         case _ => None

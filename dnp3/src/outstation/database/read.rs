@@ -101,7 +101,7 @@ impl ReadHeader {
         match header {
             // group 0
             AllObjectsVariation::Group0Var254 => None,
-            AllObjectsVariation::Group0Var255 => None,
+            AllObjectsVariation::Group0(_) => None,
             // group 1
             AllObjectsVariation::Group1Var0 => Some(StaticReadHeader::Binary(None, None).into()),
             AllObjectsVariation::Group1Var1 => Some(
@@ -884,7 +884,6 @@ impl ReadHeader {
         match header {
             // group 0
             RangedVariation::Group0Var254 => None,
-            RangedVariation::Group0Var255(_) => None,
             RangedVariation::Group0(_, _) => None,
             // group 1
             RangedVariation::Group1Var0 => Some(StaticReadHeader::Binary(None, Some(range)).into()),
