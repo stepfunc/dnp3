@@ -105,7 +105,7 @@ impl std::fmt::Display for ObjectParseError {
             ObjectParseError::ZeroLengthOctetData => {
                 f.write_str("octet-data may not be zero length")
             }
-            ObjectParseError::BadAttribute(x) => write!(f, "{}", x),
+            ObjectParseError::BadAttribute(x) => write!(f, "{x}"),
         }
     }
 }

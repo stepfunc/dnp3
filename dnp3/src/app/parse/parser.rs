@@ -1107,11 +1107,10 @@ mod test {
         assert!(headers.next().is_none());
 
         assert_eq!(first.variation, Variation::Group0(0xCA));
-        assert!(std::matches!(first.details, HeaderDetails::OneByteStartStop(
-                0x07,
-                0x07,
-                RangedVariation::Group0(0xCA, None)
-        )));
+        assert!(std::matches!(
+            first.details,
+            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(0xCA, None))
+        ));
     }
 
     #[test]

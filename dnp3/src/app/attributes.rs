@@ -16,7 +16,7 @@ const EXT_ATTR_LIST: u8 = 255;
 ///
 /// IEEE 1815-2012 pg 150
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum AttrDataType {
+pub enum AttrDataType {
     /// VSTR - Visible character suitable for print and display
     VisibleString,
     /// UINT - Unsigned integer
@@ -71,6 +71,59 @@ impl AttrDataType {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AttrList<'a> {
     data: &'a [u8],
+}
+
+/// An attribute list corresponding to a particular set
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct AttrListSet<'a> {
+    /// Set for the attribute. Value of 0 indicates the default/reserved set of attributes
+    pub(crate) set: u8,
+    /// List of attribute variations for the set
+    pub(crate) list: AttrList<'a>,
+}
+
+fn try_get_set(range: Range) -> Result<u8, AttrParseError> {
+    let set: u8 = match range.get_start().try_into() {
+        Err(_) => {
+            return Err(AttrParseError::BadRange(
+                range.get_start(),
+                range.get_count(),
+            ))
+        }
+        Ok(x) => x,
+    };
+
+    if range.get_count() != 1 {
+        return Err(AttrParseError::BadRange(
+            range.get_start(),
+            range.get_count(),
+        ));
+    }
+
+    Ok(set)
+}
+
+impl<'a> AttrListSet<'a> {
+    pub(crate) fn parse_from_range(
+        range: Range,
+        cursor: &mut ReadCursor<'a>,
+    ) -> Result<Self, AttrParseError> {
+        let set = try_get_set(range)?;
+
+        let attr = Attribute::parse(cursor)?;
+
+        let list = match attr {
+            Attribute::AttrList(x) => x,
+            _ => {
+                return Err(AttrParseError::UnexpectedType(
+                    AttrDataType::AttrList,
+                    attr.get_type(),
+                ))
+            }
+        };
+
+        Ok(Self { set, list })
+    }
 }
 
 /// Single entry in the attribute list
@@ -180,23 +233,7 @@ impl<'a> AttributeSet<'a> {
         range: Range,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<Self, AttrParseError> {
-        let set: u8 = match range.get_start().try_into() {
-            Err(_) => {
-                return Err(AttrParseError::BadRange(
-                    range.get_start(),
-                    range.get_count(),
-                ))
-            }
-            Ok(x) => x,
-        };
-
-        if range.get_count() != 1 {
-            return Err(AttrParseError::BadRange(
-                range.get_start(),
-                range.get_count(),
-            ));
-        }
-
+        let set = try_get_set(range)?;
         let value = Attribute::parse(cursor)?;
         Ok(Self { set, value })
     }
@@ -221,6 +258,8 @@ pub enum AttrParseError {
     BadVisibleString(Utf8Error),
     /// Range is either not U8 or contains count != 1
     BadRange(u16, usize),
+    /// Expected type X but received type Y
+    UnexpectedType(AttrDataType, AttrDataType),
 }
 
 impl Display for AttrParseError {
@@ -244,6 +283,9 @@ impl Display for AttrParseError {
                 f,
                 "Attribute range is not U8 or has count != 1, start: {start} count: {count}"
             ),
+            AttrParseError::UnexpectedType(x, y) => {
+                write!(f, "Expected attribute type {x:?} but received {y:?}")
+            }
         }
     }
 }
@@ -296,6 +338,18 @@ impl<'a> Attribute<'a> {
         };
 
         Ok(attr)
+    }
+
+    pub(crate) fn get_type(&self) -> AttrDataType {
+        match self {
+            Attribute::VisibleString(_) => AttrDataType::VisibleString,
+            Attribute::UnsignedInt(_) => AttrDataType::UnsignedInt,
+            Attribute::SignedInt(_) => AttrDataType::SignedInt,
+            Attribute::FloatingPoint(_) => AttrDataType::FloatingPoint,
+            Attribute::OctetString(_) => AttrDataType::OctetString,
+            Attribute::BitString(_) => AttrDataType::BitString,
+            Attribute::AttrList(_) => AttrDataType::AttrList,
+        }
     }
 
     fn parse_visible_string(
