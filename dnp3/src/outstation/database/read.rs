@@ -882,6 +882,8 @@ impl ReadHeader {
 
     fn from_range(header: &RangedVariation, range: IndexRange) -> Option<ReadHeader> {
         match header {
+            // group 0
+            RangedVariation::Group0Var254 => None,
             RangedVariation::Group0Var255 => None,
             // group 1
             RangedVariation::Group1Var0 => Some(StaticReadHeader::Binary(None, Some(range)).into()),
