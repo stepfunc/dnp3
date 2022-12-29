@@ -627,6 +627,7 @@ mod test {
     use crate::app::sequence::Sequence;
     use crate::app::types::Timestamp;
     use crate::app::variations::*;
+    use crate::app::{Attribute, AttributeSet};
 
     use super::*;
 
@@ -1061,6 +1062,36 @@ mod test {
             &[0x6E, 0x00, 0x00, 0x01, 0x02],
             FunctionCode::Response,
             ObjectParseError::ZeroLengthOctetData,
+        );
+    }
+
+    #[test]
+    fn parses_specific_attribute_in_range() {
+        let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x07, 0x02, 0x01, 42];
+
+        let mut headers = ObjectParser::parse(FunctionCode::Response, &input)
+            .unwrap()
+            .iter();
+
+        let first = headers.next().unwrap();
+        assert!(headers.next().is_none());
+
+        assert_eq!(first.variation, Variation::Group0(0xCA));
+        let set = match first.details {
+            HeaderDetails::OneByteStartStop(
+                0x07,
+                0x07,
+                RangedVariation::Group0(0xCA, Some(set)),
+            ) => set,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(
+            set,
+            AttributeSet {
+                set: 0x07,
+                value: Attribute::UnsignedInt(42)
+            }
         );
     }
 }

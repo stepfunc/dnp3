@@ -170,9 +170,9 @@ pub enum Attribute<'a> {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct AttributeSet<'a> {
     /// Set for the attribute. Value of 0 indicates the default/reserved set of attributes
-    set: u8,
+    pub(crate) set: u8,
     /// Value of the attribute
-    value: Attribute<'a>,
+    pub(crate) value: Attribute<'a>,
 }
 
 impl<'a> AttributeSet<'a> {
