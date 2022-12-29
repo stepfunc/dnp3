@@ -2135,7 +2135,6 @@ impl OutstationSession {
 
 impl From<ObjectParseError> for Iin2 {
     fn from(err: ObjectParseError) -> Self {
-        // TODO - review these
         match err {
             ObjectParseError::InsufficientBytes => Iin2::PARAMETER_ERROR,
             ObjectParseError::InvalidQualifierForVariation(_, _) => Iin2::NO_FUNC_CODE_SUPPORT,
@@ -2144,6 +2143,7 @@ impl From<ObjectParseError> for Iin2 {
             ObjectParseError::UnsupportedQualifierCode(_) => Iin2::PARAMETER_ERROR,
             ObjectParseError::UnknownQualifier(_) => Iin2::PARAMETER_ERROR,
             ObjectParseError::ZeroLengthOctetData => Iin2::PARAMETER_ERROR,
+            ObjectParseError::BadAttribute(_) => Iin2::PARAMETER_ERROR,
         }
     }
 }

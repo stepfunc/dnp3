@@ -3,12 +3,13 @@ use std::fmt::Formatter;
 use crate::app::parse::range::InvalidRange;
 use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
-use crate::app::{FunctionCode, QualifierCode};
+use crate::app::{AttrParseError, FunctionCode, QualifierCode};
 
 use scursor::ReadError;
 
 /// errors that occur when parsing an application layer header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum HeaderParseError {
     /// unknown function code
     UnknownFunction(Sequence, u8),
@@ -18,6 +19,7 @@ pub enum HeaderParseError {
 
 /// errors that occur when parsing object headers
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ObjectParseError {
     /// unknown group and variation
     UnknownGroupVariation(u8, u8),
@@ -33,10 +35,13 @@ pub enum ObjectParseError {
     UnsupportedQualifierCode(QualifierCode),
     /// response containing zero-length octet data disallowed by the specification
     ZeroLengthOctetData,
+    /// Device attribute parsing error
+    BadAttribute(AttrParseError),
 }
 
 /// errors that occur when interpreting a header as a request header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RequestValidationError {
     /// function code not allowed in requests
     UnexpectedFunction(FunctionCode),
@@ -48,6 +53,7 @@ pub enum RequestValidationError {
 
 /// errors that occur when interpreting a header as a response header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ResponseValidationError {
     /// function code not allowed in responses
     UnexpectedFunction(FunctionCode),
@@ -99,6 +105,7 @@ impl std::fmt::Display for ObjectParseError {
             ObjectParseError::ZeroLengthOctetData => {
                 f.write_str("octet-data may not be zero length")
             }
+            ObjectParseError::BadAttribute(x) => write!(f, "{}", x),
         }
     }
 }
@@ -135,6 +142,12 @@ impl std::fmt::Display for ResponseValidationError {
                 f.write_str("unsolicited responses must have FIR = 1 and FIN = 1")
             }
         }
+    }
+}
+
+impl From<AttrParseError> for ObjectParseError {
+    fn from(x: AttrParseError) -> Self {
+        Self::BadAttribute(x)
     }
 }
 

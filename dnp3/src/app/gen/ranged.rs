@@ -27,6 +27,9 @@ pub(crate) enum RangedVariation<'a> {
     Group0Var255,
     /// Device Attributes - Non-Specific All Attributes Request
     Group0Var254,
+    /// Device Attributes - Variations 1 to 253
+    /// variation and optional attribute
+    Group0(u8, Option<crate::app::AttributeSet<'a>>),
     /// Binary Input - Any Variation
     Group1Var0,
     /// Binary Input - Packed Format
@@ -129,6 +132,7 @@ impl<'a> RangedVariation<'a> {
         match v {
             Variation::Group0Var255 => Ok(RangedVariation::Group0Var255),
             Variation::Group0Var254 => Ok(RangedVariation::Group0Var254),
+            Variation::Group0(var) => Ok(RangedVariation::Group0(var, Some(crate::app::AttributeSet::parse_from_range(range, cursor)?))),
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::parse(range, cursor)?)),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::parse(range, cursor)?)),
@@ -187,6 +191,7 @@ impl<'a> RangedVariation<'a> {
         match v {
             Variation::Group0Var255 => Ok(RangedVariation::Group0Var255),
             Variation::Group0Var254 => Ok(RangedVariation::Group0Var254),
+            Variation::Group0(var) => Ok(RangedVariation::Group0(var, None)),
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::empty())),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::empty())),
@@ -242,6 +247,7 @@ impl<'a> RangedVariation<'a> {
         match self {
             RangedVariation::Group0Var255 => Ok(()),
             RangedVariation::Group0Var254 => Ok(()),
+            RangedVariation::Group0(_,_) => Ok(()), // TODO - this should output something!
             RangedVariation::Group1Var0 => Ok(()),
             RangedVariation::Group1Var1(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group1Var2(seq) => format_indexed_items(f, seq.iter()),
@@ -296,13 +302,17 @@ impl<'a> RangedVariation<'a> {
     pub(crate) fn extract_measurements_to(&self, qualifier: QualifierCode, handler: &mut dyn ReadHandler) -> bool {
         match self {
             RangedVariation::Group0Var255 => {
-                false // qualifier 0x06
+                false // extraction not supported
             }
             RangedVariation::Group0Var254 => {
-                false // qualifier 0x06
+                false // extraction not supported
+            }
+            RangedVariation::Group0(_,_) => {
+                // TODO
+                false // extraction not supported
             }
             RangedVariation::Group1Var0 => {
-                false // qualifier 0x06
+                false // extraction not supported
             }
             RangedVariation::Group1Var1(seq) => {
                 handler.handle_binary_input(
@@ -319,7 +329,7 @@ impl<'a> RangedVariation<'a> {
                 true
             }
             RangedVariation::Group3Var0 => {
-                false // qualifier 0x06
+                false // extraction not supported
             }
             RangedVariation::Group3Var1(seq) => {
                 handler.handle_double_bit_binary_input(
@@ -336,7 +346,7 @@ impl<'a> RangedVariation<'a> {
                 true
             }
             RangedVariation::Group10Var0 => {
-                false // qualifier 0x06
+                false // extraction not supported
             }
             RangedVariation::Group10Var1(seq) => {
                 handler.handle_binary_output_status(
@@ -353,7 +363,7 @@ impl<'a> RangedVariation<'a> {
                 true
             }
             RangedVariation::Group20Var0 => {
-                false // qualifier 0x06
+                false // extraction not supported
             }
             RangedVariation::Group20Var1(seq) => {
                 handler.handle_counter(
@@ -384,7 +394,7 @@ impl<'a> RangedVariation<'a> {
                 true
             }
             RangedVariation::Group21Var0 => {
-                false // qualifier 0x06
+                false // extraction not supported
             }
             RangedVariation::Group21Var1(seq) => {
                 handler.handle_frozen_counter(
@@ -429,7 +439,7 @@ impl<'a> RangedVariation<'a> {
                 true
             }
             RangedVariation::Group30Var0 => {
-                false // qualifier 0x06
+                false // extraction not supported
             }
             RangedVariation::Group30Var1(seq) => {
                 handler.handle_analog_input(
@@ -474,7 +484,7 @@ impl<'a> RangedVariation<'a> {
                 true
             }
             RangedVariation::Group31Var0 => {
-                false // qualifier 0x06
+                false // extraction not supported
             }
             RangedVariation::Group31Var1(seq) => {
                 handler.handle_frozen_analog_input(
@@ -554,7 +564,7 @@ impl<'a> RangedVariation<'a> {
                 true
             }
             RangedVariation::Group40Var0 => {
-                false // qualifier 0x06
+                false // extraction not supported
             }
             RangedVariation::Group40Var1(seq) => {
                 handler.handle_analog_output_status(
@@ -604,6 +614,7 @@ impl<'a> RangedVariation<'a> {
         match self {
             RangedVariation::Group0Var255 => Variation::Group0Var255,
             RangedVariation::Group0Var254 => Variation::Group0Var254,
+            RangedVariation::Group0(var,_) => Variation::Group0(*var),
             RangedVariation::Group1Var0 => Variation::Group1Var0,
             RangedVariation::Group1Var1(_) => Variation::Group1Var1,
             RangedVariation::Group1Var2(_) => Variation::Group1Var2,

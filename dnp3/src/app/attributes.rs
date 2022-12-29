@@ -1,4 +1,6 @@
+use crate::app::parse::range::Range;
 use scursor::{ReadCursor, ReadError};
+use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
 const VISIBLE_STRING: u8 = 1;
@@ -164,6 +166,42 @@ pub enum Attribute<'a> {
     AttrList(AttrList<'a>),
 }
 
+/// Attribute and the set to which it belongs
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct AttributeSet<'a> {
+    /// Set for the attribute. Value of 0 indicates the default/reserved set of attributes
+    set: u8,
+    /// Value of the attribute
+    value: Attribute<'a>,
+}
+
+impl<'a> AttributeSet<'a> {
+    pub(crate) fn parse_from_range(
+        range: Range,
+        cursor: &mut ReadCursor<'a>,
+    ) -> Result<Self, AttrParseError> {
+        let set: u8 = match range.get_start().try_into() {
+            Err(_) => {
+                return Err(AttrParseError::BadRange(
+                    range.get_start(),
+                    range.get_count(),
+                ))
+            }
+            Ok(x) => x,
+        };
+
+        if range.get_count() != 1 {
+            return Err(AttrParseError::BadRange(
+                range.get_start(),
+                range.get_count(),
+            ));
+        }
+
+        let value = Attribute::parse(cursor)?;
+        Ok(Self { set, value })
+    }
+}
+
 /// Possible errors when parsing device attributes
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -181,7 +219,36 @@ pub enum AttrParseError {
     /// Visible string is not UTF-8. The DNP3 standard doesn't really define what "visible" means
     /// but this handles ASCII and is more flexible for non-english users.
     BadVisibleString(Utf8Error),
+    /// Range is either not U8 or contains count != 1
+    BadRange(u16, usize),
 }
+
+impl Display for AttrParseError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            AttrParseError::ReadError => f.write_str("attr read error"),
+            AttrParseError::UnknownDataType(x) => write!(f, "Unknown attribute data type: {x}"),
+            AttrParseError::BadIntegerLength(x) => {
+                write!(f, "Unsupported attribute integer length: {x}")
+            }
+            AttrParseError::BadFloatLength(x) => {
+                write!(f, "Bad attribute floating point length: {x}")
+            }
+            AttrParseError::BadAttrListLength(x) => {
+                write!(f, "Attribute list has non-even length: {x}")
+            }
+            AttrParseError::BadVisibleString(x) => {
+                write!(f, "Attribute visible string is not UTF8: {x}")
+            }
+            AttrParseError::BadRange(start, count) => write!(
+                f,
+                "Attribute range is not U8 or has count != 1, start: {start} count: {count}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for AttrParseError {}
 
 impl From<ReadError> for AttrParseError {
     fn from(_: ReadError) -> Self {
@@ -197,7 +264,7 @@ impl From<Utf8Error> for AttrParseError {
 
 impl<'a> Attribute<'a> {
     /// Parse a device attribute (code, length, and payload)
-    pub fn parse(cursor: &'a mut ReadCursor) -> Result<Self, AttrParseError> {
+    pub fn parse(cursor: &mut ReadCursor<'a>) -> Result<Self, AttrParseError> {
         let data_type = {
             let data_type = cursor.read_u8()?;
             match AttrDataType::get(data_type) {
@@ -232,7 +299,7 @@ impl<'a> Attribute<'a> {
     }
 
     fn parse_visible_string(
-        cursor: &'a mut ReadCursor,
+        cursor: &mut ReadCursor<'a>,
         len: u8,
     ) -> Result<&'a str, AttrParseError> {
         let data = cursor.read_bytes(len as usize)?;
@@ -240,7 +307,7 @@ impl<'a> Attribute<'a> {
         Ok(value)
     }
 
-    fn parse_unsigned_int(cursor: &'a mut ReadCursor, len: u8) -> Result<u32, AttrParseError> {
+    fn parse_unsigned_int(cursor: &mut ReadCursor<'a>, len: u8) -> Result<u32, AttrParseError> {
         match len {
             1 => Ok(cursor.read_u8()? as u32),
             2 => Ok(cursor.read_u16_le()? as u32),
@@ -249,7 +316,7 @@ impl<'a> Attribute<'a> {
         }
     }
 
-    fn parse_signed_int(cursor: &'a mut ReadCursor, len: u8) -> Result<i32, AttrParseError> {
+    fn parse_signed_int(cursor: &mut ReadCursor<'a>, len: u8) -> Result<i32, AttrParseError> {
         match len {
             1 => Ok(cursor.read_u8()? as i32),
             2 => Ok(cursor.read_i16_le()? as i32),
@@ -259,7 +326,7 @@ impl<'a> Attribute<'a> {
     }
 
     fn parse_floating_point(
-        cursor: &'a mut ReadCursor,
+        cursor: &mut ReadCursor<'a>,
         len: u8,
     ) -> Result<FloatType, AttrParseError> {
         match len {
@@ -270,7 +337,7 @@ impl<'a> Attribute<'a> {
     }
 
     fn parse_attr_list(
-        cursor: &'a mut ReadCursor,
+        cursor: &mut ReadCursor<'a>,
         len: u16,
     ) -> Result<AttrList<'a>, AttrParseError> {
         if len % 2 != 0 {
