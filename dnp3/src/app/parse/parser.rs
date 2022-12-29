@@ -627,7 +627,7 @@ mod test {
     use crate::app::sequence::Sequence;
     use crate::app::types::Timestamp;
     use crate::app::variations::*;
-    use crate::app::{Attribute, AttributeSet};
+    use crate::app::{AttrParseError, Attribute, AttributeSet};
 
     use super::*;
 
@@ -1092,6 +1092,16 @@ mod test {
                 set: 0x07,
                 value: Attribute::UnsignedInt(42)
             }
+        );
+    }
+
+    #[test]
+    fn range_parsing_fails_for_specific_attribute_with_count_equal_two() {
+        let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x08, 0x02, 0x01, 42];
+        let err = ObjectParser::parse(FunctionCode::Response, &input).unwrap_err();
+        assert_eq!(
+            err,
+            ObjectParseError::BadAttribute(AttrParseError::BadRange(0x07, 2))
         );
     }
 }
