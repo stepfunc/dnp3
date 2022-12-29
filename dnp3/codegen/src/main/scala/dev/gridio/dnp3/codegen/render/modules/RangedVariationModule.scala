@@ -1,7 +1,7 @@
 package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
-import dev.gridio.dnp3.codegen.model.groups.{Group10Var1, Group110AnyVar, Group1Var1, Group80Var1}
+import dev.gridio.dnp3.codegen.model.groups.{Group10Var1, Group110AnyVar, Group1Var1, Group80Var1, ListOfAttributes}
 import dev.gridio.dnp3.codegen.render._
 
 object RangedVariationModule extends Module {
@@ -34,6 +34,7 @@ object RangedVariationModule extends Module {
         s"${v.parent.name}Var0,".eol ++
         s"${v.parent.name}VarX(u8, RangedBytesSequence<'a>),".eol
       }
+      case ListOfAttributes => s"${v.name},".eol
     }
 
     "#[derive(Debug, PartialEq)]".eol ++
@@ -46,11 +47,13 @@ object RangedVariationModule extends Module {
   private def rangedVariationEnumImpl(implicit indent: Indentation) : Iterator[String] = {
 
     def getNonReadVarDefinition(v: Variation) : String = v match {
+      case ListOfAttributes => ""
       case _ : AnyVariation => ""
       case _ : FixedSize => "(RangedSequence::parse(range, cursor)?)"
     }
 
     def getReadVarDefinition(v: Variation) : String = v match {
+      case ListOfAttributes => ""
       case _ : AnyVariation => ""
       case _ : FixedSize => "(RangedSequence::empty())"
     }
@@ -88,11 +91,13 @@ object RangedVariationModule extends Module {
     }
 
     def getFmtMatcher(v: Variation): Iterator[String] = v match {
+      case ListOfAttributes => s"RangedVariation::${v.name} => Ok(()),".eol
       case _ : AnyVariation => s"RangedVariation::${v.name} => Ok(()),".eol
       case _ : SizedByVariation => {
         s"RangedVariation::${v.parent.name}Var0 => Ok(()),".eol ++
           s"RangedVariation::${v.parent.name}VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),".eol
       }
+
       case _ => s"RangedVariation::${v.name}(seq) => format_indexed_items(f, seq.iter()),".eol
     }
 
@@ -113,6 +118,9 @@ object RangedVariationModule extends Module {
 
     def getVariationMatcher(v: Variation): Iterator[String] = {
       v match {
+        case ListOfAttributes => {
+          s"RangedVariation::${v.name} => Variation::${v.name},".eol
+        }
         case _ : AnyVariation => {
           s"RangedVariation::${v.name} => Variation::${v.name},".eol
         }
@@ -141,6 +149,11 @@ object RangedVariationModule extends Module {
       }
 
       v match {
+        case ListOfAttributes => {
+          bracket(s"RangedVariation::${v.name} =>") {
+            "false // qualifier 0x06".eol
+          }
+        }
         case _ : AnyVariation => {
           bracket(s"RangedVariation::${v.name} =>") {
               "false // qualifier 0x06".eol
@@ -207,6 +220,7 @@ object RangedVariationModule extends Module {
         case v : FixedSize if v.parent.groupType.isStatic => Some(v)
         case v : SizedByVariation if v.parent.groupType.isStatic => Some(v)
         case v : FixedSize if v.parent.groupType == GroupType.AnalogInputDeadband => Some(v)
+        case ListOfAttributes => Some(v)
         case _ => None
       }
     }

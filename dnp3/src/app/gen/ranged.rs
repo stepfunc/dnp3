@@ -23,6 +23,8 @@ use scursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum RangedVariation<'a> {
+    /// Device Attributes - List of Attribute Variations
+    Group0Var255,
     /// Binary Input - Any Variation
     Group1Var0,
     /// Binary Input - Packed Format
@@ -123,6 +125,7 @@ pub(crate) enum RangedVariation<'a> {
 impl<'a> RangedVariation<'a> {
     pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
+            Variation::Group0Var255 => Ok(RangedVariation::Group0Var255),
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::parse(range, cursor)?)),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::parse(range, cursor)?)),
@@ -179,6 +182,7 @@ impl<'a> RangedVariation<'a> {
     
     pub(crate) fn parse_read(v: Variation, qualifier: QualifierCode) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
+            Variation::Group0Var255 => Ok(RangedVariation::Group0Var255),
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::empty())),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::empty())),
@@ -232,6 +236,7 @@ impl<'a> RangedVariation<'a> {
     
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            RangedVariation::Group0Var255 => Ok(()),
             RangedVariation::Group1Var0 => Ok(()),
             RangedVariation::Group1Var1(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group1Var2(seq) => format_indexed_items(f, seq.iter()),
@@ -285,6 +290,9 @@ impl<'a> RangedVariation<'a> {
     
     pub(crate) fn extract_measurements_to(&self, qualifier: QualifierCode, handler: &mut dyn ReadHandler) -> bool {
         match self {
+            RangedVariation::Group0Var255 => {
+                false // qualifier 0x06
+            }
             RangedVariation::Group1Var0 => {
                 false // qualifier 0x06
             }
@@ -586,6 +594,7 @@ impl<'a> RangedVariation<'a> {
     
     pub(crate) fn variation(&self) -> Variation {
         match self {
+            RangedVariation::Group0Var255 => Variation::Group0Var255,
             RangedVariation::Group1Var0 => Variation::Group1Var0,
             RangedVariation::Group1Var1(_) => Variation::Group1Var1,
             RangedVariation::Group1Var2(_) => Variation::Group1Var2,
