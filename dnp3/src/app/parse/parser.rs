@@ -627,7 +627,7 @@ mod test {
     use crate::app::sequence::Sequence;
     use crate::app::types::Timestamp;
     use crate::app::variations::*;
-    use crate::app::{AttrParseError, Attribute, AttributeSet};
+    use crate::app::{AttrParseError, AttrSet, AttrValue, Attribute};
 
     use super::*;
 
@@ -1078,19 +1078,16 @@ mod test {
 
         assert_eq!(first.variation, Variation::Group0(0xCA));
         let set = match first.details {
-            HeaderDetails::OneByteStartStop(
-                0x07,
-                0x07,
-                RangedVariation::Group0(0xCA, Some(set)),
-            ) => set,
+            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(Some(set))) => set,
             _ => unreachable!(),
         };
 
         assert_eq!(
             set,
-            AttributeSet {
-                set: 0x07,
-                value: Attribute::UnsignedInt(42)
+            Attribute {
+                set: AttrSet::Private(0x07),
+                variation: 0xCA,
+                value: AttrValue::UnsignedInt(42)
             }
         );
     }
@@ -1109,7 +1106,7 @@ mod test {
         assert_eq!(first.variation, Variation::Group0(0xCA));
         assert!(std::matches!(
             first.details,
-            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(0xCA, None))
+            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(None))
         ));
     }
 

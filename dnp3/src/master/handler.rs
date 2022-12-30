@@ -549,6 +549,10 @@ pub trait ReadHandler: Send + Sync {
         iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     ) {
     }
+
+    /// Process a visible string device attribute
+    #[allow(unused_variables)]
+    fn handle_vstr_attr<'a>(&mut self, info: HeaderInfo, value: &str) {}
 }
 
 /// read handler that does nothing

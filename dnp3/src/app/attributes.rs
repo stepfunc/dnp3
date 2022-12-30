@@ -5,6 +5,60 @@ use scursor::{ReadCursor, ReadError};
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
+/// Set to which a device attribute belongs
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum AttrSet {
+    /// The default attribute set defined by DNP3.org
+    Default,
+    /// Non-zero privately defined attribute set
+    Private(u8),
+}
+
+impl AttrSet {
+    /// Initialize based on raw value
+    pub fn new(value: u8) -> Self {
+        match value {
+            0 => Self::Default,
+            _ => Self::Private(value),
+        }
+    }
+
+    /// Initialize based on raw value
+    pub fn get(self) -> u8 {
+        match self {
+            AttrSet::Default => 0,
+            AttrSet::Private(x) => x,
+        }
+    }
+
+    pub(crate) fn from_range(range: Range) -> Result<Self, AttrParseError> {
+        let value: u8 = match range.get_start().try_into() {
+            Err(_) => {
+                return Err(AttrParseError::SetIdNotU8(range.get_start()));
+            }
+            Ok(x) => x,
+        };
+
+        if range.get_count() != 1 {
+            return Err(AttrParseError::CountNotOne(range.get_count()));
+        }
+
+        Ok(Self::new(value))
+    }
+}
+
+impl Default for AttrSet {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+/// Variants for all the pre-defined attributes in the standard
+pub enum KnownAttribute<'a> {
+    /// Unknown values in the default set or any private set values
+    Other(Attribute<'a>),
+}
+
 const VISIBLE_STRING: u8 = 1;
 const UNSIGNED_INT: u8 = 2;
 const SIGNED_INT: u8 = 3;
@@ -73,30 +127,6 @@ impl AttrDataType {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AttrList<'a> {
     data: &'a [u8],
-}
-
-/// An attribute list corresponding to a particular set
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct AttrListSet<'a> {
-    /// Set for the attribute. Value of 0 indicates the default/reserved set of attributes
-    pub(crate) set: u8,
-    /// List of attribute variations for the set
-    pub(crate) list: AttrList<'a>,
-}
-
-fn try_get_set(range: Range) -> Result<u8, AttrParseError> {
-    let set: u8 = match range.get_start().try_into() {
-        Err(_) => {
-            return Err(AttrParseError::SetIdNotU8(range.get_start()));
-        }
-        Ok(x) => x,
-    };
-
-    if range.get_count() != 1 {
-        return Err(AttrParseError::CountNotOne(range.get_count()));
-    }
-
-    Ok(set)
 }
 
 /// Single entry in the attribute list
@@ -173,9 +203,9 @@ pub enum FloatType {
     F64(f64),
 }
 
-/// Represents an attribute value
+/// Represents the value of a device attribute
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Attribute<'a> {
+pub enum AttrValue<'a> {
     /// VSTR - Visible character suitable for print and display
     VisibleString(&'a str),
     /// UINT - Unsigned integer
@@ -192,17 +222,20 @@ pub enum Attribute<'a> {
     AttrList(AttrList<'a>),
 }
 
-/// Attribute and the set to which it belongs
+/// Attribute value and the set to which it belongs
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct AttributeSet<'a> {
-    /// Set for the attribute. Value of 0 indicates the default/reserved set of attributes
-    pub(crate) set: u8,
+pub struct Attribute<'a> {
+    /// Set to which the attribute belongs
+    pub set: AttrSet,
+    /// The variation of the attribute
+    pub variation: u8,
     /// Value of the attribute
-    pub(crate) value: Attribute<'a>,
+    pub value: AttrValue<'a>,
 }
 
-impl<'a> AttributeSet<'a> {
+impl<'a> Attribute<'a> {
     pub(crate) fn parse_prefixed<I>(
+        variation: u8,
         count: u16,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<Self, ObjectParseError>
@@ -218,17 +251,26 @@ impl<'a> AttributeSet<'a> {
         let set: u8 = index
             .try_into()
             .map_err(|_| AttrParseError::SetIdNotU8(index))?;
-        let value = Attribute::parse(cursor)?;
-        Ok(Self { set, value })
+        let value = AttrValue::parse(cursor)?;
+        Ok(Self {
+            set: AttrSet::new(set),
+            variation,
+            value,
+        })
     }
 
     pub(crate) fn parse_from_range(
+        variation: u8,
         range: Range,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<Self, AttrParseError> {
-        let set = try_get_set(range)?;
-        let value = Attribute::parse(cursor)?;
-        Ok(Self { set, value })
+        let set = AttrSet::from_range(range)?;
+        let value = AttrValue::parse(cursor)?;
+        Ok(Self {
+            set,
+            variation,
+            value,
+        })
     }
 }
 
@@ -299,7 +341,7 @@ impl From<Utf8Error> for AttrParseError {
     }
 }
 
-impl<'a> Attribute<'a> {
+impl<'a> AttrValue<'a> {
     /// Parse a device attribute (code, length, and payload)
     pub fn parse(cursor: &mut ReadCursor<'a>) -> Result<Self, AttrParseError> {
         let data_type = {
@@ -338,13 +380,13 @@ impl<'a> Attribute<'a> {
     /// underlying type
     pub fn get_type(&self) -> AttrDataType {
         match self {
-            Attribute::VisibleString(_) => AttrDataType::VisibleString,
-            Attribute::UnsignedInt(_) => AttrDataType::UnsignedInt,
-            Attribute::SignedInt(_) => AttrDataType::SignedInt,
-            Attribute::FloatingPoint(_) => AttrDataType::FloatingPoint,
-            Attribute::OctetString(_) => AttrDataType::OctetString,
-            Attribute::BitString(_) => AttrDataType::BitString,
-            Attribute::AttrList(_) => AttrDataType::AttrList,
+            AttrValue::VisibleString(_) => AttrDataType::VisibleString,
+            AttrValue::UnsignedInt(_) => AttrDataType::UnsignedInt,
+            AttrValue::SignedInt(_) => AttrDataType::SignedInt,
+            AttrValue::FloatingPoint(_) => AttrDataType::FloatingPoint,
+            AttrValue::OctetString(_) => AttrDataType::OctetString,
+            AttrValue::BitString(_) => AttrDataType::BitString,
+            AttrValue::AttrList(_) => AttrDataType::AttrList,
         }
     }
 
@@ -408,8 +450,8 @@ mod test {
     fn parses_visible_string() {
         let vis_str: &[u8] = &[VISIBLE_STRING, 0x05, b'H', b'E', b'L', b'L', b'O'];
         let mut cursor = ReadCursor::new(vis_str);
-        let attr = Attribute::parse(&mut cursor).unwrap();
-        assert_eq!(attr, Attribute::VisibleString("HELLO"));
+        let attr = AttrValue::parse(&mut cursor).unwrap();
+        assert_eq!(attr, AttrValue::VisibleString("HELLO"));
         assert!(cursor.is_empty());
     }
 
@@ -417,8 +459,8 @@ mod test {
     fn parses_one_byte_unsigned_int() {
         let mut cursor = ReadCursor::new(&[UNSIGNED_INT, 0x01, 42]);
         assert_eq!(
-            Attribute::parse(&mut cursor).unwrap(),
-            Attribute::UnsignedInt(42)
+            AttrValue::parse(&mut cursor).unwrap(),
+            AttrValue::UnsignedInt(42)
         );
         assert!(cursor.is_empty());
     }
@@ -427,8 +469,8 @@ mod test {
     fn parses_two_byte_unsigned_int() {
         let mut cursor = ReadCursor::new(&[UNSIGNED_INT, 0x02, 42, 00]);
         assert_eq!(
-            Attribute::parse(&mut cursor).unwrap(),
-            Attribute::UnsignedInt(42)
+            AttrValue::parse(&mut cursor).unwrap(),
+            AttrValue::UnsignedInt(42)
         );
         assert!(cursor.is_empty());
     }
@@ -437,8 +479,8 @@ mod test {
     fn parses_four_byte_unsigned_int() {
         let mut cursor = ReadCursor::new(&[UNSIGNED_INT, 0x04, 42, 00, 00, 00]);
         assert_eq!(
-            Attribute::parse(&mut cursor).unwrap(),
-            Attribute::UnsignedInt(42)
+            AttrValue::parse(&mut cursor).unwrap(),
+            AttrValue::UnsignedInt(42)
         );
         assert!(cursor.is_empty());
     }
@@ -447,7 +489,7 @@ mod test {
     fn rejects_three_byte_unsigned_int() {
         let mut cursor = ReadCursor::new(&[UNSIGNED_INT, 0x03, 42, 00, 00]);
         assert_eq!(
-            Attribute::parse(&mut cursor),
+            AttrValue::parse(&mut cursor),
             Err(AttrParseError::BadIntegerLength(3))
         );
     }
@@ -455,8 +497,8 @@ mod test {
     #[test]
     fn parses_attr_list() {
         let mut cursor = ReadCursor::new(&[ATTR_LIST, 0x06, 20, 00, 21, 01, 22, 02]);
-        let parsed_list: Vec<AttrItem> = match Attribute::parse(&mut cursor).unwrap() {
-            Attribute::AttrList(x) => x.collect(),
+        let parsed_list: Vec<AttrItem> = match AttrValue::parse(&mut cursor).unwrap() {
+            AttrValue::AttrList(x) => x.collect(),
             _ => unreachable!(),
         };
         assert_eq!(
@@ -485,8 +527,8 @@ mod test {
         let input = &[FLOATING_POINT, 0x04, 0x01, 0x02, 0x03, 0x04];
         let mut cursor = ReadCursor::new(input.as_slice());
         assert_eq!(
-            Attribute::parse(&mut cursor),
-            Ok(Attribute::FloatingPoint(FloatType::F32(expected)))
+            AttrValue::parse(&mut cursor),
+            Ok(AttrValue::FloatingPoint(FloatType::F32(expected)))
         );
     }
 
@@ -507,8 +549,8 @@ mod test {
         let expected = f64::from_le_bytes([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]);
         let mut cursor = ReadCursor::new(input.as_slice());
         assert_eq!(
-            Attribute::parse(&mut cursor),
-            Ok(Attribute::FloatingPoint(FloatType::F64(expected)))
+            AttrValue::parse(&mut cursor),
+            Ok(AttrValue::FloatingPoint(FloatType::F64(expected)))
         );
     }
 
@@ -517,7 +559,7 @@ mod test {
         let input = &[FLOATING_POINT, 0x07, 0x01, 0x02];
         let mut cursor = ReadCursor::new(input.as_slice());
         assert_eq!(
-            Attribute::parse(&mut cursor),
+            AttrValue::parse(&mut cursor),
             Err(AttrParseError::BadFloatLength(7))
         );
     }

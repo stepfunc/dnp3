@@ -39,7 +39,7 @@ object RangedVariationModule extends Module {
         }
         case SpecificAttribute => {
           "/// variation and optional attribute".eol ++
-          s"${v.parent.name}(u8, Option<crate::app::AttributeSet<'a>>),".eol
+          s"${v.parent.name}(Option<crate::app::Attribute<'a>>),".eol
         }
         case AllAttributesRequest => nameOnly
       }
@@ -56,14 +56,14 @@ object RangedVariationModule extends Module {
 
     def getNonReadVarDefinition(v: Variation) : String = v match {
       case AllAttributesRequest => ""
-      case SpecificAttribute => "(var, Some(crate::app::AttributeSet::parse_from_range(range, cursor)?))"
+      case SpecificAttribute => "(Some(crate::app::Attribute::parse_from_range(var, range, cursor)?))"
       case _ : AnyVariation => ""
       case _ : FixedSize => "(RangedSequence::parse(range, cursor)?)"
     }
 
     def getReadVarDefinition(v: Variation) : String = v match {
       case AllAttributesRequest => ""
-      case SpecificAttribute => "(var, None)"
+      case SpecificAttribute => "(None)"
       case _ : AnyVariation => ""
       case _ : FixedSize => "(RangedSequence::empty())"
     }
@@ -101,7 +101,7 @@ object RangedVariationModule extends Module {
         s"Variation::${v.parent.name}(0) => Ok(RangedVariation::${v.parent.name}Var0),".eol
       }
       case SpecificAttribute => {
-        s"Variation::${v.parent.name}(var) => Ok(RangedVariation::${v.parent.name}${getReadVarDefinition(v)}),".eol
+        s"Variation::${v.parent.name}(_) => Ok(RangedVariation::${v.parent.name}${getReadVarDefinition(v)}),".eol
       }
       case _ => s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getReadVarDefinition(v)}),".eol
     }
@@ -111,7 +111,7 @@ object RangedVariationModule extends Module {
 
       v match {
         case AllAttributesRequest => nothing
-        case SpecificAttribute => s"RangedVariation::${v.parent.name}(_,_) => Ok(()), // TODO - this should output something!".eol
+        case SpecificAttribute => s"RangedVariation::${v.parent.name}(_) => Ok(()), // TODO - this should output something!".eol
         case _ : AnyVariation => nothing
         case _ : SizedByVariation => {
           s"RangedVariation::${v.parent.name}Var0 => Ok(()),".eol ++
@@ -137,26 +137,6 @@ object RangedVariationModule extends Module {
       }
     }
 
-    def getVariationMatcher(v: Variation): Iterator[String] = {
-      def simple = s"RangedVariation::${v.name} => Variation::${v.name},".eol
-
-      v match {
-        case AllAttributesRequest => simple
-        case SpecificAttribute => {
-          s"RangedVariation::${v.parent.name}(var,_) => Variation::${v.parent.name}(*var),".eol
-        }
-        case _ : AnyVariation => simple
-        case _ : SizedByVariation => {
-          s"RangedVariation::${v.parent.name}Var0 => Variation::${v.parent.name}(0),".eol ++
-          s"RangedVariation::${v.parent.name}VarX(x, _) => Variation::${v.parent.name}(*x),".eol
-        }
-        case _ => {
-          s"RangedVariation::${v.name}(_) => Variation::${v.name},".eol
-        }
-      }
-    }
-
-
     def getExtractMatcher(v: Variation): Iterator[String] = {
 
       val isEvent = v.parent.groupType.isEvent;
@@ -164,7 +144,7 @@ object RangedVariationModule extends Module {
       def simpleExtract(v: Variation): Iterator[String] = {
         bracket(s"RangedVariation::${v.name}(seq) =>") {
           parenSemi(s"handler.handle_${getMeasName(v)}") {
-            s"HeaderInfo::new(self.variation(), qualifier, ${isEvent}, ${v.hasFlags}),".eol ++
+            s"HeaderInfo::new(var, qualifier, ${isEvent}, ${v.hasFlags}),".eol ++
             "&mut seq.iter().map(|(v,i)| (v.into(), i))".eol
           } ++ "true".eol
         }
@@ -176,7 +156,7 @@ object RangedVariationModule extends Module {
 
       v match {
         case AllAttributesRequest => notSupported
-        case SpecificAttribute => bracket(s"RangedVariation::${v.parent.name}(_,_) =>") {
+        case SpecificAttribute => bracket(s"RangedVariation::${v.parent.name}(_) =>") {
           "// TODO".eol ++
           "false // extraction not supported".eol
         }
@@ -196,7 +176,7 @@ object RangedVariationModule extends Module {
           } ++
           bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
             parenSemi("handler.handle_octet_string") {
-              s"HeaderInfo::new(self.variation(), qualifier, ${isEvent}, ${v.hasFlags}),".eol ++
+              s"HeaderInfo::new(var, qualifier, ${isEvent}, ${v.hasFlags}),".eol ++
               "&mut seq.iter()".eol
             } ++ "true".eol
           }
@@ -220,14 +200,9 @@ object RangedVariationModule extends Module {
             variations.flatMap(getFmtMatcher).iterator
           }
         } ++ space ++
-        bracket("pub(crate) fn extract_measurements_to(&self, qualifier: QualifierCode, handler: &mut dyn ReadHandler) -> bool") {
+        bracket("pub(crate) fn extract_measurements_to(&self, var: Variation, qualifier: QualifierCode, handler: &mut dyn ReadHandler) -> bool") {
           bracket("match self") {
             variations.flatMap(getExtractMatcher).iterator
-          }
-        } ++ space ++
-        bracket("pub(crate) fn variation(&self) -> Variation") {
-          bracket("match self") {
-            variations.flatMap(getVariationMatcher).iterator
           }
         }
     }

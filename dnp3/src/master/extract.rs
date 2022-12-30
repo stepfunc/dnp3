@@ -54,10 +54,10 @@ pub(crate) fn extract_measurements_inner(
             }
             // everything else
             HeaderDetails::OneByteStartStop(_, _, var) => {
-                var.extract_measurements_to(header.details.qualifier(), handler)
+                var.extract_measurements_to(header.variation, header.details.qualifier(), handler)
             }
             HeaderDetails::TwoByteStartStop(_, _, var) => {
-                var.extract_measurements_to(header.details.qualifier(), handler)
+                var.extract_measurements_to(header.variation, header.details.qualifier(), handler)
             }
             HeaderDetails::OneByteCountAndPrefix(_, var) => {
                 var.extract_measurements_to(cto, handler)
