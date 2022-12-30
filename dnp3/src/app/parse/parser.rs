@@ -1119,7 +1119,7 @@ mod test {
         let err = ObjectParser::parse(FunctionCode::Response, &input).unwrap_err();
         assert_eq!(
             err,
-            ObjectParseError::BadAttribute(AttrParseError::BadRange(0x07, 2))
+            ObjectParseError::BadAttribute(AttrParseError::CountNotOne(2))
         );
     }
 }

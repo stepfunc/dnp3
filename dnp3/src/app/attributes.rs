@@ -1,4 +1,6 @@
 use crate::app::parse::range::Range;
+use crate::app::parse::traits::{FixedSize, Index};
+use crate::app::ObjectParseError;
 use scursor::{ReadCursor, ReadError};
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
@@ -85,19 +87,13 @@ pub struct AttrListSet<'a> {
 fn try_get_set(range: Range) -> Result<u8, AttrParseError> {
     let set: u8 = match range.get_start().try_into() {
         Err(_) => {
-            return Err(AttrParseError::BadRange(
-                range.get_start(),
-                range.get_count(),
-            ))
+            return Err(AttrParseError::SetIdNotU8(range.get_start()));
         }
         Ok(x) => x,
     };
 
     if range.get_count() != 1 {
-        return Err(AttrParseError::BadRange(
-            range.get_start(),
-            range.get_count(),
-        ));
+        return Err(AttrParseError::CountNotOne(range.get_count()));
     }
 
     Ok(set)
@@ -206,6 +202,26 @@ pub struct AttributeSet<'a> {
 }
 
 impl<'a> AttributeSet<'a> {
+    pub(crate) fn parse_prefixed<I>(
+        count: u16,
+        cursor: &mut ReadCursor<'a>,
+    ) -> Result<Self, ObjectParseError>
+    where
+        I: FixedSize + Index + Display,
+    {
+        if count != 1 {
+            return Err(ObjectParseError::BadAttribute(AttrParseError::CountNotOne(
+                count as usize,
+            )));
+        }
+        let index = I::read(cursor)?.widen_to_u16();
+        let set: u8 = index
+            .try_into()
+            .map_err(|_| AttrParseError::SetIdNotU8(index))?;
+        let value = Attribute::parse(cursor)?;
+        Ok(Self { set, value })
+    }
+
     pub(crate) fn parse_from_range(
         range: Range,
         cursor: &mut ReadCursor<'a>,
@@ -233,8 +249,10 @@ pub enum AttrParseError {
     /// Visible string is not UTF-8. The DNP3 standard doesn't really define what "visible" means
     /// but this handles ASCII and is more flexible for non-english users.
     BadVisibleString(Utf8Error),
-    /// Range is either not U8 or contains count != 1
-    BadRange(u16, usize),
+    /// Set identifier is not u8
+    SetIdNotU8(u16),
+    /// Count != 1
+    CountNotOne(usize),
     /// Expected type X but received type Y
     UnexpectedType(AttrDataType, AttrDataType),
 }
@@ -256,10 +274,10 @@ impl Display for AttrParseError {
             AttrParseError::BadVisibleString(x) => {
                 write!(f, "Attribute visible string is not UTF8: {x}")
             }
-            AttrParseError::BadRange(start, count) => write!(
-                f,
-                "Attribute range is not U8 or has count != 1, start: {start} count: {count}"
-            ),
+            AttrParseError::SetIdNotU8(id) => {
+                write!(f, "Attribute range or prefix is not [0,255] - value: {id}")
+            }
+            AttrParseError::CountNotOne(count) => write!(f, "Attribute count {count} != 1"),
             AttrParseError::UnexpectedType(x, y) => {
                 write!(f, "Expected attribute type {x:?} but received {y:?}")
             }

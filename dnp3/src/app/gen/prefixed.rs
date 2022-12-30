@@ -24,6 +24,8 @@ use scursor::ReadCursor;
 
 #[derive(Debug)]
 pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
+    /// Device Attributes - Variations 1 to 253 and 255
+    Group0(u8, crate::app::AttributeSet<'a>),
     /// Binary Input Event - Without Time
     Group2Var1(CountSequence<'a, Prefix<I, Group2Var1>>),
     /// Binary Input Event - With Absolute Time
@@ -127,6 +129,7 @@ pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt:
 impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
     pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
         match v {
+            Variation::Group0(var) => Ok(PrefixedVariation::Group0(var, crate::app::AttributeSet::parse_prefixed::<I>(count, cursor)?)),
             Variation::Group2Var1 => Ok(PrefixedVariation::Group2Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group2Var2 => Ok(PrefixedVariation::Group2Var2(CountSequence::parse(count, cursor)?)),
             Variation::Group2Var3 => Ok(PrefixedVariation::Group2Var3(CountSequence::parse(count, cursor)?)),
@@ -183,6 +186,7 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
     
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            PrefixedVariation::Group0(_, _) => Ok(()), // TODO
             PrefixedVariation::Group2Var1(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group2Var2(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group2Var3(seq) => format_prefixed_items(f, seq.iter()),
@@ -237,6 +241,9 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
     
     pub(crate) fn extract_measurements_to(&self, cto: Option<Time>, handler: &mut dyn ReadHandler) -> bool {
         match self {
+            PrefixedVariation::Group0(_,_) => {
+                false // TODO
+            }
             PrefixedVariation::Group2Var1(seq) => {
                 handler.handle_binary_input(
                     self.get_header_info(),
@@ -465,13 +472,13 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
                 true
             }
             PrefixedVariation::Group34Var1(_) => {
-                false // deadband
+                false // dead-band
             }
             PrefixedVariation::Group34Var2(_) => {
-                false // deadband
+                false // dead-band
             }
             PrefixedVariation::Group34Var3(_) => {
-                false // deadband
+                false // dead-band
             }
             PrefixedVariation::Group41Var1(_) => {
                 false // command
@@ -553,6 +560,7 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
     
     pub(crate) fn get_header_info(&self) -> HeaderInfo {
         match self {
+            PrefixedVariation::Group0(var,_) => HeaderInfo::new(Variation::Group0(*var), I::COUNT_AND_PREFIX_QUALIFIER, false, false),
             PrefixedVariation::Group2Var1(_) => HeaderInfo::new(Variation::Group2Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
             PrefixedVariation::Group2Var2(_) => HeaderInfo::new(Variation::Group2Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
             PrefixedVariation::Group2Var3(_) => HeaderInfo::new(Variation::Group2Var3, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
