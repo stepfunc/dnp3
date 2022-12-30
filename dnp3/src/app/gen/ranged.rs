@@ -299,7 +299,7 @@ impl<'a> RangedVariation<'a> {
             RangedVariation::Group0Var254 => {
                 false // extraction not supported
             }
-            RangedVariation::Group0(_) => {
+            RangedVariation::Group0(_x) => {
                 // TODO
                 false // extraction not supported
             }

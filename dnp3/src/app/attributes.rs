@@ -55,8 +55,88 @@ impl Default for AttrSet {
 
 /// Variants for all the pre-defined attributes in the standard
 pub enum KnownAttribute<'a> {
-    /// Unknown values in the default set or any private set values
-    Other(Attribute<'a>),
+    /// Variation 252 - Device manufacturer's name
+    DeviceManufacturersName(&'a str),
+    /// Variation 250 - Device manufacturer's product name and model
+    ProductNameAndModel(&'a str),
+    /// Variation 249 - DNP3 subset and conformance
+    SubsetAndConformance(&'a str),
+    /// Variation 248 - DNP3 subset and conformance
+    DeviceSerialNumber(&'a str),
+    /// Variation 247 - User assigned device name
+    UserAssignedDeviceName(&'a str),
+    /// Variation 246 - User assigned ID code/number
+    UserAssignedId(&'a str),
+    /// Variation 245 - User assigned location/name
+    UserAssignedLocation(&'a str),
+    /// Variation 243 - Device manufacturer hardware version
+    DeviceManufacturerHardwareVersion(&'a str),
+    /// Variation 242 - Device manufacturer software version
+    DeviceManufacturerSoftwareVersion(&'a str),
+    /// Variation 241 - Maximum receive fragment size
+    MaximumReceiveFragmentSize(u32),
+    /// Variation 240 - Maximum transmit fragment size
+    MaximumTransmitFragmentSize(u32),
+    /// Variation 239 - Number of binary input points
+    NumBinaryInput(u32),
+    /// Variation 238 - Maximum binary input point index
+    MaxBinaryInputIndex(u32),
+    /// Variation 237 - Support binary input events
+    SupportsBinaryInputEvents(bool),
+    /// Variation 236 - Number of double-bit binary input points
+    NumDoubleBitBinaryInput(u32),
+    /// Variation 235 - Maximum double-bit binary input point index
+    MaxDoubleBitBinaryInputIndex(u32),
+    /// Variation 234 - Support double-bit binary input events
+    SupportsDoubleBitBinaryInputEvents(bool),
+    /// Variation 233 - Number of analog input points
+    NumAnalogInput(u32),
+    /// Variation 232 - Maximum analog input point index
+    MaAnalogInputIndex(u32),
+    /// Variation 231 - Support analog input events
+    SupportsAnalogInputEvents(bool),
+    /// Variation 230 - Support frozen analog input events
+    SupportsFrozenAnalogInputs(bool),
+    /// Variation 229 - Number of counter points
+    NumCounter(u32),
+    /// Variation 228 - Maximum counter point index
+    MaxCounterIndex(u32),
+    /// Variation 227 - Support counter events
+    SupportsCounterEvents(bool),
+    /// Variation 226 - Support frozen counters
+    SupportsFrozenCounters(bool),
+    /// Variation 225 - Support frozen counter events
+    SupportsFrozenCounterEvents(bool),
+    /// Variation 224 - Number of binary outputs
+    NumBinaryOutputs(u32),
+    /// Variation 223 - Maximum binary output index
+    MaxBinaryOutputIndex(u32),
+    /// Variation 222 - Supports binary output events
+    SupportsBinaryOutputEvents(bool),
+    /// Variation 221 - Number of analog outputs
+    NumAnalogOutputs(u32),
+    /// Variation 220 - Maximum analog output index
+    MaxAnalogOutputIndex(u32),
+    /// Variation 219 - Supports analog output events
+    SupportsAnalogOutputEvents(bool),
+    /// Variation 218 - Duration of time accuracy (seconds)
+    DurationOfTimeAccuracy(u32),
+    /// Variation 217 - Local timing accuracy (microseconds)
+    LocalTimingAccuracy(u32),
+    /// Variation 216 - Maximum number of binary outputs per request
+    MaxBinaryOutputPerRequest(u32),
+    /// Variation 215 - Number of outstation defined data-sets
+    NumOutstationDefinedDataSets(u32),
+    /// Variation 214 - Number of master defined data-sets
+    NumMasterDefinedDataSets(u32),
+    /// Variation 213 - Number of outstation defined data-set prototypes
+    NumOutstationDefinedDataSetProto(u32),
+    /// Variation 212 - Number of master defined data-set prototypes
+    NumMasterDefinedDataSetProto(u32),
+    /// Variation 211 - Identification of user-specific attributes
+    UserSpecificAttributes(&'a str),
+    /// Variation 209 - Secure authentication version
+    SecureAuthenticationVersion(u32),
 }
 
 const VISIBLE_STRING: u8 = 1;
