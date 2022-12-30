@@ -299,9 +299,9 @@ impl<'a> RangedVariation<'a> {
             RangedVariation::Group0Var254 => {
                 false // extraction not supported
             }
-            RangedVariation::Group0(_x) => {
-                // TODO
-                false // extraction not supported
+            RangedVariation::Group0(attr) => {
+                crate::master::handle_attribute(var, qualifier, attr, handler);
+                true
             }
             RangedVariation::Group1Var0 => {
                 false // extraction not supported

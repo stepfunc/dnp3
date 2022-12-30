@@ -109,8 +109,10 @@ object PrefixedVariationModule extends Module {
           }
         }
         case SpecificAttribute => {
-          bracket(s"PrefixedVariation::${v.parent.name}(_) =>") {
-            "false // TODO".eol
+          bracket(s"PrefixedVariation::${v.parent.name}(attr) =>") {
+            "let info = self.get_header_info();".eol ++
+            "crate::master::handle_attribute(info.variation, info.qualifier, &Some(*attr), handler);".eol ++
+            "true".eol
           }
         }
         case _ if v.parent.groupType == GroupType.AnalogInputDeadband => {

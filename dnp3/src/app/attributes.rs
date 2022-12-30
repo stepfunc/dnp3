@@ -54,7 +54,19 @@ impl Default for AttrSet {
 }
 
 /// Variants for all the pre-defined attributes in the standard
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum AnyAttribute<'a> {
+    /// Either an attribute from a private set or an unknown attribute in the default set
+    Other(Attribute<'a>),
+    /// An attribute defined in the default set
+    Known(KnownAttribute<'a>),
+}
+
+/// Variants for all the pre-defined attributes in the standard
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum KnownAttribute<'a> {
+    /// Variation 255 - Device manufacturer's name
+    AttributeList(AttrList<'a>),
     /// Variation 252 - Device manufacturer's name
     DeviceManufacturersName(&'a str),
     /// Variation 250 - Device manufacturer's product name and model
@@ -135,10 +147,68 @@ pub enum KnownAttribute<'a> {
     NumMasterDefinedDataSetProto(u32),
     /// Variation 211 - Identification of user-specific attributes
     UserSpecificAttributes(&'a str),
+    /// Number of security statistics per association
+    NumSecurityStatsPerAssoc(u32),
     /// Variation 209 - Secure authentication version
     SecureAuthenticationVersion(u32),
 }
 
+impl<'a> AnyAttribute<'a> {
+    pub(crate) fn try_from(attr: &Attribute<'a>) -> Result<Self, TypeError> {
+        if let AttrSet::Private(_) = attr.set {
+            return Ok(AnyAttribute::Other(*attr));
+        }
+
+        let known = match attr.variation {
+            255 => KnownAttribute::AttributeList(attr.value.expect_attr_list()?),
+            252 => KnownAttribute::DeviceManufacturersName(attr.value.expect_vstr()?),
+            250 => KnownAttribute::ProductNameAndModel(attr.value.expect_vstr()?),
+            249 => KnownAttribute::SubsetAndConformance(attr.value.expect_vstr()?),
+            248 => KnownAttribute::DeviceSerialNumber(attr.value.expect_vstr()?),
+            247 => KnownAttribute::UserAssignedDeviceName(attr.value.expect_vstr()?),
+            246 => KnownAttribute::UserAssignedId(attr.value.expect_vstr()?),
+            245 => KnownAttribute::UserAssignedLocation(attr.value.expect_vstr()?),
+            243 => KnownAttribute::DeviceManufacturerHardwareVersion(attr.value.expect_vstr()?),
+            242 => KnownAttribute::DeviceManufacturerSoftwareVersion(attr.value.expect_vstr()?),
+            241 => KnownAttribute::MaximumReceiveFragmentSize(attr.value.expect_uint()?),
+            240 => KnownAttribute::MaximumTransmitFragmentSize(attr.value.expect_uint()?),
+            239 => KnownAttribute::NumBinaryInput(attr.value.expect_uint()?),
+            238 => KnownAttribute::MaxBinaryInputIndex(attr.value.expect_uint()?),
+            237 => KnownAttribute::SupportsBinaryInputEvents(attr.value.expect_bool()?),
+            236 => KnownAttribute::NumDoubleBitBinaryInput(attr.value.expect_uint()?),
+            235 => KnownAttribute::MaxDoubleBitBinaryInputIndex(attr.value.expect_uint()?),
+            234 => KnownAttribute::SupportsDoubleBitBinaryInputEvents(attr.value.expect_bool()?),
+            233 => KnownAttribute::NumAnalogInput(attr.value.expect_uint()?),
+            232 => KnownAttribute::MaAnalogInputIndex(attr.value.expect_uint()?),
+            231 => KnownAttribute::SupportsAnalogInputEvents(attr.value.expect_bool()?),
+            230 => KnownAttribute::SupportsFrozenAnalogInputs(attr.value.expect_bool()?),
+            229 => KnownAttribute::NumCounter(attr.value.expect_uint()?),
+            228 => KnownAttribute::MaxCounterIndex(attr.value.expect_uint()?),
+            227 => KnownAttribute::SupportsCounterEvents(attr.value.expect_bool()?),
+            226 => KnownAttribute::SupportsFrozenCounters(attr.value.expect_bool()?),
+            225 => KnownAttribute::SupportsFrozenCounterEvents(attr.value.expect_bool()?),
+            224 => KnownAttribute::NumBinaryOutputs(attr.value.expect_uint()?),
+            223 => KnownAttribute::MaxBinaryInputIndex(attr.value.expect_uint()?),
+            222 => KnownAttribute::SupportsBinaryOutputEvents(attr.value.expect_bool()?),
+            221 => KnownAttribute::NumAnalogOutputs(attr.value.expect_uint()?),
+            220 => KnownAttribute::MaxAnalogOutputIndex(attr.value.expect_uint()?),
+            219 => KnownAttribute::SupportsAnalogOutputEvents(attr.value.expect_bool()?),
+            218 => KnownAttribute::DurationOfTimeAccuracy(attr.value.expect_uint()?),
+            217 => KnownAttribute::LocalTimingAccuracy(attr.value.expect_uint()?),
+            216 => KnownAttribute::MaxBinaryOutputPerRequest(attr.value.expect_uint()?),
+            215 => KnownAttribute::NumOutstationDefinedDataSets(attr.value.expect_uint()?),
+            214 => KnownAttribute::NumMasterDefinedDataSets(attr.value.expect_uint()?),
+            213 => KnownAttribute::NumOutstationDefinedDataSetProto(attr.value.expect_uint()?),
+            212 => KnownAttribute::NumMasterDefinedDataSetProto(attr.value.expect_uint()?),
+            211 => KnownAttribute::UserSpecificAttributes(attr.value.expect_vstr()?),
+            209 => KnownAttribute::SecureAuthenticationVersion(attr.value.expect_uint()?),
+
+            _ => return Ok(AnyAttribute::Other(*attr)),
+        };
+
+        Ok(AnyAttribute::Known(known))
+    }
+}
 const VISIBLE_STRING: u8 = 1;
 const UNSIGNED_INT: u8 = 2;
 const SIGNED_INT: u8 = 3;
@@ -243,16 +313,6 @@ impl AttrProp {
             is_writable: props & Self::READ_BIT != 0,
         }
     }
-
-    /*
-    pub(crate) fn value(self) -> u8 {
-        let mut value = 0;
-        if self.is_writable {
-            value |= Self::READ_BIT;
-        }
-        value
-    }
-     */
 }
 
 impl<'a> Iterator for AttrList<'a> {
@@ -300,6 +360,46 @@ pub enum AttrValue<'a> {
     BitString(&'a [u8]),
     /// List of UINT8-BSTR8
     AttrList(AttrList<'a>),
+}
+
+/// Expected type X but received type Y
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct TypeError {
+    pub(crate) expected: AttrDataType,
+    pub(crate) actual: AttrDataType,
+}
+
+impl TypeError {
+    fn new(expected: AttrDataType, actual: AttrDataType) -> Self {
+        Self { expected, actual }
+    }
+}
+
+impl<'a> AttrValue<'a> {
+    pub(crate) fn expect_vstr(&self) -> Result<&'a str, TypeError> {
+        match self {
+            AttrValue::VisibleString(x) => Ok(x),
+            _ => Err(TypeError::new(AttrDataType::VisibleString, self.get_type())),
+        }
+    }
+
+    pub(crate) fn expect_bool(&self) -> Result<bool, TypeError> {
+        Ok(self.expect_uint()? == 1)
+    }
+
+    pub(crate) fn expect_uint(&self) -> Result<u32, TypeError> {
+        match self {
+            AttrValue::UnsignedInt(x) => Ok(*x),
+            _ => Err(TypeError::new(AttrDataType::UnsignedInt, self.get_type())),
+        }
+    }
+
+    pub(crate) fn expect_attr_list(&self) -> Result<AttrList<'a>, TypeError> {
+        match self {
+            AttrValue::AttrList(x) => Ok(*x),
+            _ => Err(TypeError::new(AttrDataType::AttrList, self.get_type())),
+        }
+    }
 }
 
 /// Attribute value and the set to which it belongs
@@ -375,8 +475,6 @@ pub enum AttrParseError {
     SetIdNotU8(u16),
     /// Count != 1
     CountNotOne(usize),
-    /// Expected type X but received type Y
-    UnexpectedType(AttrDataType, AttrDataType),
 }
 
 impl Display for AttrParseError {
@@ -400,9 +498,6 @@ impl Display for AttrParseError {
                 write!(f, "Attribute range or prefix is not [0,255] - value: {id}")
             }
             AttrParseError::CountNotOne(count) => write!(f, "Attribute count {count} != 1"),
-            AttrParseError::UnexpectedType(x, y) => {
-                write!(f, "Expected attribute type {x:?} but received {y:?}")
-            }
         }
     }
 }

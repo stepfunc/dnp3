@@ -156,9 +156,9 @@ object RangedVariationModule extends Module {
 
       v match {
         case AllAttributesRequest => notSupported
-        case SpecificAttribute => bracket(s"RangedVariation::${v.parent.name}(_) =>") {
-          "// TODO".eol ++
-          "false // extraction not supported".eol
+        case SpecificAttribute => bracket(s"RangedVariation::${v.parent.name}(attr) =>") {
+          "crate::master::handle_attribute(var, qualifier, attr, handler);".eol ++
+          "true".eol
         }
         case _ : AnyVariation => notSupported
         case Group80Var1 => {

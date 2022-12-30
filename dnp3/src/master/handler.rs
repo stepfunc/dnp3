@@ -549,6 +549,33 @@ pub trait ReadHandler: Send + Sync {
         iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     ) {
     }
+
+    /// Process a device attribute
+    #[allow(unused_variables)]
+    fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {}
+}
+
+pub(crate) fn handle_attribute(
+    var: Variation,
+    qualifier: QualifierCode,
+    attr: &Option<Attribute>,
+    handler: &mut dyn ReadHandler,
+) {
+    if let Some(attr) = attr {
+        match AnyAttribute::try_from(attr) {
+            Ok(attr) => {
+                handler
+                    .handle_device_attribute(HeaderInfo::new(var, qualifier, false, false), attr);
+            }
+            Err(err) => {
+                tracing::warn!(
+                    "Expected attribute type {:?} but received {:?}",
+                    err.expected,
+                    err.actual
+                );
+            }
+        }
+    }
 }
 
 /// read handler that does nothing
