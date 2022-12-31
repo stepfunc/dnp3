@@ -449,11 +449,11 @@ mod test {
         let objects = HeaderCollection::parse(
             FunctionCode::Response,
             &[
-                // group 0 var 252 - one byte count and prefix
+                // group 0 var 252 - default set == 0 - one byte count and prefix
                 0, 252, 0x17, 0x01, 0x00, 0x01, 0x04, b'A', b'C', b'M', b'E',
-                // group 0 var 217 - one byte start/stop
+                // group 0 var 217 - default set == 0 - one byte start/stop
                 0, 217, 0x00, 0x00, 0x00, 0x02, 0x02, 0xFE, 0xCA,
-                // group 0 var 42 - one byte count and prefix, private set == 7
+                // group 0 var 42 - private set == 7 - one byte count and prefix
                 0, 42, 0x17, 0x01, 0x07, 0x01, 0x03, b'F', b'O', b'O',
             ],
         )
