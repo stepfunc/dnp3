@@ -62,95 +62,116 @@ pub enum AnyAttribute<'a> {
     Known(KnownAttribute<'a>),
 }
 
+/// Enumeration of all the known string attributes
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum StringAttr {
+    /// Variation 252 - Device manufacturer's name
+    DeviceManufacturersName,
+    /// Variation 250 - Device manufacturer's product name and model
+    ProductNameAndModel,
+    /// Variation 249 - DNP3 subset and conformance
+    SubsetAndConformance,
+    /// Variation 248 - DNP3 subset and conformance
+    DeviceSerialNumber,
+    /// Variation 247 - User assigned device name
+    UserAssignedDeviceName,
+    /// Variation 246 - User assigned ID code/number
+    UserAssignedId,
+    /// Variation 245 - User assigned location/name
+    UserAssignedLocation,
+    /// Variation 243 - Device manufacturer hardware version
+    DeviceManufacturerHardwareVersion,
+    /// Variation 242 - Device manufacturer software version
+    DeviceManufacturerSoftwareVersion,
+    /// Variation 211 - Identification of user-specific attributes
+    UserSpecificAttributes,
+}
+
+/// Enumeration of all the known unsigned integer
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum UIntAttr {
+    /// Variation 241 - Maximum receive fragment size
+    MaximumReceiveFragmentSize,
+    /// Variation 240 - Maximum transmit fragment size
+    MaximumTransmitFragmentSize,
+    /// Variation 239 - Number of binary input points
+    NumBinaryInput,
+    /// Variation 238 - Maximum binary input point index
+    MaxBinaryInputIndex,
+    /// Variation 236 - Number of double-bit binary input points
+    NumDoubleBitBinaryInput,
+    /// Variation 235 - Maximum double-bit binary input point index
+    MaxDoubleBitBinaryInputIndex,
+    /// Variation 233 - Number of analog input points
+    NumAnalogInput,
+    /// Variation 232 - Maximum analog input point index
+    MaxAnalogInputIndex,
+    /// Variation 229 - Number of counter points
+    NumCounter,
+    /// Variation 228 - Maximum counter point index
+    MaxCounterIndex,
+    /// Variation 224 - Number of binary outputs
+    NumBinaryOutputs,
+    /// Variation 223 - Maximum binary output index
+    MaxBinaryOutputIndex,
+    /// Variation 221 - Number of analog outputs
+    NumAnalogOutputs,
+    /// Variation 220 - Maximum analog output index
+    MaxAnalogOutputIndex,
+    /// Variation 218 - Duration of time accuracy (seconds)
+    DurationOfTimeAccuracy,
+    /// Variation 217 - Local timing accuracy (microseconds)
+    LocalTimingAccuracy,
+    /// Variation 216 - Maximum number of binary outputs per request
+    MaxBinaryOutputPerRequest,
+    /// Variation 215 - Number of outstation defined data-sets
+    NumOutstationDefinedDataSets,
+    /// Variation 214 - Number of master defined data-sets
+    NumMasterDefinedDataSets,
+    /// Variation 213 - Number of outstation defined data-set prototypes
+    NumOutstationDefinedDataSetProto,
+    /// Variation 212 - Number of master defined data-set prototypes
+    NumMasterDefinedDataSetProto,
+    /// Number of security statistics per association
+    NumSecurityStatsPerAssoc,
+    /// Variation 209 - Secure authentication version
+    SecureAuthenticationVersion,
+}
+
+/// Enumeration of all the known boolean attributes
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum BoolAttr {
+    /// Variation 237 - Support binary input events
+    SupportsBinaryInputEvents,
+    /// Variation 234 - Support double-bit binary input events
+    SupportsDoubleBitBinaryInputEvents,
+    /// Variation 231 - Support analog input events
+    SupportsAnalogInputEvents,
+    /// Variation 230 - Support frozen analog input events
+    SupportsFrozenAnalogInputs,
+    /// Variation 227 - Support counter events
+    SupportsCounterEvents,
+    /// Variation 226 - Support frozen counters
+    SupportsFrozenCounters,
+    /// Variation 225 - Support frozen counter events
+    SupportsFrozenCounterEvents,
+    /// Variation 222 - Supports binary output events
+    SupportsBinaryOutputEvents,
+    /// Variation 219 - Supports analog output events
+    SupportsAnalogOutputEvents,
+}
+
 /// Variants for all the pre-defined attributes in the standard
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum KnownAttribute<'a> {
-    /// Variation 255 - Device manufacturer's name
+    /// Variation 255 - List of attribute variations
     AttributeList(AttrList<'a>),
-    /// Variation 252 - Device manufacturer's name
-    DeviceManufacturersName(&'a str),
-    /// Variation 250 - Device manufacturer's product name and model
-    ProductNameAndModel(&'a str),
-    /// Variation 249 - DNP3 subset and conformance
-    SubsetAndConformance(&'a str),
-    /// Variation 248 - DNP3 subset and conformance
-    DeviceSerialNumber(&'a str),
-    /// Variation 247 - User assigned device name
-    UserAssignedDeviceName(&'a str),
-    /// Variation 246 - User assigned ID code/number
-    UserAssignedId(&'a str),
-    /// Variation 245 - User assigned location/name
-    UserAssignedLocation(&'a str),
-    /// Variation 243 - Device manufacturer hardware version
-    DeviceManufacturerHardwareVersion(&'a str),
-    /// Variation 242 - Device manufacturer software version
-    DeviceManufacturerSoftwareVersion(&'a str),
-    /// Variation 241 - Maximum receive fragment size
-    MaximumReceiveFragmentSize(u32),
-    /// Variation 240 - Maximum transmit fragment size
-    MaximumTransmitFragmentSize(u32),
-    /// Variation 239 - Number of binary input points
-    NumBinaryInput(u32),
-    /// Variation 238 - Maximum binary input point index
-    MaxBinaryInputIndex(u32),
-    /// Variation 237 - Support binary input events
-    SupportsBinaryInputEvents(bool),
-    /// Variation 236 - Number of double-bit binary input points
-    NumDoubleBitBinaryInput(u32),
-    /// Variation 235 - Maximum double-bit binary input point index
-    MaxDoubleBitBinaryInputIndex(u32),
-    /// Variation 234 - Support double-bit binary input events
-    SupportsDoubleBitBinaryInputEvents(bool),
-    /// Variation 233 - Number of analog input points
-    NumAnalogInput(u32),
-    /// Variation 232 - Maximum analog input point index
-    MaAnalogInputIndex(u32),
-    /// Variation 231 - Support analog input events
-    SupportsAnalogInputEvents(bool),
-    /// Variation 230 - Support frozen analog input events
-    SupportsFrozenAnalogInputs(bool),
-    /// Variation 229 - Number of counter points
-    NumCounter(u32),
-    /// Variation 228 - Maximum counter point index
-    MaxCounterIndex(u32),
-    /// Variation 227 - Support counter events
-    SupportsCounterEvents(bool),
-    /// Variation 226 - Support frozen counters
-    SupportsFrozenCounters(bool),
-    /// Variation 225 - Support frozen counter events
-    SupportsFrozenCounterEvents(bool),
-    /// Variation 224 - Number of binary outputs
-    NumBinaryOutputs(u32),
-    /// Variation 223 - Maximum binary output index
-    MaxBinaryOutputIndex(u32),
-    /// Variation 222 - Supports binary output events
-    SupportsBinaryOutputEvents(bool),
-    /// Variation 221 - Number of analog outputs
-    NumAnalogOutputs(u32),
-    /// Variation 220 - Maximum analog output index
-    MaxAnalogOutputIndex(u32),
-    /// Variation 219 - Supports analog output events
-    SupportsAnalogOutputEvents(bool),
-    /// Variation 218 - Duration of time accuracy (seconds)
-    DurationOfTimeAccuracy(u32),
-    /// Variation 217 - Local timing accuracy (microseconds)
-    LocalTimingAccuracy(u32),
-    /// Variation 216 - Maximum number of binary outputs per request
-    MaxBinaryOutputPerRequest(u32),
-    /// Variation 215 - Number of outstation defined data-sets
-    NumOutstationDefinedDataSets(u32),
-    /// Variation 214 - Number of master defined data-sets
-    NumMasterDefinedDataSets(u32),
-    /// Variation 213 - Number of outstation defined data-set prototypes
-    NumOutstationDefinedDataSetProto(u32),
-    /// Variation 212 - Number of master defined data-set prototypes
-    NumMasterDefinedDataSetProto(u32),
-    /// Variation 211 - Identification of user-specific attributes
-    UserSpecificAttributes(&'a str),
-    /// Number of security statistics per association
-    NumSecurityStatsPerAssoc(u32),
-    /// Variation 209 - Secure authentication version
-    SecureAuthenticationVersion(u32),
+    /// VStr attributes
+    String(StringAttr, &'a str),
+    /// UInt attributes
+    UInt(UIntAttr, u32),
+    /// Bool attributes,
+    Bool(BoolAttr, bool),
 }
 
 impl<'a> AnyAttribute<'a> {
@@ -161,47 +182,124 @@ impl<'a> AnyAttribute<'a> {
 
         let known = match attr.variation {
             255 => KnownAttribute::AttributeList(attr.value.expect_attr_list()?),
-            252 => KnownAttribute::DeviceManufacturersName(attr.value.expect_vstr()?),
-            250 => KnownAttribute::ProductNameAndModel(attr.value.expect_vstr()?),
-            249 => KnownAttribute::SubsetAndConformance(attr.value.expect_vstr()?),
-            248 => KnownAttribute::DeviceSerialNumber(attr.value.expect_vstr()?),
-            247 => KnownAttribute::UserAssignedDeviceName(attr.value.expect_vstr()?),
-            246 => KnownAttribute::UserAssignedId(attr.value.expect_vstr()?),
-            245 => KnownAttribute::UserAssignedLocation(attr.value.expect_vstr()?),
-            243 => KnownAttribute::DeviceManufacturerHardwareVersion(attr.value.expect_vstr()?),
-            242 => KnownAttribute::DeviceManufacturerSoftwareVersion(attr.value.expect_vstr()?),
-            241 => KnownAttribute::MaximumReceiveFragmentSize(attr.value.expect_uint()?),
-            240 => KnownAttribute::MaximumTransmitFragmentSize(attr.value.expect_uint()?),
-            239 => KnownAttribute::NumBinaryInput(attr.value.expect_uint()?),
-            238 => KnownAttribute::MaxBinaryInputIndex(attr.value.expect_uint()?),
-            237 => KnownAttribute::SupportsBinaryInputEvents(attr.value.expect_bool()?),
-            236 => KnownAttribute::NumDoubleBitBinaryInput(attr.value.expect_uint()?),
-            235 => KnownAttribute::MaxDoubleBitBinaryInputIndex(attr.value.expect_uint()?),
-            234 => KnownAttribute::SupportsDoubleBitBinaryInputEvents(attr.value.expect_bool()?),
-            233 => KnownAttribute::NumAnalogInput(attr.value.expect_uint()?),
-            232 => KnownAttribute::MaAnalogInputIndex(attr.value.expect_uint()?),
-            231 => KnownAttribute::SupportsAnalogInputEvents(attr.value.expect_bool()?),
-            230 => KnownAttribute::SupportsFrozenAnalogInputs(attr.value.expect_bool()?),
-            229 => KnownAttribute::NumCounter(attr.value.expect_uint()?),
-            228 => KnownAttribute::MaxCounterIndex(attr.value.expect_uint()?),
-            227 => KnownAttribute::SupportsCounterEvents(attr.value.expect_bool()?),
-            226 => KnownAttribute::SupportsFrozenCounters(attr.value.expect_bool()?),
-            225 => KnownAttribute::SupportsFrozenCounterEvents(attr.value.expect_bool()?),
-            224 => KnownAttribute::NumBinaryOutputs(attr.value.expect_uint()?),
-            223 => KnownAttribute::MaxBinaryInputIndex(attr.value.expect_uint()?),
-            222 => KnownAttribute::SupportsBinaryOutputEvents(attr.value.expect_bool()?),
-            221 => KnownAttribute::NumAnalogOutputs(attr.value.expect_uint()?),
-            220 => KnownAttribute::MaxAnalogOutputIndex(attr.value.expect_uint()?),
-            219 => KnownAttribute::SupportsAnalogOutputEvents(attr.value.expect_bool()?),
-            218 => KnownAttribute::DurationOfTimeAccuracy(attr.value.expect_uint()?),
-            217 => KnownAttribute::LocalTimingAccuracy(attr.value.expect_uint()?),
-            216 => KnownAttribute::MaxBinaryOutputPerRequest(attr.value.expect_uint()?),
-            215 => KnownAttribute::NumOutstationDefinedDataSets(attr.value.expect_uint()?),
-            214 => KnownAttribute::NumMasterDefinedDataSets(attr.value.expect_uint()?),
-            213 => KnownAttribute::NumOutstationDefinedDataSetProto(attr.value.expect_uint()?),
-            212 => KnownAttribute::NumMasterDefinedDataSetProto(attr.value.expect_uint()?),
-            211 => KnownAttribute::UserSpecificAttributes(attr.value.expect_vstr()?),
-            209 => KnownAttribute::SecureAuthenticationVersion(attr.value.expect_uint()?),
+            252 => KnownAttribute::String(
+                StringAttr::DeviceManufacturersName,
+                attr.value.expect_vstr()?,
+            ),
+            250 => {
+                KnownAttribute::String(StringAttr::ProductNameAndModel, attr.value.expect_vstr()?)
+            }
+            249 => {
+                KnownAttribute::String(StringAttr::SubsetAndConformance, attr.value.expect_vstr()?)
+            }
+            248 => {
+                KnownAttribute::String(StringAttr::DeviceSerialNumber, attr.value.expect_vstr()?)
+            }
+            247 => KnownAttribute::String(
+                StringAttr::UserAssignedDeviceName,
+                attr.value.expect_vstr()?,
+            ),
+            246 => KnownAttribute::String(StringAttr::UserAssignedId, attr.value.expect_vstr()?),
+            245 => {
+                KnownAttribute::String(StringAttr::UserAssignedLocation, attr.value.expect_vstr()?)
+            }
+            243 => KnownAttribute::String(
+                StringAttr::DeviceManufacturerHardwareVersion,
+                attr.value.expect_vstr()?,
+            ),
+            242 => KnownAttribute::String(
+                StringAttr::DeviceManufacturerSoftwareVersion,
+                attr.value.expect_vstr()?,
+            ),
+            241 => KnownAttribute::UInt(
+                UIntAttr::MaximumReceiveFragmentSize,
+                attr.value.expect_uint()?,
+            ),
+            240 => KnownAttribute::UInt(
+                UIntAttr::MaximumTransmitFragmentSize,
+                attr.value.expect_uint()?,
+            ),
+            239 => KnownAttribute::UInt(UIntAttr::NumBinaryInput, attr.value.expect_uint()?),
+            238 => KnownAttribute::UInt(UIntAttr::MaxBinaryInputIndex, attr.value.expect_uint()?),
+            237 => KnownAttribute::Bool(
+                BoolAttr::SupportsBinaryInputEvents,
+                attr.value.expect_bool()?,
+            ),
+            236 => {
+                KnownAttribute::UInt(UIntAttr::NumDoubleBitBinaryInput, attr.value.expect_uint()?)
+            }
+            235 => KnownAttribute::UInt(
+                UIntAttr::MaxDoubleBitBinaryInputIndex,
+                attr.value.expect_uint()?,
+            ),
+            234 => KnownAttribute::Bool(
+                BoolAttr::SupportsDoubleBitBinaryInputEvents,
+                attr.value.expect_bool()?,
+            ),
+            233 => KnownAttribute::UInt(UIntAttr::NumAnalogInput, attr.value.expect_uint()?),
+            232 => KnownAttribute::UInt(UIntAttr::MaxAnalogInputIndex, attr.value.expect_uint()?),
+            231 => KnownAttribute::Bool(
+                BoolAttr::SupportsAnalogInputEvents,
+                attr.value.expect_bool()?,
+            ),
+            230 => KnownAttribute::Bool(
+                BoolAttr::SupportsFrozenAnalogInputs,
+                attr.value.expect_bool()?,
+            ),
+            229 => KnownAttribute::UInt(UIntAttr::NumCounter, attr.value.expect_uint()?),
+            228 => KnownAttribute::UInt(UIntAttr::MaxCounterIndex, attr.value.expect_uint()?),
+            227 => KnownAttribute::Bool(BoolAttr::SupportsCounterEvents, attr.value.expect_bool()?),
+            226 => {
+                KnownAttribute::Bool(BoolAttr::SupportsFrozenCounters, attr.value.expect_bool()?)
+            }
+            225 => KnownAttribute::Bool(
+                BoolAttr::SupportsFrozenCounterEvents,
+                attr.value.expect_bool()?,
+            ),
+            224 => KnownAttribute::UInt(UIntAttr::NumBinaryOutputs, attr.value.expect_uint()?),
+            223 => KnownAttribute::UInt(UIntAttr::MaxBinaryInputIndex, attr.value.expect_uint()?),
+            222 => KnownAttribute::Bool(
+                BoolAttr::SupportsBinaryOutputEvents,
+                attr.value.expect_bool()?,
+            ),
+            221 => KnownAttribute::UInt(UIntAttr::NumAnalogOutputs, attr.value.expect_uint()?),
+            220 => KnownAttribute::UInt(UIntAttr::MaxAnalogOutputIndex, attr.value.expect_uint()?),
+            219 => KnownAttribute::Bool(
+                BoolAttr::SupportsAnalogOutputEvents,
+                attr.value.expect_bool()?,
+            ),
+            218 => {
+                KnownAttribute::UInt(UIntAttr::DurationOfTimeAccuracy, attr.value.expect_uint()?)
+            }
+            217 => KnownAttribute::UInt(UIntAttr::LocalTimingAccuracy, attr.value.expect_uint()?),
+            216 => KnownAttribute::UInt(
+                UIntAttr::MaxBinaryOutputPerRequest,
+                attr.value.expect_uint()?,
+            ),
+            215 => KnownAttribute::UInt(
+                UIntAttr::NumOutstationDefinedDataSets,
+                attr.value.expect_uint()?,
+            ),
+            214 => KnownAttribute::UInt(
+                UIntAttr::NumMasterDefinedDataSets,
+                attr.value.expect_uint()?,
+            ),
+            213 => KnownAttribute::UInt(
+                UIntAttr::NumOutstationDefinedDataSetProto,
+                attr.value.expect_uint()?,
+            ),
+            212 => KnownAttribute::UInt(
+                UIntAttr::NumMasterDefinedDataSetProto,
+                attr.value.expect_uint()?,
+            ),
+            211 => KnownAttribute::String(
+                StringAttr::UserSpecificAttributes,
+                attr.value.expect_vstr()?,
+            ),
+            209 => KnownAttribute::UInt(
+                UIntAttr::SecureAuthenticationVersion,
+                attr.value.expect_uint()?,
+            ),
 
             _ => return Ok(AnyAttribute::Other(*attr)),
         };
