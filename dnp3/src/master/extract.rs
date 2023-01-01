@@ -240,7 +240,7 @@ mod test {
                 }
                 AnyAttribute::Known(x) => {
                     let known = match x {
-                        KnownAttribute::AttributeList(items) => Known::List(items.collect()),
+                        KnownAttribute::AttributeList(items) => Known::List(items.iter().collect()),
                         KnownAttribute::String(x, v) => Known::String(x, v.to_string()),
                         KnownAttribute::UInt(x, v) => Known::UInt(x, v),
                         KnownAttribute::Bool(x, v) => Known::Bool(x, v),

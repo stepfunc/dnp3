@@ -111,7 +111,7 @@ object RangedVariationModule extends Module {
 
       v match {
         case AllAttributesRequest => nothing
-        case SpecificAttribute => s"RangedVariation::${v.parent.name}(_) => Ok(()), // TODO - this should output something!".eol
+        case SpecificAttribute => s"RangedVariation::${v.parent.name}(x) => format_optional_attribute(f, x),".eol
         case _ : AnyVariation => nothing
         case _ : SizedByVariation => {
           s"RangedVariation::${v.parent.name}Var0 => Ok(()),".eol ++

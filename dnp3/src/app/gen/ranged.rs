@@ -242,7 +242,7 @@ impl<'a> RangedVariation<'a> {
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             RangedVariation::Group0Var254 => Ok(()),
-            RangedVariation::Group0(_) => Ok(()), // TODO - this should output something!
+            RangedVariation::Group0(x) => format_optional_attribute(f, x),
             RangedVariation::Group1Var0 => Ok(()),
             RangedVariation::Group1Var1(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group1Var2(seq) => format_indexed_items(f, seq.iter()),

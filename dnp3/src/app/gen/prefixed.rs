@@ -186,7 +186,7 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
     
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            PrefixedVariation::Group0(_) => Ok(()), // TODO
+            PrefixedVariation::Group0(attr) => attr.write(f),
             PrefixedVariation::Group2Var1(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group2Var2(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group2Var3(seq) => format_prefixed_items(f, seq.iter()),

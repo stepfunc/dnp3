@@ -377,6 +377,19 @@ pub struct AttrList<'a> {
     data: &'a [u8],
 }
 
+impl<'a> AttrList<'a> {
+    /// Create an iterator of the list
+    pub fn iter(&self) -> AttrIter<'a> {
+        AttrIter { data: self.data }
+    }
+}
+
+/// An iterator over an `AttrList`
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct AttrIter<'a> {
+    data: &'a [u8],
+}
+
 /// Single entry in the attribute list
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AttrItem {
@@ -413,7 +426,7 @@ impl AttrProp {
     }
 }
 
-impl<'a> Iterator for AttrList<'a> {
+impl<'a> Iterator for AttrIter<'a> {
     type Item = AttrItem;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -474,6 +487,30 @@ impl TypeError {
 }
 
 impl<'a> AttrValue<'a> {
+    pub(crate) fn write(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            AttrValue::VisibleString(x) => write!(f, "visible string: {x}"),
+            AttrValue::UnsignedInt(x) => write!(f, "unsigned int: {x}"),
+            AttrValue::SignedInt(x) => write!(f, "signed int: {x}"),
+            AttrValue::FloatingPoint(x) => match x {
+                FloatType::F32(x) => write!(f, "float32: {x}"),
+                FloatType::F64(x) => write!(f, "float64: {x}"),
+            },
+            AttrValue::OctetString(x) => write!(f, "octet string len == {}", x.len()),
+            AttrValue::BitString(x) => write!(f, "bit string len == {}", x.len()),
+            AttrValue::AttrList(list) => {
+                for x in list.iter() {
+                    write!(
+                        f,
+                        "\n variation: {} writeable: {}",
+                        x.variation, x.properties.is_writable
+                    )?;
+                }
+                Ok(())
+            }
+        }
+    }
+
     pub(crate) fn expect_vstr(&self) -> Result<&'a str, TypeError> {
         match self {
             AttrValue::VisibleString(x) => Ok(x),
@@ -512,6 +549,21 @@ pub struct Attribute<'a> {
 }
 
 impl<'a> Attribute<'a> {
+    pub(crate) fn write(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self.set {
+            AttrSet::Default => {
+                // lookup description
+                let desc = "wat";
+                write!(f, "Default set - {desc} - variation {}", self.variation)?;
+            }
+            AttrSet::Private(x) => {
+                write!(f, "Private set ({x})")?;
+                self.value.write(f)?;
+            }
+        }
+        self.value.write(f)
+    }
+
     pub(crate) fn parse_prefixed<I>(
         variation: u8,
         count: u16,
@@ -771,7 +823,7 @@ mod test {
     fn parses_attr_list() {
         let mut cursor = ReadCursor::new(&[ATTR_LIST, 0x06, 20, 00, 21, 01, 22, 02]);
         let parsed_list: Vec<AttrItem> = match AttrValue::parse(&mut cursor).unwrap() {
-            AttrValue::AttrList(x) => x.collect(),
+            AttrValue::AttrList(x) => x.iter().collect(),
             _ => unreachable!(),
         };
         assert_eq!(

@@ -12,7 +12,7 @@ use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::parse_error::*;
 use crate::app::variations::Variation;
-use crate::app::{FunctionCode, QualifierCode};
+use crate::app::{Attribute, FunctionCode, QualifierCode};
 use crate::decode::AppDecodeLevel;
 
 use scursor::ReadCursor;
@@ -48,6 +48,16 @@ where
 {
     for x in iter {
         write!(f, "\nindex: {} {}", x.index, x.value)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn format_optional_attribute(
+    f: &mut Formatter,
+    attr: &Option<Attribute>,
+) -> std::fmt::Result {
+    if let Some(attr) = attr {
+        attr.write(f)?;
     }
     Ok(())
 }
