@@ -548,17 +548,65 @@ pub struct Attribute<'a> {
     pub value: AttrValue<'a>,
 }
 
+fn get_default_desc(var: u8) -> &'static str {
+    match var {
+        209 => "Secure authentication version",
+        210 => "Number of security statistics per association",
+        211 => "Identification of support for user-specific attributes",
+        212 => "Number of master-defined data set prototypes",
+        213 => "Number of outstation-defined data set prototypes",
+        214 => "Number of master-defined data sets",
+        215 => "Number of outstation-defined data sets",
+        216 => "Maximum number of binary output objects per request",
+        217 => "Local timing accuracy",
+        218 => "Duration of time accuracy",
+        219 => "Support for analog output events",
+        220 => "Maximum analog output index",
+        221 => "Number of analog outputs",
+        222 => "Support for binary output events",
+        223 => "Maximum binary output index",
+        224 => "Number of binary outputs",
+        225 => "Support for frozen counter events",
+        226 => "Support for frozen counters",
+        227 => "Support for counter events",
+        228 => "Maximum counter index",
+        229 => "Number of counter points",
+        230 => "Support for frozen analog inputs",
+        231 => "Support for analog input events",
+        232 => "Maximum analog input index",
+        233 => "Number of analog input points",
+        234 => "Support for double-bit binary input events",
+        235 => "Maximum double-bit binary input index",
+        236 => "Number of double-bit binary input points",
+        237 => "Support for binary input events",
+        238 => "Maximum binary input index",
+        239 => "Number of binary input points",
+        240 => "Maximum transmit fragment size",
+        241 => "Maximum receive fragment size",
+        242 => "Device manufacturer's software version",
+        243 => "Device manufacturer's hardware version",
+        245 => "User-assigned location name",
+        246 => "User-assigned ID code/number",
+        247 => "User-assigned device name",
+        248 => "Device serial number",
+        249 => "DNP3 subset and conformance",
+        250 => "Device manufacturer's product name and model",
+        252 => "Device manufacturer's name",
+        255 => "List of attribute variations",
+        _ => "Unknown",
+    }
+}
+
 impl<'a> Attribute<'a> {
     pub(crate) fn write(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.set {
             AttrSet::Default => {
                 // lookup description
-                let desc = "wat";
-                write!(f, "Default set - {desc} - variation {}", self.variation)?;
+                let desc = get_default_desc(self.variation);
+                writeln!(f, "Default set - variation {} - {desc}", self.variation)?;
             }
             AttrSet::Private(x) => {
-                write!(f, "Private set ({x})")?;
-                self.value.write(f)?;
+                writeln!(f, "Private set ({x})")?;
             }
         }
         self.value.write(f)
