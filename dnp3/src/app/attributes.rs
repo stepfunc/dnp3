@@ -515,7 +515,6 @@ impl<'a> AttrValue<'a> {
                 }
                 Ok(())
             }
-
         }
     }
 
@@ -672,6 +671,8 @@ pub enum AttrParseError {
     BadIntegerLength(u8),
     /// Only 4 and 8 byte floats are supported
     BadFloatLength(u8),
+    /// Time length must be 6
+    BadTimeLength(u8),
     /// Attribute lists must be even in length (2*N) where N is number of pairs
     BadAttrListLength(u16),
     /// Visible string is not UTF-8. The DNP3 standard doesn't really define what "visible" means
@@ -693,6 +694,9 @@ impl Display for AttrParseError {
             }
             AttrParseError::BadFloatLength(x) => {
                 write!(f, "Bad attribute floating point length: {x}")
+            }
+            AttrParseError::BadTimeLength(x) => {
+                write!(f, "Time attribute length {x} != 6")
             }
             AttrParseError::BadAttrListLength(x) => {
                 write!(f, "Attribute list has non-even length: {x}")
@@ -747,7 +751,12 @@ impl<'a> AttrValue<'a> {
             }
             AttrDataType::OctetString => Self::OctetString(cursor.read_bytes(len as usize)?),
             AttrDataType::BitString => Self::BitString(cursor.read_bytes(len as usize)?),
-            AttrDataType::Timestamp => Self::Timestamp(Timestamp::new(cursor.read_u48_le()?)),
+            AttrDataType::Timestamp => {
+                if len != 6 {
+                    return Err(AttrParseError::BadTimeLength(len));
+                }
+                Self::Timestamp(Timestamp::new(cursor.read_u48_le()?))
+            }
             AttrDataType::AttrList => Self::AttrList(Self::parse_attr_list(cursor, len as u16)?),
             AttrDataType::ExtAttrList => {
                 // with extended attribute lists, the len is really len + 256
