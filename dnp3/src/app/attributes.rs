@@ -526,13 +526,20 @@ impl<'a> AttrValue<'a> {
     }
 
     pub(crate) fn expect_bool(&self) -> Result<bool, TypeError> {
-        Ok(self.expect_uint()? == 1)
+        Ok(self.expect_int()? == 1)
     }
 
     pub(crate) fn expect_uint(&self) -> Result<u32, TypeError> {
         match self {
             AttrValue::UnsignedInt(x) => Ok(*x),
             _ => Err(TypeError::new(AttrDataType::UnsignedInt, self.get_type())),
+        }
+    }
+
+    pub(crate) fn expect_int(&self) -> Result<i32, TypeError> {
+        match self {
+            AttrValue::SignedInt(x) => Ok(*x),
+            _ => Err(TypeError::new(AttrDataType::SignedInt, self.get_type())),
         }
     }
 
