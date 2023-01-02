@@ -1,6 +1,6 @@
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSize, Index};
-use crate::app::ObjectParseError;
+use crate::app::{ObjectParseError, Timestamp};
 use scursor::{ReadCursor, ReadError};
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
@@ -313,6 +313,7 @@ const SIGNED_INT: u8 = 3;
 const FLOATING_POINT: u8 = 4;
 const OCTET_STRING: u8 = 5;
 const BIT_STRING: u8 = 6;
+const DNP3_TIME: u8 = 7;
 const ATTR_LIST: u8 = 254;
 const EXT_ATTR_LIST: u8 = 255;
 
@@ -333,6 +334,8 @@ pub enum AttrDataType {
     OctetString,
     /// BSTR - Bit string
     BitString,
+    /// DNP3 Time
+    Timestamp,
     /// List of UINT8-BSTR8 pairs
     AttrList,
     /// Extended list of UINT8-BSTR8 pairs
@@ -348,6 +351,7 @@ impl AttrDataType {
             FLOATING_POINT => Some(Self::FloatingPoint),
             OCTET_STRING => Some(Self::OctetString),
             BIT_STRING => Some(Self::BitString),
+            DNP3_TIME => Some(Self::Timestamp),
             ATTR_LIST => Some(Self::AttrList),
             EXT_ATTR_LIST => Some(Self::ExtAttrList),
             _ => None,
@@ -467,6 +471,8 @@ pub enum AttrValue<'a> {
     FloatingPoint(FloatType),
     /// OSTR - Octet string
     OctetString(&'a [u8]),
+    /// DNP3 Time
+    Timestamp(Timestamp),
     /// BSTR - Bit string
     BitString(&'a [u8]),
     /// List of UINT8-BSTR8
@@ -498,6 +504,7 @@ impl<'a> AttrValue<'a> {
             },
             AttrValue::OctetString(x) => write!(f, "octet string len == {}", x.len()),
             AttrValue::BitString(x) => write!(f, "bit string len == {}", x.len()),
+            AttrValue::Timestamp(x) => write!(f, "{}", x),
             AttrValue::AttrList(list) => {
                 for x in list.iter() {
                     write!(
@@ -508,6 +515,7 @@ impl<'a> AttrValue<'a> {
                 }
                 Ok(())
             }
+
         }
     }
 
@@ -603,7 +611,7 @@ impl<'a> Attribute<'a> {
             AttrSet::Default => {
                 // lookup description
                 let desc = get_default_desc(self.variation);
-                writeln!(f, "Default set - variation {} - {desc}", self.variation)?;
+                writeln!(f, "\nDefault set - variation {} - {desc}", self.variation)?;
             }
             AttrSet::Private(x) => {
                 writeln!(f, "Private set ({x})")?;
@@ -739,6 +747,7 @@ impl<'a> AttrValue<'a> {
             }
             AttrDataType::OctetString => Self::OctetString(cursor.read_bytes(len as usize)?),
             AttrDataType::BitString => Self::BitString(cursor.read_bytes(len as usize)?),
+            AttrDataType::Timestamp => Self::Timestamp(Timestamp::new(cursor.read_u48_le()?)),
             AttrDataType::AttrList => Self::AttrList(Self::parse_attr_list(cursor, len as u16)?),
             AttrDataType::ExtAttrList => {
                 // with extended attribute lists, the len is really len + 256
@@ -760,6 +769,7 @@ impl<'a> AttrValue<'a> {
             AttrValue::OctetString(_) => AttrDataType::OctetString,
             AttrValue::BitString(_) => AttrDataType::BitString,
             AttrValue::AttrList(_) => AttrDataType::AttrList,
+            AttrValue::Timestamp(_) => AttrDataType::Timestamp,
         }
     }
 
