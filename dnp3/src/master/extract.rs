@@ -107,6 +107,9 @@ mod test {
         UInt(UIntAttr, u32),
         Bool(BoolAttr, bool),
         List(Vec<AttrItem>),
+        Float(FloatAttr, FloatType),
+        Octets(OctetStringAttr, Vec<u8>),
+        Time(TimeAttr, Timestamp),
     }
 
     #[derive(Debug, PartialEq)]
@@ -244,6 +247,9 @@ mod test {
                         KnownAttribute::String(x, v) => Known::String(x, v.to_string()),
                         KnownAttribute::UInt(x, v) => Known::UInt(x, v),
                         KnownAttribute::Bool(x, v) => Known::Bool(x, v),
+                        KnownAttribute::Float(x, v) => Known::Float(x, v),
+                        KnownAttribute::OctetString(x, v) => Known::Octets(x, v),
+                        KnownAttribute::DNP3Time(x, v) => Known::Time(x, v),
                     };
                     self.received.push(Header::KnownAttr(known));
                 }

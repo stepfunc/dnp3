@@ -54,7 +54,7 @@ impl Default for AttrSet {
 }
 
 /// Variants for all the pre-defined attributes in the standard
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AnyAttribute<'a> {
     /// Either an attribute from a private set or an unknown attribute in the default set
     Other(Attribute<'a>),
@@ -65,8 +65,20 @@ pub enum AnyAttribute<'a> {
 /// Enumeration of all the known string attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StringAttr {
-    /// Variation 196 - Configuration Id
-    ConfigurationId,
+    /// Variation 196 - Configuration id
+    ConfigId,
+    /// Variation 197 - Configuration version
+    ConfigVersion,
+    /// Variation 201 - Configuration digest algorithm
+    ConfigDigestAlgorithm,
+    /// Variation 202 - Master resource id (mRID)
+    MasterResourceId,
+    /// Variation 206 - User-assigned secondary operator name
+    UserAssignedSecondaryOperatorName,
+    /// Variation 207 - User-assigned primary operator name
+    UserAssignedPrimaryOperatorName,
+    /// Variation 208 - User-assigned system name
+    UserAssignedSystemName,
     /// Variation 211 - Identification of user-specific attributes
     UserSpecificAttributes,
     /// Variation 242 - Device manufacturer software version
@@ -165,17 +177,50 @@ pub enum BoolAttr {
     SupportsBinaryInputEvents,
 }
 
+/// Enumeration of all the known DNP3 Time attributes
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum TimeAttr {
+    /// Variation 198 - Time and date that the outstation's current configuration was built defined
+    ConfigBuildDate,
+    /// Variation 199 - Time and date that the outstation's configuration was last modified
+    ConfigLastChangeDate,
+}
+
+/// Enumeration of all known octet-string attributes
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum OctetStringAttr {
+    /// Variation 201 - Digest (aka fingerprint) of the configuration using a CRC, HASH, MAC, or public key signature
+    ConfigDigest,
+}
+
+/// Enumeration of all known float attributes
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum FloatAttr {
+    /// Variation 203 - Altitude of the device
+    DeviceLocationAltitude,
+    /// Variation 204 - Longitude of the device from reference meridian (-180.0 to 180.0 deg)
+    DeviceLocationLongitude,
+    /// Variation 204 - Latitude of the device from the equator (90.0 to -90.0 deg)
+    DeviceLocationLatitude,
+}
+
 /// Variants for all the pre-defined attributes in the standard
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum KnownAttribute<'a> {
     /// Variation 255 - List of attribute variations
     AttributeList(AttrList<'a>),
     /// VStr attributes
     String(StringAttr, &'a str),
+    /// Float attributes
+    Float(FloatAttr, FloatType),
     /// UInt attributes
     UInt(UIntAttr, u32),
-    /// Bool attributes,
+    /// Bool attributes
     Bool(BoolAttr, bool),
+    /// Octet-string attributes
+    OctetString(OctetStringAttr, Vec<u8>),
+    /// DNP3Time attributes
+    DNP3Time(TimeAttr, Timestamp),
 }
 
 impl<'a> AnyAttribute<'a> {
@@ -185,7 +230,44 @@ impl<'a> AnyAttribute<'a> {
         }
 
         let known = match attr.variation {
-            196 => KnownAttribute::String(StringAttr::ConfigurationId, attr.value.expect_vstr()?),
+            196 => KnownAttribute::String(StringAttr::ConfigId, attr.value.expect_vstr()?),
+            197 => KnownAttribute::String(StringAttr::ConfigVersion, attr.value.expect_vstr()?),
+            198 => KnownAttribute::DNP3Time(TimeAttr::ConfigBuildDate, attr.value.expect_time()?),
+            199 => {
+                KnownAttribute::DNP3Time(TimeAttr::ConfigLastChangeDate, attr.value.expect_time()?)
+            }
+            200 => KnownAttribute::OctetString(
+                OctetStringAttr::ConfigDigest,
+                attr.value.expect_octet_string()?,
+            ),
+            201 => {
+                KnownAttribute::String(StringAttr::ConfigDigestAlgorithm, attr.value.expect_vstr()?)
+            }
+            202 => KnownAttribute::String(StringAttr::MasterResourceId, attr.value.expect_vstr()?),
+            203 => KnownAttribute::Float(
+                FloatAttr::DeviceLocationAltitude,
+                attr.value.expect_float()?,
+            ),
+            204 => KnownAttribute::Float(
+                FloatAttr::DeviceLocationLongitude,
+                attr.value.expect_float()?,
+            ),
+            205 => KnownAttribute::Float(
+                FloatAttr::DeviceLocationLatitude,
+                attr.value.expect_float()?,
+            ),
+            206 => KnownAttribute::String(
+                StringAttr::UserAssignedSecondaryOperatorName,
+                attr.value.expect_vstr()?,
+            ),
+            207 => KnownAttribute::String(
+                StringAttr::UserAssignedPrimaryOperatorName,
+                attr.value.expect_vstr()?,
+            ),
+            208 => KnownAttribute::String(
+                StringAttr::UserAssignedSystemName,
+                attr.value.expect_vstr()?,
+            ),
             209 => KnownAttribute::UInt(
                 UIntAttr::SecureAuthenticationVersion,
                 attr.value.expect_uint()?,
@@ -340,7 +422,7 @@ pub enum AttrDataType {
     /// BSTR - Bit string
     BitString,
     /// DNP3 Time
-    Timestamp,
+    Dnp3Time,
     /// List of UINT8-BSTR8 pairs
     AttrList,
     /// Extended list of UINT8-BSTR8 pairs
@@ -356,7 +438,7 @@ impl AttrDataType {
             FLOATING_POINT => Some(Self::FloatingPoint),
             OCTET_STRING => Some(Self::OctetString),
             BIT_STRING => Some(Self::BitString),
-            DNP3_TIME => Some(Self::Timestamp),
+            DNP3_TIME => Some(Self::Dnp3Time),
             ATTR_LIST => Some(Self::AttrList),
             EXT_ATTR_LIST => Some(Self::ExtAttrList),
             _ => None,
@@ -477,7 +559,7 @@ pub enum AttrValue<'a> {
     /// OSTR - Octet string
     OctetString(&'a [u8]),
     /// DNP3 Time
-    Timestamp(Timestamp),
+    Dnp3Time(Timestamp),
     /// BSTR - Bit string
     BitString(&'a [u8]),
     /// List of UINT8-BSTR8
@@ -509,7 +591,7 @@ impl<'a> AttrValue<'a> {
             },
             AttrValue::OctetString(x) => write!(f, "octet string len == {}", x.len()),
             AttrValue::BitString(x) => write!(f, "bit string len == {}", x.len()),
-            AttrValue::Timestamp(x) => write!(f, "{}", x),
+            AttrValue::Dnp3Time(x) => write!(f, "{}", x),
             AttrValue::AttrList(list) => {
                 for x in list.iter() {
                     write!(
@@ -520,6 +602,27 @@ impl<'a> AttrValue<'a> {
                 }
                 Ok(())
             }
+        }
+    }
+
+    pub(crate) fn expect_octet_string(&self) -> Result<Vec<u8>, TypeError> {
+        match self {
+            AttrValue::OctetString(x) => Ok(x.to_vec()),
+            _ => Err(TypeError::new(AttrDataType::OctetString, self.get_type())),
+        }
+    }
+
+    pub(crate) fn expect_time(&self) -> Result<Timestamp, TypeError> {
+        match self {
+            AttrValue::Dnp3Time(t) => Ok(*t),
+            _ => Err(TypeError::new(AttrDataType::Dnp3Time, self.get_type())),
+        }
+    }
+
+    pub(crate) fn expect_float(&self) -> Result<FloatType, TypeError> {
+        match self {
+            AttrValue::FloatingPoint(x) => Ok(*x),
+            _ => Err(TypeError::new(AttrDataType::FloatingPoint, self.get_type())),
         }
     }
 
@@ -569,7 +672,19 @@ pub struct Attribute<'a> {
 
 fn get_default_desc(var: u8) -> &'static str {
     match var {
-        196 => "Configuration version",
+        196 => "Configuration ID",
+        197 => "Configuration version",
+        198 => "Configuration build date",
+        199 => "Configuration last change date",
+        200 => "Configuration digest",
+        201 => "Configuration digest algorithm",
+        202 => "Master resource ID",
+        203 => "Device location altitude",
+        204 => "Device location longitude",
+        205 => "Device location latitude",
+        206 => "User-assigned secondary operator name",
+        207 => "User-assigned primary operator name",
+        208 => "User-assigned system name",
         209 => "Secure authentication version",
         210 => "Number of security statistics per association",
         211 => "Identification of support for user-specific attributes",
@@ -764,11 +879,11 @@ impl<'a> AttrValue<'a> {
             }
             AttrDataType::OctetString => Self::OctetString(cursor.read_bytes(len as usize)?),
             AttrDataType::BitString => Self::BitString(cursor.read_bytes(len as usize)?),
-            AttrDataType::Timestamp => {
+            AttrDataType::Dnp3Time => {
                 if len != 6 {
                     return Err(AttrParseError::BadTimeLength(len));
                 }
-                Self::Timestamp(Timestamp::new(cursor.read_u48_le()?))
+                Self::Dnp3Time(Timestamp::new(cursor.read_u48_le()?))
             }
             AttrDataType::AttrList => Self::AttrList(Self::parse_attr_list(cursor, len as u16)?),
             AttrDataType::ExtAttrList => {
@@ -791,7 +906,7 @@ impl<'a> AttrValue<'a> {
             AttrValue::OctetString(_) => AttrDataType::OctetString,
             AttrValue::BitString(_) => AttrDataType::BitString,
             AttrValue::AttrList(_) => AttrDataType::AttrList,
-            AttrValue::Timestamp(_) => AttrDataType::Timestamp,
+            AttrValue::Dnp3Time(_) => AttrDataType::Dnp3Time,
         }
     }
 
