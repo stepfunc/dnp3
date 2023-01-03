@@ -189,9 +189,9 @@ pub enum UIntAttr {
     /// Variation 239 - Number of binary input points
     NumBinaryInput,
     /// Variation 240 - Maximum transmit fragment size
-    MaximumTransmitFragmentSize,
+    MaxTxFragmentSize,
     /// Variation 241 - Maximum receive fragment size
-    MaximumReceiveFragmentSize,
+    MaxRxFragmentSize,
 }
 
 impl UIntAttr {
@@ -223,8 +223,8 @@ impl UIntAttr {
             UIntAttr::NumDoubleBitBinaryInput => 236,
             UIntAttr::MaxBinaryInputIndex => 238,
             UIntAttr::NumBinaryInput => 239,
-            UIntAttr::MaximumTransmitFragmentSize => 240,
-            UIntAttr::MaximumReceiveFragmentSize => 241,
+            UIntAttr::MaxTxFragmentSize => 240,
+            UIntAttr::MaxRxFragmentSize => 241,
         }
     }
 
@@ -464,8 +464,8 @@ impl<'a> AnyAttribute<'a> {
             237 => BoolAttr::SupportsBinaryInputEvents.extract_from(attr.value)?,
             238 => UIntAttr::MaxBinaryInputIndex.extract_from(attr.value)?,
             239 => UIntAttr::NumBinaryInput.extract_from(attr.value)?,
-            240 => UIntAttr::MaximumTransmitFragmentSize.extract_from(attr.value)?,
-            241 => UIntAttr::MaximumReceiveFragmentSize.extract_from(attr.value)?,
+            240 => UIntAttr::MaxTxFragmentSize.extract_from(attr.value)?,
+            241 => UIntAttr::MaxRxFragmentSize.extract_from(attr.value)?,
             242 => StringAttr::DeviceManufacturerSoftwareVersion.extract_from(attr.value)?,
             243 => StringAttr::DeviceManufacturerHardwareVersion.extract_from(attr.value)?,
             244 => StringAttr::UserAssignedOwnerName.extract_from(attr.value)?,
