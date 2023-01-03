@@ -1,3 +1,4 @@
+use std::ffi::CString;
 use dnp3::app::measurement::*;
 use dnp3::app::*;
 use dnp3::app::{ResponseFunction, ResponseHeader};
@@ -131,6 +132,78 @@ impl ReadHandler for ffi::ReadHandler {
         let info = info.into();
         let mut iterator = OctetStringIterator::new(iter);
         ffi::ReadHandler::handle_octet_string(self, info, &mut iterator);
+    }
+
+    fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {
+        let info = info.into();
+        match attr {
+            AnyAttribute::Other(x) => {
+                match x.value {
+                    AttrValue::VisibleString(v) => {
+                        let string = match CString::new(v) {
+                            Ok(x) => x,
+                            Err(err) => {
+                                tracing::warn!("Attribute is not a valid C-string: {}", err);
+                                return;
+                            }
+                        };
+                        ffi::ReadHandler::handle_string_attr(self, info, ffi::StringAttr::Unknown,x.set.value(), x.variation,string.as_ref());
+                    }
+                    AttrValue::UnsignedInt(_) => {}
+                    AttrValue::SignedInt(_) => {}
+                    AttrValue::FloatingPoint(_) => {}
+                    AttrValue::OctetString(_) => {}
+                    AttrValue::Dnp3Time(_) => {}
+                    AttrValue::BitString(_) => {}
+                    AttrValue::AttrList(_) => {}
+                }
+            }
+            AnyAttribute::Known(x) => {
+                match x {
+                    KnownAttribute::AttributeList(_) => {}
+                    KnownAttribute::String(x, v) => {
+                        let string = match CString::new(v) {
+                            Ok(x) => x,
+                            Err(err) => {
+                                tracing::warn!("Attribute is not a valid C-string: {}", err);
+                                return;
+                            }
+                        };
+                        ffi::ReadHandler::handle_string_attr(self, info, x.into(),0, x.variation(),string.as_ref());
+                    }
+                    KnownAttribute::Float(_, _) => {}
+                    KnownAttribute::UInt(_, _) => {}
+                    KnownAttribute::Bool(_, _) => {}
+                    KnownAttribute::OctetString(_, _) => {}
+                    KnownAttribute::DNP3Time(_, _) => {}
+                }
+            }
+        }
+    }
+}
+
+impl From<dnp3::app::StringAttr> for ffi::StringAttr {
+    fn from(value: StringAttr) -> Self {
+        match value {
+            StringAttr::ConfigId => Self::ConfigId,
+            StringAttr::ConfigVersion => Self::ConfigVersion,
+            StringAttr::ConfigDigestAlgorithm => Self::ConfigDigestAlgorithm,
+            StringAttr::MasterResourceId => Self::MasterResourceId,
+            StringAttr::UserAssignedSecondaryOperatorName => Self::UserAssignedSecondaryOperatorName,
+            StringAttr::UserAssignedPrimaryOperatorName => Self::UserAssignedPrimaryOperatorName,
+            StringAttr::UserAssignedSystemName => Self::UserAssignedSystemName,
+            StringAttr::UserSpecificAttributes => Self::UserSpecificAttributes,
+            StringAttr::DeviceManufacturerSoftwareVersion => Self::DeviceManufacturerSoftwareVersion,
+            StringAttr::DeviceManufacturerHardwareVersion => Self::DeviceManufacturerHardwareVersion,
+            StringAttr::UserAssignedOwnerName => Self::UserAssignedOwnerName,
+            StringAttr::UserAssignedLocation => Self::UserAssignedLocation,
+            StringAttr::UserAssignedId => Self::UserAssignedId,
+            StringAttr::UserAssignedDeviceName => Self::UserAssignedDeviceName,
+            StringAttr::DeviceSerialNumber => Self::DeviceSerialNumber,
+            StringAttr::DeviceSubsetAndConformance => Self::DeviceSubsetAndConformance,
+            StringAttr::ProductNameAndModel => Self::ProductNameAndModel,
+            StringAttr::DeviceManufacturersName => Self::DeviceManufacturersName,
+        }
     }
 }
 

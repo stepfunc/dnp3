@@ -14,6 +14,8 @@ pub fn define(
 
     let iin = declare_iin_struct(lib)?;
 
+    let attr = crate::master::attributes::define(lib)?;
+
     let response_header = lib.declare_callback_argument_struct("response_header")?;
     let response_header = lib
         .define_callback_argument_struct(response_header)?
@@ -192,10 +194,35 @@ pub fn define(
         .begin_callback("handle_octet_string", "Handle octet string data")?
         .param(
             "info",
-            header_info,
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param("values", shared_def.octet_string_it.clone(), iterator_doc)?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        // group 0 callbacks
+        .begin_callback("handle_string_attr", "Handle a known or unknown visible string device attribute")?
+        .param(
+            "info",
+            header_info,
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.string_attr,
+            "Enumeration describing the attribute (possibly unknown) associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", StringType, "Value of the visible string")?
         .returns_nothing_by_default()?
         .end_callback()?
         .build_async()?;

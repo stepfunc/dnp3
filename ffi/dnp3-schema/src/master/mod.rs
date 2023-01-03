@@ -1,5 +1,6 @@
-pub(crate) mod read_handler;
+pub(crate) mod attributes;
 pub(crate) mod request;
+pub(crate) mod read_handler;
 pub(crate) mod write_dead_band_request;
 
 use crate::shared::SharedDefinitions;

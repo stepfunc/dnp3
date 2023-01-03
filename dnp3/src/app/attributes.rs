@@ -94,10 +94,10 @@ pub enum StringAttr {
     UserAssignedId,
     /// Variation 247 - User assigned device name
     UserAssignedDeviceName,
-    /// Variation 248 - DNP3 subset and conformance
+    /// Variation 248 - Device serial number
     DeviceSerialNumber,
     /// Variation 249 - DNP3 subset and conformance
-    SubsetAndConformance,
+    DeviceSubsetAndConformance,
     /// Variation 250 - Device manufacturer's product name and model
     ProductNameAndModel,
     /// Variation 252 - Device manufacturer's name
@@ -127,7 +127,7 @@ impl StringAttr {
             StringAttr::UserAssignedId => 246,
             StringAttr::UserAssignedDeviceName => 247,
             StringAttr::DeviceSerialNumber => 248,
-            StringAttr::SubsetAndConformance => 249,
+            StringAttr::DeviceSubsetAndConformance => 249,
             StringAttr::ProductNameAndModel => 250,
             StringAttr::DeviceManufacturersName => 252,
         }
@@ -147,7 +147,7 @@ impl StringAttr {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum UIntAttr {
     /// Variation 209 - Secure authentication version
-    SecureAuthenticationVersion,
+    SecureAuthVersion,
     /// Variation 210 - Number of security statistics per association
     NumSecurityStatsPerAssoc,
     /// Variation 212 - Number of master defined data-set prototypes
@@ -202,7 +202,7 @@ impl UIntAttr {
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            UIntAttr::SecureAuthenticationVersion => 209,
+            UIntAttr::SecureAuthVersion => 209,
             UIntAttr::NumSecurityStatsPerAssoc => 210,
             UIntAttr::NumMasterDefinedDataSetProto => 212,
             UIntAttr::NumOutstationDefinedDataSetProto => 213,
@@ -240,7 +240,7 @@ impl UIntAttr {
 
 /// Enumeration of all the known boolean attributes
 ///
-/// The are actually encoded as signe integer attributes where 1 == true
+/// Boolean attributes are actually just encoded as signed integer attributes where 1 == true
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum BoolAttr {
     /// Variation 219 - Supports analog output events
@@ -433,7 +433,7 @@ impl<'a> AnyAttribute<'a> {
             206 => StringAttr::UserAssignedSecondaryOperatorName.extract_from(attr.value)?,
             207 => StringAttr::UserAssignedPrimaryOperatorName.extract_from(attr.value)?,
             208 => StringAttr::UserAssignedSystemName.extract_from(attr.value)?,
-            209 => UIntAttr::SecureAuthenticationVersion.extract_from(attr.value)?,
+            209 => UIntAttr::SecureAuthVersion.extract_from(attr.value)?,
             210 => UIntAttr::NumSecurityStatsPerAssoc.extract_from(attr.value)?,
             211 => StringAttr::UserSpecificAttributes.extract_from(attr.value)?,
             212 => UIntAttr::NumMasterDefinedDataSetProto.extract_from(attr.value)?,
@@ -473,7 +473,7 @@ impl<'a> AnyAttribute<'a> {
             246 => StringAttr::UserAssignedId.extract_from(attr.value)?,
             247 => StringAttr::UserAssignedDeviceName.extract_from(attr.value)?,
             248 => StringAttr::DeviceSerialNumber.extract_from(attr.value)?,
-            249 => StringAttr::SubsetAndConformance.extract_from(attr.value)?,
+            249 => StringAttr::DeviceSubsetAndConformance.extract_from(attr.value)?,
             250 => StringAttr::ProductNameAndModel.extract_from(attr.value)?,
             252 => StringAttr::DeviceManufacturersName.extract_from(attr.value)?,
             255 => KnownAttribute::AttributeList(attr.value.expect_attr_list()?),
