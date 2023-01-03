@@ -157,6 +157,11 @@ class MainClass
                 Console.WriteLine();
             }
         }
+        
+        void IReadHandler.HandleStringAttr(HeaderInfo info, StringAttr attr, byte set, byte var, string value)
+        {
+            Console.WriteLine($"String attr: {attr} set: {set} variation: {var} value: {value}");
+        }
     }
     // ANCHOR_END: read_handler
 
@@ -480,6 +485,13 @@ class MainClass
                     request.AddAllObjectsHeader(Variation.Group20Var0);
                     await channel.RequestExpectEmptyResponse(association, FunctionCode.FreezeAtTime, request);
                     Console.WriteLine($"Freeze-at-time success");
+                    return true;
+                }
+            case "rda":
+                {
+                    var request = new Request();
+                    request.AddAllObjectsHeader(Variation.Group0Var254);
+                    await channel.Read(association, request);                    
                     return true;
                 }
             case "crt":
