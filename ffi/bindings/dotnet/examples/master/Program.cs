@@ -167,6 +167,21 @@ class MainClass
         {
             Console.WriteLine($"Unsigned integer attribute: {attr} set: {set} variation: {var} value: {value}");
         }
+
+        void IReadHandler.HandleBoolAttr(HeaderInfo info, BoolAttr attr, bool value)
+        {
+            Console.WriteLine($"Boolean attribute: {attr} value: {value}");
+        }
+
+        void IReadHandler.HandleIntAttr(HeaderInfo info, byte set, byte var, int value)
+        {
+            Console.WriteLine($"Int attribute: set: {set} variation: {var} value: {value}");
+        }
+
+        void IReadHandler.HandleTimeAttr(HeaderInfo info, TimeAttr attr, byte set, byte var, ulong value)
+        {
+            Console.WriteLine($"Time attribute: {attr} set: {set} variation: {var} value: {value}");
+        }
     }
     // ANCHOR_END: read_handler
 

@@ -222,7 +222,6 @@ fn define_bool_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .push("supports_analog_input_events","Variation 231 - Support analog input events")?
         .push("supports_double_bit_binary_input_events", "Variation 234 - Support double-bit binary input events")?
         .push("supports_binary_input_events","Variation 237 - Support binary input events")?
-        .add_unknown()?
         .build()?;
 
     Ok(value)

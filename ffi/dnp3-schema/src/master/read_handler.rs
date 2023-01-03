@@ -220,7 +220,7 @@ pub fn define(
         .param(
             "variation",
             Primitive::U8,
-            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
         )?
         .param("value", StringType, "attribute value")?
         .returns_nothing_by_default()?
@@ -228,7 +228,7 @@ pub fn define(
         .begin_callback("handle_uint_attr", "Handle an unsigned integer device attribute")?
         .param(
             "info",
-            header_info,
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
@@ -244,9 +244,72 @@ pub fn define(
         .param(
             "variation",
             Primitive::U8,
-            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
         )?
         .param("value", Primitive::U32, "attribute value")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_bool_attr",
+                        doc("Handle a boolean device attribute")
+                            .details("These are actually signed integer values on the wire. This method is only called for known values")
+        )?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.bool_attr,
+            "Enumeration describing the attribute associated with the value"
+        )?
+        .param("value", Primitive::Bool, "attribute value")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_int_attr",
+                        doc("Handle a signed integer device attribute")
+                            .details("There are no defined attributes for this type that aren't mapped to booleans so there is no enumeration")
+        )?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute"
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute"
+        )?
+        .param("value", Primitive::S32, "attribute value")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_time_attr", "Handle a DNP3 time device attribute")?
+        .param(
+            "info",
+            header_info,
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.time_attr,
+            "Enumeration describing the attribute associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", Primitive::U64, "48-bit timestamp representing milliseconds since Unix epoch")?
         .returns_nothing_by_default()?
         .end_callback()?
         .build_async()?;

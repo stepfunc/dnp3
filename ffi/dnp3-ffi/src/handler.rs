@@ -156,10 +156,21 @@ impl ReadHandler for ffi::ReadHandler {
                         v,
                     );
                 }
-                AttrValue::SignedInt(_) => {}
+                AttrValue::SignedInt(v) => {
+                    ffi::ReadHandler::handle_int_attr(self, info, x.set.value(), x.variation, v);
+                }
                 AttrValue::FloatingPoint(_) => {}
                 AttrValue::OctetString(_) => {}
-                AttrValue::Dnp3Time(_) => {}
+                AttrValue::Dnp3Time(v) => {
+                    ffi::ReadHandler::handle_time_attr(
+                        self,
+                        info,
+                        ffi::TimeAttr::Unknown,
+                        x.set.value(),
+                        x.variation,
+                        v.raw_value(),
+                    );
+                }
                 AttrValue::BitString(_) => {}
                 AttrValue::AttrList(_) => {}
             },
@@ -172,9 +183,20 @@ impl ReadHandler for ffi::ReadHandler {
                 KnownAttribute::UInt(x, v) => {
                     ffi::ReadHandler::handle_uint_attr(self, info, x.into(), 0, x.variation(), v);
                 }
-                KnownAttribute::Bool(_, _) => {}
+                KnownAttribute::Bool(x, v) => {
+                    ffi::ReadHandler::handle_bool_attr(self, info, x.into(), v);
+                }
                 KnownAttribute::OctetString(_, _) => {}
-                KnownAttribute::DNP3Time(_, _) => {}
+                KnownAttribute::DNP3Time(x, v) => {
+                    ffi::ReadHandler::handle_time_attr(
+                        self,
+                        info,
+                        x.into(),
+                        0,
+                        x.variation(),
+                        v.raw_value(),
+                    );
+                }
             },
         }
     }
@@ -257,6 +279,33 @@ impl From<UIntAttr> for ffi::UintAttr {
             UIntAttr::NumBinaryInput => Self::NumBinaryInput,
             UIntAttr::MaxTxFragmentSize => Self::MaxTxFragmentSize,
             UIntAttr::MaxRxFragmentSize => Self::MaxRxFragmentSize,
+        }
+    }
+}
+
+impl From<BoolAttr> for ffi::BoolAttr {
+    fn from(value: BoolAttr) -> Self {
+        match value {
+            BoolAttr::SupportsAnalogOutputEvents => Self::SupportsAnalogOutputEvents,
+            BoolAttr::SupportsBinaryOutputEvents => Self::SupportsBinaryOutputEvents,
+            BoolAttr::SupportsFrozenCounterEvents => Self::SupportsFrozenCounterEvents,
+            BoolAttr::SupportsFrozenCounters => Self::SupportsFrozenCounters,
+            BoolAttr::SupportsCounterEvents => Self::SupportsCounterEvents,
+            BoolAttr::SupportsFrozenAnalogInputs => Self::SupportsFrozenAnalogInputs,
+            BoolAttr::SupportsAnalogInputEvents => Self::SupportsAnalogInputEvents,
+            BoolAttr::SupportsDoubleBitBinaryInputEvents => {
+                Self::SupportsDoubleBitBinaryInputEvents
+            }
+            BoolAttr::SupportsBinaryInputEvents => Self::SupportsBinaryInputEvents,
+        }
+    }
+}
+
+impl From<TimeAttr> for ffi::TimeAttr {
+    fn from(value: TimeAttr) -> Self {
+        match value {
+            TimeAttr::ConfigBuildDate => Self::ConfigBuildDate,
+            TimeAttr::ConfigLastChangeDate => Self::ConfigLastChangeDate,
         }
     }
 }
