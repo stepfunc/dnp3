@@ -57,7 +57,7 @@ pub(crate) fn format_optional_attribute(
     attr: &Option<Attribute>,
 ) -> std::fmt::Result {
     if let Some(attr) = attr {
-        attr.write(f)?;
+        attr.format(f)?;
     }
     Ok(())
 }

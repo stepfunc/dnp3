@@ -896,6 +896,7 @@ macro_rules! define_task_from_impl {
                     TaskError::NoConnection => ffi::$name::NoConnection,
                     TaskError::Shutdown => ffi::$name::Shutdown,
                     TaskError::Disabled => ffi::$name::NoConnection,
+                    TaskError::BadEncoding(_) => ffi::$name::BadEncoding,
                 }
             }
         }

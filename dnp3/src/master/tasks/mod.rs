@@ -90,7 +90,7 @@ impl Task {
 
 pub(crate) trait RequestWriter {
     fn function(&self) -> FunctionCode;
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError>;
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError>;
 }
 
 pub(crate) enum ReadTask {
@@ -124,13 +124,14 @@ impl RequestWriter for ReadTask {
         FunctionCode::Read
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         match self {
-            ReadTask::PeriodicPoll(poll) => poll.format(writer),
-            ReadTask::StartupIntegrity(classes) => classes.write(writer),
-            ReadTask::EventScan(classes) => classes.write(writer),
-            ReadTask::SingleRead(req) => req.format(writer),
+            ReadTask::PeriodicPoll(poll) => poll.format(writer)?,
+            ReadTask::StartupIntegrity(classes) => classes.write(writer)?,
+            ReadTask::EventScan(classes) => classes.write(writer)?,
+            ReadTask::SingleRead(req) => req.format(writer)?,
         }
+        Ok(())
     }
 }
 
@@ -139,15 +140,16 @@ impl RequestWriter for NonReadTask {
         self.function()
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         match self {
-            NonReadTask::Auto(t) => t.write(writer),
-            NonReadTask::Command(t) => t.write(writer),
-            NonReadTask::TimeSync(t) => t.write(writer),
-            NonReadTask::Restart(_) => Ok(()),
-            NonReadTask::DeadBands(t) => t.write(writer),
-            NonReadTask::EmptyResponseTask(t) => t.write(writer),
+            NonReadTask::Auto(t) => t.write(writer)?,
+            NonReadTask::Command(t) => t.write(writer)?,
+            NonReadTask::TimeSync(t) => t.write(writer)?,
+            NonReadTask::Restart(_) => {}
+            NonReadTask::DeadBands(t) => t.write(writer)?,
+            NonReadTask::EmptyResponseTask(t) => t.write(writer)?,
         }
+        Ok(())
     }
 }
 

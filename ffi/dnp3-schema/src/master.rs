@@ -1104,6 +1104,7 @@ const TASK_ERRORS: &[(&str, &str)] = &[
     ("no_connection", "no connection"),
     ("shutdown", "master was shutdown"),
     ("association_removed", "association was removed mid-task"),
+    ("bad_encoding", "request data could not be encoded"),
 ];
 
 trait TaskErrors: Sized {

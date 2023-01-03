@@ -6,7 +6,7 @@ use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
-use crate::app::{FunctionCode, QualifierCode};
+use crate::app::{AttrWriteError, FunctionCode, OwnedAttribute, QualifierCode};
 
 use scursor::{WriteCursor, WriteError};
 
@@ -131,6 +131,17 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         QualifierCode::Count8.write(self.cursor)?;
         self.cursor.write_u8(1)?;
         item.write(self.cursor)?;
+        Ok(())
+    }
+
+    pub(crate) fn write_attribute(&mut self, attr: &OwnedAttribute) -> Result<(), AttrWriteError> {
+        let variation = Variation::Group0(attr.variation);
+        variation.write(self.cursor)?;
+        QualifierCode::Range8.write(self.cursor)?;
+        let start_stop: u8 = attr.set.value();
+        self.cursor.write_u8(start_stop)?;
+        self.cursor.write_u8(start_stop)?;
+        attr.value.write(self.cursor)?;
         Ok(())
     }
 

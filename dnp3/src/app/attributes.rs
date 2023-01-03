@@ -1,7 +1,8 @@
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSize, Index};
 use crate::app::{ObjectParseError, Timestamp};
-use scursor::{ReadCursor, ReadError};
+use crate::master::{BadEncoding, TaskError};
+use scursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
@@ -24,7 +25,7 @@ impl AttrSet {
     }
 
     /// Initialize based on raw value
-    pub fn get(self) -> u8 {
+    pub fn value(self) -> u8 {
         match self {
             AttrSet::Default => 0,
             AttrSet::Private(x) => x,
@@ -384,21 +385,6 @@ impl AttrDataType {
             _ => None,
         }
     }
-
-    /*
-    pub(crate) fn to_u8(self) -> u8 {
-        match self {
-            Self::VisibleString => VISIBLE_STRING,
-            Self::UnsignedInt => UNSIGNED_INT,
-            Self::SignedInt => SIGNED_INT,
-            Self::FloatingPoint => FLOATING_POINT,
-            Self::OctetString => OCTET_STRING,
-            Self::BitString => BIT_STRING,
-            Self::AttrList => ATTR_LIST,
-            Self::ExtAttrList => EXT_ATTR_LIST,
-        }
-    }
-    */
 }
 
 /// A list of attributes returned from the outstation. This type is
@@ -485,7 +471,7 @@ pub enum FloatType {
     F64(f64),
 }
 
-/// Represents the value of a device attribute
+/// Represents the value of a device attribute parsed from the underlying buffer
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum AttrValue<'a> {
     /// VSTR - Visible character suitable for print and display
@@ -506,6 +492,203 @@ pub enum AttrValue<'a> {
     AttrList(AttrList<'a>),
 }
 
+/// Represents the value of a device attribute in a format
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum OwnedAttrValue {
+    /// VSTR - Visible character suitable for print and display
+    VisibleString(String),
+    /// UINT - Unsigned integer
+    UnsignedInt(u32),
+    /// Signed integer
+    SignedInt(i32),
+    /// Int - Signed integer
+    FloatingPoint(FloatType),
+    /// OSTR - Octet string
+    OctetString(Vec<u8>),
+    /// DNP3 Time
+    Dnp3Time(Timestamp),
+    /// BSTR - Bit string
+    BitString(Vec<u8>),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+/// Ways in which attribute encoding can fail
+pub enum BadAttribute {
+    /// length of the string attribute exceeds what's encodable (max 255)
+    BadLength(usize),
+}
+
+impl Display for BadAttribute {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BadAttribute::BadLength(x) => write!(
+                f,
+                "Data length {x} can not be encoded in a device attribute (max = 255)"
+            ),
+        }
+    }
+}
+
+pub(crate) enum AttrWriteError {
+    /// underlying cursor error
+    Cursor(WriteError),
+    /// attribute value could not be encoded
+    BadAttribute(BadAttribute),
+}
+
+impl From<BadAttribute> for AttrWriteError {
+    fn from(value: BadAttribute) -> Self {
+        AttrWriteError::BadAttribute(value)
+    }
+}
+
+impl From<WriteError> for AttrWriteError {
+    fn from(err: WriteError) -> Self {
+        AttrWriteError::Cursor(err)
+    }
+}
+
+#[derive(Copy, Clone)]
+enum UInt {
+    U8(u8),
+    U16(u16),
+    U32(u32),
+}
+
+impl UInt {
+    fn new(value: u32) -> Self {
+        if value <= u8::MAX as u32 {
+            Self::U8(value as u8)
+        } else if value <= u16::MAX as u32 {
+            Self::U16(value as u16)
+        } else {
+            Self::U32(value)
+        }
+    }
+
+    fn len(self) -> u8 {
+        match self {
+            UInt::U8(_) => 1,
+            UInt::U16(_) => 2,
+            UInt::U32(_) => 4,
+        }
+    }
+
+    fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        match self {
+            UInt::U8(x) => cursor.write_u8(x),
+            UInt::U16(x) => cursor.write_u16_le(x),
+            UInt::U32(x) => cursor.write_u32_le(x),
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+enum Int {
+    I8(u8),
+    I16(i16),
+    I32(i32),
+}
+
+impl Int {
+    const I8_RANGE: core::ops::Range<i32> = i8::MIN as i32..i8::MAX as i32;
+    const I16_RANGE: core::ops::Range<i32> = i16::MIN as i32..i16::MAX as i32;
+
+    fn new(value: i32) -> Self {
+        if Self::I8_RANGE.contains(&value) {
+            Self::I8(value as u8)
+        } else if Self::I16_RANGE.contains(&value) {
+            Self::I16(value as i16)
+        } else {
+            Self::I32(value)
+        }
+    }
+
+    fn len(self) -> u8 {
+        match self {
+            Self::I8(_) => 1,
+            Self::I16(_) => 2,
+            Self::I32(_) => 4,
+        }
+    }
+
+    fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        match self {
+            Self::I8(x) => cursor.write_u8(x),
+            Self::I16(x) => cursor.write_i16_le(x),
+            Self::I32(x) => cursor.write_i32_le(x),
+        }
+    }
+}
+
+impl OwnedAttrValue {
+    pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), AttrWriteError> {
+        match self {
+            OwnedAttrValue::VisibleString(s) => {
+                Self::write_bytes(cursor, VISIBLE_STRING, s.as_bytes())
+            }
+            OwnedAttrValue::UnsignedInt(x) => Self::write_uint(cursor, *x),
+            OwnedAttrValue::SignedInt(x) => Self::write_int(cursor, *x),
+            OwnedAttrValue::FloatingPoint(x) => Self::write_float(cursor, *x),
+            OwnedAttrValue::OctetString(x) => Self::write_bytes(cursor, OCTET_STRING, x.as_slice()),
+            OwnedAttrValue::Dnp3Time(x) => Self::write_time(cursor, *x),
+            OwnedAttrValue::BitString(x) => Self::write_bytes(cursor, BIT_STRING, x.as_slice()),
+        }
+    }
+
+    fn write_header(cursor: &mut WriteCursor, code: u8, len: u8) -> Result<(), AttrWriteError> {
+        cursor.write_u8(code)?;
+        cursor.write_u8(len)?;
+        Ok(())
+    }
+
+    fn write_bytes(cursor: &mut WriteCursor, code: u8, bytes: &[u8]) -> Result<(), AttrWriteError> {
+        let len: u8 = bytes
+            .len()
+            .try_into()
+            .map_err(|_| BadAttribute::BadLength(bytes.len()))?;
+        Self::write_header(cursor, code, len)?;
+        cursor.write_bytes(bytes)?;
+        Ok(())
+    }
+
+    fn write_uint(cursor: &mut WriteCursor, x: u32) -> Result<(), AttrWriteError> {
+        let x = UInt::new(x);
+        Self::write_header(cursor, UNSIGNED_INT, x.len())?;
+        x.write(cursor)?;
+        Ok(())
+    }
+
+    fn write_time(cursor: &mut WriteCursor, x: Timestamp) -> Result<(), AttrWriteError> {
+        Self::write_header(cursor, DNP3_TIME, 6)?;
+        cursor.write_u48_le(x.raw_value())?;
+        Ok(())
+    }
+
+    fn write_int(cursor: &mut WriteCursor, x: i32) -> Result<(), AttrWriteError> {
+        let x = Int::new(x);
+        Self::write_header(cursor, SIGNED_INT, x.len())?;
+        x.write(cursor)?;
+        Ok(())
+    }
+
+    fn write_float(cursor: &mut WriteCursor, x: FloatType) -> Result<(), AttrWriteError> {
+        match x {
+            FloatType::F32(x) => {
+                Self::write_header(cursor, FLOATING_POINT, 4)?;
+                cursor.write_f32_le(x)?;
+            }
+            FloatType::F64(x) => {
+                Self::write_header(cursor, FLOATING_POINT, 8)?;
+                cursor.write_f64_le(x)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Expected type X but received type Y
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct TypeError {
@@ -520,7 +703,7 @@ impl TypeError {
 }
 
 impl<'a> AttrValue<'a> {
-    pub(crate) fn write(&self, f: &mut Formatter) -> std::fmt::Result {
+    pub(crate) fn format(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             AttrValue::VisibleString(x) => write!(f, "visible string: {x}"),
             AttrValue::UnsignedInt(x) => write!(f, "unsigned int: {x}"),
@@ -599,15 +782,39 @@ impl<'a> AttrValue<'a> {
     }
 }
 
-/// Attribute value and the set to which it belongs
+/// Attribute value and the set to which it belongs parsed the underlying buffer.
+///
+/// This type is zero-allocation and variable sized content is borrowed from the underlying buffer.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Attribute<'a> {
     /// Set to which the attribute belongs
     pub set: AttrSet,
     /// The variation of the attribute
     pub variation: u8,
-    /// Value of the attribute
+    /// Value of the attribute borrowed from the underlying buffer
     pub value: AttrValue<'a>,
+}
+
+/// Attribute value and the set to which it belongs
+#[derive(Clone, Debug, PartialEq)]
+pub struct OwnedAttribute {
+    /// Set to which the attribute belongs
+    pub set: AttrSet,
+    /// The variation of the attribute
+    pub variation: u8,
+    /// Value of the attribute
+    pub value: OwnedAttrValue,
+}
+
+impl OwnedAttribute {
+    /// construct an OwnedAttribute from its members
+    pub fn new(set: AttrSet, variation: u8, value: OwnedAttrValue) -> Self {
+        Self {
+            set,
+            variation,
+            value,
+        }
+    }
 }
 
 fn get_default_desc(var: u8) -> &'static str {
@@ -674,7 +881,7 @@ fn get_default_desc(var: u8) -> &'static str {
 }
 
 impl<'a> Attribute<'a> {
-    pub(crate) fn write(&self, f: &mut Formatter) -> std::fmt::Result {
+    pub(crate) fn format(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.set {
             AttrSet::Default => {
                 // lookup description
@@ -685,7 +892,7 @@ impl<'a> Attribute<'a> {
                 writeln!(f, "Private set ({x})")?;
             }
         }
-        self.value.write(f)
+        self.value.format(f)
     }
 
     pub(crate) fn parse_prefixed<I>(
@@ -725,6 +932,15 @@ impl<'a> Attribute<'a> {
             variation,
             value,
         })
+    }
+}
+
+impl From<AttrWriteError> for TaskError {
+    fn from(value: AttrWriteError) -> Self {
+        match value {
+            AttrWriteError::Cursor(_) => TaskError::WriteError,
+            AttrWriteError::BadAttribute(x) => TaskError::BadEncoding(BadEncoding::Attribute(x)),
+        }
     }
 }
 
