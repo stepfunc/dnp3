@@ -1,6 +1,6 @@
 use oo_bindgen::model::*;
 
-pub fn define(lib: &mut LibraryBuilder) -> BackTraced<ClassHandle> {
+pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<ClassHandle> {
     let request = lib.declare_class("write_dead_band_request")?;
 
     let constructor = lib

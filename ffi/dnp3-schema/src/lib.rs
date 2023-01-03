@@ -5,14 +5,11 @@ use oo_bindgen::model::*;
 mod constants;
 mod database;
 mod decoding;
-mod handler;
 mod master;
 mod outstation;
-mod request;
 mod shared;
 mod tcp;
 mod variation;
-mod write_dead_band_request;
 
 pub(crate) fn gv(g: u8, v: u8) -> String {
     format!("group{g}_var{v}")
@@ -82,8 +79,8 @@ pub fn build_lib() -> BackTraced<Library> {
     sfio_tracing_ffi::define(&mut builder, shared_def.error_type.clone())?;
 
     // master and outstation APIs
-    master::define(&mut builder, &shared_def)?;
-    outstation::define(&mut builder, &shared_def)?;
+    crate::master::define(&mut builder, &shared_def)?;
+    crate::outstation::define(&mut builder, &shared_def)?;
 
     let library = builder.build()?;
 
