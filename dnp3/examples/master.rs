@@ -352,13 +352,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::warn!("error: reading device attributes {}", err);
                 }
             }
+            "wda" => {
+                let headers = Headers::default()
+                    .add_attribute(StringAttr::UserAssignedLocation.with_value("Bend, OR"));
+
+                let result = association
+                    .request_expecting_empty_response(FunctionCode::Write, headers)
+                    .await;
+
+                if let Err(err) = result {
+                    tracing::warn!("error writing device attribute: {}", err);
+                }
+            }
             "rsa" => {
                 let result = association
                     .read(ReadRequest::one_byte_range(Variation::Group0(255), 0, 0))
                     .await;
 
                 if let Err(err) = result {
-                    tracing::warn!("error: reading device attributes {}", err);
+                    tracing::warn!("error reading device attributes: {}", err);
                 }
             }
             "crt" => {

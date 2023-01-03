@@ -84,7 +84,7 @@ pub enum StringAttr {
     UserSpecificAttributes,
     /// Variation 242 - Device manufacturer software version
     DeviceManufacturerSoftwareVersion,
-    /// Variation 243 - Device manufacturer software version
+    /// Variation 243 - Device manufacturer hardware version
     DeviceManufacturerHardwareVersion,
     /// Variation 244 - User-assigned owner name
     UserAssignedOwnerName,
@@ -107,6 +107,39 @@ pub enum StringAttr {
 impl StringAttr {
     fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::String(self, value.expect_vstr()?))
+    }
+
+    /// The variation associated with this string attribute
+    pub fn variation(self) -> u8 {
+        match self {
+            StringAttr::ConfigId => 196,
+            StringAttr::ConfigVersion => 197,
+            StringAttr::ConfigDigestAlgorithm => 201,
+            StringAttr::MasterResourceId => 202,
+            StringAttr::UserAssignedSecondaryOperatorName => 206,
+            StringAttr::UserAssignedPrimaryOperatorName => 207,
+            StringAttr::UserAssignedSystemName => 208,
+            StringAttr::UserSpecificAttributes => 211,
+            StringAttr::DeviceManufacturerSoftwareVersion => 242,
+            StringAttr::DeviceManufacturerHardwareVersion => 243,
+            StringAttr::UserAssignedOwnerName => 244,
+            StringAttr::UserAssignedLocation => 245,
+            StringAttr::UserAssignedId => 246,
+            StringAttr::UserAssignedDeviceName => 247,
+            StringAttr::DeviceSerialNumber => 248,
+            StringAttr::SubsetAndConformance => 249,
+            StringAttr::ProductNameAndModel => 250,
+            StringAttr::DeviceManufacturersName => 252,
+        }
+    }
+
+    /// Construct an ['OwnedAttribute'] given a value
+    pub fn with_value<S: Into<String>>(self, value: S) -> OwnedAttribute {
+        OwnedAttribute::new(
+            AttrSet::Default,
+            self.variation(),
+            OwnedAttrValue::VisibleString(value.into()),
+        )
     }
 }
 
@@ -165,6 +198,44 @@ impl UIntAttr {
     fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::UInt(self, value.expect_uint()?))
     }
+
+    /// The variation associated with this string attribute
+    pub fn variation(self) -> u8 {
+        match self {
+            UIntAttr::SecureAuthenticationVersion => 209,
+            UIntAttr::NumSecurityStatsPerAssoc => 210,
+            UIntAttr::NumMasterDefinedDataSetProto => 212,
+            UIntAttr::NumOutstationDefinedDataSetProto => 213,
+            UIntAttr::NumMasterDefinedDataSets => 214,
+            UIntAttr::NumOutstationDefinedDataSets => 215,
+            UIntAttr::MaxBinaryOutputPerRequest => 216,
+            UIntAttr::LocalTimingAccuracy => 217,
+            UIntAttr::DurationOfTimeAccuracy => 218,
+            UIntAttr::MaxAnalogOutputIndex => 220,
+            UIntAttr::NumAnalogOutputs => 221,
+            UIntAttr::MaxBinaryOutputIndex => 223,
+            UIntAttr::NumBinaryOutputs => 224,
+            UIntAttr::MaxCounterIndex => 228,
+            UIntAttr::NumCounter => 229,
+            UIntAttr::MaxAnalogInputIndex => 232,
+            UIntAttr::NumAnalogInput => 233,
+            UIntAttr::MaxDoubleBitBinaryInputIndex => 235,
+            UIntAttr::NumDoubleBitBinaryInput => 236,
+            UIntAttr::MaxBinaryInputIndex => 238,
+            UIntAttr::NumBinaryInput => 239,
+            UIntAttr::MaximumTransmitFragmentSize => 240,
+            UIntAttr::MaximumReceiveFragmentSize => 241,
+        }
+    }
+
+    /// Construct an ['OwnedAttribute'] given a value
+    pub fn with_value(self, value: u32) -> OwnedAttribute {
+        OwnedAttribute::new(
+            AttrSet::Default,
+            self.variation(),
+            OwnedAttrValue::UnsignedInt(value),
+        )
+    }
 }
 
 /// Enumeration of all the known boolean attributes
@@ -196,6 +267,32 @@ impl BoolAttr {
     fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::Bool(self, value.expect_bool()?))
     }
+
+    /// The variation associated with this string attribute
+    pub fn variation(self) -> u8 {
+        match self {
+            BoolAttr::SupportsAnalogOutputEvents => 219,
+            BoolAttr::SupportsBinaryOutputEvents => 222,
+            BoolAttr::SupportsFrozenCounterEvents => 225,
+            BoolAttr::SupportsFrozenCounters => 226,
+            BoolAttr::SupportsCounterEvents => 227,
+            BoolAttr::SupportsFrozenAnalogInputs => 230,
+            BoolAttr::SupportsAnalogInputEvents => 231,
+            BoolAttr::SupportsDoubleBitBinaryInputEvents => 234,
+            BoolAttr::SupportsBinaryInputEvents => 237,
+        }
+    }
+
+    /// Construct an ['OwnedAttribute'] given a value
+    pub fn with_value(self, value: bool) -> OwnedAttribute {
+        let value: i32 = if value { 1 } else { 0 };
+
+        OwnedAttribute::new(
+            AttrSet::Default,
+            self.variation(),
+            OwnedAttrValue::SignedInt(value),
+        )
+    }
 }
 
 /// Enumeration of all the known DNP3 Time attributes
@@ -210,6 +307,23 @@ pub enum TimeAttr {
 impl TimeAttr {
     fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::DNP3Time(self, value.expect_time()?))
+    }
+
+    /// The variation associated with this string attribute
+    pub fn variation(self) -> u8 {
+        match self {
+            TimeAttr::ConfigBuildDate => 198,
+            TimeAttr::ConfigLastChangeDate => 199,
+        }
+    }
+
+    /// Construct an ['OwnedAttribute'] given a value
+    pub fn with_value(self, value: Timestamp) -> OwnedAttribute {
+        OwnedAttribute::new(
+            AttrSet::Default,
+            self.variation(),
+            OwnedAttrValue::Dnp3Time(value),
+        )
     }
 }
 
@@ -227,6 +341,22 @@ impl OctetStringAttr {
             value.expect_octet_string()?,
         ))
     }
+
+    /// The variation associated with this string attribute
+    pub fn variation(self) -> u8 {
+        match self {
+            OctetStringAttr::ConfigDigest => 201,
+        }
+    }
+
+    /// Construct an ['OwnedAttribute'] given a value
+    pub fn with_value(self, value: Vec<u8>) -> OwnedAttribute {
+        OwnedAttribute::new(
+            AttrSet::Default,
+            self.variation(),
+            OwnedAttrValue::OctetString(value),
+        )
+    }
 }
 
 /// Enumeration of all known float attributes
@@ -236,13 +366,31 @@ pub enum FloatAttr {
     DeviceLocationAltitude,
     /// Variation 204 - Longitude of the device from reference meridian (-180.0 to 180.0 deg)
     DeviceLocationLongitude,
-    /// Variation 204 - Latitude of the device from the equator (90.0 to -90.0 deg)
+    /// Variation 205 - Latitude of the device from the equator (90.0 to -90.0 deg)
     DeviceLocationLatitude,
 }
 
 impl FloatAttr {
     fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::Float(self, value.expect_float()?))
+    }
+
+    /// The variation associated with this string attribute
+    pub fn variation(self) -> u8 {
+        match self {
+            FloatAttr::DeviceLocationAltitude => 203,
+            FloatAttr::DeviceLocationLongitude => 204,
+            FloatAttr::DeviceLocationLatitude => 205,
+        }
+    }
+
+    /// Construct an ['OwnedAttribute'] given a value
+    pub fn with_value(self, value: FloatType) -> OwnedAttribute {
+        OwnedAttribute::new(
+            AttrSet::Default,
+            self.variation(),
+            OwnedAttrValue::FloatingPoint(value),
+        )
     }
 }
 
