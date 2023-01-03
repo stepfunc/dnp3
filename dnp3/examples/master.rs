@@ -173,6 +173,10 @@ impl ReadHandler for ExampleReadHandler {
             println!("Octet String {}: Value={:X?}", idx, x);
         }
     }
+
+    fn handle_device_attribute(&mut self, _info: HeaderInfo, attr: AnyAttribute) {
+        println!("Device attribute: {:?}", attr)
+    }
 }
 // ANCHOR_END: read_handler
 
@@ -226,6 +230,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     // ANCHOR_END: association_create
 
+    /*
     // create an event poll
     // ANCHOR: add_poll
     let mut poll = association
@@ -235,6 +240,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     // ANCHOR_END: add_poll
+
+     */
 
     // enable communications
     channel.enable().await?;
@@ -293,7 +300,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 // ANCHOR_END: assoc_control
             }
-            "evt" => poll.demand().await?,
+            //"evt" => poll.demand().await?,
             "lts" => {
                 if let Err(err) = association.synchronize_time(TimeSyncProcedure::Lan).await {
                     tracing::warn!("error: {}", err);
@@ -335,6 +342,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::warn!("error: {}", err);
                 }
                 // ANCHOR_END: freeze_at_time
+            }
+            "rda" => {
+                let result = association
+                    .read(ReadRequest::one_byte_range(Variation::Group0Var254, 0, 0))
+                    .await;
+
+                if let Err(err) = result {
+                    tracing::warn!("error: reading device attributes {}", err);
+                }
+            }
+            "rsa" => {
+                let result = association
+                    .read(ReadRequest::one_byte_range(Variation::Group0(255), 0, 0))
+                    .await;
+
+                if let Err(err) = result {
+                    tracing::warn!("error: reading device attributes {}", err);
+                }
             }
             "crt" => {
                 let result = association.cold_restart().await;

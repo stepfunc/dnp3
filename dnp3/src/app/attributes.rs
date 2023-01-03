@@ -83,8 +83,10 @@ pub enum StringAttr {
     UserSpecificAttributes,
     /// Variation 242 - Device manufacturer software version
     DeviceManufacturerSoftwareVersion,
-    /// Variation 243 - Device manufacturer hardware version
+    /// Variation 243 - Device manufacturer software version
     DeviceManufacturerHardwareVersion,
+    /// Variation 244 - User-assigned owner name
+    UserAssignedOwnerName,
     /// Variation 245 - User assigned location/name
     UserAssignedLocation,
     /// Variation 246 - User assigned ID code/number
@@ -99,6 +101,12 @@ pub enum StringAttr {
     ProductNameAndModel,
     /// Variation 252 - Device manufacturer's name
     DeviceManufacturersName,
+}
+
+impl StringAttr {
+    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+        Ok(KnownAttribute::String(self, value.expect_vstr()?))
+    }
 }
 
 /// Enumeration of all the known unsigned integer attributes
@@ -152,6 +160,12 @@ pub enum UIntAttr {
     MaximumReceiveFragmentSize,
 }
 
+impl UIntAttr {
+    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+        Ok(KnownAttribute::UInt(self, value.expect_uint()?))
+    }
+}
+
 /// Enumeration of all the known boolean attributes
 ///
 /// The are actually encoded as signe integer attributes where 1 == true
@@ -177,6 +191,12 @@ pub enum BoolAttr {
     SupportsBinaryInputEvents,
 }
 
+impl BoolAttr {
+    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+        Ok(KnownAttribute::Bool(self, value.expect_bool()?))
+    }
+}
+
 /// Enumeration of all the known DNP3 Time attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TimeAttr {
@@ -186,11 +206,26 @@ pub enum TimeAttr {
     ConfigLastChangeDate,
 }
 
+impl TimeAttr {
+    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+        Ok(KnownAttribute::DNP3Time(self, value.expect_time()?))
+    }
+}
+
 /// Enumeration of all known octet-string attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OctetStringAttr {
     /// Variation 201 - Digest (aka fingerprint) of the configuration using a CRC, HASH, MAC, or public key signature
     ConfigDigest,
+}
+
+impl OctetStringAttr {
+    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+        Ok(KnownAttribute::OctetString(
+            self,
+            value.expect_octet_string()?,
+        ))
+    }
 }
 
 /// Enumeration of all known float attributes
@@ -202,6 +237,12 @@ pub enum FloatAttr {
     DeviceLocationLongitude,
     /// Variation 204 - Latitude of the device from the equator (90.0 to -90.0 deg)
     DeviceLocationLatitude,
+}
+
+impl FloatAttr {
+    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+        Ok(KnownAttribute::Float(self, value.expect_float()?))
+    }
 }
 
 /// Variants for all the pre-defined attributes in the standard
@@ -230,164 +271,63 @@ impl<'a> AnyAttribute<'a> {
         }
 
         let known = match attr.variation {
-            196 => KnownAttribute::String(StringAttr::ConfigId, attr.value.expect_vstr()?),
-            197 => KnownAttribute::String(StringAttr::ConfigVersion, attr.value.expect_vstr()?),
-            198 => KnownAttribute::DNP3Time(TimeAttr::ConfigBuildDate, attr.value.expect_time()?),
-            199 => {
-                KnownAttribute::DNP3Time(TimeAttr::ConfigLastChangeDate, attr.value.expect_time()?)
-            }
-            200 => KnownAttribute::OctetString(
-                OctetStringAttr::ConfigDigest,
-                attr.value.expect_octet_string()?,
-            ),
-            201 => {
-                KnownAttribute::String(StringAttr::ConfigDigestAlgorithm, attr.value.expect_vstr()?)
-            }
-            202 => KnownAttribute::String(StringAttr::MasterResourceId, attr.value.expect_vstr()?),
-            203 => KnownAttribute::Float(
-                FloatAttr::DeviceLocationAltitude,
-                attr.value.expect_float()?,
-            ),
-            204 => KnownAttribute::Float(
-                FloatAttr::DeviceLocationLongitude,
-                attr.value.expect_float()?,
-            ),
-            205 => KnownAttribute::Float(
-                FloatAttr::DeviceLocationLatitude,
-                attr.value.expect_float()?,
-            ),
-            206 => KnownAttribute::String(
-                StringAttr::UserAssignedSecondaryOperatorName,
-                attr.value.expect_vstr()?,
-            ),
-            207 => KnownAttribute::String(
-                StringAttr::UserAssignedPrimaryOperatorName,
-                attr.value.expect_vstr()?,
-            ),
-            208 => KnownAttribute::String(
-                StringAttr::UserAssignedSystemName,
-                attr.value.expect_vstr()?,
-            ),
-            209 => KnownAttribute::UInt(
-                UIntAttr::SecureAuthenticationVersion,
-                attr.value.expect_uint()?,
-            ),
-            211 => KnownAttribute::String(
-                StringAttr::UserSpecificAttributes,
-                attr.value.expect_vstr()?,
-            ),
-            212 => KnownAttribute::UInt(
-                UIntAttr::NumMasterDefinedDataSetProto,
-                attr.value.expect_uint()?,
-            ),
-            213 => KnownAttribute::UInt(
-                UIntAttr::NumOutstationDefinedDataSetProto,
-                attr.value.expect_uint()?,
-            ),
-            214 => KnownAttribute::UInt(
-                UIntAttr::NumMasterDefinedDataSets,
-                attr.value.expect_uint()?,
-            ),
-            215 => KnownAttribute::UInt(
-                UIntAttr::NumOutstationDefinedDataSets,
-                attr.value.expect_uint()?,
-            ),
-            216 => KnownAttribute::UInt(
-                UIntAttr::MaxBinaryOutputPerRequest,
-                attr.value.expect_uint()?,
-            ),
-            217 => KnownAttribute::UInt(UIntAttr::LocalTimingAccuracy, attr.value.expect_uint()?),
-            218 => {
-                KnownAttribute::UInt(UIntAttr::DurationOfTimeAccuracy, attr.value.expect_uint()?)
-            }
-            219 => KnownAttribute::Bool(
-                BoolAttr::SupportsAnalogOutputEvents,
-                attr.value.expect_bool()?,
-            ),
-            220 => KnownAttribute::UInt(UIntAttr::MaxAnalogOutputIndex, attr.value.expect_uint()?),
-            221 => KnownAttribute::UInt(UIntAttr::NumAnalogOutputs, attr.value.expect_uint()?),
-            222 => KnownAttribute::Bool(
-                BoolAttr::SupportsBinaryOutputEvents,
-                attr.value.expect_bool()?,
-            ),
-            223 => KnownAttribute::UInt(UIntAttr::MaxBinaryInputIndex, attr.value.expect_uint()?),
-            224 => KnownAttribute::UInt(UIntAttr::NumBinaryOutputs, attr.value.expect_uint()?),
-            225 => KnownAttribute::Bool(
-                BoolAttr::SupportsFrozenCounterEvents,
-                attr.value.expect_bool()?,
-            ),
-            226 => {
-                KnownAttribute::Bool(BoolAttr::SupportsFrozenCounters, attr.value.expect_bool()?)
-            }
-            227 => KnownAttribute::Bool(BoolAttr::SupportsCounterEvents, attr.value.expect_bool()?),
-            228 => KnownAttribute::UInt(UIntAttr::MaxCounterIndex, attr.value.expect_uint()?),
-            229 => KnownAttribute::UInt(UIntAttr::NumCounter, attr.value.expect_uint()?),
-            230 => KnownAttribute::Bool(
-                BoolAttr::SupportsFrozenAnalogInputs,
-                attr.value.expect_bool()?,
-            ),
-            231 => KnownAttribute::Bool(
-                BoolAttr::SupportsAnalogInputEvents,
-                attr.value.expect_bool()?,
-            ),
-            232 => KnownAttribute::UInt(UIntAttr::MaxAnalogInputIndex, attr.value.expect_uint()?),
-            233 => KnownAttribute::UInt(UIntAttr::NumAnalogInput, attr.value.expect_uint()?),
-            234 => KnownAttribute::Bool(
-                BoolAttr::SupportsDoubleBitBinaryInputEvents,
-                attr.value.expect_bool()?,
-            ),
-            235 => KnownAttribute::UInt(
-                UIntAttr::MaxDoubleBitBinaryInputIndex,
-                attr.value.expect_uint()?,
-            ),
-            236 => {
-                KnownAttribute::UInt(UIntAttr::NumDoubleBitBinaryInput, attr.value.expect_uint()?)
-            }
-            237 => KnownAttribute::Bool(
-                BoolAttr::SupportsBinaryInputEvents,
-                attr.value.expect_bool()?,
-            ),
-            238 => KnownAttribute::UInt(UIntAttr::MaxBinaryInputIndex, attr.value.expect_uint()?),
-            239 => KnownAttribute::UInt(UIntAttr::NumBinaryInput, attr.value.expect_uint()?),
-            240 => KnownAttribute::UInt(
-                UIntAttr::MaximumTransmitFragmentSize,
-                attr.value.expect_uint()?,
-            ),
-            241 => KnownAttribute::UInt(
-                UIntAttr::MaximumReceiveFragmentSize,
-                attr.value.expect_uint()?,
-            ),
-            242 => KnownAttribute::String(
-                StringAttr::DeviceManufacturerSoftwareVersion,
-                attr.value.expect_vstr()?,
-            ),
-            243 => KnownAttribute::String(
-                StringAttr::DeviceManufacturerHardwareVersion,
-                attr.value.expect_vstr()?,
-            ),
-            245 => {
-                KnownAttribute::String(StringAttr::UserAssignedLocation, attr.value.expect_vstr()?)
-            }
-            246 => KnownAttribute::String(StringAttr::UserAssignedId, attr.value.expect_vstr()?),
-            247 => KnownAttribute::String(
-                StringAttr::UserAssignedDeviceName,
-                attr.value.expect_vstr()?,
-            ),
-            248 => {
-                KnownAttribute::String(StringAttr::DeviceSerialNumber, attr.value.expect_vstr()?)
-            }
-            249 => {
-                KnownAttribute::String(StringAttr::SubsetAndConformance, attr.value.expect_vstr()?)
-            }
-            250 => {
-                KnownAttribute::String(StringAttr::ProductNameAndModel, attr.value.expect_vstr()?)
-            }
-            252 => KnownAttribute::String(
-                StringAttr::DeviceManufacturersName,
-                attr.value.expect_vstr()?,
-            ),
+            196 => StringAttr::ConfigId.extract_from(attr.value)?,
+            197 => StringAttr::ConfigVersion.extract_from(attr.value)?,
+            198 => TimeAttr::ConfigBuildDate.extract_from(attr.value)?,
+            199 => TimeAttr::ConfigLastChangeDate.extract_from(attr.value)?,
+            200 => OctetStringAttr::ConfigDigest.extract_from(attr.value)?,
+            201 => StringAttr::ConfigDigestAlgorithm.extract_from(attr.value)?,
+            202 => StringAttr::MasterResourceId.extract_from(attr.value)?,
+            203 => FloatAttr::DeviceLocationAltitude.extract_from(attr.value)?,
+            204 => FloatAttr::DeviceLocationLongitude.extract_from(attr.value)?,
+            205 => FloatAttr::DeviceLocationLatitude.extract_from(attr.value)?,
+            206 => StringAttr::UserAssignedSecondaryOperatorName.extract_from(attr.value)?,
+            207 => StringAttr::UserAssignedPrimaryOperatorName.extract_from(attr.value)?,
+            208 => StringAttr::UserAssignedSystemName.extract_from(attr.value)?,
+            209 => UIntAttr::SecureAuthenticationVersion.extract_from(attr.value)?,
+            210 => UIntAttr::NumSecurityStatsPerAssoc.extract_from(attr.value)?,
+            211 => StringAttr::UserSpecificAttributes.extract_from(attr.value)?,
+            212 => UIntAttr::NumMasterDefinedDataSetProto.extract_from(attr.value)?,
+            213 => UIntAttr::NumOutstationDefinedDataSetProto.extract_from(attr.value)?,
+            214 => UIntAttr::NumMasterDefinedDataSets.extract_from(attr.value)?,
+            215 => UIntAttr::NumOutstationDefinedDataSets.extract_from(attr.value)?,
+            216 => UIntAttr::MaxBinaryOutputPerRequest.extract_from(attr.value)?,
+            217 => UIntAttr::LocalTimingAccuracy.extract_from(attr.value)?,
+            218 => UIntAttr::DurationOfTimeAccuracy.extract_from(attr.value)?,
+            219 => BoolAttr::SupportsAnalogOutputEvents.extract_from(attr.value)?,
+            220 => UIntAttr::MaxAnalogOutputIndex.extract_from(attr.value)?,
+            221 => UIntAttr::NumAnalogOutputs.extract_from(attr.value)?,
+            222 => BoolAttr::SupportsBinaryOutputEvents.extract_from(attr.value)?,
+            223 => UIntAttr::MaxBinaryInputIndex.extract_from(attr.value)?,
+            224 => UIntAttr::NumBinaryOutputs.extract_from(attr.value)?,
+            225 => BoolAttr::SupportsFrozenCounterEvents.extract_from(attr.value)?,
+            226 => BoolAttr::SupportsFrozenCounters.extract_from(attr.value)?,
+            227 => BoolAttr::SupportsCounterEvents.extract_from(attr.value)?,
+            228 => UIntAttr::MaxCounterIndex.extract_from(attr.value)?,
+            229 => UIntAttr::NumCounter.extract_from(attr.value)?,
+            230 => BoolAttr::SupportsFrozenAnalogInputs.extract_from(attr.value)?,
+            231 => BoolAttr::SupportsAnalogInputEvents.extract_from(attr.value)?,
+            232 => UIntAttr::MaxAnalogInputIndex.extract_from(attr.value)?,
+            233 => UIntAttr::NumAnalogInput.extract_from(attr.value)?,
+            234 => BoolAttr::SupportsDoubleBitBinaryInputEvents.extract_from(attr.value)?,
+            235 => UIntAttr::MaxDoubleBitBinaryInputIndex.extract_from(attr.value)?,
+            236 => UIntAttr::NumDoubleBitBinaryInput.extract_from(attr.value)?,
+            237 => BoolAttr::SupportsBinaryInputEvents.extract_from(attr.value)?,
+            238 => UIntAttr::MaxBinaryInputIndex.extract_from(attr.value)?,
+            239 => UIntAttr::NumBinaryInput.extract_from(attr.value)?,
+            240 => UIntAttr::MaximumTransmitFragmentSize.extract_from(attr.value)?,
+            241 => UIntAttr::MaximumReceiveFragmentSize.extract_from(attr.value)?,
+            242 => StringAttr::DeviceManufacturerSoftwareVersion.extract_from(attr.value)?,
+            243 => StringAttr::DeviceManufacturerHardwareVersion.extract_from(attr.value)?,
+            244 => StringAttr::UserAssignedOwnerName.extract_from(attr.value)?,
+            245 => StringAttr::UserAssignedLocation.extract_from(attr.value)?,
+            246 => StringAttr::UserAssignedId.extract_from(attr.value)?,
+            247 => StringAttr::UserAssignedDeviceName.extract_from(attr.value)?,
+            248 => StringAttr::DeviceSerialNumber.extract_from(attr.value)?,
+            249 => StringAttr::SubsetAndConformance.extract_from(attr.value)?,
+            250 => StringAttr::ProductNameAndModel.extract_from(attr.value)?,
+            252 => StringAttr::DeviceManufacturersName.extract_from(attr.value)?,
             255 => KnownAttribute::AttributeList(attr.value.expect_attr_list()?),
-
             _ => return Ok(AnyAttribute::Other(*attr)),
         };
 
@@ -591,7 +531,7 @@ impl<'a> AttrValue<'a> {
             },
             AttrValue::OctetString(x) => write!(f, "octet string len == {}", x.len()),
             AttrValue::BitString(x) => write!(f, "bit string len == {}", x.len()),
-            AttrValue::Dnp3Time(x) => write!(f, "{}", x),
+            AttrValue::Dnp3Time(x) => write!(f, "{x}"),
             AttrValue::AttrList(list) => {
                 for x in list.iter() {
                     write!(
@@ -720,6 +660,7 @@ fn get_default_desc(var: u8) -> &'static str {
         241 => "Maximum receive fragment size",
         242 => "Device manufacturer's software version",
         243 => "Device manufacturer's hardware version",
+        244 => "User-assigned owner name",
         245 => "User-assigned location name",
         246 => "User-assigned ID code/number",
         247 => "User-assigned device name",
