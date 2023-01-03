@@ -120,7 +120,7 @@ fn define_uint_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
             "Variation 209 - Secure authentication version",
         )?
         .push(
-            "mum_security_stats_per_assoc",
+            "num_security_stats_per_assoc",
             "Variation 210 - Number of security statistics per association",
         )?
         .push(

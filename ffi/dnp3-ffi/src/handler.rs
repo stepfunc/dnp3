@@ -138,24 +138,24 @@ impl ReadHandler for ffi::ReadHandler {
         let info = info.into();
         match attr {
             AnyAttribute::Other(x) => match x.value {
-                AttrValue::VisibleString(v) => {
-                    let string = match CString::new(v) {
-                        Ok(x) => x,
-                        Err(err) => {
-                            tracing::warn!("Attribute is not a valid C-string: {}", err);
-                            return;
-                        }
-                    };
-                    ffi::ReadHandler::handle_string_attr(
+                AttrValue::VisibleString(v) => Self::handle_string_attr_impl(
+                    self,
+                    info,
+                    ffi::StringAttr::Unknown,
+                    x.set.value(),
+                    x.variation,
+                    v,
+                ),
+                AttrValue::UnsignedInt(v) => {
+                    ffi::ReadHandler::handle_uint_attr(
                         self,
                         info,
-                        ffi::StringAttr::Unknown,
+                        ffi::UintAttr::Unknown,
                         x.set.value(),
                         x.variation,
-                        string.as_ref(),
+                        v,
                     );
                 }
-                AttrValue::UnsignedInt(_) => {}
                 AttrValue::SignedInt(_) => {}
                 AttrValue::FloatingPoint(_) => {}
                 AttrValue::OctetString(_) => {}
@@ -166,24 +166,12 @@ impl ReadHandler for ffi::ReadHandler {
             AnyAttribute::Known(x) => match x {
                 KnownAttribute::AttributeList(_) => {}
                 KnownAttribute::String(x, v) => {
-                    let string = match CString::new(v) {
-                        Ok(x) => x,
-                        Err(err) => {
-                            tracing::warn!("Attribute is not a valid C-string: {}", err);
-                            return;
-                        }
-                    };
-                    ffi::ReadHandler::handle_string_attr(
-                        self,
-                        info,
-                        x.into(),
-                        0,
-                        x.variation(),
-                        string.as_ref(),
-                    );
+                    Self::handle_string_attr_impl(self, info, x.into(), 0, x.variation(), v)
                 }
                 KnownAttribute::Float(_, _) => {}
-                KnownAttribute::UInt(_, _) => {}
+                KnownAttribute::UInt(x, v) => {
+                    ffi::ReadHandler::handle_uint_attr(self, info, x.into(), 0, x.variation(), v);
+                }
                 KnownAttribute::Bool(_, _) => {}
                 KnownAttribute::OctetString(_, _) => {}
                 KnownAttribute::DNP3Time(_, _) => {}
@@ -192,7 +180,27 @@ impl ReadHandler for ffi::ReadHandler {
     }
 }
 
-impl From<dnp3::app::StringAttr> for ffi::StringAttr {
+impl ffi::ReadHandler {
+    fn handle_string_attr_impl(
+        &mut self,
+        info: ffi::HeaderInfo,
+        attr: ffi::StringAttr,
+        set: u8,
+        variation: u8,
+        value: &str,
+    ) {
+        let string = match CString::new(value) {
+            Ok(x) => x,
+            Err(err) => {
+                tracing::warn!("Attribute is not a valid C-string: {}", err);
+                return;
+            }
+        };
+        ffi::ReadHandler::handle_string_attr(self, info, attr, set, variation, string.as_ref());
+    }
+}
+
+impl From<StringAttr> for ffi::StringAttr {
     fn from(value: StringAttr) -> Self {
         match value {
             StringAttr::ConfigId => Self::ConfigId,
@@ -219,6 +227,36 @@ impl From<dnp3::app::StringAttr> for ffi::StringAttr {
             StringAttr::DeviceSubsetAndConformance => Self::DeviceSubsetAndConformance,
             StringAttr::ProductNameAndModel => Self::ProductNameAndModel,
             StringAttr::DeviceManufacturersName => Self::DeviceManufacturersName,
+        }
+    }
+}
+
+impl From<UIntAttr> for ffi::UintAttr {
+    fn from(value: UIntAttr) -> Self {
+        match value {
+            UIntAttr::SecureAuthVersion => Self::SecureAuthVersion,
+            UIntAttr::NumSecurityStatsPerAssoc => Self::NumSecurityStatsPerAssoc,
+            UIntAttr::NumMasterDefinedDataSetProto => Self::NumMasterDefinedDataSetProto,
+            UIntAttr::NumOutstationDefinedDataSetProto => Self::NumOutstationDefinedDataSetProto,
+            UIntAttr::NumMasterDefinedDataSets => Self::NumMasterDefinedDataSets,
+            UIntAttr::NumOutstationDefinedDataSets => Self::NumOutstationDefinedDataSets,
+            UIntAttr::MaxBinaryOutputPerRequest => Self::MaxBinaryOutputPerRequest,
+            UIntAttr::LocalTimingAccuracy => Self::LocalTimingAccuracy,
+            UIntAttr::DurationOfTimeAccuracy => Self::DurationOfTimeAccuracy,
+            UIntAttr::MaxAnalogOutputIndex => Self::MaxAnalogOutputIndex,
+            UIntAttr::NumAnalogOutputs => Self::NumAnalogOutputs,
+            UIntAttr::MaxBinaryOutputIndex => Self::MaxBinaryOutputIndex,
+            UIntAttr::NumBinaryOutputs => Self::NumBinaryOutputs,
+            UIntAttr::MaxCounterIndex => Self::MaxCounterIndex,
+            UIntAttr::NumCounter => Self::NumCounter,
+            UIntAttr::MaxAnalogInputIndex => Self::MaxAnalogInputIndex,
+            UIntAttr::NumAnalogInput => Self::NumAnalogInput,
+            UIntAttr::MaxDoubleBitBinaryInputIndex => Self::MaxDoubleBitBinaryInputIndex,
+            UIntAttr::NumDoubleBitBinaryInput => Self::NumDoubleBitBinaryInput,
+            UIntAttr::MaxBinaryInputIndex => Self::MaxBinaryInputIndex,
+            UIntAttr::NumBinaryInput => Self::NumBinaryInput,
+            UIntAttr::MaxTxFragmentSize => Self::MaxTxFragmentSize,
+            UIntAttr::MaxRxFragmentSize => Self::MaxRxFragmentSize,
         }
     }
 }

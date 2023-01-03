@@ -204,7 +204,7 @@ pub fn define(
         .begin_callback("handle_string_attr", "Handle a known or unknown visible string device attribute")?
         .param(
             "info",
-            header_info,
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
@@ -222,7 +222,31 @@ pub fn define(
             Primitive::U8,
             "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
         )?
-        .param("value", StringType, "Value of the visible string")?
+        .param("value", StringType, "attribute value")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_uint_attr", "Handle an unsigned integer device attribute")?
+        .param(
+            "info",
+            header_info,
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.uint_attr,
+            "Enumeration describing the attribute (possibly unknown) associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", Primitive::U32, "attribute value")?
         .returns_nothing_by_default()?
         .end_callback()?
         .build_async()?;
