@@ -160,7 +160,12 @@ class MainClass
         
         void IReadHandler.HandleStringAttr(HeaderInfo info, StringAttr attr, byte set, byte var, string value)
         {
-            Console.WriteLine($"String attr: {attr} set: {set} variation: {var} value: {value}");
+            Console.WriteLine($"Visible string attribute: {attr} set: {set} variation: {var} value: {value}");
+        }
+
+        void IReadHandler.HandleUintAttr(HeaderInfo info, UintAttr attr, byte set, byte var, uint value)
+        {
+            Console.WriteLine($"Unsigned integer attribute: {attr} set: {set} variation: {var} value: {value}");
         }
     }
     // ANCHOR_END: read_handler
