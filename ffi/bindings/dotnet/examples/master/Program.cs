@@ -523,7 +523,7 @@ class MainClass
             case "rda":
                 {
                     var request = new Request();
-                    request.AddAllObjectsHeader(Variation.Group0Var254);
+                    request.AddSpecificAttribute(AttributeVariations.AllAttributesRequest, 0);
                     await channel.Read(association, request);                    
                     return true;
                 }
