@@ -308,12 +308,10 @@ impl BoolAttr {
 
     /// Construct an ['OwnedAttribute'] given a value
     pub fn with_value(self, value: bool) -> OwnedAttribute {
-        let value: i32 = if value { 1 } else { 0 };
-
         OwnedAttribute::new(
             AttrSet::Default,
             self.variation(),
-            OwnedAttrValue::SignedInt(value),
+            OwnedAttrValue::SignedInt(i32::from(value)),
         )
     }
 }

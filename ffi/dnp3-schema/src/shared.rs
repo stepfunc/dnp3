@@ -168,7 +168,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
     let g12v1_struct = lib.declare_universal_struct(gv(12, 1))?;
     let g12v1_struct = lib
         .define_universal_struct(g12v1_struct)?
-        .add(&code_field, control_code, "Control code")?
+        .add(code_field, control_code, "Control code")?
         .add(&count_field, Primitive::U8, "Count")?
         .add(
             &on_time_field,
