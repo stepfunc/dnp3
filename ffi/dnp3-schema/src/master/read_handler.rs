@@ -225,7 +225,7 @@ pub fn define(
         .param("value", StringType, "attribute value")?
         .returns_nothing_by_default()?
         .end_callback()?
-        .begin_callback("handle_attr_list_attr", "Handle a known or unknown attribute list")?
+        .begin_callback("handle_variation_list_attr", "Handle a known or unknown list of attribute variations")?
         .param(
             "info",
             header_info.clone(),
@@ -233,7 +233,7 @@ pub fn define(
         )?
         .param(
             "attr",
-            attr.attr_list_attr,
+            attr.variation_list_attr,
             "Enumeration describing the attribute (possibly unknown) associated with the value"
         )?
         .param(

@@ -63,14 +63,14 @@ pub enum AnyAttribute<'a> {
     Known(KnownAttribute<'a>),
 }
 
-/// Enumeration of all the attribute list attributes
+/// Enumeration of all the variation list attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum AttrListAttr {
+pub enum VariationListAttr {
     /// Variation 255 - List of attribute variations
     ListOfVariations,
 }
 
-impl AttrListAttr {
+impl VariationListAttr {
     fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::AttributeList(
             self,
@@ -81,7 +81,7 @@ impl AttrListAttr {
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            AttrListAttr::ListOfVariations => 255,
+            VariationListAttr::ListOfVariations => 255,
         }
     }
 }
@@ -421,7 +421,7 @@ impl FloatAttr {
 #[derive(Clone, Debug, PartialEq)]
 pub enum KnownAttribute<'a> {
     /// Variation 255 - List of attribute variations
-    AttributeList(AttrListAttr, AttrList<'a>),
+    AttributeList(VariationListAttr, VariationList<'a>),
     /// VStr attributes
     String(StringAttr, &'a str),
     /// Float attributes
@@ -499,7 +499,7 @@ impl<'a> AnyAttribute<'a> {
             249 => StringAttr::DeviceSubsetAndConformance.extract_from(attr.value)?,
             250 => StringAttr::ProductNameAndModel.extract_from(attr.value)?,
             252 => StringAttr::DeviceManufacturersName.extract_from(attr.value)?,
-            255 => AttrListAttr::ListOfVariations.extract_from(attr.value)?,
+            255 => VariationListAttr::ListOfVariations.extract_from(attr.value)?,
             _ => return Ok(AnyAttribute::Other(*attr)),
         };
 
@@ -561,20 +561,20 @@ impl AttrDataType {
 /// A list of attributes returned from the outstation. This type is
 /// the payload of g0v255. It implements an iterator over [`AttrItem`] values.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct AttrList<'a> {
+pub struct VariationList<'a> {
     data: &'a [u8],
 }
 
-impl<'a> AttrList<'a> {
+impl<'a> VariationList<'a> {
     /// Create an iterator of the list
-    pub fn iter(&self) -> AttrIter<'a> {
-        AttrIter { data: self.data }
+    pub fn iter(&self) -> VariationListIter<'a> {
+        VariationListIter { data: self.data }
     }
 }
 
 /// An iterator over an `AttrList`
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct AttrIter<'a> {
+pub struct VariationListIter<'a> {
     data: &'a [u8],
 }
 
@@ -614,7 +614,7 @@ impl AttrProp {
     }
 }
 
-impl<'a> Iterator for AttrIter<'a> {
+impl<'a> Iterator for VariationListIter<'a> {
     type Item = AttrItem;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -670,7 +670,7 @@ pub enum AttrValue<'a> {
     /// BSTR - Bit string
     BitString(&'a [u8]),
     /// List of UINT8-BSTR8
-    AttrList(AttrList<'a>),
+    AttrList(VariationList<'a>),
 }
 
 /// Represents the value of a device attribute in a format
@@ -955,7 +955,7 @@ impl<'a> AttrValue<'a> {
         }
     }
 
-    pub(crate) fn expect_attr_list(&self) -> Result<AttrList<'a>, TypeError> {
+    pub(crate) fn expect_attr_list(&self) -> Result<VariationList<'a>, TypeError> {
         match self {
             AttrValue::AttrList(x) => Ok(*x),
             _ => Err(TypeError::new(AttrDataType::AttrList, self.get_type())),
@@ -1289,14 +1289,14 @@ impl<'a> AttrValue<'a> {
     fn parse_attr_list(
         cursor: &mut ReadCursor<'a>,
         len: u16,
-    ) -> Result<AttrList<'a>, AttrParseError> {
+    ) -> Result<VariationList<'a>, AttrParseError> {
         if len % 2 != 0 {
             return Err(AttrParseError::BadAttrListLength(len));
         }
 
         let data = cursor.read_bytes(len as usize)?;
 
-        Ok(AttrList { data })
+        Ok(VariationList { data })
     }
 }
 

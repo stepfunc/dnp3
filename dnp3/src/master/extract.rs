@@ -106,7 +106,7 @@ mod test {
         String(StringAttr, String),
         UInt(UIntAttr, u32),
         Bool(BoolAttr, bool),
-        List(AttrListAttr, Vec<AttrItem>),
+        List(VariationListAttr, Vec<AttrItem>),
         Float(FloatAttr, FloatType),
         Octets(OctetStringAttr, Vec<u8>),
         Time(TimeAttr, Timestamp),

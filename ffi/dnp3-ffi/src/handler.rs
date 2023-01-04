@@ -10,8 +10,17 @@ use std::ffi::CString;
 use crate::ffi;
 
 pub struct AttrItemIter<'a> {
-    inner: &'a mut dyn Iterator<Item = AttrItem>,
+    inner: VariationListIter<'a>,
     current: Option<ffi::AttrItem>,
+}
+
+impl<'a> AttrItemIter<'a> {
+    fn new(list: VariationList<'a>) -> Self {
+        Self {
+            inner: list.iter(),
+            current: None,
+        }
+    }
 }
 
 pub(crate) unsafe fn attr_item_iter_next(iter: *mut crate::AttrItemIter) -> Option<&ffi::AttrItem> {
@@ -165,8 +174,19 @@ impl ReadHandler for ffi::ReadHandler {
         let info: ffi::HeaderInfo = info.into();
         let (set, var, value) = FfiAttrValue::extract(attr);
         match value {
-            FfiAttrValue::AttributeList(_, _) => {
-                // TODO
+            FfiAttrValue::VariationList(e, v) => {
+                let mut iter = AttrItemIter::new(v);
+                let e = e
+                    .map(|x| x.into())
+                    .unwrap_or(ffi::VariationListAttr::Unknown);
+                ffi::ReadHandler::handle_variation_list_attr(
+                    self,
+                    info,
+                    e,
+                    set.value(),
+                    var,
+                    &mut iter,
+                );
             }
             FfiAttrValue::String(e, v) => {
                 let cstr = match CString::new(v) {
@@ -211,7 +231,7 @@ impl ReadHandler for ffi::ReadHandler {
 }
 
 enum FfiAttrValue<'a> {
-    AttributeList(Option<AttrListAttr>, AttrList<'a>),
+    VariationList(Option<VariationListAttr>, VariationList<'a>),
     /// VStr attributes
     String(Option<StringAttr>, &'a str),
     /// Float attributes
@@ -241,13 +261,13 @@ impl<'a> FfiAttrValue<'a> {
                 AttrValue::OctetString(v) => (x.set, x.variation, Self::OctetString(None, v)),
                 AttrValue::Dnp3Time(v) => (x.set, x.variation, Self::DNP3Time(None, v)),
                 AttrValue::BitString(v) => (x.set, x.variation, Self::BitString(v)),
-                AttrValue::AttrList(v) => (x.set, x.variation, Self::AttributeList(None, v)),
+                AttrValue::AttrList(v) => (x.set, x.variation, Self::VariationList(None, v)),
             },
             AnyAttribute::Known(x) => match x {
                 KnownAttribute::AttributeList(e, v) => (
                     AttrSet::Default,
                     e.variation(),
-                    Self::AttributeList(Some(e), v),
+                    Self::VariationList(Some(e), v),
                 ),
                 KnownAttribute::String(e, v) => {
                     (AttrSet::Default, e.variation(), Self::String(Some(e), v))
@@ -289,6 +309,14 @@ impl ffi::ReadHandler {
             }
         };
         ffi::ReadHandler::handle_string_attr(self, info, attr, set, variation, string.as_ref());
+    }
+}
+
+impl From<VariationListAttr> for ffi::VariationListAttr {
+    fn from(value: VariationListAttr) -> Self {
+        match value {
+            VariationListAttr::ListOfVariations => Self::ListOfVariations,
+        }
     }
 }
 

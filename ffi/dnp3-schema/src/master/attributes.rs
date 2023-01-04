@@ -1,7 +1,7 @@
 use oo_bindgen::model::*;
 
 pub(crate) struct DeviceAttrTypes {
-    pub(crate) attr_list_attr: EnumHandle,
+    pub(crate) variation_list_attr: EnumHandle,
     pub(crate) string_attr: EnumHandle,
     pub(crate) uint_attr: EnumHandle,
     pub(crate) int_attr: EnumHandle,
@@ -14,7 +14,7 @@ pub(crate) struct DeviceAttrTypes {
 
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<DeviceAttrTypes> {
     Ok(DeviceAttrTypes {
-        attr_list_attr: define_attr_list_attr(lib)?,
+        variation_list_attr: define_variation_list_attr(lib)?,
         string_attr: define_string_attr(lib)?,
         uint_attr: define_uint_attr(lib)?,
         int_attr: define_int_attr(lib)?,
@@ -78,12 +78,12 @@ impl<'a> UnknownCase for EnumBuilder<'a> {
     }
 }
 
-fn define_attr_list_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+fn define_variation_list_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let value = lib
-        .define_enum("attr_list_attr")?
-        .doc("Enumeration of all the attribute list attributes")?
+        .define_enum("variation_list_attr")?
+        .doc("Enumeration of all the variation list attributes")?
         .push(
-            "list_of_attributes",
+            "list_of_variations",
             "Variation 255  - List of attribute variations",
         )?
         .add_unknown()?
