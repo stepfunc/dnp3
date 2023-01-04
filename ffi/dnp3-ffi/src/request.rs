@@ -122,7 +122,7 @@ pub unsafe fn request_destroy(request: *mut Request) {
     }
 }
 
-pub unsafe fn request_add_one_byte_range_header(
+pub(crate) unsafe fn request_add_one_byte_range_header(
     request: *mut Request,
     variation: ffi::Variation,
     start: u8,
@@ -133,7 +133,13 @@ pub unsafe fn request_add_one_byte_range_header(
     }
 }
 
-pub unsafe fn request_add_two_byte_range_header(
+pub(crate) unsafe fn request_add_specific_attribute(request: *mut crate::Request, variation: u8, set: u8) {
+    if let Some(request) = request.as_mut() {
+        request.add_read_header(ReadHeader::one_byte_range(Variation::Group0(variation), set, set));
+    }
+}
+
+pub(crate) unsafe fn request_add_two_byte_range_header(
     request: *mut Request,
     variation: ffi::Variation,
     start: u16,
@@ -144,7 +150,7 @@ pub unsafe fn request_add_two_byte_range_header(
     }
 }
 
-pub unsafe fn request_add_all_objects_header(request: *mut Request, variation: ffi::Variation) {
+pub(crate) unsafe fn request_add_all_objects_header(request: *mut Request, variation: ffi::Variation) {
     if let Some(request) = request.as_mut() {
         request.add_read_header(ReadHeader::all_objects(variation.into()));
     }
