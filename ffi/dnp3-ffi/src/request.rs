@@ -167,6 +167,21 @@ pub(crate) unsafe fn request_add_string_attribute(
     }
 }
 
+pub(crate) unsafe fn request_add_uint_attribute(
+    request: *mut crate::Request,
+    variation: u8,
+    set: u8,
+    value: u32,
+) {
+    if let Some(request) = request.as_mut() {
+        request.add_attribute(OwnedAttribute::new(
+            AttrSet::new(set),
+            variation,
+            OwnedAttrValue::UnsignedInt(value),
+        ))
+    }
+}
+
 pub(crate) unsafe fn request_add_two_byte_range_header(
     request: *mut Request,
     variation: ffi::Variation,
