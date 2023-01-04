@@ -243,12 +243,16 @@ mod test {
                 }
                 AnyAttribute::Known(x) => {
                     let known = match x {
-                        KnownAttribute::AttributeList(x, items) => Known::List(x, items.iter().collect()),
+                        KnownAttribute::AttributeList(x, items) => {
+                            Known::List(x, items.iter().collect())
+                        }
                         KnownAttribute::String(x, v) => Known::String(x, v.to_string()),
                         KnownAttribute::UInt(x, v) => Known::UInt(x, v),
                         KnownAttribute::Bool(x, v) => Known::Bool(x, v),
                         KnownAttribute::Float(x, v) => Known::Float(x, v),
-                        KnownAttribute::OctetString(x, v) => Known::Octets(x, v.iter().copied().collect()),
+                        KnownAttribute::OctetString(x, v) => {
+                            Known::Octets(x, v.iter().copied().collect())
+                        }
                         KnownAttribute::DNP3Time(x, v) => Known::Time(x, v),
                     };
                     self.received.push(Header::KnownAttr(known));

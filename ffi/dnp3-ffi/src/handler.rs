@@ -9,6 +9,33 @@ use std::ffi::CString;
 
 use crate::ffi;
 
+pub struct AttrItemIter<'a> {
+    inner: &'a mut dyn Iterator<Item = AttrItem>,
+    current: Option<ffi::AttrItem>,
+}
+
+pub(crate) unsafe fn attr_item_iter_next(iter: *mut crate::AttrItemIter) -> Option<&ffi::AttrItem> {
+    let iter = match iter.as_mut() {
+        None => return None,
+        Some(x) => x,
+    };
+
+    iter.current = iter.inner.next().map(|x| x.into());
+
+    iter.current.as_ref()
+}
+
+impl From<AttrItem> for ffi::AttrItem {
+    fn from(value: AttrItem) -> Self {
+        Self {
+            variation: value.variation,
+            properties: ffi::AttrProp {
+                is_writable: value.properties.is_writable(),
+            },
+        }
+    }
+}
+
 impl AssociationHandler for ffi::AssociationHandler {
     fn get_current_time(&self) -> Option<Timestamp> {
         if let Some(time) = self.get_current_time() {

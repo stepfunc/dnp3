@@ -1,6 +1,7 @@
-use oo_bindgen::model::{doc, BackTraced, BindResult, EnumBuilder, EnumHandle, LibraryBuilder};
+use oo_bindgen::model::*;
 
 pub(crate) struct DeviceAttrTypes {
+    pub(crate) attr_list_attr: EnumHandle,
     pub(crate) string_attr: EnumHandle,
     pub(crate) uint_attr: EnumHandle,
     pub(crate) int_attr: EnumHandle,
@@ -8,10 +9,12 @@ pub(crate) struct DeviceAttrTypes {
     pub(crate) time_attr: EnumHandle,
     pub(crate) octet_string_attr: EnumHandle,
     pub(crate) float_attr: EnumHandle,
+    pub(crate) attr_item_iter: AbstractIteratorHandle,
 }
 
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<DeviceAttrTypes> {
     Ok(DeviceAttrTypes {
+        attr_list_attr: define_attr_list_attr(lib)?,
         string_attr: define_string_attr(lib)?,
         uint_attr: define_uint_attr(lib)?,
         int_attr: define_int_attr(lib)?,
@@ -19,7 +22,45 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<DeviceAttrTypes> {
         time_attr: define_time_attr(lib)?,
         octet_string_attr: define_octet_string_attr(lib)?,
         float_attr: define_float_attr(lib)?,
+        attr_item_iter: define_attr_item_iterator(lib)?,
     })
+}
+
+fn define_attr_item_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+    let attr_prop = lib.declare_universal_struct("attr_prop")?;
+    let attr_prop = lib
+        .define_universal_struct(attr_prop)?
+        .doc(
+            doc("Attribute properties returned in Group0Var255").details(
+                "In 1815-2012 this only includes a field indicating if the property can be written",
+            ),
+        )?
+        .add(
+            "is_writable",
+            Primitive::Bool,
+            "Indicate if the property can be used in a WRITE operation",
+        )?
+        .end_fields()?
+        .build()?;
+
+    let attr_item = lib.declare_universal_struct("attr_item")?;
+    let attr_item = lib
+        .define_universal_struct(attr_item)?
+        .doc("An attribute variation and properties pair returned in Group0Var255")?
+        .add("variation", Primitive::U8, "Variation of the attribute")?
+        .add("properties", attr_prop, "Properties of the attribute")?
+        .end_fields()?
+        .build()?;
+
+    Ok(attr_item)
+}
+
+fn define_attr_item_iterator(lib: &mut LibraryBuilder) -> BackTraced<AbstractIteratorHandle> {
+    let item = define_attr_item_struct(lib)?;
+
+    let iter = lib.define_iterator("attr_item_iter", item)?;
+
+    Ok(iter)
 }
 
 trait UnknownCase {
@@ -35,6 +76,20 @@ impl<'a> UnknownCase for EnumBuilder<'a> {
             "The attribute variation is not defined or is not part of the default set",
         )
     }
+}
+
+fn define_attr_list_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let value = lib
+        .define_enum("attr_list_attr")?
+        .doc("Enumeration of all the attribute list attributes")?
+        .push(
+            "list_of_attributes",
+            "Variation 255  - List of attribute variations",
+        )?
+        .add_unknown()?
+        .build()?;
+
+    Ok(value)
 }
 
 fn define_string_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {

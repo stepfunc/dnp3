@@ -187,6 +187,14 @@ class MainClass
         {
             Console.WriteLine($"Float attribute: {attr} set: {set} variation: {var} value: {value}");
         }
+
+        void IReadHandler.HandleAttrListAttr(HeaderInfo info, AttrListAttr attr, byte set, byte var, ICollection<AttrItem> value)
+        {
+            Console.WriteLine($"Attribute variation list: {attr} set: {set} variation: {var}");
+            foreach(var item in value) {
+                Console.WriteLine($"variation: {item.Variation} writable: {item.Properties.IsWritable}");
+            }
+        }
     }
     // ANCHOR_END: read_handler
 

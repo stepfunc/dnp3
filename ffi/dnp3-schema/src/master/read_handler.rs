@@ -225,6 +225,30 @@ pub fn define(
         .param("value", StringType, "attribute value")?
         .returns_nothing_by_default()?
         .end_callback()?
+        .begin_callback("handle_attr_list_attr", "Handle a known or unknown attribute list")?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.attr_list_attr,
+            "Enumeration describing the attribute (possibly unknown) associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", attr.attr_item_iter, "Iterator over a list of variation / properties pairs")?
+        .returns_nothing_by_default()?
+        .end_callback()?
         .begin_callback("handle_uint_attr", "Handle an unsigned integer device attribute")?
         .param(
             "info",
