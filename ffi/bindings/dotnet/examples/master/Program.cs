@@ -188,7 +188,7 @@ class MainClass
             Console.WriteLine($"Float attribute: {attr} set: {set} variation: {var} value: {value}");
         }
 
-        void IReadHandler.HandleAttrListAttr(HeaderInfo info, AttrListAttr attr, byte set, byte var, ICollection<AttrItem> value)
+        void IReadHandler.HandleVariationListAttr(HeaderInfo info, VariationListAttr attr, byte set, byte var, ICollection<AttrItem> value)
         {
             Console.WriteLine($"Attribute variation list: {attr} set: {set} variation: {var}");
             foreach(var item in value) {
