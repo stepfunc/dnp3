@@ -13,7 +13,7 @@ object Group0 extends ObjectGroup {
   override def groupType: GroupType = GroupType.DeviceAttributes
 }
 
-object SpecificAttribute extends BasicGroupVariation (Group0,  Variation.Value(0), "Variations 1 to 253 and 255")
+object SpecificAttribute extends BasicGroupVariation (Group0,  Variation.Value(0), "Specific Attribute")
 object AllAttributesRequest extends BasicGroupVariation (Group0,  Variation.Value(254), "Non-Specific All Attributes Request")
 
 

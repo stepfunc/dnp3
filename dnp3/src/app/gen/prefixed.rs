@@ -24,7 +24,7 @@ use scursor::ReadCursor;
 
 #[derive(Debug)]
 pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
-    /// Device Attributes - Variations 1 to 253 and 255
+    /// Device Attributes - Specific Attribute
     Group0(crate::app::Attribute<'a>),
     /// Binary Input Event - Without Time
     Group2Var1(CountSequence<'a, Prefix<I, Group2Var1>>),

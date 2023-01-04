@@ -195,6 +195,11 @@ class MainClass
                 Console.WriteLine($"variation: {item.Variation} writable: {item.Properties.IsWritable}");
             }
         }
+
+        void IReadHandler.HandleOctetStringAttr(HeaderInfo info, OctetStringAttr attr, byte set, byte var, ICollection<byte> value)
+        {
+            Console.WriteLine($"Octet-string attribute: {attr} set: {set} variation: {var} length: {value.Count}");            
+        }
     }
     // ANCHOR_END: read_handler
 

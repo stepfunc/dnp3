@@ -22,7 +22,7 @@ use scursor::*;
 pub enum Variation {
     /// Device Attributes - Non-Specific All Attributes Request
     Group0Var254,
-    /// Device Attributes - Variations 1 to 253 and 255
+    /// Device Attributes - Specific Attribute
     Group0(u8),
     /// Binary Input - Any Variation
     Group1Var0,
@@ -584,7 +584,7 @@ impl Variation {
     pub(crate) fn description(self) -> &'static str {
         match self {
             Variation::Group0Var254 => "Device Attributes - Non-Specific All Attributes Request",
-            Variation::Group0(_) => "Device Attributes - Variations 1 to 253 and 255",
+            Variation::Group0(_) => "Device Attributes - Specific Attribute",
             Variation::Group1Var0 => "Binary Input - Any Variation",
             Variation::Group1Var1 => "Binary Input - Packed Format",
             Variation::Group1Var2 => "Binary Input - With Flags",

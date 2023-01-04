@@ -61,7 +61,7 @@ object PrefixedVariationModule extends Module {
     }
     def fmtMatcher(v: Variation): Iterator[String] = v match {
       case SpecificAttribute => {
-        s"PrefixedVariation::${v.parent.name}(attr) => attr.write(f),".eol
+        s"PrefixedVariation::${v.parent.name}(attr) => attr.format(f),".eol
       }
       case _ : SizedByVariation => {
         s"PrefixedVariation::${v.parent.name}VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),".eol

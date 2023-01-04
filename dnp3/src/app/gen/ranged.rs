@@ -25,7 +25,7 @@ use scursor::ReadCursor;
 pub(crate) enum RangedVariation<'a> {
     /// Device Attributes - Non-Specific All Attributes Request
     Group0Var254,
-    /// Device Attributes - Variations 1 to 253 and 255
+    /// Device Attributes - Specific Attribute
     /// variation and optional attribute
     Group0(Option<crate::app::Attribute<'a>>),
     /// Binary Input - Any Variation
