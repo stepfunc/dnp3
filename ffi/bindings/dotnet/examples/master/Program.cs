@@ -530,7 +530,7 @@ class MainClass
             case "rsa":
                 {
                     var request = new Request();
-                    request.AddSpecificAttribute(255, 0);
+                    request.AddSpecificAttribute(AttributeVariations.ListOfVariations, 0);
                     await channel.Read(association, request);
                     return true;
                 }

@@ -130,10 +130,14 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             Primitive::U8,
             "Variation of the device attribute",
         )?
-        .param("set", Primitive::U8, "The set (point) to which the attribute belongs")?
-        .doc(
-            doc("Add a one-byte start/stop header for use with a READ request")
+        .param(
+            "set",
+            Primitive::U8,
+            "The set (point) to which the attribute belongs",
         )?
+        .doc(doc(
+            "Add a one-byte start/stop header for use with a READ request",
+        ))?
         .build()?;
 
     let add_one_byte_range_header = lib
