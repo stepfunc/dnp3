@@ -200,6 +200,11 @@ class MainClass
         {
             Console.WriteLine($"Octet-string attribute: {attr} set: {set} variation: {var} length: {value.Count}");            
         }
+
+        void IReadHandler.HandleBitStringAttr(HeaderInfo info, BitStringAttr attr, byte set, byte var, ICollection<byte> value)
+        {
+            Console.WriteLine($"Bit-string attribute: {attr} set: {set} variation: {var} length: {value.Count}");
+        }
     }
     // ANCHOR_END: read_handler
 

@@ -192,7 +192,10 @@ impl ReadHandler for ffi::ReadHandler {
                 let cstr = match CString::new(v) {
                     Ok(x) => x,
                     Err(err) => {
-                        tracing::warn!("Attribute is not a valid C-string: {}", err);
+                        tracing::warn!(
+                            "Attribute (set = {}, var = {var}), is not a valid C-string: {err}",
+                            set.value()
+                        );
                         return;
                     }
                 };
@@ -236,7 +239,17 @@ impl ReadHandler for ffi::ReadHandler {
                 let e = e.map(|x| x.into()).unwrap_or(ffi::TimeAttr::Unknown);
                 ffi::ReadHandler::handle_time_attr(self, info, e, set.value(), var, v.raw_value());
             }
-            FfiAttrValue::BitString(_) => {}
+            FfiAttrValue::BitString(v) => {
+                let mut iter = ByteIterator::new(v);
+                ffi::ReadHandler::handle_bit_string_attr(
+                    self,
+                    info,
+                    ffi::BitStringAttr::Unknown,
+                    set.value(),
+                    var,
+                    &mut iter,
+                );
+            }
         }
     }
 }

@@ -1,7 +1,7 @@
 use oo_bindgen::model::*;
 
 #[derive(PartialEq, Eq)]
-enum KnownAttributeType {
+enum AttributeType {
     List,
     String,
     UInt,
@@ -9,6 +9,7 @@ enum KnownAttributeType {
     Time,
     Float,
     OctetString,
+    BitString,
     All,
 }
 
@@ -16,39 +17,39 @@ struct KnownAttribute {
     variation: u8,
     name: &'static str,
     desc: &'static str,
-    attr_type: KnownAttributeType,
+    attr_type: AttributeType,
 }
 
 const fn string(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
-    KnownAttribute::new(variation, name, desc, KnownAttributeType::String)
+    KnownAttribute::new(variation, name, desc, AttributeType::String)
 }
 
 const fn octet_string(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
-    KnownAttribute::new(variation, name, desc, KnownAttributeType::OctetString)
+    KnownAttribute::new(variation, name, desc, AttributeType::OctetString)
 }
 
 const fn time(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
-    KnownAttribute::new(variation, name, desc, KnownAttributeType::Time)
+    KnownAttribute::new(variation, name, desc, AttributeType::Time)
 }
 
 const fn float(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
-    KnownAttribute::new(variation, name, desc, KnownAttributeType::Float)
+    KnownAttribute::new(variation, name, desc, AttributeType::Float)
 }
 
 const fn uint(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
-    KnownAttribute::new(variation, name, desc, KnownAttributeType::UInt)
+    KnownAttribute::new(variation, name, desc, AttributeType::UInt)
 }
 
 const fn bool(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
-    KnownAttribute::new(variation, name, desc, KnownAttributeType::Bool)
+    KnownAttribute::new(variation, name, desc, AttributeType::Bool)
 }
 
 const fn list(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
-    KnownAttribute::new(variation, name, desc, KnownAttributeType::List)
+    KnownAttribute::new(variation, name, desc, AttributeType::List)
 }
 
 const fn all(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
-    KnownAttribute::new(variation, name, desc, KnownAttributeType::All)
+    KnownAttribute::new(variation, name, desc, AttributeType::All)
 }
 
 impl KnownAttribute {
@@ -56,7 +57,7 @@ impl KnownAttribute {
         variation: u8,
         name: &'static str,
         desc: &'static str,
-        attr_type: KnownAttributeType,
+        attr_type: AttributeType,
     ) -> Self {
         Self {
             variation,
@@ -136,6 +137,7 @@ pub(crate) struct DeviceAttrTypes {
     pub(crate) bool_attr: EnumHandle,
     pub(crate) time_attr: EnumHandle,
     pub(crate) octet_string_attr: EnumHandle,
+    pub(crate) bit_string_attr: EnumHandle,
     pub(crate) float_attr: EnumHandle,
     pub(crate) attr_item_iter: AbstractIteratorHandle,
 }
@@ -151,6 +153,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<DeviceAttrTypes> {
         bool_attr: define_bool_attr(lib)?,
         time_attr: define_time_attr(lib)?,
         octet_string_attr: define_octet_string_attr(lib)?,
+        bit_string_attr: define_bit_string_attr(lib)?,
         float_attr: define_float_attr(lib)?,
         attr_item_iter: define_attr_item_iterator(lib)?,
     })
@@ -228,7 +231,7 @@ impl<'a> UnknownCase for EnumBuilder<'a> {
 
 fn define_attr_enum(
     lib: &mut LibraryBuilder,
-    typ: KnownAttributeType,
+    typ: AttributeType,
     name: &str,
     doc: Doc<Unvalidated>,
 ) -> BackTraced<EnumHandle> {
@@ -249,7 +252,7 @@ fn define_attr_enum(
 fn define_variation_list_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     define_attr_enum(
         lib,
-        KnownAttributeType::List,
+        AttributeType::List,
         "variation_list_attr",
         doc("Enumeration of all the variation list attributes"),
     )
@@ -258,7 +261,7 @@ fn define_variation_list_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle
 fn define_string_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     define_attr_enum(
         lib,
-        KnownAttributeType::String,
+        AttributeType::String,
         "string_attr",
         doc("Enumeration of all the default string attributes"),
     )
@@ -267,7 +270,7 @@ fn define_string_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
 fn define_uint_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     define_attr_enum(
         lib,
-        KnownAttributeType::UInt,
+        AttributeType::UInt,
         "uint_attr",
         doc("Enumeration of all the default uint attributes"),
     )
@@ -287,13 +290,13 @@ fn define_int_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
 }
 
 fn define_bool_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
-    define_attr_enum(lib, KnownAttributeType::Bool, "bool_attr",doc("Enumeration of all the known boolean attributes").details("Boolean attributes are actually just encoded as signed integer attributes where 1 == true"))
+    define_attr_enum(lib, AttributeType::Bool, "bool_attr", doc("Enumeration of all the known boolean attributes").details("Boolean attributes are actually just encoded as signed integer attributes where 1 == true"))
 }
 
 fn define_time_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     define_attr_enum(
         lib,
-        KnownAttributeType::Time,
+        AttributeType::Time,
         "time_attr",
         doc("Enumeration of all the known DNP3 Time attributes"),
     )
@@ -302,16 +305,25 @@ fn define_time_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
 fn define_octet_string_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     define_attr_enum(
         lib,
-        KnownAttributeType::OctetString,
+        AttributeType::OctetString,
         "octet_string_attr",
         doc("Enumeration of all known octet-string attributes"),
+    )
+}
+
+fn define_bit_string_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    define_attr_enum(
+        lib,
+        AttributeType::BitString,
+        "bit_string_attr",
+        doc("Enumeration of all known bit-string attributes"),
     )
 }
 
 fn define_float_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     define_attr_enum(
         lib,
-        KnownAttributeType::Float,
+        AttributeType::Float,
         "float_attr",
         doc("Enumeration of all known float attributes"),
     )
