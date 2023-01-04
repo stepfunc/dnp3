@@ -178,6 +178,7 @@ impl ReadHandler for ffi::ReadHandler {
                 let e = e.map(|x| x.into()).unwrap_or(ffi::TimeAttr::Unknown);
                 ffi::ReadHandler::handle_time_attr(self, info, e, set.value(), var, v.raw_value());
             }
+            FfiAttrValue::BitString(_) => {}
         }
     }
 }
@@ -196,6 +197,8 @@ enum FfiAttrValue<'a> {
     Bool(BoolAttr, bool),
     /// Octet-string attributes
     OctetString(Option<OctetStringAttr>, &'a [u8]),
+    /// Bit-string attributes
+    BitString(&'a [u8]),
     /// DNP3Time attributes
     DNP3Time(Option<TimeAttr>, Timestamp),
 }
@@ -210,7 +213,7 @@ impl<'a> FfiAttrValue<'a> {
                 AttrValue::FloatingPoint(v) => (x.set, x.variation, Self::Float(None, v)),
                 AttrValue::OctetString(v) => (x.set, x.variation, Self::OctetString(None, v)),
                 AttrValue::Dnp3Time(v) => (x.set, x.variation, Self::DNP3Time(None, v)),
-                AttrValue::BitString(v) => (x.set, x.variation, Self::OctetString(None, v)),
+                AttrValue::BitString(v) => (x.set, x.variation, Self::BitString(v)),
                 AttrValue::AttrList(v) => (x.set, x.variation, Self::AttributeList(None, v)),
             },
             AnyAttribute::Known(x) => match x {
