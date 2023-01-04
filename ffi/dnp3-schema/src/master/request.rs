@@ -140,6 +140,20 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         ))?
         .build()?;
 
+    let add_string_attribute_fn = lib
+        .define_method("add_string_attribute", request.clone())?
+        .param("variation", Primitive::U8, "Variation of the attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set (point) to which the attribute belongs",
+        )?
+        .param("value", StringType, "Value of the attribute")?
+        .doc(doc(
+            "Add a one-byte start/stop header containing for use with a WRITE request",
+        ))?
+        .build()?;
+
     let add_one_byte_range_header = lib
         .define_method("add_one_byte_range_header", request.clone())?
         .param(
@@ -231,6 +245,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .method(add_two_byte_limited_count_header)?
         .method(add_time_and_interval)?
         .method(add_specific_attribute_fn)?
+        .method(add_string_attribute_fn)?
         .doc(
             doc("Custom request")
             .details("Whenever a method takes a request as a parameter, the request is internally copied. Therefore, it is possible to reuse the same requests over and over.")

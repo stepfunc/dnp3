@@ -1,6 +1,7 @@
-use dnp3::app::{Timestamp, Variation};
+use dnp3::app::{AttrSet, OwnedAttrValue, OwnedAttribute, Timestamp, Variation};
 use dnp3::master::{Headers, ReadHeader, ReadRequest};
 use dnp3::outstation::FreezeInterval;
+use std::ffi::CStr;
 
 use crate::ffi;
 
@@ -15,11 +16,15 @@ impl Request {
         }
     }
 
-    fn add_read_header(&mut self, header: ReadHeader) {
+    pub(crate) fn add_read_header(&mut self, header: ReadHeader) {
         self.headers.push_read_header(header);
     }
 
-    fn add_time_and_interval(&mut self, time: Timestamp, interval: u32) {
+    pub(crate) fn add_attribute(&mut self, attr: OwnedAttribute) {
+        self.headers.push_attr(attr);
+    }
+
+    pub(crate) fn add_time_and_interval(&mut self, time: Timestamp, interval: u32) {
         self.headers
             .push_freeze_interval(FreezeInterval::new(time, interval));
     }
@@ -144,6 +149,21 @@ pub(crate) unsafe fn request_add_specific_attribute(
             set,
             set,
         ));
+    }
+}
+
+pub(crate) unsafe fn request_add_string_attribute(
+    request: *mut crate::Request,
+    variation: u8,
+    set: u8,
+    value: &CStr,
+) {
+    if let Some(request) = request.as_mut() {
+        request.add_attribute(OwnedAttribute::new(
+            AttrSet::new(set),
+            variation,
+            OwnedAttrValue::VisibleString(value.to_string_lossy().to_string()),
+        ))
     }
 }
 

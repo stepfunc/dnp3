@@ -527,6 +527,13 @@ class MainClass
                     await channel.Read(association, request);                    
                     return true;
                 }
+            case "wda":
+                {
+                    var request = new Request();
+                    request.AddStringAttribute(AttributeVariations.UserAssignedLocation, 0, "Bend, OR");
+                    await channel.RequestExpectEmptyResponse(association, FunctionCode.Write, request);
+                    return true;
+                }
             case "rsa":
                 {
                     var request = new Request();

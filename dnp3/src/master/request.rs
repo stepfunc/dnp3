@@ -478,6 +478,12 @@ impl Headers {
         self.headers.push(Header::TimeAndInterval(interval));
     }
 
+    /// Add an attribute header to the collection
+    #[cfg(feature = "ffi")]
+    pub fn push_attr(&mut self, attr: OwnedAttribute) {
+        self.headers.push(Header::Attribute(attr));
+    }
+
     /// Add an all objects header (0x06) with the specified variation
     pub fn add_all_objects(self, variation: Variation) -> Self {
         self.add(ReadHeader::all_objects(variation).into())
