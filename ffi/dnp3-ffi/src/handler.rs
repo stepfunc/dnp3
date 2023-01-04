@@ -220,7 +220,18 @@ impl ReadHandler for ffi::ReadHandler {
             FfiAttrValue::Bool(e, v) => {
                 ffi::ReadHandler::handle_bool_attr(self, info, e.into(), set.value(), var, v);
             }
-            FfiAttrValue::OctetString(_, _) => {}
+            FfiAttrValue::OctetString(e, v) => {
+                let mut iter = ByteIterator::new(v);
+                let e = e.map(|x| x.into()).unwrap_or(ffi::OctetStringAttr::Unknown);
+                ffi::ReadHandler::handle_octet_string_attr(
+                    self,
+                    info,
+                    e,
+                    set.value(),
+                    var,
+                    &mut iter,
+                );
+            }
             FfiAttrValue::DNP3Time(e, v) => {
                 let e = e.map(|x| x.into()).unwrap_or(ffi::TimeAttr::Unknown);
                 ffi::ReadHandler::handle_time_attr(self, info, e, set.value(), var, v.raw_value());
@@ -316,6 +327,14 @@ impl From<VariationListAttr> for ffi::VariationListAttr {
     fn from(value: VariationListAttr) -> Self {
         match value {
             VariationListAttr::ListOfVariations => Self::ListOfVariations,
+        }
+    }
+}
+
+impl From<OctetStringAttr> for ffi::OctetStringAttr {
+    fn from(value: OctetStringAttr) -> Self {
+        match value {
+            OctetStringAttr::ConfigDigest => Self::ConfigDigest,
         }
     }
 }

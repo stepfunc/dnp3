@@ -354,7 +354,7 @@ pub fn define(
         .begin_callback("handle_float_attr", "Handle a floating point device attribute")?
         .param(
             "info",
-            header_info,
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
@@ -373,6 +373,30 @@ pub fn define(
             "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
         )?
         .param("value", Primitive::Double, "Attribute value")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_octet_string_attr", "Handle an octet string device attribute")?
+        .param(
+            "info",
+            header_info,
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.octet_string_attr,
+            "Enumeration describing the attribute associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", shared_def.byte_it.clone(), "Iterator over bytes in the octet-string")?
         .returns_nothing_by_default()?
         .end_callback()?
         .build_async()?;
