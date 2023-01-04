@@ -63,6 +63,29 @@ pub enum AnyAttribute<'a> {
     Known(KnownAttribute<'a>),
 }
 
+/// Enumeration of all the attribute list attributes
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum AttrListAttr {
+    /// Variation 255 - List of attribute variations
+    ListOfVariations,
+}
+
+impl AttrListAttr {
+    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+        Ok(KnownAttribute::AttributeList(
+            self,
+            value.expect_attr_list()?,
+        ))
+    }
+
+    /// The variation associated with this string attribute
+    pub fn variation(self) -> u8 {
+        match self {
+            AttrListAttr::ListOfVariations => 255,
+        }
+    }
+}
+
 /// Enumeration of all the known string attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StringAttr {
@@ -398,7 +421,7 @@ impl FloatAttr {
 #[derive(Clone, Debug, PartialEq)]
 pub enum KnownAttribute<'a> {
     /// Variation 255 - List of attribute variations
-    AttributeList(AttrList<'a>),
+    AttributeList(AttrListAttr, AttrList<'a>),
     /// VStr attributes
     String(StringAttr, &'a str),
     /// Float attributes
@@ -408,7 +431,7 @@ pub enum KnownAttribute<'a> {
     /// Bool attributes
     Bool(BoolAttr, bool),
     /// Octet-string attributes
-    OctetString(OctetStringAttr, Vec<u8>),
+    OctetString(OctetStringAttr, &'a [u8]),
     /// DNP3Time attributes
     DNP3Time(TimeAttr, Timestamp),
 }
@@ -476,7 +499,7 @@ impl<'a> AnyAttribute<'a> {
             249 => StringAttr::DeviceSubsetAndConformance.extract_from(attr.value)?,
             250 => StringAttr::ProductNameAndModel.extract_from(attr.value)?,
             252 => StringAttr::DeviceManufacturersName.extract_from(attr.value)?,
-            255 => KnownAttribute::AttributeList(attr.value.expect_attr_list()?),
+            255 => AttrListAttr::ListOfVariations.extract_from(attr.value)?,
             _ => return Ok(AnyAttribute::Other(*attr)),
         };
 
@@ -617,6 +640,16 @@ pub enum FloatType {
     F32(f32),
     /// Double-precision
     F64(f64),
+}
+
+impl FloatType {
+    /// Extract the value, widening f32 to f64
+    pub fn value(self) -> f64 {
+        match self {
+            FloatType::F32(x) => x as f64,
+            FloatType::F64(x) => x,
+        }
+    }
 }
 
 /// Represents the value of a device attribute parsed from the underlying buffer
@@ -876,9 +909,9 @@ impl<'a> AttrValue<'a> {
         }
     }
 
-    pub(crate) fn expect_octet_string(&self) -> Result<Vec<u8>, TypeError> {
+    pub(crate) fn expect_octet_string(&self) -> Result<&'a [u8], TypeError> {
         match self {
-            AttrValue::OctetString(x) => Ok(x.to_vec()),
+            AttrValue::OctetString(x) => Ok(x),
             _ => Err(TypeError::new(AttrDataType::OctetString, self.get_type())),
         }
     }

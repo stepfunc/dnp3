@@ -263,6 +263,16 @@ pub fn define(
             attr.bool_attr,
             "Enumeration describing the attribute associated with the value"
         )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
         .param("value", Primitive::Bool, "attribute value")?
         .returns_nothing_by_default()?
         .end_callback()?
@@ -276,14 +286,19 @@ pub fn define(
             "Group/variation and qualifier information",
         )?
         .param(
+            "attr",
+            attr.int_attr,
+            "Enumeration describing the attribute associated with the value"
+        )?
+        .param(
             "set",
             Primitive::U8,
-            "The set associated with this attribute"
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
         )?
         .param(
             "variation",
             Primitive::U8,
-            "The variation associated with this attribute"
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
         )?
         .param("value", Primitive::S32, "attribute value")?
         .returns_nothing_by_default()?
@@ -291,7 +306,7 @@ pub fn define(
         .begin_callback("handle_time_attr", "Handle a DNP3 time device attribute")?
         .param(
             "info",
-            header_info,
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param(
@@ -310,6 +325,30 @@ pub fn define(
             "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
         )?
         .param("value", Primitive::U64, "48-bit timestamp representing milliseconds since Unix epoch")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_float_attr", "Handle a floating point device attribute")?
+        .param(
+            "info",
+            header_info,
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.float_attr,
+            "Enumeration describing the attribute associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", Primitive::Double, "Attribute value")?
         .returns_nothing_by_default()?
         .end_callback()?
         .build_async()?;

@@ -135,67 +135,107 @@ impl ReadHandler for ffi::ReadHandler {
     }
 
     fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {
-        let info = info.into();
-        match attr {
-            AnyAttribute::Other(x) => match x.value {
-                AttrValue::VisibleString(v) => Self::handle_string_attr_impl(
+        let info: ffi::HeaderInfo = info.into();
+        let (set, var, value) = FfiAttrValue::extract(attr);
+        match value {
+            FfiAttrValue::AttributeList(_, _) => {
+                // TODO
+            }
+            FfiAttrValue::String(e, v) => {
+                let cstr = match CString::new(v) {
+                    Ok(x) => x,
+                    Err(err) => {
+                        tracing::warn!("Attribute is not a valid C-string: {}", err);
+                        return;
+                    }
+                };
+                let e = e.map(|x| x.into()).unwrap_or(ffi::StringAttr::Unknown);
+                ffi::ReadHandler::handle_string_attr(self, info, e, set.value(), var, &cstr);
+            }
+            FfiAttrValue::Float(e, v) => {
+                let e = e.map(|x| x.into()).unwrap_or(ffi::FloatAttr::Unknown);
+                ffi::ReadHandler::handle_float_attr(self, info, e, set.value(), var, v.value());
+            }
+            FfiAttrValue::UInt(e, v) => {
+                let e = e.map(|x| x.into()).unwrap_or(ffi::UintAttr::Unknown);
+                ffi::ReadHandler::handle_uint_attr(self, info, e, set.value(), var, v);
+            }
+            FfiAttrValue::Int(v) => {
+                ffi::ReadHandler::handle_int_attr(
                     self,
                     info,
-                    ffi::StringAttr::Unknown,
-                    x.set.value(),
-                    x.variation,
+                    ffi::IntAttr::Unknown,
+                    set.value(),
+                    var,
                     v,
-                ),
-                AttrValue::UnsignedInt(v) => {
-                    ffi::ReadHandler::handle_uint_attr(
-                        self,
-                        info,
-                        ffi::UintAttr::Unknown,
-                        x.set.value(),
-                        x.variation,
-                        v,
-                    );
-                }
-                AttrValue::SignedInt(v) => {
-                    ffi::ReadHandler::handle_int_attr(self, info, x.set.value(), x.variation, v);
-                }
-                AttrValue::FloatingPoint(_) => {}
-                AttrValue::OctetString(_) => {}
-                AttrValue::Dnp3Time(v) => {
-                    ffi::ReadHandler::handle_time_attr(
-                        self,
-                        info,
-                        ffi::TimeAttr::Unknown,
-                        x.set.value(),
-                        x.variation,
-                        v.raw_value(),
-                    );
-                }
-                AttrValue::BitString(_) => {}
-                AttrValue::AttrList(_) => {}
+                );
+            }
+            FfiAttrValue::Bool(e, v) => {
+                ffi::ReadHandler::handle_bool_attr(self, info, e.into(), set.value(), var, v);
+            }
+            FfiAttrValue::OctetString(_, _) => {}
+            FfiAttrValue::DNP3Time(e, v) => {
+                let e = e.map(|x| x.into()).unwrap_or(ffi::TimeAttr::Unknown);
+                ffi::ReadHandler::handle_time_attr(self, info, e, set.value(), var, v.raw_value());
+            }
+        }
+    }
+}
+
+enum FfiAttrValue<'a> {
+    AttributeList(Option<AttrListAttr>, AttrList<'a>),
+    /// VStr attributes
+    String(Option<StringAttr>, &'a str),
+    /// Float attributes
+    Float(Option<FloatAttr>, FloatType),
+    /// UInt attributes
+    UInt(Option<UIntAttr>, u32),
+    /// Int attributes
+    Int(i32),
+    /// Bool attributes
+    Bool(BoolAttr, bool),
+    /// Octet-string attributes
+    OctetString(Option<OctetStringAttr>, &'a [u8]),
+    /// DNP3Time attributes
+    DNP3Time(Option<TimeAttr>, Timestamp),
+}
+
+impl<'a> FfiAttrValue<'a> {
+    fn extract(any: AnyAttribute<'a>) -> (AttrSet, u8, Self) {
+        match any {
+            AnyAttribute::Other(x) => match x.value {
+                AttrValue::VisibleString(v) => (x.set, x.variation, Self::String(None, v)),
+                AttrValue::UnsignedInt(v) => (x.set, x.variation, Self::UInt(None, v)),
+                AttrValue::SignedInt(v) => (x.set, x.variation, Self::Int(v)),
+                AttrValue::FloatingPoint(v) => (x.set, x.variation, Self::Float(None, v)),
+                AttrValue::OctetString(v) => (x.set, x.variation, Self::OctetString(None, v)),
+                AttrValue::Dnp3Time(v) => (x.set, x.variation, Self::DNP3Time(None, v)),
+                AttrValue::BitString(v) => (x.set, x.variation, Self::OctetString(None, v)),
+                AttrValue::AttrList(v) => (x.set, x.variation, Self::AttributeList(None, v)),
             },
             AnyAttribute::Known(x) => match x {
-                KnownAttribute::AttributeList(_) => {}
-                KnownAttribute::String(x, v) => {
-                    Self::handle_string_attr_impl(self, info, x.into(), 0, x.variation(), v)
+                KnownAttribute::AttributeList(e, v) => (
+                    AttrSet::Default,
+                    e.variation(),
+                    Self::AttributeList(Some(e), v),
+                ),
+                KnownAttribute::String(e, v) => {
+                    (AttrSet::Default, e.variation(), Self::String(Some(e), v))
                 }
-                KnownAttribute::Float(_, _) => {}
-                KnownAttribute::UInt(x, v) => {
-                    ffi::ReadHandler::handle_uint_attr(self, info, x.into(), 0, x.variation(), v);
+                KnownAttribute::Float(e, v) => {
+                    (AttrSet::Default, e.variation(), Self::Float(Some(e), v))
                 }
-                KnownAttribute::Bool(x, v) => {
-                    ffi::ReadHandler::handle_bool_attr(self, info, x.into(), v);
+                KnownAttribute::UInt(e, v) => {
+                    (AttrSet::Default, e.variation(), Self::UInt(Some(e), v))
                 }
-                KnownAttribute::OctetString(_, _) => {}
-                KnownAttribute::DNP3Time(x, v) => {
-                    ffi::ReadHandler::handle_time_attr(
-                        self,
-                        info,
-                        x.into(),
-                        0,
-                        x.variation(),
-                        v.raw_value(),
-                    );
+                KnownAttribute::Bool(e, v) => (AttrSet::Default, e.variation(), Self::Bool(e, v)),
+                KnownAttribute::OctetString(e, v) => (
+                    AttrSet::Default,
+                    e.variation(),
+                    Self::OctetString(Some(e), v),
+                ),
+                KnownAttribute::DNP3Time(e, v) => {
+                    (AttrSet::Default, e.variation(), Self::DNP3Time(Some(e), v))
                 }
             },
         }
@@ -279,6 +319,16 @@ impl From<UIntAttr> for ffi::UintAttr {
             UIntAttr::NumBinaryInput => Self::NumBinaryInput,
             UIntAttr::MaxTxFragmentSize => Self::MaxTxFragmentSize,
             UIntAttr::MaxRxFragmentSize => Self::MaxRxFragmentSize,
+        }
+    }
+}
+
+impl From<FloatAttr> for ffi::FloatAttr {
+    fn from(value: FloatAttr) -> Self {
+        match value {
+            FloatAttr::DeviceLocationAltitude => Self::DeviceLocationAltitude,
+            FloatAttr::DeviceLocationLongitude => Self::DeviceLocationLongitude,
+            FloatAttr::DeviceLocationLatitude => Self::DeviceLocationLatitude,
         }
     }
 }

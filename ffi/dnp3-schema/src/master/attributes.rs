@@ -3,6 +3,7 @@ use oo_bindgen::model::{doc, BackTraced, BindResult, EnumBuilder, EnumHandle, Li
 pub(crate) struct DeviceAttrTypes {
     pub(crate) string_attr: EnumHandle,
     pub(crate) uint_attr: EnumHandle,
+    pub(crate) int_attr: EnumHandle,
     pub(crate) bool_attr: EnumHandle,
     pub(crate) time_attr: EnumHandle,
     pub(crate) octet_string_attr: EnumHandle,
@@ -13,6 +14,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<DeviceAttrTypes> {
     Ok(DeviceAttrTypes {
         string_attr: define_string_attr(lib)?,
         uint_attr: define_uint_attr(lib)?,
+        int_attr: define_int_attr(lib)?,
         bool_attr: define_bool_attr(lib)?,
         time_attr: define_time_attr(lib)?,
         octet_string_attr: define_octet_string_attr(lib)?,
@@ -210,6 +212,19 @@ fn define_uint_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     Ok(value)
 }
 
+fn define_int_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let value = lib
+        .define_enum("int_attr")?
+        .doc(
+            doc("Enumeration of all the default integer attributes")
+                .details("In 1815-2012 all integer attributes are mapped to boolean values"),
+        )?
+        .add_unknown()?
+        .build()?;
+
+    Ok(value)
+}
+
 fn define_bool_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let value = lib.define_enum("bool_attr")?
         .doc(doc("Enumeration of all the known boolean attributes").details("Boolean attributes are actually just encoded as signed integer attributes where 1 == true"))?
@@ -222,6 +237,7 @@ fn define_bool_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .push("supports_analog_input_events","Variation 231 - Support analog input events")?
         .push("supports_double_bit_binary_input_events", "Variation 234 - Support double-bit binary input events")?
         .push("supports_binary_input_events","Variation 237 - Support binary input events")?
+        .add_unknown()?
         .build()?;
 
     Ok(value)
