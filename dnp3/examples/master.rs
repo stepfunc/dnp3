@@ -340,7 +340,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 // ANCHOR_END: freeze_at_time
             }
-            "rda" => {
+            "ral" => {
+                // read the attribute list
                 let result = association
                     .read(ReadRequest::one_byte_range(Variation::Group0Var254, 0, 0))
                     .await;

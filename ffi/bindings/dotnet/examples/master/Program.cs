@@ -544,7 +544,7 @@ class MainClass
                     await channel.RequestExpectEmptyResponse(association, FunctionCode.Write, request);
                     return true;
                 }
-            case "rsa":
+            case "ral":
                 {
                     var request = new Request();
                     request.AddSpecificAttribute(AttributeVariations.ListOfVariations, 0);

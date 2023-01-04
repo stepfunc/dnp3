@@ -158,6 +158,11 @@ void handle_octet_strings(dnp3_header_info_t info, dnp3_octet_string_iterator_t 
         printf("\n");
     }
 }
+
+void handle_string_attr(dnp3_header_info_t info, dnp3_string_attr_t attr, uint8_t set, uint8_t variation, const char* value, void *arg)
+{
+    printf("String attribute: %s set: %d var: %d value: %s \n", dnp3_string_attr_to_string(attr), set, variation, value);
+}
 // ANCHOR_END: read_handler
 
 dnp3_read_handler_t get_read_handler()
@@ -173,6 +178,7 @@ dnp3_read_handler_t get_read_handler()
         .handle_analog_input = &handle_analog_input,
         .handle_analog_output_status = &handle_analog_output_status,
         .handle_octet_string = &handle_octet_strings,
+        .handle_string_attr = &handle_string_attr,        
         .on_destroy = NULL,
         .ctx = NULL,
     };
@@ -456,6 +462,47 @@ int run_channel(dnp3_master_channel_t *channel)
             
             dnp3_master_channel_request_expect_empty_response(channel, association_id, DNP3_FUNCTION_CODE_FREEZE_AT_TIME, request, cb);
             dnp3_request_destroy(request);            
+        }
+        else if (strcmp(cbuf, "rda\n") == 0) {
+            dnp3_request_t *request = dnp3_request_create();
+            dnp3_request_add_specific_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_ALL_ATTRIBUTES_REQUEST, 0);                        
+
+            dnp3_read_task_callback_t cb = {
+                .on_complete = &on_read_success,
+                .on_failure = &on_read_failure,
+                .on_destroy = NULL,
+                .ctx = NULL,
+            };
+            dnp3_master_channel_read(channel, association_id, request, cb);
+
+            dnp3_request_destroy(request);
+        }
+        else if (strcmp(cbuf, "wda\n") == 0) {
+            dnp3_request_t *request = dnp3_request_create();
+            dnp3_request_add_string_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_USER_ASSIGNED_LOCATION, 0, "Bend, OR");
+
+            dnp3_empty_response_callback_t cb = {
+                .on_complete = &on_generic_success,
+                .on_failure = &on_generic_failure,
+                .on_destroy = NULL,
+                .ctx = "write device attribute",
+            };
+            dnp3_master_channel_request_expect_empty_response(channel, association_id, DNP3_FUNCTION_CODE_WRITE, request, cb);
+            dnp3_request_destroy(request);
+        }
+        else if (strcmp(cbuf, "ral\n") == 0) {
+            dnp3_request_t *request = dnp3_request_create();
+            dnp3_request_add_specific_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_LIST_OF_VARIATIONS, 0);
+
+            dnp3_read_task_callback_t cb = {
+                .on_complete = &on_read_success,
+                .on_failure = &on_read_failure,
+                .on_destroy = NULL,
+                .ctx = NULL,
+            };
+            dnp3_master_channel_read(channel, association_id, request, cb);
+
+            dnp3_request_destroy(request);
         }
         else if (strcmp(cbuf, "crt\n") == 0) {
             dnp3_restart_task_callback_t cb = {
