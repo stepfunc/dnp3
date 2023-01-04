@@ -1,5 +1,129 @@
 use oo_bindgen::model::*;
 
+enum KnownAttributeType {
+    List,
+    String,
+    UInt,
+    Bool,
+    Time,
+    Float,
+    OctetString,
+    All,
+}
+
+struct KnownAttribute {
+    variation: u8,
+    name: &'static str,
+    desc: &'static str,
+    attr_type: KnownAttributeType,
+}
+
+const fn string(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
+    KnownAttribute::new(variation, name, desc, KnownAttributeType::String)
+}
+
+const fn octet_string(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
+    KnownAttribute::new(variation, name, desc, KnownAttributeType::OctetString)
+}
+
+const fn time(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
+    KnownAttribute::new(variation, name, desc, KnownAttributeType::Time)
+}
+
+const fn float(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
+    KnownAttribute::new(variation, name, desc, KnownAttributeType::Float)
+}
+
+const fn uint(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
+    KnownAttribute::new(variation, name, desc, KnownAttributeType::UInt)
+}
+
+const fn bool(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
+    KnownAttribute::new(variation, name, desc, KnownAttributeType::Bool)
+}
+
+const fn list(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
+    KnownAttribute::new(variation, name, desc, KnownAttributeType::List)
+}
+
+const fn all(variation: u8, name: &'static str, desc: &'static str) -> KnownAttribute {
+    KnownAttribute::new(variation, name, desc, KnownAttributeType::All)
+}
+
+impl KnownAttribute {
+    const fn new(variation: u8, name: &'static str, desc: &'static str, attr_type: KnownAttributeType) -> Self {
+        Self {
+            variation,
+            name,
+            desc,
+            attr_type,
+        }
+    }
+}
+
+const ATTRIBUTES: &[KnownAttribute] = &[
+    string(196, "config_id", "Configuration id"),
+    string(197, "config_version", "Configuration version"),
+    time(198, "config_build_date", "Time and date that the outstation's current configuration was built defined"),
+    time(199, "config_last_change_date","Time and date that the outstation's configuration was last modified"),
+    octet_string(200, "config_digest", "Digest (aka fingerprint) of the configuration using a CRC, HASH, MAC, or public key signature"),
+    string(201, "config_digest_algorithm", "Configuration digest algorithm"),
+    string(202, "master_resource_id", "Master resource id (mRID)"),
+    float(203, "device_location_altitude", "Altitude of the device"),
+    float(204, "device_location_longitude", "Longitude of the device from reference meridian (-180.0 to 180.0 deg)"),
+    float(205, "device_location_latitude", "Latitude of the device from the equator (90.0 to -90.0 deg)"),
+    string(206, "user_assigned_secondary_operator_name", "User-assigned secondary operator name"),
+    string(207, "user_assigned_primary_operator_name", "User-assigned primary operator name"),
+    string(208,"user_assigned_system_name", "User-assigned system name"),
+    string(209, "secure_auth_version", "Secure authentication version"),
+    uint(210, "num_security_stats_per_assoc", "Number of security statistics per association"),
+    string(211, "user_specific_attributes", "Identification of user-specific attributes"),
+    uint(212, "num_master_defined_data_set_proto", "Number of master defined data-set prototypes"),
+    uint(213, "num_outstation_defined_data_set_proto", "Number of outstation defined data-set prototypes"),
+    uint(214, "num_master_defined_data_sets", "Number of master defined data-sets"),
+    uint(215, "num_outstation_defined_data_sets", "Number of outstation defined data-sets"),
+    uint(216, "max_binary_output_per_request", "Maximum number of binary outputs per request"),
+    uint(217, "local_timing_accuracy", "Local timing accuracy (microseconds)"),
+    uint(218, "duration_of_time_accuracy", "Duration of time accuracy (seconds)"),
+    bool(219, "supports_analog_output_events", "Supports analog output events"),
+    uint(220, "max_analog_output_index", "Maximum analog output index"),
+    uint(221, "num_analog_outputs", "Number of analog outputs"),
+    bool(222, "supports_binary_output_events",  "Supports binary output events"),
+    uint(223, "max_binary_output_index", "Maximum binary output index"),
+    uint(224, "num_binary_outputs", "Number of binary outputs"),
+    bool(225, "supports_frozen_counter_events", "Supports frozen counter events"),
+    bool(226, "supports_frozen_counters", "Supports frozen counters"),
+    bool(227, "supports_counter_events", "Supports counter events"),
+    uint(228, "max_counter_index", "Maximum counter point index"),
+    uint(229, "num_counter", "Number of counter points"),
+    bool(230, "supports_frozen_analog_inputs", "Supports frozen analog input events"),
+    bool(231, "supports_analog_input_events", "Supports analog input events"),
+    uint(232, "max_analog_input_index", "Maximum analog input point index"),
+    uint(233, "num_analog_input", "Number of analog input points"),
+    bool(234, "supports_double_bit_binary_input_events", "Supports double-bit binary input events"),
+    uint(235, "max_double_bit_binary_input_index", "Maximum double-bit binary input point index"),
+    uint(236, "num_double_bit_binary_input", "Number of double-bit binary input points"),
+    bool(237, "supports_binary_input_events", "Support binary input events"),
+    uint(238, "max_binary_input_index", "Maximum binary input point index"),
+    uint(239, "num_binary_input", "Number of binary input points"),
+    uint(240, "max_tx_fragment_size", "Maximum transmit fragment size"),
+    uint(241, "max_rx_fragment_size","Maximum receive fragment size"),
+    string(242, "device_manufacturer_software_version", "Device manufacturer software version"),
+    string(243,"device_manufacturer_hardware_version", "Device manufacturer hardware version"),
+    string(244, "user_assigned_owner_name", "User-assigned owner name"),
+    string(245, "user_assigned_location", "User assigned location name"),
+    string(246, "user_assigned_id", "User assigned ID code/number"),
+    string(247, "user_assigned_device_name", "User assigned device name"),
+    string(248, "device_serial_number", "Device serial number"),
+    string(249, "device_subset_and_conformance", "DNP3 subset and conformance"),
+    string(250, "product_name_and_model", "Device manufacturer's product name and model"),
+    string(252,"device_manufacturers_name", "Device manufacturer's name"),
+    all(254, "all_attributes_request", "Non-specific all attributes request"),
+    list(255, "list_of_variations", "List of attribute variations"),
+];
+
+
+
 pub(crate) struct DeviceAttrTypes {
     pub(crate) variation_list_attr: EnumHandle,
     pub(crate) string_attr: EnumHandle,
@@ -29,218 +153,13 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<DeviceAttrTypes> {
 }
 
 fn define_attr_constants(lib: &mut LibraryBuilder) -> BackTraced<()> {
-    fn variation(v: u8) -> ConstantValue {
-        ConstantValue::U8(v, Representation::Hex)
+    let mut builder = lib.define_constants("attribute_variations")?.doc("Device attribute variation constants")?;
+
+    for attr in ATTRIBUTES {
+        builder = builder.add(attr.name, ConstantValue::U8(attr.variation, Representation::Hex), attr.desc)?;
     }
 
-    lib.define_constants("attribute_variations")?
-        .doc("Device attribute variation constants")?
-        .add("config_id", variation(196), "Configuration id")?
-        .add("config_version", variation(197), "Configuration version")?
-        .add("config_build_date", variation(198), "Time and date that the outstation's current configuration was built defined")?
-        .add("config_last_change_date", variation(199), "Time and date that the outstation's configuration was last modified")?
-        .add("config_digest", variation(200), "Digest (aka fingerprint) of the configuration using a CRC, HASH, MAC, or public key signature")?
-        .add(
-            "config_digest_algorithm",
-            variation(201),
-            "Configuration digest algorithm",
-        )?
-        .add(
-            "master_resource_id",
-            variation(202),
-            "Master resource id (mRID)",
-        )?
-        .add(
-            "device_location_altitude",
-            variation(203), "Altitude of the device",
-        )?
-        .add(
-            "device_location_longitude",
-            variation(204),"Longitude of the device from reference meridian (-180.0 to 180.0 deg)",
-        )?
-        .add(
-            "device_location_latitude",
-            variation(205), "Latitude of the device from the equator (90.0 to -90.0 deg)",
-        )?
-        .add(
-            "user_assigned_secondary_operator_name",
-            variation(206),
-            "User-assigned secondary operator name",
-        )?
-        .add(
-            "user_assigned_primary_operator_name",
-            variation(207),
-            "User-assigned primary operator name",
-        )?
-        .add(
-            "user_assigned_system_name",
-            variation(208),
-            "User-assigned system name",
-        )?
-        .add(
-            "secure_auth_version",
-            variation(209), "Secure authentication version",
-        )?
-        .add(
-            "num_security_stats_per_assoc",
-            variation(210), "Number of security statistics per association",
-        )?
-        .add(
-            "user_specific_attributes",
-            variation(211),
-            "Identification of user-specific attributes",
-        )?
-        .add(
-            "num_master_defined_data_set_proto",
-            variation(212), "Number of master defined data-set prototypes",
-        )?
-        .add(
-            "num_outstation_defined_data_set_proto",
-            variation(213), "Number of outstation defined data-set prototypes",
-        )?
-        .add(
-            "num_master_defined_data_sets",
-            variation(214), "Number of master defined data-sets",
-        )?
-        .add(
-            "num_outstation_defined_data_sets",
-            variation(215), "Number of outstation defined data-sets",
-        )?
-        .add(
-            "max_binary_output_per_request",
-            variation(216), "Maximum number of binary outputs per request",
-        )?
-        .add(
-            "local_timing_accuracy",
-            variation(217), "Local timing accuracy (microseconds)",
-        )?
-        .add(
-            "duration_of_time_accuracy",
-            variation(218), "Duration of time accuracy (seconds)",
-        )?
-        .add("supports_analog_output_events", variation(219), "Supports analog output events")?
-        .add(
-            "max_analog_output_index",
-            variation(220), "Maximum analog output index",
-        )?
-        .add(
-            "num_analog_outputs",
-            variation(221), "Number of analog outputs",
-        )?
-        .add("supports_binary_output_events", variation(222), "Supports binary output events")?
-        .add(
-            "max_binary_output_index",
-            variation(223), "Maximum binary output index",
-        )?
-        .add(
-            "num_binary_outputs",
-            variation(224), "Number of binary outputs",
-        )?
-        .add("supports_frozen_counter_events", variation(225), "Supports frozen counter events")?
-        .add("supports_frozen_counters", variation(226), "Supports frozen counters")?
-        .add("supports_counter_events", variation(227), "Supports counter events")?
-        .add(
-            "max_counter_index",
-            variation(228), "Maximum counter point index",
-        )?
-        .add("num_counter", variation(229), "Number of counter points")?
-        .add("supports_frozen_analog_inputs", variation(230), "Support frozen analog input events")?
-        .add("supports_analog_input_events",variation(231), "Support analog input events")?
-        .add(
-            "max_analog_input_index",
-            variation(232), "Maximum analog input point index",
-        )?
-        .add(
-            "num_analog_input",
-            variation(233), "Number of analog input points",
-        )?
-        .add("supports_double_bit_binary_input_events", variation(234), "Support double-bit binary input events")?
-        .add(
-            "max_double_bit_binary_input_index",
-            variation(235), "Maximum double-bit binary input point index",
-        )?
-        .add(
-            "num_double_bit_binary_input",
-            variation(236), "Number of double-bit binary input points",
-        )?
-        .add("supports_binary_input_events",variation(237),"Support binary input events")?
-        .add(
-            "max_binary_input_index",
-            variation(238), "Maximum binary input point index",
-        )?
-        .add(
-            "num_binary_input",
-            variation(239), "Number of binary input points",
-        )?
-        .add(
-            "max_tx_fragment_size",
-            variation(240), "Maximum transmit fragment size",
-        )?
-        .add(
-            "max_rx_fragment_size",
-            variation(241), "Maximum receive fragment size",
-        )?
-        .add(
-            "device_manufacturer_software_version",
-            variation(242),
-            "Device manufacturer software version",
-        )?
-        .add(
-            "device_manufacturer_hardware_version",
-            variation(243),
-            "Device manufacturer hardware version",
-        )?
-        .add(
-            "user_assigned_owner_name",
-            variation(244),
-            "User-assigned owner name",
-        )?
-        .add(
-            "user_assigned_location",
-            variation(245),
-            "User assigned location/name",
-        )?
-        .add(
-            "user_assigned_id",
-            variation(246),
-            "User assigned ID code/number",
-        )?
-        .add(
-            "user_assigned_device_name",
-            variation(247),
-            "User assigned device name",
-        )?
-        .add(
-            "device_serial_number",
-            variation(248),
-            "Device serial number",
-        )?
-        .add(
-            "device_subset_and_conformance",
-            variation(249),
-            "DNP3 subset and conformance",
-        )?
-        .add(
-            "product_name_and_model",
-            variation(250),
-            "Device manufacturer's product name and model",
-        )?
-        .add(
-            "device_manufacturers_name",
-            variation(252),
-            "Device manufacturer's name",
-        )?
-        .add(
-            "list_of_variations",
-            variation(255), "List of attribute variations"
-        )?
-
-
-
-
-
-
-        .build()?;
+    builder.build()?;
 
     Ok(())
 }
