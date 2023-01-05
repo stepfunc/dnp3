@@ -8,8 +8,8 @@ slug: /api/master/read_handler
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `ReadHandler` interface is how the measurement data received from the outstation is passed to your application code. This callback interface is specified
-for each association you create and is invoked for both unsolicited responses and responses to polls.
+The `ReadHandler` interface is used to receive values from the outstation as it is received by the master. This callback interface is specified
+for each association you create and is invoked for both unsolicited responses and responses to READ requests.
 
 When a response is parsed and determined to carry measurement data, `ReadHandler` callbacks are executed in the following order:
 
@@ -38,6 +38,32 @@ in a response series.
 It is possible to send a read request with a specific `ReadHandler` by using the `MasterChannel::read_with_handler()` method.
 All the response data associated with the request will be forwarded to the `ReadHandler` specified as an argument instead of
 going to the handler specified at the creation of the association.
+
+## Device Attributes
+
+The `ReadHandler` also has callbacks for receiving device attributes (Group 0) from the outstation. The Rust trait uses
+a single method and passes an enum representing the various types of values. The bindings use a distinct method for each
+type of value, i.e. one for strings, another for unsigned integers, etc.
+
+All of the callbacks provide an enum allowing you to determine if the received attribute is from the default set specified by
+DNP.org (i.e. set "0") or a privately defined set. The intent is that you never have to match variations numbers yourself
+unless you are dealing with data from a private set.
+
+:::tip
+The default set includes a number of signed integer attributes that are mapped to boolean values, e.g.:
+
+* Group 0 Variation 231 - Support for analog input events
+
+* Group 0 Variation 237 - Support for binary input events
+
+Instead of providing you with the raw integer, the library converts it to a bool for convenience.
+:::
+
+## Examples
+
+The example below shows an implementation of a `ReadHandler` that prints received values to the console. The Rust and C#
+examples can print all of the received device attributes. The examples for the other bindings only demonstrate receiving
+string attributes.
 
 <Tabs
 groupId="language"
