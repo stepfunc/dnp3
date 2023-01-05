@@ -49,6 +49,36 @@ impl From<TypeError> for AttrError {
 }
 
 impl SetMap {
+    fn validate_properties(prop: AttrProp, attr: &OwnedAttribute) -> Result<(), AttrError> {
+        if !prop.is_writable() {
+            return Ok(());
+        };
+
+        let can_be_writable = match attr.set {
+            AttrSet::Default => match attr.variation {
+                203 => true, // device location altitude
+                204 => true, // device location longitude
+                205 => true, // device location latitude
+                206 => true, // user-assigned secondary operator name
+                207 => true, // user-assigned primary operator name
+                208 => true, // user-assigned name
+                247 => true, // user-assigned device name
+                246 => true, // user-assigned ID/code
+                245 => true, // user-assigned location
+                240 => true, // max tx fragment size
+                _ => false,
+            },
+            // private sets can do whatever they want
+            AttrSet::Private(_) => true,
+        };
+
+        if !can_be_writable {
+            return Err(AttrError::NotWritable);
+        }
+
+        Ok(())
+    }
+
     /// Define an attribute in map
     ///
     /// return false if the attribute already exists
@@ -56,6 +86,8 @@ impl SetMap {
         let key = Variation::create(attr.variation)?;
         // this will ensure that we're using the right types for default attributes
         let _ = AnyAttribute::try_from(&attr.view())?;
+        // this validates writable properties in the default set
+        Self::validate_properties(prop, &attr)?;
         match self.inner.entry(key) {
             Entry::Occupied(_) => Err(AttrError::AlreadyDefined),
             Entry::Vacant(x) => {
@@ -95,12 +127,15 @@ impl SetMap {
         }
     }
 
-    /// Iterate over variations
-    pub(crate) fn iter(&mut self) -> impl Iterator<Item = AttrItem> + '_ {
-        self.inner.iter().map(|(k, (prop, _))| AttrItem {
+    /// Iterate over variations in a set
+    pub(crate) fn set_iter(
+        &mut self,
+        _set: AttrSet,
+    ) -> Option<impl Iterator<Item = AttrItem> + '_> {
+        Some(self.inner.iter().map(|(k, (prop, _))| AttrItem {
             variation: k.value,
             properties: *prop,
-        })
+        }))
     }
 }
 
@@ -125,6 +160,18 @@ mod test {
                 actual: AttrDataType::SignedInt
             })
         );
+    }
+
+    #[test]
+    fn cannot_define_non_writable_attribute_as_writable() {
+        let mut map = SetMap::default();
+        let attr = OwnedAttribute::new(
+            AttrSet::Default,
+            StringAttr::DeviceSubsetAndConformance.variation(),
+            OwnedAttrValue::VisibleString("3:2010".into()),
+        );
+        let err = map.define(AttrProp::writable(), attr).unwrap_err();
+        assert_eq!(err, AttrError::NotWritable);
     }
 
     #[test]
