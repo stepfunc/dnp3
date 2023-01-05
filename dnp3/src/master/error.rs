@@ -12,6 +12,8 @@ use crate::transport::TransportResponseError;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
+use crate::app::attr::BadAttribute;
+
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AssociationError {
@@ -23,6 +25,23 @@ pub enum AssociationError {
 
 /// Errors that can occur while executing a master task
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum BadEncoding {
+    /// Attribute could not be encoded
+    Attribute(BadAttribute),
+}
+
+impl std::fmt::Display for BadEncoding {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            BadEncoding::Attribute(x) => write!(f, "Bad attribute encoding: {x}"),
+        }
+    }
+}
+
+/// Errors that can occur while executing a master task
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
 pub enum TaskError {
     /// There are too many user requests queued
     TooManyRequests,
@@ -46,6 +65,8 @@ pub enum TaskError {
     ResponseTimeout,
     /// Insufficient buffer space to serialize the request
     WriteError,
+    /// Request data could not be encoded
+    BadEncoding(BadEncoding),
     /// The requested association does not exist (not configured)
     NoSuchAssociation(EndpointAddress),
     /// There is not connection at the transport level
@@ -224,6 +245,9 @@ impl std::fmt::Display for TaskError {
             TaskError::Disabled => f.write_str("the master was disabled while executing the task"),
             TaskError::NoConnection => f.write_str("no connection"),
             TaskError::NoSuchAssociation(x) => write!(f, "no association with address: {x}"),
+            TaskError::BadEncoding(x) => {
+                write!(f, "Encoding error: {x}")
+            }
         }
     }
 }

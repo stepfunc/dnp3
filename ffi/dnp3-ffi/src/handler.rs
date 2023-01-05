@@ -1,3 +1,4 @@
+use dnp3::app::attr::*;
 use dnp3::app::measurement::*;
 use dnp3::app::*;
 use dnp3::app::{ResponseFunction, ResponseHeader};
@@ -5,8 +6,45 @@ use dnp3::master::{
     AssociationHandler, AssociationInformation, HeaderInfo, ReadHandler, ReadType, TaskError,
     TaskType,
 };
+use std::ffi::CString;
 
 use crate::ffi;
+
+pub struct AttrItemIter<'a> {
+    inner: VariationListIter<'a>,
+    current: Option<ffi::AttrItem>,
+}
+
+impl<'a> AttrItemIter<'a> {
+    fn new(list: VariationList<'a>) -> Self {
+        Self {
+            inner: list.iter(),
+            current: None,
+        }
+    }
+}
+
+pub(crate) unsafe fn attr_item_iter_next(iter: *mut crate::AttrItemIter) -> Option<&ffi::AttrItem> {
+    let iter = match iter.as_mut() {
+        None => return None,
+        Some(x) => x,
+    };
+
+    iter.current = iter.inner.next().map(|x| x.into());
+
+    iter.current.as_ref()
+}
+
+impl From<AttrItem> for ffi::AttrItem {
+    fn from(value: AttrItem) -> Self {
+        Self {
+            variation: value.variation,
+            properties: ffi::AttrProp {
+                is_writable: value.properties.is_writable(),
+            },
+        }
+    }
+}
 
 impl AssociationHandler for ffi::AssociationHandler {
     fn get_current_time(&self) -> Option<Timestamp> {
@@ -131,6 +169,285 @@ impl ReadHandler for ffi::ReadHandler {
         let info = info.into();
         let mut iterator = OctetStringIterator::new(iter);
         ffi::ReadHandler::handle_octet_string(self, info, &mut iterator);
+    }
+
+    fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {
+        let info: ffi::HeaderInfo = info.into();
+        let (set, var, value) = FfiAttrValue::extract(attr);
+        match value {
+            FfiAttrValue::VariationList(e, v) => {
+                let mut iter = AttrItemIter::new(v);
+                let e = e
+                    .map(|x| x.into())
+                    .unwrap_or(ffi::VariationListAttr::Unknown);
+                ffi::ReadHandler::handle_variation_list_attr(
+                    self,
+                    info,
+                    e,
+                    set.value(),
+                    var,
+                    &mut iter,
+                );
+            }
+            FfiAttrValue::String(e, v) => {
+                let cstr = match CString::new(v) {
+                    Ok(x) => x,
+                    Err(err) => {
+                        tracing::warn!(
+                            "Attribute (set = {}, var = {var}), is not a valid C-string: {err}",
+                            set.value()
+                        );
+                        return;
+                    }
+                };
+                let e = e.map(|x| x.into()).unwrap_or(ffi::StringAttr::Unknown);
+                ffi::ReadHandler::handle_string_attr(self, info, e, set.value(), var, &cstr);
+            }
+            FfiAttrValue::Float(e, v) => {
+                let e = e.map(|x| x.into()).unwrap_or(ffi::FloatAttr::Unknown);
+                ffi::ReadHandler::handle_float_attr(self, info, e, set.value(), var, v.value());
+            }
+            FfiAttrValue::UInt(e, v) => {
+                let e = e.map(|x| x.into()).unwrap_or(ffi::UintAttr::Unknown);
+                ffi::ReadHandler::handle_uint_attr(self, info, e, set.value(), var, v);
+            }
+            FfiAttrValue::Int(v) => {
+                ffi::ReadHandler::handle_int_attr(
+                    self,
+                    info,
+                    ffi::IntAttr::Unknown,
+                    set.value(),
+                    var,
+                    v,
+                );
+            }
+            FfiAttrValue::Bool(e, v) => {
+                ffi::ReadHandler::handle_bool_attr(self, info, e.into(), set.value(), var, v);
+            }
+            FfiAttrValue::OctetString(e, v) => {
+                let mut iter = ByteIterator::new(v);
+                let e = e.map(|x| x.into()).unwrap_or(ffi::OctetStringAttr::Unknown);
+                ffi::ReadHandler::handle_octet_string_attr(
+                    self,
+                    info,
+                    e,
+                    set.value(),
+                    var,
+                    &mut iter,
+                );
+            }
+            FfiAttrValue::DNP3Time(e, v) => {
+                let e = e.map(|x| x.into()).unwrap_or(ffi::TimeAttr::Unknown);
+                ffi::ReadHandler::handle_time_attr(self, info, e, set.value(), var, v.raw_value());
+            }
+            FfiAttrValue::BitString(v) => {
+                let mut iter = ByteIterator::new(v);
+                ffi::ReadHandler::handle_bit_string_attr(
+                    self,
+                    info,
+                    ffi::BitStringAttr::Unknown,
+                    set.value(),
+                    var,
+                    &mut iter,
+                );
+            }
+        }
+    }
+}
+
+enum FfiAttrValue<'a> {
+    VariationList(Option<VariationListAttr>, VariationList<'a>),
+    /// VStr attributes
+    String(Option<StringAttr>, &'a str),
+    /// Float attributes
+    Float(Option<FloatAttr>, FloatType),
+    /// UInt attributes
+    UInt(Option<UIntAttr>, u32),
+    /// Int attributes
+    Int(i32),
+    /// Bool attributes
+    Bool(BoolAttr, bool),
+    /// Octet-string attributes
+    OctetString(Option<OctetStringAttr>, &'a [u8]),
+    /// Bit-string attributes
+    BitString(&'a [u8]),
+    /// DNP3Time attributes
+    DNP3Time(Option<TimeAttr>, Timestamp),
+}
+
+impl<'a> FfiAttrValue<'a> {
+    fn extract(any: AnyAttribute<'a>) -> (AttrSet, u8, Self) {
+        match any {
+            AnyAttribute::Other(x) => match x.value {
+                AttrValue::VisibleString(v) => (x.set, x.variation, Self::String(None, v)),
+                AttrValue::UnsignedInt(v) => (x.set, x.variation, Self::UInt(None, v)),
+                AttrValue::SignedInt(v) => (x.set, x.variation, Self::Int(v)),
+                AttrValue::FloatingPoint(v) => (x.set, x.variation, Self::Float(None, v)),
+                AttrValue::OctetString(v) => (x.set, x.variation, Self::OctetString(None, v)),
+                AttrValue::Dnp3Time(v) => (x.set, x.variation, Self::DNP3Time(None, v)),
+                AttrValue::BitString(v) => (x.set, x.variation, Self::BitString(v)),
+                AttrValue::AttrList(v) => (x.set, x.variation, Self::VariationList(None, v)),
+            },
+            AnyAttribute::Known(x) => match x {
+                KnownAttribute::AttributeList(e, v) => (
+                    AttrSet::Default,
+                    e.variation(),
+                    Self::VariationList(Some(e), v),
+                ),
+                KnownAttribute::String(e, v) => {
+                    (AttrSet::Default, e.variation(), Self::String(Some(e), v))
+                }
+                KnownAttribute::Float(e, v) => {
+                    (AttrSet::Default, e.variation(), Self::Float(Some(e), v))
+                }
+                KnownAttribute::UInt(e, v) => {
+                    (AttrSet::Default, e.variation(), Self::UInt(Some(e), v))
+                }
+                KnownAttribute::Bool(e, v) => (AttrSet::Default, e.variation(), Self::Bool(e, v)),
+                KnownAttribute::OctetString(e, v) => (
+                    AttrSet::Default,
+                    e.variation(),
+                    Self::OctetString(Some(e), v),
+                ),
+                KnownAttribute::DNP3Time(e, v) => {
+                    (AttrSet::Default, e.variation(), Self::DNP3Time(Some(e), v))
+                }
+            },
+        }
+    }
+}
+
+impl ffi::ReadHandler {
+    fn handle_string_attr_impl(
+        &mut self,
+        info: ffi::HeaderInfo,
+        attr: ffi::StringAttr,
+        set: u8,
+        variation: u8,
+        value: &str,
+    ) {
+        let string = match CString::new(value) {
+            Ok(x) => x,
+            Err(err) => {
+                tracing::warn!("Attribute is not a valid C-string: {}", err);
+                return;
+            }
+        };
+        ffi::ReadHandler::handle_string_attr(self, info, attr, set, variation, string.as_ref());
+    }
+}
+
+impl From<VariationListAttr> for ffi::VariationListAttr {
+    fn from(value: VariationListAttr) -> Self {
+        match value {
+            VariationListAttr::ListOfVariations => Self::ListOfVariations,
+        }
+    }
+}
+
+impl From<OctetStringAttr> for ffi::OctetStringAttr {
+    fn from(value: OctetStringAttr) -> Self {
+        match value {
+            OctetStringAttr::ConfigDigest => Self::ConfigDigest,
+        }
+    }
+}
+
+impl From<StringAttr> for ffi::StringAttr {
+    fn from(value: StringAttr) -> Self {
+        match value {
+            StringAttr::ConfigId => Self::ConfigId,
+            StringAttr::ConfigVersion => Self::ConfigVersion,
+            StringAttr::ConfigDigestAlgorithm => Self::ConfigDigestAlgorithm,
+            StringAttr::MasterResourceId => Self::MasterResourceId,
+            StringAttr::UserAssignedSecondaryOperatorName => {
+                Self::UserAssignedSecondaryOperatorName
+            }
+            StringAttr::UserAssignedPrimaryOperatorName => Self::UserAssignedPrimaryOperatorName,
+            StringAttr::UserAssignedSystemName => Self::UserAssignedSystemName,
+            StringAttr::UserSpecificAttributes => Self::UserSpecificAttributes,
+            StringAttr::DeviceManufacturerSoftwareVersion => {
+                Self::DeviceManufacturerSoftwareVersion
+            }
+            StringAttr::DeviceManufacturerHardwareVersion => {
+                Self::DeviceManufacturerHardwareVersion
+            }
+            StringAttr::UserAssignedOwnerName => Self::UserAssignedOwnerName,
+            StringAttr::UserAssignedLocation => Self::UserAssignedLocation,
+            StringAttr::UserAssignedId => Self::UserAssignedId,
+            StringAttr::UserAssignedDeviceName => Self::UserAssignedDeviceName,
+            StringAttr::DeviceSerialNumber => Self::DeviceSerialNumber,
+            StringAttr::DeviceSubsetAndConformance => Self::DeviceSubsetAndConformance,
+            StringAttr::ProductNameAndModel => Self::ProductNameAndModel,
+            StringAttr::DeviceManufacturersName => Self::DeviceManufacturersName,
+        }
+    }
+}
+
+impl From<UIntAttr> for ffi::UintAttr {
+    fn from(value: UIntAttr) -> Self {
+        match value {
+            UIntAttr::SecureAuthVersion => Self::SecureAuthVersion,
+            UIntAttr::NumSecurityStatsPerAssoc => Self::NumSecurityStatsPerAssoc,
+            UIntAttr::NumMasterDefinedDataSetProto => Self::NumMasterDefinedDataSetProto,
+            UIntAttr::NumOutstationDefinedDataSetProto => Self::NumOutstationDefinedDataSetProto,
+            UIntAttr::NumMasterDefinedDataSets => Self::NumMasterDefinedDataSets,
+            UIntAttr::NumOutstationDefinedDataSets => Self::NumOutstationDefinedDataSets,
+            UIntAttr::MaxBinaryOutputPerRequest => Self::MaxBinaryOutputPerRequest,
+            UIntAttr::LocalTimingAccuracy => Self::LocalTimingAccuracy,
+            UIntAttr::DurationOfTimeAccuracy => Self::DurationOfTimeAccuracy,
+            UIntAttr::MaxAnalogOutputIndex => Self::MaxAnalogOutputIndex,
+            UIntAttr::NumAnalogOutputs => Self::NumAnalogOutputs,
+            UIntAttr::MaxBinaryOutputIndex => Self::MaxBinaryOutputIndex,
+            UIntAttr::NumBinaryOutputs => Self::NumBinaryOutputs,
+            UIntAttr::MaxCounterIndex => Self::MaxCounterIndex,
+            UIntAttr::NumCounter => Self::NumCounter,
+            UIntAttr::MaxAnalogInputIndex => Self::MaxAnalogInputIndex,
+            UIntAttr::NumAnalogInput => Self::NumAnalogInput,
+            UIntAttr::MaxDoubleBitBinaryInputIndex => Self::MaxDoubleBitBinaryInputIndex,
+            UIntAttr::NumDoubleBitBinaryInput => Self::NumDoubleBitBinaryInput,
+            UIntAttr::MaxBinaryInputIndex => Self::MaxBinaryInputIndex,
+            UIntAttr::NumBinaryInput => Self::NumBinaryInput,
+            UIntAttr::MaxTxFragmentSize => Self::MaxTxFragmentSize,
+            UIntAttr::MaxRxFragmentSize => Self::MaxRxFragmentSize,
+        }
+    }
+}
+
+impl From<FloatAttr> for ffi::FloatAttr {
+    fn from(value: FloatAttr) -> Self {
+        match value {
+            FloatAttr::DeviceLocationAltitude => Self::DeviceLocationAltitude,
+            FloatAttr::DeviceLocationLongitude => Self::DeviceLocationLongitude,
+            FloatAttr::DeviceLocationLatitude => Self::DeviceLocationLatitude,
+        }
+    }
+}
+
+impl From<BoolAttr> for ffi::BoolAttr {
+    fn from(value: BoolAttr) -> Self {
+        match value {
+            BoolAttr::SupportsAnalogOutputEvents => Self::SupportsAnalogOutputEvents,
+            BoolAttr::SupportsBinaryOutputEvents => Self::SupportsBinaryOutputEvents,
+            BoolAttr::SupportsFrozenCounterEvents => Self::SupportsFrozenCounterEvents,
+            BoolAttr::SupportsFrozenCounters => Self::SupportsFrozenCounters,
+            BoolAttr::SupportsCounterEvents => Self::SupportsCounterEvents,
+            BoolAttr::SupportsFrozenAnalogInputs => Self::SupportsFrozenAnalogInputs,
+            BoolAttr::SupportsAnalogInputEvents => Self::SupportsAnalogInputEvents,
+            BoolAttr::SupportsDoubleBitBinaryInputEvents => {
+                Self::SupportsDoubleBitBinaryInputEvents
+            }
+            BoolAttr::SupportsBinaryInputEvents => Self::SupportsBinaryInputEvents,
+        }
+    }
+}
+
+impl From<TimeAttr> for ffi::TimeAttr {
+    fn from(value: TimeAttr) -> Self {
+        match value {
+            TimeAttr::ConfigBuildDate => Self::ConfigBuildDate,
+            TimeAttr::ConfigLastChangeDate => Self::ConfigLastChangeDate,
+        }
     }
 }
 

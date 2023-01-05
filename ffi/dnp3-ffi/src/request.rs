@@ -1,6 +1,8 @@
+use dnp3::app::attr::*;
 use dnp3::app::{Timestamp, Variation};
 use dnp3::master::{Headers, ReadHeader, ReadRequest};
 use dnp3::outstation::FreezeInterval;
+use std::ffi::CStr;
 
 use crate::ffi;
 
@@ -15,11 +17,15 @@ impl Request {
         }
     }
 
-    fn add_read_header(&mut self, header: ReadHeader) {
+    pub(crate) fn add_read_header(&mut self, header: ReadHeader) {
         self.headers.push_read_header(header);
     }
 
-    fn add_time_and_interval(&mut self, time: Timestamp, interval: u32) {
+    pub(crate) fn add_attribute(&mut self, attr: OwnedAttribute) {
+        self.headers.push_attr(attr);
+    }
+
+    pub(crate) fn add_time_and_interval(&mut self, time: Timestamp, interval: u32) {
         self.headers
             .push_freeze_interval(FreezeInterval::new(time, interval));
     }
@@ -122,7 +128,7 @@ pub unsafe fn request_destroy(request: *mut Request) {
     }
 }
 
-pub unsafe fn request_add_one_byte_range_header(
+pub(crate) unsafe fn request_add_one_byte_range_header(
     request: *mut Request,
     variation: ffi::Variation,
     start: u8,
@@ -133,7 +139,51 @@ pub unsafe fn request_add_one_byte_range_header(
     }
 }
 
-pub unsafe fn request_add_two_byte_range_header(
+pub(crate) unsafe fn request_add_specific_attribute(
+    request: *mut crate::Request,
+    variation: u8,
+    set: u8,
+) {
+    if let Some(request) = request.as_mut() {
+        request.add_read_header(ReadHeader::one_byte_range(
+            Variation::Group0(variation),
+            set,
+            set,
+        ));
+    }
+}
+
+pub(crate) unsafe fn request_add_string_attribute(
+    request: *mut crate::Request,
+    variation: u8,
+    set: u8,
+    value: &CStr,
+) {
+    if let Some(request) = request.as_mut() {
+        request.add_attribute(OwnedAttribute::new(
+            AttrSet::new(set),
+            variation,
+            OwnedAttrValue::VisibleString(value.to_string_lossy().to_string()),
+        ))
+    }
+}
+
+pub(crate) unsafe fn request_add_uint_attribute(
+    request: *mut crate::Request,
+    variation: u8,
+    set: u8,
+    value: u32,
+) {
+    if let Some(request) = request.as_mut() {
+        request.add_attribute(OwnedAttribute::new(
+            AttrSet::new(set),
+            variation,
+            OwnedAttrValue::UnsignedInt(value),
+        ))
+    }
+}
+
+pub(crate) unsafe fn request_add_two_byte_range_header(
     request: *mut Request,
     variation: ffi::Variation,
     start: u16,
@@ -144,7 +194,10 @@ pub unsafe fn request_add_two_byte_range_header(
     }
 }
 
-pub unsafe fn request_add_all_objects_header(request: *mut Request, variation: ffi::Variation) {
+pub(crate) unsafe fn request_add_all_objects_header(
+    request: *mut Request,
+    variation: ffi::Variation,
+) {
     if let Some(request) = request.as_mut() {
         request.add_read_header(ReadHeader::all_objects(variation.into()));
     }
@@ -183,6 +236,8 @@ pub(crate) unsafe fn request_add_time_and_interval(
 impl From<ffi::Variation> for Variation {
     fn from(from: ffi::Variation) -> Variation {
         match from {
+            ffi::Variation::Group0 => Variation::Group0(0),
+            ffi::Variation::Group0Var254 => Variation::Group0Var254,
             ffi::Variation::Group1Var0 => Variation::Group1Var0,
             ffi::Variation::Group1Var1 => Variation::Group1Var1,
             ffi::Variation::Group1Var2 => Variation::Group1Var2,
@@ -325,6 +380,8 @@ impl From<ffi::Variation> for Variation {
 impl From<Variation> for ffi::Variation {
     fn from(from: Variation) -> ffi::Variation {
         match from {
+            Variation::Group0(_) => ffi::Variation::Group0,
+            Variation::Group0Var254 => ffi::Variation::Group0Var254,
             Variation::Group1Var0 => ffi::Variation::Group1Var0,
             Variation::Group1Var1 => ffi::Variation::Group1Var1,
             Variation::Group1Var2 => ffi::Variation::Group1Var2,

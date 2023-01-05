@@ -15,6 +15,7 @@ use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
 use crate::decode::AppDecodeLevel;
 
+use crate::app::attr::Attribute;
 use scursor::ReadCursor;
 
 pub(crate) fn format_count_of_items<T, V>(f: &mut Formatter, iter: T) -> std::fmt::Result
@@ -48,6 +49,16 @@ where
 {
     for x in iter {
         write!(f, "\nindex: {} {}", x.index, x.value)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn format_optional_attribute(
+    f: &mut Formatter,
+    attr: &Option<Attribute>,
+) -> std::fmt::Result {
+    if let Some(attr) = attr {
+        attr.format(f)?;
     }
     Ok(())
 }
@@ -619,6 +630,7 @@ impl QualifierCode {
 
 #[cfg(test)]
 mod test {
+    use crate::app::attr::{AttrParseError, AttrSet, AttrValue, Attribute};
     use crate::app::control::CommandStatus;
     use crate::app::header::{ControlField, Iin, Iin1, Iin2};
     use crate::app::measurement::DoubleBit;
@@ -1061,6 +1073,61 @@ mod test {
             &[0x6E, 0x00, 0x00, 0x01, 0x02],
             FunctionCode::Response,
             ObjectParseError::ZeroLengthOctetData,
+        );
+    }
+
+    #[test]
+    fn parses_specific_attribute_in_range() {
+        let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x07, 0x02, 0x01, 42];
+
+        let mut headers = ObjectParser::parse(FunctionCode::Response, &input)
+            .unwrap()
+            .iter();
+
+        let first = headers.next().unwrap();
+        assert!(headers.next().is_none());
+
+        assert_eq!(first.variation, Variation::Group0(0xCA));
+        let set = match first.details {
+            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(Some(set))) => set,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(
+            set,
+            Attribute {
+                set: AttrSet::Private(0x07),
+                variation: 0xCA,
+                value: AttrValue::UnsignedInt(42)
+            }
+        );
+    }
+
+    #[test]
+    fn parses_specific_attribute_in_read_request() {
+        let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x07];
+
+        let mut headers = ObjectParser::parse(FunctionCode::Read, &input)
+            .unwrap()
+            .iter();
+
+        let first = headers.next().unwrap();
+        assert!(headers.next().is_none());
+
+        assert_eq!(first.variation, Variation::Group0(0xCA));
+        assert!(std::matches!(
+            first.details,
+            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(None))
+        ));
+    }
+
+    #[test]
+    fn range_parsing_fails_for_specific_attribute_with_count_equal_two() {
+        let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x08, 0x02, 0x01, 42];
+        let err = ObjectParser::parse(FunctionCode::Response, &input).unwrap_err();
+        assert_eq!(
+            err,
+            ObjectParseError::BadAttribute(AttrParseError::CountNotOne(2))
         );
     }
 }

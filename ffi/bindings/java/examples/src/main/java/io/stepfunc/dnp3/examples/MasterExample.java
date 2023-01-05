@@ -227,6 +227,11 @@ class TestReadHandler implements ReadHandler {
             System.out.println();
           });
     }
+
+    @Override
+    public void handleStringAttr(HeaderInfo info, StringAttr attr, UByte set, UByte variation, String value) {
+      System.out.printf("String attribute: %s set: %d var: %d value: %s%n", attr, set.intValue(), variation.intValue(), value);
+    }
 }
 // ANCHOR_END: read_handler
 
@@ -497,8 +502,36 @@ public class MasterExample {
         Request request = new Request();
         request.addTimeAndInterval(ulong(0), uint(86400000));
         request.addAllObjectsHeader(Variation.GROUP20_VAR0);
-        channel.requestExpectEmptyResponse(association, FunctionCode.FREEZE_AT_TIME, request).toCompletableFuture().get();
-        System.out.println("Freeze-at-time success");
+        channel.sendAndExpectEmptyResponse(association, FunctionCode.FREEZE_AT_TIME, request).toCompletableFuture().get();
+        System.out.println("Freezer-at-time success");
+        break;
+      }
+      case "rda":
+      {
+        // ANCHOR: read_attributes
+        Request request = new Request();
+        request.addSpecificAttribute(AttributeVariations.ALL_ATTRIBUTES_REQUEST, ubyte(0));
+        channel.read(association, request).toCompletableFuture().get();
+        // ANCHOR_END: read_attributes
+        System.out.println("read device attributes success");
+        break;
+      }
+      case "wda":
+      {
+        // ANCHOR: write_attribute
+        Request request = new Request();
+        request.addStringAttribute(AttributeVariations.USER_ASSIGNED_LOCATION, ubyte(0), "Bend, OR");
+        channel.sendAndExpectEmptyResponse(association, FunctionCode.WRITE, request).toCompletableFuture().get();
+        // ANCHOR_END: write_attribute
+        System.out.println("write device attribute success");
+        break;
+      }
+      case "ral":
+      {
+        Request request = new Request();
+        request.addSpecificAttribute(AttributeVariations.LIST_OF_VARIATIONS, ubyte(0));
+        channel.read(association, request).toCompletableFuture().get();
+        System.out.println("read list of attribute variations success");
         break;
       }
       case "crt":

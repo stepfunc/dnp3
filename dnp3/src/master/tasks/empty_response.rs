@@ -31,7 +31,7 @@ impl EmptyResponseTask {
         self.function
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         self.headers.write(writer)
     }
 

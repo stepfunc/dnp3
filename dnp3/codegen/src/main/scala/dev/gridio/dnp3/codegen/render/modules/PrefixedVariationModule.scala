@@ -28,6 +28,9 @@ object PrefixedVariationModule extends Module {
 
     def definition(v : Variation) : Iterator[String] = {
       v match {
+        case SpecificAttribute => {
+          "Group0(crate::app::Attribute<'a>),".eol
+        }
         case _ : SizedByVariation =>{
           "Group111VarX(u8, PrefixedBytesSequence<'a, I>),".eol
         }
@@ -45,6 +48,9 @@ object PrefixedVariationModule extends Module {
   private def enumImpl(implicit indent: Indentation) : Iterator[String] = {
 
     def parseMatcher(v: Variation) : Iterator[String] = v match {
+      case SpecificAttribute => {
+        s"Variation::Group0(var) => Ok(PrefixedVariation::Group0(crate::app::Attribute::parse_prefixed::<I>(var, count, cursor)?)),".eol
+      }
       case Group111AnyVar => {
         "Variation::Group111(0) => Err(ObjectParseError::ZeroLengthOctetData),".eol ++
           "Variation::Group111(x) => Ok(PrefixedVariation::Group111VarX(x, PrefixedBytesSequence::parse(x, count, cursor)?)),".eol
@@ -54,6 +60,9 @@ object PrefixedVariationModule extends Module {
       }
     }
     def fmtMatcher(v: Variation): Iterator[String] = v match {
+      case SpecificAttribute => {
+        s"PrefixedVariation::${v.parent.name}(attr) => attr.format(f),".eol
+      }
       case _ : SizedByVariation => {
         s"PrefixedVariation::${v.parent.name}VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),".eol
       }
@@ -65,6 +74,9 @@ object PrefixedVariationModule extends Module {
     def infoMatcher(v: Variation) : Iterator[String] = {
       val isEvent = v.parent.groupType.isEvent;
       v match {
+        case SpecificAttribute => {
+          s"PrefixedVariation::Group0(attr) => HeaderInfo::new(Variation::Group0(attr.variation), I::COUNT_AND_PREFIX_QUALIFIER, false, false),".eol
+        }
         case _ : SizedByVariation =>  {
           s"PrefixedVariation::${v.parent.name}VarX(x, _) =>  HeaderInfo::new(Variation::${v.parent.name}(*x), I::COUNT_AND_PREFIX_QUALIFIER, ${isEvent}, ${v.hasFlags}),".eol
         }
@@ -96,9 +108,16 @@ object PrefixedVariationModule extends Module {
             "false // command".eol
           }
         }
+        case SpecificAttribute => {
+          bracket(s"PrefixedVariation::${v.parent.name}(attr) =>") {
+            "let info = self.get_header_info();".eol ++
+            "crate::master::handle_attribute(info.variation, info.qualifier, &Some(*attr), handler);".eol ++
+            "true".eol
+          }
+        }
         case _ if v.parent.groupType == GroupType.AnalogInputDeadband => {
           bracket(s"PrefixedVariation::${v.name}(_) =>") {
-            "false // deadband".eol
+            "false // dead-band".eol
           }
         }
         case Group111AnyVar => {
@@ -165,6 +184,7 @@ object PrefixedVariationModule extends Module {
       case v : SizedByVariation if v.parent == Group111 => v
       case v : FixedSize if v.parent.groupType == GroupType.AnalogInputDeadband => v
       case v : FixedSize if v.parent.groupType.isEvent || v.parent.groupType == GroupType.Command => v
+      case SpecificAttribute => SpecificAttribute
     }
   }
 

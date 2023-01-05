@@ -54,10 +54,10 @@ pub(crate) fn extract_measurements_inner(
             }
             // everything else
             HeaderDetails::OneByteStartStop(_, _, var) => {
-                var.extract_measurements_to(header.details.qualifier(), handler)
+                var.extract_measurements_to(header.variation, header.details.qualifier(), handler)
             }
             HeaderDetails::TwoByteStartStop(_, _, var) => {
-                var.extract_measurements_to(header.details.qualifier(), handler)
+                var.extract_measurements_to(header.variation, header.details.qualifier(), handler)
             }
             HeaderDetails::OneByteCountAndPrefix(_, var) => {
                 var.extract_measurements_to(cto, handler)
@@ -87,6 +87,7 @@ pub(crate) fn extract_measurements_inner(
 
 #[cfg(test)]
 mod test {
+    use crate::app::attr::*;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::*;
     use crate::master::handler::{HeaderInfo, ReadHandler};
@@ -101,11 +102,24 @@ mod test {
         )
     }
 
+    #[derive(Clone, Debug, PartialEq)]
+    enum Known {
+        String(StringAttr, String),
+        UInt(UIntAttr, u32),
+        Bool(BoolAttr, bool),
+        List(VariationListAttr, Vec<AttrItem>),
+        Float(FloatAttr, FloatType),
+        Octets(OctetStringAttr, Vec<u8>),
+        Time(TimeAttr, Timestamp),
+    }
+
     #[derive(Debug, PartialEq)]
     enum Header {
         Binary(Vec<(BinaryInput, u16)>),
         FrozenAnalog(Vec<(FrozenAnalogInput, u16)>),
         AnalogDeadBand(Vec<(AnalogInputDeadBand, u16)>),
+        KnownAttr(Known),
+        UnknownAttr(AttrSet, u8, String),
     }
 
     #[derive(Default)]
@@ -189,20 +203,20 @@ mod test {
             unimplemented!()
         }
 
-        fn handle_analog_input_dead_band(
-            &mut self,
-            _info: HeaderInfo,
-            iter: &mut dyn Iterator<Item = (AnalogInputDeadBand, u16)>,
-        ) {
-            self.received.push(Header::AnalogDeadBand(iter.collect()))
-        }
-
         fn handle_frozen_analog_input(
             &mut self,
             _info: HeaderInfo,
             x: &mut dyn Iterator<Item = (FrozenAnalogInput, u16)>,
         ) {
             self.received.push(Header::FrozenAnalog(x.collect()))
+        }
+
+        fn handle_analog_input_dead_band(
+            &mut self,
+            _info: HeaderInfo,
+            iter: &mut dyn Iterator<Item = (AnalogInputDeadBand, u16)>,
+        ) {
+            self.received.push(Header::AnalogDeadBand(iter.collect()))
         }
 
         fn handle_analog_output_status(
@@ -219,6 +233,32 @@ mod test {
             _x: &mut dyn Iterator<Item = (&'a [u8], u16)>,
         ) {
             unimplemented!()
+        }
+
+        fn handle_device_attribute(&mut self, _info: HeaderInfo, attr: AnyAttribute) {
+            match attr {
+                AnyAttribute::Other(x) => {
+                    let value = x.value.expect_vstr().unwrap();
+                    self.received
+                        .push(Header::UnknownAttr(x.set, x.variation, value.to_string()));
+                }
+                AnyAttribute::Known(x) => {
+                    let known = match x {
+                        KnownAttribute::AttributeList(x, items) => {
+                            Known::List(x, items.iter().collect())
+                        }
+                        KnownAttribute::String(x, v) => Known::String(x, v.to_string()),
+                        KnownAttribute::UInt(x, v) => Known::UInt(x, v),
+                        KnownAttribute::Bool(x, v) => Known::Bool(x, v),
+                        KnownAttribute::Float(x, v) => Known::Float(x, v),
+                        KnownAttribute::OctetString(x, v) => {
+                            Known::Octets(x, v.iter().copied().collect())
+                        }
+                        KnownAttribute::DNP3Time(x, v) => Known::Time(x, v),
+                    };
+                    self.received.push(Header::KnownAttr(known));
+                }
+            }
         }
     }
 
@@ -412,5 +452,32 @@ mod test {
 
         extract_measurements_inner(objects, &mut handler);
         assert_eq!(&handler.pop(), &[Header::FrozenAnalog(vec![expected])]);
+    }
+
+    #[test]
+    fn handles_device_attrs() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            FunctionCode::Response,
+            &[
+                // group 0 var 252 - default set == 0 - one byte count and prefix
+                0, 252, 0x17, 0x01, 0x00, 0x01, 0x04, b'A', b'C', b'M', b'E',
+                // group 0 var 217 - default set == 0 - one byte start/stop
+                0, 217, 0x00, 0x00, 0x00, 0x02, 0x02, 0xFE, 0xCA,
+                // group 0 var 42 - private set == 7 - one byte count and prefix
+                0, 42, 0x17, 0x01, 0x07, 0x01, 0x03, b'F', b'O', b'O',
+            ],
+        )
+        .unwrap();
+
+        extract_measurements_inner(objects, &mut handler);
+
+        let h1 = Header::KnownAttr(Known::String(
+            StringAttr::DeviceManufacturersName,
+            "ACME".to_string(),
+        ));
+        let h2 = Header::KnownAttr(Known::UInt(UIntAttr::LocalTimingAccuracy, 0xCAFE));
+        let h3 = Header::UnknownAttr(AttrSet::Private(7), 42, "FOO".to_string());
+        assert_eq!(&handler.pop(), &[h1, h2, h3]);
     }
 }

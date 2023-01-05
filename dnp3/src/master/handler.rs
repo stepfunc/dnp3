@@ -1,8 +1,10 @@
 use std::time::{Duration, SystemTime};
 
+use crate::app::attr::*;
 use crate::app::measurement::*;
 use crate::app::variations::Variation;
 use crate::app::*;
+
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
@@ -212,7 +214,7 @@ impl AssociationHandle {
     /// This is useful for constructing various types of WRITE and FREEZE operations where
     /// an empty response is expected from the outstation, and the only indication of success
     /// are bits in IIN.2
-    pub async fn request_expecting_empty_response(
+    pub async fn send_and_expect_empty_response(
         &mut self,
         function: FunctionCode,
         headers: Headers,
@@ -548,6 +550,33 @@ pub trait ReadHandler: Send + Sync {
         info: HeaderInfo,
         iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     ) {
+    }
+
+    /// Process a device attribute
+    #[allow(unused_variables)]
+    fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {}
+}
+
+pub(crate) fn handle_attribute(
+    var: Variation,
+    qualifier: QualifierCode,
+    attr: &Option<Attribute>,
+    handler: &mut dyn ReadHandler,
+) {
+    if let Some(attr) = attr {
+        match AnyAttribute::try_from(attr) {
+            Ok(attr) => {
+                handler
+                    .handle_device_attribute(HeaderInfo::new(var, qualifier, false, false), attr);
+            }
+            Err(err) => {
+                tracing::warn!(
+                    "Expected attribute type {:?} but received {:?}",
+                    err.expected,
+                    err.actual
+                );
+            }
+        }
     }
 }
 

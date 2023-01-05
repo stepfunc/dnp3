@@ -1,9 +1,14 @@
+pub(crate) mod attributes;
+pub(crate) mod read_handler;
+pub(crate) mod request;
+pub(crate) mod write_dead_band_request;
+
 use crate::shared::SharedDefinitions;
 use oo_bindgen::model::*;
 use std::time::Duration;
 
 pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<()> {
-    let read_handler = crate::handler::define(lib, shared)?;
+    let read_handler = read_handler::define(lib, shared)?;
 
     let endpoint_list = define_endpoint_list(lib)?;
 
@@ -23,7 +28,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .doc("A single value enum which is used as a placeholder for futures that don't return a value")?
         .build()?;
 
-    let write_dead_band_request = crate::write_dead_band_request::define(lib)?;
+    let write_dead_band_request = crate::master::write_dead_band_request::define(lib)?;
     let empty_response_callback = define_empty_response_callback(lib, nothing.clone())?;
 
     let master_channel_create_tcp_fn = lib
@@ -254,7 +259,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
 
     let association_information_interface = define_association_information(lib, shared)?;
 
-    let request_class = crate::request::define(lib, shared)?;
+    let request_class = crate::master::request::define(lib, shared)?;
 
     let add_association_method = lib
         .define_method("add_association", master_channel_class.clone())?
@@ -378,9 +383,9 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         ))?
         .build()?;
 
-    let request_expect_empty_response = lib
+    let send_and_expect_empty_response = lib
         .define_future_method(
-            "request_expect_empty_response",
+            "send_and_expect_empty_response",
             master_channel_class.clone(),
             empty_response_callback,
         )?
@@ -400,9 +405,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "Headers that will be contained in the request",
         )?
         .fails_with(shared.error_type.clone())?
-        .doc(doc(
-            "Send the specified request to the association using the supplied function and collection of request headers",
-        ))?
+        .doc(
+            doc("Send the specified request to the association using the supplied function and collection of request headers")
+                .details("This is useful for constructing various types of WRITE and FREEZE operations where an empty response is expected from the outstation, and the only indication of success are bits in IIN.2.")
+                .details("The request will fail if 1) The response contains object headers or 2) One of the error bits in IIN.2 is set.")
+        )?
         .build()?;
 
     let read_with_handler_async = lib
@@ -517,13 +524,13 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .async_method(cold_restart_async)?
         .async_method(warm_restart_async)?
         .async_method(write_dead_bands_async)?
-        .async_method(request_expect_empty_response)?
+        .async_method(send_and_expect_empty_response)?
         .async_method(check_link_status_async)?
         .custom_destroy("shutdown")?
         .doc(
             doc("Represents a communication channel for a master station")
-            .details("To communicate with a particular outstation, you need to add an association with {class:master_channel.add_association()}.")
-            .warning("The class methods that return a value (e.g. as {class:master_channel.add_association()}) cannot be called from within a callback.")
+                .details("To communicate with a particular outstation, you need to add an association with {class:master_channel.add_association()}.")
+                .warning("The class methods that return a value (e.g. as {class:master_channel.add_association()}) cannot be called from within a callback.")
         )?
         .build()?;
 
@@ -601,7 +608,7 @@ fn define_tls_client_config(
         )?
         .add(
             min_tls_version.clone(),
-             shared.min_tls_version.clone(),
+            shared.min_tls_version.clone(),
             "Minimum TLS version allowed",
         )?
         .add(certificate_mode.clone(), shared.certificate_mode.clone(), "Certificate validation mode")?
@@ -718,17 +725,17 @@ fn define_association_config(
         )?
         .add(
             "disable_unsol_classes",
-          event_classes.clone(),
+            event_classes.clone(),
             "Classes to disable unsolicited responses at startup",
         )?
         .add(
             "enable_unsol_classes",
-          event_classes.clone(),
+            event_classes.clone(),
             "Classes to enable unsolicited responses at startup",
         )?
         .add(
             "startup_integrity_classes",
-          classes,
+            classes,
             doc("Startup integrity classes to ask on master startup and when an outstation restart is detected.").details("For conformance, this should be Class 1230.")
         )?
         .add(
@@ -738,7 +745,7 @@ fn define_association_config(
         )?
         .add(
             &auto_tasks_retry_strategy,
-          shared.retry_strategy.clone(),
+            shared.retry_strategy.clone(),
             "Automatic tasks retry strategy",
         )?
         .add(&keep_alive_timeout,
@@ -750,12 +757,12 @@ fn define_association_config(
              doc("Automatic integrity scan when an EVENT_BUFFER_OVERFLOW is detected")
         )?
         .add("event_scan_on_events_available",
-           event_classes,
+             event_classes,
              doc("Classes to automatically send reads when the IIN bit is asserted")
         )?
         .add(&max_queued_user_requests,
-            Primitive::U16,
-            doc("maximum number of user requests (e.g. commands, adhoc reads, etc) that will be queued before back-pressure is applied by failing requests")
+             Primitive::U16,
+             doc("maximum number of user requests (e.g. commands, adhoc reads, etc) that will be queued before back-pressure is applied by failing requests")
         )?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize the configuration with the specified values")?
@@ -894,18 +901,18 @@ fn define_association_handler(lib: &mut LibraryBuilder) -> BackTraced<Asynchrono
         "association_handler",
         "Callbacks for a particular outstation association",
     )?
-    .begin_callback(
-        "get_current_time",
-        doc("Returns the current time or an invalid time if none is available")
-            .details("This callback is used when the master performs time synchronization for a particular outstation.")
-            .details("This could return the system clock or some other clock's time"),
-    )?
-    .returns(
-        timestamp_utc,
-        "The current time",
-    )?
-    .end_callback()?
-    .build_async()?;
+        .begin_callback(
+            "get_current_time",
+            doc("Returns the current time or an invalid time if none is available")
+                .details("This callback is used when the master performs time synchronization for a particular outstation.")
+                .details("This could return the system clock or some other clock's time"),
+        )?
+        .returns(
+            timestamp_utc,
+            "The current time",
+        )?
+        .end_callback()?
+        .build_async()?;
 
     Ok(timestamp_utc)
 }
@@ -1104,6 +1111,7 @@ const TASK_ERRORS: &[(&str, &str)] = &[
     ("no_connection", "no connection"),
     ("shutdown", "master was shutdown"),
     ("association_removed", "association was removed mid-task"),
+    ("bad_encoding", "request data could not be encoded"),
 ];
 
 trait TaskErrors: Sized {

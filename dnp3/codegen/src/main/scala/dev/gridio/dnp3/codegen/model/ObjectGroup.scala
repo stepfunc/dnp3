@@ -7,6 +7,7 @@ object ObjectGroup {
   def allVariations : List[Variation] = all.flatMap(g => g.variations)
 
   val all: List[ObjectGroup] = List(
+    Group0,
     Group1,
     Group2,
     Group3,
@@ -91,6 +92,8 @@ object GroupType {
   object FileControl extends GroupType
   object InternalIndications extends GroupType
   object VirtualTerminalOutput extends GroupType
+
+  object DeviceAttributes extends GroupType
 }
 
 trait ObjectGroup {

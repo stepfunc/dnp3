@@ -14,6 +14,8 @@ pub fn define(
 
     let iin = declare_iin_struct(lib)?;
 
+    let attr = crate::master::attributes::define(lib)?;
+
     let response_header = lib.declare_callback_argument_struct("response_header")?;
     let response_header = lib
         .define_callback_argument_struct(response_header)?
@@ -192,10 +194,233 @@ pub fn define(
         .begin_callback("handle_octet_string", "Handle octet string data")?
         .param(
             "info",
-            header_info,
+            header_info.clone(),
             "Group/variation and qualifier information",
         )?
         .param("values", shared_def.octet_string_it.clone(), iterator_doc)?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        // group 0 callbacks
+        .begin_callback("handle_string_attr", "Handle a known or unknown visible string device attribute")?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.string_attr,
+            "Enumeration describing the attribute (possibly unknown) associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", StringType, "attribute value")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_variation_list_attr", "Handle a known or unknown list of attribute variations")?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.variation_list_attr,
+            "Enumeration describing the attribute (possibly unknown) associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", attr.attr_item_iter, "Iterator over a list of variation / properties pairs")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_uint_attr", "Handle an unsigned integer device attribute")?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.uint_attr,
+            "Enumeration describing the attribute (possibly unknown) associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", Primitive::U32, "attribute value")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_bool_attr",
+                        doc("Handle a boolean device attribute")
+                            .details("These are actually signed integer values on the wire. This method is only called for known values")
+        )?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.bool_attr,
+            "Enumeration describing the attribute associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", Primitive::Bool, "attribute value")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_int_attr",
+                        doc("Handle a signed integer device attribute")
+                            .details("There are no defined attributes for this type that aren't mapped to booleans so there is no enumeration")
+        )?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.int_attr,
+            "Enumeration describing the attribute associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", Primitive::S32, "attribute value")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_time_attr", "Handle a DNP3 time device attribute")?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.time_attr,
+            "Enumeration describing the attribute associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", Primitive::U64, "48-bit timestamp representing milliseconds since Unix epoch")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_float_attr", "Handle a floating point device attribute")?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.float_attr,
+            "Enumeration describing the attribute associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", Primitive::Double, "Attribute value")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_octet_string_attr", "Handle an octet string device attribute")?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.octet_string_attr,
+            "Enumeration describing the attribute associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", shared_def.byte_it.clone(), "Iterator over bytes in the octet-string")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        .begin_callback("handle_bit_string_attr", "Handle a bit string device attribute")?
+        .param(
+            "info",
+            header_info,
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "attr",
+            attr.bit_string_attr,
+            "Enumeration describing the attribute associated with the value"
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param(
+            "variation",
+            Primitive::U8,
+            "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
+        )?
+        .param("value", shared_def.byte_it.clone(), "Iterator over bytes in the bit-string")?
         .returns_nothing_by_default()?
         .end_callback()?
         .build_async()?;

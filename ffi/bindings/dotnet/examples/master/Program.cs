@@ -157,6 +157,54 @@ class MainClass
                 Console.WriteLine();
             }
         }
+        
+        void IReadHandler.HandleStringAttr(HeaderInfo info, StringAttr attr, byte set, byte var, string value)
+        {
+            Console.WriteLine($"Visible string attribute: {attr} set: {set} variation: {var} value: {value}");
+        }
+
+        void IReadHandler.HandleUintAttr(HeaderInfo info, UintAttr attr, byte set, byte var, uint value)
+        {
+            Console.WriteLine($"Unsigned integer attribute: {attr} set: {set} variation: {var} value: {value}");
+        }
+
+        void IReadHandler.HandleBoolAttr(HeaderInfo info, BoolAttr attr, byte set, byte var, bool value)
+        {
+            Console.WriteLine($"Boolean attribute: {attr} set: {set} variation: {var} value: {value}");
+        }
+
+        void IReadHandler.HandleIntAttr(HeaderInfo info, IntAttr attr, byte set, byte var, int value)
+        {
+            Console.WriteLine($"Int attribute: {attr} set: {set} variation: {var} value: {value}");
+        }
+
+        void IReadHandler.HandleTimeAttr(HeaderInfo info, TimeAttr attr, byte set, byte var, ulong value)
+        {
+            Console.WriteLine($"Time attribute: {attr} set: {set} variation: {var} value: {value}");
+        }
+
+        void IReadHandler.HandleFloatAttr(HeaderInfo info, FloatAttr attr, byte set, byte var, double value)
+        {
+            Console.WriteLine($"Float attribute: {attr} set: {set} variation: {var} value: {value}");
+        }
+
+        void IReadHandler.HandleVariationListAttr(HeaderInfo info, VariationListAttr attr, byte set, byte var, ICollection<AttrItem> value)
+        {
+            Console.WriteLine($"Attribute variation list: {attr} set: {set} variation: {var}");
+            foreach(var item in value) {
+                Console.WriteLine($"variation: {item.Variation} writable: {item.Properties.IsWritable}");
+            }
+        }
+
+        void IReadHandler.HandleOctetStringAttr(HeaderInfo info, OctetStringAttr attr, byte set, byte var, ICollection<byte> value)
+        {
+            Console.WriteLine($"Octet-string attribute: {attr} set: {set} variation: {var} length: {value.Count}");            
+        }
+
+        void IReadHandler.HandleBitStringAttr(HeaderInfo info, BitStringAttr attr, byte set, byte var, ICollection<byte> value)
+        {
+            Console.WriteLine($"Bit-string attribute: {attr} set: {set} variation: {var} length: {value.Count}");
+        }
     }
     // ANCHOR_END: read_handler
 
@@ -478,8 +526,33 @@ class MainClass
                     var request = new Request();                    
                     request.AddTimeAndInterval(0, 86400000);
                     request.AddAllObjectsHeader(Variation.Group20Var0);
-                    await channel.RequestExpectEmptyResponse(association, FunctionCode.FreezeAtTime, request);
+                    await channel.SendAndExpectEmptyResponse(association, FunctionCode.FreezeAtTime, request);
                     Console.WriteLine($"Freeze-at-time success");
+                    return true;
+                }
+            case "rda":
+                {
+                    // ANCHOR: read_attributes
+                    var request = new Request();
+                    request.AddSpecificAttribute(AttributeVariations.AllAttributesRequest, 0);
+                    await channel.Read(association, request);
+                    // ANCHOR_END: read_attributes
+                    return true;
+                }
+            case "wda":
+                {
+                    // ANCHOR: write_attribute
+                    var request = new Request();
+                    request.AddStringAttribute(AttributeVariations.UserAssignedLocation, 0, "Bend, OR");
+                    await channel.SendAndExpectEmptyResponse(association, FunctionCode.Write, request);
+                    return true;
+                    // ANCHOR_END: write_attribute
+                }
+            case "ral":
+                {
+                    var request = new Request();
+                    request.AddSpecificAttribute(AttributeVariations.ListOfVariations, 0);
+                    await channel.Read(association, request);
                     return true;
                 }
             case "crt":

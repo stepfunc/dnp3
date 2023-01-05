@@ -424,7 +424,7 @@ pub(crate) unsafe fn master_channel_write_dead_bands(
     Ok(())
 }
 
-pub(crate) unsafe fn master_channel_request_expect_empty_response(
+pub(crate) unsafe fn master_channel_send_and_expect_empty_response(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     function: ffi::FunctionCode,
@@ -441,7 +441,7 @@ pub(crate) unsafe fn master_channel_request_expect_empty_response(
 
     let task = async move {
         match handle
-            .request_expecting_empty_response(function, headers)
+            .send_and_expect_empty_response(function, headers)
             .await
         {
             Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
@@ -896,6 +896,7 @@ macro_rules! define_task_from_impl {
                     TaskError::NoConnection => ffi::$name::NoConnection,
                     TaskError::Shutdown => ffi::$name::Shutdown,
                     TaskError::Disabled => ffi::$name::NoConnection,
+                    TaskError::BadEncoding(_) => ffi::$name::BadEncoding,
                 }
             }
         }

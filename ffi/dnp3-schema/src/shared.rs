@@ -33,6 +33,7 @@ pub struct SharedDefinitions {
     pub analog_output_status_it: AbstractIteratorHandle,
     pub octet_string: FunctionReturnStructHandle,
     pub octet_string_it: AbstractIteratorHandle,
+    pub byte_it: AbstractIteratorHandle,
     pub min_tls_version: EnumHandle,
     pub certificate_mode: EnumHandle,
 }
@@ -167,7 +168,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
     let g12v1_struct = lib.declare_universal_struct(gv(12, 1))?;
     let g12v1_struct = lib
         .define_universal_struct(g12v1_struct)?
-        .add(&code_field, control_code, "Control code")?
+        .add(code_field, control_code, "Control code")?
         .add(&count_field, Primitive::U8, "Count")?
         .add(
             &on_time_field,
@@ -262,7 +263,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         &timestamp_struct,
     )?;
 
-    let (octet_string, octet_string_it) = build_octet_string(lib)?;
+    let (octet_string, octet_string_it, byte_it) = build_octet_string(lib)?;
 
     let connect_options = define_connect_options(lib, error_type.clone())?;
 
@@ -299,6 +300,7 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         analog_output_status_it,
         octet_string,
         octet_string_it,
+        byte_it,
     })
 }
 
@@ -662,14 +664,21 @@ fn build_iterator<T: Into<UniversalStructField>>(
 
 fn build_octet_string(
     lib: &mut LibraryBuilder,
-) -> Result<(FunctionReturnStructHandle, AbstractIteratorHandle), BindingError> {
+) -> Result<
+    (
+        FunctionReturnStructHandle,
+        AbstractIteratorHandle,
+        AbstractIteratorHandle,
+    ),
+    BindingError,
+> {
     let byte_it = lib.define_iterator_with_lifetime("byte_iterator", Primitive::U8)?;
 
     let octet_string_struct_decl = lib.declare_function_return_struct("octet_string")?;
     let octet_string_struct = lib
         .define_function_return_struct(octet_string_struct_decl)?
         .add("index", Primitive::U16, "Point index")?
-        .add("value", byte_it, "Point value")?
+        .add("value", byte_it.clone(), "Point value")?
         .doc("Octet String point")?
         .end_fields()?
         .build()?;
@@ -677,5 +686,5 @@ fn build_octet_string(
     let octet_string_iterator =
         lib.define_iterator_with_lifetime("octet_string_iterator", octet_string_struct.clone())?;
 
-    Ok((octet_string_struct, octet_string_iterator))
+    Ok((octet_string_struct, octet_string_iterator, byte_it))
 }

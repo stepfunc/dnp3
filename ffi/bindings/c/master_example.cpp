@@ -108,6 +108,13 @@ class ReadHandler : public dnp3::ReadHandler {
             std::cout << "]" << std::endl;
         }
     }
+
+    virtual void handle_string_attr(const dnp3::HeaderInfo &info, dnp3::StringAttr attr, uint8_t set, uint8_t variation, const char *value) { 
+        std::cout << std::dec << "String Attribute: " << dnp3::to_string(attr) << " set: " << (size_t)set << " var: " << (size_t)variation
+                  << " value: " << value
+                  << std::endl;
+        
+    }
 };
 // ANCHOR_END: read_handler
 
@@ -314,7 +321,26 @@ void run_channel(dnp3::MasterChannel &channel)
             dnp3::Request request;
             request.add_time_and_interval(0xFF0000000000, 86400000);
             request.add_all_objects_header(dnp3::Variation::group20_var0);
-            channel.request_expect_empty_response(assoc, dnp3::FunctionCode::freeze_at_time, request, std::make_unique<GenericCallback>("freeze-at-time"));
+            channel.send_and_expect_empty_response(assoc, dnp3::FunctionCode::freeze_at_time, request, std::make_unique<GenericCallback>("freeze-at-time"));
+        }
+        else if (cmd == "rda") {
+            // ANCHOR: read_attributes
+            dnp3::Request request;
+            request.add_specific_attribute(dnp3::attribute_variations::all_attributes_request, 0);
+            channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
+            // ANCHOR_END: read_attributes
+        }
+        else if (cmd == "wda") {
+            // ANCHOR: write_attribute
+            dnp3::Request request;
+            request.add_string_attribute(dnp3::attribute_variations::user_assigned_location, 0, "Bend, OR");
+            channel.send_and_expect_empty_response(assoc, dnp3::FunctionCode::write, request, std::make_unique<GenericCallback>("write-device-attribute"));
+            // ANCHOR_END: write_attribute
+        }
+        else if (cmd == "ral") {
+            dnp3::Request request;
+            request.add_specific_attribute(dnp3::attribute_variations::list_of_variations, 0);
+            channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
         }
         else if (cmd == "crt") {
             channel.cold_restart(assoc, std::make_unique<RestartTaskCallback>());

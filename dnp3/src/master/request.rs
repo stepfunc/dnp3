@@ -1,3 +1,4 @@
+use crate::app::attr::{AttrSet, OwnedAttribute};
 use std::ops::BitAnd;
 
 use crate::app::control::CommandStatus;
@@ -9,7 +10,9 @@ use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::*;
 use crate::app::Timestamp;
+use crate::app::Variation::Group0;
 use crate::master::error::CommandResponseError;
+use crate::master::TaskError;
 use crate::outstation::FreezeInterval;
 
 /// Controls how a command request is issued
@@ -414,23 +417,28 @@ pub struct Headers {
     headers: Vec<Header>,
 }
 
-impl Headers {}
-
 #[derive(Clone, Debug)]
 enum Header {
     Read(ReadHeader),
     TimeAndInterval(FreezeInterval),
+    Attribute(OwnedAttribute),
 }
 
 impl Header {
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         match self {
-            Header::Read(x) => x.format(writer),
+            Header::Read(x) => {
+                x.format(writer)?;
+            }
             Header::TimeAndInterval(x) => {
                 let g50v2: Group50Var2 = <FreezeInterval as Into<Group50Var2>>::into(*x);
-                writer.write_count_of_one(g50v2)
+                writer.write_count_of_one(g50v2)?;
+            }
+            Header::Attribute(x) => {
+                writer.write_attribute(x)?;
             }
         }
+        Ok(())
     }
 
     #[cfg(feature = "ffi")]
@@ -438,6 +446,7 @@ impl Header {
         match self {
             Header::Read(x) => Some(*x),
             Header::TimeAndInterval(_) => None,
+            Header::Attribute(_) => None,
         }
     }
 }
@@ -469,6 +478,12 @@ impl Headers {
     #[cfg(feature = "ffi")]
     pub fn push_freeze_interval(&mut self, interval: FreezeInterval) {
         self.headers.push(Header::TimeAndInterval(interval));
+    }
+
+    /// Add an attribute header to the collection
+    #[cfg(feature = "ffi")]
+    pub fn push_attr(&mut self, attr: OwnedAttribute) {
+        self.headers.push(Header::Attribute(attr));
     }
 
     /// Add an all objects header (0x06) with the specified variation
@@ -513,7 +528,12 @@ impl Headers {
         self.add(Header::TimeAndInterval(interval))
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    /// Add an attribute header that will be encoded using 0x00 - one byte start/stop
+    pub fn add_attribute(self, attr: OwnedAttribute) -> Self {
+        self.add(Header::Attribute(attr))
+    }
+
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         for header in self.headers.iter() {
             header.format(writer)?;
         }
@@ -546,6 +566,11 @@ impl ReadRequest {
     /// construct a `ReadRequest` consisting of a single one-byte range
     pub fn one_byte_range(variation: Variation, start: u8, stop: u8) -> Self {
         Self::SingleHeader(ReadHeader::one_byte_range(variation, start, stop))
+    }
+
+    /// construct a `ReadRequest` consisting of a single one-byte range specifying a specific device attribute
+    pub fn device_attribute<T: Into<u8>>(variation: T, set: AttrSet) -> Self {
+        Self::one_byte_range(Group0(variation.into()), set.value(), set.value())
     }
 
     /// construct a `ReadRequest` consisting of a single two-byte range

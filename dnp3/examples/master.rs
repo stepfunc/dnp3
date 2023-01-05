@@ -3,6 +3,7 @@ use std::time::Duration;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
+use dnp3::app::attr::*;
 use dnp3::app::control::*;
 use dnp3::app::measurement::*;
 use dnp3::app::*;
@@ -173,6 +174,10 @@ impl ReadHandler for ExampleReadHandler {
             println!("Octet String {}: Value={:X?}", idx, x);
         }
     }
+
+    fn handle_device_attribute(&mut self, _info: HeaderInfo, attr: AnyAttribute) {
+        println!("Device attribute: {:?}", attr)
+    }
 }
 // ANCHOR_END: read_handler
 
@@ -329,12 +334,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .add_all_objects(Variation::Group20Var0);
 
                 if let Err(err) = association
-                    .request_expecting_empty_response(FunctionCode::FreezeAtTime, headers)
+                    .send_and_expect_empty_response(FunctionCode::FreezeAtTime, headers)
                     .await
                 {
                     tracing::warn!("error: {}", err);
                 }
                 // ANCHOR_END: freeze_at_time
+            }
+            "rda" => {
+                // ANCHOR: read_attributes
+                let result = association
+                    .read(ReadRequest::device_attribute(
+                        AllAttributes,
+                        AttrSet::Default,
+                    ))
+                    .await;
+
+                if let Err(err) = result {
+                    tracing::warn!("error: reading device attributes {}", err);
+                }
+                // ANCHOR_END: read_attributes
+            }
+            "wda" => {
+                // ANCHOR: write_attribute
+                let headers = Headers::default()
+                    .add_attribute(StringAttr::UserAssignedLocation.with_value("Bend, OR"));
+
+                let result = association
+                    .send_and_expect_empty_response(FunctionCode::Write, headers)
+                    .await;
+
+                if let Err(err) = result {
+                    tracing::warn!("error writing device attribute: {}", err);
+                }
+                // ANCHOR_END: write_attribute
+            }
+            "ral" => {
+                let result = association
+                    .read(ReadRequest::device_attribute(
+                        VariationListAttr::ListOfVariations,
+                        AttrSet::Default,
+                    ))
+                    .await;
+
+                if let Err(err) = result {
+                    tracing::warn!("error reading device attributes: {}", err);
+                }
             }
             "crt" => {
                 let result = association.cold_restart().await;

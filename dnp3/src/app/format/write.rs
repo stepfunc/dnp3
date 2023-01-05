@@ -1,3 +1,4 @@
+use crate::app::attr::{AttrWriteError, OwnedAttribute};
 use crate::app::header::{ControlField, RequestHeader};
 #[cfg(test)]
 use crate::app::header::{Iin, ResponseFunction, ResponseHeader};
@@ -131,6 +132,17 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         QualifierCode::Count8.write(self.cursor)?;
         self.cursor.write_u8(1)?;
         item.write(self.cursor)?;
+        Ok(())
+    }
+
+    pub(crate) fn write_attribute(&mut self, attr: &OwnedAttribute) -> Result<(), AttrWriteError> {
+        let variation = Variation::Group0(attr.variation);
+        variation.write(self.cursor)?;
+        QualifierCode::Range8.write(self.cursor)?;
+        let start_stop: u8 = attr.set.value();
+        self.cursor.write_u8(start_stop)?;
+        self.cursor.write_u8(start_stop)?;
+        attr.value.write(self.cursor)?;
         Ok(())
     }
 

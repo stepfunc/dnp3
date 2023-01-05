@@ -123,6 +123,51 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "Destroy a request created with {class:request.[constructor]} or {class:request.class_request()}."
         )?;
 
+    let add_specific_attribute_fn = lib
+        .define_method("add_specific_attribute", request.clone())?
+        .param(
+            "variation",
+            Primitive::U8,
+            "Variation of the device attribute",
+        )?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set (point) to which the attribute belongs",
+        )?
+        .doc(doc(
+            "Add a one-byte start/stop header for use with a READ request",
+        ))?
+        .build()?;
+
+    let add_string_attribute_fn = lib
+        .define_method("add_string_attribute", request.clone())?
+        .param("variation", Primitive::U8, "Variation of the attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set (point) to which the attribute belongs",
+        )?
+        .param("value", StringType, "Value of the attribute")?
+        .doc(doc(
+            "Add a one-byte start/stop header containing for use with a WRITE request",
+        ))?
+        .build()?;
+
+    let add_uint_attribute_fn = lib
+        .define_method("add_uint_attribute", request.clone())?
+        .param("variation", Primitive::U8, "Variation of the attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set (point) to which the attribute belongs",
+        )?
+        .param("value", Primitive::U32, "Value of the attribute")?
+        .doc(doc(
+            "Add a one-byte start/stop header containing for use with a WRITE request",
+        ))?
+        .build()?;
+
     let add_one_byte_range_header = lib
         .define_method("add_one_byte_range_header", request.clone())?
         .param(
@@ -132,7 +177,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .param("start", Primitive::U8, "Start index to ask")?
         .param("stop", Primitive::U8, "Stop index to ask (inclusive)")?
-        .doc("Add a one-byte start/stop variation interrogation")?
+        .doc("Add a one-byte start/stop header for use with a READ request")?
         .build()?;
 
     let add_two_byte_range_header = lib
@@ -144,7 +189,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         )?
         .param("start", Primitive::U16, "Start index to ask")?
         .param("stop", Primitive::U16, "Stop index to ask (inclusive)")?
-        .doc("Add a two-byte start/stop variation interrogation")?
+        .doc("Add a two-byte start/stop header for use with a READ request")?
         .build()?;
 
     let add_all_objects_header = lib
@@ -154,7 +199,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             shared.variation_enum.clone(),
             "Variation to ask for",
         )?
-        .doc("Add an all objects variation interrogation")?
+        .doc("Add an all objects variation request")?
         .build()?;
 
     let add_one_byte_limited_count_header = lib
@@ -165,7 +210,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "Variation to ask for",
         )?
         .param("count", Primitive::U8, "Maximum number of events")?
-        .doc("Add a one-byte limited count variation interrogation")?
+        .doc("Add a one-byte limited count variation header for use with a READ request")?
         .build()?;
 
     let add_two_byte_limited_count_header = lib
@@ -176,7 +221,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "Variation to ask for",
         )?
         .param("count", Primitive::U16, "Maximum number of events")?
-        .doc("Add a two-byte limited count variation interrogation")?
+        .doc("Add a two-byte limited count variation header for use with a READ request")?
         .build()?;
 
     let add_time_and_interval = lib
@@ -213,6 +258,9 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .method(add_one_byte_limited_count_header)?
         .method(add_two_byte_limited_count_header)?
         .method(add_time_and_interval)?
+        .method(add_specific_attribute_fn)?
+        .method(add_string_attribute_fn)?
+        .method(add_uint_attribute_fn)?
         .doc(
             doc("Custom request")
             .details("Whenever a method takes a request as a parameter, the request is internally copied. Therefore, it is possible to reuse the same requests over and over.")

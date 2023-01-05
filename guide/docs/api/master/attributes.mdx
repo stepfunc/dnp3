@@ -1,0 +1,120 @@
+---
+id: attributes
+title: Device Attributes
+sidebar_label: Device Attributes
+slug: /api/master/attributes
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+The master API can be used to `READ` and `WRITE` objects from Group 0. Attribute values, including attribute lists (g0v255s),
+are passed to the [ReadHandler](read_handler) when they are received from the outstation.
+
+## Reading Attributes
+
+A request to read attributes use the `READ` function code combined with one or more object headers. Each header consists
+of a group 0 variation using the 8-bit start/stop qualifier code (0x00). The point index in the request corresponds to
+the "set" to which the device attribute belongs.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master.rs:read_attributes}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:read_attributes}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/master_example.cpp:read_attributes}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:read_attributes}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:read_attributes}}
+```
+
+</TabItem>
+</Tabs>
+
+## Writing Attributes
+
+Attributes can be written one at a time or in batches by constructing a request header send it the outstation. The Rust
+API uses a single method to add an attribute to the header, whereas the bindings use a separate method for each type of
+attribute.
+
+The example below demonstrates how to write g0v245 (User-assigned location) to the outstation which is a visible string.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master.rs:write_attribute}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:write_attribute}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/master_example.cpp:write_attribute}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:write_attribute}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:write_attribute}}
+```
+
+</TabItem>
+</Tabs>

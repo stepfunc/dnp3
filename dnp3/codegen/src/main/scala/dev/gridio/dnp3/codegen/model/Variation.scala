@@ -1,13 +1,27 @@
 package dev.gridio.dnp3.codegen.model
 
 object Variation {
-  case class Id(group: Byte, variation: Byte)
+
+  case class Value(value: Short) {
+    if (value < 0 || value > 255) {
+      throw new Exception(String.format("Invalid variation value: %s", value))
+    }
+
+    override def toString: java.lang.String =  {
+      this.value.toString
+    }
+  }
+
+  case class Id(group: Byte, variation: Variation.Value)
 }
+
+
 
 /**
  * Base trait for DNP3 objects
  */
 trait Variation {
+
 
   import Variation.Id
 
@@ -19,7 +33,7 @@ trait Variation {
 
   final def fullDesc: String = s"${parent.desc} - ${desc}"
 
-  def variation: Byte
+  def variation: Variation.Value
 
   def parent: ObjectGroup
 
@@ -33,50 +47,24 @@ trait Variation {
   }
 }
 
-class AnyVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g, v, "Any Variation")
+class AnyVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g, Variation.Value(v), "Any Variation")
 
-class ClassData(g: ObjectGroup, v: Byte, desc: String) extends BasicGroupVariation(g, v, desc)
+class ClassData(g: ObjectGroup, v: Byte, desc: String) extends BasicGroupVariation(g,  Variation.Value(v), desc)
 
-class SizedByVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g, v, "Sized by variation")
+class SizedByVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g,  Variation.Value(v), "Sized by variation")
 
-abstract class DefaultVariableSize(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g, v, description)
+class SingleBitField(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g,  Variation.Value(v), description)
 
-class SingleBitField(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g, v, description)
+class DoubleBitField(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g,  Variation.Value(v), description)
 
-class DoubleBitField(g: ObjectGroup, v: Byte, description: String) extends BasicGroupVariation(g, v, description)
-
-sealed abstract class BasicGroupVariation(g: ObjectGroup, v: Byte, description: String) extends Variation {
-  def variation: Byte = v
+abstract class BasicGroupVariation(g: ObjectGroup, v: Variation.Value, description: String) extends Variation {
+  def variation: Variation.Value = v
 
   def parent: ObjectGroup = g
 
   def desc: String = description
 }
-
-class AuthVariableSize(g: ObjectGroup,
-                       v: Byte,
-                       description: String,
-                       val fixedFields: List[FixedSizeField],
-                       val lengthFields: List[VariableField],
-                       val remainder: Option[VariableField]) extends BasicGroupVariation(g, v, description) {
-
-  /// The total minimum size for the aggregate object
-  def minimumSize: Int = {
-
-    def fixedSize = fixedFields.map(x => x.typ.numBytes).sum
-
-    def variableSize = 2 * lengthFields.length
-
-    fixedSize + variableSize
-  }
-
-}
-
-class RemainderOnly(g: ObjectGroup, v: Byte, description: String, remainder: VariableField) extends AuthVariableSize(g, v, description, Nil, Nil, Some(remainder)) {
-  def remainderValue: VariableField = remainder
-}
-
-class FixedSize(g: ObjectGroup, v: Byte, description: String)(fs: FixedSizeField*) extends BasicGroupVariation(g, v, description) {
+class FixedSize(g: ObjectGroup, v: Byte, description: String)(fs: FixedSizeField*) extends BasicGroupVariation(g,  Variation.Value(v), description) {
 
   def hasFloatingPoint: Boolean = {
     fields.exists(f => f.isFloatingPoint)
