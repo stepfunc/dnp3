@@ -7,7 +7,7 @@ use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
 /// Set to which a device attribute belongs
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AttrSet {
     /// The default attribute set defined by DNP3.org
     Default,

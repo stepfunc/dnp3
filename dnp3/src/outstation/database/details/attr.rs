@@ -19,19 +19,21 @@ impl Variation {
     }
 }
 
+type VarMap = BTreeMap<Variation, (AttrProp, OwnedAttribute)>;
+
 /// represents a set of attributes, e.g. the default set (0)
 #[derive(Default)]
 pub(crate) struct SetMap {
-    /// Determines if this is the default set or not
-    set: AttrSet,
-    inner: BTreeMap<Variation, (AttrProp, OwnedAttribute)>,
+    sets: BTreeMap<AttrSet, VarMap>,
 }
 
 /// Errors that can occur when manipulating attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum AttrError {
-    /// An attribute has not been defined for this variation
-    NotDefined,
+    /// An attribute with this value has not been defined for this variation
+    AttrNotDefined(u8),
+    /// No set with this value has been defined
+    SetNotDefined(AttrSet),
     /// The attribute is already defined
     AlreadyDefined,
     /// The attribute does not match the type expected for set 0
@@ -49,6 +51,13 @@ impl From<TypeError> for AttrError {
 }
 
 impl SetMap {
+    fn get_set(&mut self, set: AttrSet) -> Result<&mut VarMap, AttrError> {
+        match self.sets.get_mut(&set) {
+            None => Err(AttrError::SetNotDefined(set)),
+            Some(set) => Ok(set),
+        }
+    }
+
     fn validate_properties(prop: AttrProp, attr: &OwnedAttribute) -> Result<(), AttrError> {
         if !prop.is_writable() {
             return Ok(());
@@ -88,10 +97,19 @@ impl SetMap {
         let _ = AnyAttribute::try_from(&attr.view())?;
         // this validates writable properties in the default set
         Self::validate_properties(prop, &attr)?;
-        match self.inner.entry(key) {
-            Entry::Occupied(_) => Err(AttrError::AlreadyDefined),
-            Entry::Vacant(x) => {
-                x.insert((prop, attr));
+        // lookup or create the set
+        match self.sets.entry(attr.set) {
+            Entry::Occupied(mut e) => match e.get_mut().entry(key) {
+                Entry::Occupied(_) => Err(AttrError::AlreadyDefined),
+                Entry::Vacant(x) => {
+                    x.insert((prop, attr));
+                    Ok(())
+                }
+            },
+            Entry::Vacant(e) => {
+                let mut new_set = BTreeMap::new();
+                new_set.insert(key, (prop, attr));
+                e.insert(new_set);
                 Ok(())
             }
         }
@@ -100,8 +118,9 @@ impl SetMap {
     /// Write an attribute in the map
     pub(crate) fn write(&mut self, attr: Attribute) -> Result<(), AttrError> {
         let key = Variation::create(attr.variation)?;
-        match self.inner.get_mut(&key) {
-            None => Err(AttrError::NotDefined),
+
+        match self.get_set(attr.set)?.get_mut(&key) {
+            None => Err(AttrError::AttrNotDefined(key.value)),
             Some((prop, current)) => {
                 if prop.is_writable() {
                     match attr.to_owned() {
@@ -119,23 +138,23 @@ impl SetMap {
     }
 
     /// Retrieve an attribute in the map
-    pub(crate) fn get(&mut self, var: u8) -> Result<&OwnedAttribute, AttrError> {
+    pub(crate) fn get(&mut self, set: AttrSet, var: u8) -> Result<&OwnedAttribute, AttrError> {
         let key = Variation::create(var)?;
-        match self.inner.get(&key) {
-            None => Err(AttrError::NotDefined),
+
+        match self.get_set(set)?.get(&key) {
+            None => Err(AttrError::AttrNotDefined(key.value)),
             Some((_, attr)) => Ok(attr),
         }
     }
 
     /// Iterate over variations in a set
-    pub(crate) fn set_iter(
-        &mut self,
-        _set: AttrSet,
-    ) -> Option<impl Iterator<Item = AttrItem> + '_> {
-        Some(self.inner.iter().map(|(k, (prop, _))| AttrItem {
-            variation: k.value,
-            properties: *prop,
-        }))
+    pub(crate) fn set_iter(&mut self, set: AttrSet) -> Option<impl Iterator<Item = AttrItem> + '_> {
+        self.sets.get(&set).map(|x| {
+            x.iter().map(|(k, (prop, _))| AttrItem {
+                variation: k.value,
+                properties: *prop,
+            })
+        })
     }
 }
 
