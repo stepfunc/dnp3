@@ -343,7 +343,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "rda" => {
                 // ANCHOR: read_attributes
                 let result = association
-                    .read(ReadRequest::one_byte_range(Variation::Group0Var254, 0, 0))
+                    .read(ReadRequest::device_attribute(
+                        AllAttributes,
+                        AttrSet::Default,
+                    ))
                     .await;
 
                 if let Err(err) = result {
@@ -352,6 +355,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // ANCHOR_END: read_attributes
             }
             "wda" => {
+                // ANCHOR: write_attribute
                 let headers = Headers::default()
                     .add_attribute(StringAttr::UserAssignedLocation.with_value("Bend, OR"));
 
@@ -362,10 +366,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Err(err) = result {
                     tracing::warn!("error writing device attribute: {}", err);
                 }
+                // ANCHOR_END: write_attribute
             }
             "ral" => {
                 let result = association
-                    .read(ReadRequest::one_byte_range(Variation::Group0(255), 0, 0))
+                    .read(ReadRequest::device_attribute(
+                        VariationListAttr::ListOfVariations,
+                        AttrSet::Default,
+                    ))
                     .await;
 
                 if let Err(err) = result {

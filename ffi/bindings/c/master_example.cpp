@@ -331,9 +331,11 @@ void run_channel(dnp3::MasterChannel &channel)
             // ANCHOR_END: read_attributes
         }
         else if (cmd == "wda") {
+            // ANCHOR: write_attribute
             dnp3::Request request;
             request.add_string_attribute(dnp3::attribute_variations::user_assigned_location, 0, "Bend, OR");
             channel.request_expect_empty_response(assoc, dnp3::FunctionCode::write, request, std::make_unique<GenericCallback>("write-device-attribute"));
+            // ANCHOR_END: write_attribute
         }
         else if (cmd == "ral") {
             dnp3::Request request;

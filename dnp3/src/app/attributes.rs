@@ -63,6 +63,16 @@ pub enum AnyAttribute<'a> {
     Known(KnownAttribute<'a>),
 }
 
+/// Unit value used to specify a g0v254 request
+#[derive(Copy, Clone, Debug)]
+pub struct AllAttributes;
+
+impl From<AllAttributes> for u8 {
+    fn from(_: AllAttributes) -> Self {
+        254
+    }
+}
+
 /// Enumeration of all the variation list attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum VariationListAttr {
@@ -83,6 +93,12 @@ impl VariationListAttr {
         match self {
             VariationListAttr::ListOfVariations => 255,
         }
+    }
+}
+
+impl From<VariationListAttr> for u8 {
+    fn from(value: VariationListAttr) -> Self {
+        value.variation()
     }
 }
 
@@ -163,6 +179,12 @@ impl StringAttr {
             self.variation(),
             OwnedAttrValue::VisibleString(value.into()),
         )
+    }
+}
+
+impl From<StringAttr> for u8 {
+    fn from(value: StringAttr) -> Self {
+        value.variation()
     }
 }
 
@@ -261,6 +283,12 @@ impl UIntAttr {
     }
 }
 
+impl From<UIntAttr> for u8 {
+    fn from(value: UIntAttr) -> Self {
+        value.variation()
+    }
+}
+
 /// Enumeration of all the known boolean attributes
 ///
 /// Boolean attributes are actually just encoded as signed integer attributes where 1 == true
@@ -316,6 +344,12 @@ impl BoolAttr {
     }
 }
 
+impl From<BoolAttr> for u8 {
+    fn from(value: BoolAttr) -> Self {
+        value.variation()
+    }
+}
+
 /// Enumeration of all the known DNP3 Time attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TimeAttr {
@@ -345,6 +379,12 @@ impl TimeAttr {
             self.variation(),
             OwnedAttrValue::Dnp3Time(value),
         )
+    }
+}
+
+impl From<TimeAttr> for u8 {
+    fn from(value: TimeAttr) -> Self {
+        value.variation()
     }
 }
 
@@ -380,6 +420,12 @@ impl OctetStringAttr {
     }
 }
 
+impl From<OctetStringAttr> for u8 {
+    fn from(value: OctetStringAttr) -> Self {
+        value.variation()
+    }
+}
+
 /// Enumeration of all known float attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FloatAttr {
@@ -412,6 +458,12 @@ impl FloatAttr {
             self.variation(),
             OwnedAttrValue::FloatingPoint(value),
         )
+    }
+}
+
+impl From<FloatAttr> for u8 {
+    fn from(value: FloatAttr) -> Self {
+        value.variation()
     }
 }
 
@@ -504,6 +556,7 @@ impl<'a> AnyAttribute<'a> {
         Ok(AnyAttribute::Known(known))
     }
 }
+
 const VISIBLE_STRING: u8 = 1;
 const UNSIGNED_INT: u8 = 2;
 const SIGNED_INT: u8 = 3;

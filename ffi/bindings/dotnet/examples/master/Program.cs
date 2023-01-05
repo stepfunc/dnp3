@@ -541,10 +541,12 @@ class MainClass
                 }
             case "wda":
                 {
+                    // ANCHOR: write_attribute
                     var request = new Request();
                     request.AddStringAttribute(AttributeVariations.UserAssignedLocation, 0, "Bend, OR");
                     await channel.RequestExpectEmptyResponse(association, FunctionCode.Write, request);
                     return true;
+                    // ANCHOR_END: write_attribute
                 }
             case "ral":
                 {

@@ -8,7 +8,8 @@ use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::*;
-use crate::app::{OwnedAttribute, Timestamp};
+use crate::app::Variation::Group0;
+use crate::app::{AttrSet, OwnedAttribute, Timestamp};
 use crate::master::error::CommandResponseError;
 use crate::master::TaskError;
 use crate::outstation::FreezeInterval;
@@ -564,6 +565,11 @@ impl ReadRequest {
     /// construct a `ReadRequest` consisting of a single one-byte range
     pub fn one_byte_range(variation: Variation, start: u8, stop: u8) -> Self {
         Self::SingleHeader(ReadHeader::one_byte_range(variation, start, stop))
+    }
+
+    /// construct a `ReadRequest` consisting of a single one-byte range specifying a specific device attribute
+    pub fn device_attribute<T: Into<u8>>(variation: T, set: AttrSet) -> Self {
+        Self::one_byte_range(Group0(variation.into()), set.value(), set.value())
     }
 
     /// construct a `ReadRequest` consisting of a single two-byte range

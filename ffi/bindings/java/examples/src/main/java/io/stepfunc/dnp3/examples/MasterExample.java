@@ -518,9 +518,11 @@ public class MasterExample {
       }
       case "wda":
       {
+        // ANCHOR: write_attribute
         Request request = new Request();
         request.addStringAttribute(AttributeVariations.USER_ASSIGNED_LOCATION, ubyte(0), "Bend, OR");
         channel.requestExpectEmptyResponse(association, FunctionCode.WRITE, request).toCompletableFuture().get();
+        // ANCHOR_END: write_attribute
         System.out.println("write device attribute success");
         break;
       }

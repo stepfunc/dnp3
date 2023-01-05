@@ -480,6 +480,7 @@ int run_channel(dnp3_master_channel_t *channel)
             // ANCHOR_END: read_attributes
         }
         else if (strcmp(cbuf, "wda\n") == 0) {
+            // ANCHOR: write_attribute
             dnp3_request_t *request = dnp3_request_create();
             dnp3_request_add_string_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_USER_ASSIGNED_LOCATION, 0, "Bend, OR");
 
@@ -491,6 +492,7 @@ int run_channel(dnp3_master_channel_t *channel)
             };
             dnp3_master_channel_request_expect_empty_response(channel, association_id, DNP3_FUNCTION_CODE_WRITE, request, cb);
             dnp3_request_destroy(request);
+            // ANCHOR_END: write_attribute
         }
         else if (strcmp(cbuf, "ral\n") == 0) {
             dnp3_request_t *request = dnp3_request_create();
