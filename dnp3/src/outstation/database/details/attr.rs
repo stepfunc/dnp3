@@ -147,7 +147,7 @@ impl SetMap {
         }
     }
 
-    /// Iterate over variations in a set
+    /// Iterate over variations in a set. This is useful for implementing READ on g0v254.
     pub(crate) fn set_iter(&mut self, set: AttrSet) -> Option<impl Iterator<Item = AttrItem> + '_> {
         self.sets.get(&set).map(|x| {
             x.iter().map(|(k, (prop, _))| AttrItem {
@@ -162,6 +162,36 @@ impl SetMap {
 mod test {
     use super::*;
     use crate::app::attr::*;
+
+    #[test]
+    fn can_iterate_over_defined_attributes() {
+        let mut map = SetMap::default();
+        let attr1 = StringAttr::UserAssignedLocation.with_value("Bend");
+        let attr2 = StringAttr::ConfigVersion.with_value("1.0.0");
+        map.define(AttrProp::writable(), attr1).unwrap();
+        map.define(AttrProp::default(), attr2).unwrap();
+
+        // any other set will be NONE
+        assert!(map.set_iter(AttrSet::new(1)).is_none());
+
+        let mut items = map.set_iter(AttrSet::Default).unwrap();
+
+        assert_eq!(
+            items.next().unwrap(),
+            AttrItem {
+                variation: StringAttr::ConfigVersion.variation(),
+                properties: AttrProp::default()
+            }
+        );
+        assert_eq!(
+            items.next().unwrap(),
+            AttrItem {
+                variation: StringAttr::UserAssignedLocation.variation(),
+                properties: AttrProp::writable()
+            }
+        );
+        assert!(items.next().is_none());
+    }
 
     #[test]
     fn cannot_define_attributes_with_wrong_types_in_default_set() {
