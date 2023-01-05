@@ -324,9 +324,11 @@ void run_channel(dnp3::MasterChannel &channel)
             channel.request_expect_empty_response(assoc, dnp3::FunctionCode::freeze_at_time, request, std::make_unique<GenericCallback>("freeze-at-time"));
         }
         else if (cmd == "rda") {
+            // ANCHOR: read_attributes
             dnp3::Request request;
             request.add_specific_attribute(dnp3::attribute_variations::all_attributes_request, 0);
             channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
+            // ANCHOR_END: read_attributes
         }
         else if (cmd == "wda") {
             dnp3::Request request;

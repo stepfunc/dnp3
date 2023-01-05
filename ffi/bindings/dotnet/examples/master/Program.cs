@@ -532,9 +532,11 @@ class MainClass
                 }
             case "rda":
                 {
+                    // ANCHOR: read_attributes
                     var request = new Request();
                     request.AddSpecificAttribute(AttributeVariations.AllAttributesRequest, 0);
-                    await channel.Read(association, request);                    
+                    await channel.Read(association, request);
+                    // ANCHOR_END: read_attributes
                     return true;
                 }
             case "wda":

@@ -464,8 +464,9 @@ int run_channel(dnp3_master_channel_t *channel)
             dnp3_request_destroy(request);            
         }
         else if (strcmp(cbuf, "rda\n") == 0) {
+            // ANCHOR: read_attributes
             dnp3_request_t *request = dnp3_request_create();
-            dnp3_request_add_specific_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_ALL_ATTRIBUTES_REQUEST, 0);                        
+            dnp3_request_add_specific_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_ALL_ATTRIBUTES_REQUEST, 0);
 
             dnp3_read_task_callback_t cb = {
                 .on_complete = &on_read_success,
@@ -473,9 +474,10 @@ int run_channel(dnp3_master_channel_t *channel)
                 .on_destroy = NULL,
                 .ctx = NULL,
             };
-            dnp3_master_channel_read(channel, association_id, request, cb);
 
+            dnp3_master_channel_read(channel, association_id, request, cb);
             dnp3_request_destroy(request);
+            // ANCHOR_END: read_attributes
         }
         else if (strcmp(cbuf, "wda\n") == 0) {
             dnp3_request_t *request = dnp3_request_create();

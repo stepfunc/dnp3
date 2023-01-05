@@ -508,9 +508,11 @@ public class MasterExample {
       }
       case "rda":
       {
+        // ANCHOR: read_attributes
         Request request = new Request();
         request.addSpecificAttribute(AttributeVariations.ALL_ATTRIBUTES_REQUEST, ubyte(0));
         channel.read(association, request).toCompletableFuture().get();
+        // ANCHOR_END: read_attributes
         System.out.println("read device attributes success");
         break;
       }
