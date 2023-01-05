@@ -502,7 +502,7 @@ public class MasterExample {
         Request request = new Request();
         request.addTimeAndInterval(ulong(0), uint(86400000));
         request.addAllObjectsHeader(Variation.GROUP20_VAR0);
-        channel.requestExpectEmptyResponse(association, FunctionCode.FREEZE_AT_TIME, request).toCompletableFuture().get();
+        channel.sendAndExpectEmptyResponse(association, FunctionCode.FREEZE_AT_TIME, request).toCompletableFuture().get();
         System.out.println("Freezer-at-time success");
         break;
       }
@@ -521,7 +521,7 @@ public class MasterExample {
         // ANCHOR: write_attribute
         Request request = new Request();
         request.addStringAttribute(AttributeVariations.USER_ASSIGNED_LOCATION, ubyte(0), "Bend, OR");
-        channel.requestExpectEmptyResponse(association, FunctionCode.WRITE, request).toCompletableFuture().get();
+        channel.sendAndExpectEmptyResponse(association, FunctionCode.WRITE, request).toCompletableFuture().get();
         // ANCHOR_END: write_attribute
         System.out.println("write device attribute success");
         break;

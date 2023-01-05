@@ -526,7 +526,7 @@ class MainClass
                     var request = new Request();                    
                     request.AddTimeAndInterval(0, 86400000);
                     request.AddAllObjectsHeader(Variation.Group20Var0);
-                    await channel.RequestExpectEmptyResponse(association, FunctionCode.FreezeAtTime, request);
+                    await channel.SendAndExpectEmptyResponse(association, FunctionCode.FreezeAtTime, request);
                     Console.WriteLine($"Freeze-at-time success");
                     return true;
                 }
@@ -544,7 +544,7 @@ class MainClass
                     // ANCHOR: write_attribute
                     var request = new Request();
                     request.AddStringAttribute(AttributeVariations.UserAssignedLocation, 0, "Bend, OR");
-                    await channel.RequestExpectEmptyResponse(association, FunctionCode.Write, request);
+                    await channel.SendAndExpectEmptyResponse(association, FunctionCode.Write, request);
                     return true;
                     // ANCHOR_END: write_attribute
                 }

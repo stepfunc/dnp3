@@ -424,7 +424,7 @@ pub(crate) unsafe fn master_channel_write_dead_bands(
     Ok(())
 }
 
-pub(crate) unsafe fn master_channel_request_expect_empty_response(
+pub(crate) unsafe fn master_channel_send_and_expect_empty_response(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     function: ffi::FunctionCode,

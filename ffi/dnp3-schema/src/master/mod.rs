@@ -383,9 +383,9 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         ))?
         .build()?;
 
-    let request_expect_empty_response = lib
+    let send_and_expect_empty_response = lib
         .define_future_method(
-            "request_expect_empty_response",
+            "send_and_expect_empty_response",
             master_channel_class.clone(),
             empty_response_callback,
         )?
@@ -405,9 +405,11 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
             "Headers that will be contained in the request",
         )?
         .fails_with(shared.error_type.clone())?
-        .doc(doc(
-            "Send the specified request to the association using the supplied function and collection of request headers",
-        ))?
+        .doc(
+            doc("Send the specified request to the association using the supplied function and collection of request headers")
+                .details("This is useful for constructing various types of WRITE and FREEZE operations where an empty response is expected from the outstation, and the only indication of success are bits in IIN.2.")
+                .details("The request will fail if 1) The response contains object headers or 2) One of the error bits in IIN.2 is set.")
+        )?
         .build()?;
 
     let read_with_handler_async = lib
@@ -522,7 +524,7 @@ pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTrace
         .async_method(cold_restart_async)?
         .async_method(warm_restart_async)?
         .async_method(write_dead_bands_async)?
-        .async_method(request_expect_empty_response)?
+        .async_method(send_and_expect_empty_response)?
         .async_method(check_link_status_async)?
         .custom_destroy("shutdown")?
         .doc(

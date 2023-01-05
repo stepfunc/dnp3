@@ -460,7 +460,7 @@ int run_channel(dnp3_master_channel_t *channel)
             dnp3_request_add_all_objects_header(request, DNP3_VARIATION_GROUP20_VAR0);
                      
             
-            dnp3_master_channel_request_expect_empty_response(channel, association_id, DNP3_FUNCTION_CODE_FREEZE_AT_TIME, request, cb);
+            dnp3_master_channel_send_and_expect_empty_response(channel, association_id, DNP3_FUNCTION_CODE_FREEZE_AT_TIME, request, cb);
             dnp3_request_destroy(request);            
         }
         else if (strcmp(cbuf, "rda\n") == 0) {
@@ -490,7 +490,7 @@ int run_channel(dnp3_master_channel_t *channel)
                 .on_destroy = NULL,
                 .ctx = "write device attribute",
             };
-            dnp3_master_channel_request_expect_empty_response(channel, association_id, DNP3_FUNCTION_CODE_WRITE, request, cb);
+            dnp3_master_channel_send_and_expect_empty_response(channel, association_id, DNP3_FUNCTION_CODE_WRITE, request, cb);
             dnp3_request_destroy(request);
             // ANCHOR_END: write_attribute
         }
