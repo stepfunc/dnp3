@@ -38,7 +38,7 @@ pub(crate) enum AttrError {
     AlreadyDefined,
     /// The attribute does not match the type expected for set 0
     BadType(TypeError),
-    /// The variation is reserved (254 or 255) and cannot be defined
+    /// The variation is reserved (254 or 255) and cannot be defined, written, or retrieved
     ReservedVariation(u8),
     /// The attribute is not writable
     NotWritable,
@@ -51,43 +51,6 @@ impl From<TypeError> for AttrError {
 }
 
 impl SetMap {
-    fn get_set(&mut self, set: AttrSet) -> Result<&mut VarMap, AttrError> {
-        match self.sets.get_mut(&set) {
-            None => Err(AttrError::SetNotDefined(set)),
-            Some(set) => Ok(set),
-        }
-    }
-
-    fn validate_properties(prop: AttrProp, attr: &OwnedAttribute) -> Result<(), AttrError> {
-        if !prop.is_writable() {
-            return Ok(());
-        };
-
-        let can_be_writable = match attr.set {
-            AttrSet::Default => match attr.variation {
-                203 => true, // device location altitude
-                204 => true, // device location longitude
-                205 => true, // device location latitude
-                206 => true, // user-assigned secondary operator name
-                207 => true, // user-assigned primary operator name
-                208 => true, // user-assigned name
-                247 => true, // user-assigned device name
-                246 => true, // user-assigned ID/code
-                245 => true, // user-assigned location
-                240 => true, // max tx fragment size
-                _ => false,
-            },
-            // private sets can do whatever they want
-            AttrSet::Private(_) => true,
-        };
-
-        if !can_be_writable {
-            return Err(AttrError::NotWritable);
-        }
-
-        Ok(())
-    }
-
     /// Define an attribute in map
     ///
     /// return false if the attribute already exists
@@ -155,6 +118,43 @@ impl SetMap {
                 properties: *prop,
             })
         })
+    }
+
+    fn get_set(&mut self, set: AttrSet) -> Result<&mut VarMap, AttrError> {
+        match self.sets.get_mut(&set) {
+            None => Err(AttrError::SetNotDefined(set)),
+            Some(set) => Ok(set),
+        }
+    }
+
+    fn validate_properties(prop: AttrProp, attr: &OwnedAttribute) -> Result<(), AttrError> {
+        if !prop.is_writable() {
+            return Ok(());
+        };
+
+        let can_be_writable = match attr.set {
+            AttrSet::Default => match attr.variation {
+                203 => true, // device location altitude
+                204 => true, // device location longitude
+                205 => true, // device location latitude
+                206 => true, // user-assigned secondary operator name
+                207 => true, // user-assigned primary operator name
+                208 => true, // user-assigned name
+                247 => true, // user-assigned device name
+                246 => true, // user-assigned ID/code
+                245 => true, // user-assigned location
+                240 => true, // max tx fragment size
+                _ => false,
+            },
+            // private sets can do whatever they want
+            AttrSet::Private(_) => true,
+        };
+
+        if !can_be_writable {
+            return Err(AttrError::NotWritable);
+        }
+
+        Ok(())
     }
 }
 
