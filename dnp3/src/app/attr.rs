@@ -652,7 +652,7 @@ impl AttrProp {
     const READ_BIT: u8 = 0x01;
 
     /// Construct `AttrProp` with the write-able bit set
-    pub fn writable(self) -> Self {
+    pub const fn writable() -> Self {
         Self { is_writable: true }
     }
 
@@ -728,8 +728,8 @@ pub enum AttrValue<'a> {
 }
 
 impl<'a> AttrValue<'a> {
-    pub(crate) fn to_owned(self) -> OwnedAttrValue {
-        match self {
+    pub(crate) fn to_owned(self) -> Option<OwnedAttrValue> {
+        let attr = match self {
             AttrValue::VisibleString(x) => OwnedAttrValue::VisibleString(x.to_string()),
             AttrValue::UnsignedInt(x) => OwnedAttrValue::UnsignedInt(x),
             AttrValue::SignedInt(x) => OwnedAttrValue::SignedInt(x),
@@ -737,8 +737,10 @@ impl<'a> AttrValue<'a> {
             AttrValue::OctetString(x) => OwnedAttrValue::OctetString(x.to_vec()),
             AttrValue::Dnp3Time(x) => OwnedAttrValue::Dnp3Time(x),
             AttrValue::BitString(x) => OwnedAttrValue::BitString(x.to_vec()),
-            AttrValue::AttrList(x) => OwnedAttrValue::AttrList(x.iter().collect()),
-        }
+            AttrValue::AttrList(_) => return None,
+        };
+
+        Some(attr)
     }
 }
 
@@ -761,8 +763,81 @@ pub enum OwnedAttrValue {
     Dnp3Time(Timestamp),
     /// BSTR - Bit string
     BitString(Vec<u8>),
-    /// List of UINT8-BSTR8
-    AttrList(Vec<AttrItem>),
+}
+
+impl OwnedAttrValue {
+    fn data_type(&self) -> AttrDataType {
+        match self {
+            OwnedAttrValue::VisibleString(_) => AttrDataType::VisibleString,
+            OwnedAttrValue::UnsignedInt(_) => AttrDataType::UnsignedInt,
+            OwnedAttrValue::SignedInt(_) => AttrDataType::SignedInt,
+            OwnedAttrValue::FloatingPoint(_) => AttrDataType::FloatingPoint,
+            OwnedAttrValue::OctetString(_) => AttrDataType::OctetString,
+            OwnedAttrValue::Dnp3Time(_) => AttrDataType::Dnp3Time,
+            OwnedAttrValue::BitString(_) => AttrDataType::BitString,
+        }
+    }
+
+    pub(crate) fn view(&self) -> AttrValue {
+        match self {
+            OwnedAttrValue::VisibleString(x) => AttrValue::VisibleString(x.as_str()),
+            OwnedAttrValue::UnsignedInt(x) => AttrValue::UnsignedInt(*x),
+            OwnedAttrValue::SignedInt(x) => AttrValue::SignedInt(*x),
+            OwnedAttrValue::FloatingPoint(x) => AttrValue::FloatingPoint(*x),
+            OwnedAttrValue::OctetString(x) => AttrValue::OctetString(x.as_slice()),
+            OwnedAttrValue::Dnp3Time(x) => AttrValue::Dnp3Time(*x),
+            OwnedAttrValue::BitString(x) => AttrValue::BitString(x.as_slice()),
+        }
+    }
+
+    /// Modify a value if it is of the same type
+    pub(crate) fn modify(&mut self, other: Self) -> Result<(), TypeError> {
+        match self {
+            Self::VisibleString(x) => {
+                if let Self::VisibleString(y) = other {
+                    *x = y;
+                    return Ok(());
+                }
+            }
+            Self::UnsignedInt(x) => {
+                if let Self::UnsignedInt(y) = other {
+                    *x = y;
+                    return Ok(());
+                }
+            }
+            Self::SignedInt(x) => {
+                if let Self::SignedInt(y) = other {
+                    *x = y;
+                    return Ok(());
+                }
+            }
+            Self::FloatingPoint(x) => {
+                if let Self::FloatingPoint(y) = other {
+                    *x = y;
+                    return Ok(());
+                }
+            }
+            Self::OctetString(x) => {
+                if let Self::OctetString(y) = other {
+                    *x = y;
+                    return Ok(());
+                }
+            }
+            Self::Dnp3Time(x) => {
+                if let Self::Dnp3Time(y) = other {
+                    *x = y;
+                    return Ok(());
+                }
+            }
+            Self::BitString(x) => {
+                if let Self::BitString(y) = other {
+                    *x = y;
+                    return Ok(());
+                }
+            }
+        }
+        Err(TypeError::new(self.data_type(), other.data_type()))
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -888,10 +963,6 @@ impl OwnedAttrValue {
             OwnedAttrValue::OctetString(x) => Self::write_bytes(cursor, OCTET_STRING, x.as_slice()),
             OwnedAttrValue::Dnp3Time(x) => Self::write_time(cursor, *x),
             OwnedAttrValue::BitString(x) => Self::write_bytes(cursor, BIT_STRING, x.as_slice()),
-            OwnedAttrValue::AttrList(_) => {
-                // TODO!
-                unimplemented!()
-            }
         }
     }
 
@@ -1053,12 +1124,13 @@ pub struct Attribute<'a> {
 }
 
 impl<'a> Attribute<'a> {
-    pub(crate) fn to_owned(self) -> OwnedAttribute {
-        OwnedAttribute {
+    pub(crate) fn to_owned(self) -> Option<OwnedAttribute> {
+        let value = self.value.to_owned()?;
+        Some(OwnedAttribute {
             set: self.set,
             variation: self.variation,
-            value: self.value.to_owned(),
-        }
+            value,
+        })
     }
 }
 
@@ -1082,6 +1154,14 @@ impl OwnedAttribute {
             set,
             variation,
             value,
+        }
+    }
+
+    pub(crate) fn view(&self) -> Attribute {
+        Attribute {
+            set: self.set,
+            variation: self.variation,
+            value: self.value.view(),
         }
     }
 }

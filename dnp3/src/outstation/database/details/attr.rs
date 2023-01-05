@@ -4,11 +4,6 @@ use crate::app::attr::{
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 
-struct AttrInfo {
-    prop: AttrProp,
-    value: OwnedAttribute,
-}
-
 /// restricted to non-reserved attribute variations
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
 struct Variation {
@@ -29,7 +24,7 @@ impl Variation {
 pub(crate) struct SetMap {
     /// Determines if this is the default set or not
     set: AttrSet,
-    inner: BTreeMap<Variation, AttrInfo>,
+    inner: BTreeMap<Variation, (AttrProp, OwnedAttribute)>,
 }
 
 /// Errors that can occur when manipulating attributes
@@ -57,17 +52,14 @@ impl SetMap {
     /// Define an attribute in map
     ///
     /// return false if the attribute already exists
-    pub(crate) fn define(&mut self, prop: AttrProp, attr: Attribute) -> Result<(), AttrError> {
+    pub(crate) fn define(&mut self, prop: AttrProp, attr: OwnedAttribute) -> Result<(), AttrError> {
         let key = Variation::create(attr.variation)?;
         // this will ensure that we're using the right types for default attributes
-        let _ = AnyAttribute::try_from(&attr)?;
+        let _ = AnyAttribute::try_from(&attr.view())?;
         match self.inner.entry(key) {
             Entry::Occupied(_) => Err(AttrError::AlreadyDefined),
             Entry::Vacant(x) => {
-                x.insert(AttrInfo {
-                    prop,
-                    value: attr.to_owned(),
-                });
+                x.insert((prop, attr));
                 Ok(())
             }
         }
@@ -76,14 +68,17 @@ impl SetMap {
     /// Write an attribute in the map
     pub(crate) fn write(&mut self, attr: Attribute) -> Result<(), AttrError> {
         let key = Variation::create(attr.variation)?;
-        // this will ensure that we're using the right types for default attributes
-        let _ = AnyAttribute::try_from(&attr)?;
         match self.inner.get_mut(&key) {
             None => Err(AttrError::NotDefined),
-            Some(x) => {
-                if x.prop.is_writable() {
-                    x.value = attr.to_owned();
-                    Ok(())
+            Some((prop, current)) => {
+                if prop.is_writable() {
+                    match attr.to_owned() {
+                        None => Err(AttrError::NotWritable),
+                        Some(attr) => {
+                            current.value.modify(attr.value)?;
+                            Ok(())
+                        }
+                    }
                 } else {
                     Err(AttrError::NotWritable)
                 }
@@ -96,15 +91,62 @@ impl SetMap {
         let key = Variation::create(var)?;
         match self.inner.get(&key) {
             None => Err(AttrError::NotDefined),
-            Some(x) => Ok(&x.value),
+            Some((_, attr)) => Ok(attr),
         }
     }
 
     /// Iterate over variations
     pub(crate) fn iter(&mut self) -> impl Iterator<Item = AttrItem> + '_ {
-        self.inner.iter().map(|(k, v)| AttrItem {
+        self.inner.iter().map(|(k, (prop, _))| AttrItem {
             variation: k.value,
-            properties: v.prop,
+            properties: *prop,
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::app::attr::*;
+
+    #[test]
+    fn cannot_define_attributes_with_wrong_types_in_default_set() {
+        let mut map = SetMap::default();
+        let attr = OwnedAttribute::new(
+            AttrSet::Default,
+            StringAttr::UserAssignedLocation.variation(),
+            OwnedAttrValue::SignedInt(42),
+        );
+        let err = map.define(AttrProp::writable(), attr).unwrap_err();
+        assert_eq!(
+            err,
+            AttrError::BadType(TypeError {
+                expected: AttrDataType::VisibleString,
+                actual: AttrDataType::SignedInt
+            })
+        );
+    }
+
+    #[test]
+    fn cannot_write_attribute_defined_with_different_type() {
+        let mut map = SetMap::default();
+        map.define(
+            AttrProp::writable(),
+            StringAttr::UserAssignedLocation.with_value("Bend"),
+        )
+        .unwrap();
+        let attr = Attribute {
+            set: Default::default(),
+            variation: StringAttr::UserAssignedLocation.variation(),
+            value: AttrValue::SignedInt(42),
+        };
+        let err = map.write(attr).unwrap_err();
+        assert_eq!(
+            err,
+            AttrError::BadType(TypeError {
+                expected: AttrDataType::VisibleString,
+                actual: AttrDataType::SignedInt
+            })
+        );
     }
 }
