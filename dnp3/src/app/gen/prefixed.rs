@@ -25,7 +25,7 @@ use scursor::ReadCursor;
 #[derive(Debug)]
 pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
     /// Device Attributes - Specific Attribute
-    Group0(crate::app::Attribute<'a>),
+    Group0(crate::app::attr::Attribute<'a>),
     /// Binary Input Event - Without Time
     Group2Var1(CountSequence<'a, Prefix<I, Group2Var1>>),
     /// Binary Input Event - With Absolute Time
@@ -129,7 +129,7 @@ pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt:
 impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
     pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
         match v {
-            Variation::Group0(var) => Ok(PrefixedVariation::Group0(crate::app::Attribute::parse_prefixed::<I>(var, count, cursor)?)),
+            Variation::Group0(var) => Ok(PrefixedVariation::Group0(crate::app::attr::Attribute::parse_prefixed::<I>(var, count, cursor)?)),
             Variation::Group2Var1 => Ok(PrefixedVariation::Group2Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group2Var2 => Ok(PrefixedVariation::Group2Var2(CountSequence::parse(count, cursor)?)),
             Variation::Group2Var3 => Ok(PrefixedVariation::Group2Var3(CountSequence::parse(count, cursor)?)),

@@ -54,7 +54,7 @@ impl Default for AttrSet {
     }
 }
 
-/// Variants for all the pre-defined attributes in the standard
+/// Enum that represent default or private set attributes
 #[derive(Clone, Debug, PartialEq)]
 pub enum AnyAttribute<'a> {
     /// Either an attribute from a private set or an unknown attribute in the default set
@@ -571,7 +571,7 @@ const EXT_ATTR_LIST: u8 = 255;
 ///
 /// IEEE 1815-2012 pg 150
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum AttrDataType {
+pub(crate) enum AttrDataType {
     /// VSTR - Visible character suitable for print and display
     VisibleString,
     /// UINT - Unsigned integer
@@ -623,13 +623,13 @@ impl<'a> VariationList<'a> {
     }
 }
 
-/// An iterator over an `AttrList`
+/// An iterator over a [VariationList] that yields [AttrItem]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct VariationListIter<'a> {
     data: &'a [u8],
 }
 
-/// Single entry in the attribute list
+/// Single entry in a [VariationList]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AttrItem {
     /// Variation of the attribute
@@ -1286,7 +1286,7 @@ impl<'a> AttrValue<'a> {
     }
 
     /// underlying type
-    pub fn get_type(&self) -> AttrDataType {
+    pub(crate) fn get_type(&self) -> AttrDataType {
         match self {
             AttrValue::VisibleString(_) => AttrDataType::VisibleString,
             AttrValue::UnsignedInt(_) => AttrDataType::UnsignedInt,

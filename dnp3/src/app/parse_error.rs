@@ -3,65 +3,66 @@ use std::fmt::Formatter;
 use crate::app::parse::range::InvalidRange;
 use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
-use crate::app::{AttrParseError, FunctionCode, QualifierCode};
+use crate::app::{FunctionCode, QualifierCode};
 
+use crate::app::attr::AttrParseError;
 use scursor::ReadError;
 
-/// errors that occur when parsing an application layer header
+/// Errors that occur when parsing an application layer header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum HeaderParseError {
-    /// unknown function code
+    /// Unknown function code
     UnknownFunction(Sequence, u8),
     /// insufficient bytes for a header
     InsufficientBytes,
 }
 
-/// errors that occur when parsing object headers
+/// Errors that occur when parsing object headers
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ObjectParseError {
-    /// unknown group and variation
+    /// Unknown group and variation
     UnknownGroupVariation(u8, u8),
-    /// unknown qualifier code
+    /// Unknown qualifier code
     UnknownQualifier(u8),
-    /// insufficient bytes for object header or specified object values
+    /// Insufficient bytes for object header or specified object values
     InsufficientBytes,
-    /// range where stop < start
+    /// Range where stop < start
     InvalidRange(u16, u16),
-    /// specified variation and qualifier code are invalid or not supported
+    /// Specified variation and qualifier code are invalid or not supported
     InvalidQualifierForVariation(Variation, QualifierCode),
-    /// specified qualifier code is not supported
+    /// Specified qualifier code is not supported
     UnsupportedQualifierCode(QualifierCode),
-    /// response containing zero-length octet data disallowed by the specification
+    /// Response containing zero-length octet data disallowed by the specification
     ZeroLengthOctetData,
     /// Device attribute parsing error
     BadAttribute(AttrParseError),
 }
 
-/// errors that occur when interpreting a header as a request header
+/// Errors that occur when interpreting a header as a request header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum RequestValidationError {
-    /// function code not allowed in requests
+    /// Function code not allowed in requests
     UnexpectedFunction(FunctionCode),
-    /// request with either FIR or FIN == 0
+    /// Request with either FIR or FIN == 0
     NonFirFin,
-    /// request with an UNS bit that doesn't match the function code (only allowed in Confirm)
+    /// Request with an UNS bit that doesn't match the function code (only allowed in Confirm)
     UnexpectedUnsBit(FunctionCode),
 }
 
-/// errors that occur when interpreting a header as a response header
+/// Errors that occur when interpreting a header as a response header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ResponseValidationError {
-    /// function code not allowed in responses
+    /// Function code not allowed in responses
     UnexpectedFunction(FunctionCode),
-    /// solicited response with UNS == 1
+    /// Solicited response with UNS == 1
     SolicitedResponseWithUnsBit,
-    /// unsolicited response without UNS == 0
+    /// Unsolicited response without UNS == 0
     UnsolicitedResponseWithoutUnsBit,
-    /// unsolicited response with either FIR or FIN == 0
+    /// Unsolicited response with either FIR or FIN == 0
     UnsolicitedResponseWithoutFirAndFin,
 }
 

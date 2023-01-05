@@ -53,9 +53,9 @@ extern crate core;
 /// Current version of the library
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// application layer types shared by both the master and outstation APIs
+/// Application layer types shared by both the master and outstation APIs
 pub mod app;
-/// types used to control decoding in the log
+/// Types used to control decoding in the log
 pub mod decode;
 /// Types specific to the link-layer
 pub mod link;

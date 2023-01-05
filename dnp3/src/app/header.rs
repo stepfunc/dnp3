@@ -496,7 +496,7 @@ impl Iin {
     }
 }
 
-/// application-layer header for requests
+/// Application-layer header for requests
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct RequestHeader {
     /// control field
@@ -514,7 +514,7 @@ pub enum ResponseFunction {
     UnsolicitedResponse,
 }
 
-/// application-layer header for responses
+/// Application-layer header for responses
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ResponseHeader {
     /// control field

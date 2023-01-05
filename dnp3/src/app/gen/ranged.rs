@@ -27,7 +27,7 @@ pub(crate) enum RangedVariation<'a> {
     Group0Var254,
     /// Device Attributes - Specific Attribute
     /// variation and optional attribute
-    Group0(Option<crate::app::Attribute<'a>>),
+    Group0(Option<crate::app::attr::Attribute<'a>>),
     /// Binary Input - Any Variation
     Group1Var0,
     /// Binary Input - Packed Format
@@ -129,7 +129,7 @@ impl<'a> RangedVariation<'a> {
     pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group0Var254 => Ok(RangedVariation::Group0Var254),
-            Variation::Group0(var) => Ok(RangedVariation::Group0(Some(crate::app::Attribute::parse_from_range(var, range, cursor)?))),
+            Variation::Group0(var) => Ok(RangedVariation::Group0(Some(crate::app::attr::Attribute::parse_from_range(var, range, cursor)?))),
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::parse(range, cursor)?)),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::parse(range, cursor)?)),

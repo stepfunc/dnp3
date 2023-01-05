@@ -1,3 +1,4 @@
+use crate::app::attr::{AttrSet, OwnedAttribute};
 use std::ops::BitAnd;
 
 use crate::app::control::CommandStatus;
@@ -8,8 +9,8 @@ use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::*;
+use crate::app::Timestamp;
 use crate::app::Variation::Group0;
-use crate::app::{AttrSet, OwnedAttribute, Timestamp};
 use crate::master::error::CommandResponseError;
 use crate::master::TaskError;
 use crate::outstation::FreezeInterval;

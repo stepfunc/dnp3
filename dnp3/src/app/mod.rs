@@ -1,5 +1,4 @@
 pub use app_enums::*;
-pub use attributes::*;
 pub use buffer_size::*;
 pub use header::*;
 pub use listener::*;
@@ -32,7 +31,8 @@ impl EndpointType {
     }
 }
 
-mod attributes;
+/// Types association with Device Attributes (Group 0)
+pub mod attr;
 mod control_types;
 #[rustfmt::skip]
 mod app_enums;
@@ -42,9 +42,8 @@ mod extensions;
 mod header;
 mod listener;
 mod maybe_async;
-/// measurement types, e.g. Binary, Analog, Counter, etc
+/// Measurement types, e.g. Binary, Analog, Counter, etc
 pub mod measurement;
-/// application layer parser
 pub(crate) mod parse;
 mod retry;
 mod sequence;
@@ -56,7 +55,6 @@ mod types;
 pub(crate) mod variations;
 
 pub(crate) mod format;
-/// errors associated with parsing the application layer
 mod parse_error;
 
 #[rustfmt::skip]

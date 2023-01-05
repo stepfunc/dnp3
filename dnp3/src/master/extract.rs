@@ -87,6 +87,7 @@ pub(crate) fn extract_measurements_inner(
 
 #[cfg(test)]
 mod test {
+    use crate::app::attr::*;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::*;
     use crate::master::handler::{HeaderInfo, ReadHandler};

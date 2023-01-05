@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use crate::app::control::CommandStatus;
-use crate::app::{BadAttribute, Iin, Iin2};
+use crate::app::{Iin, Iin2};
 use crate::app::{ObjectParseError, Shutdown};
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
@@ -11,6 +11,8 @@ use crate::transport::TransportResponseError;
 
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
+
+use crate::app::attr::BadAttribute;
 
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

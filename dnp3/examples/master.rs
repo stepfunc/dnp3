@@ -3,6 +3,7 @@ use std::time::Duration;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
+use dnp3::app::attr::*;
 use dnp3::app::control::*;
 use dnp3::app::measurement::*;
 use dnp3::app::*;

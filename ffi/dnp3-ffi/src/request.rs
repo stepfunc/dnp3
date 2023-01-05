@@ -1,4 +1,5 @@
-use dnp3::app::{AttrSet, OwnedAttrValue, OwnedAttribute, Timestamp, Variation};
+use dnp3::app::attr::*;
+use dnp3::app::{Timestamp, Variation};
 use dnp3::master::{Headers, ReadHeader, ReadRequest};
 use dnp3::outstation::FreezeInterval;
 use std::ffi::CStr;

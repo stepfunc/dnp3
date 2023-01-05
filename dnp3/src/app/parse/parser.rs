@@ -12,9 +12,10 @@ use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::parse_error::*;
 use crate::app::variations::Variation;
-use crate::app::{Attribute, FunctionCode, QualifierCode};
+use crate::app::{FunctionCode, QualifierCode};
 use crate::decode::AppDecodeLevel;
 
+use crate::app::attr::Attribute;
 use scursor::ReadCursor;
 
 pub(crate) fn format_count_of_items<T, V>(f: &mut Formatter, iter: T) -> std::fmt::Result
@@ -629,6 +630,7 @@ impl QualifierCode {
 
 #[cfg(test)]
 mod test {
+    use crate::app::attr::{AttrParseError, AttrSet, AttrValue, Attribute};
     use crate::app::control::CommandStatus;
     use crate::app::header::{ControlField, Iin, Iin1, Iin2};
     use crate::app::measurement::DoubleBit;
@@ -637,7 +639,6 @@ mod test {
     use crate::app::sequence::Sequence;
     use crate::app::types::Timestamp;
     use crate::app::variations::*;
-    use crate::app::{AttrParseError, AttrSet, AttrValue, Attribute};
 
     use super::*;
 

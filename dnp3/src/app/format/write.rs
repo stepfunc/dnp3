@@ -1,3 +1,4 @@
+use crate::app::attr::{AttrWriteError, OwnedAttribute};
 use crate::app::header::{ControlField, RequestHeader};
 #[cfg(test)]
 use crate::app::header::{Iin, ResponseFunction, ResponseHeader};
@@ -6,7 +7,7 @@ use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
-use crate::app::{AttrWriteError, FunctionCode, OwnedAttribute, QualifierCode};
+use crate::app::{FunctionCode, QualifierCode};
 
 use scursor::{WriteCursor, WriteError};
 
