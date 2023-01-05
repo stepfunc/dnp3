@@ -212,7 +212,7 @@ impl AssociationHandle {
     /// This is useful for constructing various types of WRITE and FREEZE operations where
     /// an empty response is expected from the outstation, and the only indication of success
     /// are bits in IIN.2
-    pub async fn request_expecting_empty_response(
+    pub async fn send_and_expect_empty_response(
         &mut self,
         function: FunctionCode,
         headers: Headers,

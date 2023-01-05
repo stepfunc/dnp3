@@ -441,7 +441,7 @@ pub(crate) unsafe fn master_channel_request_expect_empty_response(
 
     let task = async move {
         match handle
-            .request_expecting_empty_response(function, headers)
+            .send_and_expect_empty_response(function, headers)
             .await
         {
             Ok(()) => callback.on_complete(ffi::Nothing::Nothing),

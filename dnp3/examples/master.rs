@@ -333,7 +333,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .add_all_objects(Variation::Group20Var0);
 
                 if let Err(err) = association
-                    .request_expecting_empty_response(FunctionCode::FreezeAtTime, headers)
+                    .send_and_expect_empty_response(FunctionCode::FreezeAtTime, headers)
                     .await
                 {
                     tracing::warn!("error: {}", err);
@@ -360,7 +360,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .add_attribute(StringAttr::UserAssignedLocation.with_value("Bend, OR"));
 
                 let result = association
-                    .request_expecting_empty_response(FunctionCode::Write, headers)
+                    .send_and_expect_empty_response(FunctionCode::Write, headers)
                     .await;
 
                 if let Err(err) = result {
