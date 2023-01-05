@@ -9,11 +9,13 @@ use crate::outstation::database::{
     ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateOptions,
 };
 
+use crate::app::attr::AttrSet;
 use scursor::WriteCursor;
 
 pub(crate) struct Database {
     static_db: StaticDatabase,
     event_buffer: EventBuffer,
+    _default_set: AttrSet,
 }
 
 impl Database {
@@ -25,6 +27,7 @@ impl Database {
         Self {
             static_db: StaticDatabase::new(max_read_selection, class_zero_config),
             event_buffer: EventBuffer::new(config),
+            _default_set: Default::default(),
         }
     }
 

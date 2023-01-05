@@ -727,6 +727,21 @@ pub enum AttrValue<'a> {
     AttrList(VariationList<'a>),
 }
 
+impl<'a> AttrValue<'a> {
+    pub(crate) fn to_owned(self) -> OwnedAttrValue {
+        match self {
+            AttrValue::VisibleString(x) => OwnedAttrValue::VisibleString(x.to_string()),
+            AttrValue::UnsignedInt(x) => OwnedAttrValue::UnsignedInt(x),
+            AttrValue::SignedInt(x) => OwnedAttrValue::SignedInt(x),
+            AttrValue::FloatingPoint(x) => OwnedAttrValue::FloatingPoint(x),
+            AttrValue::OctetString(x) => OwnedAttrValue::OctetString(x.to_vec()),
+            AttrValue::Dnp3Time(x) => OwnedAttrValue::Dnp3Time(x),
+            AttrValue::BitString(x) => OwnedAttrValue::BitString(x.to_vec()),
+            AttrValue::AttrList(x) => OwnedAttrValue::AttrList(x.iter().collect()),
+        }
+    }
+}
+
 /// Represents the value of an attribute
 ///
 /// This type owns all of its data unlike [AttrValue].
@@ -746,6 +761,8 @@ pub enum OwnedAttrValue {
     Dnp3Time(Timestamp),
     /// BSTR - Bit string
     BitString(Vec<u8>),
+    /// List of UINT8-BSTR8
+    AttrList(Vec<AttrItem>),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -871,6 +888,10 @@ impl OwnedAttrValue {
             OwnedAttrValue::OctetString(x) => Self::write_bytes(cursor, OCTET_STRING, x.as_slice()),
             OwnedAttrValue::Dnp3Time(x) => Self::write_time(cursor, *x),
             OwnedAttrValue::BitString(x) => Self::write_bytes(cursor, BIT_STRING, x.as_slice()),
+            OwnedAttrValue::AttrList(_) => {
+                // TODO!
+                unimplemented!()
+            }
         }
     }
 
@@ -927,7 +948,7 @@ impl OwnedAttrValue {
 
 /// Expected type X but received type Y
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct TypeError {
+pub struct TypeError {
     pub(crate) expected: AttrDataType,
     pub(crate) actual: AttrDataType,
 }
@@ -1029,6 +1050,16 @@ pub struct Attribute<'a> {
     pub variation: u8,
     /// Value of the attribute borrowed from the underlying buffer
     pub value: AttrValue<'a>,
+}
+
+impl<'a> Attribute<'a> {
+    pub(crate) fn to_owned(self) -> OwnedAttribute {
+        OwnedAttribute {
+            set: self.set,
+            variation: self.variation,
+            value: self.value.to_owned(),
+        }
+    }
 }
 
 /// Attribute value and the set to which it belongs

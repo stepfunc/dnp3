@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+pub(crate) mod attr;
 pub(crate) mod database;
 pub(crate) mod event;
 pub(crate) mod range;
