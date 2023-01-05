@@ -467,10 +467,13 @@ impl From<FloatAttr> for u8 {
     }
 }
 
-/// Variants for all the pre-defined attributes in the standard
+/// An enumeration that represents all of attributes defined in the default set (0)
+///
+/// Each type has its own enum which represents only the valid variants for that type,
+/// e.g. see [StringAttr] or [UIntAttr].
 #[derive(Clone, Debug, PartialEq)]
 pub enum KnownAttribute<'a> {
-    /// Variation 255 - List of attribute variations
+    /// List of attribute variations
     AttributeList(VariationListAttr, VariationList<'a>),
     /// VStr attributes
     String(StringAttr, &'a str),
@@ -724,9 +727,10 @@ pub enum AttrValue<'a> {
     AttrList(VariationList<'a>),
 }
 
-/// Represents the value of a device attribute in a format
+/// Represents the value of an attribute
+///
+/// This type owns all of its data unlike [AttrValue].
 #[derive(Clone, Debug, PartialEq)]
-#[non_exhaustive]
 pub enum OwnedAttrValue {
     /// VSTR - Visible character suitable for print and display
     VisibleString(String),
@@ -1028,6 +1032,8 @@ pub struct Attribute<'a> {
 }
 
 /// Attribute value and the set to which it belongs
+///
+/// This type owns all of its data unlike [Attribute].
 #[derive(Clone, Debug, PartialEq)]
 pub struct OwnedAttribute {
     /// Set to which the attribute belongs
