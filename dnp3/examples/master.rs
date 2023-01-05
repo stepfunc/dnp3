@@ -340,8 +340,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 // ANCHOR_END: freeze_at_time
             }
-            "ral" => {
-                // read the attribute list
+            "rda" => {
+                // ANCHOR: read_attributes
                 let result = association
                     .read(ReadRequest::one_byte_range(Variation::Group0Var254, 0, 0))
                     .await;
@@ -349,6 +349,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Err(err) = result {
                     tracing::warn!("error: reading device attributes {}", err);
                 }
+                // ANCHOR_END: read_attributes
             }
             "wda" => {
                 let headers = Headers::default()
@@ -362,7 +363,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::warn!("error writing device attribute: {}", err);
                 }
             }
-            "rsa" => {
+            "ral" => {
                 let result = association
                     .read(ReadRequest::one_byte_range(Variation::Group0(255), 0, 0))
                     .await;
