@@ -17,6 +17,53 @@ impl Variation {
             _ => Ok(Self { value }),
         }
     }
+
+    /// variations in the default set *may* be configured as writable by the user
+    fn can_be_written(self) -> bool {
+        use crate::app::attr::var;
+        std::matches!(
+            self.value,
+            var::DEVICE_LOCATION_ALTITUDE
+                | var::DEVICE_LOCATION_LONGITUDE
+                | var::DEVICE_LOCATION_LATITUDE
+                | var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME
+                | var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME
+                | var::USER_ASSIGNED_OWNER_NAME
+                | var::USER_ASSIGNED_DEVICE_NAME
+                | var::USER_ASSIGNED_ID
+                | var::USER_ASSIGNED_LOCATION
+        )
+    }
+
+    /// variations in the default set that are sourced from internal configuration only
+    fn is_internal(self) -> bool {
+        use crate::app::attr::var;
+        std::matches!(
+            self.value,
+            // static configuration values
+            var::MAX_TX_FRAGMENT_SIZE |
+                var::MAX_RX_FRAGMENT_SIZE |
+                var::MAX_BINARY_OUTPUT_PER_REQUEST |
+                // shape of the database - this could change between requests
+                var::NUM_BINARY_INPUT |
+                var::MAX_BINARY_INPUT_INDEX |
+                //
+                var::NUM_DOUBLE_BIT_BINARY_INPUT |
+                var::MAX_DOUBLE_BIT_BINARY_INPUT_INDEX |
+                //
+                var::NUM_ANALOG_INPUT |
+                var::MAX_ANALOG_INPUT_INDEX |
+                //
+                var::NUM_COUNTER |
+                var::MAX_COUNTER_INDEX |
+                //
+                var::NUM_BINARY_OUTPUT |
+                var::MAX_BINARY_OUTPUT_INDEX |
+                //
+                var::NUM_ANALOG_OUTPUT |
+                var::MAX_ANALOG_OUTPUT_INDEX
+        )
+    }
 }
 
 type VarMap = BTreeMap<Variation, (AttrProp, OwnedAttribute)>;
@@ -42,6 +89,8 @@ pub(crate) enum AttrError {
     ReservedVariation(u8),
     /// The attribute is not writable
     NotWritable,
+    /// The attribute is determined internally to the library and cannot be defined by the user
+    InternalOnly,
 }
 
 impl From<TypeError> for AttrError {
@@ -55,14 +104,25 @@ impl SetMap {
     ///
     /// return false if the attribute already exists
     pub(crate) fn define(&mut self, prop: AttrProp, attr: OwnedAttribute) -> Result<(), AttrError> {
-        let key = Variation::create(attr.variation)?;
-        // this will ensure that we're using the right types for default attributes
+        // reject reserved variations
+        let variation = Variation::create(attr.variation)?;
+
+        // ensure that we're using the right types for default attributes
         let _ = AnyAttribute::try_from(&attr.view())?;
-        // this validates writable properties in the default set
-        Self::validate_properties(prop, &attr)?;
+
+        // constraints that apply to certain items in the default set
+        if attr.set == AttrSet::Default {
+            if prop.is_writable() && !variation.can_be_written() {
+                return Err(AttrError::NotWritable);
+            }
+            if variation.is_internal() {
+                return Err(AttrError::InternalOnly);
+            }
+        }
+
         // lookup or create the set
         match self.sets.entry(attr.set) {
-            Entry::Occupied(mut e) => match e.get_mut().entry(key) {
+            Entry::Occupied(mut e) => match e.get_mut().entry(variation) {
                 Entry::Occupied(_) => Err(AttrError::AlreadyDefined),
                 Entry::Vacant(x) => {
                     x.insert((prop, attr));
@@ -71,7 +131,7 @@ impl SetMap {
             },
             Entry::Vacant(e) => {
                 let mut new_set = BTreeMap::new();
-                new_set.insert(key, (prop, attr));
+                new_set.insert(variation, (prop, attr));
                 e.insert(new_set);
                 Ok(())
             }
@@ -126,31 +186,6 @@ impl SetMap {
             Some(set) => Ok(set),
         }
     }
-
-    fn validate_properties(prop: AttrProp, attr: &OwnedAttribute) -> Result<(), AttrError> {
-        fn allow_writable(variation: u8) -> bool {
-            use crate::app::attr::var;
-            std::matches!(
-                variation,
-                var::DEVICE_LOCATION_ALTITUDE |
-                var::DEVICE_LOCATION_LONGITUDE |
-                var::DEVICE_LOCATION_LATITUDE |
-                var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME |
-                var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME |
-                var::USER_ASSIGNED_OWNER_NAME |
-                var::USER_ASSIGNED_DEVICE_NAME |
-                var::USER_ASSIGNED_ID |
-                var::USER_ASSIGNED_LOCATION |
-                var::MAX_TX_FRAGMENT_SIZE
-            )
-        }
-
-        if prop.is_writable() && !allow_writable(attr.variation) {
-            return Err(AttrError::NotWritable);
-        };
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -204,6 +239,18 @@ mod test {
                 actual: AttrDataType::SignedInt
             })
         );
+    }
+
+    #[test]
+    fn cannot_define_internal_attributes_in_default_set() {
+        let mut map = SetMap::default();
+        let err = map
+            .define(
+                AttrProp::default(),
+                UIntAttr::MaxBinaryOutputIndex.with_value(42),
+            )
+            .unwrap_err();
+        assert_eq!(err, AttrError::InternalOnly);
     }
 
     #[test]

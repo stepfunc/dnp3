@@ -142,7 +142,7 @@ pub enum VariationListAttr {
 }
 
 impl VariationListAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::AttributeList(
             self,
             value.expect_attr_list()?,
@@ -205,7 +205,7 @@ pub enum StringAttr {
 }
 
 impl StringAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::String(self, value.expect_vstr()?))
     }
 
@@ -307,7 +307,7 @@ pub enum UIntAttr {
 }
 
 impl UIntAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::UInt(self, value.expect_uint()?))
     }
 
@@ -384,7 +384,7 @@ pub enum BoolAttr {
 }
 
 impl BoolAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::Bool(self, value.expect_bool()?))
     }
 
@@ -431,7 +431,7 @@ pub enum TimeAttr {
 }
 
 impl TimeAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::DNP3Time(self, value.expect_time()?))
     }
 
@@ -467,7 +467,7 @@ pub enum OctetStringAttr {
 }
 
 impl OctetStringAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::OctetString(
             self,
             value.expect_octet_string()?,
@@ -500,7 +500,7 @@ impl From<OctetStringAttr> for u8 {
 /// Enumeration of all known float attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FloatAttr {
-    /// Variation 203 - Altitude of the device
+    /// Variation 203 - Altitude of the device in meters
     DeviceLocationAltitude,
     /// Variation 204 - Longitude of the device from reference meridian (-180.0 to 180.0 deg)
     DeviceLocationLongitude,
@@ -509,7 +509,7 @@ pub enum FloatAttr {
 }
 
 impl FloatAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::Float(self, value.expect_float()?))
     }
 
@@ -567,142 +567,126 @@ impl<'a> AnyAttribute<'a> {
         }
 
         let known = match attr.variation {
-            var::CONFIG_ID => StringAttr::ConfigId.extract_from(attr.value)?,
-            var::CONFIG_VERSION => StringAttr::ConfigVersion.extract_from(attr.value)?,
-            var::CONFIG_BUILD_DATE => TimeAttr::ConfigBuildDate.extract_from(attr.value)?,
-            var::CONFIG_LAST_CHANGE_DATE => {
-                TimeAttr::ConfigLastChangeDate.extract_from(attr.value)?
-            }
-            var::CONFIG_DIGEST => OctetStringAttr::ConfigDigest.extract_from(attr.value)?,
+            var::CONFIG_ID => StringAttr::ConfigId.extract(attr.value)?,
+            var::CONFIG_VERSION => StringAttr::ConfigVersion.extract(attr.value)?,
+            var::CONFIG_BUILD_DATE => TimeAttr::ConfigBuildDate.extract(attr.value)?,
+            var::CONFIG_LAST_CHANGE_DATE => TimeAttr::ConfigLastChangeDate.extract(attr.value)?,
+            var::CONFIG_DIGEST => OctetStringAttr::ConfigDigest.extract(attr.value)?,
             var::CONFIG_DIGEST_ALGORITHM => {
-                StringAttr::ConfigDigestAlgorithm.extract_from(attr.value)?
+                StringAttr::ConfigDigestAlgorithm.extract(attr.value)?
             }
-            var::MASTER_RESOURCE_ID => StringAttr::MasterResourceId.extract_from(attr.value)?,
+            var::MASTER_RESOURCE_ID => StringAttr::MasterResourceId.extract(attr.value)?,
             var::DEVICE_LOCATION_ALTITUDE => {
-                FloatAttr::DeviceLocationAltitude.extract_from(attr.value)?
+                FloatAttr::DeviceLocationAltitude.extract(attr.value)?
             }
             var::DEVICE_LOCATION_LONGITUDE => {
-                FloatAttr::DeviceLocationLongitude.extract_from(attr.value)?
+                FloatAttr::DeviceLocationLongitude.extract(attr.value)?
             }
             var::DEVICE_LOCATION_LATITUDE => {
-                FloatAttr::DeviceLocationLatitude.extract_from(attr.value)?
+                FloatAttr::DeviceLocationLatitude.extract(attr.value)?
             }
             var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME => {
-                StringAttr::UserAssignedSecondaryOperatorName.extract_from(attr.value)?
+                StringAttr::UserAssignedSecondaryOperatorName.extract(attr.value)?
             }
             var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME => {
-                StringAttr::UserAssignedPrimaryOperatorName.extract_from(attr.value)?
+                StringAttr::UserAssignedPrimaryOperatorName.extract(attr.value)?
             }
             var::USER_ASSIGNED_SYSTEM_NAME => {
-                StringAttr::UserAssignedSystemName.extract_from(attr.value)?
+                StringAttr::UserAssignedSystemName.extract(attr.value)?
             }
-            var::SECURE_AUTH_VERSION => UIntAttr::SecureAuthVersion.extract_from(attr.value)?,
+            var::SECURE_AUTH_VERSION => UIntAttr::SecureAuthVersion.extract(attr.value)?,
             var::NUM_SECURITY_STAT_PER_ASSOC => {
-                UIntAttr::NumSecurityStatsPerAssoc.extract_from(attr.value)?
+                UIntAttr::NumSecurityStatsPerAssoc.extract(attr.value)?
             }
             var::USER_SPECIFIC_ATTRIBUTES => {
-                StringAttr::UserSpecificAttributes.extract_from(attr.value)?
+                StringAttr::UserSpecificAttributes.extract(attr.value)?
             }
             var::NUM_MASTER_DEFINED_DATA_SET_PROTO => {
-                UIntAttr::NumMasterDefinedDataSetProto.extract_from(attr.value)?
+                UIntAttr::NumMasterDefinedDataSetProto.extract(attr.value)?
             }
             var::NUM_OUTSTATION_DEFINED_DATA_SET_PROTO => {
-                UIntAttr::NumOutstationDefinedDataSetProto.extract_from(attr.value)?
+                UIntAttr::NumOutstationDefinedDataSetProto.extract(attr.value)?
             }
             var::NUM_MASTER_DEFINED_DATA_SETS => {
-                UIntAttr::NumMasterDefinedDataSets.extract_from(attr.value)?
+                UIntAttr::NumMasterDefinedDataSets.extract(attr.value)?
             }
             var::NUM_OUTSTATION_DEFINED_DATA_SETS => {
-                UIntAttr::NumOutstationDefinedDataSets.extract_from(attr.value)?
+                UIntAttr::NumOutstationDefinedDataSets.extract(attr.value)?
             }
             var::MAX_BINARY_OUTPUT_PER_REQUEST => {
-                UIntAttr::MaxBinaryOutputPerRequest.extract_from(attr.value)?
+                UIntAttr::MaxBinaryOutputPerRequest.extract(attr.value)?
             }
-            var::LOCAL_TIMING_ACCURACY => UIntAttr::LocalTimingAccuracy.extract_from(attr.value)?,
+            var::LOCAL_TIMING_ACCURACY => UIntAttr::LocalTimingAccuracy.extract(attr.value)?,
             var::DURATION_OF_TIME_ACCURACY => {
-                UIntAttr::DurationOfTimeAccuracy.extract_from(attr.value)?
+                UIntAttr::DurationOfTimeAccuracy.extract(attr.value)?
             }
             var::SUPPORTS_ANALOG_OUTPUT_EVENTS => {
-                BoolAttr::SupportsAnalogOutputEvents.extract_from(attr.value)?
+                BoolAttr::SupportsAnalogOutputEvents.extract(attr.value)?
             }
-            var::MAX_ANALOG_OUTPUT_INDEX => {
-                UIntAttr::MaxAnalogOutputIndex.extract_from(attr.value)?
-            }
-            var::NUM_ANALOG_OUTPUT => UIntAttr::NumAnalogOutputs.extract_from(attr.value)?,
+            var::MAX_ANALOG_OUTPUT_INDEX => UIntAttr::MaxAnalogOutputIndex.extract(attr.value)?,
+            var::NUM_ANALOG_OUTPUT => UIntAttr::NumAnalogOutputs.extract(attr.value)?,
             var::SUPPORTS_BINARY_OUTPUT_EVENTS => {
-                BoolAttr::SupportsBinaryOutputEvents.extract_from(attr.value)?
+                BoolAttr::SupportsBinaryOutputEvents.extract(attr.value)?
             }
-            var::MAX_BINARY_OUTPUT_INDEX => {
-                UIntAttr::MaxBinaryOutputIndex.extract_from(attr.value)?
-            }
-            var::NUM_BINARY_OUTPUT => UIntAttr::NumBinaryOutputs.extract_from(attr.value)?,
+            var::MAX_BINARY_OUTPUT_INDEX => UIntAttr::MaxBinaryOutputIndex.extract(attr.value)?,
+            var::NUM_BINARY_OUTPUT => UIntAttr::NumBinaryOutputs.extract(attr.value)?,
             var::SUPPORTS_FROZEN_COUNTER_EVENTS => {
-                BoolAttr::SupportsFrozenCounterEvents.extract_from(attr.value)?
+                BoolAttr::SupportsFrozenCounterEvents.extract(attr.value)?
             }
             var::SUPPORTS_FROZEN_COUNTERS => {
-                BoolAttr::SupportsFrozenCounters.extract_from(attr.value)?
+                BoolAttr::SupportsFrozenCounters.extract(attr.value)?
             }
-            var::SUPPORTS_COUNTER_EVENTS => {
-                BoolAttr::SupportsCounterEvents.extract_from(attr.value)?
-            }
-            var::MAX_COUNTER_INDEX => UIntAttr::MaxCounterIndex.extract_from(attr.value)?,
-            var::NUM_COUNTER => UIntAttr::NumCounter.extract_from(attr.value)?,
+            var::SUPPORTS_COUNTER_EVENTS => BoolAttr::SupportsCounterEvents.extract(attr.value)?,
+            var::MAX_COUNTER_INDEX => UIntAttr::MaxCounterIndex.extract(attr.value)?,
+            var::NUM_COUNTER => UIntAttr::NumCounter.extract(attr.value)?,
             var::SUPPORTS_FROZEN_ANALOG_INPUTS => {
-                BoolAttr::SupportsFrozenAnalogInputs.extract_from(attr.value)?
+                BoolAttr::SupportsFrozenAnalogInputs.extract(attr.value)?
             }
             var::SUPPORTS_ANALOG_INPUT_EVENTS => {
-                BoolAttr::SupportsAnalogInputEvents.extract_from(attr.value)?
+                BoolAttr::SupportsAnalogInputEvents.extract(attr.value)?
             }
-            var::MAX_ANALOG_INPUT_INDEX => {
-                UIntAttr::MaxAnalogInputIndex.extract_from(attr.value)?
-            }
-            var::NUM_ANALOG_INPUT => UIntAttr::NumAnalogInput.extract_from(attr.value)?,
+            var::MAX_ANALOG_INPUT_INDEX => UIntAttr::MaxAnalogInputIndex.extract(attr.value)?,
+            var::NUM_ANALOG_INPUT => UIntAttr::NumAnalogInput.extract(attr.value)?,
             var::SUPPORTS_DOUBLE_BIT_BINARY_INPUT_EVENTS => {
-                BoolAttr::SupportsDoubleBitBinaryInputEvents.extract_from(attr.value)?
+                BoolAttr::SupportsDoubleBitBinaryInputEvents.extract(attr.value)?
             }
             var::MAX_DOUBLE_BIT_BINARY_INPUT_INDEX => {
-                UIntAttr::MaxDoubleBitBinaryInputIndex.extract_from(attr.value)?
+                UIntAttr::MaxDoubleBitBinaryInputIndex.extract(attr.value)?
             }
             var::NUM_DOUBLE_BIT_BINARY_INPUT => {
-                UIntAttr::NumDoubleBitBinaryInput.extract_from(attr.value)?
+                UIntAttr::NumDoubleBitBinaryInput.extract(attr.value)?
             }
             var::SUPPORTS_BINARY_INPUT_EVENTS => {
-                BoolAttr::SupportsBinaryInputEvents.extract_from(attr.value)?
+                BoolAttr::SupportsBinaryInputEvents.extract(attr.value)?
             }
-            var::MAX_BINARY_INPUT_INDEX => {
-                UIntAttr::MaxBinaryInputIndex.extract_from(attr.value)?
-            }
-            var::NUM_BINARY_INPUT => UIntAttr::NumBinaryInput.extract_from(attr.value)?,
-            var::MAX_TX_FRAGMENT_SIZE => UIntAttr::MaxTxFragmentSize.extract_from(attr.value)?,
-            var::MAX_RX_FRAGMENT_SIZE => UIntAttr::MaxRxFragmentSize.extract_from(attr.value)?,
+            var::MAX_BINARY_INPUT_INDEX => UIntAttr::MaxBinaryInputIndex.extract(attr.value)?,
+            var::NUM_BINARY_INPUT => UIntAttr::NumBinaryInput.extract(attr.value)?,
+            var::MAX_TX_FRAGMENT_SIZE => UIntAttr::MaxTxFragmentSize.extract(attr.value)?,
+            var::MAX_RX_FRAGMENT_SIZE => UIntAttr::MaxRxFragmentSize.extract(attr.value)?,
             var::DEVICE_MANUFACTURER_SOFTWARE_VERSION => {
-                StringAttr::DeviceManufacturerSoftwareVersion.extract_from(attr.value)?
+                StringAttr::DeviceManufacturerSoftwareVersion.extract(attr.value)?
             }
             var::DEVICE_MANUFACTURER_HARDWARE_VERSION => {
-                StringAttr::DeviceManufacturerHardwareVersion.extract_from(attr.value)?
+                StringAttr::DeviceManufacturerHardwareVersion.extract(attr.value)?
             }
             var::USER_ASSIGNED_OWNER_NAME => {
-                StringAttr::UserAssignedOwnerName.extract_from(attr.value)?
+                StringAttr::UserAssignedOwnerName.extract(attr.value)?
             }
-            var::USER_ASSIGNED_LOCATION => {
-                StringAttr::UserAssignedLocation.extract_from(attr.value)?
-            }
-            var::USER_ASSIGNED_ID => StringAttr::UserAssignedId.extract_from(attr.value)?,
+            var::USER_ASSIGNED_LOCATION => StringAttr::UserAssignedLocation.extract(attr.value)?,
+            var::USER_ASSIGNED_ID => StringAttr::UserAssignedId.extract(attr.value)?,
             var::USER_ASSIGNED_DEVICE_NAME => {
-                StringAttr::UserAssignedDeviceName.extract_from(attr.value)?
+                StringAttr::UserAssignedDeviceName.extract(attr.value)?
             }
-            var::DEVICE_SERIAL_NUMBER => StringAttr::DeviceSerialNumber.extract_from(attr.value)?,
+            var::DEVICE_SERIAL_NUMBER => StringAttr::DeviceSerialNumber.extract(attr.value)?,
             var::DEVICE_SUBSET_AND_CONFORMANCE => {
-                StringAttr::DeviceSubsetAndConformance.extract_from(attr.value)?
+                StringAttr::DeviceSubsetAndConformance.extract(attr.value)?
             }
-            var::PRODUCT_NAME_AND_MODEL => {
-                StringAttr::ProductNameAndModel.extract_from(attr.value)?
-            }
+            var::PRODUCT_NAME_AND_MODEL => StringAttr::ProductNameAndModel.extract(attr.value)?,
             var::DEVICE_MANUFACTURER_NAME => {
-                StringAttr::DeviceManufacturersName.extract_from(attr.value)?
+                StringAttr::DeviceManufacturersName.extract(attr.value)?
             }
             var::LIST_OF_ATTRIBUTE_VARIATIONS => {
-                VariationListAttr::ListOfVariations.extract_from(attr.value)?
+                VariationListAttr::ListOfVariations.extract(attr.value)?
             }
             _ => return Ok(AnyAttribute::Other(*attr)),
         };
