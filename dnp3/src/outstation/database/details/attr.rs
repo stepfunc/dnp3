@@ -128,22 +128,21 @@ impl SetMap {
     }
 
     fn validate_properties(prop: AttrProp, attr: &OwnedAttribute) -> Result<(), AttrError> {
-        #[allow(clippy::match_like_matches_macro)]
-        fn allow_writable(var: u8) -> bool {
+        fn allow_writable(variation: u8) -> bool {
             use crate::app::attr::var;
-            match var {
-                var::DEVICE_LOCATION_ALTITUDE => true,
-                var::DEVICE_LOCATION_LONGITUDE => true,
-                var::DEVICE_LOCATION_LATITUDE => true,
-                var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME => true,
-                var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME => true,
-                var::USER_ASSIGNED_OWNER_NAME => true,
-                var::USER_ASSIGNED_DEVICE_NAME => true,
-                var::USER_ASSIGNED_ID => true,
-                var::USER_ASSIGNED_LOCATION => true,
-                var::MAX_TX_FRAGMENT_SIZE => true,
-                _ => false,
-            }
+            std::matches!(
+                variation,
+                var::DEVICE_LOCATION_ALTITUDE |
+                var::DEVICE_LOCATION_LONGITUDE |
+                var::DEVICE_LOCATION_LATITUDE |
+                var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME |
+                var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME |
+                var::USER_ASSIGNED_OWNER_NAME |
+                var::USER_ASSIGNED_DEVICE_NAME |
+                var::USER_ASSIGNED_ID |
+                var::USER_ASSIGNED_LOCATION |
+                var::MAX_TX_FRAGMENT_SIZE
+            )
         }
 
         if prop.is_writable() && !allow_writable(attr.variation) {
