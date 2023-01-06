@@ -127,16 +127,11 @@ impl SetMap {
         }
     }
 
-    #[allow(clippy::match_like_matches_macro)]
     fn validate_properties(prop: AttrProp, attr: &OwnedAttribute) -> Result<(), AttrError> {
-        use crate::app::attr::var;
-
-        if !prop.is_writable() {
-            return Ok(());
-        };
-
-        let can_be_writable = match attr.set {
-            AttrSet::Default => match attr.variation {
+        #[allow(clippy::match_like_matches_macro)]
+        fn allow_writable(var: u8) -> bool {
+            use crate::app::attr::var;
+            match var {
                 var::DEVICE_LOCATION_ALTITUDE => true,
                 var::DEVICE_LOCATION_LONGITUDE => true,
                 var::DEVICE_LOCATION_LATITUDE => true,
@@ -148,14 +143,12 @@ impl SetMap {
                 var::USER_ASSIGNED_LOCATION => true,
                 var::MAX_TX_FRAGMENT_SIZE => true,
                 _ => false,
-            },
-            // private sets can do whatever they want
-            AttrSet::Private(_) => true,
-        };
-
-        if !can_be_writable {
-            return Err(AttrError::NotWritable);
+            }
         }
+
+        if prop.is_writable() && !allow_writable(attr.variation) {
+            return Err(AttrError::NotWritable);
+        };
 
         Ok(())
     }
