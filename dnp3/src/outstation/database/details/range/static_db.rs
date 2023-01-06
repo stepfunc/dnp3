@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, Bound, VecDeque};
+use std::fmt::Formatter;
 use std::ops::RangeBounds;
 
 use crate::app::measurement::*;
@@ -35,6 +36,12 @@ pub(crate) trait Updatable: Insertable + Clone + Default {
 pub(crate) struct IndexRange {
     start: u16,
     stop: u16,
+}
+
+impl std::fmt::Display for IndexRange {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "start: {} stop: {}", self.start, self.stop)
+    }
 }
 
 impl IndexRange {

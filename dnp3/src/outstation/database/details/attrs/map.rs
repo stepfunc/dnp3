@@ -142,7 +142,7 @@ impl SetMap {
     pub(crate) fn write(&mut self, attr: Attribute) -> Result<(), AttrError> {
         let key = Variation::create(attr.variation)?;
 
-        match self.get_set(attr.set)?.get_mut(&key) {
+        match self.get_set_mut(attr.set)?.get_mut(&key) {
             None => Err(AttrError::AttrNotDefined(key.value)),
             Some((prop, current)) => {
                 if prop.is_writable() {
@@ -160,18 +160,21 @@ impl SetMap {
         }
     }
 
-    /// Retrieve an attribute in the map
-    pub(crate) fn get(&mut self, set: AttrSet, var: u8) -> Result<&OwnedAttribute, AttrError> {
-        let key = Variation::create(var)?;
+    pub(crate) fn exists(&self, set: AttrSet, var: u8) -> bool {
+        self.get(set, var).is_ok()
+    }
 
+    /// Retrieve an attribute in the map
+    pub(crate) fn get(&self, set: AttrSet, var: u8) -> Result<&OwnedAttribute, AttrError> {
+        let key = Variation::create(var)?;
         match self.get_set(set)?.get(&key) {
             None => Err(AttrError::AttrNotDefined(key.value)),
             Some((_, attr)) => Ok(attr),
         }
     }
 
-    /// Iterate over variations in a set. This is useful for implementing READ on g0v254.
-    pub(crate) fn set_iter(&mut self, set: AttrSet) -> Option<impl Iterator<Item = AttrItem> + '_> {
+    /// Iterate over variations in a requested set. This is useful for implementing READ on g0v254.
+    pub(crate) fn variations(&self, set: AttrSet) -> Option<impl Iterator<Item = AttrItem> + '_> {
         self.sets.get(&set).map(|x| {
             x.iter().map(|(k, (prop, _))| AttrItem {
                 variation: k.value,
@@ -180,8 +183,20 @@ impl SetMap {
         })
     }
 
-    fn get_set(&mut self, set: AttrSet) -> Result<&mut VarMap, AttrError> {
+    /// Iterate over all the sets. This is useful for READ 255 w/ 0x06.
+    pub(crate) fn sets(&self) -> impl Iterator<Item = AttrSet> + '_ {
+        self.sets.keys().copied()
+    }
+
+    fn get_set_mut(&mut self, set: AttrSet) -> Result<&mut VarMap, AttrError> {
         match self.sets.get_mut(&set) {
+            None => Err(AttrError::SetNotDefined(set)),
+            Some(set) => Ok(set),
+        }
+    }
+
+    fn get_set(&self, set: AttrSet) -> Result<&VarMap, AttrError> {
+        match self.sets.get(&set) {
             None => Err(AttrError::SetNotDefined(set)),
             Some(set) => Ok(set),
         }
@@ -202,9 +217,9 @@ mod test {
         map.define(AttrProp::default(), attr2).unwrap();
 
         // any other set will be NONE
-        assert!(map.set_iter(AttrSet::new(1)).is_none());
+        assert!(map.variations(AttrSet::new(1)).is_none());
 
-        let mut items = map.set_iter(AttrSet::Default).unwrap();
+        let mut items = map.variations(AttrSet::Default).unwrap();
 
         assert_eq!(
             items.next().unwrap(),

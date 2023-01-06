@@ -4,7 +4,7 @@ use crate::outstation::database::details::event::buffer::EventBuffer;
 use crate::outstation::database::details::range::static_db::{
     PointConfig, StaticDatabase, Updatable,
 };
-use crate::outstation::database::read::{AttrHeader, ReadHeader};
+use crate::outstation::database::read::ReadHeader;
 use crate::outstation::database::{
     ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateOptions,
 };
@@ -14,6 +14,7 @@ use scursor::WriteCursor;
 pub(crate) struct Database {
     static_db: StaticDatabase,
     event_buffer: EventBuffer,
+    attrs: super::attrs::AttrHandler,
 }
 
 impl Database {
@@ -25,12 +26,14 @@ impl Database {
         Self {
             static_db: StaticDatabase::new(max_read_selection, class_zero_config),
             event_buffer: EventBuffer::new(config),
+            attrs: super::attrs::AttrHandler::new(32),
         }
     }
 
     pub(crate) fn reset(&mut self) {
         self.static_db.reset();
         self.event_buffer.reset();
+        self.attrs.reset();
     }
 
     pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> bool {
@@ -56,16 +59,7 @@ impl Database {
                 self.event_buffer.select_by_header(header);
                 Iin2::default()
             }
-            ReadHeader::Attr(x) => match x {
-                AttrHeader::All(var) => {
-                    tracing::warn!("read attr {var} all");
-                    Iin2::NO_FUNC_CODE_SUPPORT
-                }
-                AttrHeader::Specific(var, range) => {
-                    tracing::warn!("read attr {var} set: {:?}", range.to_attr_set());
-                    Iin2::NO_FUNC_CODE_SUPPORT
-                }
-            },
+            ReadHeader::Attr(header) => self.attrs.select(header),
         }
     }
 
