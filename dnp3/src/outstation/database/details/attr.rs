@@ -127,23 +127,26 @@ impl SetMap {
         }
     }
 
+    #[allow(clippy::match_like_matches_macro)]
     fn validate_properties(prop: AttrProp, attr: &OwnedAttribute) -> Result<(), AttrError> {
+        use crate::app::attr::var;
+
         if !prop.is_writable() {
             return Ok(());
         };
 
         let can_be_writable = match attr.set {
             AttrSet::Default => match attr.variation {
-                203 => true, // device location altitude
-                204 => true, // device location longitude
-                205 => true, // device location latitude
-                206 => true, // user-assigned secondary operator name
-                207 => true, // user-assigned primary operator name
-                208 => true, // user-assigned name
-                247 => true, // user-assigned device name
-                246 => true, // user-assigned ID/code
-                245 => true, // user-assigned location
-                240 => true, // max tx fragment size
+                var::DEVICE_LOCATION_ALTITUDE => true,
+                var::DEVICE_LOCATION_LONGITUDE => true,
+                var::DEVICE_LOCATION_LATITUDE => true,
+                var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME => true,
+                var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME => true,
+                var::USER_ASSIGNED_OWNER_NAME => true,
+                var::USER_ASSIGNED_DEVICE_NAME => true,
+                var::USER_ASSIGNED_ID => true,
+                var::USER_ASSIGNED_LOCATION => true,
+                var::MAX_TX_FRAGMENT_SIZE => true,
                 _ => false,
             },
             // private sets can do whatever they want

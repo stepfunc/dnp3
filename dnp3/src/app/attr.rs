@@ -6,6 +6,67 @@ use scursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
+/// constants defining attribute variations
+pub(crate) mod var {
+    pub(crate) const CONFIG_ID: u8 = 196;
+    pub(crate) const CONFIG_VERSION: u8 = 197;
+    pub(crate) const CONFIG_BUILD_DATE: u8 = 198;
+    pub(crate) const CONFIG_LAST_CHANGE_DATE: u8 = 199;
+    pub(crate) const CONFIG_DIGEST: u8 = 200;
+    pub(crate) const CONFIG_DIGEST_ALGORITHM: u8 = 201;
+    pub(crate) const MASTER_RESOURCE_ID: u8 = 202;
+    pub(crate) const DEVICE_LOCATION_ALTITUDE: u8 = 203;
+    pub(crate) const DEVICE_LOCATION_LONGITUDE: u8 = 204;
+    pub(crate) const DEVICE_LOCATION_LATITUDE: u8 = 205;
+    pub(crate) const USER_ASSIGNED_SECONDARY_OPERATOR_NAME: u8 = 206;
+    pub(crate) const USER_ASSIGNED_PRIMARY_OPERATOR_NAME: u8 = 207;
+    pub(crate) const USER_ASSIGNED_SYSTEM_NAME: u8 = 208;
+    pub(crate) const SECURE_AUTH_VERSION: u8 = 209;
+    pub(crate) const NUM_SECURITY_STAT_PER_ASSOC: u8 = 210;
+    pub(crate) const USER_SPECIFIC_ATTRIBUTES: u8 = 211;
+    pub(crate) const NUM_MASTER_DEFINED_DATA_SET_PROTO: u8 = 212;
+    pub(crate) const NUM_OUTSTATION_DEFINED_DATA_SET_PROTO: u8 = 213;
+    pub(crate) const NUM_MASTER_DEFINED_DATA_SETS: u8 = 214;
+    pub(crate) const NUM_OUTSTATION_DEFINED_DATA_SETS: u8 = 215;
+    pub(crate) const MAX_BINARY_OUTPUT_PER_REQUEST: u8 = 216;
+    pub(crate) const LOCAL_TIMING_ACCURACY: u8 = 217;
+    pub(crate) const DURATION_OF_TIME_ACCURACY: u8 = 218;
+    pub(crate) const SUPPORTS_ANALOG_OUTPUT_EVENTS: u8 = 219;
+    pub(crate) const MAX_ANALOG_OUTPUT_INDEX: u8 = 220;
+    pub(crate) const NUM_ANALOG_OUTPUT: u8 = 221;
+    pub(crate) const SUPPORTS_BINARY_OUTPUT_EVENTS: u8 = 222;
+    pub(crate) const MAX_BINARY_OUTPUT_INDEX: u8 = 223;
+    pub(crate) const NUM_BINARY_OUTPUT: u8 = 224;
+    pub(crate) const SUPPORTS_FROZEN_COUNTER_EVENTS: u8 = 225;
+    pub(crate) const SUPPORTS_FROZEN_COUNTERS: u8 = 226;
+    pub(crate) const SUPPORTS_COUNTER_EVENTS: u8 = 227;
+    pub(crate) const MAX_COUNTER_INDEX: u8 = 228;
+    pub(crate) const NUM_COUNTER: u8 = 229;
+    pub(crate) const SUPPORTS_FROZEN_ANALOG_INPUTS: u8 = 230;
+    pub(crate) const SUPPORTS_ANALOG_INPUT_EVENTS: u8 = 231;
+    pub(crate) const MAX_ANALOG_INPUT_INDEX: u8 = 232;
+    pub(crate) const NUM_ANALOG_INPUT: u8 = 233;
+    pub(crate) const SUPPORTS_DOUBLE_BIT_BINARY_INPUT_EVENTS: u8 = 234;
+    pub(crate) const MAX_DOUBLE_BIT_BINARY_INPUT_INDEX: u8 = 235;
+    pub(crate) const NUM_DOUBLE_BIT_BINARY_INPUT: u8 = 236;
+    pub(crate) const SUPPORTS_BINARY_INPUT_EVENTS: u8 = 237;
+    pub(crate) const MAX_BINARY_INPUT_INDEX: u8 = 238;
+    pub(crate) const NUM_BINARY_INPUT: u8 = 239;
+    pub(crate) const MAX_TX_FRAGMENT_SIZE: u8 = 240;
+    pub(crate) const MAX_RX_FRAGMENT_SIZE: u8 = 241;
+    pub(crate) const DEVICE_MANUFACTURER_SOFTWARE_VERSION: u8 = 242;
+    pub(crate) const DEVICE_MANUFACTURER_HARDWARE_VERSION: u8 = 243;
+    pub(crate) const USER_ASSIGNED_OWNER_NAME: u8 = 244;
+    pub(crate) const USER_ASSIGNED_LOCATION: u8 = 245;
+    pub(crate) const USER_ASSIGNED_ID: u8 = 246;
+    pub(crate) const USER_ASSIGNED_DEVICE_NAME: u8 = 247;
+    pub(crate) const DEVICE_SERIAL_NUMBER: u8 = 248;
+    pub(crate) const DEVICE_SUBSET_AND_CONFORMANCE: u8 = 249;
+    pub(crate) const PRODUCT_NAME_AND_MODEL: u8 = 250;
+    pub(crate) const DEVICE_MANUFACTURER_NAME: u8 = 252;
+    pub(crate) const LIST_OF_ATTRIBUTE_VARIATIONS: u8 = 255;
+}
+
 /// Set to which a device attribute belongs
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AttrSet {
@@ -151,24 +212,30 @@ impl StringAttr {
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            StringAttr::ConfigId => 196,
-            StringAttr::ConfigVersion => 197,
-            StringAttr::ConfigDigestAlgorithm => 201,
-            StringAttr::MasterResourceId => 202,
-            StringAttr::UserAssignedSecondaryOperatorName => 206,
-            StringAttr::UserAssignedPrimaryOperatorName => 207,
-            StringAttr::UserAssignedSystemName => 208,
-            StringAttr::UserSpecificAttributes => 211,
-            StringAttr::DeviceManufacturerSoftwareVersion => 242,
-            StringAttr::DeviceManufacturerHardwareVersion => 243,
-            StringAttr::UserAssignedOwnerName => 244,
-            StringAttr::UserAssignedLocation => 245,
-            StringAttr::UserAssignedId => 246,
-            StringAttr::UserAssignedDeviceName => 247,
-            StringAttr::DeviceSerialNumber => 248,
-            StringAttr::DeviceSubsetAndConformance => 249,
-            StringAttr::ProductNameAndModel => 250,
-            StringAttr::DeviceManufacturersName => 252,
+            StringAttr::ConfigId => var::CONFIG_ID,
+            StringAttr::ConfigVersion => var::CONFIG_VERSION,
+            StringAttr::ConfigDigestAlgorithm => var::CONFIG_DIGEST_ALGORITHM,
+            StringAttr::MasterResourceId => var::MASTER_RESOURCE_ID,
+            StringAttr::UserAssignedSecondaryOperatorName => {
+                var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME
+            }
+            StringAttr::UserAssignedPrimaryOperatorName => var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME,
+            StringAttr::UserAssignedSystemName => var::USER_ASSIGNED_SYSTEM_NAME,
+            StringAttr::UserSpecificAttributes => var::USER_SPECIFIC_ATTRIBUTES,
+            StringAttr::DeviceManufacturerSoftwareVersion => {
+                var::DEVICE_MANUFACTURER_SOFTWARE_VERSION
+            }
+            StringAttr::DeviceManufacturerHardwareVersion => {
+                var::DEVICE_MANUFACTURER_HARDWARE_VERSION
+            }
+            StringAttr::UserAssignedOwnerName => var::USER_ASSIGNED_OWNER_NAME,
+            StringAttr::UserAssignedLocation => var::USER_ASSIGNED_LOCATION,
+            StringAttr::UserAssignedId => var::USER_ASSIGNED_ID,
+            StringAttr::UserAssignedDeviceName => var::USER_ASSIGNED_DEVICE_NAME,
+            StringAttr::DeviceSerialNumber => var::DEVICE_SERIAL_NUMBER,
+            StringAttr::DeviceSubsetAndConformance => var::DEVICE_SUBSET_AND_CONFORMANCE,
+            StringAttr::ProductNameAndModel => var::PRODUCT_NAME_AND_MODEL,
+            StringAttr::DeviceManufacturersName => var::DEVICE_MANUFACTURER_NAME,
         }
     }
 
@@ -247,29 +314,31 @@ impl UIntAttr {
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            UIntAttr::SecureAuthVersion => 209,
-            UIntAttr::NumSecurityStatsPerAssoc => 210,
-            UIntAttr::NumMasterDefinedDataSetProto => 212,
-            UIntAttr::NumOutstationDefinedDataSetProto => 213,
-            UIntAttr::NumMasterDefinedDataSets => 214,
-            UIntAttr::NumOutstationDefinedDataSets => 215,
-            UIntAttr::MaxBinaryOutputPerRequest => 216,
-            UIntAttr::LocalTimingAccuracy => 217,
-            UIntAttr::DurationOfTimeAccuracy => 218,
-            UIntAttr::MaxAnalogOutputIndex => 220,
-            UIntAttr::NumAnalogOutputs => 221,
-            UIntAttr::MaxBinaryOutputIndex => 223,
-            UIntAttr::NumBinaryOutputs => 224,
-            UIntAttr::MaxCounterIndex => 228,
-            UIntAttr::NumCounter => 229,
-            UIntAttr::MaxAnalogInputIndex => 232,
-            UIntAttr::NumAnalogInput => 233,
-            UIntAttr::MaxDoubleBitBinaryInputIndex => 235,
-            UIntAttr::NumDoubleBitBinaryInput => 236,
-            UIntAttr::MaxBinaryInputIndex => 238,
-            UIntAttr::NumBinaryInput => 239,
-            UIntAttr::MaxTxFragmentSize => 240,
-            UIntAttr::MaxRxFragmentSize => 241,
+            UIntAttr::SecureAuthVersion => var::SECURE_AUTH_VERSION,
+            UIntAttr::NumSecurityStatsPerAssoc => var::NUM_SECURITY_STAT_PER_ASSOC,
+            UIntAttr::NumMasterDefinedDataSetProto => var::NUM_MASTER_DEFINED_DATA_SET_PROTO,
+            UIntAttr::NumOutstationDefinedDataSetProto => {
+                var::NUM_OUTSTATION_DEFINED_DATA_SET_PROTO
+            }
+            UIntAttr::NumMasterDefinedDataSets => var::NUM_MASTER_DEFINED_DATA_SETS,
+            UIntAttr::NumOutstationDefinedDataSets => var::NUM_OUTSTATION_DEFINED_DATA_SETS,
+            UIntAttr::MaxBinaryOutputPerRequest => var::MAX_BINARY_OUTPUT_PER_REQUEST,
+            UIntAttr::LocalTimingAccuracy => var::LOCAL_TIMING_ACCURACY,
+            UIntAttr::DurationOfTimeAccuracy => var::DURATION_OF_TIME_ACCURACY,
+            UIntAttr::MaxAnalogOutputIndex => var::MAX_ANALOG_OUTPUT_INDEX,
+            UIntAttr::NumAnalogOutputs => var::NUM_ANALOG_OUTPUT,
+            UIntAttr::MaxBinaryOutputIndex => var::MAX_BINARY_OUTPUT_INDEX,
+            UIntAttr::NumBinaryOutputs => var::NUM_BINARY_OUTPUT,
+            UIntAttr::MaxCounterIndex => var::MAX_COUNTER_INDEX,
+            UIntAttr::NumCounter => var::NUM_COUNTER,
+            UIntAttr::MaxAnalogInputIndex => var::MAX_ANALOG_INPUT_INDEX,
+            UIntAttr::NumAnalogInput => var::NUM_ANALOG_INPUT,
+            UIntAttr::MaxDoubleBitBinaryInputIndex => var::MAX_DOUBLE_BIT_BINARY_INPUT_INDEX,
+            UIntAttr::NumDoubleBitBinaryInput => var::NUM_DOUBLE_BIT_BINARY_INPUT,
+            UIntAttr::MaxBinaryInputIndex => var::MAX_BINARY_INPUT_INDEX,
+            UIntAttr::NumBinaryInput => var::NUM_BINARY_INPUT,
+            UIntAttr::MaxTxFragmentSize => var::MAX_TX_FRAGMENT_SIZE,
+            UIntAttr::MaxRxFragmentSize => var::MAX_RX_FRAGMENT_SIZE,
         }
     }
 
@@ -322,15 +391,17 @@ impl BoolAttr {
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            BoolAttr::SupportsAnalogOutputEvents => 219,
-            BoolAttr::SupportsBinaryOutputEvents => 222,
-            BoolAttr::SupportsFrozenCounterEvents => 225,
-            BoolAttr::SupportsFrozenCounters => 226,
-            BoolAttr::SupportsCounterEvents => 227,
-            BoolAttr::SupportsFrozenAnalogInputs => 230,
-            BoolAttr::SupportsAnalogInputEvents => 231,
-            BoolAttr::SupportsDoubleBitBinaryInputEvents => 234,
-            BoolAttr::SupportsBinaryInputEvents => 237,
+            BoolAttr::SupportsAnalogOutputEvents => var::SUPPORTS_ANALOG_OUTPUT_EVENTS,
+            BoolAttr::SupportsBinaryOutputEvents => var::SUPPORTS_BINARY_OUTPUT_EVENTS,
+            BoolAttr::SupportsFrozenCounterEvents => var::SUPPORTS_FROZEN_COUNTER_EVENTS,
+            BoolAttr::SupportsFrozenCounters => var::SUPPORTS_FROZEN_COUNTERS,
+            BoolAttr::SupportsCounterEvents => var::SUPPORTS_COUNTER_EVENTS,
+            BoolAttr::SupportsFrozenAnalogInputs => var::SUPPORTS_FROZEN_ANALOG_INPUTS,
+            BoolAttr::SupportsAnalogInputEvents => var::SUPPORTS_ANALOG_INPUT_EVENTS,
+            BoolAttr::SupportsDoubleBitBinaryInputEvents => {
+                var::SUPPORTS_DOUBLE_BIT_BINARY_INPUT_EVENTS
+            }
+            BoolAttr::SupportsBinaryInputEvents => var::SUPPORTS_BINARY_INPUT_EVENTS,
         }
     }
 
@@ -367,8 +438,8 @@ impl TimeAttr {
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            TimeAttr::ConfigBuildDate => 198,
-            TimeAttr::ConfigLastChangeDate => 199,
+            TimeAttr::ConfigBuildDate => var::CONFIG_BUILD_DATE,
+            TimeAttr::ConfigLastChangeDate => var::CONFIG_LAST_CHANGE_DATE,
         }
     }
 
@@ -406,7 +477,7 @@ impl OctetStringAttr {
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            OctetStringAttr::ConfigDigest => 201,
+            OctetStringAttr::ConfigDigest => var::CONFIG_DIGEST,
         }
     }
 
@@ -445,9 +516,9 @@ impl FloatAttr {
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            FloatAttr::DeviceLocationAltitude => 203,
-            FloatAttr::DeviceLocationLongitude => 204,
-            FloatAttr::DeviceLocationLatitude => 205,
+            FloatAttr::DeviceLocationAltitude => var::DEVICE_LOCATION_ALTITUDE,
+            FloatAttr::DeviceLocationLongitude => var::DEVICE_LOCATION_LONGITUDE,
+            FloatAttr::DeviceLocationLatitude => var::DEVICE_LOCATION_LATITUDE,
         }
     }
 
@@ -496,63 +567,143 @@ impl<'a> AnyAttribute<'a> {
         }
 
         let known = match attr.variation {
-            196 => StringAttr::ConfigId.extract_from(attr.value)?,
-            197 => StringAttr::ConfigVersion.extract_from(attr.value)?,
-            198 => TimeAttr::ConfigBuildDate.extract_from(attr.value)?,
-            199 => TimeAttr::ConfigLastChangeDate.extract_from(attr.value)?,
-            200 => OctetStringAttr::ConfigDigest.extract_from(attr.value)?,
-            201 => StringAttr::ConfigDigestAlgorithm.extract_from(attr.value)?,
-            202 => StringAttr::MasterResourceId.extract_from(attr.value)?,
-            203 => FloatAttr::DeviceLocationAltitude.extract_from(attr.value)?,
-            204 => FloatAttr::DeviceLocationLongitude.extract_from(attr.value)?,
-            205 => FloatAttr::DeviceLocationLatitude.extract_from(attr.value)?,
-            206 => StringAttr::UserAssignedSecondaryOperatorName.extract_from(attr.value)?,
-            207 => StringAttr::UserAssignedPrimaryOperatorName.extract_from(attr.value)?,
-            208 => StringAttr::UserAssignedSystemName.extract_from(attr.value)?,
-            209 => UIntAttr::SecureAuthVersion.extract_from(attr.value)?,
-            210 => UIntAttr::NumSecurityStatsPerAssoc.extract_from(attr.value)?,
-            211 => StringAttr::UserSpecificAttributes.extract_from(attr.value)?,
-            212 => UIntAttr::NumMasterDefinedDataSetProto.extract_from(attr.value)?,
-            213 => UIntAttr::NumOutstationDefinedDataSetProto.extract_from(attr.value)?,
-            214 => UIntAttr::NumMasterDefinedDataSets.extract_from(attr.value)?,
-            215 => UIntAttr::NumOutstationDefinedDataSets.extract_from(attr.value)?,
-            216 => UIntAttr::MaxBinaryOutputPerRequest.extract_from(attr.value)?,
-            217 => UIntAttr::LocalTimingAccuracy.extract_from(attr.value)?,
-            218 => UIntAttr::DurationOfTimeAccuracy.extract_from(attr.value)?,
-            219 => BoolAttr::SupportsAnalogOutputEvents.extract_from(attr.value)?,
-            220 => UIntAttr::MaxAnalogOutputIndex.extract_from(attr.value)?,
-            221 => UIntAttr::NumAnalogOutputs.extract_from(attr.value)?,
-            222 => BoolAttr::SupportsBinaryOutputEvents.extract_from(attr.value)?,
-            223 => UIntAttr::MaxBinaryInputIndex.extract_from(attr.value)?,
-            224 => UIntAttr::NumBinaryOutputs.extract_from(attr.value)?,
-            225 => BoolAttr::SupportsFrozenCounterEvents.extract_from(attr.value)?,
-            226 => BoolAttr::SupportsFrozenCounters.extract_from(attr.value)?,
-            227 => BoolAttr::SupportsCounterEvents.extract_from(attr.value)?,
-            228 => UIntAttr::MaxCounterIndex.extract_from(attr.value)?,
-            229 => UIntAttr::NumCounter.extract_from(attr.value)?,
-            230 => BoolAttr::SupportsFrozenAnalogInputs.extract_from(attr.value)?,
-            231 => BoolAttr::SupportsAnalogInputEvents.extract_from(attr.value)?,
-            232 => UIntAttr::MaxAnalogInputIndex.extract_from(attr.value)?,
-            233 => UIntAttr::NumAnalogInput.extract_from(attr.value)?,
-            234 => BoolAttr::SupportsDoubleBitBinaryInputEvents.extract_from(attr.value)?,
-            235 => UIntAttr::MaxDoubleBitBinaryInputIndex.extract_from(attr.value)?,
-            236 => UIntAttr::NumDoubleBitBinaryInput.extract_from(attr.value)?,
-            237 => BoolAttr::SupportsBinaryInputEvents.extract_from(attr.value)?,
-            238 => UIntAttr::MaxBinaryInputIndex.extract_from(attr.value)?,
-            239 => UIntAttr::NumBinaryInput.extract_from(attr.value)?,
-            240 => UIntAttr::MaxTxFragmentSize.extract_from(attr.value)?,
-            241 => UIntAttr::MaxRxFragmentSize.extract_from(attr.value)?,
-            242 => StringAttr::DeviceManufacturerSoftwareVersion.extract_from(attr.value)?,
-            243 => StringAttr::DeviceManufacturerHardwareVersion.extract_from(attr.value)?,
-            244 => StringAttr::UserAssignedOwnerName.extract_from(attr.value)?,
-            245 => StringAttr::UserAssignedLocation.extract_from(attr.value)?,
-            246 => StringAttr::UserAssignedId.extract_from(attr.value)?,
-            247 => StringAttr::UserAssignedDeviceName.extract_from(attr.value)?,
-            248 => StringAttr::DeviceSerialNumber.extract_from(attr.value)?,
-            249 => StringAttr::DeviceSubsetAndConformance.extract_from(attr.value)?,
-            250 => StringAttr::ProductNameAndModel.extract_from(attr.value)?,
-            252 => StringAttr::DeviceManufacturersName.extract_from(attr.value)?,
-            255 => VariationListAttr::ListOfVariations.extract_from(attr.value)?,
+            var::CONFIG_ID => StringAttr::ConfigId.extract_from(attr.value)?,
+            var::CONFIG_VERSION => StringAttr::ConfigVersion.extract_from(attr.value)?,
+            var::CONFIG_BUILD_DATE => TimeAttr::ConfigBuildDate.extract_from(attr.value)?,
+            var::CONFIG_LAST_CHANGE_DATE => {
+                TimeAttr::ConfigLastChangeDate.extract_from(attr.value)?
+            }
+            var::CONFIG_DIGEST => OctetStringAttr::ConfigDigest.extract_from(attr.value)?,
+            var::CONFIG_DIGEST_ALGORITHM => {
+                StringAttr::ConfigDigestAlgorithm.extract_from(attr.value)?
+            }
+            var::MASTER_RESOURCE_ID => StringAttr::MasterResourceId.extract_from(attr.value)?,
+            var::DEVICE_LOCATION_ALTITUDE => {
+                FloatAttr::DeviceLocationAltitude.extract_from(attr.value)?
+            }
+            var::DEVICE_LOCATION_LONGITUDE => {
+                FloatAttr::DeviceLocationLongitude.extract_from(attr.value)?
+            }
+            var::DEVICE_LOCATION_LATITUDE => {
+                FloatAttr::DeviceLocationLatitude.extract_from(attr.value)?
+            }
+            var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME => {
+                StringAttr::UserAssignedSecondaryOperatorName.extract_from(attr.value)?
+            }
+            var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME => {
+                StringAttr::UserAssignedPrimaryOperatorName.extract_from(attr.value)?
+            }
+            var::USER_ASSIGNED_SYSTEM_NAME => {
+                StringAttr::UserAssignedSystemName.extract_from(attr.value)?
+            }
+            var::SECURE_AUTH_VERSION => UIntAttr::SecureAuthVersion.extract_from(attr.value)?,
+            var::NUM_SECURITY_STAT_PER_ASSOC => {
+                UIntAttr::NumSecurityStatsPerAssoc.extract_from(attr.value)?
+            }
+            var::USER_SPECIFIC_ATTRIBUTES => {
+                StringAttr::UserSpecificAttributes.extract_from(attr.value)?
+            }
+            var::NUM_MASTER_DEFINED_DATA_SET_PROTO => {
+                UIntAttr::NumMasterDefinedDataSetProto.extract_from(attr.value)?
+            }
+            var::NUM_OUTSTATION_DEFINED_DATA_SET_PROTO => {
+                UIntAttr::NumOutstationDefinedDataSetProto.extract_from(attr.value)?
+            }
+            var::NUM_MASTER_DEFINED_DATA_SETS => {
+                UIntAttr::NumMasterDefinedDataSets.extract_from(attr.value)?
+            }
+            var::NUM_OUTSTATION_DEFINED_DATA_SETS => {
+                UIntAttr::NumOutstationDefinedDataSets.extract_from(attr.value)?
+            }
+            var::MAX_BINARY_OUTPUT_PER_REQUEST => {
+                UIntAttr::MaxBinaryOutputPerRequest.extract_from(attr.value)?
+            }
+            var::LOCAL_TIMING_ACCURACY => UIntAttr::LocalTimingAccuracy.extract_from(attr.value)?,
+            var::DURATION_OF_TIME_ACCURACY => {
+                UIntAttr::DurationOfTimeAccuracy.extract_from(attr.value)?
+            }
+            var::SUPPORTS_ANALOG_OUTPUT_EVENTS => {
+                BoolAttr::SupportsAnalogOutputEvents.extract_from(attr.value)?
+            }
+            var::MAX_ANALOG_OUTPUT_INDEX => {
+                UIntAttr::MaxAnalogOutputIndex.extract_from(attr.value)?
+            }
+            var::NUM_ANALOG_OUTPUT => UIntAttr::NumAnalogOutputs.extract_from(attr.value)?,
+            var::SUPPORTS_BINARY_OUTPUT_EVENTS => {
+                BoolAttr::SupportsBinaryOutputEvents.extract_from(attr.value)?
+            }
+            var::MAX_BINARY_OUTPUT_INDEX => {
+                UIntAttr::MaxBinaryOutputIndex.extract_from(attr.value)?
+            }
+            var::NUM_BINARY_OUTPUT => UIntAttr::NumBinaryOutputs.extract_from(attr.value)?,
+            var::SUPPORTS_FROZEN_COUNTER_EVENTS => {
+                BoolAttr::SupportsFrozenCounterEvents.extract_from(attr.value)?
+            }
+            var::SUPPORTS_FROZEN_COUNTERS => {
+                BoolAttr::SupportsFrozenCounters.extract_from(attr.value)?
+            }
+            var::SUPPORTS_COUNTER_EVENTS => {
+                BoolAttr::SupportsCounterEvents.extract_from(attr.value)?
+            }
+            var::MAX_COUNTER_INDEX => UIntAttr::MaxCounterIndex.extract_from(attr.value)?,
+            var::NUM_COUNTER => UIntAttr::NumCounter.extract_from(attr.value)?,
+            var::SUPPORTS_FROZEN_ANALOG_INPUTS => {
+                BoolAttr::SupportsFrozenAnalogInputs.extract_from(attr.value)?
+            }
+            var::SUPPORTS_ANALOG_INPUT_EVENTS => {
+                BoolAttr::SupportsAnalogInputEvents.extract_from(attr.value)?
+            }
+            var::MAX_ANALOG_INPUT_INDEX => {
+                UIntAttr::MaxAnalogInputIndex.extract_from(attr.value)?
+            }
+            var::NUM_ANALOG_INPUT => UIntAttr::NumAnalogInput.extract_from(attr.value)?,
+            var::SUPPORTS_DOUBLE_BIT_BINARY_INPUT_EVENTS => {
+                BoolAttr::SupportsDoubleBitBinaryInputEvents.extract_from(attr.value)?
+            }
+            var::MAX_DOUBLE_BIT_BINARY_INPUT_INDEX => {
+                UIntAttr::MaxDoubleBitBinaryInputIndex.extract_from(attr.value)?
+            }
+            var::NUM_DOUBLE_BIT_BINARY_INPUT => {
+                UIntAttr::NumDoubleBitBinaryInput.extract_from(attr.value)?
+            }
+            var::SUPPORTS_BINARY_INPUT_EVENTS => {
+                BoolAttr::SupportsBinaryInputEvents.extract_from(attr.value)?
+            }
+            var::MAX_BINARY_INPUT_INDEX => {
+                UIntAttr::MaxBinaryInputIndex.extract_from(attr.value)?
+            }
+            var::NUM_BINARY_INPUT => UIntAttr::NumBinaryInput.extract_from(attr.value)?,
+            var::MAX_TX_FRAGMENT_SIZE => UIntAttr::MaxTxFragmentSize.extract_from(attr.value)?,
+            var::MAX_RX_FRAGMENT_SIZE => UIntAttr::MaxRxFragmentSize.extract_from(attr.value)?,
+            var::DEVICE_MANUFACTURER_SOFTWARE_VERSION => {
+                StringAttr::DeviceManufacturerSoftwareVersion.extract_from(attr.value)?
+            }
+            var::DEVICE_MANUFACTURER_HARDWARE_VERSION => {
+                StringAttr::DeviceManufacturerHardwareVersion.extract_from(attr.value)?
+            }
+            var::USER_ASSIGNED_OWNER_NAME => {
+                StringAttr::UserAssignedOwnerName.extract_from(attr.value)?
+            }
+            var::USER_ASSIGNED_LOCATION => {
+                StringAttr::UserAssignedLocation.extract_from(attr.value)?
+            }
+            var::USER_ASSIGNED_ID => StringAttr::UserAssignedId.extract_from(attr.value)?,
+            var::USER_ASSIGNED_DEVICE_NAME => {
+                StringAttr::UserAssignedDeviceName.extract_from(attr.value)?
+            }
+            var::DEVICE_SERIAL_NUMBER => StringAttr::DeviceSerialNumber.extract_from(attr.value)?,
+            var::DEVICE_SUBSET_AND_CONFORMANCE => {
+                StringAttr::DeviceSubsetAndConformance.extract_from(attr.value)?
+            }
+            var::PRODUCT_NAME_AND_MODEL => {
+                StringAttr::ProductNameAndModel.extract_from(attr.value)?
+            }
+            var::DEVICE_MANUFACTURER_NAME => {
+                StringAttr::DeviceManufacturersName.extract_from(attr.value)?
+            }
+            var::LIST_OF_ATTRIBUTE_VARIATIONS => {
+                VariationListAttr::ListOfVariations.extract_from(attr.value)?
+            }
             _ => return Ok(AnyAttribute::Other(*attr)),
         };
 
