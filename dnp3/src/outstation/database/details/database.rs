@@ -4,18 +4,16 @@ use crate::outstation::database::details::event::buffer::EventBuffer;
 use crate::outstation::database::details::range::static_db::{
     PointConfig, StaticDatabase, Updatable,
 };
-use crate::outstation::database::read::ReadHeader;
+use crate::outstation::database::read::{AttrHeader, ReadHeader};
 use crate::outstation::database::{
     ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateOptions,
 };
 
-use crate::app::attr::AttrSet;
 use scursor::WriteCursor;
 
 pub(crate) struct Database {
     static_db: StaticDatabase,
     event_buffer: EventBuffer,
-    _default_set: AttrSet,
 }
 
 impl Database {
@@ -27,7 +25,6 @@ impl Database {
         Self {
             static_db: StaticDatabase::new(max_read_selection, class_zero_config),
             event_buffer: EventBuffer::new(config),
-            _default_set: Default::default(),
         }
     }
 
@@ -59,6 +56,16 @@ impl Database {
                 self.event_buffer.select_by_header(header);
                 Iin2::default()
             }
+            ReadHeader::Attr(x) => match x {
+                AttrHeader::All(var) => {
+                    tracing::warn!("read attr {var} all");
+                    Iin2::NO_FUNC_CODE_SUPPORT
+                }
+                AttrHeader::Specific(var, range) => {
+                    tracing::warn!("read attr {var} set: {:?}", range.to_attr_set());
+                    Iin2::NO_FUNC_CODE_SUPPORT
+                }
+            },
         }
     }
 
@@ -111,7 +118,7 @@ impl Database {
         };
 
         let complete = if result.is_err() {
-            // unable to write all the events in this response, so we can't any static data
+            // unable to write all the events in this response, so we can't write any static data
             false
         } else {
             // write all events to we can try to write all static data

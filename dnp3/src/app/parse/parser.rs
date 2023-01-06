@@ -1089,7 +1089,11 @@ mod test {
 
         assert_eq!(first.variation, Variation::Group0(0xCA));
         let set = match first.details {
-            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(Some(set))) => set,
+            HeaderDetails::OneByteStartStop(
+                0x07,
+                0x07,
+                RangedVariation::Group0(0xCA, Some(set)),
+            ) => set,
             _ => unreachable!(),
         };
 
@@ -1117,7 +1121,7 @@ mod test {
         assert_eq!(first.variation, Variation::Group0(0xCA));
         assert!(std::matches!(
             first.details,
-            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(None))
+            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(0xCA, None))
         ));
     }
 

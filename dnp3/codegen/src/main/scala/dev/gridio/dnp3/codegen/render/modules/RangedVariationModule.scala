@@ -39,7 +39,7 @@ object RangedVariationModule extends Module {
         }
         case SpecificAttribute => {
           "/// variation and optional attribute".eol ++
-          s"${v.parent.name}(Option<crate::app::Attribute<'a>>),".eol
+          s"${v.parent.name}(u8, Option<crate::app::attr::Attribute<'a>>),".eol
         }
         case AllAttributesRequest => nameOnly
       }
@@ -56,14 +56,14 @@ object RangedVariationModule extends Module {
 
     def getNonReadVarDefinition(v: Variation) : String = v match {
       case AllAttributesRequest => ""
-      case SpecificAttribute => "(Some(crate::app::Attribute::parse_from_range(var, range, cursor)?))"
+      case SpecificAttribute => "(var, Some(crate::app::attr::Attribute::parse_from_range(var, range, cursor)?))"
       case _ : AnyVariation => ""
       case _ : FixedSize => "(RangedSequence::parse(range, cursor)?)"
     }
 
     def getReadVarDefinition(v: Variation) : String = v match {
       case AllAttributesRequest => ""
-      case SpecificAttribute => "(None)"
+      case SpecificAttribute => "(var, None)"
       case _ : AnyVariation => ""
       case _ : FixedSize => "(RangedSequence::empty())"
     }
@@ -101,7 +101,7 @@ object RangedVariationModule extends Module {
         s"Variation::${v.parent.name}(0) => Ok(RangedVariation::${v.parent.name}Var0),".eol
       }
       case SpecificAttribute => {
-        s"Variation::${v.parent.name}(_) => Ok(RangedVariation::${v.parent.name}${getReadVarDefinition(v)}),".eol
+        s"Variation::${v.parent.name}(var) => Ok(RangedVariation::${v.parent.name}${getReadVarDefinition(v)}),".eol
       }
       case _ => s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getReadVarDefinition(v)}),".eol
     }
@@ -111,7 +111,7 @@ object RangedVariationModule extends Module {
 
       v match {
         case AllAttributesRequest => nothing
-        case SpecificAttribute => s"RangedVariation::${v.parent.name}(x) => format_optional_attribute(f, x),".eol
+        case SpecificAttribute => s"RangedVariation::${v.parent.name}(_, x) => format_optional_attribute(f, x),".eol
         case _ : AnyVariation => nothing
         case _ : SizedByVariation => {
           s"RangedVariation::${v.parent.name}Var0 => Ok(()),".eol ++
@@ -156,7 +156,7 @@ object RangedVariationModule extends Module {
 
       v match {
         case AllAttributesRequest => notSupported
-        case SpecificAttribute => bracket(s"RangedVariation::${v.parent.name}(attr) =>") {
+        case SpecificAttribute => bracket(s"RangedVariation::${v.parent.name}(_, attr) =>") {
           "crate::master::handle_attribute(var, qualifier, attr, handler);".eol ++
           "true".eol
         }

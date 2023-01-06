@@ -27,7 +27,7 @@ pub(crate) enum RangedVariation<'a> {
     Group0Var254,
     /// Device Attributes - Specific Attribute
     /// variation and optional attribute
-    Group0(Option<crate::app::attr::Attribute<'a>>),
+    Group0(u8, Option<crate::app::attr::Attribute<'a>>),
     /// Binary Input - Any Variation
     Group1Var0,
     /// Binary Input - Packed Format
@@ -129,7 +129,7 @@ impl<'a> RangedVariation<'a> {
     pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group0Var254 => Ok(RangedVariation::Group0Var254),
-            Variation::Group0(var) => Ok(RangedVariation::Group0(Some(crate::app::attr::Attribute::parse_from_range(var, range, cursor)?))),
+            Variation::Group0(var) => Ok(RangedVariation::Group0(var, Some(crate::app::attr::Attribute::parse_from_range(var, range, cursor)?))),
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::parse(range, cursor)?)),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::parse(range, cursor)?)),
@@ -187,7 +187,7 @@ impl<'a> RangedVariation<'a> {
     pub(crate) fn parse_read(v: Variation, qualifier: QualifierCode) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group0Var254 => Ok(RangedVariation::Group0Var254),
-            Variation::Group0(_) => Ok(RangedVariation::Group0(None)),
+            Variation::Group0(var) => Ok(RangedVariation::Group0(var, None)),
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::empty())),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::empty())),
@@ -242,7 +242,7 @@ impl<'a> RangedVariation<'a> {
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             RangedVariation::Group0Var254 => Ok(()),
-            RangedVariation::Group0(x) => format_optional_attribute(f, x),
+            RangedVariation::Group0(_, x) => format_optional_attribute(f, x),
             RangedVariation::Group1Var0 => Ok(()),
             RangedVariation::Group1Var1(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group1Var2(seq) => format_indexed_items(f, seq.iter()),
@@ -299,7 +299,7 @@ impl<'a> RangedVariation<'a> {
             RangedVariation::Group0Var254 => {
                 false // extraction not supported
             }
-            RangedVariation::Group0(attr) => {
+            RangedVariation::Group0(_, attr) => {
                 crate::master::handle_attribute(var, qualifier, attr, handler);
                 true
             }

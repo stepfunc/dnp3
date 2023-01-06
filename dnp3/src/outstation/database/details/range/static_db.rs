@@ -11,6 +11,7 @@ use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::outstation::database::read::StaticReadHeader;
 use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
 
+use crate::app::attr::AttrSet;
 use crate::util::BadWrite;
 use scursor::WriteCursor;
 
@@ -39,6 +40,14 @@ pub(crate) struct IndexRange {
 impl IndexRange {
     pub(crate) fn new(start: u16, stop: u16) -> Self {
         Self { start, stop }
+    }
+
+    pub(crate) fn to_attr_set(self) -> Option<AttrSet> {
+        if self.start != self.stop {
+            return None;
+        }
+
+        self.start.try_into().ok().map(AttrSet::new)
     }
 }
 
