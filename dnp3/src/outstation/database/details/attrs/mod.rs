@@ -1,7 +1,11 @@
-use crate::app::attr::AttrSet;
-use crate::app::{Iin2, QualifierCode};
+use crate::app::attr::{
+    AttrDataType, AttrItem, AttrProp, AttrSet, OwnedAttrValue, OwnedAttribute, StringAttr,
+};
+use crate::app::format::write::HeaderWriter;
+use crate::app::{Iin2, QualifierCode, Variation};
 use crate::outstation::database::details::attrs::map::SetMap;
 use crate::outstation::database::read::AttrHeader;
+use scursor::WriteCursor;
 use std::collections::VecDeque;
 
 pub(crate) mod map;
@@ -40,15 +44,18 @@ impl Selected {
         (self.set, self.current)
     }
 
-    fn advance(self) -> Option<Self> {
+    /// return true if completed
+    fn advance(&mut self) -> bool {
         if self.current == self.end {
-            None
+            true
         } else {
-            self.current.checked_add(1).map(|x| Self {
-                set: self.set,
-                current: x,
-                end: self.end,
-            })
+            match self.current.checked_add(1) {
+                Some(x) => {
+                    self.current = x;
+                    false
+                }
+                None => true,
+            }
         }
     }
 }
@@ -56,6 +63,23 @@ impl Selected {
 struct Selection {
     max: usize,
     selected: VecDeque<Selected>,
+}
+
+fn get_list_encoding(num_items: usize) -> Option<(u8, AttrDataType)> {
+    if let Some(len) = num_items.checked_mul(2) {
+        // 2 bytes per attribute
+        match len.try_into() {
+            Ok(x) => return Some((x, AttrDataType::AttrList)),
+            Err(_) => {
+                if let Some(len) = len.checked_sub(255) {
+                    if let Ok(x) = len.try_into() {
+                        return Some((x, AttrDataType::ExtAttrList));
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 impl Selection {
@@ -74,6 +98,73 @@ impl Selection {
         }
     }
 
+    fn tx<F>(cursor: &mut WriteCursor, f: F) -> Result<(), scursor::WriteError>
+    where
+        F: FnOnce(&mut WriteCursor) -> Result<(), scursor::WriteError>,
+    {
+        let start = cursor.position();
+        let res = f(cursor);
+        if res.is_err() {
+            cursor.seek_to(start)?
+        }
+        res
+    }
+
+    fn write_attr_list(
+        set: AttrSet,
+        cursor: &mut WriteCursor,
+        items: impl Iterator<Item = AttrItem>,
+    ) -> Result<(), scursor::WriteError> {
+        if let (_, Some(num)) = items.size_hint() {
+            if let Some((len, dt)) = get_list_encoding(num) {
+                // we're committed to writing now
+                return Self::tx(cursor, |cur| {
+                    HeaderWriter::new(cur).write_range_only(
+                        Variation::Group0(255),
+                        set.value(),
+                        set.value(),
+                    )?;
+                    cur.write_u8(dt.into())?;
+                    cur.write_u8(len)?;
+                    for item in items {
+                        cur.write_u8(item.variation)?;
+                        cur.write_u8(item.properties.into())?;
+                    }
+                    Ok(())
+                });
+            }
+        }
+        Ok(())
+    }
+
+    // return true if we wrote all selected attributes!
+    fn write_all(&mut self, cursor: &mut WriteCursor, map: &SetMap) -> bool {
+        while let Some(item) = self.selected.front_mut() {
+            let (set, var) = item.current();
+
+            // is it a variation list?
+            if var == 255 {
+                if let Some(vars) = map.variations(set) {
+                    if Self::write_attr_list(set, cursor, vars).is_err() {
+                        return false;
+                    }
+                }
+            } else {
+                // check if it exists in the user map
+                if let Ok(attr) = map.get(set, var) {
+                    // attempt to write this attribute!
+                    tracing::info!("writing {:?}", attr);
+                }
+            }
+
+            if item.advance() {
+                self.selected.pop_front();
+            }
+        }
+        tracing::info!("wrote all attributes");
+        true
+    }
+
     fn clear(&mut self) {
         self.selected.clear();
     }
@@ -86,13 +177,43 @@ pub(crate) struct AttrHandler {
 
 impl AttrHandler {
     pub(crate) fn new(max_selected: usize) -> Self {
+        let mut map = SetMap::default();
+
+        // set 0
+        let _ = map.define(
+            AttrProp::default(),
+            StringAttr::UserAssignedLocation.with_value("Bend, OR"),
+        );
+        let _ = map.define(
+            AttrProp::default(),
+            StringAttr::UserAssignedSystemName.with_value("SYSTEMS!"),
+        );
+
+        // set 1
+        let _ = map.define(
+            AttrProp::default(),
+            OwnedAttribute::new(AttrSet::Private(1), 24, OwnedAttrValue::SignedInt(4)),
+        );
+        let _ = map.define(
+            AttrProp::writable(),
+            OwnedAttribute::new(
+                AttrSet::Private(1),
+                26,
+                OwnedAttrValue::VisibleString("tada".to_string()),
+            ),
+        );
+
         Self {
-            map: Default::default(),
+            map,
             selection: Selection {
                 max: max_selected,
                 selected: VecDeque::with_capacity(max_selected),
             },
         }
+    }
+
+    pub(crate) fn write(&mut self, cursor: &mut WriteCursor) -> bool {
+        self.selection.write_all(cursor, &self.map)
     }
 
     pub(crate) fn reset(&mut self) {

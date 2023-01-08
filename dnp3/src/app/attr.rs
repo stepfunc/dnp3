@@ -730,6 +730,22 @@ pub(crate) enum AttrDataType {
     ExtAttrList,
 }
 
+impl From<AttrDataType> for u8 {
+    fn from(value: AttrDataType) -> Self {
+        match value {
+            AttrDataType::VisibleString => VISIBLE_STRING,
+            AttrDataType::UnsignedInt => UNSIGNED_INT,
+            AttrDataType::SignedInt => SIGNED_INT,
+            AttrDataType::FloatingPoint => FLOATING_POINT,
+            AttrDataType::OctetString => OCTET_STRING,
+            AttrDataType::BitString => BIT_STRING,
+            AttrDataType::Dnp3Time => DNP3_TIME,
+            AttrDataType::AttrList => ATTR_LIST,
+            AttrDataType::ExtAttrList => EXT_ATTR_LIST,
+        }
+    }
+}
+
 impl AttrDataType {
     pub(crate) fn get(value: u8) -> Option<AttrDataType> {
         match value {
@@ -800,6 +816,12 @@ impl AttrProp {
         Self {
             is_writable: props & Self::READ_BIT != 0,
         }
+    }
+}
+
+impl From<AttrProp> for u8 {
+    fn from(value: AttrProp) -> Self {
+        value.is_writable.into()
     }
 }
 
@@ -1182,7 +1204,7 @@ impl<'a> AttrValue<'a> {
                 for x in list.iter() {
                     write!(
                         f,
-                        "\n variation: {} writeable: {}",
+                        "\nvariation: {} writeable: {}",
                         x.variation, x.properties.is_writable
                     )?;
                 }
@@ -1370,10 +1392,10 @@ impl<'a> Attribute<'a> {
             AttrSet::Default => {
                 // lookup description
                 let desc = get_default_desc(self.variation);
-                writeln!(f, "\nDefault set - variation {} - {desc}", self.variation)?;
+                write!(f, "\nDefault set - variation {} - {desc}", self.variation)?;
             }
             AttrSet::Private(x) => {
-                writeln!(f, "Private set ({x})")?;
+                write!(f, "\nPrivate set ({x}) - variation {}", self.variation)?;
             }
         }
         self.value.format(f)

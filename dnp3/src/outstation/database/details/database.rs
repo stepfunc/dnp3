@@ -111,12 +111,20 @@ impl Database {
             Err(count) => count > 0,
         };
 
+        // next write static data
         let complete = if result.is_err() {
             // unable to write all the events in this response, so we can't write any static data
             false
         } else {
             // write all events to we can try to write all static data
             self.static_db.write(cursor).is_ok()
+        };
+
+        // next write device attributes
+        let complete = if complete {
+            self.attrs.write(cursor)
+        } else {
+            false
         };
 
         ResponseInfo {
