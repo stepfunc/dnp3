@@ -1,5 +1,6 @@
 use crate::app::attr::{
-    AttrDataType, AttrItem, AttrProp, AttrSet, OwnedAttrValue, OwnedAttribute, StringAttr,
+    AttrDataType, AttrItem, AttrProp, AttrSet, AttrWriteError, OwnedAttrValue, OwnedAttribute,
+    StringAttr,
 };
 use crate::app::format::write::HeaderWriter;
 use crate::app::{Iin2, QualifierCode, Variation};
@@ -143,7 +144,7 @@ impl Selection {
             let (set, var) = item.current();
 
             // is it a variation list?
-            if var == 255 {
+            if var == crate::app::attr::var::LIST_OF_ATTRIBUTE_VARIATIONS {
                 if let Some(vars) = map.variations(set) {
                     if Self::write_attr_list(set, cursor, vars).is_err() {
                         return false;
@@ -152,8 +153,15 @@ impl Selection {
             } else {
                 // check if it exists in the user map
                 if let Ok(attr) = map.get(set, var) {
-                    // attempt to write this attribute!
-                    tracing::info!("writing {:?}", attr);
+                    let mut writer = HeaderWriter::new(cursor);
+                    if let Err(err) = writer.write_attribute(attr) {
+                        match err {
+                            AttrWriteError::Cursor(_) => return false, // out of space
+                            AttrWriteError::BadAttribute(err) => {
+                                tracing::error!("Unable to write attribute: {}", err);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -192,7 +200,7 @@ impl AttrHandler {
         // set 1
         let _ = map.define(
             AttrProp::default(),
-            OwnedAttribute::new(AttrSet::Private(1), 24, OwnedAttrValue::SignedInt(4)),
+            OwnedAttribute::new(AttrSet::Private(1), 24, OwnedAttrValue::SignedInt(42)),
         );
         let _ = map.define(
             AttrProp::writable(),
