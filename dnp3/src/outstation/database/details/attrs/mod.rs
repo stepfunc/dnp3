@@ -258,6 +258,7 @@ impl AttrHandler {
                 };
                 match var {
                     254 => self.selection.push(Selected::all(set)),
+                    255 => self.selection.push(Selected::single(set, 255)),
                     _ => {
                         if self.map.exists(set, var) {
                             self.selection.push(Selected::single(set, var))
