@@ -34,36 +34,6 @@ impl Variation {
                 | var::USER_ASSIGNED_LOCATION
         )
     }
-
-    /// variations in the default set that are sourced from internal configuration only
-    fn is_internal(self) -> bool {
-        use crate::app::attr::var;
-        std::matches!(
-            self.value,
-            // static configuration values
-            var::MAX_TX_FRAGMENT_SIZE |
-                var::MAX_RX_FRAGMENT_SIZE |
-                var::MAX_BINARY_OUTPUT_PER_REQUEST |
-                // shape of the database - this could change between requests
-                var::NUM_BINARY_INPUT |
-                var::MAX_BINARY_INPUT_INDEX |
-                //
-                var::NUM_DOUBLE_BIT_BINARY_INPUT |
-                var::MAX_DOUBLE_BIT_BINARY_INPUT_INDEX |
-                //
-                var::NUM_ANALOG_INPUT |
-                var::MAX_ANALOG_INPUT_INDEX |
-                //
-                var::NUM_COUNTER |
-                var::MAX_COUNTER_INDEX |
-                //
-                var::NUM_BINARY_OUTPUT |
-                var::MAX_BINARY_OUTPUT_INDEX |
-                //
-                var::NUM_ANALOG_OUTPUT |
-                var::MAX_ANALOG_OUTPUT_INDEX
-        )
-    }
 }
 
 type VarMap = BTreeMap<Variation, (AttrProp, OwnedAttribute)>;
@@ -89,8 +59,6 @@ pub(crate) enum AttrError {
     ReservedVariation(u8),
     /// The attribute is not writable
     NotWritable,
-    /// The attribute is determined internally to the library and cannot be defined by the user
-    InternalOnly,
 }
 
 impl From<TypeError> for AttrError {
@@ -111,13 +79,8 @@ impl SetMap {
         let _ = AnyAttribute::try_from(&attr.view())?;
 
         // constraints that apply to certain items in the default set
-        if attr.set == AttrSet::Default {
-            if prop.is_writable() && !variation.can_be_written() {
-                return Err(AttrError::NotWritable);
-            }
-            if variation.is_internal() {
-                return Err(AttrError::InternalOnly);
-            }
+        if attr.set == AttrSet::Default && prop.is_writable() && !variation.can_be_written() {
+            return Err(AttrError::NotWritable);
         }
 
         // lookup or create the set
@@ -254,18 +217,6 @@ mod test {
                 actual: AttrDataType::SignedInt
             })
         );
-    }
-
-    #[test]
-    fn cannot_define_internal_attributes_in_default_set() {
-        let mut map = SetMap::default();
-        let err = map
-            .define(
-                AttrProp::default(),
-                UIntAttr::MaxBinaryOutputIndex.with_value(42),
-            )
-            .unwrap_err();
-        assert_eq!(err, AttrError::InternalOnly);
     }
 
     #[test]
