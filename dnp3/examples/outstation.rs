@@ -6,7 +6,7 @@ use dnp3::link::*;
 use dnp3::outstation::database::*;
 use dnp3::outstation::*;
 
-use dnp3::app::attr::{AttrProp, StringAttr};
+use dnp3::app::attr::{AttrProp, Attribute, StringAttr};
 use dnp3::tcp::*;
 use std::process::exit;
 use std::time::Duration;
@@ -64,6 +64,11 @@ impl OutstationApplication for ExampleOutstationApplication {
 
     fn write_analog_dead_band(&mut self, index: u16, dead_band: f64) {
         tracing::info!("change analog dead-band {index} to {dead_band}");
+    }
+
+    fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<()> {
+        tracing::info!("write device attribute: {:?}", attr);
+        MaybeAsync::ready(())
     }
 }
 

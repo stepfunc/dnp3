@@ -1257,15 +1257,14 @@ impl OutstationSession {
         iin2
     }
 
-    fn handle_write_attr(&mut self, attr: Attribute, db: &mut DatabaseHandle) -> Iin2 {
-        tracing::info!("Received write attr: {:?}", attr);
+    async fn handle_write_attr(&mut self, attr: Attribute<'_>, db: &mut DatabaseHandle) -> Iin2 {
         match db.transaction(|db| db.inner.get_attr_map().write(attr)) {
             Ok(()) => {
-                // TODO - invoke write callback!
+                self.application.write_device_attr(attr).get().await;
                 Iin2::default()
             }
             Err(err) => {
-                tracing::warn!("Error writing attribute: {}", err);
+                tracing::warn!("Unable to WRITE attribute: {}", err);
                 Iin2::PARAMETER_ERROR
             }
         }
@@ -1325,10 +1324,10 @@ impl OutstationSession {
     ) -> Iin2 {
         match header.details {
             HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group0(_, Some(attr))) => {
-                self.handle_write_attr(attr, db)
+                self.handle_write_attr(attr, db).await
             }
             HeaderDetails::TwoByteStartStop(_, _, RangedVariation::Group0(_, Some(attr))) => {
-                self.handle_write_attr(attr, db)
+                self.handle_write_attr(attr, db).await
             }
             HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(bits)) => {
                 self.handle_write_iin(bits)

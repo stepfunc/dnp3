@@ -1,3 +1,4 @@
+use crate::app::attr::Attribute;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
@@ -144,6 +145,19 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// Multiple dead-bands changes can be accumulated in calls to [`Self::write_analog_dead_band`] and
     /// then be processed as a batch in this method.
     fn end_write_analog_dead_bands(&mut self) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
+
+    /// Called in response to a WRITE request containing a group 0 object for purposes of storing
+    /// the value in non-volatile memory. The attribute is automatically updated updated in the
+    /// in-memory database.
+    ///
+    /// This callback is only invoked for attributes that have been defined as write-able in the
+    /// database. The library automatically validates that the attribute has the same type as the
+    /// defined type. Writes to non-defined or readonly attributes are rejected with IIN2::PARAM_ERROR
+    /// within the library.
+    #[allow(unused_variables)]
+    fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<()> {
         MaybeAsync::ready(())
     }
 }
