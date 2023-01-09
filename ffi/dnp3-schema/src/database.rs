@@ -904,22 +904,19 @@ pub(crate) fn define_database(
         .build()?;
 
     let attr_def_error = lib
-        .define_error_type(
-            "attr_def_error",
-            "attr_def_exception",
-            ExceptionType::UncheckedException,
-        )?
+        .define_enum("attr_def_error")?
         .doc("Errors that can occur when defining attributes")?
-        .add_error("already_defined", "Attribute has already been defined")?
-        .add_error(
+        .variant("ok", 0, "attribute defined successfully")?
+        .push("already_defined", "Attribute has already been defined")?
+        .push(
             "reserved_variation",
             "Variation is reserved and cannot be defined",
         )?
-        .add_error(
+        .push(
             "bad_type",
             "The type does not match the required type in set 0",
         )?
-        .add_error(
+        .push(
             "not_writable",
             "This attribute cannot be configured as writable",
         )?
@@ -935,7 +932,10 @@ pub(crate) fn define_database(
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", StringType, "The value of the attribute")?
-        .fails_with(attr_def_error.clone())?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
         .build()?;
 
     let define_float_attr = lib
@@ -948,7 +948,10 @@ pub(crate) fn define_database(
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", Primitive::Float, "The value of the attribute")?
-        .fails_with(attr_def_error.clone())?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
         .build()?;
 
     let define_double_attr = lib
@@ -961,7 +964,10 @@ pub(crate) fn define_database(
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", Primitive::Double, "The value of the attribute")?
-        .fails_with(attr_def_error.clone())?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
         .build()?;
 
     let define_uint_attr = lib
@@ -974,7 +980,10 @@ pub(crate) fn define_database(
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", Primitive::U32, "The value of the attribute")?
-        .fails_with(attr_def_error.clone())?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
         .build()?;
 
     let define_int_attr = lib
@@ -987,7 +996,10 @@ pub(crate) fn define_database(
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", Primitive::S32, "The value of the attribute")?
-        .fails_with(attr_def_error.clone())?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
         .build()?;
 
     let define_time_attr = lib
@@ -1004,7 +1016,10 @@ pub(crate) fn define_database(
             Primitive::U64,
             "The DNP3 timestamp value of the attribute. Only the lower 48-bits are used.",
         )?
-        .fails_with(attr_def_error.clone())?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
         .build()?;
 
     let define_bool_attr = lib
@@ -1017,7 +1032,10 @@ pub(crate) fn define_database(
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", Primitive::Bool, "The value of the attribute")?
-        .fails_with(attr_def_error)?
+        .returns(
+            attr_def_error,
+            "Enumeration indicating if the operation was successful",
+        )?
         .build()?;
 
     // TODO: Add a getter for octet strings

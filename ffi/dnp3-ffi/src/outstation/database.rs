@@ -179,7 +179,7 @@ pub(crate) unsafe fn database_define_string_attr(
     set: u8,
     variation: u8,
     value: &CStr,
-) -> Result<(), ffi::AttrDefError> {
+) -> ffi::AttrDefError {
     let value = || OwnedAttrValue::VisibleString(value.to_string_lossy().to_string());
     define_any_attr(instance, set, variation, value)
 }
@@ -189,7 +189,7 @@ pub(crate) unsafe fn database_define_uint_attr(
     set: u8,
     variation: u8,
     value: u32,
-) -> Result<(), ffi::AttrDefError> {
+) -> ffi::AttrDefError {
     define_any_attr(instance, set, variation, || {
         OwnedAttrValue::UnsignedInt(value)
     })
@@ -200,7 +200,7 @@ pub(crate) unsafe fn database_define_int_attr(
     set: u8,
     variation: u8,
     value: i32,
-) -> Result<(), ffi::AttrDefError> {
+) -> ffi::AttrDefError {
     define_any_attr(instance, set, variation, || {
         OwnedAttrValue::SignedInt(value)
     })
@@ -211,7 +211,7 @@ pub(crate) unsafe fn database_define_time_attr(
     set: u8,
     variation: u8,
     value: u64,
-) -> Result<(), ffi::AttrDefError> {
+) -> ffi::AttrDefError {
     define_any_attr(instance, set, variation, || {
         OwnedAttrValue::Dnp3Time(Timestamp::new(value))
     })
@@ -222,7 +222,7 @@ pub(crate) unsafe fn database_define_bool_attr(
     set: u8,
     variation: u8,
     value: bool,
-) -> Result<(), ffi::AttrDefError> {
+) -> ffi::AttrDefError {
     define_any_attr(instance, set, variation, || {
         OwnedAttrValue::SignedInt(value.into())
     })
@@ -233,7 +233,7 @@ pub(crate) unsafe fn database_define_float_attr(
     set: u8,
     variation: u8,
     value: f32,
-) -> Result<(), ffi::AttrDefError> {
+) -> ffi::AttrDefError {
     define_any_attr(instance, set, variation, || {
         OwnedAttrValue::FloatingPoint(FloatType::F32(value))
     })
@@ -244,7 +244,7 @@ pub(crate) unsafe fn database_define_double_attr(
     set: u8,
     variation: u8,
     value: f64,
-) -> Result<(), ffi::AttrDefError> {
+) -> ffi::AttrDefError {
     define_any_attr(instance, set, variation, || {
         OwnedAttrValue::FloatingPoint(FloatType::F64(value))
     })
@@ -255,20 +255,22 @@ unsafe fn define_any_attr<F>(
     set: u8,
     variation: u8,
     value: F,
-) -> Result<(), ffi::AttrDefError>
+) -> ffi::AttrDefError
 where
     F: FnOnce() -> OwnedAttrValue,
 {
     let db = match instance.as_mut() {
-        None => return Ok(()),
+        None => return ffi::AttrDefError::Ok,
         Some(x) => x,
     };
 
     let attr = OwnedAttribute::new(AttrSet::new(set), variation, value());
 
-    db.define_attr(AttrProp::default(), attr)?;
+    if let Err(err) = db.define_attr(AttrProp::default(), attr) {
+        return err.into();
+    }
 
-    Ok(())
+    ffi::AttrDefError::Ok
 }
 
 impl From<AttrDefError> for ffi::AttrDefError {
