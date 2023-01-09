@@ -1,7 +1,4 @@
-use crate::app::attr::{
-    AttrDataType, AttrItem, AttrProp, AttrSet, AttrWriteError, OwnedAttrValue, OwnedAttribute,
-    StringAttr,
-};
+use crate::app::attr::{AttrDataType, AttrItem, AttrSet, AttrWriteError};
 use crate::app::format::write::HeaderWriter;
 use crate::app::{Iin2, QualifierCode, Variation};
 use crate::outstation::database::details::attrs::map::SetMap;
@@ -182,32 +179,17 @@ pub(crate) struct AttrHandler {
 
 impl AttrHandler {
     pub(crate) fn new(max_selected: usize) -> Self {
-        let mut map = SetMap::default();
-
-        // set 0
-        let _ = map.define(
-            AttrProp::default(),
-            StringAttr::UserAssignedLocation.with_value("Bend, OR"),
-        );
-        let _ = map.define(
-            AttrProp::default(),
-            StringAttr::UserAssignedSystemName.with_value("SYSTEMS!"),
-        );
-
-        for var in 0..=255 {
-            let _ = map.define(
-                AttrProp::default(),
-                OwnedAttribute::new(AttrSet::Private(1), var, OwnedAttrValue::SignedInt(42)),
-            );
-        }
-
         Self {
-            map,
+            map: SetMap::default(),
             selection: Selection {
                 max: max_selected,
                 selected: VecDeque::with_capacity(max_selected),
             },
         }
+    }
+
+    pub(crate) fn get_attr_map(&mut self) -> &mut SetMap {
+        &mut self.map
     }
 
     pub(crate) fn write(&mut self, cursor: &mut WriteCursor) -> bool {

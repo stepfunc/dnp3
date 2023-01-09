@@ -9,6 +9,7 @@ use crate::outstation::database::{
     ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateOptions,
 };
 
+use crate::outstation::database::details::attrs::map::SetMap;
 use scursor::WriteCursor;
 
 pub(crate) struct Database {
@@ -28,6 +29,10 @@ impl Database {
             event_buffer: EventBuffer::new(config),
             attrs: super::attrs::AttrHandler::new(32),
         }
+    }
+
+    pub(crate) fn get_attr_map(&mut self) -> &mut SetMap {
+        self.attrs.get_attr_map()
     }
 
     pub(crate) fn reset(&mut self) {

@@ -46,7 +46,8 @@ pub(crate) struct SetMap {
 
 /// Errors that can occur when manipulating attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum AttrError {
+#[non_exhaustive]
+pub enum AttrError {
     /// An attribute with this value has not been defined for this variation
     AttrNotDefined(u8),
     /// No set with this value has been defined

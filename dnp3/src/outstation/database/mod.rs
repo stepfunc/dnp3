@@ -9,6 +9,8 @@ use crate::app::Iin2;
 use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
 
+use crate::app::attr::{AttrProp, OwnedAttribute};
+use crate::outstation::database::details::attrs::map::AttrError;
 use scursor::WriteCursor;
 
 mod config;
@@ -288,6 +290,11 @@ impl Database {
                 config,
             ),
         }
+    }
+
+    /// Define an attribute that will be exposed to the master
+    pub fn define_attr(&mut self, prop: AttrProp, attr: OwnedAttribute) -> Result<(), AttrError> {
+        self.inner.get_attr_map().define(prop, attr)
     }
 }
 

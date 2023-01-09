@@ -6,6 +6,7 @@ use dnp3::link::*;
 use dnp3::outstation::database::*;
 use dnp3::outstation::*;
 
+use dnp3::app::attr::{AttrProp, StringAttr};
 use dnp3::tcp::*;
 use std::process::exit;
 use std::time::Duration;
@@ -314,6 +315,24 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
             );
             db.add(i, Some(EventClass::Class1), OctetStringConfig);
         }
+
+        // setup any desired device attributes
+        let _ = db.define_attr(
+            AttrProp::default(),
+            StringAttr::DeviceManufacturersName.with_value("Step Function I/O"),
+        );
+        let _ = db.define_attr(
+            AttrProp::writable(),
+            StringAttr::UserAssignedLocation.with_value("Bend, OR"),
+        );
+        let _ = db.define_attr(
+            AttrProp::writable(),
+            StringAttr::UserAssignedPrimaryOperatorName.with_value("Company1"),
+        );
+        let _ = db.define_attr(
+            AttrProp::writable(),
+            StringAttr::UserAssignedSecondaryOperatorName.with_value("Company2"),
+        );
     });
     // ANCHOR_END: database_init
 
